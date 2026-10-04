@@ -14,11 +14,13 @@ Generate exactly {{COUNT}} short, scaffolded writing tasks the learner should re
 - Be anchored in concrete source material: a short message to answer, a model sentence to transform, ordered cues to combine, or a partially completed note to finish.
 - Never ask the learner to "write sentences" or invent content from a blank page.
 - Supply ALL facts needed for the answer in the task itself. Never ask about the learner's own day, experiences, preferences, plans, or feelings. A message asking "What did you do yesterday?" is not sufficient source material. If a reply is needed, provide the speaker's exact actions, times, places, and other relevant facts.
+- Keep the actor and grammatical person consistent across task, sourceText, guidance, and ideas. State whose actions each supplied fact describes. A reply must explicitly name the fictional responder and recipient, tell the learner to write as that responder, and provide that responder's facts. The incoming message must address that same responder. Do not answer a question about one person's trip with another person's travel facts. First-person openings are appropriate only when the learner is explicitly writing as the fictional fact owner; otherwise preserve the named subject.
 - Prefer sentence transformations, error correction, combining supplied clauses, and completing a message from explicit facts. The learner's work is choosing and producing the language, without inventing a story. For example, supply "Mia / gestern / ins Kino gehen / einen Film sehen" and ask for two linked clauses in the Perfekt.
 - Across the tasks, include a transformation and a correction with the full original sentences provided. Any reply task must include a complete fact list. Optional ideas must never contain facts necessary to solve the task.
 - Be a realistic communicative task, preferably a reply, completion, correction, transformation, or guided note.
 - Be appropriate for {{LEVEL}} proficiency and draw on the objective and vocabulary above
 - Be answerable in 1–3 sentences at A1/A2, or a short paragraph at B1+
+- Choose the fact load and sentence requirement together so every required fact fits naturally at {{LEVEL}}. Reduce the supplied facts or adjust the allowed response length within the level's bounds rather than forcing an overloaded reply. Guidance and ideas must support the stated task without changing the actor, inventing events, or imposing incompatible constraints.
 - Follow the language policy for task instructions and guidance.
 - Vary in type so the learner practices different registers and structures
 - Include enough cues that the learner knows what to say before they start.

@@ -28,8 +28,8 @@ Rules:
 - Make tips specific to the grammar/vocabulary, not generic study advice.
 - Verify every complete example for idiomatic verb-object combinations and correct auxiliary/participle pairs. Use vocabulary only where it fits naturally; do not force every supplied word into an example.
 - Every examples[].target must be correct model language that the learner can reuse. Never put a knowingly incorrect or unnatural sentence there, even if its note identifies the mistake. Discuss a common mistake only in an explicitly labelled note or tip that also supplies the correct form.
-- Meanings must closely paraphrase the actual sentence. Do not add an unstated action, result, means of travel, or interpretation. Distinguish going on foot from travelling by vehicle.
-- Use plain, everyday wording at the learner's level for meanings. Reuse the example's core words or change their order when a different synonym would sound unnatural. Do not force lexical variety or replace ordinary actions with abstract noun phrases.
+- {{EXAMPLE_MEANING_POLICY}}
+- Use plain, everyday wording at the learner's level for meanings. Distinguish going on foot from travelling by vehicle. Do not force lexical variety or replace ordinary actions with abstract noun phrases.
 - State the scope of every grammar rule. A verb-position rule for a main clause must explicitly say that it applies to main clauses. Do not present a common pattern as a universal rule.
 - Meanings, notes and tips must use grammatical explanatory prose. When mentioning a word, infinitive phrase or other citation form, clearly quote that expression and make the surrounding sentence grammatical. A quoted example may be a fragment; explanatory prose must not treat an unquoted fragment as a grammatically integrated phrase.
 - Visuals must be pedagogical, not decorative: timelines, contrast maps, memory callouts, and helpful external links only when directly useful.
@@ -43,7 +43,7 @@ Return ONLY JSON with this shape. The visuals field is optional; omit it when no
 "about": "2-3 sentences teaching the core idea before practice",
 "focus": ["3-5 short focus points"],
 "examples": [
-{ "target": "<{{TARGET}} example>", "meaning": "<meaning or paraphrase that follows the language policy>", "note": "<short teaching note that follows the language policy>" }
+{ "target": "<{{TARGET}} example>", "meaning": "<meaning or usage note that follows the example meaning policy>", "note": "<short teaching note that follows the language policy>" }
 ],
 "tips": ["2-4 practical tricks or common mistakes to watch for"],
 "visuals": {

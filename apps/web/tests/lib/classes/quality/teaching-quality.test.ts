@@ -71,6 +71,140 @@ beforeEach(() => {
 });
 
 describe('intro teaching gate', () => {
+  it.each(['initial', 'structural repair', 'semantic replacement'])(
+    'reviews the exact immersion usage note after %s without requiring a different meaning',
+    async (path) => {
+      const usageIntro = {
+        purpose: 'Erzähle von gestern.',
+        about: 'Mit dem Perfekt erzählst du von Vergangenem.',
+        focus: ['Perfekt mit haben'],
+        examples: [
+          {
+            target: 'Sie hat das Museum besucht.',
+            meaning: 'Du erzählst hier von einem Besuch im Museum.',
+            note: 'Das Verb „besuchen“ bildet das Perfekt mit „haben“.',
+          },
+        ],
+        tips: ['Achte auf das Hilfsverb.'],
+      };
+      const drifted = {
+        ...usageIntro,
+        examples: [{ ...usageIntro.examples[0], meaning: 'Sie hat das Museum angesehen.' }],
+      };
+      const driftVerdict = {
+        items: [
+          {
+            index: 0,
+            acceptable: false,
+            issues: ['incorrect'],
+            feedback: ['examples[0].meaning changes a museum visit into looking at the museum.'],
+          },
+        ],
+      };
+      const responses =
+        path === 'initial'
+          ? [usageIntro, approved]
+          : path === 'structural repair'
+            ? ['invalid fixture JSON', usageIntro, approved]
+            : [drifted, driftVerdict, usageIntro, approved];
+      boundary.generate.mockReset();
+      for (const response of responses)
+        boundary.generate.mockResolvedValueOnce({
+          content: typeof response === 'string' ? response : JSON.stringify(response),
+          model: 'captured-model',
+        });
+
+      const result = await generateClassIntro(params);
+      expect(result.examples).toEqual(usageIntro.examples);
+      expect(result.visuals).toBeUndefined();
+      const generationRequests = boundary.generate.mock.calls.filter(([system]) =>
+        system.startsWith('You are a language teacher')
+      );
+      for (const [system, messages] of generationRequests) {
+        expect(system).toContain('target-language usage note');
+        expect(system).toContain('claims supported by that example');
+        expect(system).not.toContain('closely paraphrase');
+        expect(messages[0].content).not.toContain('distinct meanings');
+        if (system.includes('repairing or replacing')) {
+          expect(messages[0].content).toContain('target-language usage note');
+          expect(messages[0].content).toContain('Do not add an event, result, intention');
+        }
+      }
+      const reviewRequests = boundary.generate.mock.calls.filter(([system]) =>
+        system.startsWith('Independently review')
+      );
+      const [reviewSystem, messages] = reviewRequests.at(-1)!;
+      expect(reviewSystem).toContain('For immersion intro examples only');
+      expect(reviewSystem).toContain('claims supported by the actual example');
+      expect(reviewSystem).toContain('This does not change meaning fidelity for A1 translations');
+      expect(JSON.parse(messages[0].content).items[0].content.examples).toEqual(
+        usageIntro.examples
+      );
+    }
+  );
+
+  it('keeps rejecting an immersion usage note with an unsupported result after bounded replacement', async () => {
+    const unsupported = {
+      ...intro,
+      examples: [
+        {
+          target: 'Sie hat das Museum besucht.',
+          meaning: 'Sie hat dort alle Bilder gesehen.',
+          note: 'Das Verb „besuchen“ bildet das Perfekt mit „haben“.',
+        },
+      ],
+    };
+    const verdict = {
+      items: [
+        {
+          index: 0,
+          acceptable: false,
+          issues: ['unsupported'],
+          feedback: ['examples[0].meaning claims she saw every picture, absent from the example.'],
+        },
+      ],
+    };
+    boundary.generate.mockReset();
+    for (const response of [unsupported, verdict, unsupported, verdict]) {
+      boundary.generate.mockResolvedValueOnce({
+        content: JSON.stringify(response),
+        model: 'captured-model',
+      });
+    }
+    await expect(generateClassIntro(params)).rejects.toBeInstanceOf(TeachingQualityRejectionError);
+    expect(boundary.generate.mock.calls).toHaveLength(4);
+    for (const [system, messages] of boundary.generate.mock.calls.filter(([system]) =>
+      system.startsWith('Independently review')
+    )) {
+      expect(system).toContain('Reject added events, results, intentions or false grammar claims');
+      expect(JSON.parse(messages[0].content).items[0].content.examples).toEqual(
+        unsupported.examples
+      );
+    }
+  });
+
+  it('preserves accurate native-language meaning instructions for A1 initial and repaired intros', async () => {
+    boundary.generate.mockReset();
+    for (const response of [intro, rejected, intro, approved]) {
+      boundary.generate.mockResolvedValueOnce({
+        content: JSON.stringify(response),
+        model: 'captured-model',
+      });
+    }
+    const result = await generateClassIntro({ ...params, level: 'A1' });
+    expect(result.examples).toEqual(intro.examples);
+    for (const [system, messages] of boundary.generate.mock.calls.filter(([system]) =>
+      system.startsWith('You are a language teacher')
+    )) {
+      expect(system).toContain('preserve the exact meaning of the target sentence');
+      expect(system).toContain('Concise native-language support is allowed');
+      expect(system).not.toContain(
+        'write its meaning as a short, grammatical target-language usage note'
+      );
+      expect(messages[0].content).not.toContain('distinct meanings');
+    }
+  });
+
   it('keeps rejected A2 meanings and misleading visual claims out of published teaching', async () => {
     const candidate = {
       ...intro,

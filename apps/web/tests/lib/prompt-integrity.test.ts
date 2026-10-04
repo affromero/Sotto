@@ -112,6 +112,7 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
     'TARGET',
   ],
   'class/repair-class-intro.md': [
+    'EXAMPLE_MEANING_POLICY',
     'GRAMMAR_POINTS',
     'INTRO_SCHEMA',
     'LANGUAGE_POLICY',
@@ -309,6 +310,7 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
     'VOCAB',
   ].sort(),
   'class/generate-class-intro.md': [
+    'EXAMPLE_MEANING_POLICY',
     'GRAMMAR_POINTS',
     'LANGUAGE_POLICY',
     'LEVEL',

@@ -439,6 +439,95 @@ describe('composeWritingPrompts', () => {
 });
 
 describe('generateClassWriting', () => {
+  it('retains fictional reply ownership through replacement review and publication', async () => {
+    const promptLoader =
+      await vi.importActual<typeof import('@/lib/prompt-loader')>('@/lib/prompt-loader');
+    mockLoadAndRender.mockImplementation(promptLoader.loadAndRender);
+    const rejected = [
+      {
+        taskType: 'guided_reply',
+        task: 'Schreibe als Tom eine Antwort an Nora in zwei Sätzen im Perfekt.',
+        sourceText:
+          'Nora fragt Tom: „Wie war deine Reise?“ Fakten: Nora ist nach Berlin gefahren und hat ein Museum besucht.',
+        guidance: 'Erzähle von der Reise.',
+        ideas: ['Ich bin nach Berlin …'],
+      },
+      {
+        taskType: 'transformation',
+        task: 'Schreibe die beiden Sätze im Perfekt und verbinde sie mit „und“.',
+        sourceText: 'Mia geht ins Kino. Sie sieht einen Film.',
+        guidance: 'Behalte Mia als Subjekt.',
+        ideas: ['Mia ist …'],
+      },
+      {
+        taskType: 'correction',
+        task: 'Korrigiere das Hilfsverb im Satz.',
+        sourceText: 'Leon ist einen Kuchen gemacht.',
+        guidance: 'Verwende das passende Hilfsverb.',
+        ideas: ['Leon hat …'],
+      },
+    ];
+    const corrected = [
+      {
+        ...rejected[0],
+        sourceText:
+          'Nora fragt Tom: „Wie war deine Reise?“ Fakten für Toms Antwort: Tom ist nach Berlin gefahren und hat ein Museum besucht.',
+        guidance: 'Berichte als Tom von den beiden angegebenen Aktivitäten.',
+        ideas: ['Ich bin nach Berlin …', 'Dort habe ich …'],
+      },
+      ...rejected.slice(1),
+    ];
+    mockGenerateResponse
+      .mockResolvedValueOnce({ content: JSON.stringify(rejected), model: 'm' })
+      .mockResolvedValueOnce({ content: JSON.stringify(corrected), model: 'm' });
+    mockTeachingResponse.mockResolvedValueOnce({
+      content: JSON.stringify({
+        items: [
+          {
+            index: 0,
+            acceptable: false,
+            issues: ['incorrect', 'infeasible'],
+            feedback: ['The question addresses Tom, but the supplied trip facts belong to Nora.'],
+          },
+          { index: 1, acceptable: true, issues: [], feedback: [] },
+          { index: 2, acceptable: true, issues: [], feedback: [] },
+        ],
+      }),
+      model: 'm',
+    });
+
+    await generateClassWriting({ ...PARAMS, targetLang: 'de', classId: 'class-1' });
+
+    const generationInstructions = mockGenerateResponse.mock.calls[0][0];
+    expect(generationInstructions).toContain('fictional responder and recipient');
+    expect(generationInstructions).toContain('same responder');
+    expect(generationInstructions).toContain('fact load and sentence requirement together');
+    const reviewInstructions = mockTeachingResponse.mock.calls[0][0];
+    expect(reviewInstructions).toContain('whose actions the facts describe');
+    expect(reviewInstructions).toContain('task explicitly assigns that role');
+    expect(reviewInstructions).toContain('changing present-tense input to a past tense');
+    const replacementRequest = mockGenerateResponse.mock.calls[1][1][0].content;
+    expect(replacementRequest).toContain("supply that responder's facts");
+    expect(replacementRequest).toContain('stated response length at A2');
+    expect(replacementRequest).toContain('supplied trip facts belong to Nora');
+    const reviewedReply = JSON.parse(mockTeachingResponse.mock.calls[1][1][0].content).items[0];
+    expect(reviewedReply.content).toEqual({
+      taskType: 'guided_reply',
+      task: `${corrected[0].task}\n\n${corrected[0].sourceText}`,
+      guidance: corrected[0].guidance,
+      ideas: corrected[0].ideas,
+    });
+    const published = mockWritingPromptCreateMany.mock.calls[0][0].data;
+    expect(published[0]).toMatchObject({
+      task: reviewedReply.content.task,
+      guidance: corrected[0].guidance,
+      ideas: corrected[0].ideas,
+    });
+    expect(published[0].task).not.toContain('Fakten: Nora');
+    expect(published[1].task).toContain('Mia geht ins Kino. Sie sieht einen Film.');
+    expect(published[2].task).toContain('Leon ist einen Kuchen gemacht.');
+  });
+
   it('creates a WRITING ClassSection + WritingPrompt rows', async () => {
     const res = await generateClassWriting({ ...PARAMS, classId: 'class-1' });
     expect(res).toEqual({ sectionId: 'section-w' });
