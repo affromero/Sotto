@@ -11,6 +11,7 @@ import {
   reviewTeachingContent,
   TeachingQualityRejectionError,
 } from './classes/quality/teaching-quality';
+import { combineTeachingFailures, type TeachingFailure } from './classes/quality/teaching-failure';
 import { classLanguagePolicy } from './classes/class-language-policy';
 import {
   assessSectionReview,
@@ -407,10 +408,13 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
     }),
   });
   let teachingRejection: TeachingQualityRejectionError | undefined;
+  let terminalTeachingRejection: TeachingQualityRejectionError | undefined;
+  let teachingFailure: TeachingFailure | undefined;
   let sectionFeedback: SectionReviewFeedback | undefined;
   let vocabularyFeedback: VocabularyCoverageFeedback | undefined;
   const review = async (questions: GeneratedQuestion[]): Promise<string[]> => {
     teachingRejection = undefined;
+    terminalTeachingRejection = undefined;
     sectionFeedback = undefined;
     vocabularyFeedback = undefined;
     const coverage: ReturnType<typeof assessVocabularyCoverage> = p.vocabularyReview
@@ -454,6 +458,8 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
       } catch (error) {
         if (error instanceof TeachingQualityRejectionError) {
           teachingRejection = error;
+          terminalTeachingRejection = error;
+          teachingFailure = combineTeachingFailures(teachingFailure, error.teachingFailure);
           return ['teaching_quality'];
         }
         throw error;
@@ -502,6 +508,7 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
       userId: p.userId,
     });
 
+    terminalTeachingRejection = undefined;
     let candidate: GeneratedQuestion[] | undefined;
     try {
       const parsed = parseGeneratedQuestions(response.content);
@@ -582,6 +589,7 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
       userId: p.userId,
     });
 
+    terminalTeachingRejection = undefined;
     let candidate: GeneratedQuestion[] | undefined;
     try {
       const parsed = parseGeneratedQuestions(repairResponse.content);
@@ -612,7 +620,16 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
     error: lastError,
     outputSnippet: lastMalformedContent ? loggedOutputSnippet(lastMalformedContent) : undefined,
   });
-  if (qualityFailed) throw new SectionQualityError();
+  if (qualityFailed) {
+    if (terminalTeachingRejection) {
+      throw new TeachingQualityRejectionError(
+        terminalTeachingRejection.issues,
+        terminalTeachingRejection.feedback,
+        teachingFailure
+      );
+    }
+    throw new SectionQualityError();
+  }
   throw new Error(
     lastError.includes('no usable questions')
       ? 'Class generation produced no usable questions.'

@@ -547,6 +547,18 @@ This is a LANGUAGE LEARNING audio lesson. Generate the learner-facing script in 
   const instruction =
     modeInstructions[mode ?? 'conversational_mix'] ?? modeInstructions.conversational_mix;
 
+  const teachingCorrectness = opts?.forLearning
+    ? `\n\n## Grammar explanations
+
+- Distinguish infinitives or base forms, participles, and finite verb forms. Use the correct grammatical term for the form in the actual example.
+- Qualify word-order rules by clause type: declarative main clause, subordinate clause, or question. Distinguish finite verb position from participle position.
+- Check that every explanation and rule matches its example. For A1/A2, prefer correct concrete examples and omit a broad rule if you cannot state its scope accurately at that level.${
+        lang === 'de'
+          ? '\n- German Perfekt uses a finite auxiliary and a past participle (Partizip II). In "hat gemacht", "hat" is the finite auxiliary and "gemacht" is the past participle. Do not call the participle the infinitive or Grundform.'
+          : ''
+      }`
+    : '';
+
   const vocabularyInstruction = `## Vocabulary Output — REQUIRED when language learning mode is active
 
 In addition to references, you MUST include a "vocabulary" array in your JSON output:
@@ -574,7 +586,7 @@ ${opts.mustIncludeVocabulary.map((v) => `- ${v.word} — ${v.translation}`).join
     : '';
 
   return {
-    languageInstruction: instruction,
+    languageInstruction: instruction + teachingCorrectness,
     vocabularyInstruction: vocabularyInstruction + requiredItems,
   };
 }

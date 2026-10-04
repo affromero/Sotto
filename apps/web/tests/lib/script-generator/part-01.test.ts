@@ -31,6 +31,94 @@ describe('generateScript', () => {
   });
 
   describe('prompt construction', () => {
+    it.each(['vocabulary_intro', 'conversational_mix', 'full_immersion'])(
+      'teaches accurate verb forms and scoped word order in %s listening lessons',
+      async (languageMode) => {
+        let providerInstruction = '';
+        mockGenerateResponse.mockImplementation(async (system: string) => {
+          providerInstruction = system;
+          return {
+            content: JSON.stringify({
+              turns: [{ speaker: 'HOST', text: 'Nora hat Tee gemacht.' }],
+              soundCues: [],
+              references: [],
+            }),
+            inputTokens: 1,
+            outputTokens: 1,
+          };
+        });
+
+        const result = await generateScript({
+          topic: 'Talking about yesterday',
+          depth: 'standard',
+          audienceLevel: 'A2',
+          focusAreas: [],
+          tone: 'casual',
+          durationTarget: 4,
+          targetLanguage: 'de',
+          languageMode,
+          forLearning: true,
+        });
+
+        expect(result.turns[0].text).toBe('Nora hat Tee gemacht.');
+        expect(providerInstruction).toMatch(
+          /Distinguish infinitives or base forms, participles, and finite verb forms/
+        );
+        expect(providerInstruction).toMatch(
+          /German Perfekt uses a finite auxiliary and a past participle \(Partizip II\)/
+        );
+        expect(providerInstruction).toMatch(
+          /"hat" is the finite auxiliary and "gemacht" is the past participle/
+        );
+        expect(providerInstruction).toMatch(
+          /Do not call the participle the infinitive or Grundform/
+        );
+        expect(providerInstruction).toMatch(
+          /clause type: declarative main clause, subordinate clause, or question/
+        );
+        expect(providerInstruction).toMatch(/every explanation and rule matches its example/);
+        expect(providerInstruction).toMatch(
+          /For A1\/A2, prefer correct concrete examples and omit a broad rule/
+        );
+      }
+    );
+
+    it.each([
+      { targetLanguage: 'en', forLearning: true, expectsGuidance: true },
+      { targetLanguage: 'de', forLearning: false, expectsGuidance: false },
+    ])(
+      'scopes grammatical guidance to learning in $targetLanguage',
+      async ({ targetLanguage, forLearning, expectsGuidance }) => {
+        let providerInstruction = '';
+        mockGenerateResponse.mockImplementation(async (system: string) => {
+          providerInstruction = system;
+          return {
+            content: JSON.stringify({
+              turns: [{ speaker: 'HOST', text: 'Yesterday was busy.' }],
+              soundCues: [],
+              references: [],
+            }),
+            inputTokens: 1,
+            outputTokens: 1,
+          };
+        });
+
+        await generateScript({
+          topic: 'Yesterday',
+          depth: 'standard',
+          audienceLevel: 'A2',
+          focusAreas: [],
+          tone: 'casual',
+          durationTarget: 4,
+          targetLanguage,
+          forLearning,
+        });
+
+        expect(providerInstruction.includes('## Grammar explanations')).toBe(expectsGuidance);
+        expect(providerInstruction).not.toContain('German Perfekt uses a finite auxiliary');
+      }
+    );
+
     it('preserves the captured transport, endpoint and cancellation for listening generation', async () => {
       const controller = new AbortController();
       const dispatched: string[] = [];

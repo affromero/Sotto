@@ -6,6 +6,7 @@ import { loadAndRender } from '../prompt-loader';
 import { formatNotesForPrompt } from '../course-notes';
 import { logUsage } from '../usage-logger';
 import { reviewTeachingContent, TeachingQualityRejectionError } from './quality/teaching-quality';
+import { combineTeachingFailures } from './quality/teaching-failure';
 import { classLanguagePolicy, isImmersionLevel } from './class-language-policy';
 import { SectionQualityError } from './section-quality';
 import { logger } from '../logger';
@@ -524,16 +525,25 @@ export async function generateClassIntro(p: ClassIntroParams): Promise<ClassIntr
   } catch (error) {
     if (!(error instanceof TeachingQualityRejectionError) || repaired) throw error;
     intro = await repairIntro(JSON.stringify(intro), intro, error);
-    await reviewTeachingContent({
-      ai,
-      provider,
-      userId: p.userId,
-      level: p.level,
-      nativeLang: p.nativeLang,
-      targetLang: p.targetLang,
-      kind: 'intro',
-      items: [intro],
-    });
+    try {
+      await reviewTeachingContent({
+        ai,
+        provider,
+        userId: p.userId,
+        level: p.level,
+        nativeLang: p.nativeLang,
+        targetLang: p.targetLang,
+        kind: 'intro',
+        items: [intro],
+      });
+    } catch (replacementError) {
+      if (!(replacementError instanceof TeachingQualityRejectionError)) throw replacementError;
+      throw new TeachingQualityRejectionError(
+        replacementError.issues,
+        replacementError.feedback,
+        combineTeachingFailures(error.teachingFailure, replacementError.teachingFailure)
+      );
+    }
   }
   return intro;
 }

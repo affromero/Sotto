@@ -10,7 +10,7 @@
  *
  * Lives outside practice-service.ts, which is already at its length ceiling.
  */
-import { prisma } from '../prisma';
+import { prisma, prismaUnfiltered } from '../prisma';
 import { readSkillRequirements } from '../learning/skill-requirements';
 import { z } from 'zod';
 import {
@@ -20,6 +20,11 @@ import {
 } from '@sotto/shared';
 import { practicePreparationSchema } from './preparation-state';
 import { practicePreparationProgress, reconcilePracticePreparation } from './preparation';
+import {
+  readLearningFailure,
+  learningFailureReason,
+} from '../classes/quality/teaching-failure-store';
+import { sottoTransaction } from '../sidedoor/access/state/transaction';
 import {
   PracticeSessionNotFoundError,
   type PracticeMcItemPublic,
@@ -72,8 +77,23 @@ export async function resumePractice(
       operation.status !== 'COMPLETED' &&
       session.status !== 'ACTIVE' &&
       session.status !== 'COMPLETED'
-    )
-      return practicePreparationProgress(operation);
+    ) {
+      const progress = practicePreparationProgress(operation);
+      if (operation.status !== 'FAILED' || operation.failure !== 'generation_failed')
+        return progress;
+      const failure = await sottoTransaction(prismaUnfiltered, async (database) => {
+        const owned = await database.practiceSession.findFirst({
+          where: { id: sessionId, course: { userId } },
+          select: { id: true, generationState: true },
+        });
+        if (!owned) throw new PracticeSessionNotFoundError('Practice session not found');
+        const current = practicePreparationSchema.parse(owned.generationState);
+        if (current.id !== operation.id || current.userId !== userId)
+          throw new PracticeSessionNotFoundError('Practice preparation changed');
+        return readLearningFailure(database, current);
+      });
+      return failure ? { ...progress, message: learningFailureReason(failure) } : progress;
+    }
   }
   if (session.status !== 'ACTIVE' && !session.submissionResult) {
     throw new PracticeSessionNotFoundError('Practice session is already complete');

@@ -25,6 +25,35 @@ describe('StartNextClass', () => {
     global.fetch = vi.fn();
   });
 
+  it('shows the saved failure reason without exposing private review content', async () => {
+    const reason =
+      'The generated lesson did not pass teaching review. You can start a new attempt.';
+    vi.mocked(global.fetch).mockImplementation(async (url) =>
+      String(url).includes('/preparation?')
+        ? jsonResponse({
+            aiProvider: 'codex',
+            aiModel: 'selected-model',
+            availableAt: '2026-10-04T10:00:00Z',
+            timeZone: 'UTC',
+            maxProviderRequests: null,
+            providerRequestsAdmitted: null,
+            failureReason: reason,
+            events: [],
+          })
+        : jsonResponse({
+            status: 'FAILED',
+            operationId: 'failed-operation',
+            detail: 'Preparation failed.',
+            progress: 0,
+          })
+    );
+    render(<StartNextClass courseId="course-1" activeClassId={null} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Check preparation' }));
+    expect(await screen.findByText('Preparation activity')).toBeInTheDocument();
+    expect(await screen.findByText(reason)).toBeInTheDocument();
+    expect(screen.queryByText(/private candidate/i)).not.toBeInTheDocument();
+  });
+
   it('schedules one bounded preparation with audio deferred', async () => {
     let submitted: Record<string, unknown> | undefined;
     vi.mocked(global.fetch).mockImplementation(async (url, init) => {

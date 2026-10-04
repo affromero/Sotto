@@ -6,35 +6,11 @@ import { logUsage } from '../../usage-logger';
 import { SectionQualityError } from '../section-quality';
 import { logger } from '../../logger';
 import { classLanguagePolicy } from '../class-language-policy';
-
-const verdictSchema = z
-  .object({
-    items: z
-      .array(
-        z
-          .object({
-            index: z.number().int().min(0).max(4),
-            acceptable: z.boolean(),
-            issues: z
-              .array(
-                z.enum([
-                  'incorrect',
-                  'unnatural',
-                  'unsupported',
-                  'infeasible',
-                  'level',
-                  'uncertain',
-                ])
-              )
-              .max(6),
-            feedback: z.array(z.string().trim().min(1).max(300)).max(6),
-          })
-          .strict()
-      )
-      .min(1)
-      .max(5),
-  })
-  .strict();
+import {
+  captureTeachingFailure,
+  teachingQualityVerdictSchema as verdictSchema,
+  type TeachingFailure,
+} from './teaching-failure';
 
 export const TEACHING_QUALITY_JSON_SCHEMA = {
   name: 'class_teaching_quality',
@@ -43,12 +19,22 @@ export const TEACHING_QUALITY_JSON_SCHEMA = {
 
 /** A complete, protocol-valid review that rejects the learner-visible content. */
 export class TeachingQualityRejectionError extends SectionQualityError {
+  readonly issues: readonly string[];
+  declare readonly feedback: ReadonlyArray<{ index: number; feedback: readonly string[] }>;
+  declare readonly teachingFailure?: TeachingFailure;
+
   constructor(
-    readonly issues: readonly string[] = [],
-    readonly feedback: ReadonlyArray<{ index: number; feedback: readonly string[] }> = []
+    issues: readonly string[] = [],
+    feedback: ReadonlyArray<{ index: number; feedback: readonly string[] }> = [],
+    teachingFailure?: TeachingFailure
   ) {
     super();
     this.name = 'TeachingQualityRejectionError';
+    this.issues = issues;
+    Object.defineProperties(this, {
+      feedback: { value: feedback, enumerable: false },
+      teachingFailure: { value: teachingFailure, enumerable: false },
+    });
   }
 }
 
@@ -145,7 +131,8 @@ export async function reviewTeachingContent(options: {
       issues,
       parsed.items
         .filter((item) => !item.acceptable || item.issues.length > 0)
-        .map(({ index, feedback }) => ({ index, feedback }))
+        .map(({ index, feedback }) => ({ index, feedback })),
+      captureTeachingFailure(options.kind, options.items, parsed)
     );
   }
 }

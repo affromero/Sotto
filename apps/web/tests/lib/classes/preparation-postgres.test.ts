@@ -35,6 +35,7 @@ import {
   settleCancelledPreparation,
 } from '@/lib/classes/preparation';
 import { classPreparationGrant } from '@/lib/classes/preparation-grant';
+import { registerPreparationFailureTests } from './quality/preparation-failure-cases';
 import { preparationProviderRequest } from '@/lib/classes/preparation-provider';
 import { capturedLearningAiOptions, resolveCapturedLearningAi } from '@/lib/learning-ai';
 import { createAIProvider } from '@/lib/providers/ai';
@@ -135,6 +136,8 @@ suite('durable preparation admission and provider accounting', () => {
     );
     return { ...operation, status: 'RUNNING' as const };
   }
+
+  registerPreparationFailureTests(() => ({ instance, courseId, execution, running, lesson }));
 
   async function queuedJob(operationId: string) {
     const record = await sottoTransaction(instance.database, (database) =>

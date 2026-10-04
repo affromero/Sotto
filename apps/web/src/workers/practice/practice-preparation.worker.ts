@@ -20,6 +20,11 @@ import {
   reconcilePracticePreparation,
 } from '@/lib/practice/preparation';
 import { assertStoredPracticeMaterial } from '@/lib/practice/material';
+import { writeLearningFailure } from '@/lib/classes/quality/teaching-failure-store';
+import {
+  captureGenerationFailure,
+  generationCleanupUnconfirmed,
+} from '@/lib/classes/quality/generation-failure';
 
 /** A delivery can replay publication, but never interrupted paid generation. */
 export async function processPracticePreparation(job: Job<unknown>, workerSignal?: AbortSignal) {
@@ -51,13 +56,18 @@ export async function processPracticePreparation(job: Job<unknown>, workerSignal
     ? AbortSignal.any([workerSignal, controller.signal])
     : controller.signal;
   let unknownOutcome = false;
+  let generationFailure:
+    import('@/lib/classes/quality/generation-failure').GenerationFailure | undefined;
   try {
     await withSottoJobExecution({
       database: prisma,
       parentId: operationId,
       fingerprint: work.fingerprint,
       signal,
-      isCleanupFailure: (error) => unknownOutcome || isDurableQueueCleanupFailure(error),
+      isCleanupFailure: (error) =>
+        unknownOutcome ||
+        isDurableQueueCleanupFailure(error) ||
+        generationCleanupUnconfirmed(error),
       validate: async (database) => {
         const current = await readSottoWorkerJob(database, job, {
           handler: PRACTICE_PREPARATION_QUEUE,
@@ -122,7 +132,10 @@ export async function processPracticePreparation(job: Job<unknown>, workerSignal
               signal,
               learningSelection: operation.selection,
               isolatedWorkspace: { directory, markCleanupUnconfirmed },
-              onCleanupError: markCleanupUnconfirmed,
+              onCleanupError: () => {
+                unknownOutcome = true;
+                markCleanupUnconfirmed();
+              },
               registerAudioEpisode: (database, episodeId, generationKey) =>
                 registerPreparationAudio(database, operation, episodeId, generationKey, 'practice'),
               providerRequest: learningPreparationProviderRequest(
@@ -166,6 +179,9 @@ export async function processPracticePreparation(job: Job<unknown>, workerSignal
             {
               generation,
               lifecycle: {
+                onGenerationFailure: (failure) => {
+                  generationFailure = failure;
+                },
                 populate: (data) =>
                   sottoTransaction(
                     prisma,
@@ -222,7 +238,10 @@ export async function processPracticePreparation(job: Job<unknown>, workerSignal
           );
         } catch (error) {
           const uncertain = Boolean(
-            unknownOutcome || isDurableQueueCleanupFailure(error) || workerSignal?.aborted
+            unknownOutcome ||
+            isDurableQueueCleanupFailure(error) ||
+            generationCleanupUnconfirmed(error) ||
+            workerSignal?.aborted
           );
           if (uncertain) markCleanupUnconfirmed();
           await sottoTransaction(prisma, async (database) => {
@@ -253,6 +272,16 @@ export async function processPracticePreparation(job: Job<unknown>, workerSignal
               },
               { status: status === 'CANCELLED' ? 'CANCELLED' : 'FAILED' }
             );
+            if (
+              !cancelling &&
+              (status === 'FAILED' || (status === 'UNRESOLVED' && generationFailure))
+            )
+              await writeLearningFailure(
+                database,
+                { ...current.operation, status },
+                work.fingerprint,
+                generationFailure ?? captureGenerationFailure(error)
+              );
             if (!uncertain) await sottoJobOutbox(database).complete(operationId, work.fingerprint);
           });
           if (uncertain) throw error;

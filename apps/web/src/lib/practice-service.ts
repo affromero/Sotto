@@ -3,7 +3,13 @@ import { learningScriptHash } from './learning/script-hash';
 import { Prisma } from '@/generated/prisma/client';
 import { prisma } from './prisma';
 import { getDueItems, upsertLiveVocab } from './knowledge-graph';
-import type { PracticeMcItem, PracticeMcItemPublic } from './practice/types';
+import type {
+  PracticeMcItem,
+  PracticeMcItemPublic,
+  PracticeBuildLifecycle,
+  PracticeSpeakingItem,
+  PracticeWritingItem,
+} from './practice/types';
 export type { PracticeMcItemPublic } from './practice/types';
 import { generateSectionQuestions } from './class-generation';
 import { composeListeningContent, queueListeningAudio } from './class-listening-generator';
@@ -15,6 +21,7 @@ import { composeWritingPrompts } from './class-writing-generator';
 import { getCourseNote } from './course-notes';
 import { buildLearnerContext } from './pedagogy';
 import { getPracticeFocusTargets, type FocusPracticeTarget } from './learning-targets';
+import { recordFullPracticeFailures } from './learning/practice-generation-failures';
 import { logger } from './logger';
 import { PracticeIncompleteError } from './practice/types';
 import { resolveSkillRequirements } from './learning/skill-requirements';
@@ -34,25 +41,6 @@ const FULL_DUE_COUNT = 12;
 const MIN_VOCAB = 2;
 
 export class PracticeCourseNotFoundError extends Error {}
-
-// Stored item shape (full — includes the answer). The public projection drops it.
-
-interface PracticeSpeakingItem {
-  id: string;
-  targetPhrase: string;
-  translation: string;
-  referenceTtsUrl: string | null;
-  latestRecording?: import('@sotto/shared').SpeakingEvidence | null;
-}
-
-interface PracticeWritingItem {
-  id: string;
-  task: string;
-  guidance: string | null;
-  ideas: string[];
-  response?: import('@sotto/shared').WritingFeedback | null;
-  savedDraft?: string;
-}
 
 type StartPracticeContent =
   | import('@sotto/shared').PracticePreparing
@@ -88,10 +76,6 @@ export interface StartPracticeOptions {
   focusTargetId?: string | null;
   generation?: PracticeGenerationContext;
   lifecycle?: PracticeBuildLifecycle;
-}
-
-interface PracticeBuildLifecycle {
-  populate: (data: Prisma.PracticeSessionUncheckedCreateInput) => Promise<{ id: string }>;
 }
 
 export interface PracticeGenerationContext {
@@ -639,6 +623,8 @@ async function startFull(
     }),
   ]);
   // Keep the parent execution alive until every admitted provider request settles.
+  const failure = recordFullPracticeFailures(generated, execution.onCleanupError);
+  if (failure) lifecycle?.onGenerationFailure?.(failure);
   if (generated[0].status === 'rejected') throw generated[0].reason;
   if (generated[1].status === 'rejected') throw generated[1].reason;
   if (generated[2].status === 'rejected') throw generated[2].reason;

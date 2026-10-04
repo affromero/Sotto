@@ -27,12 +27,15 @@ Rules:
 - Make tips specific to the grammar/vocabulary, not generic study advice.
 - Verify every complete example for idiomatic verb-object combinations and correct auxiliary/participle pairs. Use vocabulary only where it fits naturally; do not force every supplied word into an example.
 - Meanings must closely paraphrase the actual sentence. Do not add an unstated action, result, means of travel, or interpretation. Distinguish going on foot from travelling by vehicle.
+- Use plain, everyday wording at the learner's level for meanings. Reuse the example's core words or change their order when a different synonym would sound unnatural. Do not force lexical variety or replace ordinary actions with abstract noun phrases.
 - State the scope of every grammar rule. A verb-position rule for a main clause must explicitly say that it applies to main clauses. Do not present a common pattern as a universal rule.
 - Meanings, notes and tips must use grammatical explanatory prose. When mentioning a word, infinitive phrase or other citation form, clearly quote that expression and make the surrounding sentence grammatical. A quoted example may be a fragment; explanatory prose must not treat an unquoted fragment as a grammatically integrated phrase.
 - Visuals must be pedagogical, not decorative: timelines, contrast maps, memory callouts, and helpful external links only when directly useful.
+- Every visual claim must be as accurate and precise as the prose, including the scope and exact position of a grammar rule. Preserve a verb's required complements when shortening examples. If showing only verb forms or a sentence pattern, explicitly label it as study notation and mark missing slots rather than presenting it as a complete sentence.
+- Omit visuals when they add no useful teaching aid. A timeline or contrast may be null, and callouts or links may be empty. Do not invent content just to fill the visual fields below.
 - Use links sparingly. Only include stable, relevant URLs that help the learner inspect a real reference or official explanation.
 
-Return ONLY JSON with this exact shape:
+Return ONLY JSON with this shape. The visuals field is optional; omit it when no useful aid is needed:
 {
 "purpose": "1 sentence explaining why this class matters",
 "about": "2-3 sentences teaching the core idea before practice",

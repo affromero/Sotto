@@ -15,6 +15,7 @@ import {
   reviewTeachingContent,
   TeachingQualityRejectionError,
 } from './classes/quality/teaching-quality';
+import { combineTeachingFailures } from './classes/quality/teaching-failure';
 
 const WRITING_PROMPT_COUNT = 3;
 
@@ -165,7 +166,16 @@ export async function composeWritingPrompts(
       'class-writing-prompts-repair',
       0
     );
-    await review(generated.reviewItems);
+    try {
+      await review(generated.reviewItems);
+    } catch (replacementError) {
+      if (!(replacementError instanceof TeachingQualityRejectionError)) throw replacementError;
+      throw new TeachingQualityRejectionError(
+        replacementError.issues,
+        replacementError.feedback,
+        combineTeachingFailures(error.teachingFailure, replacementError.teachingFailure)
+      );
+    }
   }
   return generated.prompts;
 }
