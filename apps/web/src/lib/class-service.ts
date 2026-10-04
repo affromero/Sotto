@@ -182,7 +182,7 @@ async function buildSection(
     const stored = await prisma.lessonQuestion.findMany({
       where: { sectionId: section.id },
       orderBy: { order: 'asc' },
-      select: { id: true, question: true, options: true, passageText: true },
+      select: { id: true, question: true, options: true, correctIndex: true, passageText: true },
     });
     const readingVocabulary = await extractReadingVocabulary({
       userId,

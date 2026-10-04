@@ -1,6 +1,10 @@
 // @vitest-environment node
 import { createSkillRequirements } from '@sotto/shared';
-import { classRepairSkills, selectClassRepairSkills } from '@/lib/learning/classes/class-repair';
+import {
+  classRepairSkills,
+  selectClassRepairSkills,
+  repairClassReadingMemory,
+} from '@/lib/learning/classes/class-repair';
 import { setSiteConfig } from '@/lib/site-config';
 import { randomUUID, createHash } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -395,6 +399,65 @@ suite('complete class material and retained repair', () => {
     expect(
       await instance.database.learnerVocab.findFirst({ where: { courseId, lemma: 'Hallo' } })
     ).toMatchObject({ translation: 'hello', reps: 0 });
+  });
+
+  it('rejects invalid preserved reading keys before extraction or memory publication', async () => {
+    const { cls, requirements } = await repairTarget();
+    const section = await instance.database.classSection.create({
+      data: {
+        classId: cls.id,
+        skill: 'READING',
+        seed: 'preserved',
+        spec: {},
+        status: 'READY',
+        questions: {
+          create: {
+            order: 1,
+            skill: 'READING',
+            question: 'What does Mia say?',
+            options: ['Hallo', 'Tschüss', 'Morgen', 'Gestern'],
+            correctIndex: 4,
+            explanation: 'Mia says Hallo.',
+            passageText: 'Mia sagt Hallo.',
+          },
+        },
+      },
+      include: { questions: true },
+    });
+    const material = await instance.database.courseClass.findUniqueOrThrow({
+      where: { id: cls.id },
+      include: {
+        course: true,
+        lesson: true,
+        sections: {
+          include: {
+            questions: true,
+            prompts: true,
+            writingPrompts: true,
+            episode: { include: { script: true } },
+          },
+        },
+      },
+    });
+    const fetch = vi.fn(() => {
+      throw new Error('Invalid keys must not reach a provider.');
+    });
+    vi.stubGlobal('fetch', fetch);
+    await expect(
+      repairClassReadingMemory(material, requirements, execution, cls.attempt)
+    ).rejects.toThrow('private question keys');
+    expect(fetch).not.toHaveBeenCalled();
+    expect(await instance.database.learnerVocab.count({ where: { courseId } })).toBe(0);
+    expect(
+      await instance.database.lessonQuestion.findMany({
+        where: { sectionId: section.id },
+        orderBy: { order: 'asc' },
+      })
+    ).toEqual(section.questions);
+    expect(
+      (await instance.database.courseClass.findUniqueOrThrow({ where: { id: cls.id } }))
+        .readingVocabulary
+    ).toBeNull();
   });
 
   it('settles a cancelled queued repair without deleting learner history or the active gate', async () => {

@@ -83,6 +83,34 @@ stage summaries. `classes/quality/teaching-failure-store.ts` stores those summar
 in sealed snapshots owned by the existing preparation job and cleanup policy.
 Learner responses receive static failure reasons after ownership and erasure checks.
 
+Listening permits one semantic replacement of the complete generated script and
+its quiz, through `generateScript` with bounded untrusted correction context.
+Only a complete, schema-valid blind verdict can trigger it. Malformed verdicts,
+provider errors, cancellation, and teaching-review rejection never trigger replay.
+The replacement preserves the original objective, course, vocabulary requirements,
+provider, model, and execution authority. Both blind and teaching checks must pass
+before script, vocabulary, or learner graph publication. Canonical reference
+verification still gates readiness, and audio waits for the learning association.
+The maximum is seven application AI requests: two scripts, two quizzes, two blind
+reviews, and one teaching review. Reference verification, provider transport or
+search subrequests, and later TTS/audio are separate. Parent request budgets remain
+unchanged. Private blind diagnostics use the existing sealed failure envelope with
+explicit `blind_section` and `derived_compatibility_summary` tags. The exact blind
+verdict remains inside the bounded candidate JSON; its outer verdict is a derived
+summary. Oversized transcript/questions are explicitly omitted without losing the
+exact verdict. Neither raw material nor this diagnostic crosses learner APIs.
+
+Reading vocabulary allows one bounded extraction replacement. Twelve words in
+batches of five require at most two extraction requests and six teaching reviews.
+These are additional bounded requests within the unchanged parent budget. The
+replacement preserves the passage, questions, options, keys, and each source-form
+ordinal/count, while permitting reviewed lemma, gloss, part-of-speech, and
+association corrections. Every replacement batch must pass. A background word
+may have empty `questionIndices`; that word then adds no SRS evidence. The
+extracted word list itself must remain nonempty. Failure
+evidence preserves batch-local candidates/verdicts; offsets apply to correction
+feedback only.
+
 `classes/section-quality.ts` validates independent review verdicts for grammar,
 reading, and contextual vocabulary. `class-generation.ts` rejects malformed
 question structure before review, then uses the same captured provider and

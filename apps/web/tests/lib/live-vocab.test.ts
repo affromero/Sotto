@@ -39,6 +39,7 @@ import {
   extractAndStoreLiveVocab,
   extractAndStoreNoteLearningTargets,
   extractAndStoreNoteVocab,
+  requestVocabularyExtraction,
 } from '@/lib/live-vocab';
 import { blockedProviderExecution } from '../helpers/runtime/provider-execution';
 
@@ -66,6 +67,77 @@ const PARAMS = {
   level: 'A2',
   transcript: 'Ich möchte einen Kaffee bestellen.',
 };
+
+describe('keyed reading extraction requests', () => {
+  const question = {
+    question: 'What does Ana order?',
+    options: ['Coffee', 'Tea', 'Milk', 'Water'],
+    correctIndex: 0,
+  };
+  const reading = {
+    ...PARAMS,
+    text: 'Ana bestellt Kaffee.',
+    label: 'COURSE_NOTES' as const,
+    usageCategory: 'reading-vocabulary-extraction',
+    readingQuestions: [question],
+  };
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    mockResolveLearningAi.mockResolvedValue({
+      provider: 'anthropic',
+      model: 'captured',
+      apiKey: 'key',
+    });
+    const { loadAndRender } =
+      await vi.importActual<typeof import('@/lib/prompt-loader')>('@/lib/prompt-loader');
+    mockLoadAndRender.mockImplementation(loadAndRender);
+    mockGenerateResponse.mockResolvedValue({ content: SAMPLE, model: 'captured' });
+  });
+  it('sends private answer keys and bounded correction data using the captured selection', async () => {
+    const correction = {
+      words: [{ lemma: 'bestellen', sourceForm: 'bestellt' }],
+      issues: ['unsupported'],
+      feedback: [{ index: 0, feedback: ['Use background attribution.'] }],
+    };
+    await expect(
+      requestVocabularyExtraction({ ...reading, readingCorrection: correction })
+    ).resolves.toBe(SAMPLE);
+    const [system, messages, options] = mockGenerateResponse.mock.calls[0]!;
+    expect(system).toContain('same number of words, in the same order');
+    expect(system).toContain('word need not itself be the answer');
+    expect(JSON.parse(messages[0].content)).toEqual({
+      passageText: reading.text,
+      questions: [question],
+      correction,
+    });
+    expect(options).toMatchObject({ model: 'captured', apiKeyOverride: 'key', maxTokens: 2048 });
+    expect(mockResolveLearningAi).toHaveBeenCalledWith(PARAMS.userId, PARAMS.execution);
+  });
+  it.each([-1, 4, 0.5, undefined])(
+    'refuses invalid private key %s before resolving a provider',
+    async (correctIndex) => {
+      await expect(
+        requestVocabularyExtraction({
+          ...reading,
+          readingQuestions: [{ ...question, correctIndex: correctIndex as number }],
+        })
+      ).rejects.toThrow('private question keys');
+      expect(mockResolveLearningAi).not.toHaveBeenCalled();
+      expect(mockGenerateResponse).not.toHaveBeenCalled();
+    }
+  );
+  it('refuses oversized or out-of-range correction data before resolving a provider', async () => {
+    for (const correction of [
+      { words: ['x'.repeat(33000)], issues: [], feedback: [] },
+      { words: [{}], issues: [], feedback: [{ index: 1, feedback: ['Wrong index.'] }] },
+    ]) {
+      await expect(
+        requestVocabularyExtraction({ ...reading, readingCorrection: correction })
+      ).rejects.toThrow('bounded metadata');
+    }
+    expect(mockResolveLearningAi).not.toHaveBeenCalled();
+  });
+});
 
 describe('parseLiveVocab', () => {
   it('parses a JSON array of items', () => {

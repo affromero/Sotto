@@ -33,6 +33,7 @@ Produce a DIFFERENT set of items than any previous attempt for this lesson — d
 - Follow the language policy for all learner-visible fields: passage, question, options, explanation, and passageRef.
 - One-sentence explanation per question.
 - Explain the actual grammatical constraint, contextual meaning, or passage evidence that makes the answer correct. Do not invent passage facts or present a context-specific choice as a universal grammar rule.
+- For German Perfekt, choose and explain the auxiliary for the actual verb, construction and meaning. "Stehen bleiben" meaning "come to a stop" forms "ist ... stehen geblieben"; ordinary "bleiben" meaning "remain" also forms "ist ... geblieben". For a stopping event, "stoppen" instead forms "hat ... gestoppt"; do not transfer an auxiliary merely because two verbs describe stopping. These lexical uses of "sein" do not by themselves prove a change of location or state. Prefer a simple explanation of the specific verb's auxiliary over an inaccurate universal motion or state-change rule.
 - Put the full generated reading text in the top-level `passage` field. For grammar, set `passage` to an empty string.
 - For reading questions, `passageRef` should be a short locator such as "paragraph 1" or "the notice"; do not duplicate the full passage in each question.
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Prisma } from '@/generated/prisma/client';
-import { SectionQualityError } from '@/lib/classes/section-quality';
+import { SectionQualityError, captureBlindSectionFailure } from '@/lib/classes/section-quality';
 import {
   ReviewerProtocolError,
   TeachingQualityRejectionError,
@@ -10,10 +10,48 @@ import {
   classifyGenerationFailure,
   generationCleanupUnconfirmed,
   retainParallelGenerationFailures,
+  generationFailureSchema,
 } from '@/lib/classes/quality/generation-failure';
 import { captureTeachingFailure } from '@/lib/classes/quality/teaching-failure';
 
 describe('terminal generation failure classification', () => {
+  it('preserves exact blind evidence in settled FULL stages and the existing strict failure schema', () => {
+    const evidence = captureBlindSectionFailure(
+      [
+        {
+          question: 'Where did Lena go?',
+          options: ['Hamburg', 'Bremen', 'Berlin', 'Kiel'],
+          correctIndex: 0,
+          explanation: 'Private audio states Hamburg.',
+          passageText: 'Private immutable audio transcript.',
+        },
+      ],
+      {
+        passageAcceptable: true,
+        issues: [],
+        questions: [{ index: 0, acceptableOptionIndices: [1], issues: ['incorrect'] }],
+      }
+    );
+    const first = new TeachingQualityRejectionError(['incorrect']);
+    const listening = new SectionQualityError('Listening rejected.', evidence);
+    retainParallelGenerationFailures(
+      first,
+      [
+        { stage: 'grammar', error: first },
+        { stage: 'listening', error: listening },
+      ],
+      true
+    );
+    const captured = captureGenerationFailure(first);
+    expect(captured.stages![1]).toEqual({
+      stage: 'listening',
+      category: 'section_quality',
+      teachingFailure: evidence,
+    });
+    expect(generationFailureSchema.parse(captured)).toEqual(captured);
+    expect(JSON.stringify(listening)).not.toContain('Private');
+    expect(generationCleanupUnconfirmed(first)).toBe(true);
+  });
   it('retains every settled FULL stage privately while preserving the original error and cleanup flag', () => {
     const evidence = captureTeachingFailure('writing', [{ task: 'Private writing task.' }], {
       items: [

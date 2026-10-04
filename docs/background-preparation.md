@@ -27,6 +27,22 @@ Grammar, reading, and contextual vocabulary candidates receive an independent re
 
 These multiple-choice sections permit two generation attempts and, when needed, one JSON repair. Each structurally valid candidate adds one blind review request. Passing that review adds one teaching review request, including for repaired output. This allows at most seven application-level model calls per section; provider transport retries can consume additional admitted requests. A section that passes both reviews on its first attempt uses three calls. Reviews use the existing request budget and fail when admission is denied; no alternate provider is selected. Allow for these requests when scheduling preparation.
 
+Listening allows one complete script and quiz replacement after a valid blind
+review rejects their content. It uses the original model, objective, vocabulary,
+and execution authority. Both independent reviews must approve the final material
+before publication. Malformed verdicts, provider errors, cancellation, and teaching
+review rejection stop generation without another replacement. Listening uses at
+most seven application model calls: two scripts, two quizzes, two blind reviews,
+and one teaching review. Reference verification, provider transport and search
+subrequests, and later audio usage are separate.
+
+Reading vocabulary receives teaching review in batches of five words and allows
+one extraction replacement. Twelve words permit at most two extraction calls and
+six teaching reviews. These requests use the unchanged parent budget. Replacement
+preserves the reading passage and questions while correcting the reviewed word
+metadata. A background word may have no associated question and therefore adds no
+SRS evidence; the extracted word list remains nonempty.
+
 Generation reads the course level, curriculum, saved course notes, and existing review targets through the normal learning pipeline. Notes can guide future content; scored practice determines mastery. Clearing saved notes does not delete vocabulary previously imported from them or reset practice scores. Edit those items through the existing vocabulary and learning controls.
 
 Raw source URLs and topics live in the scoped job payload so existing erasure rules cover them. The preparation record stores their fingerprint. The activity feed exposes model selection, admission counts, and lifecycle events without prompts, credentials, or raw learner content. The shared journal retains at most 128 recent events and marks gaps explicitly.

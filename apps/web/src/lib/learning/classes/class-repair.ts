@@ -104,8 +104,11 @@ export async function repairClassReadingMemory(
   const reading = currentClassSections(cls.sections).find((section) => section.skill === 'READING');
   if (!reading || requirements.skills.READING.state !== 'REQUIRED') return;
   const questions = reading.questions.map((question) => ({
-    ...question,
+    id: question.id,
+    question: question.question,
     options: question.options as string[],
+    correctIndex: question.correctIndex,
+    passageText: question.passageText,
   }));
   const saved = readingVocabularySchema.safeParse(cls.readingVocabulary);
   const ids = new Set(questions.map((question) => question.id));

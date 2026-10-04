@@ -3,6 +3,9 @@ import { createHash } from 'node:crypto';
 import { createSkillRequirements, learningSkills } from '@sotto/shared';
 import { vi } from 'vitest';
 
+const mockReadingProviderInput = vi.hoisted(() => vi.fn());
+
+export { mockReadingProviderInput };
 vi.mock('@/lib/learning-ai', () => ({
   resolveCapturedLearningAi: async () => ({ provider: 'anthropic', model: 'fixture' }),
   capturedLearningAiOptions: async () => ({}),
@@ -15,6 +18,7 @@ vi.mock('@/lib/providers/ai', () => ({
       options: { jsonSchema?: unknown }
     ) => {
       const input = JSON.parse(messages[0]!.content);
+      if (input.passageText) mockReadingProviderInput(input);
       return {
         content: JSON.stringify(
           options.jsonSchema
@@ -195,6 +199,7 @@ vi.mock('@/lib/prisma', () => {
           id: 'reading-question',
           question: 'What greeting is used?',
           options: ['Hola', 'Adiós', 'Ayer', 'Mañana'],
+          correctIndex: 0,
           passageText: 'Hola, Ana.',
         },
       ],

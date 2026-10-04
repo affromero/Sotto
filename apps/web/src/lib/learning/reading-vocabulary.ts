@@ -1,10 +1,14 @@
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { readingVocabularySchema, type ReadingVocabulary } from '@sotto/shared';
-import { requestVocabularyExtraction } from '../live-vocab';
+import { assertReadingQuestionKeys, requestVocabularyExtraction } from '../live-vocab';
 import { resolveCapturedLearningAi } from '../learning-ai';
 import { createAIProvider } from '../providers/ai';
-import { reviewTeachingContent } from '../classes/quality/teaching-quality';
+import {
+  reviewTeachingContent,
+  TeachingQualityRejectionError,
+} from '../classes/quality/teaching-quality';
+import { combineTeachingFailures } from '../classes/quality/teaching-failure';
 import type { SottoProviderExecution } from '../sidedoor/credentials/runtime/provider-execution';
 import type { LearningDatabase } from './database';
 import { LearningIncompleteError } from './session-evaluation';
@@ -25,31 +29,7 @@ const extractionSchema = z
   .min(1)
   .max(12);
 
-export async function extractReadingVocabulary(options: {
-  userId: string;
-  execution: SottoProviderExecution;
-  nativeLang: string;
-  targetLang: string;
-  level: string;
-  questions: readonly {
-    id: string;
-    question: string;
-    options: readonly string[];
-    passageText?: string | null;
-  }[];
-}): Promise<ReadingVocabulary> {
-  const passages = new Set(
-    options.questions.map((question) => question.passageText).filter(Boolean)
-  );
-  if (passages.size !== 1) throw new Error('Reading vocabulary requires one exact passage.');
-  const passageText = [...passages][0]!;
-  const content = await requestVocabularyExtraction({
-    ...options,
-    text: passageText,
-    label: 'COURSE_NOTES',
-    usageCategory: 'reading-vocabulary-extraction',
-    readingQuestions: options.questions,
-  });
+function parseExtraction(content: string, passageText: string, questionCount: number) {
   let parsed: unknown;
   try {
     parsed = JSON.parse(content);
@@ -66,26 +46,106 @@ export async function extractReadingVocabulary(options: {
       (word) =>
         !passageText.includes(word.sourceForm) ||
         new Set(word.questionIndices).size !== word.questionIndices.length ||
-        word.questionIndices.some((index) => index >= options.questions.length)
+        word.questionIndices.some((index) => index >= questionCount)
     )
   )
     throw new Error(
       'Reading vocabulary attribution does not match the supplied passage and questions.'
     );
+  return words;
+}
+
+export async function extractReadingVocabulary(options: {
+  userId: string;
+  execution: SottoProviderExecution;
+  nativeLang: string;
+  targetLang: string;
+  level: string;
+  questions: readonly {
+    id: string;
+    question: string;
+    options: readonly string[];
+    correctIndex: number;
+    passageText?: string | null;
+  }[];
+}): Promise<ReadingVocabulary> {
+  assertReadingQuestionKeys(options.questions);
+  const passages = new Set(
+    options.questions.map((question) => question.passageText).filter(Boolean)
+  );
+  if (
+    passages.size !== 1 ||
+    options.questions.some((question) => !question.passageText) ||
+    new Set(options.questions.map((question) => question.id)).size !== options.questions.length
+  )
+    throw new Error('Reading vocabulary requires one exact passage and unique question IDs.');
+  const passageText = [...passages][0]!;
+  const request = {
+    ...options,
+    text: passageText,
+    label: 'COURSE_NOTES' as const,
+    usageCategory: 'reading-vocabulary-extraction',
+    readingQuestions: options.questions,
+  };
+  let words = parseExtraction(
+    await requestVocabularyExtraction(request),
+    passageText,
+    options.questions.length
+  );
   const ai = await resolveCapturedLearningAi(options.userId, options.execution);
   const provider = createAIProvider(ai.provider);
-  for (let offset = 0; offset < words.length; offset += 5) {
-    await reviewTeachingContent({
-      ...options,
-      ai,
-      provider,
-      kind: 'vocabulary',
-      items: words.slice(offset, offset + 5).map((word) => ({
-        ...word,
-        passageText,
-        assessedQuestions: word.questionIndices.map((index) => options.questions[index]),
-      })),
-    });
+  let reviewOffset = 0;
+  async function reviewWords(candidate: typeof words) {
+    for (let offset = 0; offset < candidate.length; offset += 5) {
+      reviewOffset = offset;
+      await reviewTeachingContent({
+        ...options,
+        ai,
+        provider,
+        kind: 'vocabulary',
+        items: candidate.slice(offset, offset + 5).map((word) => ({
+          ...word,
+          passageText,
+          assessedQuestions: word.questionIndices.map((index) => options.questions[index]),
+        })),
+      });
+    }
+  }
+  try {
+    await reviewWords(words);
+  } catch (error) {
+    if (!(error instanceof TeachingQualityRejectionError)) throw error;
+    const replacement = parseExtraction(
+      await requestVocabularyExtraction({
+        ...request,
+        readingCorrection: {
+          words,
+          issues: error.issues,
+          feedback: error.feedback.map(({ index, feedback }) => ({
+            index: index + reviewOffset,
+            feedback,
+          })),
+        },
+      }),
+      passageText,
+      options.questions.length
+    );
+    if (
+      replacement.length !== words.length ||
+      replacement.some((word, index) => word.sourceForm !== words[index]!.sourceForm)
+    )
+      throw new Error('Reading vocabulary correction changed the original source identities.');
+    try {
+      await reviewWords(replacement);
+    } catch (replacementError) {
+      if (!(replacementError instanceof TeachingQualityRejectionError)) throw replacementError;
+      throw new TeachingQualityRejectionError(
+        replacementError.issues,
+        replacementError.feedback,
+        combineTeachingFailures(error.teachingFailure, replacementError.teachingFailure)
+      );
+    }
+    words = replacement;
   }
   return readingVocabularySchema.parse({
     sourceHash: createHash('sha256').update(passageText).digest('hex'),
