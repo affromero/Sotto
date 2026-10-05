@@ -19,10 +19,16 @@ import {
   type ReadingVocabularyProtocolCode,
 } from './reading/vocabulary-protocol';
 
+type ReadingAttributionViolation = {
+  code: 'dup_lemma' | 'source_form_missing' | 'dup_question_index' | 'out_of_range';
+  wordIndex: number;
+};
+
 function rejectProtocol(
   code: ReadingVocabularyProtocolCode,
   passageText: string,
-  questionIds: readonly string[]
+  questionIds: readonly string[],
+  attributionViolations?: readonly ReadingAttributionViolation[]
 ): never {
   const serializedIds = JSON.stringify(questionIds);
   logger.error('Reading vocabulary output protocol rejected', {
@@ -30,6 +36,7 @@ function rejectProtocol(
     sourceHash: createHash('sha256').update(passageText).digest('hex'),
     questionCount: questionIds.length,
     questionIdsSha256: createHash('sha256').update(serializedIds).digest('hex'),
+    ...(attributionViolations ? { attributionViolations } : {}),
     ...(Buffer.byteLength(serializedIds, 'utf8') <= 4096
       ? { questionIds }
       : { questionIdsOmitted: 'size_limit' }),
@@ -47,16 +54,20 @@ function parseExtraction(content: string, passageText: string, questionIds: read
   const extraction = readingVocabularyResponseSchema.safeParse(parsed);
   if (!extraction.success) rejectProtocol('invalid_shape', passageText, questionIds);
   const words = extraction.data.words;
-  if (
-    new Set(words.map((word) => word.lemma)).size !== words.length ||
-    words.some(
-      (word) =>
-        !passageText.includes(word.sourceForm) ||
-        new Set(word.questionIndices).size !== word.questionIndices.length ||
-        word.questionIndices.some((index) => index >= questionIds.length)
-    )
-  )
-    rejectProtocol('source_attribution', passageText, questionIds);
+  const attributionViolations: ReadingAttributionViolation[] = [];
+  const lemmas = new Set<string>();
+  for (const [wordIndex, word] of words.entries()) {
+    if (lemmas.has(word.lemma)) attributionViolations.push({ code: 'dup_lemma', wordIndex });
+    lemmas.add(word.lemma);
+    if (!passageText.includes(word.sourceForm))
+      attributionViolations.push({ code: 'source_form_missing', wordIndex });
+    if (new Set(word.questionIndices).size !== word.questionIndices.length)
+      attributionViolations.push({ code: 'dup_question_index', wordIndex });
+    if (word.questionIndices.some((index) => index >= questionIds.length))
+      attributionViolations.push({ code: 'out_of_range', wordIndex });
+  }
+  if (attributionViolations.length)
+    rejectProtocol('source_attribution', passageText, questionIds, attributionViolations);
   return words;
 }
 
