@@ -513,4 +513,25 @@ describe('composeSpeakingPrompts', () => {
 
     expect(prompts[0]?.referenceTtsAudio?.byteLength).toBeGreaterThan(0);
   });
+
+  it('rejects an invalid optional phonetic transcription before creating reference audio', async () => {
+    setupHappyPath();
+    const phrases = JSON.parse(SAMPLE_PHRASES_JSON);
+    phrases[0].ipa = false;
+    mockGenerateResponse.mockResolvedValue({ content: JSON.stringify(phrases), model: 'm' });
+    await expect(
+      composeSpeakingPrompts({
+        execution: authorizedLearnerExecution('u1'),
+        userId: 'u1',
+        level: 'A1',
+        nativeLang: 'en',
+        targetLang: 'es',
+        objective: 'Practice everyday greetings',
+        targetVocab: [{ lemma: 'hola', gloss: 'hello' }],
+        refId: 'practice-1',
+      })
+    ).rejects.toThrow('usable phrases');
+    expect(mockResolveTtsProvider).not.toHaveBeenCalled();
+    expect(mockClassSectionCreate).not.toHaveBeenCalled();
+  });
 });

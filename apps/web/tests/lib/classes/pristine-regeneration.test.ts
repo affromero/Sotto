@@ -452,7 +452,93 @@ suite.each(['AVAILABLE', 'FAILED'] as const)(
       ).toMatchObject({ text: 'Learner work' });
     });
 
-    it('keeps completed audio fenced until its execution cleanup is confirmed', async () => {
+    it.each([
+      { operationStatus: 'CANCELLED' as const, failure: null },
+      { operationStatus: 'FAILED' as const, failure: 'generation_failed' as const },
+      { operationStatus: 'FAILED' as const, failure: 'source_unreadable' as const },
+    ])(
+      'keeps $operationStatus audio fenced until its execution cleanup is confirmed',
+      async ({ operationStatus, failure }) => {
+        const episode = await instance.database.episode.create({
+          data: {
+            userId: execution.userId,
+            title: 'Fixture',
+            topic: 'Fixture',
+            source: 'CLASS',
+            status: 'GENERATING_AUDIO',
+          },
+        });
+        await instance.database.classSection.update({
+          where: { id: sectionId },
+          data: { episodeId: episode.id },
+        });
+        const operation = await linkPreparationAudio(
+          instance.database,
+          execution.userId,
+          episode.id
+        );
+        await instance.database.courseClass.update({
+          where: { id: classId },
+          data: { courseId: operation.courseId },
+        });
+        await expect(readPristineRegenerationSnapshot(classId, execution)).rejects.toThrow(
+          'active jobs'
+        );
+        await settlePreparationAudio(instance.database, operation, 'revoked');
+        await expect(readPristineRegenerationSnapshot(classId, execution)).rejects.toThrow(
+          'active jobs'
+        );
+        await sottoTransaction(instance.database, (database) =>
+          classPreparationStore(database, operation.courseId).transact((current) => {
+            if (!current) throw new Error('Missing fixture');
+            current.status = operationStatus;
+            current.failure = failure;
+            current.classId = classId;
+          })
+        );
+        const snapshot = await readPristineRegenerationSnapshot(classId, execution);
+        const record = await sottoTransaction(instance.database, async (database) => {
+          const captured = await captureEpisodeStorage(database, episode.id);
+          return sottoJobOutbox(database).enqueue(
+            prepareJob({
+              id: randomUUID(),
+              namespace: SIDEDOOR_STATE_ID,
+              handler: 'audio-generation',
+              version: 1,
+              payload: {},
+              scopes: captured.scopes,
+              delivery: { attempts: 1, priority: 0, availableAt: Date.now() },
+            })
+          );
+        });
+        await expect(claimPristineRegeneration(classId, execution, snapshot)).rejects.toThrow(
+          'active jobs'
+        );
+        const binding = {
+          id: randomUUID(),
+          parentId: record.job.id,
+          fingerprint: record.fingerprint,
+          executorId: randomUUID(),
+        };
+        await sottoTransaction(instance.database, async (database) => {
+          await sottoJobExecutions(database).begin(binding);
+          await sottoJobOutbox(database).complete(record.job.id, record.fingerprint);
+        });
+        await expect(claimPristineRegeneration(classId, execution, snapshot)).rejects.toThrow(
+          'active jobs'
+        );
+        await sottoTransaction(instance.database, (database) =>
+          sottoJobExecutions(database).settle(binding)
+        );
+        await expect(
+          claimPristineRegeneration(classId, execution, snapshot)
+        ).resolves.toMatchObject({
+          id: classId,
+        });
+      }
+    );
+
+    it('rejects failed audio lineage without a known generation or source failure', async () => {
       const episode = await instance.database.episode.create({
         data: {
           userId: execution.userId,
@@ -471,57 +557,18 @@ suite.each(['AVAILABLE', 'FAILED'] as const)(
         where: { id: classId },
         data: { courseId: operation.courseId },
       });
-      await expect(readPristineRegenerationSnapshot(classId, execution)).rejects.toThrow(
-        'active jobs'
-      );
       await settlePreparationAudio(instance.database, operation, 'revoked');
-      await expect(readPristineRegenerationSnapshot(classId, execution)).rejects.toThrow(
-        'active jobs'
-      );
       await sottoTransaction(instance.database, (database) =>
         classPreparationStore(database, operation.courseId).transact((current) => {
           if (!current) throw new Error('Missing fixture');
-          current.status = 'CANCELLED';
+          current.status = 'FAILED';
+          current.failure = 'interrupted';
           current.classId = classId;
         })
       );
-      const snapshot = await readPristineRegenerationSnapshot(classId, execution);
-      const record = await sottoTransaction(instance.database, async (database) => {
-        const captured = await captureEpisodeStorage(database, episode.id);
-        return sottoJobOutbox(database).enqueue(
-          prepareJob({
-            id: randomUUID(),
-            namespace: SIDEDOOR_STATE_ID,
-            handler: 'audio-generation',
-            version: 1,
-            payload: {},
-            scopes: captured.scopes,
-            delivery: { attempts: 1, priority: 0, availableAt: Date.now() },
-          })
-        );
-      });
-      await expect(claimPristineRegeneration(classId, execution, snapshot)).rejects.toThrow(
-        'active jobs'
+      await expect(readPristineRegenerationSnapshot(classId, execution)).rejects.toThrow(
+        /active jobs/
       );
-      const binding = {
-        id: randomUUID(),
-        parentId: record.job.id,
-        fingerprint: record.fingerprint,
-        executorId: randomUUID(),
-      };
-      await sottoTransaction(instance.database, async (database) => {
-        await sottoJobExecutions(database).begin(binding);
-        await sottoJobOutbox(database).complete(record.job.id, record.fingerprint);
-      });
-      await expect(claimPristineRegeneration(classId, execution, snapshot)).rejects.toThrow(
-        'active jobs'
-      );
-      await sottoTransaction(instance.database, (database) =>
-        sottoJobExecutions(database).settle(binding)
-      );
-      await expect(claimPristineRegeneration(classId, execution, snapshot)).resolves.toMatchObject({
-        id: classId,
-      });
     });
 
     it('never erases a recording that wins a concurrent admission', async () => {
