@@ -12,6 +12,8 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import * as globModule from 'glob';
+import { loadAndRender } from '@/lib/prompt-loader';
+import { SECTION_QUALITY_JSON_SCHEMA } from '@/lib/classes/section-quality';
 
 type GlobSync = (
   pattern: string,
@@ -426,6 +428,24 @@ describe('shared fragment content', () => {
 });
 
 describe('generation templates', () => {
+  it('renders required bounded passage evidence beside the listening review task', () => {
+    const prompt = loadAndRender('class/review-section-quiz.md', {
+      LEVEL: 'A2',
+      TARGET: 'de',
+      NATIVE: 'en',
+      SKILL: 'LISTENING',
+      LANGUAGE_POLICY: 'Use the target language for learner-visible content.',
+      REVIEW_SCHEMA: JSON.stringify(SECTION_QUALITY_JSON_SCHEMA.schema),
+    });
+    const schema = JSON.parse(/```json\s*([\s\S]*?)\s*```/.exec(prompt)![1]);
+    expect(schema.required).toContain('passageFeedback');
+    expect(schema.properties.passageFeedback.maxItems).toBe(3);
+    expect(schema.properties.passageFeedback.items.properties.quote.maxLength).toBe(240);
+    expect(schema.properties.passageFeedback.items.properties.reason.maxLength).toBe(300);
+    expect(prompt).toContain('learner sentence starters');
+    expect(prompt).toContain('reject incorrect complete positive examples');
+    expect(prompt).toContain('quote copied exactly from the supplied passage');
+  });
   it('script-generator.md references JSON output format', () => {
     const content = readFileSync(join(PROMPTS_DIR, 'generation/script-generator.md'), 'utf-8');
     expect(content).toContain('"speaker"');

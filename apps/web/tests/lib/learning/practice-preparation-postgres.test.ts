@@ -666,6 +666,7 @@ suite('Durable practice preparation against PostgreSQL', () => {
           else if (reviewed.questions)
             content = {
               passageAcceptable: true,
+              passageFeedback: [],
               issues: [],
               questions: reviewed.questions.map(({ index }) => ({
                 index,

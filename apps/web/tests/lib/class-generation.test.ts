@@ -1,8 +1,4 @@
-/**
- * Unit tests for src/lib/class-generation.ts.
- * Verifies MCQ generation and that READING sections carry a full passage:
- * generated for curriculum classes, sourced from {{SOURCE}} for sourced classes.
- */
+/** MCQ generation preserves complete generated or immutable sourced reading passages. */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mockResolveLearningAi = vi.fn();
@@ -345,6 +341,7 @@ beforeEach(() => {
   mockReviewResponse.mockImplementation(async (_system, messages) => ({
     content: JSON.stringify({
       passageAcceptable: true,
+      passageFeedback: [],
       issues: [],
       questions: JSON.parse(messages[0].content).questions.map((q: { index: number }) => ({
         index: q.index,
@@ -512,7 +509,11 @@ describe('generateSectionQuestions', () => {
     return {
       content: JSON.stringify({
         passageAcceptable: true,
-        issues: [],
+        passageFeedback:
+          overrides.passageAcceptable === false
+            ? [{ quote: GENERATED_PASSAGE, reason: 'The supplied wording is unnatural.' }]
+            : [],
+        issues: overrides.passageAcceptable === false ? ['unnatural'] : [],
         questions: SAMPLE_QUESTIONS.map((q, index) => ({
           index,
           acceptableOptionIndices: [q.correctIndex],
@@ -711,6 +712,7 @@ describe('generateSectionQuestions', () => {
     mockReviewResponse.mockResolvedValueOnce({
       content: JSON.stringify({
         passageAcceptable: true,
+        passageFeedback: [],
         issues: [],
         questions: SAMPLE_QUESTIONS.map((question, index) => ({
           index,
@@ -732,7 +734,12 @@ describe('generateSectionQuestions', () => {
   });
 
   it('reviews the immutable published source and fails immediately if it is defective', async () => {
-    mockReviewResponse.mockResolvedValue(verdict({ passageAcceptable: false }));
+    mockReviewResponse.mockResolvedValue(
+      verdict({
+        passageAcceptable: false,
+        passageFeedback: [{ quote: PASSAGE, reason: 'The supplied source is incorrect.' }],
+      })
+    );
     await expect(generateSectionQuestions({ ...BASE, sourceContent: PASSAGE })).rejects.toThrow(
       /supplied reading passage/
     );
@@ -794,7 +801,16 @@ describe('generateSectionQuestions', () => {
       }),
     });
     mockReviewResponse.mockResolvedValue(
-      verdict({ passageAcceptable: false, issues: ['unnatural'] })
+      verdict({
+        passageAcceptable: false,
+        issues: ['unnatural'],
+        passageFeedback: [
+          {
+            quote: 'Mit der Straßenbahn bin ich zum Rathaus gelaufen.',
+            reason: 'The travel verb does not fit taking the tram.',
+          },
+        ],
+      })
     );
     await expect(generateSectionQuestions({ ...BASE, targetLang: 'de' })).rejects.toThrow(
       /educational quality/
