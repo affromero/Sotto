@@ -76,15 +76,17 @@ export async function startProvider() {
           ) {
             throw new Error('Unexpected reading extraction fixture');
           }
-          content = JSON.stringify([
-            {
-              lemma: 'Hallo',
-              gloss: 'hello',
-              pos: 'interjection',
-              sourceForm: 'Hallo',
-              questionIndices: input.questions.map((_, index) => index),
-            },
-          ]);
+          content = JSON.stringify({
+            words: [
+              {
+                lemma: 'Hallo',
+                gloss: 'hello',
+                pos: 'interjection',
+                sourceForm: 'Hallo',
+                questionIndices: input.questions.map((_, index) => index),
+              },
+            ],
+          });
         } else if (system.startsWith('Independently review vocabulary teaching content')) {
           const input = JSON.parse(
             body.messages.find((message) => message.role === 'user').content
