@@ -12,6 +12,7 @@ vi.mock('@/lib/providers/ai', () => ({
 
 // ---- Import under test ----
 import { generateScript as generateScriptImpl } from '@/lib/script-generator';
+import { VOICE_REALISM_INSTRUCTIONS } from '@/lib/voice-realism-prompts';
 
 const AI_RUNTIME = { provider: 'anthropic', model: 'claude-haiku-4-5-20251001' };
 type GenerateScriptParams = Parameters<typeof generateScriptImpl>[0];
@@ -92,6 +93,14 @@ describe('generateScript', () => {
         expect(providerInstruction).toMatch(
           /For A1\/A2, prefer correct concrete examples and omit a broad rule/
         );
+        expect(providerInstruction).toContain('Voice Realism for Language Learning');
+        expect(providerInstruction).toContain('hesitate or rephrase an already correct statement');
+        expect(providerInstruction).toContain(
+          'Highlight vocabulary only in correct, positive examples'
+        );
+        expect(providerInstruction).toContain("Keep each story's narrator");
+        expect(providerInstruction).toContain('keep that example distinct');
+        expect(providerInstruction).not.toContain('Rule 1: Include Natural Disfluencies');
       }
     );
 
@@ -128,6 +137,10 @@ describe('generateScript', () => {
 
         expect(providerInstruction.includes('## Grammar explanations')).toBe(expectsGuidance);
         expect(providerInstruction).not.toContain('German Perfekt uses a finite auxiliary');
+        if (!forLearning) {
+          expect(providerInstruction).toContain(VOICE_REALISM_INSTRUCTIONS);
+          expect(providerInstruction).not.toContain('Voice Realism for Language Learning');
+        }
       }
     );
 

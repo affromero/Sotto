@@ -673,7 +673,9 @@ export async function generateScript(params: {
     VOICE_DELIVERY_GUIDELINES: voiceDeliveryGuidelines,
     LANGUAGE_INSTRUCTION: langInstr.languageInstruction,
     VOCABULARY_INSTRUCTION: langInstr.vocabularyInstruction,
-    VOICE_REALISM: VOICE_REALISM_INSTRUCTIONS,
+    VOICE_REALISM: params.forLearning
+      ? loadPrompt('shared/voice-realism-learning.md')
+      : VOICE_REALISM_INSTRUCTIONS,
     TONE_GUIDANCE: TONE_GUIDANCE_MAIN[params.tone] || '',
     ELI5_SECTION: eli5Section,
     AUDIENCE: params.audience || 'general',

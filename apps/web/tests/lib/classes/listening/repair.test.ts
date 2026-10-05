@@ -14,11 +14,13 @@ import {
   mockLearnerVocabUpsert,
   mockCreateSegmentsAndQueueAudio,
   mockPersistGeneratedReferences,
+  mockClassSectionCreate,
 } from '../../../helpers/runtime/listening-generation';
 import { generateClassListening } from '@/lib/class-listening-generator';
 import { SectionQualityError } from '@/lib/classes/section-quality';
 import { TeachingQualityRejectionError } from '@/lib/classes/quality/teaching-quality';
 import { captureGenerationFailure } from '@/lib/classes/quality/generation-failure';
+import { learningScriptHash } from '@/lib/learning/script-hash';
 
 const approved = {
   passageAcceptable: true,
@@ -131,6 +133,118 @@ describe('bounded canonical listening correction', () => {
     expect(records.map((record) => record.blindVerdict)).toEqual([rejected, rejected]);
     expect(records.every((record) => record.questions[0].correctIndex === 0)).toBe(true);
     expect(scriptRequests()).toHaveLength(2);
+    noLearningPublication();
+  });
+
+  it('uses the same audible transcript at all provider review boundaries without rewriting the saved script', async () => {
+    const turns = [
+      { speaker: 'HOST', text: 'Ich habe Tante Anna [V1:besucht]. [1] [SFX: gentle music]' },
+      { speaker: 'EXPERT', text: 'Sie hat uns Tee gegeben.' },
+    ];
+    const transcript = 'HOST: Ich habe Tante Anna besucht.\nEXPERT: Sie hat uns Tee gegeben.';
+    const questions = [
+      {
+        question: 'Wen hat HOST besucht?',
+        options: ['Tante Anna', 'Ben', 'Mia', 'Tom'],
+        correctIndex: 0,
+        explanation: 'HOST sagt: Tante Anna.',
+      },
+      {
+        question: 'Was hat Tante Anna gegeben?',
+        options: ['Kaffee', 'Wasser', 'Tee', 'Saft'],
+        correctIndex: 2,
+        explanation: 'EXPERT nennt Tee.',
+      },
+      {
+        question: 'Wer erzählt vom Besuch?',
+        options: ['HOST', 'EXPERT', 'Tante Anna', 'Tom'],
+        correctIndex: 0,
+        explanation: 'HOST erzählt in der ersten Person.',
+      },
+      {
+        question: 'Welche Handlung nennt EXPERT?',
+        options: ['Etwas kaufen', 'Nach Hause gehen', 'Tee geben', 'Einen Film sehen'],
+        correctIndex: 2,
+        explanation: 'EXPERT sagt: Sie hat uns Tee gegeben.',
+      },
+    ];
+    mockGenerateResponse.mockImplementation(async (system: string, messages, options) => {
+      noLearningPublication();
+      if (options.maxTokens === 12288) {
+        expect(system).toContain('Voice Realism for Language Learning');
+        expect(messages[0].content).toContain(PARAMS.objective);
+        return {
+          content: JSON.stringify({
+            ...SAMPLE_SCRIPT_RESULT,
+            turns,
+            vocabulary: [{ number: 1, word: 'besucht', translation: 'visited' }],
+          }),
+          model: 'm',
+        };
+      }
+      expect(system).toContain(transcript);
+      expect(system).not.toContain('[V1:');
+      expect(system).not.toContain('[SFX:');
+      return { content: JSON.stringify(questions), model: 'm' };
+    });
+
+    await generateClassListening({ ...PARAMS, targetLang: 'de', level: 'A2' });
+
+    const blind = JSON.parse(mockBlindResponse.mock.calls[0][1][0].content);
+    expect(blind.passage).toBe(transcript);
+    expect(blind.questions).toEqual(
+      questions.map(({ question, options }, index) => ({ index, question, options }))
+    );
+    const teaching = JSON.parse(mockTeachingResponse.mock.calls[0][1][0].content);
+    expect(
+      teaching.items.map((item: { content: { passageText: string } }) => item.content.passageText)
+    ).toEqual(Array(4).fill(transcript));
+    expect(mockScriptCreate.mock.calls[0][0].data.turns).toEqual(turns);
+    expect(mockClassSectionCreate.mock.calls[0][0].data.spec.scriptHash).toBe(
+      learningScriptHash(turns)
+    );
+    expect(mockCreateSegmentsAndQueueAudio.mock.calls[0][1]).toEqual(turns);
+  });
+
+  it('keeps incorrect highlighted words audible and retains both rejections without publication', async () => {
+    const texts = [
+      'Welche Geschichte hast du [V1:gemacht]? Äh, so sagt man das nicht.',
+      'Welche Geschichte hast du [V1:gemacht]? Nein, was hast du erlebt?',
+    ];
+    let nextScript = 0;
+    mockGenerateResponse.mockImplementation(async (system: string, messages, options) => {
+      noLearningPublication();
+      if (options.maxTokens === 12288) {
+        expect(system).toContain('Highlight vocabulary only in correct, positive examples');
+        if (nextScript > 0) expect(messages[0].content).toContain(texts[0]);
+        return {
+          content: JSON.stringify({
+            ...SAMPLE_SCRIPT_RESULT,
+            turns: [{ speaker: 'HOST', text: texts[nextScript++] }],
+            vocabulary: [{ number: 1, word: 'gemacht', translation: 'made' }],
+          }),
+          model: 'm',
+        };
+      }
+      expect(system).toContain('Welche Geschichte hast du gemacht?');
+      expect(system).not.toContain('[V1:');
+      return { content: SAMPLE_QUESTIONS_JSON, model: 'm' };
+    });
+    mockBlindResponse.mockResolvedValue({ content: JSON.stringify(rejected), model: 'm' });
+
+    const error = await generateClassListening({ ...PARAMS, targetLang: 'de', level: 'A2' }).catch(
+      (failure: unknown) => failure
+    );
+
+    expect(error).toBeInstanceOf(SectionQualityError);
+    const records = captureGenerationFailure(error).teachingFailure!.reviews.map((review) =>
+      JSON.parse(review.candidate!)
+    );
+    expect(records.map((record) => record.transcript)).toEqual(
+      texts.map((text) => 'HOST: ' + text.replace('[V1:gemacht]', 'gemacht'))
+    );
+    expect(records.map((record) => record.blindVerdict)).toEqual([rejected, rejected]);
+    expect(mockTeachingResponse).not.toHaveBeenCalled();
     noLearningPublication();
   });
 

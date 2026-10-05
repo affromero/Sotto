@@ -10,6 +10,7 @@ import { loadAndRender } from './prompt-loader';
 import { formatNotesForPrompt } from './course-notes';
 import { generateScript } from './script-generator';
 import { createSegmentsAndQueueAudio } from './segment-creator';
+import { cleanTextForTts } from './tts-text-cleaner';
 import { persistGeneratedReferences } from './references';
 import { getConfiguredTtsProviderId, resolveTtsProvider } from './providers/tts';
 import { getServerInfra } from './server-config';
@@ -247,7 +248,9 @@ export async function composeListeningContent(
       });
 
       // Step 8: build transcript for quiz generation
-      const transcript = result.turns.map((t) => `${t.speaker}: ${t.text}`).join('\n');
+      const transcript = result.turns
+        .map((turn) => `${turn.speaker}: ${cleanTextForTts(turn.text)}`)
+        .join('\n');
 
       // Step 9: generate comprehension questions
       const systemPrompt = loadAndRender('class/generate-listening-quiz.md', {
