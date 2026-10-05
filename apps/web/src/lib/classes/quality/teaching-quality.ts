@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { capturedLearningAiOptions, type CapturedLearningAi } from '../../learning-ai';
-import type { AIProvider } from '../../providers/ai';
+import type { AIOptions, AIProvider } from '../../providers/ai';
 import { loadAndRender } from '../../prompt-loader';
 import { logUsage } from '../../usage-logger';
 import { SectionQualityError } from '../section-quality';
@@ -46,6 +46,45 @@ export class ReviewerProtocolError extends SectionQualityError {
   }
 }
 
+/** Shared provider boundary for canonical teaching audits. */
+export async function requestTeachingReview(options: {
+  ai: CapturedLearningAi;
+  provider: AIProvider;
+  userId: string;
+  prompt: string;
+  variables: Record<string, string>;
+  items: readonly unknown[];
+  jsonSchema: NonNullable<AIOptions['jsonSchema']>;
+}): Promise<string> {
+  if (options.items.length < 1 || options.items.length > 5) throw new SectionQualityError();
+  const response = await options.provider.generateResponse(
+    loadAndRender(options.prompt, options.variables),
+    [
+      {
+        role: 'user',
+        content: JSON.stringify({
+          items: options.items.map((content, index) => ({ index, content })),
+        }),
+      },
+    ],
+    {
+      ...(await capturedLearningAiOptions(options.ai)),
+      maxTokens: 2048,
+      temperature: 0,
+      jsonSchema: options.jsonSchema,
+    }
+  );
+  logUsage({
+    service: options.ai.provider,
+    model: response.model,
+    category: 'class-teaching-review',
+    inputTokens: response.inputTokens,
+    outputTokens: response.outputTokens,
+    userId: options.userId,
+  });
+  return response.content;
+}
+
 /** Review exact learner-visible teaching content after independent question solving. */
 export async function reviewTeachingContent(options: {
   ai: CapturedLearningAi;
@@ -57,9 +96,11 @@ export async function reviewTeachingContent(options: {
   kind: 'intro' | 'explanations' | 'writing' | 'listening' | 'speaking' | 'vocabulary';
   items: readonly unknown[];
 }): Promise<void> {
-  if (options.items.length < 1 || options.items.length > 5) throw new SectionQualityError();
-  const response = await options.provider.generateResponse(
-    loadAndRender('class/review-teaching-content.md', {
+  const content = await requestTeachingReview({
+    ...options,
+    prompt: 'class/review-teaching-content.md',
+    jsonSchema: TEACHING_QUALITY_JSON_SCHEMA,
+    variables: {
       REVIEW_SCHEMA: JSON.stringify(TEACHING_QUALITY_JSON_SCHEMA.schema),
       LEVEL: options.level,
       NATIVE: options.nativeLang,
@@ -73,33 +114,11 @@ export async function reviewTeachingContent(options: {
               `Apply the class language policy only to the embedded passage, questions, options and explanations, never to vocabulary metadata: ${classLanguagePolicy(options)}`,
             ].join(' ')
           : classLanguagePolicy(options),
-    }),
-    [
-      {
-        role: 'user',
-        content: JSON.stringify({
-          items: options.items.map((content, index) => ({ index, content })),
-        }),
-      },
-    ],
-    {
-      ...(await capturedLearningAiOptions(options.ai)),
-      maxTokens: 2048,
-      temperature: 0,
-      jsonSchema: TEACHING_QUALITY_JSON_SCHEMA,
-    }
-  );
-  logUsage({
-    service: options.ai.provider,
-    model: response.model,
-    category: 'class-teaching-review',
-    inputTokens: response.inputTokens,
-    outputTokens: response.outputTokens,
-    userId: options.userId,
+    },
   });
   let parsed: z.infer<typeof verdictSchema>;
   try {
-    parsed = verdictSchema.parse(JSON.parse(response.content));
+    parsed = verdictSchema.parse(JSON.parse(content));
   } catch {
     logger.warn('Teaching review protocol rejected content', {
       kind: options.kind,

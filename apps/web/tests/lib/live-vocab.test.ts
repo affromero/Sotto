@@ -117,6 +117,8 @@ describe('keyed reading extraction requests', () => {
     const [system, messages, options] = mockGenerateResponse.mock.calls[0]!;
     expect(system).toContain('same number of words, in the same order');
     expect(system).toContain('word need not itself be the answer');
+    expect(system).toContain('Understanding the word must be necessary');
+    expect(system).toContain('including associations not mentioned in the feedback');
     expect(JSON.parse(messages[0].content)).toEqual({
       passageText: reading.text,
       questions: [question],

@@ -621,7 +621,10 @@ suite('Durable practice preparation against PostgreSQL', () => {
             payload.messages.find((message) => message.role === 'system')?.content ?? '';
           const user = payload.messages.at(-1)?.content ?? '';
           let content: unknown;
-          let reviewed: { items?: { index: number }[]; questions?: { index: number }[] } = {};
+          let reviewed: {
+            items?: { index: number; content: { questionIndices?: number[] } }[];
+            questions?: { index: number }[];
+          } = {};
           try {
             reviewed = JSON.parse(user);
           } catch {
@@ -641,12 +644,24 @@ suite('Durable practice preparation against PostgreSQL', () => {
             };
           else if (reviewed.items)
             content = {
-              items: reviewed.items.map(({ index }) => ({
-                index,
-                acceptable: true,
-                issues: [],
-                feedback: [],
-              })),
+              items: reviewed.items.map(({ index, content: item }) =>
+                system.startsWith('Independently review reading vocabulary')
+                  ? {
+                      index,
+                      metadata: { acceptable: true, issues: [], feedback: [] },
+                      associations: item.questionIndices!.map((questionIndex) => ({
+                        questionIndex,
+                        canAnswerWithoutWord: false,
+                        reasoning: 'The greeting meaning distinguishes the required answer.',
+                      })),
+                    }
+                  : {
+                      index,
+                      acceptable: true,
+                      issues: [],
+                      feedback: [],
+                    }
+              ),
             };
           else if (reviewed.questions)
             content = {

@@ -232,6 +232,11 @@ describe('intro teaching gate', () => {
     expect(system).toContain(
       'Incidental locations, objects or events are unsupported associations'
     );
+    expect(boundary.generate.mock.calls[0]![2]).toMatchObject({
+      maxTokens: 2048,
+      temperature: 0,
+      jsonSchema: { name: 'class_teaching_quality' },
+    });
     expect(JSON.parse(messages[0].content)).toEqual({ items: [{ index: 0, content }] });
   });
   it.each(['initial', 'structural repair', 'semantic replacement'])(

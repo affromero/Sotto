@@ -3,10 +3,8 @@ import { readingVocabularySchema, type ReadingVocabulary } from '@sotto/shared';
 import { assertReadingQuestionKeys, requestVocabularyExtraction } from '../live-vocab';
 import { resolveCapturedLearningAi } from '../learning-ai';
 import { createAIProvider } from '../providers/ai';
-import {
-  reviewTeachingContent,
-  TeachingQualityRejectionError,
-} from '../classes/quality/teaching-quality';
+import { TeachingQualityRejectionError } from '../classes/quality/teaching-quality';
+import { reviewReadingVocabularyContent } from '../classes/quality/reading-vocabulary-quality';
 import { combineTeachingFailures } from '../classes/quality/teaching-failure';
 import type { SottoProviderExecution } from '../sidedoor/credentials/runtime/provider-execution';
 import type { LearningDatabase } from './database';
@@ -109,23 +107,29 @@ export async function extractReadingVocabulary(options: {
   const provider = createAIProvider(ai.provider);
   let reviewOffset = 0;
   async function reviewWords(candidate: typeof words) {
+    const admitted: typeof words = [];
     for (let offset = 0; offset < candidate.length; offset += 5) {
       reviewOffset = offset;
-      await reviewTeachingContent({
+      const indices = await reviewReadingVocabularyContent({
         ...options,
         ai,
         provider,
-        kind: 'vocabulary',
         items: candidate.slice(offset, offset + 5).map((word) => ({
           ...word,
           passageText,
           assessedQuestions: word.questionIndices.map((index) => options.questions[index]),
         })),
       });
+      admitted.push(
+        ...candidate
+          .slice(offset, offset + 5)
+          .map((word, index) => ({ ...word, questionIndices: indices[index]! }))
+      );
     }
+    return admitted;
   }
   try {
-    await reviewWords(words);
+    words = await reviewWords(words);
   } catch (error) {
     if (!(error instanceof TeachingQualityRejectionError)) throw error;
     const replacement = parseExtraction(
@@ -149,7 +153,7 @@ export async function extractReadingVocabulary(options: {
     )
       rejectProtocol('replacement_identity', passageText, questionIds);
     try {
-      await reviewWords(replacement);
+      words = await reviewWords(replacement);
     } catch (replacementError) {
       if (!(replacementError instanceof TeachingQualityRejectionError)) throw replacementError;
       throw new TeachingQualityRejectionError(
@@ -158,7 +162,6 @@ export async function extractReadingVocabulary(options: {
         combineTeachingFailures(error.teachingFailure, replacementError.teachingFailure)
       );
     }
-    words = replacement;
   }
   return readingVocabularySchema.parse({
     sourceHash: createHash('sha256').update(passageText).digest('hex'),

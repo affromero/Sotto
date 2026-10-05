@@ -110,11 +110,20 @@ batches of five require at most two extraction requests and six teaching reviews
 These are additional bounded requests within the unchanged parent budget. The
 replacement preserves the passage, questions, options, keys, and each source-form
 ordinal/count, while permitting reviewed lemma, gloss, part-of-speech, and
-association corrections. Every replacement batch must pass. A background word
+association corrections. Reading audits return independent metadata and complete
+per-proposed-question counterfactual decisions in the same request. Each pair requires
+`canAnswerWithoutWord` and a bounded nonempty evidence summary; the server admits a
+link only when the counterfactual is false. Rejected word metadata
+requires the existing bounded replacement; unsupported associations are explicitly
+denied and cannot credit SRS. Accepted metadata remains background exposure when
+no link is admitted. Supported links retain word-level reading credit. Missing,
+duplicate, invented or inconsistent decisions fail the protocol, without correction.
+Every replacement batch must pass. A background word
 may have empty `questionIndices`; that word then adds no SRS evidence. The
 extracted word list itself must remain nonempty. Failure
 evidence preserves batch-local candidates/verdicts; offsets apply to correction
-feedback only.
+feedback only. Metadata failure evidence labels the complete actual private decision
+and its derived metadata-only outer verdict inside the unchanged sealed envelope.
 
 Speaking permits one complete four-phrase replacement after the canonical teaching
 review rejects a valid set. The replacement uses the same captured provider,

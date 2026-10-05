@@ -26,17 +26,16 @@ vi.mock('@/lib/providers/ai', () => ({
         expect(system).toContain('JSON object containing only a words array');
         expect(options.jsonSchema?.name).toBe('reading_vocabulary_extraction');
         mockReadingProviderInput(input);
-      } else expect(options.jsonSchema?.name).toBe('class_teaching_quality');
+      } else expect(options.jsonSchema?.name).toBe('reading_vocabulary_quality');
       const sourceForm = input.passageText?.split(' ')[0] ?? 'Hola';
       return {
         content: JSON.stringify(
-          options.jsonSchema?.name === 'class_teaching_quality'
+          options.jsonSchema?.name === 'reading_vocabulary_quality'
             ? {
                 items: input.items.map(({ index }: { index: number }) => ({
                   index,
-                  acceptable: true,
-                  issues: [],
-                  feedback: [],
+                  metadata: { acceptable: true, issues: [], feedback: [] },
+                  associations: [],
                 })),
               }
             : {

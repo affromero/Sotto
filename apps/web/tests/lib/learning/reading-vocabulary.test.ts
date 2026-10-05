@@ -16,7 +16,7 @@ import { captureGenerationFailure } from '@/lib/classes/quality/generation-failu
 
 const generate = vi.hoisted(() => vi.fn());
 const logError = vi.hoisted(() => vi.fn());
-vi.mock('@/lib/logger', () => ({ logger: { error: logError, warn: vi.fn() } }));
+vi.mock('@/lib/logger', () => ({ logger: { error: logError, warn: vi.fn(), info: vi.fn() } }));
 vi.mock('@/lib/learning-ai', () => ({
   resolveCapturedLearningAi: async () => ({ provider: 'anthropic', model: 'fixture' }),
   capturedLearningAiOptions: async () => ({}),
@@ -50,21 +50,33 @@ const response = (content: unknown) => ({
   content: JSON.stringify(Array.isArray(content) ? { words: content } : content),
   model: 'fixture',
 });
-const approved = (count = 1) => ({
-  items: Array.from({ length: count }, (_, index) => ({
+const approved = (indices: number[][] = [[0]]) => ({
+  items: indices.map((questionIndices, index) => ({
     index,
-    acceptable: true,
-    issues: [],
-    feedback: [],
+    metadata: { acceptable: true, issues: [], feedback: [] },
+    associations: questionIndices.map((questionIndex) => ({
+      questionIndex,
+      canAnswerWithoutWord: false,
+      reasoning: 'The answer requires understanding this word.',
+    })),
   })),
 });
 const rejected = {
   items: [
     {
       index: 0,
-      acceptable: false,
-      issues: ['unsupported'],
-      feedback: ['This question does not assess the verb.'],
+      metadata: {
+        acceptable: false,
+        issues: ['incorrect'],
+        feedback: ['The gloss does not match the source verb.'],
+      },
+      associations: [
+        {
+          questionIndex: 0,
+          canAnswerWithoutWord: false,
+          reasoning: 'The answer requires understanding this word.',
+        },
+      ],
     },
   ],
 };
@@ -73,7 +85,7 @@ beforeEach(() => {
   logError.mockReset();
   generate.mockResolvedValueOnce(response([word]));
   generate.mockResolvedValue({
-    content: JSON.stringify({ items: [{ index: 0, acceptable: true, issues: [], feedback: [] }] }),
+    content: JSON.stringify(approved()),
     model: 'fixture',
   });
 });
@@ -139,7 +151,7 @@ describe('reading vocabulary extraction', () => {
     generate.mockResolvedValueOnce(response([{ ...word, questionIndices: [] }]));
     generate.mockResolvedValueOnce({
       content: JSON.stringify({
-        items: [{ index: 0, acceptable: true, issues: [], feedback: [] }],
+        ...approved([[]]),
       }),
       model: 'fixture',
     });
@@ -158,7 +170,7 @@ describe('reading vocabulary extraction', () => {
       .mockResolvedValueOnce(response([{ ...word, lemma: 'trinken', gloss: 'to drink' }]))
       .mockResolvedValueOnce(response(rejected))
       .mockResolvedValueOnce(response([replacement]))
-      .mockResolvedValueOnce(response(approved()));
+      .mockResolvedValueOnce(response(approved([[]])));
     const result = await extractReadingVocabulary(options);
     expect(result.words).toEqual([
       {
@@ -176,7 +188,7 @@ describe('reading vocabulary extraction', () => {
       questions: initial.questions,
       correction: {
         words: [{ lemma: 'trinken', sourceForm: 'bestellt' }],
-        feedback: [{ index: 0, feedback: rejected.items[0]!.feedback }],
+        feedback: [{ index: 0, feedback: rejected.items[0]!.metadata.feedback }],
       },
     });
     expect(generate.mock.calls[2]![0]).toContain('preserving each exact sourceForm');
@@ -200,13 +212,13 @@ describe('reading vocabulary extraction', () => {
     expect(generate.mock.calls[3]![0]).toContain('faithful contextual synonyms');
     expect(options.questions).toEqual(originalQuestions);
   });
-  it('retains native glosses while correcting incidental vocabulary to unassessed background', async () => {
+  it('admits supported assessment links while retaining denied incidental words as background exposure', async () => {
     const readingQuestion = {
       id: 'reading-purchase',
       question: 'Was kauft Mara?',
       options: ['Äpfel', 'Eine Fahrkarte', 'Ein Buch', 'Eine Suppe'],
       correctIndex: 0,
-      passageText: 'Mara kauft am Markt Äpfel.',
+      passageText: 'Mara kauft am Markt an einem Stand Äpfel.',
     };
     const market = {
       lemma: 'Markt',
@@ -222,23 +234,44 @@ describe('reading vocabulary extraction', () => {
       sourceForm: 'Äpfel',
       questionIndices: [0],
     };
+    const stall = {
+      lemma: 'der Stand',
+      gloss: 'stall',
+      pos: 'noun',
+      sourceForm: 'Stand',
+      questionIndices: [0],
+    };
     const attributionVerdict = {
       items: [
         {
           index: 0,
-          acceptable: false,
-          issues: ['unsupported'],
-          feedback: ['The purchase question assesses the object, not the market location.'],
+          metadata: { acceptable: true, issues: [], feedback: [] },
+          associations: [
+            {
+              questionIndex: 0,
+              canAnswerWithoutWord: true,
+              reasoning: 'The question assesses the object, not the location.',
+            },
+          ],
         },
-        { index: 1, acceptable: true, issues: [], feedback: [] },
+        { ...approved().items[0], index: 1 },
+        {
+          index: 2,
+          metadata: { acceptable: true, issues: [], feedback: [] },
+          associations: [
+            {
+              questionIndex: 0,
+              canAnswerWithoutWord: true,
+              reasoning: 'The stall location does not determine the purchased object.',
+            },
+          ],
+        },
       ],
     };
     generate.mockReset();
     generate
-      .mockResolvedValueOnce(response([market, apple]))
-      .mockResolvedValueOnce(response(attributionVerdict))
-      .mockResolvedValueOnce(response([{ ...market, questionIndices: [] }, apple]))
-      .mockResolvedValueOnce(response(approved(2)));
+      .mockResolvedValueOnce(response([market, apple, stall]))
+      .mockResolvedValueOnce(response(attributionVerdict));
 
     const result = await extractReadingVocabulary({ ...options, questions: [readingQuestion] });
 
@@ -252,17 +285,18 @@ describe('reading vocabulary extraction', () => {
         sourceForm: 'Äpfel',
         questionIds: ['reading-purchase'],
       },
+      { lemma: 'der Stand', gloss: 'stall', pos: 'noun', sourceForm: 'Stand', questionIds: [] },
     ]);
-    for (const request of [generate.mock.calls[1]!, generate.mock.calls[3]!]) {
-      expect(request[0]).toContain('gloss is a dictionary meaning in the native language (en)');
-      expect(request[0]).toContain('never to vocabulary metadata');
-      expect(request[0]).toContain(
-        'Reject incorrect glosses, invented forms and unsupported assessment attribution'
-      );
-    }
-    const correctedReview = JSON.parse(generate.mock.calls[3]![1][0].content);
-    expect(correctedReview.items[0].content.assessedQuestions).toEqual([]);
-    expect(correctedReview.items[1].content.assessedQuestions).toEqual([readingQuestion]);
+    const reviewInput = JSON.parse(generate.mock.calls[1]![1][0].content);
+    expect(
+      reviewInput.items.map(
+        (item: { content: { assessedQuestions: unknown[] } }) => item.content.assessedQuestions
+      )
+    ).toEqual([[readingQuestion], [readingQuestion], [readingQuestion]]);
+    expect(generate.mock.calls.map((call) => call[2].jsonSchema.name)).toEqual([
+      'reading_vocabulary_extraction',
+      'reading_vocabulary_quality',
+    ]);
   });
   it('maps late-batch feedback to whole-candidate indices and reviews all replacement batches', async () => {
     const words = Array.from({ length: 12 }, (_, index) => ({
@@ -275,24 +309,27 @@ describe('reading vocabulary extraction', () => {
     generate.mockReset();
     generate
       .mockResolvedValueOnce(response(words))
-      .mockResolvedValueOnce(response(approved(5)))
-      .mockResolvedValueOnce(response(approved(5)))
+      .mockResolvedValueOnce(response(approved(Array.from({ length: 5 }, () => []))))
+      .mockResolvedValueOnce(response(approved(Array.from({ length: 5 }, () => []))))
       .mockResolvedValueOnce(
         response({
-          items: [rejected.items[0], { index: 1, acceptable: true, issues: [], feedback: [] }],
+          items: [
+            { ...rejected.items[0], associations: [] },
+            { ...approved([[]]).items[0], index: 1 },
+          ],
         })
       )
       .mockResolvedValueOnce(response(words))
-      .mockResolvedValueOnce(response(approved(5)))
-      .mockResolvedValueOnce(response(approved(5)))
-      .mockResolvedValueOnce(response(approved(2)));
+      .mockResolvedValueOnce(response(approved(Array.from({ length: 5 }, () => []))))
+      .mockResolvedValueOnce(response(approved(Array.from({ length: 5 }, () => []))))
+      .mockResolvedValueOnce(response(approved([[], []])));
     const result = await extractReadingVocabulary({
       ...options,
       questions: [{ ...question, passageText }],
     });
     expect(result.words).toHaveLength(12);
     expect(JSON.parse(generate.mock.calls[4]![1][0].content).correction.feedback).toEqual([
-      { index: 10, feedback: rejected.items[0]!.feedback },
+      { index: 10, feedback: rejected.items[0]!.metadata.feedback },
     ]);
     expect(
       generate.mock.calls
@@ -321,7 +358,18 @@ describe('reading vocabulary extraction', () => {
     const failure = teachingFailureSchema.parse(
       (error as TeachingQualityRejectionError).teachingFailure
     );
-    expect(failure.reviews.map((review) => review.verdict)).toEqual([rejected, rejected]);
+    expect(failure.reviews.map((review) => review.verdict)).toEqual(
+      [rejected, rejected].map((verdict) => ({
+        items: verdict.items.map(({ index, metadata }) => ({ index, ...metadata })),
+      }))
+    );
+    for (const review of failure.reviews) {
+      expect(JSON.parse(review.candidate!)[0]).toMatchObject({
+        reviewContract: 'reading_metadata_and_associations',
+        outerVerdict: 'derived_metadata_only',
+        actualReview: rejected.items[0],
+      });
+    }
     expect(failure.reviews.map((review) => JSON.parse(review.candidate!)[0].gloss)).toEqual([
       'to order',
       'to drink',
@@ -356,7 +404,7 @@ describe('reading vocabulary extraction', () => {
         .mockResolvedValueOnce(response(words))
         .mockResolvedValueOnce(
           response({
-            items: [rejected.items[0], { index: 1, acceptable: true, issues: [], feedback: [] }],
+            items: [rejected.items[0], { ...approved().items[0], index: 1 }],
           })
         )
         .mockResolvedValueOnce(response(change === 'reordered' ? [...words].reverse() : [word]));
@@ -408,11 +456,22 @@ describe('reading vocabulary extraction', () => {
   });
   it('does not advance SRS for a reviewed background word', async () => {
     generate.mockReset();
-    generate
-      .mockResolvedValueOnce(response([word]))
-      .mockResolvedValueOnce(response(rejected))
-      .mockResolvedValueOnce(response([{ ...word, questionIndices: [] }]))
-      .mockResolvedValueOnce(response(approved()));
+    generate.mockResolvedValueOnce(response([word])).mockResolvedValueOnce(
+      response({
+        items: [
+          {
+            ...approved().items[0],
+            associations: [
+              {
+                questionIndex: 0,
+                canAnswerWithoutWord: true,
+                reasoning: 'This question does not assess the verb.',
+              },
+            ],
+          },
+        ],
+      })
+    );
     const snapshot = await extractReadingVocabulary(options);
     const database = new Proxy({} as LearningDatabase, {
       get() {
@@ -429,61 +488,86 @@ describe('reading vocabulary extraction', () => {
       )
     ).toEqual(new Set());
   });
-  it('advances only the reviewed assessed word while preserving background SRS state', async () => {
-    const background = {
-      ...word,
-      lemma: 'Kaffee',
-      sourceForm: 'Kaffee',
-      pos: 'noun',
-      gloss: 'coffee',
-      questionIndices: [],
-    };
-    generate.mockReset();
-    generate
-      .mockResolvedValueOnce(response([word, background]))
-      .mockResolvedValueOnce(response(approved(2)));
-    const snapshot = await extractReadingVocabulary(options);
-    const states = snapshot.words.map((item, index) => ({
-      id: `word-${index}`,
-      lemma: item.lemma,
-      ease: 2.5,
-      intervalDays: 0,
-      reps: 0,
-      lapses: 0,
-      mastery: 0,
-    }));
-    const database = {
-      learnerVocab: {
-        findMany: async ({ where }: { where: { lemma: { in: string[] } } }) =>
-          states.filter((state) => where.lemma.in.includes(state.lemma)),
-        update: async ({ where, data }: { where: { id: string }; data: object }) =>
-          Object.assign(
-            states.find((state) => state.id === where.id)!,
-            data
-          ),
-      },
-      learnerGrammar: { findMany: async () => [] },
-    } as unknown as LearningDatabase;
-    expect(
-      await reviewReadingVocabulary(
-        database,
-        'course',
-        snapshot,
-        new Map([['reading-1', true]]),
-        new Date('2026-10-05T00:00:00Z')
-      )
-    ).toEqual(new Set(['bestellen']));
-    expect(states[0]).toMatchObject({ lemma: 'bestellen', reps: 1 });
-    expect(states[1]).toEqual({
-      id: 'word-1',
-      lemma: 'Kaffee',
-      ease: 2.5,
-      intervalDays: 0,
-      reps: 0,
-      lapses: 0,
-      mastery: 0,
-    });
-  });
+  it.each(['newly admitted', 'historically stored'])(
+    'advances only %s assessed vocabulary while preserving background SRS state',
+    async (origin) => {
+      const background = {
+        ...word,
+        lemma: 'Kaffee',
+        sourceForm: 'Kaffee',
+        pos: 'noun',
+        gloss: 'coffee',
+        questionIndices: [],
+      };
+      generate.mockReset();
+      generate
+        .mockResolvedValueOnce(response([word, background]))
+        .mockResolvedValueOnce(response(approved([[0], []])));
+      const snapshot =
+        origin === 'newly admitted'
+          ? await extractReadingVocabulary(options)
+          : {
+              sourceHash: createHash('sha256').update(question.passageText).digest('hex'),
+              passageText: question.passageText,
+              words: [
+                {
+                  lemma: word.lemma,
+                  gloss: word.gloss,
+                  pos: word.pos,
+                  sourceForm: word.sourceForm,
+                  questionIds: [question.id],
+                },
+                {
+                  lemma: background.lemma,
+                  gloss: background.gloss,
+                  pos: background.pos,
+                  sourceForm: background.sourceForm,
+                  questionIds: [],
+                },
+              ],
+            };
+      const states = snapshot.words.map((item, index) => ({
+        id: `word-${index}`,
+        lemma: item.lemma,
+        ease: 2.5,
+        intervalDays: 0,
+        reps: 0,
+        lapses: 0,
+        mastery: 0,
+      }));
+      const database = {
+        learnerVocab: {
+          findMany: async ({ where }: { where: { lemma: { in: string[] } } }) =>
+            states.filter((state) => where.lemma.in.includes(state.lemma)),
+          update: async ({ where, data }: { where: { id: string }; data: object }) =>
+            Object.assign(
+              states.find((state) => state.id === where.id)!,
+              data
+            ),
+        },
+        learnerGrammar: { findMany: async () => [] },
+      } as unknown as LearningDatabase;
+      expect(
+        await reviewReadingVocabulary(
+          database,
+          'course',
+          snapshot,
+          new Map([['reading-1', true]]),
+          new Date('2026-10-05T00:00:00Z')
+        )
+      ).toEqual(new Set(['bestellen']));
+      expect(states[0]).toMatchObject({ lemma: 'bestellen', reps: 1 });
+      expect(states[1]).toEqual({
+        id: 'word-1',
+        lemma: 'Kaffee',
+        ease: 2.5,
+        intervalDays: 0,
+        reps: 0,
+        lapses: 0,
+        mastery: 0,
+      });
+    }
+  );
   it('surfaces provider failures without publishing an empty extraction', async () => {
     generate.mockReset();
     generate.mockRejectedValue(new Error('Provider unavailable'));
