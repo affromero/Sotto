@@ -24,6 +24,7 @@ import { learningScriptHash } from '@/lib/learning/script-hash';
 
 const approved = {
   passageAcceptable: true,
+  passageFeedback: [],
   issues: [],
   questions: [0, 2, 0, 2].map((key, index) => ({
     index,
@@ -31,9 +32,20 @@ const approved = {
     issues: [],
   })),
 };
-const rejected = { ...approved, passageAcceptable: false, issues: ['unnatural'] };
 const firstText = '„Bin“ ist hier endlich und passt zu „ich“.';
 const finalText = '„Bin“ ist die konjugierte Form von „sein“ und passt zu „ich“.';
+const rejected = {
+  ...approved,
+  passageAcceptable: false,
+  issues: ['unnatural'],
+  passageFeedback: [{ quote: firstText, reason: 'Endlich does not mean finite.' }],
+};
+const finalRejected = {
+  ...rejected,
+  passageFeedback: [
+    { quote: finalText, reason: 'The replacement still fails the supplied review.' },
+  ],
+};
 
 function scriptRequests() {
   return mockGenerateResponse.mock.calls.filter((call) => call[2].maxTokens === 12288);
@@ -106,7 +118,9 @@ describe('bounded canonical listening correction', () => {
     );
     expect(correction).toBeDefined();
     expect(correction![1][0].content).toContain(firstText);
-    expect(correction![1][0].content).toContain(JSON.stringify(rejected));
+    const correctionContext = JSON.parse(correction![1][0].content.split('\n').at(-1)!);
+    expect(correctionContext.verdict).toEqual(rejected);
+    expect(correctionContext.candidate.turns).toEqual([{ speaker: 'HOST', text: firstText }]);
     expect(correction![1][0].content).toContain(PARAMS.objective);
     expect(correction![2]).toMatchObject({ model: 'm', apiKeyOverride: 'k' });
     expect(correction![0]).toContain('Full Immersion Mode');
@@ -120,7 +134,9 @@ describe('bounded canonical listening correction', () => {
   });
 
   it('retains both exact rejected candidates and strict verdicts without publishing learner material', async () => {
-    mockBlindResponse.mockResolvedValue({ content: JSON.stringify(rejected), model: 'm' });
+    mockBlindResponse
+      .mockResolvedValueOnce({ content: JSON.stringify(rejected), model: 'm' })
+      .mockResolvedValueOnce({ content: JSON.stringify(finalRejected), model: 'm' });
     const error = await generateClassListening(PARAMS).catch((failure: unknown) => failure);
     expect(error).toBeInstanceOf(SectionQualityError);
     const failure = captureGenerationFailure(error);
@@ -130,7 +146,7 @@ describe('bounded canonical listening correction', () => {
       'HOST: ' + firstText,
       'HOST: ' + finalText,
     ]);
-    expect(records.map((record) => record.blindVerdict)).toEqual([rejected, rejected]);
+    expect(records.map((record) => record.blindVerdict)).toEqual([rejected, finalRejected]);
     expect(records.every((record) => record.questions[0].correctIndex === 0)).toBe(true);
     expect(scriptRequests()).toHaveLength(2);
     noLearningPublication();
@@ -230,7 +246,19 @@ describe('bounded canonical listening correction', () => {
       expect(system).not.toContain('[V1:');
       return { content: SAMPLE_QUESTIONS_JSON, model: 'm' };
     });
-    mockBlindResponse.mockResolvedValue({ content: JSON.stringify(rejected), model: 'm' });
+    const collocationRejection = {
+      ...rejected,
+      passageFeedback: [
+        {
+          quote: 'Welche Geschichte hast du gemacht?',
+          reason: 'The verb does not fit the intended story question.',
+        },
+      ],
+    };
+    mockBlindResponse.mockResolvedValue({
+      content: JSON.stringify(collocationRejection),
+      model: 'm',
+    });
 
     const error = await generateClassListening({ ...PARAMS, targetLang: 'de', level: 'A2' }).catch(
       (failure: unknown) => failure
@@ -243,7 +271,10 @@ describe('bounded canonical listening correction', () => {
     expect(records.map((record) => record.transcript)).toEqual(
       texts.map((text) => 'HOST: ' + text.replace('[V1:gemacht]', 'gemacht'))
     );
-    expect(records.map((record) => record.blindVerdict)).toEqual([rejected, rejected]);
+    expect(records.map((record) => record.blindVerdict)).toEqual([
+      collocationRejection,
+      collocationRejection,
+    ]);
     expect(mockTeachingResponse).not.toHaveBeenCalled();
     noLearningPublication();
   });
@@ -262,6 +293,14 @@ describe('bounded canonical listening correction', () => {
   it.each([
     '{',
     JSON.stringify({ ...approved, questions: [] }),
+    JSON.stringify({ ...rejected, passageFeedback: [] }),
+    JSON.stringify({
+      ...rejected,
+      passageFeedback: [{ quote: 'An invented excerpt.', reason: 'Incorrect.' }],
+    }),
+    JSON.stringify({ ...rejected, passageFeedback: [{ quote: firstText, reason: '  ' }] }),
+    JSON.stringify({ ...rejected, questions: [] }),
+    JSON.stringify({ ...approved, passageFeedback: rejected.passageFeedback }),
     JSON.stringify({
       ...approved,
       questions: approved.questions.map((item) => ({ ...item, acceptableOptionIndices: [0, 0] })),

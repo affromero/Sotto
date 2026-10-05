@@ -13,6 +13,16 @@ const issueCode = z.enum([
 const verdictSchema = z
   .object({
     passageAcceptable: z.boolean(),
+    passageFeedback: z
+      .array(
+        z
+          .object({
+            quote: z.string().min(1).max(240).regex(/\S/),
+            reason: z.string().min(1).max(300).regex(/\S/),
+          })
+          .strict()
+      )
+      .max(3),
     issues: z.array(issueCode).max(6),
     questions: z
       .array(
@@ -63,9 +73,23 @@ export class SectionQualityError extends Error {
   }
 }
 
+function validPassageFeedback(
+  verdict: Pick<SectionReviewFeedback, 'passageAcceptable' | 'passageFeedback' | 'issues'>,
+  questions: GeneratedQuestion[]
+): boolean {
+  const passage = questions[0]?.passageText ?? '';
+  return verdict.passageAcceptable
+    ? verdict.passageFeedback.length === 0
+    : passage.length > 0 &&
+        verdict.issues.length > 0 &&
+        verdict.passageFeedback.length > 0 &&
+        verdict.passageFeedback.every((feedback) => passage.includes(feedback.quote));
+}
+
 function completeReview(verdict: SectionReviewFeedback, questions: GeneratedQuestion[]): boolean {
   const indices = new Set(verdict.questions.map((question) => question.index));
   return (
+    validPassageFeedback(verdict, questions) &&
     indices.size === questions.length &&
     verdict.questions.length === questions.length &&
     questions.every((_, index) => indices.has(index)) &&
@@ -152,22 +176,46 @@ export function assessSectionReview(
   immutablePassage: boolean,
   diagnosticKind?: 'listening'
 ): SectionReviewAssessment {
-  let verdict: z.infer<typeof verdictSchema>;
+  let raw: unknown;
   try {
-    verdict = verdictSchema.parse(JSON.parse(content));
+    raw = JSON.parse(content);
   } catch {
     return { issues: ['invalid_review'] };
   }
+  if (typeof raw === 'object' && raw !== null && !Array.isArray(raw)) {
+    const candidate = raw as Record<string, unknown>;
+    const feedback = verdictSchema.shape.passageFeedback.safeParse(candidate.passageFeedback);
+    if (!feedback.success)
+      throw new SectionQualityError('Blind review passage feedback is malformed.');
+    if (
+      typeof candidate.passageAcceptable === 'boolean' &&
+      !validPassageFeedback(
+        {
+          passageAcceptable: candidate.passageAcceptable,
+          passageFeedback: feedback.data,
+          issues: Array.isArray(candidate.issues) ? candidate.issues : [],
+        },
+        questions
+      )
+    )
+      throw new SectionQualityError(
+        'Blind review passage feedback does not match its passage verdict.'
+      );
+  }
+  let verdict: z.infer<typeof verdictSchema>;
+  try {
+    verdict = verdictSchema.parse(raw);
+  } catch {
+    return { issues: ['invalid_review'] };
+  }
+  if (!completeReview(verdict, questions)) return { issues: ['invalid_review'] };
   if (!verdict.passageAcceptable && immutablePassage) {
     throw new SectionQualityError(
       'The supplied reading passage failed its language quality check.',
-      diagnosticKind === 'listening' && completeReview(verdict, questions)
-        ? captureBlindSectionFailure(questions, verdict)
-        : undefined,
-      diagnosticKind === 'listening' && completeReview(verdict, questions) ? verdict : undefined
+      diagnosticKind === 'listening' ? captureBlindSectionFailure(questions, verdict) : undefined,
+      diagnosticKind === 'listening' ? verdict : undefined
     );
   }
-  if (!completeReview(verdict, questions)) return { issues: ['invalid_review'] };
   const issues = new Set<string>(verdict.issues);
   if (!verdict.passageAcceptable) issues.add('unnatural_passage');
   for (const result of verdict.questions) {

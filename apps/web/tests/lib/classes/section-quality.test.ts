@@ -28,10 +28,24 @@ const questions: GeneratedQuestion[] = [
 
 const verdict = {
   passageAcceptable: true,
+  passageFeedback: [],
   issues: [],
   questions: [
     { index: 1, acceptableOptionIndices: [0], issues: [] },
     { index: 0, acceptableOptionIndices: [0, 1], issues: ['ambiguous'] },
+  ],
+};
+
+const passageQuestions = questions.map((question) => ({
+  ...question,
+  passageText: 'Private exact script.',
+}));
+const rejected = {
+  ...verdict,
+  passageAcceptable: false,
+  issues: ['unnatural'],
+  passageFeedback: [
+    { quote: 'Private exact script.', reason: 'The supplied wording is unnatural.' },
   ],
 };
 
@@ -83,33 +97,25 @@ describe('section review correction feedback', () => {
   });
 
   it('identifies an unacceptable generated passage for replacement', () => {
-    const result = assessSectionReview(
-      JSON.stringify({ ...verdict, passageAcceptable: false, issues: ['unnatural'] }),
-      questions,
-      false
-    );
+    const result = assessSectionReview(JSON.stringify(rejected), passageQuestions, false);
     expect(result.issues).toContain('unnatural_passage');
     expect(result.feedback?.passageAcceptable).toBe(false);
     expect(result.feedback?.issues).toEqual(['unnatural']);
   });
 
   it('rejects an unacceptable supplied passage instead of offering to rewrite it', () => {
-    expect(() =>
-      assessSectionReview(JSON.stringify({ ...verdict, passageAcceptable: false }), questions, true)
-    ).toThrow(SectionQualityError);
+    expect(() => assessSectionReview(JSON.stringify(rejected), passageQuestions, true)).toThrow(
+      SectionQualityError
+    );
     try {
-      assessSectionReview(
-        JSON.stringify({ ...verdict, passageAcceptable: false }),
-        questions,
-        true
-      );
+      assessSectionReview(JSON.stringify(rejected), passageQuestions, true);
     } catch (error) {
       expect((error as SectionQualityError).blindReviewFailure).toBeUndefined();
     }
   });
 
   it('retains exact blind evidence in the existing private envelope without leaking it publicly', () => {
-    const exact = { ...verdict, passageAcceptable: false };
+    const exact = rejected;
     const material = questions.map((question) => ({
       ...question,
       passageText: 'Private exact script.',
@@ -167,5 +173,86 @@ describe('section review correction feedback', () => {
     expect(assessSectionReview(JSON.stringify(invalid), questions, true, 'listening')).toEqual({
       issues: ['invalid_review'],
     });
+  });
+
+  it.each([
+    ['missing feedback', undefined],
+    ['empty feedback', []],
+    ['whitespace quote', [{ quote: ' \t', reason: 'Incorrect grammar.' }]],
+    ['whitespace reason', [{ quote: 'Private', reason: ' \t' }]],
+    ['oversized quote', [{ quote: 'x'.repeat(241), reason: 'Incorrect grammar.' }]],
+    ['oversized reason', [{ quote: 'Private', reason: 'x'.repeat(301) }]],
+    ['invented quote', [{ quote: 'An invented sentence.', reason: 'Incorrect grammar.' }]],
+    ['changed quote case', [{ quote: 'private exact script.', reason: 'Incorrect grammar.' }]],
+    ['too many records', Array(4).fill({ quote: 'Private', reason: 'Incorrect grammar.' })],
+  ])(
+    'withholds %s from immutable rejection and private correction evidence',
+    (name, passageFeedback) => {
+      const content = JSON.stringify({ ...rejected, passageFeedback });
+      expect(() => assessSectionReview(content, passageQuestions, true, 'listening'), name).toThrow(
+        SectionQualityError
+      );
+      try {
+        assessSectionReview(content, passageQuestions, true, 'listening');
+      } catch (error) {
+        expect((error as SectionQualityError).blindReviewFeedback).toBeUndefined();
+        expect((error as SectionQualityError).blindReviewFailure).toBeUndefined();
+      }
+    }
+  );
+
+  it.each([
+    { ...rejected, passageAcceptable: true },
+    { ...rejected, issues: [] },
+  ])('validates the complete protocol before rejecting immutable passage text', (invalid) => {
+    expect(() =>
+      assessSectionReview(JSON.stringify(invalid), passageQuestions, true, 'listening')
+    ).toThrow(SectionQualityError);
+  });
+
+  it('preserves exact whitespace and Unicode in private feedback without normalizing invented excerpts', () => {
+    const passage = 'HOST:  Grüße, wir sind gegangen.  EXPERT: Ja.';
+    const material = questions.map((question) => ({ ...question, passageText: passage }));
+    const feedback = [
+      { quote: '  Grüße, wir sind gegangen.  ', reason: 'A specific attributed issue.' },
+    ];
+    const review = { ...rejected, passageFeedback: feedback };
+    expect(
+      assessSectionReview(JSON.stringify(review), material, false).feedback?.passageFeedback
+    ).toEqual(feedback);
+    const evidence = captureBlindSectionFailure(
+      material,
+      review as Parameters<typeof captureBlindSectionFailure>[1]
+    );
+    expect(JSON.parse(evidence.reviews[0].candidate!).blindVerdict.passageFeedback).toEqual(
+      feedback
+    );
+    expect(() =>
+      assessSectionReview(
+        JSON.stringify({
+          ...review,
+          passageFeedback: [{ ...feedback[0], quote: '  Gru\u0308ße, wir sind gegangen.  ' }],
+        }),
+        material,
+        true,
+        'listening'
+      )
+    ).toThrow(SectionQualityError);
+  });
+
+  it('accepts empty grammar passage metadata while retaining question-only rejection', () => {
+    const result = assessSectionReview(JSON.stringify(verdict), questions, true);
+    expect(result.issues).toEqual(['ambiguous']);
+    expect(result.feedback?.passageFeedback).toEqual([]);
+    expect(() =>
+      assessSectionReview(JSON.stringify(rejected), questions, true, 'listening')
+    ).toThrow(SectionQualityError);
+  });
+
+  it('withholds incomplete question identities before attaching passage rejection evidence', () => {
+    const invalid = { ...rejected, questions: [verdict.questions[0], verdict.questions[0]] };
+    expect(
+      assessSectionReview(JSON.stringify(invalid), passageQuestions, true, 'listening')
+    ).toEqual({ issues: ['invalid_review'] });
   });
 });

@@ -129,6 +129,7 @@ describe('grammar speaker attribution at the provider boundary', () => {
           return {
             content: JSON.stringify({
               passageAcceptable: true,
+              passageFeedback: [],
               issues: [],
               questions: input.questions.map((item: { index: number }) => ({
                 index: item.index,
@@ -172,6 +173,7 @@ describe('grammar speaker attribution at the provider boundary', () => {
           return {
             content: JSON.stringify({
               passageAcceptable: true,
+              passageFeedback: [],
               issues: [],
               questions: questions.map((_, index) => ({
                 index,

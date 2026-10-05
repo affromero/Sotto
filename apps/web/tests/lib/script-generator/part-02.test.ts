@@ -121,6 +121,9 @@ describe('generateScript', () => {
       ],
       verdict: {
         passageAcceptable: false,
+        passageFeedback: [
+          { quote: 'Private rejected dialogue.', reason: 'The passage is not idiomatic.' },
+        ],
         issues: ['unnatural'],
         questions: [{ index: 0, acceptableOptionIndices: [0], issues: [] }],
       },

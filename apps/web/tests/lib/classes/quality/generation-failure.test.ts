@@ -28,6 +28,7 @@ describe('terminal generation failure classification', () => {
       ],
       {
         passageAcceptable: true,
+        passageFeedback: [],
         issues: [],
         questions: [{ index: 0, acceptableOptionIndices: [1], issues: ['incorrect'] }],
       }

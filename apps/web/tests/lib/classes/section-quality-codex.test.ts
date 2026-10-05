@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { SECTION_QUALITY_JSON_SCHEMA } from '@/lib/classes/section-quality';
+import { SECTION_QUALITY_JSON_SCHEMA, SectionQualityError } from '@/lib/classes/section-quality';
 import { TEACHING_QUALITY_JSON_SCHEMA } from '@/lib/classes/quality/teaching-quality';
 import { generateSectionQuestions } from '@/lib/class-generation';
 import { blockedProviderExecution } from '../../helpers/runtime/provider-execution';
@@ -57,6 +57,7 @@ describe('section review through the Codex provider', () => {
       return {
         content: JSON.stringify({
           passageAcceptable: true,
+          passageFeedback: [],
           issues: [],
           questions: [{ index: 0, acceptableOptionIndices: [0], issues: [] }],
         }),
@@ -106,6 +107,7 @@ describe('section review through the Codex provider', () => {
         return {
           content: JSON.stringify({
             passageAcceptable: true,
+            passageFeedback: [],
             issues: [],
             questions: [
               {
@@ -151,5 +153,65 @@ describe('section review through the Codex provider', () => {
       seed: 'fixture-retry',
     });
     expect(result).toEqual([expect.objectContaining(replacement)]);
+  });
+
+  it.each([
+    { passageAcceptable: true },
+    { passageAcceptable: false, passageFeedback: [] },
+    {
+      passageAcceptable: true,
+      passageFeedback: [{ quote: 'Invented text.', reason: 'Incorrect.' }],
+    },
+    {
+      passageAcceptable: false,
+      passageFeedback: [{ quote: 'Invented text.', reason: 'Incorrect.' }],
+    },
+    { passageAcceptable: false, passageFeedback: [{ quote: 'hola', reason: '  ' }] },
+  ])('does not dispatch a replacement after malformed passage evidence', async (overrides) => {
+    const question = {
+      question: 'Al llegar, Ana dice _____ a sus amigos.',
+      options: ['hola', 'mesa', 'libro', 'agua'],
+      correctIndex: 0,
+      explanation: 'Hola is a greeting.',
+    };
+    execute.mockImplementation(async (system: string, user: string) => {
+      if (system.includes('independently evaluate')) {
+        expect(user).not.toContain('correctIndex');
+        expect(user).not.toContain(question.explanation);
+        return {
+          content: JSON.stringify({
+            ...overrides,
+            issues: ['incorrect'],
+            questions: [{ index: 0, acceptableOptionIndices: [0], issues: [] }],
+          }),
+          model: 'fixture-model',
+        };
+      }
+      expect(user).not.toContain('Blind review feedback:');
+      expect(user).not.toContain('Rejected candidate JSON:');
+      return {
+        content: JSON.stringify({ passage: '', questions: [question] }),
+        model: 'fixture-model',
+      };
+    });
+    const error = await generateSectionQuestions({
+      userId: 'learner',
+      execution: blockedProviderExecution('learner'),
+      skill: 'GRAMMAR',
+      vocabularyReview: true,
+      level: 'A1',
+      nativeLang: 'en',
+      targetLang: 'es',
+      objective: 'Greet friends',
+      grammarPoints: [],
+      targetVocab: [{ lemma: 'hola', gloss: 'hello' }],
+      seed: 'fixture-protocol',
+    }).catch((failure: unknown) => failure);
+    expect(error).toBeInstanceOf(SectionQualityError);
+    expect((error as SectionQualityError).blindReviewFeedback).toBeUndefined();
+    expect((error as SectionQualityError).blindReviewFailure).toBeUndefined();
+    expect(
+      execute.mock.calls.filter(([system]) => !String(system).includes('independently evaluate'))
+    ).toHaveLength(1);
   });
 });

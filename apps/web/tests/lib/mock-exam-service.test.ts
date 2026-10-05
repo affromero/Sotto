@@ -212,6 +212,7 @@ suite('persisted mock exams', () => {
       } else if (body.response_format?.json_schema?.name === 'class_section_quality') {
         content = {
           passageAcceptable: true,
+          passageFeedback: [],
           issues: [],
           questions: Array.from({ length: 5 }, (_, index) => ({
             index,

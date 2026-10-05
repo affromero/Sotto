@@ -282,6 +282,7 @@ function setupHappyPath() {
   mockBlindResponse.mockResolvedValue({
     content: JSON.stringify({
       passageAcceptable: true,
+      passageFeedback: [],
       issues: [],
       questions: [0, 2, 0, 2].map((key, index) => ({
         index,

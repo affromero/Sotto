@@ -72,7 +72,7 @@ describe('generateClassListening', () => {
   it('rejects malformed blind review before publishing listening questions', async () => {
     setupHappyPath();
     mockBlindResponse.mockResolvedValue({ content: '{"questions":[]}', model: 'm' });
-    await expect(generateClassListening(PARAMS)).rejects.toThrow(/exact audio script/);
+    await expect(generateClassListening(PARAMS)).rejects.toThrow(/passage feedback/);
     expect(mockClassSectionCreate).not.toHaveBeenCalled();
     expect(mockEpisodeUpdate).toHaveBeenCalledWith({
       where: { id: 'episode-1' },
