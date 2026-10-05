@@ -104,7 +104,12 @@ export async function readPristine(
         !lineage ||
         !operation ||
         operation.id !== lineage.operationId ||
-        operation.status !== 'CANCELLED' ||
+        !(
+          operation.status === 'CANCELLED' ||
+          (operation.status === 'FAILED' &&
+            (operation.failure === 'generation_failed' ||
+              operation.failure === 'source_unreadable'))
+        ) ||
         operation.classId !== classId ||
         operation.userId !== userId ||
         lineage.audioGenerationKey !== episode.audioGenerationKey ||

@@ -565,7 +565,12 @@ async function settlePreparationCleanup(
   await sottoJobOutbox(database).complete(operation.id, record.fingerprint);
   const settled = await classPreparationStore(database, operation.courseId).transact((current) => {
     if (!current || current.id !== operation.id) throw new PreparationConflictError();
-    if (current.status !== 'FAILED') current.status = 'CANCELLED';
+    if (current.status !== 'FAILED')
+      current.status =
+        current.status === 'UNRESOLVED' &&
+        (current.failure === 'generation_failed' || current.failure === 'source_unreadable')
+          ? 'FAILED'
+          : 'CANCELLED';
     current.updatedAt = Date.now();
     return current;
   });
@@ -636,7 +641,7 @@ export async function recordClassPreparationFailure(
   if (
     diagnostic &&
     !['CANCELLING', 'CANCELLED'].includes(admitted.status) &&
-    ((failed.status === 'FAILED' && failed.failure === 'generation_failed') ||
+    ((['FAILED', 'UNRESOLVED'].includes(failed.status) && failed.failure === 'generation_failed') ||
       (uncertain && failed.status === 'UNRESOLVED'))
   )
     await writeLearningFailure(database, failed, fingerprint, diagnostic);

@@ -111,6 +111,15 @@ extracted word list itself must remain nonempty. Failure
 evidence preserves batch-local candidates/verdicts; offsets apply to correction
 feedback only.
 
+Speaking permits one complete four-phrase replacement after the canonical teaching
+review rejects a valid set. The replacement uses the same captured provider,
+model, objective, vocabulary, language policy, and execution authority. Candidate
+and indexed feedback are untrusted correction data. Both generation and review
+must succeed before reference TTS. Malformed output or verdicts, provider errors,
+and cancellation propagate without repair. At most four application model requests
+are made; TTS remains separate. A second rejection retains both actual private
+candidates and verdicts, with explicit omission for oversized evidence.
+
 `classes/section-quality.ts` validates independent review verdicts for grammar,
 reading, and contextual vocabulary. `class-generation.ts` rejects malformed
 question structure before review, then uses the same captured provider and
@@ -165,6 +174,10 @@ jobs in the serializable admission transaction. Successful admission returns HTT
 attempt history. Section repair retains complete unsubmitted work, replaces only
 selected incomplete sections, and preserves old material until publication.
 Never claim a replacement while earlier provider or execution cleanup is unresolved.
+Known generation failures retain sealed diagnostics while descendant audio cleanup
+is unresolved. Canonical recovery restores `FAILED` only after exact owned root
+and audio receipts settle. Pristine replacement of incomplete audio requires that
+known failure and the existing lineage, fingerprint, revocation, and drain proofs.
 
 `sidedoor/storage-probe-runtime.ts` adapts the shared probe lifecycle to a captured
 backend, original authority callback and dedicated PostgreSQL lock. It checks

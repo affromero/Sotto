@@ -1,6 +1,6 @@
 # Background class preparation
 
-Updated: October 1, 2026
+Updated: October 5, 2026
 
 Durable class and practice preparation preserves learner authority, execution cleanup, and visible outcomes.
 
@@ -43,6 +43,14 @@ preserves the reading passage and questions while correcting the reviewed word
 metadata. A background word may have no associated question and therefore adds no
 SRS evidence; the extracted word list remains nonempty.
 
+Speaking permits one complete four-phrase replacement after its teaching review
+rejects a valid set. The same model and captured lesson context must produce a
+replacement that passes the same review before any reference audio is generated.
+This uses at most four application model requests, plus separate TTS usage.
+Malformed output or verdicts, provider errors, and cancellation stop generation.
+If the replacement is rejected, both actual candidates and verdicts remain private;
+oversized evidence is explicitly marked as omitted.
+
 Generation reads the course level, curriculum, saved course notes, and existing review targets through the normal learning pipeline. Notes can guide future content; scored practice determines mastery. Clearing saved notes does not delete vocabulary previously imported from them or reset practice scores. Edit those items through the existing vocabulary and learning controls.
 
 Raw source URLs and topics live in the scoped job payload so existing erasure rules cover them. The preparation record stores their fingerprint. The activity feed exposes model selection, admission counts, and lifecycle events without prompts, credentials, or raw learner content. The shared journal retains at most 128 recent events and marks gaps explicitly.
@@ -52,6 +60,9 @@ Raw source URLs and topics live in the scoped job payload so existing erasure ru
 Cancellation revokes the preparation grant. Queued work cannot begin new model requests, and linked audio jobs cannot make further provider requests or publish results under revoked authority. Work already sent to a remote provider may still incur charges. Sotto waits for local execution cleanup before treating cancellation as settled.
 
 Class preparations recorded as `FAILED` retain that outcome after cleanup.
+Known generation failures with unfinished audio cleanup temporarily remain
+`UNRESOLVED` and retain their private diagnostic. Canonical recovery restores
+`FAILED` after the owned execution and audio receipts settle.
 Completing cleanup does not mean the learner cancelled the task. A new class attempt is admitted only after
 the execution and descendant audio receipts confirm that cleanup settled.
 Practice failures report unsuccessful generation without assuming the provider
