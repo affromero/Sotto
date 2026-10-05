@@ -216,6 +216,7 @@ function buildUserPrompt(
             : skill === 'grammar'
               ? [
                   'For grammar, rewrite the sentence or exchange and its distractors so exactly one option satisfies the stated task. Explicitly name the requested tense or construction when the exercise tests that form and other forms would otherwise be grammatical. A time expression alone may not exclude another tense. Keep passage empty.',
+                  'Make the speaker and requested perspective explicit with a self-contained sentence, attributed quotation or assigned role. The subject inside a quotation determines its agreement independently of the reporting clause; a singular speaker may say "we" without naming every companion. Do not change a valid quoted subject merely because feedback confuses it with the narrator. For unquoted transformations, preserve the stated actor and facts unless the task explicitly requests a perspective change.',
                 ]
               : [
                   'For vocabulary, preserve exact target lemma coverage and rewrite each context and its distractors to distinguish the word by meaning and grammar. Keep passage empty.',

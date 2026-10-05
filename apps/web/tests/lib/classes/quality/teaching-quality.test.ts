@@ -73,6 +73,56 @@ beforeEach(() => {
 });
 
 describe('intro teaching gate', () => {
+  it.each([true, false])(
+    'reviews the exact grammar perspective and preserves an acceptable=%s verdict',
+    async (acceptable) => {
+      const content = {
+        question: acceptable
+          ? 'Lea erzählt: „Wir _____ zusammen gekocht.“ Ergänze das Perfekt.'
+          : 'Forme ins Perfekt um, ohne die Person zu ändern: Lea kocht.',
+        options: acceptable
+          ? ['haben', 'sind', 'hat', 'seid']
+          : ['Ich habe gekocht.', 'Ich bin gekocht.', 'Ich habe kocht.', 'Ich koche gekocht.'],
+        correctIndex: 0,
+        explanation: '„Kochen“ bildet das Perfekt mit „haben“.',
+        passageRef: '',
+      };
+      const verdict = {
+        items: [
+          {
+            index: 0,
+            acceptable,
+            issues: acceptable ? [] : ['incorrect'],
+            feedback: acceptable ? [] : ['The unquoted answer changes the stated actor.'],
+          },
+        ],
+      };
+      boundary.generate.mockReset();
+      boundary.generate.mockResolvedValue({ content: JSON.stringify(verdict) });
+      const review = reviewTeachingContent({
+        ...params,
+        ai: await boundary.resolve(),
+        provider: createAIProvider('fixture'),
+        kind: 'explanations',
+        items: [content],
+      });
+      if (acceptable) await expect(review).resolves.toBeUndefined();
+      else {
+        const error = await review.catch((failure: unknown) => failure);
+        expect(error).toBeInstanceOf(TeachingQualityRejectionError);
+        if (!(error instanceof TeachingQualityRejectionError)) throw error;
+        expect(error.teachingFailure?.reviews).toEqual([
+          { candidate: JSON.stringify([content]), verdict },
+        ]);
+      }
+      const [system, messages] = boundary.generate.mock.calls[0]!;
+      expect(system).toContain('For explanation items involving grammar tasks');
+      expect(system).toContain('Do not require a quoted subject to match');
+      expect(system).toContain('Reject unquoted transformations that change the stated actor');
+      expect(system).toContain('does not supply missing attribution or unsupported facts');
+      expect(JSON.parse(messages[0].content)).toEqual({ items: [{ index: 0, content }] });
+    }
+  );
   it('reviews vocabulary against the private key and allows faithful gloss synonyms without incidental attribution', async () => {
     const content = {
       lemma: 'zurückkommen',
