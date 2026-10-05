@@ -65,6 +65,14 @@ describe('generateScript', () => {
         expect(providerInstruction).toMatch(
           /Distinguish infinitives or base forms, participles, and finite verb forms/
         );
+        expect(providerInstruction).toContain(
+          'Frame spoken word mentions explicitly as words, verbs or example forms'
+        );
+        expect(providerInstruction).toContain(
+          'quotation marks alone do not make a bare citation fit after a preposition'
+        );
+        expect(providerInstruction).toContain('beim Verb „gehen“');
+        expect(providerInstruction).toContain('die passende Form für das Wort „ich“');
         expect(providerInstruction).toMatch(
           /German Perfekt uses a finite auxiliary and a past participle \(Partizip II\)/
         );
@@ -136,7 +144,12 @@ describe('generateScript', () => {
         });
 
         expect(providerInstruction.includes('## Grammar explanations')).toBe(expectsGuidance);
+        expect(providerInstruction.includes('Frame spoken word mentions explicitly')).toBe(
+          expectsGuidance
+        );
         expect(providerInstruction).not.toContain('German Perfekt uses a finite auxiliary');
+        expect(providerInstruction).not.toContain('beim Verb „gehen“');
+        expect(providerInstruction).not.toContain('die passende Form für das Wort „ich“');
         if (!forLearning) {
           expect(providerInstruction).toContain(VOICE_REALISM_INSTRUCTIONS);
           expect(providerInstruction).not.toContain('Voice Realism for Language Learning');
