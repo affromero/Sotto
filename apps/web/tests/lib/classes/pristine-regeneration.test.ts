@@ -23,6 +23,7 @@ import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 import { sottoJobOutbox } from '@/lib/sidedoor/jobs/core/job-delivery';
 import { sottoJobExecutions } from '@/lib/sidedoor/jobs/core/job-execution-lifetime';
 import { captureEpisodeStorage } from '@/lib/sidedoor/storage/core/episode-storage';
+import { captureCourseStorage } from '@/lib/sidedoor/storage/core/course-storage';
 import { SIDEDOOR_STATE_ID } from '@/lib/sidedoor/access/state/store';
 import { classPreparationStore } from '@/lib/classes/preparation';
 import {
@@ -569,6 +570,178 @@ suite.each(['AVAILABLE', 'FAILED'] as const)(
       await expect(readPristineRegenerationSnapshot(classId, execution)).rejects.toThrow(
         /active jobs/
       );
+    });
+
+    it('recovers historical audio only after its original parent and children drain', async () => {
+      const episode = await instance.database.episode.create({
+        data: {
+          userId: execution.userId,
+          title: 'Fixture',
+          topic: 'Fixture',
+          source: 'CLASS',
+          status: 'GENERATING_AUDIO',
+        },
+      });
+      await instance.database.classSection.update({
+        where: { id: sectionId },
+        data: { episodeId: episode.id },
+      });
+      const original = await linkPreparationAudio(instance.database, execution.userId, episode.id);
+      await instance.database.courseClass.update({
+        where: { id: classId },
+        data: {
+          courseId: original.courseId,
+          status: 'FAILED',
+          failedAt: new Date(),
+          attempt: 9,
+        },
+      });
+      const parent = await sottoTransaction(instance.database, async (tx) => {
+        const ownership = await captureCourseStorage(tx, original.courseId);
+        return sottoJobOutbox(tx).enqueue(
+          prepareJob({
+            id: original.id,
+            namespace: SIDEDOOR_STATE_ID,
+            handler: 'class-preparation',
+            version: 1,
+            payload: { operationId: original.id, courseId: original.courseId },
+            scopes: ownership.scopes,
+            delivery: { attempts: 1, priority: 0, availableAt: Date.now() },
+          })
+        );
+      });
+      await sottoTransaction(instance.database, (tx) =>
+        classPreparationStore(tx, original.courseId).transact((current) => {
+          if (!current) throw new Error('Missing fixture');
+          current.id = randomUUID();
+          current.status = 'FAILED';
+          current.failure = 'generation_failed';
+          current.classId = classId;
+          current.audioEpisodeIds = [];
+        })
+      );
+      await expect(readPristineRegenerationSnapshot(classId, execution)).rejects.toThrow();
+      await settlePreparationAudio(instance.database, original, 'revoked');
+      await expect(readPristineRegenerationSnapshot(classId, execution)).rejects.toThrow();
+      const binding = {
+        id: randomUUID(),
+        parentId: parent.job.id,
+        fingerprint: parent.fingerprint,
+        executorId: randomUUID(),
+      };
+      await sottoTransaction(instance.database, async (tx) => {
+        await sottoJobExecutions(tx).begin(binding);
+        await sottoJobOutbox(tx).complete(parent.job.id, parent.fingerprint);
+      });
+      await expect(readPristineRegenerationSnapshot(classId, execution)).rejects.toThrow();
+      await sottoTransaction(instance.database, (tx) => sottoJobExecutions(tx).settle(binding));
+      const child = await sottoTransaction(instance.database, async (tx) => {
+        const ownership = await captureEpisodeStorage(tx, episode.id);
+        return sottoJobOutbox(tx).enqueue(
+          prepareJob({
+            id: randomUUID(),
+            namespace: SIDEDOOR_STATE_ID,
+            handler: 'audio-generation',
+            version: 1,
+            payload: {},
+            scopes: ownership.scopes,
+            delivery: { attempts: 1, priority: 0, availableAt: Date.now() },
+          })
+        );
+      });
+      await expect(readPristineRegenerationSnapshot(classId, execution)).rejects.toThrow();
+      const childBinding = {
+        id: randomUUID(),
+        parentId: child.job.id,
+        fingerprint: child.fingerprint,
+        executorId: randomUUID(),
+      };
+      await sottoTransaction(instance.database, async (tx) => {
+        await sottoJobExecutions(tx).begin(childBinding);
+        await sottoJobOutbox(tx).complete(child.job.id, child.fingerprint);
+      });
+      await expect(readPristineRegenerationSnapshot(classId, execution)).rejects.toThrow();
+      await sottoTransaction(instance.database, (tx) =>
+        sottoJobExecutions(tx).settle(childBinding)
+      );
+      const snapshot = await readPristineRegenerationSnapshot(classId, execution);
+      expect(snapshot).toMatch(/^[a-f0-9]{64}$/);
+      expect(
+        await instance.database.classSection.findUnique({ where: { id: sectionId } })
+      ).toMatchObject({ episodeId: episode.id, score: null, passed: null });
+      await expect(claimPristineRegeneration(classId, execution, snapshot)).resolves.toMatchObject({
+        attempt: 10,
+      });
+    });
+
+    it.each([
+      'missing parent',
+      'wrong handler',
+      'wrong version',
+      'wrong course',
+      'wrong operation',
+      'missing scopes',
+      'changed audio key',
+    ])('preserves historical material when authority has %s', async (defect) => {
+      const episode = await instance.database.episode.create({
+        data: {
+          userId: execution.userId,
+          title: 'Fixture',
+          topic: 'Fixture',
+          source: 'CLASS',
+          status: 'GENERATING_AUDIO',
+        },
+      });
+      await instance.database.classSection.update({
+        where: { id: sectionId },
+        data: { episodeId: episode.id },
+      });
+      const original = await linkPreparationAudio(instance.database, execution.userId, episode.id);
+      await instance.database.courseClass.update({
+        where: { id: classId },
+        data: { courseId: original.courseId, status: 'FAILED', failedAt: new Date() },
+      });
+      await settlePreparationAudio(instance.database, original, 'revoked');
+      await sottoTransaction(instance.database, async (tx) => {
+        const ownership = await captureCourseStorage(tx, original.courseId);
+        if (defect !== 'missing parent') {
+          const parent = await sottoJobOutbox(tx).enqueue(
+            prepareJob({
+              id: original.id,
+              namespace: SIDEDOOR_STATE_ID,
+              handler: defect === 'wrong handler' ? 'practice-preparation' : 'class-preparation',
+              version: defect === 'wrong version' ? 2 : 1,
+              payload: {
+                courseId: defect === 'wrong course' ? 'foreign-course' : original.courseId,
+                operationId: defect === 'wrong operation' ? randomUUID() : original.id,
+              },
+              scopes: defect === 'missing scopes' ? ownership.scopes.slice(1) : ownership.scopes,
+              delivery: { attempts: 1, priority: 0, availableAt: Date.now() },
+            })
+          );
+          await sottoJobOutbox(tx).complete(parent.job.id, parent.fingerprint);
+        }
+        await classPreparationStore(tx, original.courseId).transact((current) => {
+          if (!current) throw new Error('Missing fixture');
+          current.id = randomUUID();
+          current.status = 'FAILED';
+          current.failure = 'generation_failed';
+          current.classId = classId;
+          current.audioEpisodeIds = [];
+        });
+      });
+      if (defect === 'changed audio key')
+        await instance.database.episode.update({
+          where: { id: episode.id },
+          data: { audioGenerationKey: 'changed-generation' },
+        });
+      await expect(readPristineRegenerationSnapshot(classId, execution)).rejects.toThrow();
+      expect(
+        await instance.database.classSection.findUnique({ where: { id: sectionId } })
+      ).toMatchObject({ episodeId: episode.id, score: null, passed: null });
+      expect(
+        await instance.database.courseClass.findUnique({ where: { id: classId } })
+      ).toMatchObject({ status: 'FAILED', attempt: 1 });
     });
 
     it('never erases a recording that wins a concurrent admission', async () => {
