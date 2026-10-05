@@ -101,6 +101,9 @@ describe('intro teaching gate', () => {
       items: [content],
     });
     const [system, messages] = boundary.generate.mock.calls[0]!;
+    expect(system).toContain('gloss is a dictionary meaning in the native language (en)');
+    expect(system).toContain('never to vocabulary metadata');
+    expect(system).toContain('Immediate immersion for A2');
     expect(system).toContain('Accept faithful contextual synonyms');
     expect(system).toContain(
       'interpret the question or distinguish the supplied private correctIndex answer'
