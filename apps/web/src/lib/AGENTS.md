@@ -56,6 +56,11 @@ capture versioned requirements and explicit provider bindings without paid probe
 `learning/session-evaluation.ts` validates complete material and current evidence.
 `learning/reading-vocabulary.ts` extracts passage vocabulary independently of
 listening and credits only assessed targets backed by course memory.
+`learning/reading/vocabulary-protocol.ts` shares the strict private model-output
+schema between reading requests and parsing. Initial and replacement responses
+use a structured `words` object. Protocol rejection logs contain only static codes,
+the passage hash, and bounded question identities with an explicit hash and omission
+for oversized identity lists. Stored vocabulary and sealed failure formats stay unchanged.
 `learning/progress.ts` and `progress-route.ts` persist revision-bound choices and
 writing drafts. Conflicts preserve local work until the learner reconciles it.
 `learning/database.ts` defines the transaction boundary shared by these helpers.

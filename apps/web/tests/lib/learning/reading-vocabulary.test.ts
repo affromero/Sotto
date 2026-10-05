@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createHash } from 'node:crypto';
 import { blockedProviderExecution } from '../../helpers/runtime/provider-execution';
 import {
   extractReadingVocabulary,
@@ -10,8 +11,12 @@ import {
 } from '@/lib/classes/quality/teaching-quality';
 import { teachingFailureSchema } from '@/lib/classes/quality/teaching-failure';
 import type { LearningDatabase } from '@/lib/learning/database';
+import { ReadingVocabularyProtocolError } from '@/lib/learning/reading/vocabulary-protocol';
+import { captureGenerationFailure } from '@/lib/classes/quality/generation-failure';
 
 const generate = vi.hoisted(() => vi.fn());
+const logError = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/logger', () => ({ logger: { error: logError, warn: vi.fn() } }));
 vi.mock('@/lib/learning-ai', () => ({
   resolveCapturedLearningAi: async () => ({ provider: 'anthropic', model: 'fixture' }),
   capturedLearningAiOptions: async () => ({}),
@@ -41,7 +46,10 @@ const word = {
   sourceForm: 'bestellt',
   questionIndices: [0],
 };
-const response = (content: unknown) => ({ content: JSON.stringify(content), model: 'fixture' });
+const response = (content: unknown) => ({
+  content: JSON.stringify(Array.isArray(content) ? { words: content } : content),
+  model: 'fixture',
+});
 const approved = (count = 1) => ({
   items: Array.from({ length: count }, (_, index) => ({
     index,
@@ -62,7 +70,8 @@ const rejected = {
 };
 beforeEach(() => {
   generate.mockReset();
-  generate.mockResolvedValueOnce({ content: JSON.stringify([word]), model: 'fixture' });
+  logError.mockReset();
+  generate.mockResolvedValueOnce(response([word]));
   generate.mockResolvedValue({
     content: JSON.stringify({ items: [{ index: 0, acceptable: true, issues: [], feedback: [] }] }),
     model: 'fixture',
@@ -120,15 +129,12 @@ describe('reading vocabulary extraction', () => {
     { ...word, questionIndices: [0, 0] },
   ])('rejects attribution outside the exact passage or question set: %j', async (invalid) => {
     generate.mockReset();
-    generate.mockResolvedValue({ content: JSON.stringify([invalid]), model: 'fixture' });
+    generate.mockResolvedValue(response([invalid]));
     await expect(extractReadingVocabulary(options)).rejects.toThrow('attribution');
   });
   it('keeps background vocabulary separate from assessed words', async () => {
     generate.mockReset();
-    generate.mockResolvedValueOnce({
-      content: JSON.stringify([{ ...word, questionIndices: [] }]),
-      model: 'fixture',
-    });
+    generate.mockResolvedValueOnce(response([{ ...word, questionIndices: [] }]));
     generate.mockResolvedValueOnce({
       content: JSON.stringify({
         items: [{ index: 0, acceptable: true, issues: [], feedback: [] }],
@@ -172,6 +178,14 @@ describe('reading vocabulary extraction', () => {
       },
     });
     expect(generate.mock.calls[2]![0]).toContain('preserving each exact sourceForm');
+    for (const request of [generate.mock.calls[0]!, generate.mock.calls[2]!]) {
+      expect(request[0]).toContain('JSON object containing only a words array');
+      expect(request[2].jsonSchema.schema).toMatchObject({
+        type: 'object',
+        required: ['words'],
+        additionalProperties: false,
+      });
+    }
     expect(generate.mock.calls[3]![0]).toContain('faithful contextual synonyms');
     expect(options.questions).toEqual(originalQuestions);
   });
@@ -343,6 +357,7 @@ describe('reading vocabulary extraction', () => {
     generate.mockResolvedValueOnce(response([word])).mockResolvedValueOnce(response({ items: [] }));
     await expect(extractReadingVocabulary(options)).rejects.toBeInstanceOf(ReviewerProtocolError);
     expect(generate).toHaveBeenCalledTimes(2);
+    expect(logError).not.toHaveBeenCalled();
   });
   it.each(['review', 'replacement', 'replacement review'])(
     'propagates the actual %s provider failure without retry',
@@ -354,6 +369,7 @@ describe('reading vocabulary extraction', () => {
       if (stage === 'replacement review') generate.mockResolvedValueOnce(response([word]));
       generate.mockRejectedValueOnce(failure);
       await expect(extractReadingVocabulary(options)).rejects.toBe(failure);
+      expect(logError).not.toHaveBeenCalled();
       expect(generate).toHaveBeenCalledTimes(
         stage === 'review' ? 2 : stage === 'replacement' ? 3 : 4
       );
@@ -377,6 +393,7 @@ describe('reading vocabulary extraction', () => {
       .mockRejectedValueOnce(cancellation);
     await expect(extractReadingVocabulary(options)).rejects.toBe(cancellation);
     expect(generate).toHaveBeenCalledTimes(3);
+    expect(logError).not.toHaveBeenCalled();
   });
   it('does not advance SRS for a reviewed background word', async () => {
     generate.mockReset();
@@ -460,5 +477,99 @@ describe('reading vocabulary extraction', () => {
     generate.mockReset();
     generate.mockRejectedValue(new Error('Provider unavailable'));
     await expect(extractReadingVocabulary(options)).rejects.toThrow('Provider unavailable');
+    expect(logError).not.toHaveBeenCalled();
+  });
+  it.each([
+    { content: 'private malformed provider body', code: 'malformed_json' },
+    { content: JSON.stringify([word]), code: 'invalid_shape' },
+    {
+      content: JSON.stringify({ words: [{ ...word, extra: 'private extra field' }] }),
+      code: 'invalid_shape',
+    },
+    { content: JSON.stringify({ words: [] }), code: 'invalid_shape' },
+    {
+      content: JSON.stringify({ words: [{ ...word, sourceForm: 'private absent form' }] }),
+      code: 'source_attribution',
+    },
+    {
+      content: JSON.stringify({ words: [{ ...word, questionIndices: [1] }] }),
+      code: 'source_attribution',
+    },
+    {
+      content: JSON.stringify({ words: [{ ...word, questionIndices: [0, 0] }] }),
+      code: 'source_attribution',
+    },
+    { content: JSON.stringify({ words: [word, word] }), code: 'source_attribution' },
+  ])(
+    'rejects invalid structured output with a safe correlated protocol code: $code',
+    async ({ content, code }) => {
+      generate.mockReset();
+      generate.mockImplementation(async (system, messages, requestOptions) => {
+        expect(system).toContain('Return a JSON object containing only a words array');
+        expect(JSON.parse(messages[0].content).passageText).toBe(question.passageText);
+        expect(requestOptions.jsonSchema.schema.properties.words).toMatchObject({
+          type: 'array',
+          minItems: 1,
+          maxItems: 12,
+        });
+        return { content, model: 'fixture' };
+      });
+      const failure = await extractReadingVocabulary(options).catch((error: unknown) => error);
+      expect(failure).toBeInstanceOf(ReadingVocabularyProtocolError);
+      expect(failure).toMatchObject({ code });
+      expect(captureGenerationFailure(failure)).toEqual({ category: 'generation_failed' });
+      expect(logError.mock.calls).toEqual([
+        [
+          'Reading vocabulary output protocol rejected',
+          {
+            code,
+            sourceHash: createHash('sha256').update(question.passageText).digest('hex'),
+            questionCount: 1,
+            questionIds: [question.id],
+            questionIdsSha256: createHash('sha256')
+              .update(JSON.stringify([question.id]))
+              .digest('hex'),
+          },
+        ],
+      ]);
+      expect(JSON.stringify(failure)).not.toContain(content);
+      expect(JSON.stringify(logError.mock.calls)).not.toContain('private');
+      expect(failure).not.toHaveProperty('cause');
+    }
+  );
+  it('omits oversized question identities from protocol logs without restricting generation inputs', async () => {
+    const id = 'reading-'.repeat(600);
+    generate.mockReset();
+    generate.mockResolvedValue({ content: 'private malformed output', model: 'fixture' });
+    const failure = await extractReadingVocabulary({
+      ...options,
+      questions: [{ ...question, id }],
+    }).catch((error: unknown) => error);
+    expect(failure).toMatchObject({ code: 'malformed_json' });
+    const diagnostic = logError.mock.calls[0]![1];
+    expect(diagnostic).toMatchObject({
+      questionCount: 1,
+      questionIdsOmitted: 'size_limit',
+      questionIdsSha256: createHash('sha256')
+        .update(JSON.stringify([id]))
+        .digest('hex'),
+    });
+    expect(diagnostic).not.toHaveProperty('questionIds');
+    expect(JSON.stringify(diagnostic)).not.toContain(id);
+  });
+  it('reports replacement source-identity rejection without retaining the rejected provider body', async () => {
+    generate.mockReset();
+    generate
+      .mockResolvedValueOnce(response([word]))
+      .mockResolvedValueOnce(response(rejected))
+      .mockResolvedValueOnce(response([{ ...word, sourceForm: 'Kaffee' }]));
+    const failure = await extractReadingVocabulary(options).catch((error: unknown) => error);
+    expect(failure).toMatchObject({ code: 'replacement_identity' });
+    expect(captureGenerationFailure(failure)).toEqual({ category: 'generation_failed' });
+    expect(logError.mock.calls[0]![1]).toMatchObject({
+      code: 'replacement_identity',
+      questionIds: [question.id],
+    });
+    expect(JSON.stringify(logError.mock.calls)).not.toContain('Kaffee');
   });
 });

@@ -628,15 +628,17 @@ suite('Durable practice preparation against PostgreSQL', () => {
             /* Generation instructions are plain text. */
           }
           if (system.startsWith('Extract useful'))
-            content = [
-              {
-                lemma: 'Hallo',
-                gloss: 'hello',
-                pos: 'expression',
-                sourceForm: 'Hallo',
-                questionIndices: [0],
-              },
-            ];
+            content = {
+              words: [
+                {
+                  lemma: 'Hallo',
+                  gloss: 'hello',
+                  pos: 'expression',
+                  sourceForm: 'Hallo',
+                  questionIndices: [0],
+                },
+              ],
+            };
           else if (reviewed.items)
             content = {
               items: reviewed.items.map(({ index }) => ({

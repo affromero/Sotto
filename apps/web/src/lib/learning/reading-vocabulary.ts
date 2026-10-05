@@ -1,5 +1,4 @@
 import { createHash } from 'node:crypto';
-import { z } from 'zod';
 import { readingVocabularySchema, type ReadingVocabulary } from '@sotto/shared';
 import { assertReadingQuestionKeys, requestVocabularyExtraction } from '../live-vocab';
 import { resolveCapturedLearningAi } from '../learning-ai';
@@ -13,45 +12,51 @@ import type { SottoProviderExecution } from '../sidedoor/credentials/runtime/pro
 import type { LearningDatabase } from './database';
 import { LearningIncompleteError } from './session-evaluation';
 import { applyReviewOutcome } from '../knowledge-graph';
+import { logger } from '../logger';
+import {
+  readingVocabularyResponseSchema,
+  ReadingVocabularyProtocolError,
+  type ReadingVocabularyProtocolCode,
+} from './reading/vocabulary-protocol';
 
-const extractionSchema = z
-  .array(
-    z
-      .object({
-        lemma: z.string().trim().min(1),
-        gloss: z.string().trim().min(1),
-        pos: z.string().trim().min(1),
-        sourceForm: z.string().min(1),
-        questionIndices: z.array(z.number().int().nonnegative()),
-      })
-      .strict()
-  )
-  .min(1)
-  .max(12);
+function rejectProtocol(
+  code: ReadingVocabularyProtocolCode,
+  passageText: string,
+  questionIds: readonly string[]
+): never {
+  const serializedIds = JSON.stringify(questionIds);
+  logger.error('Reading vocabulary output protocol rejected', {
+    code,
+    sourceHash: createHash('sha256').update(passageText).digest('hex'),
+    questionCount: questionIds.length,
+    questionIdsSha256: createHash('sha256').update(serializedIds).digest('hex'),
+    ...(Buffer.byteLength(serializedIds, 'utf8') <= 4096
+      ? { questionIds }
+      : { questionIdsOmitted: 'size_limit' }),
+  });
+  throw new ReadingVocabularyProtocolError(code);
+}
 
-function parseExtraction(content: string, passageText: string, questionCount: number) {
+function parseExtraction(content: string, passageText: string, questionIds: readonly string[]) {
   let parsed: unknown;
   try {
     parsed = JSON.parse(content);
   } catch {
-    throw new Error('Reading vocabulary extraction returned malformed JSON.');
+    rejectProtocol('malformed_json', passageText, questionIds);
   }
-  const extraction = extractionSchema.safeParse(parsed);
-  if (!extraction.success)
-    throw new Error('Reading vocabulary extraction returned invalid vocabulary.');
-  const words = extraction.data;
+  const extraction = readingVocabularyResponseSchema.safeParse(parsed);
+  if (!extraction.success) rejectProtocol('invalid_shape', passageText, questionIds);
+  const words = extraction.data.words;
   if (
     new Set(words.map((word) => word.lemma)).size !== words.length ||
     words.some(
       (word) =>
         !passageText.includes(word.sourceForm) ||
         new Set(word.questionIndices).size !== word.questionIndices.length ||
-        word.questionIndices.some((index) => index >= questionCount)
+        word.questionIndices.some((index) => index >= questionIds.length)
     )
   )
-    throw new Error(
-      'Reading vocabulary attribution does not match the supplied passage and questions.'
-    );
+    rejectProtocol('source_attribution', passageText, questionIds);
   return words;
 }
 
@@ -80,6 +85,7 @@ export async function extractReadingVocabulary(options: {
   )
     throw new Error('Reading vocabulary requires one exact passage and unique question IDs.');
   const passageText = [...passages][0]!;
+  const questionIds = options.questions.map(({ id }) => id);
   const request = {
     ...options,
     text: passageText,
@@ -87,11 +93,7 @@ export async function extractReadingVocabulary(options: {
     usageCategory: 'reading-vocabulary-extraction',
     readingQuestions: options.questions,
   };
-  let words = parseExtraction(
-    await requestVocabularyExtraction(request),
-    passageText,
-    options.questions.length
-  );
+  let words = parseExtraction(await requestVocabularyExtraction(request), passageText, questionIds);
   const ai = await resolveCapturedLearningAi(options.userId, options.execution);
   const provider = createAIProvider(ai.provider);
   let reviewOffset = 0;
@@ -128,13 +130,13 @@ export async function extractReadingVocabulary(options: {
         },
       }),
       passageText,
-      options.questions.length
+      questionIds
     );
     if (
       replacement.length !== words.length ||
       replacement.some((word, index) => word.sourceForm !== words[index]!.sourceForm)
     )
-      throw new Error('Reading vocabulary correction changed the original source identities.');
+      rejectProtocol('replacement_identity', passageText, questionIds);
     try {
       await reviewWords(replacement);
     } catch (replacementError) {

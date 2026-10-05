@@ -335,7 +335,7 @@ export async function generateTtsAudio(
   const charCount = text.length;
   const totalCost = (charCount / 1000) * meta.platformCostPerKChar;
 
-  logUsage({
+  await logUsage({
     service,
     category: usageCategory,
     inputTokens: charCount,
