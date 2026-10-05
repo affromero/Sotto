@@ -7,8 +7,15 @@ import { sottoJobOutbox } from '@/lib/sidedoor/jobs/core/job-delivery';
 import { sottoJobExecutions } from '@/lib/sidedoor/jobs/core/job-execution-lifetime';
 import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import { readPreparationAudioBinding } from '../preparation-audio';
-import { classPreparationStore } from '../preparation';
+import {
+  CLASS_PREPARATION_QUEUE,
+  classPreparationPayload,
+  classPreparationStore,
+} from '../preparation';
 import { classPreparationGrant } from '../preparation-grant';
+import { captureCourseStorage } from '@/lib/sidedoor/storage/core/course-storage';
+import { SIDEDOOR_STATE_ID } from '@/lib/sidedoor/access/state/store';
+import { requireSottoJobVersion } from '@/lib/sidedoor/jobs/core/job-contracts';
 import type { SkillRequirements } from '@sotto/shared';
 
 export const pristineSnapshotSchema = z.string().regex(/^[a-f0-9]{64}$/);
@@ -102,8 +109,45 @@ export async function readPristine(
       const operation = await classPreparationStore(database, cls.courseId).read();
       if (
         !lineage ||
+        lineage.userId !== userId ||
+        lineage.courseId !== cls.courseId ||
+        (lineage.kind !== undefined && lineage.kind !== 'class') ||
+        lineage.sessionId !== undefined ||
+        lineage.audioGenerationKey !== episode.audioGenerationKey ||
         !operation ||
-        operation.id !== lineage.operationId ||
+        (
+          await classPreparationGrant(database, {
+            id: lineage.operationId,
+            courseId: lineage.courseId,
+            userId: lineage.userId,
+          }).read(lineage.grant)
+        ).status !== 'revoked'
+      )
+        throw new PristineRegenerationConflict();
+      if (operation.id !== lineage.operationId) {
+        const ownership = await captureCourseStorage(database, cls.courseId);
+        const parent = await outbox.read(lineage.operationId);
+        if (
+          !parent ||
+          !parent.complete ||
+          parent.job.id !== lineage.operationId ||
+          parent.job.namespace !== SIDEDOOR_STATE_ID ||
+          parent.job.handler !== CLASS_PREPARATION_QUEUE ||
+          parent.job.version !== 1 ||
+          JSON.stringify(parent.job.scopes) !== JSON.stringify(ownership.scopes)
+        )
+          throw new PristineRegenerationConflict();
+        requireSottoJobVersion(parent.job.handler, parent.job.version);
+        const payload = classPreparationPayload.safeParse(parent.job.payload);
+        if (
+          !payload.success ||
+          payload.data.courseId !== cls.courseId ||
+          payload.data.operationId !== lineage.operationId ||
+          (await executions.blockingStatus(parent.job.id, parent.fingerprint))
+        )
+          throw new PristineRegenerationConflict();
+        await executions.requireParentDrained(parent.job.id, parent.fingerprint);
+      } else if (
         !(
           operation.status === 'CANCELLED' ||
           (operation.status === 'FAILED' &&
@@ -112,11 +156,8 @@ export async function readPristine(
         ) ||
         operation.classId !== classId ||
         operation.userId !== userId ||
-        lineage.audioGenerationKey !== episode.audioGenerationKey ||
         lineage.grant.fingerprint !== operation.grant.fingerprint ||
-        !operation.audioEpisodeIds.includes(episode.id) ||
-        (await classPreparationGrant(database, operation).read(operation.grant)).status !==
-          'revoked'
+        !operation.audioEpisodeIds.includes(episode.id)
       )
         throw new PristineRegenerationConflict();
     }
