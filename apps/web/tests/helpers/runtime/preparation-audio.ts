@@ -12,7 +12,8 @@ import { classPreparationBackend } from '@/lib/classes/preparation';
 export async function linkPreparationAudio(
   database: PrismaClient,
   userId: string,
-  episodeId: string
+  episodeId: string,
+  options: { courseId?: string; deferRegistration?: boolean } = {}
 ) {
   return sottoTransaction(database, async (tx) => {
     const curriculum = await tx.curriculum.upsert({
@@ -20,11 +21,13 @@ export async function linkPreparationAudio(
       update: {},
       create: { nativeLang: 'en', targetLang: 'es', title: 'Audio lineage test' },
     });
-    const course = await tx.course.upsert({
-      where: { userId_nativeLang_targetLang: { userId, nativeLang: 'en', targetLang: 'es' } },
-      update: {},
-      create: { userId, nativeLang: 'en', targetLang: 'es', curriculumId: curriculum.id },
-    });
+    const course = options.courseId
+      ? await tx.course.findUniqueOrThrow({ where: { id: options.courseId } })
+      : await tx.course.upsert({
+          where: { userId_nativeLang_targetLang: { userId, nativeLang: 'en', targetLang: 'es' } },
+          update: {},
+          create: { userId, nativeLang: 'en', targetLang: 'es', curriculumId: curriculum.id },
+        });
     const ownership = await captureCourseStorage(tx, course.id);
     const subject = ownership.scopes.find((scope) => scope.subjectId === `profile:${userId}`)!;
     const resource = ownership.scopes.find((scope) => scope.subjectId === `course:${course.id}`)!;
@@ -84,8 +87,9 @@ export async function linkPreparationAudio(
         where: { id: episodeId },
         data: { audioGenerationKey: generationKey },
       });
-    await registerPreparationAudio(tx, operation, episodeId, generationKey);
-    return { ...operation, audioEpisodeIds: [episodeId] };
+    if (!options.deferRegistration)
+      await registerPreparationAudio(tx, operation, episodeId, generationKey);
+    return { ...operation, audioEpisodeIds: options.deferRegistration ? [] : [episodeId] };
   });
 }
 

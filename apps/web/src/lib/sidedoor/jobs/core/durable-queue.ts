@@ -318,12 +318,37 @@ export async function admitDurableQueueBatch(options: {
       ? await validateDurableAuthority(database, parent.authority)
       : await options.authorize?.(database);
     const children = await options.prepare(database);
+    const episodeAuthorities = new Map<
+      string,
+      {
+        captured: Awaited<ReturnType<typeof captureAuthority>>;
+        recipient: Awaited<ReturnType<typeof validateDurableAuthority>>;
+      }
+    >();
     const records = [];
     for (const child of children) {
       const operationId = durableQueueOperationId(child.queue.name, child.jobId);
       const version = child.version ?? (child.queue.name === 'notifications' ? 4 : 1);
-      const captured = await captureAuthority(database, child.payload);
-      const recipient = await validateDurableAuthority(database, captured.authority);
+      const input =
+        child.payload !== null && typeof child.payload === 'object'
+          ? (child.payload as Record<string, unknown>)
+          : {};
+      const episodeKey =
+        typeof input.episodeId === 'string' && input.episodeId
+          ? JSON.stringify([
+              input.episodeId,
+              typeof input.userId === 'string' ? input.userId : null,
+              typeof input.audioGenerationKey === 'string' ? input.audioGenerationKey : null,
+            ])
+          : null;
+      let authority = episodeKey === null ? undefined : episodeAuthorities.get(episodeKey);
+      if (!authority) {
+        const captured = await captureAuthority(database, child.payload);
+        const recipient = await validateDurableAuthority(database, captured.authority);
+        authority = { captured, recipient };
+        if (episodeKey !== null) episodeAuthorities.set(episodeKey, authority);
+      }
+      const { captured, recipient } = authority;
       if (expected?.userId && recipient?.userId !== expected.userId)
         throw new Error('Durable child recipient differs from its authorization');
       const outbox = sottoJobOutbox(database);
@@ -348,6 +373,11 @@ export async function admitDurableQueueBatch(options: {
         })
       );
       records.push({ child, operationId, version, record });
+    }
+    for (const { captured, recipient } of episodeAuthorities.values()) {
+      const current = await validateDurableAuthority(database, captured.authority);
+      if (current?.userId !== recipient?.userId)
+        throw new Error('Durable child recipient changed before admission');
     }
     if (parent) await sottoJobOutbox(database).complete(parent.operationId, parent.fingerprint);
     return records;
