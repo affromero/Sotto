@@ -15,7 +15,7 @@ import {
   type VocabItem,
 } from './knowledge-graph';
 import type { CefrLevel } from '@sotto/shared';
-import { READING_VOCABULARY_JSON_SCHEMA } from './learning/reading/vocabulary-protocol';
+import { buildReadingVocabularyJsonSchema } from './learning/reading/vocabulary-protocol';
 
 export interface ReadingVocabularyQuestion {
   question: string;
@@ -87,6 +87,7 @@ export async function requestVocabularyExtraction(p: {
       NATIVE: p.nativeLang,
       LEVEL: p.level,
       MAX: String(MAX_ITEMS),
+      ...(p.readingQuestions ? { MAX_QUESTION_INDEX: String(p.readingQuestions.length - 1) } : {}),
     }
   );
   const res = await createAIProvider(ai.provider).generateResponse(
@@ -109,7 +110,9 @@ export async function requestVocabularyExtraction(p: {
     ],
     {
       ...(await capturedLearningAiOptions(ai)),
-      ...(p.readingQuestions ? { jsonSchema: READING_VOCABULARY_JSON_SCHEMA } : {}),
+      ...(p.readingQuestions
+        ? { jsonSchema: buildReadingVocabularyJsonSchema(p.readingQuestions.length) }
+        : {}),
       maxTokens: p.readingQuestions ? 2048 : 1024,
       temperature: 0.2,
     }

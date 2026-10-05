@@ -125,6 +125,8 @@ describe('reading vocabulary extraction', () => {
   });
   it.each([
     { ...word, sourceForm: 'trinkt' },
+    { ...word, sourceForm: 'Bestellt' },
+    { ...word, sourceForm: 'bestellt Kaffee' },
     { ...word, questionIndices: [1] },
     { ...word, questionIndices: [0, 0] },
   ])('rejects attribution outside the exact passage or question set: %j', async (invalid) => {
@@ -184,6 +186,15 @@ describe('reading vocabulary extraction', () => {
         type: 'object',
         required: ['words'],
         additionalProperties: false,
+        properties: {
+          words: {
+            items: {
+              properties: {
+                questionIndices: { maxItems: 1, items: { maximum: 0 } },
+              },
+            },
+          },
+        },
       });
     }
     expect(generate.mock.calls[3]![0]).toContain('faithful contextual synonyms');
@@ -490,19 +501,26 @@ describe('reading vocabulary extraction', () => {
     {
       content: JSON.stringify({ words: [{ ...word, sourceForm: 'private absent form' }] }),
       code: 'source_attribution',
+      attributionViolations: [{ code: 'source_form_missing', wordIndex: 0 }],
     },
     {
       content: JSON.stringify({ words: [{ ...word, questionIndices: [1] }] }),
       code: 'source_attribution',
+      attributionViolations: [{ code: 'out_of_range', wordIndex: 0 }],
     },
     {
       content: JSON.stringify({ words: [{ ...word, questionIndices: [0, 0] }] }),
       code: 'source_attribution',
+      attributionViolations: [{ code: 'dup_question_index', wordIndex: 0 }],
     },
-    { content: JSON.stringify({ words: [word, word] }), code: 'source_attribution' },
+    {
+      content: JSON.stringify({ words: [word, word] }),
+      code: 'source_attribution',
+      attributionViolations: [{ code: 'dup_lemma', wordIndex: 1 }],
+    },
   ])(
     'rejects invalid structured output with a safe correlated protocol code: $code',
-    async ({ content, code }) => {
+    async ({ content, code, attributionViolations }) => {
       generate.mockReset();
       generate.mockImplementation(async (system, messages, requestOptions) => {
         expect(system).toContain('Return a JSON object containing only a words array');
@@ -529,12 +547,19 @@ describe('reading vocabulary extraction', () => {
             questionIdsSha256: createHash('sha256')
               .update(JSON.stringify([question.id]))
               .digest('hex'),
+            ...(attributionViolations ? { attributionViolations } : {}),
           },
         ],
       ]);
       expect(JSON.stringify(failure)).not.toContain(content);
       expect(JSON.stringify(logError.mock.calls)).not.toContain('private');
       expect(failure).not.toHaveProperty('cause');
+      expect(generate.mock.calls.map((request) => JSON.parse(request[1][0].content))).toEqual([
+        {
+          passageText: question.passageText,
+          questions: [{ question: question.question, options: question.options, correctIndex: 0 }],
+        },
+      ]);
     }
   );
   it('omits oversized question identities from protocol logs without restricting generation inputs', async () => {

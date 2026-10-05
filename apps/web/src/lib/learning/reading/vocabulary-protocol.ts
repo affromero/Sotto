@@ -20,10 +20,28 @@ export const readingVocabularyResponseSchema = z
   })
   .strict();
 
-export const READING_VOCABULARY_JSON_SCHEMA = {
-  name: 'reading_vocabulary_extraction',
-  schema: z.toJSONSchema(readingVocabularyResponseSchema, { target: 'draft-7' }),
-};
+export function buildReadingVocabularyJsonSchema(questionCount: number) {
+  if (!Number.isSafeInteger(questionCount) || questionCount < 1)
+    throw new Error('Reading vocabulary requires a positive safe question count.');
+  const word = readingVocabularyResponseSchema.shape.words.element.extend({
+    questionIndices: z
+      .array(
+        z
+          .number()
+          .int()
+          .nonnegative()
+          .max(questionCount - 1)
+      )
+      .max(questionCount),
+  });
+  return {
+    name: 'reading_vocabulary_extraction',
+    schema: z.toJSONSchema(
+      readingVocabularyResponseSchema.extend({ words: z.array(word).min(1).max(12) }),
+      { target: 'draft-7' }
+    ),
+  };
+}
 
 const protocolMessages = {
   malformed_json: 'Reading vocabulary extraction returned malformed JSON.',

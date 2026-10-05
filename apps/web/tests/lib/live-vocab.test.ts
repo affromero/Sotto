@@ -42,6 +42,7 @@ import {
   requestVocabularyExtraction,
 } from '@/lib/live-vocab';
 import { blockedProviderExecution } from '../helpers/runtime/provider-execution';
+import { buildReadingVocabularyJsonSchema } from '@/lib/learning/reading/vocabulary-protocol';
 
 const SAMPLE = JSON.stringify([
   { lemma: 'bestellen', gloss: 'to order', pos: 'verb' },
@@ -138,7 +139,11 @@ describe('keyed reading extraction requests', () => {
               required: ['lemma', 'gloss', 'pos', 'sourceForm', 'questionIndices'],
               additionalProperties: false,
               properties: {
-                questionIndices: { type: 'array', items: { type: 'integer', minimum: 0 } },
+                questionIndices: {
+                  type: 'array',
+                  maxItems: 1,
+                  items: { type: 'integer', minimum: 0, maximum: 0 },
+                },
               },
             },
           },
@@ -147,6 +152,64 @@ describe('keyed reading extraction requests', () => {
     });
     expect(mockResolveLearningAi).toHaveBeenCalledWith(PARAMS.userId, PARAMS.execution);
   });
+  it('binds initial and correction requests to their own question range without mutating earlier schemas', async () => {
+    const sent: { questionCount: number; schema: unknown; prompt: string }[] = [];
+    mockGenerateResponse.mockImplementation(async (system, messages, requestOptions) => {
+      sent.push({
+        questionCount: JSON.parse(messages[0].content).questions.length,
+        schema: requestOptions.jsonSchema,
+        prompt: system,
+      });
+      return { content: READING_SAMPLE, model: 'captured' };
+    });
+    for (const questionCount of [1, 5]) {
+      const request = {
+        ...reading,
+        readingQuestions: Array.from({ length: questionCount }, () => question),
+      };
+      await requestVocabularyExtraction(request);
+      await requestVocabularyExtraction({
+        ...request,
+        readingCorrection: {
+          words: [{ lemma: 'bestellen', sourceForm: 'bestellt' }],
+          issues: ['unsupported'],
+          feedback: [{ index: 0, feedback: ['Keep unassessed vocabulary as background.'] }],
+        },
+      });
+    }
+    expect(sent.map(({ questionCount }) => questionCount)).toEqual([1, 1, 5, 5]);
+    for (const { questionCount, schema, prompt } of sent) {
+      expect(schema).toMatchObject({
+        name: 'reading_vocabulary_extraction',
+        schema: {
+          properties: {
+            words: {
+              minItems: 1,
+              maxItems: 12,
+              items: {
+                properties: {
+                  questionIndices: {
+                    maxItems: questionCount,
+                    items: { type: 'integer', minimum: 0, maximum: questionCount - 1 },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+      expect(JSON.stringify(schema)).not.toContain('uniqueItems');
+      expect(prompt).toContain(`unique integers from 0 through ${questionCount - 1}, inclusive`);
+      expect(prompt).toContain('Every canonical lemma must be unique');
+      expect(prompt).toContain("passage's original spelling and case");
+    }
+  });
+  it.each([0, -1, 0.5, Number.NaN, Number.POSITIVE_INFINITY, Number.MAX_SAFE_INTEGER + 1])(
+    'refuses an invalid schema question count %s',
+    (questionCount) => {
+      expect(() => buildReadingVocabularyJsonSchema(questionCount)).toThrow('safe question count');
+    }
+  );
   it.each([-1, 4, 0.5, undefined])(
     'refuses invalid private key %s before resolving a provider',
     async (correctIndex) => {
