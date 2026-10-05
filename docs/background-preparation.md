@@ -41,7 +41,15 @@ one extraction replacement. Twelve words permit at most two extraction calls and
 six teaching reviews. These requests use the unchanged parent budget. Replacement
 preserves the reading passage and questions while correcting the reviewed word
 metadata. A background word may have no associated question and therefore adds no
-SRS evidence; the extracted word list remains nonempty.
+SRS evidence; the extracted word list remains nonempty. The same review request
+independently checks word metadata and every proposed assessment link. Each link
+requires an explicit answer to whether the question can be answered without
+understanding the word, with a bounded evidence summary. The server admits a link
+only when that answer is false. A denied
+link cannot advance the word's SRS; its approved metadata remains background
+exposure. Supported links still credit reading vocabulary. Metadata rejection
+requires the existing replacement. Missing or inconsistent review decisions,
+provider failures and cancellation stop generation without another attempt.
 
 Speaking permits one complete four-phrase replacement after its teaching review
 rejects a valid set. The same model and captured lesson context must produce a

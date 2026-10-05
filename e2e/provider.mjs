@@ -87,7 +87,7 @@ export async function startProvider() {
               },
             ],
           });
-        } else if (system.startsWith('Independently review vocabulary teaching content')) {
+        } else if (system.startsWith('Independently review reading vocabulary')) {
           const input = JSON.parse(
             body.messages.find((message) => message.role === 'user').content
           );
@@ -103,7 +103,17 @@ export async function startProvider() {
             throw new Error('Unexpected vocabulary review fixture');
           }
           content = JSON.stringify({
-            items: [{ index: 0, acceptable: true, issues: [], feedback: [] }],
+            items: [
+              {
+                index: 0,
+                metadata: { acceptable: true, issues: [], feedback: [] },
+                associations: input.items[0].content.questionIndices.map((questionIndex) => ({
+                  questionIndex,
+                  canAnswerWithoutWord: false,
+                  reasoning: 'The greeting meaning distinguishes the required answer.',
+                })),
+              },
+            ],
           });
         } else if (messages.includes('Grade the response.'))
           content = JSON.stringify({
