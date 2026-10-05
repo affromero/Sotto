@@ -134,12 +134,15 @@ export async function composeWritingPrompts(
       reviewItems: prompts.map((prompt, index) => ({
         ...prompt,
         taskType: valid[index].taskType,
+        sourceText: valid[index].sourceText.trim(),
       })),
     };
   };
 
   const review = (
-    items: Array<ComposedWritingPrompt & { taskType: RawWritingPrompt['taskType'] }>
+    items: Array<
+      ComposedWritingPrompt & { taskType: RawWritingPrompt['taskType']; sourceText: string }
+    >
   ) =>
     reviewTeachingContent({
       ai,

@@ -73,6 +73,77 @@ beforeEach(() => {
 });
 
 describe('intro teaching gate', () => {
+  it('reviews a partial reply opening without inventing a completed travel event', async () => {
+    const content = {
+      taskType: 'guided_reply',
+      task: 'Schreibe als Lea an Ben über deinen Aufenthalt in Berlin.',
+      sourceText: 'Lea war gestern in Berlin.',
+      guidance: 'Verwende das Perfekt und behalte Leas Fakten.',
+      ideas: ['Hallo Ben, ich bin …'],
+    };
+    boundary.generate.mockReset();
+    boundary.generate.mockResolvedValue({ content: JSON.stringify(approved) });
+    await expect(
+      reviewTeachingContent({
+        ...params,
+        ai: await boundary.resolve(),
+        provider: createAIProvider('fixture'),
+        kind: 'writing',
+        items: [content],
+      })
+    ).resolves.toBeUndefined();
+    const [system, messages] = boundary.generate.mock.calls[0];
+    expect(system).toContain('Partial ideas are openings, not completed answers');
+    expect(system).toContain('in Berlin gewesen');
+    expect(JSON.parse(messages[0].content).items[0].content).toEqual(content);
+  });
+
+  it.each([true, false])(
+    'preserves writing source boundaries and a valid=%s review outcome',
+    async (acceptable) => {
+      const content = acceptable
+        ? {
+            taskType: 'correction',
+            task: 'Korrigiere das Perfekt.\n\nTom hat gestern zum Bahnhof gegangen.',
+            sourceText: 'Tom hat gestern zum Bahnhof gegangen.',
+            guidance: 'Verwende das richtige Hilfsverb.',
+            ideas: ['Tom ist gestern …'],
+          }
+        : {
+            taskType: 'guided_reply',
+            task: 'Schreibe als Lea über ihren Aufenthalt in Berlin. Behalte alle Fakten.',
+            sourceText: 'Lea war in Berlin.',
+            guidance: 'Schreibe über Lea.',
+            ideas: ['Nora hat Rom besucht.'],
+          };
+      const verdict = {
+        items: [
+          {
+            index: 0,
+            acceptable,
+            issues: acceptable ? [] : ['unsupported'],
+            feedback: acceptable ? [] : ['The idea changes both the actor and the supplied place.'],
+          },
+        ],
+      };
+      boundary.generate.mockReset();
+      boundary.generate.mockResolvedValue({ content: JSON.stringify(verdict) });
+      const review = reviewTeachingContent({
+        ...params,
+        ai: await boundary.resolve(),
+        provider: createAIProvider('fixture'),
+        kind: 'writing',
+        items: [content],
+      });
+      if (acceptable) await expect(review).resolves.toBeUndefined();
+      else await expect(review).rejects.toBeInstanceOf(TeachingQualityRejectionError);
+      const [system, messages] = boundary.generate.mock.calls[0];
+      expect(system).toContain('the separate sourceText is the supplied input');
+      expect(system).toContain('idiomatic completion that preserves the assigned actor');
+      expect(JSON.parse(messages[0].content).items[0].content).toEqual(content);
+    }
+  );
+
   it.each([true, false])(
     'reviews the exact grammar perspective and preserves an acceptable=%s verdict',
     async (acceptable) => {

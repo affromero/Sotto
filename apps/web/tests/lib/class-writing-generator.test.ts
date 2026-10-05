@@ -133,10 +133,13 @@ describe('composeWritingPrompts', () => {
     const prompts = await composeWritingPrompts(PARAMS);
     const reviewed = JSON.parse(mockTeachingResponse.mock.calls[0][1][0].content);
     expect(reviewed.items.map((item: { content: unknown }) => item.content)).toEqual([
-      { ...prompts[0], taskType: 'guided_reply' },
-      { ...prompts[1], taskType: 'correction' },
-      { ...prompts[2], taskType: 'completion' },
+      { ...prompts[0], taskType: 'guided_reply', sourceText: JSON.parse(SAMPLE)[0].sourceText },
+      { ...prompts[1], taskType: 'correction', sourceText: JSON.parse(SAMPLE)[1].sourceText },
+      { ...prompts[2], taskType: 'completion', sourceText: JSON.parse(SAMPLE)[2].sourceText },
     ]);
+    expect(prompts.every((prompt) => !('sourceText' in prompt) && !('taskType' in prompt))).toBe(
+      true
+    );
   });
 
   it('rejects instructions requiring incorrect output before writing prompts are persisted', async () => {
@@ -218,6 +221,7 @@ describe('composeWritingPrompts', () => {
     expect(JSON.parse(mockTeachingResponse.mock.calls[1][1][0].content).items[0].content).toEqual({
       ...prompts[0],
       taskType: 'completion',
+      sourceText: 'Mañana ___ una cena con Ana a las ocho.',
     });
     expect(mockGenerateResponse.mock.calls[1][1][0].content).toContain(
       'supply every fact the learner needs'
@@ -514,6 +518,7 @@ describe('generateClassWriting', () => {
     expect(reviewedReply.content).toEqual({
       taskType: 'guided_reply',
       task: `${corrected[0].task}\n\n${corrected[0].sourceText}`,
+      sourceText: corrected[0].sourceText,
       guidance: corrected[0].guidance,
       ideas: corrected[0].ideas,
     });

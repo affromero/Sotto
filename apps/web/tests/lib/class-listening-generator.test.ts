@@ -16,6 +16,7 @@ import {
   mockPersistGeneratedReferences,
   mockVerifyEpisodeReferences,
   mockBlindResponse,
+  mockTeachingResponse,
   mockGenerateResponse,
   mockLogUsage,
   mockGetConfiguredTtsProviderId,
@@ -190,6 +191,25 @@ describe('generateClassListening', () => {
           ]),
         })
       );
+    });
+
+    it('reviews spoken words while keeping annotated turns intact for persistence and audio', async () => {
+      setupHappyPath();
+      const turns = [{ speaker: 'HOST', text: '[V1:hola], bienvenidos. [1] [SFX: intro]' }];
+      mockGenerateScript.mockResolvedValue({ ...SAMPLE_SCRIPT_RESULT, turns });
+
+      await generateClassListening(PARAMS);
+
+      const blindInput = JSON.parse(mockBlindResponse.mock.calls[0][1][0].content);
+      const teachingInput = JSON.parse(mockTeachingResponse.mock.calls[0][1][0].content);
+      expect(blindInput.passage).toBe('HOST: hola, bienvenidos.');
+      expect(
+        teachingInput.items.map(
+          (item: { content: { passageText: string } }) => item.content.passageText
+        )
+      ).toEqual(Array(4).fill(blindInput.passage));
+      expect(mockScriptCreate.mock.calls[0][0].data.turns).toEqual(turns);
+      expect(mockCreateSegmentsAndQueueAudio.mock.calls[0][1]).toEqual(turns);
     });
 
     it('calls createSegmentsAndQueueAudio with episodeId and the turns', async () => {

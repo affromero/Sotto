@@ -44,6 +44,7 @@ const EXPECTED_FILES = [
   'shared/content-safety.md',
   'shared/input-sanitization.md',
   'shared/voice-realism-full.md',
+  'shared/voice-realism-learning.md',
   'shared/voice-realism-short.md',
   'shared/audience/kids.md',
   'shared/audience/teens.md',

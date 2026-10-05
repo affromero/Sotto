@@ -21,6 +21,7 @@ Generate exactly {{COUNT}} short, scaffolded writing tasks the learner should re
 - Be appropriate for {{LEVEL}} proficiency and draw on the objective and vocabulary above
 - Be answerable in 1–3 sentences at A1/A2, or a short paragraph at B1+
 - Choose the fact load and sentence requirement together so every required fact fits naturally at {{LEVEL}}. Reduce the supplied facts or adjust the allowed response length within the level's bounds rather than forcing an overloaded reply. Guidance and ideas must support the stated task without changing the actor, inventing events, or imposing incompatible constraints.
+- Recheck sentence counts and connectors across task, guidance, and ideas. Two clauses joined by a connector can form one sentence; do not simultaneously require them to become two separate sentences. Correction instructions must permit correcting the supplied error, and transformation instructions must permit the requested tense change. Every partial opening must allow a natural completion using the supplied facts and assigned actor.
 - Follow the language policy for task instructions and guidance.
 - Vary in type so the learner practices different registers and structures
 - Include enough cues that the learner knows what to say before they start.
