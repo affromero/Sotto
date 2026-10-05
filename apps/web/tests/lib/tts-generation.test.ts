@@ -52,6 +52,10 @@ vi.mock('@/lib/providers/tts-registry', () => ({
 }));
 
 const mockLogUsage = vi.fn();
+const createUsage = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/prisma', () => ({
+  prisma: { apiUsageLog: { create: (...args: unknown[]) => createUsage(...args) } },
+}));
 vi.mock('@/lib/usage-logger', () => ({
   logUsage: (...args: unknown[]) => mockLogUsage(...args),
 }));
@@ -107,6 +111,8 @@ function defaultParams(overrides?: Partial<TtsGenerationParams>): TtsGenerationP
 describe('generateTtsAudio', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockLogUsage.mockReset().mockResolvedValue(undefined);
+    createUsage.mockReset();
     mockGetConcurrencyLimit.mockResolvedValue(5);
     mockObserveConcurrencyError.mockResolvedValue(undefined);
     mockSemaphoreWait.mockResolvedValue(true);
@@ -124,6 +130,67 @@ describe('generateTtsAudio', () => {
     expect(result!.service).toBe('elevenlabs');
     expect(result!.wordTimings).toBeNull();
   });
+
+  it.each(['saved', 'failed'] as const)(
+    'settles the actual usage write before returning audio when persistence is %s',
+    async (outcome) => {
+      const { logUsage } =
+        await vi.importActual<typeof import('@/lib/usage-logger')>('@/lib/usage-logger');
+      mockLogUsage.mockImplementation(logUsage);
+      let enteredWrite!: () => void;
+      let settleWrite!: () => void;
+      const writeStarted = new Promise<void>((resolve) => {
+        enteredWrite = resolve;
+      });
+      const writeReleased = new Promise<void>((resolve) => {
+        settleWrite = resolve;
+      });
+      let occupied = 0;
+      let completed = false;
+      let usageData: unknown;
+      mockSemaphoreWait.mockImplementation(async () => {
+        occupied += 1;
+        return true;
+      });
+      mockSemaphoreRelease.mockImplementation(async () => {
+        occupied -= 1;
+      });
+      createUsage.mockImplementation(async ({ data }) => {
+        usageData = data;
+        enteredWrite();
+        await writeReleased;
+        if (outcome === 'failed') throw new Error('Usage database unavailable');
+        return { id: 'usage-1' };
+      });
+      const generation = generateTtsAudio(defaultParams()).then((result) => {
+        completed = true;
+        return result;
+      });
+      try {
+        await writeStarted;
+        expect(usageData).toMatchObject({
+          userId: 'user-1',
+          episodeId: 'episode-1',
+          category: 'audio_generation',
+          service: 'elevenlabs',
+          inputTokens: 'Hello world'.length,
+        });
+        await new Promise<void>((resolve) => setImmediate(resolve));
+        expect(completed).toBe(false);
+        expect(occupied).toBe(0);
+      } finally {
+        settleWrite();
+        await generation;
+      }
+      expect(await generation).toMatchObject({
+        audioBuffer: Buffer.from('audio-data'),
+        segmentDuration: 5,
+        service: 'elevenlabs',
+        wordTimings: null,
+      });
+      expect(completed).toBe(true);
+    }
+  );
 
   it('makes the provider slot available before local duration processing', async () => {
     let occupied = 0;
