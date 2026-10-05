@@ -407,6 +407,7 @@ describe('generateSectionQuestions', () => {
       });
       expect(result).toEqual(questions);
       for (const call of mockGenerateResponse.mock.calls) {
+        expect(call[0]).toContain('subject inside the quotation determines its agreement');
         expect(call[0]).toContain('actual verb, construction and meaning');
         expect(call[0]).toContain('ordinary "bleiben" meaning "remain"');
         expect(call[0]).toContain('"stoppen" instead forms "hat ... gestoppt"');
