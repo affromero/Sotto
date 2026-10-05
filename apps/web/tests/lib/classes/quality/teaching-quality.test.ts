@@ -73,6 +73,115 @@ beforeEach(() => {
 });
 
 describe('intro teaching gate', () => {
+  it.each([
+    {
+      defect: 'none',
+      passageText:
+        'HOST: [chuckles] Beim Verb gehen benutzen wir hier sein.\nEXPERT: Die passende Form für das Wort ich ist bin. Ich bin zum Bahnhof gegangen.',
+      correctIndex: 0,
+      feedback: [],
+    },
+    {
+      defect: 'incorrect spoken agreement',
+      passageText: 'HOST: [laughs] Ich hat Tee gekocht.\nEXPERT: Ich bin zum Bahnhof gegangen.',
+      correctIndex: 0,
+      feedback: ['passageText: The spoken clause uses hat with ich.'],
+    },
+    {
+      defect: 'English spoken teaching',
+      passageText:
+        'HOST: [chuckles] Now use the perfect tense.\nEXPERT: Ich bin zum Bahnhof gegangen.',
+      correctIndex: 0,
+      feedback: ['passageText: The spoken instruction is English at A2.'],
+    },
+    {
+      defect: 'arbitrary bracketed English',
+      passageText: 'HOST: [Use the perfect tense]\nEXPERT: Ich bin zum Bahnhof gegangen.',
+      correctIndex: 0,
+      feedback: ['passageText: The bracketed instruction is not a known audio control.'],
+    },
+    {
+      defect: 'unsupported key',
+      passageText: 'HOST: [laughs] Ich habe Tee gekocht.\nEXPERT: Ich bin zum Bahnhof gegangen.',
+      correctIndex: 1,
+      feedback: ['correctIndex: The second speaker says Bahnhof, not Kino.'],
+    },
+    {
+      defect: 'incorrect speaker attribution',
+      passageText: 'HOST: [laughs] Ich bin zum Bahnhof gegangen.\nEXPERT: Ich habe Tee gekocht.',
+      correctIndex: 0,
+      feedback: ['explanation: The first speaker, not the second, went to the station.'],
+    },
+  ])(
+    'preserves the exact listening candidate and reviewer decision for $defect',
+    async (fixture) => {
+      const content = {
+        question: 'Wohin ist der zweite Sprecher gegangen?',
+        options: ['Zum Bahnhof', 'Zum Kino', 'Nach Hause', 'Zum Park'],
+        correctIndex: fixture.correctIndex,
+        explanation: 'Der zweite Sprecher sagt: Ich bin zum Bahnhof gegangen.',
+        passageText: fixture.passageText,
+      };
+      const acceptable = fixture.feedback.length === 0;
+      const verdict = {
+        items: [
+          {
+            index: 0,
+            acceptable,
+            issues: acceptable ? [] : ['incorrect'],
+            feedback: fixture.feedback,
+          },
+        ],
+      };
+      boundary.generate.mockReset();
+      boundary.generate.mockResolvedValue({ content: JSON.stringify(verdict) });
+      const review = reviewTeachingContent({
+        ...params,
+        ai: await boundary.resolve(),
+        provider: createAIProvider('fixture'),
+        kind: 'listening',
+        items: [content],
+      });
+      if (acceptable) await expect(review).resolves.toBeUndefined();
+      else {
+        const error = await review.catch((failure: unknown) => failure);
+        expect(error).toBeInstanceOf(TeachingQualityRejectionError);
+        if (!(error instanceof TeachingQualityRejectionError)) throw error;
+        expect(error.teachingFailure?.reviews).toEqual([
+          { candidate: JSON.stringify([content]), verdict },
+        ]);
+      }
+      const [system, messages, options] = boundary.generate.mock.calls[0]!;
+      expect(system).toContain(
+        'HOST and EXPERT at turn prefixes are nonspoken speaker identifiers'
+      );
+      expect(system).toContain('[laughs], [chuckles]');
+      expect(system).toContain('never to arbitrary bracketed English');
+      expect(system).toContain(
+        'all spoken transcript content and the full questions, options and explanations'
+      );
+      expect(system).toContain('Immediate immersion for A2');
+      expect(system).toContain('Preserve speaker attribution');
+      expect(system).toContain('For listening passageText only');
+      expect(system).toContain(
+        'The surrounding spoken explanation must still be grammatical and idiomatic'
+      );
+      expect(system).toContain(
+        'does not change the citation requirements for written intro content'
+      );
+      expect(system).toContain(
+        'Reject an unquoted citation form used as though it were grammatically integrated'
+      );
+      expect(JSON.parse(messages[0].content)).toEqual({ items: [{ index: 0, content }] });
+      expect(options).toMatchObject({
+        model: 'captured-model',
+        maxTokens: 2048,
+        temperature: 0,
+        jsonSchema: { name: 'class_teaching_quality' },
+      });
+    }
+  );
+
   it('reviews a partial reply opening without inventing a completed travel event', async () => {
     const content = {
       taskType: 'guided_reply',
@@ -95,6 +204,9 @@ describe('intro teaching gate', () => {
     const [system, messages] = boundary.generate.mock.calls[0];
     expect(system).toContain('Partial ideas are openings, not completed answers');
     expect(system).toContain('in Berlin gewesen');
+    expect(system).not.toContain(
+      'HOST and EXPERT at turn prefixes are nonspoken speaker identifiers'
+    );
     expect(JSON.parse(messages[0].content).items[0].content).toEqual(content);
   });
 

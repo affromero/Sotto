@@ -154,34 +154,38 @@ describe('bounded canonical listening correction', () => {
 
   it('uses the same audible transcript at all provider review boundaries without rewriting the saved script', async () => {
     const turns = [
-      { speaker: 'HOST', text: 'Ich habe Tante Anna [V1:besucht]. [1] [SFX: gentle music]' },
-      { speaker: 'EXPERT', text: 'Sie hat uns Tee gegeben.' },
+      {
+        speaker: 'HOST',
+        text: '[chuckles] Ich habe Tante Anna [V1:besucht]. [1] [SFX: gentle music]',
+      },
+      { speaker: 'EXPERT', text: '[laughs] Sie hat uns Tee gegeben.' },
     ];
-    const transcript = 'HOST: Ich habe Tante Anna besucht.\nEXPERT: Sie hat uns Tee gegeben.';
+    const transcript =
+      'HOST: [chuckles] Ich habe Tante Anna besucht.\nEXPERT: [laughs] Sie hat uns Tee gegeben.';
     const questions = [
       {
-        question: 'Wen hat HOST besucht?',
+        question: 'Wen hat der erste Sprecher besucht?',
         options: ['Tante Anna', 'Ben', 'Mia', 'Tom'],
         correctIndex: 0,
-        explanation: 'HOST sagt: Tante Anna.',
+        explanation: 'Der erste Sprecher sagt: Tante Anna.',
       },
       {
         question: 'Was hat Tante Anna gegeben?',
         options: ['Kaffee', 'Wasser', 'Tee', 'Saft'],
         correctIndex: 2,
-        explanation: 'EXPERT nennt Tee.',
+        explanation: 'Der zweite Sprecher nennt Tee.',
       },
       {
         question: 'Wer erzählt vom Besuch?',
-        options: ['HOST', 'EXPERT', 'Tante Anna', 'Tom'],
+        options: ['Der erste Sprecher', 'Der zweite Sprecher', 'Tante Anna', 'Tom'],
         correctIndex: 0,
-        explanation: 'HOST erzählt in der ersten Person.',
+        explanation: 'Der erste Sprecher erzählt in der ersten Person.',
       },
       {
-        question: 'Welche Handlung nennt EXPERT?',
+        question: 'Welche Handlung nennt der zweite Sprecher?',
         options: ['Etwas kaufen', 'Nach Hause gehen', 'Tee geben', 'Einen Film sehen'],
         correctIndex: 2,
-        explanation: 'EXPERT sagt: Sie hat uns Tee gegeben.',
+        explanation: 'Der zweite Sprecher sagt: Sie hat uns Tee gegeben.',
       },
     ];
     mockGenerateResponse.mockImplementation(async (system: string, messages, options) => {
@@ -212,6 +216,10 @@ describe('bounded canonical listening correction', () => {
       questions.map(({ question, options }, index) => ({ index, question, options }))
     );
     const teaching = JSON.parse(mockTeachingResponse.mock.calls[0][1][0].content);
+    expect(mockTeachingResponse.mock.calls[0][0]).toContain(
+      'HOST and EXPERT at turn prefixes are nonspoken speaker identifiers'
+    );
+    expect(mockTeachingResponse.mock.calls[0][0]).toContain('never to arbitrary bracketed English');
     expect(
       teaching.items.map((item: { content: { passageText: string } }) => item.content.passageText)
     ).toEqual(Array(4).fill(transcript));

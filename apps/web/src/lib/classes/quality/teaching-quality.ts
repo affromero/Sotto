@@ -96,6 +96,19 @@ export async function reviewTeachingContent(options: {
   kind: 'intro' | 'explanations' | 'writing' | 'listening' | 'speaking' | 'vocabulary';
   items: readonly unknown[];
 }): Promise<void> {
+  let languagePolicy = classLanguagePolicy(options);
+  if (options.kind === 'vocabulary')
+    languagePolicy = [
+      `Vocabulary metadata has field-specific languages at every CEFR level: lemma and sourceForm are in the target language (${options.targetLang}), while gloss is a dictionary meaning in the native language (${options.nativeLang}).`,
+      'The gloss may be a word or short dictionary phrase. Part-of-speech labels and question indices are structural metadata. Do not reject these metadata fields merely for using their required language or dictionary form.',
+      `Apply the class language policy only to the embedded passage, questions, options and explanations, never to vocabulary metadata: ${languagePolicy}`,
+    ].join(' ');
+  else if (options.kind === 'listening')
+    languagePolicy = [
+      'In passageText, HOST and EXPERT at turn prefixes are nonspoken speaker identifiers. Known inline audio controls [laughs], [chuckles], [giggles], [with genuine belly laugh], [sighs], [exhales sharply], [whispers], [gasps], [excited], [sarcastic], [curious], [nervously], [cautiously], [pause], [short pause] and [long pause] are nonspoken delivery metadata. Do not reject these identifiers or controls merely for their English spelling.',
+      'This exemption applies only to those transcript controls, never to arbitrary bracketed English, spoken words, questions, options or explanations. Preserve speaker attribution when checking the proposed key and explanation.',
+      `Apply the class language policy to all spoken transcript content and the full questions, options and explanations: ${languagePolicy}`,
+    ].join(' ');
   const content = await requestTeachingReview({
     ...options,
     prompt: 'class/review-teaching-content.md',
@@ -106,14 +119,7 @@ export async function reviewTeachingContent(options: {
       NATIVE: options.nativeLang,
       TARGET: options.targetLang,
       KIND: options.kind,
-      LANGUAGE_POLICY:
-        options.kind === 'vocabulary'
-          ? [
-              `Vocabulary metadata has field-specific languages at every CEFR level: lemma and sourceForm are in the target language (${options.targetLang}), while gloss is a dictionary meaning in the native language (${options.nativeLang}).`,
-              'The gloss may be a word or short dictionary phrase. Part-of-speech labels and question indices are structural metadata. Do not reject these metadata fields merely for using their required language or dictionary form.',
-              `Apply the class language policy only to the embedded passage, questions, options and explanations, never to vocabulary metadata: ${classLanguagePolicy(options)}`,
-            ].join(' ')
-          : classLanguagePolicy(options),
+      LANGUAGE_POLICY: languagePolicy,
     },
   });
   let parsed: z.infer<typeof verdictSchema>;

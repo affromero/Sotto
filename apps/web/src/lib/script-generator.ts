@@ -553,11 +553,12 @@ This is a LANGUAGE LEARNING audio lesson. Generate the learner-facing script in 
     ? `\n\n## Grammar explanations
 
 - Distinguish infinitives or base forms, participles, and finite verb forms. Use the correct grammatical term for the form in the actual example.
+- Frame spoken word mentions explicitly as words, verbs or example forms. Keep the surrounding sentence grammatical and idiomatic; quotation marks alone do not make a bare citation fit after a preposition.
 - Qualify word-order rules by clause type: declarative main clause, subordinate clause, or question. Distinguish finite verb position from participle position.
 - Check every spoken clause for grammatical and idiomatic wording after adding vocabulary markers. Wrap an existing word or phrase in its grammatical position; never move it to introduce a marker. Preserve complete coordinated clauses and verb complements, and use the tense that fits the intended meaning. Do not force vocabulary into a sentence where it does not fit naturally.
 - Check that every explanation and rule matches its example. For A1/A2, prefer correct concrete examples and omit a broad rule if you cannot state its scope accurately at that level.${
         lang === 'de'
-          ? '\n- German Perfekt uses a finite auxiliary and a past participle (Partizip II). In "hat gemacht", "hat" is the finite auxiliary and "gemacht" is the past participle. Do not call the participle the infinitive or Grundform.\n- In a German declarative main clause, the finite verb occupies the second constituent position, including when vocabulary is marked: "Ich wollte [V1:gestern] ins Kino gehen." or "[V1:Gestern] wollte ich ins Kino gehen." Never insert a marked adverb between an initial subject and its finite verb.'
+          ? '\n- In German, use spoken word-mention framing such as "beim Verb „gehen“" and "die passende Form für das Wort „ich“" instead of improperly integrating bare citation forms.\n- German Perfekt uses a finite auxiliary and a past participle (Partizip II). In "hat gemacht", "hat" is the finite auxiliary and "gemacht" is the past participle. Do not call the participle the infinitive or Grundform.\n- In a German declarative main clause, the finite verb occupies the second constituent position, including when vocabulary is marked: "Ich wollte [V1:gestern] ins Kino gehen." or "[V1:Gestern] wollte ich ins Kino gehen." Never insert a marked adverb between an initial subject and its finite verb.'
           : ''
       }`
     : '';
