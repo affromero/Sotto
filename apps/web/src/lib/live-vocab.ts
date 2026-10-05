@@ -15,6 +15,7 @@ import {
   type VocabItem,
 } from './knowledge-graph';
 import type { CefrLevel } from '@sotto/shared';
+import { READING_VOCABULARY_JSON_SCHEMA } from './learning/reading/vocabulary-protocol';
 
 export interface ReadingVocabularyQuestion {
   question: string;
@@ -108,6 +109,7 @@ export async function requestVocabularyExtraction(p: {
     ],
     {
       ...(await capturedLearningAiOptions(ai)),
+      ...(p.readingQuestions ? { jsonSchema: READING_VOCABULARY_JSON_SCHEMA } : {}),
       maxTokens: p.readingQuestions ? 2048 : 1024,
       temperature: 0.2,
     }

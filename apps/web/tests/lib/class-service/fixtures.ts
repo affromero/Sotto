@@ -1,7 +1,7 @@
 import { learningScriptHash } from '@/lib/learning/script-hash';
 import { createHash } from 'node:crypto';
 import { createSkillRequirements, learningSkills } from '@sotto/shared';
-import { vi } from 'vitest';
+import { expect, vi } from 'vitest';
 
 const mockReadingProviderInput = vi.hoisted(() => vi.fn());
 
@@ -13,32 +13,38 @@ vi.mock('@/lib/learning-ai', () => ({
 vi.mock('@/lib/providers/ai', () => ({
   createAIProvider: () => ({
     generateResponse: async (
-      _system: string,
+      system: string,
       messages: { content: string }[],
-      options: { jsonSchema?: unknown }
+      options: { jsonSchema?: { name: string } }
     ) => {
       const input = JSON.parse(messages[0]!.content);
-      if (input.passageText) mockReadingProviderInput(input);
+      if (input.passageText) {
+        expect(system).toContain('JSON object containing only a words array');
+        expect(options.jsonSchema?.name).toBe('reading_vocabulary_extraction');
+        mockReadingProviderInput(input);
+      } else expect(options.jsonSchema?.name).toBe('class_teaching_quality');
       return {
         content: JSON.stringify(
-          options.jsonSchema
+          options.jsonSchema?.name === 'class_teaching_quality'
             ? {
-                items: input.items.map((_: unknown, index: number) => ({
+                items: input.items.map(({ index }: { index: number }) => ({
                   index,
                   acceptable: true,
                   issues: [],
                   feedback: [],
                 })),
               }
-            : [
-                {
-                  lemma: 'hola',
-                  gloss: 'hello',
-                  pos: 'expression',
-                  sourceForm: 'Hola',
-                  questionIndices: [],
-                },
-              ]
+            : {
+                words: [
+                  {
+                    lemma: 'hola',
+                    gloss: 'hello',
+                    pos: 'expression',
+                    sourceForm: 'Hola',
+                    questionIndices: [],
+                  },
+                ],
+              }
         ),
         model: 'fixture',
       };

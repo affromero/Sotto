@@ -57,6 +57,17 @@ const NOTE_SAMPLE = JSON.stringify({
     { key: 'Past tense', title: 'Past tense' },
   ],
 });
+const READING_SAMPLE = JSON.stringify({
+  words: [
+    {
+      lemma: 'bestellen',
+      gloss: 'to order',
+      pos: 'verb',
+      sourceForm: 'bestellt',
+      questionIndices: [0],
+    },
+  ],
+});
 
 const PARAMS = {
   userId: 'u1',
@@ -91,7 +102,7 @@ describe('keyed reading extraction requests', () => {
     const { loadAndRender } =
       await vi.importActual<typeof import('@/lib/prompt-loader')>('@/lib/prompt-loader');
     mockLoadAndRender.mockImplementation(loadAndRender);
-    mockGenerateResponse.mockResolvedValue({ content: SAMPLE, model: 'captured' });
+    mockGenerateResponse.mockResolvedValue({ content: READING_SAMPLE, model: 'captured' });
   });
   it('sends private answer keys and bounded correction data using the captured selection', async () => {
     const correction = {
@@ -101,7 +112,7 @@ describe('keyed reading extraction requests', () => {
     };
     await expect(
       requestVocabularyExtraction({ ...reading, readingCorrection: correction })
-    ).resolves.toBe(SAMPLE);
+    ).resolves.toBe(READING_SAMPLE);
     const [system, messages, options] = mockGenerateResponse.mock.calls[0]!;
     expect(system).toContain('same number of words, in the same order');
     expect(system).toContain('word need not itself be the answer');
@@ -111,6 +122,29 @@ describe('keyed reading extraction requests', () => {
       correction,
     });
     expect(options).toMatchObject({ model: 'captured', apiKeyOverride: 'key', maxTokens: 2048 });
+    expect(options.jsonSchema).toMatchObject({
+      name: 'reading_vocabulary_extraction',
+      schema: {
+        type: 'object',
+        required: ['words'],
+        additionalProperties: false,
+        properties: {
+          words: {
+            type: 'array',
+            minItems: 1,
+            maxItems: 12,
+            items: {
+              type: 'object',
+              required: ['lemma', 'gloss', 'pos', 'sourceForm', 'questionIndices'],
+              additionalProperties: false,
+              properties: {
+                questionIndices: { type: 'array', items: { type: 'integer', minimum: 0 } },
+              },
+            },
+          },
+        },
+      },
+    });
     expect(mockResolveLearningAi).toHaveBeenCalledWith(PARAMS.userId, PARAMS.execution);
   });
   it.each([-1, 4, 0.5, undefined])(
@@ -205,6 +239,7 @@ describe('extractAndStoreLiveVocab', () => {
     const n = await extractAndStoreLiveVocab(PARAMS);
     expect(n).toBe(2);
     expect(mockGenerateResponse.mock.calls[0][1][0].content).toContain('<UNTRUSTED_TRANSCRIPT>');
+    expect(mockGenerateResponse.mock.calls[0][2]).not.toHaveProperty('jsonSchema');
     expect(mockUpsertLiveVocab).toHaveBeenCalledWith(
       'c1',
       [
