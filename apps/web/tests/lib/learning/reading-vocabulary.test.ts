@@ -175,6 +175,70 @@ describe('reading vocabulary extraction', () => {
     expect(generate.mock.calls[3]![0]).toContain('faithful contextual synonyms');
     expect(options.questions).toEqual(originalQuestions);
   });
+  it('retains native glosses while correcting incidental vocabulary to unassessed background', async () => {
+    const readingQuestion = {
+      id: 'reading-purchase',
+      question: 'Was kauft Mara?',
+      options: ['Äpfel', 'Eine Fahrkarte', 'Ein Buch', 'Eine Suppe'],
+      correctIndex: 0,
+      passageText: 'Mara kauft am Markt Äpfel.',
+    };
+    const market = {
+      lemma: 'Markt',
+      gloss: 'market',
+      pos: 'noun',
+      sourceForm: 'Markt',
+      questionIndices: [0],
+    };
+    const apple = {
+      lemma: 'Apfel',
+      gloss: 'apple',
+      pos: 'noun',
+      sourceForm: 'Äpfel',
+      questionIndices: [0],
+    };
+    const attributionVerdict = {
+      items: [
+        {
+          index: 0,
+          acceptable: false,
+          issues: ['unsupported'],
+          feedback: ['The purchase question assesses the object, not the market location.'],
+        },
+        { index: 1, acceptable: true, issues: [], feedback: [] },
+      ],
+    };
+    generate.mockReset();
+    generate
+      .mockResolvedValueOnce(response([market, apple]))
+      .mockResolvedValueOnce(response(attributionVerdict))
+      .mockResolvedValueOnce(response([{ ...market, questionIndices: [] }, apple]))
+      .mockResolvedValueOnce(response(approved(2)));
+
+    const result = await extractReadingVocabulary({ ...options, questions: [readingQuestion] });
+
+    expect(result.passageText).toBe(readingQuestion.passageText);
+    expect(result.words).toEqual([
+      { lemma: 'Markt', gloss: 'market', pos: 'noun', sourceForm: 'Markt', questionIds: [] },
+      {
+        lemma: 'Apfel',
+        gloss: 'apple',
+        pos: 'noun',
+        sourceForm: 'Äpfel',
+        questionIds: ['reading-purchase'],
+      },
+    ]);
+    for (const request of [generate.mock.calls[1]!, generate.mock.calls[3]!]) {
+      expect(request[0]).toContain('gloss is a dictionary meaning in the native language (en)');
+      expect(request[0]).toContain('never to vocabulary metadata');
+      expect(request[0]).toContain(
+        'Reject incorrect glosses, invented forms and unsupported assessment attribution'
+      );
+    }
+    const correctedReview = JSON.parse(generate.mock.calls[3]![1][0].content);
+    expect(correctedReview.items[0].content.assessedQuestions).toEqual([]);
+    expect(correctedReview.items[1].content.assessedQuestions).toEqual([readingQuestion]);
+  });
   it('maps late-batch feedback to whole-candidate indices and reviews all replacement batches', async () => {
     const words = Array.from({ length: 12 }, (_, index) => ({
       ...word,

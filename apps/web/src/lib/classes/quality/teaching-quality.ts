@@ -65,7 +65,14 @@ export async function reviewTeachingContent(options: {
       NATIVE: options.nativeLang,
       TARGET: options.targetLang,
       KIND: options.kind,
-      LANGUAGE_POLICY: classLanguagePolicy(options),
+      LANGUAGE_POLICY:
+        options.kind === 'vocabulary'
+          ? [
+              `Vocabulary metadata has field-specific languages at every CEFR level: lemma and sourceForm are in the target language (${options.targetLang}), while gloss is a dictionary meaning in the native language (${options.nativeLang}).`,
+              'The gloss may be a word or short dictionary phrase. Part-of-speech labels and question indices are structural metadata. Do not reject these metadata fields merely for using their required language or dictionary form.',
+              `Apply the class language policy only to the embedded passage, questions, options and explanations, never to vocabulary metadata: ${classLanguagePolicy(options)}`,
+            ].join(' ')
+          : classLanguagePolicy(options),
     }),
     [
       {
