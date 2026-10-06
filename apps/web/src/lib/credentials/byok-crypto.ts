@@ -1,14 +1,26 @@
-import { scryptSync } from 'crypto';
+import { createHash, scryptSync } from 'crypto';
 
 const KEY_LENGTH = 32;
+let cachedKey: { secretFingerprint: string; value: Buffer } | undefined;
 
-function getEncryptionKey(salt: Buffer): Buffer {
-  const secret = process.env.BYOK_ENCRYPTION_KEY;
-  if (!secret) throw new Error('BYOK_ENCRYPTION_KEY environment variable is not set');
-  return scryptSync(secret, salt, KEY_LENGTH);
+function clearCachedKey(): void {
+  cachedKey?.value.fill(0);
+  cachedKey = undefined;
 }
 
-/** Derive the application key used by Sidedoor-owned credentials. */
+/** Reuse only the current instance key. Credential ownership is checked by the caller. */
 export function deriveOwnedCredentialKey(): Buffer {
-  return getEncryptionKey(Buffer.from('sotto-owned-credentials-v1', 'utf8'));
+  const secret = process.env.BYOK_ENCRYPTION_KEY;
+  if (!secret) {
+    clearCachedKey();
+    throw new Error('BYOK_ENCRYPTION_KEY environment variable is not set');
+  }
+
+  const secretFingerprint = createHash('sha256').update(secret).digest('hex');
+  if (cachedKey?.secretFingerprint !== secretFingerprint) {
+    clearCachedKey();
+    const value = scryptSync(secret, Buffer.from('sotto-owned-credentials-v1', 'utf8'), KEY_LENGTH);
+    cachedKey = { secretFingerprint, value };
+  }
+  return Buffer.from(cachedKey.value);
 }

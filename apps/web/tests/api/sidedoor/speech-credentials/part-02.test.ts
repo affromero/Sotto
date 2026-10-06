@@ -81,6 +81,7 @@ suite('speech tooling uses complete canonical credentials', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
   afterAll(async () => {
     await instance?.close();
@@ -614,6 +615,8 @@ suite('speech tooling uses complete canonical credentials', () => {
   });
   it.each(['preview', 'admin'] as const)('%s sends the complete saved account', async (kind) => {
     await seed();
+    const startedAt = Date.now();
+    vi.spyOn(Date, 'now').mockReturnValue(startedAt);
     let observed: { key: string | null; account: string | null } | undefined;
     vi.stubGlobal('fetch', async (input: RequestInfo | URL, options?: RequestInit) => {
       const outgoing = new Request(input, options);
@@ -625,7 +628,7 @@ suite('speech tooling uses complete canonical credentials', () => {
           return (await storage.owned.head({ ...storage.slot, owner })).credential?.metadata
             .lastUsedAt;
         });
-        expect(usedAt).toEqual(expect.any(Number));
+        expect(usedAt).toBe(startedAt);
       }
       observed = {
         key: outgoing.headers.get('authorization'),

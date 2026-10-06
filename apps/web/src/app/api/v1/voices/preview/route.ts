@@ -80,12 +80,15 @@ export async function POST(request: NextRequest) {
         'local',
         'kokoro',
       ].includes(providerName)
-    )
+    ) {
+      const usedAt = Date.now();
       await sottoTransaction(prismaUnfiltered, async (database) => {
-        if (saved) await admitSottoExecutionCredential(database, authorize, saved, request.signal);
+        if (saved)
+          await admitSottoExecutionCredential(database, authorize, saved, usedAt, request.signal);
         else await authorize(database);
         request.signal.throwIfAborted();
       });
+    }
     audioBuffer = await ttsProvider.generateSpeech({ text, voiceId, signal: request.signal });
   } catch (err) {
     if (isAccessError(err)) return errorResponse(err.code, accessErrorStatus(err));

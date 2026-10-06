@@ -88,6 +88,7 @@ suite('speech tooling uses complete canonical credentials', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
   afterAll(async () => {
     await instance?.close();
@@ -442,8 +443,32 @@ suite('speech tooling uses complete canonical credentials', () => {
     vi.stubGlobal('fetch', async () => new Response('accepted'));
     const transport = admission.createTransport(rules);
     rules[0]!.url = 'https://unrelated.invalid/';
-    const response = await transport.authenticatedFetch('https://api.play.ht/api/v2/voices');
+    const usedAt = Date.now();
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(usedAt);
+    boundary.database = new Proxy(instance.database, {
+      get(target, property, receiver) {
+        const value = Reflect.get(target, property, receiver);
+        if (property === '$transaction')
+          return (...parameters: unknown[]) => {
+            clock.mockReturnValue(usedAt + 1);
+            return Reflect.apply(value, target, parameters);
+          };
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    });
+    let response: Response;
+    try {
+      response = await transport.authenticatedFetch('https://api.play.ht/api/v2/voices');
+    } finally {
+      boundary.database = instance.database;
+    }
     expect(await response.text()).toBe('accepted');
+    const recorded = await sottoTransaction(instance.database, async (tx) => {
+      const storage = await sottoCredentialStorage(tx, 'tts', 'playht');
+      const owner = await captureSottoCredentialOwner(tx, identity.ownerId);
+      return (await storage.owned.head({ ...storage.slot, owner })).credential?.metadata.lastUsedAt;
+    });
+    expect(recorded).toBe(usedAt);
     await expect(transport.authenticatedFetch('https://unrelated.invalid/')).rejects.toThrow();
   });
 

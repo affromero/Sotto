@@ -511,7 +511,6 @@ export async function processAudioGeneration(
           },
         });
         if (persisted.count !== 1) throw new EpisodeStorageChangedError();
-        await admit(tx);
       },
     });
   } catch (error) {
@@ -527,28 +526,7 @@ export async function processAudioGeneration(
 
   await job.updateProgress(90);
 
-  await deliver(
-    await sottoTransaction(
-      prisma,
-      async (tx) => {
-        await authorizeGeneration(tx);
-        const current = await tx.episode.findUniqueOrThrow({
-          where: { id: episodeId },
-          select: { status: true },
-        });
-        if (current.status === 'GENERATING_AUDIO') return { kind: 'waiting' as const };
-        const { record } = await verifyCurrentInitialStitch(
-          tx,
-          authorizeGeneration,
-          episodeId,
-          audioGenerationKey,
-          signal
-        );
-        return { kind: 'existing' as const, record };
-      },
-      { signal }
-    )
-  );
+  await deliver(await sottoTransaction(prisma, admit, { signal }));
 
   await job.updateProgress(100);
   logger.info('Audio generation complete for segment', {

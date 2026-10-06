@@ -89,6 +89,7 @@ export async function captureSottoProviderAdmission(execution: SottoProviderExec
   );
   const admit = async (suppliedSignal: AbortSignal, recordUse: boolean) => {
     const requestSignal = signal ? AbortSignal.any([signal, suppliedSignal]) : suppliedSignal;
+    const usedAt = Date.now();
     await sottoTransaction(
       prismaUnfiltered,
       async (database) => {
@@ -97,7 +98,13 @@ export async function captureSottoProviderAdmission(execution: SottoProviderExec
           throw new AccessError('conflict', 'The execution instance changed');
         if (credential) {
           if (recordUse)
-            await admitSottoExecutionCredential(database, authorize, credential, requestSignal);
+            await admitSottoExecutionCredential(
+              database,
+              authorize,
+              credential,
+              usedAt,
+              requestSignal
+            );
           else
             await validateSottoExecutionCredential(database, authorize, credential, requestSignal);
         } else {

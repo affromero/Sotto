@@ -13,6 +13,7 @@ import { PATCH } from '@/app/api/v1/profiles/[id]/route';
 import { SIDEDOOR_STATE_ID, sottoStorageInstance } from '@/lib/sidedoor/access/state/store';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 import { writeStorageReference } from '@/lib/sidedoor/storage/core/storage-write';
+import { sottoStorageWriteTransaction } from '@/lib/sidedoor/storage/admission/storage-write-transaction';
 import {
   createSharedTestInstance,
   type SharedTestInstance,
@@ -356,6 +357,33 @@ suite('avatar uploads with shared authority and durable storage writes', () => {
       `SELECT state->>'outcome' AS outcome FROM "SidedoorState" WHERE state->>'kind' = 'write_receipt'`
     );
     expect(receipts).toEqual([{ outcome: 'referenced' }, { outcome: 'referenced' }]);
+  });
+  it('releases storage phase admission before the external avatar writer runs', async () => {
+    const marker = randomUUID();
+    binding.duringWrite = () =>
+      sottoStorageWriteTransaction(
+        instance.database,
+        async (tx) => {
+          await tx.$executeRawUnsafe(
+            'INSERT INTO "SidedoorState" (id,revision,state) VALUES ($1,$2,$3::jsonb)',
+            marker,
+            randomUUID(),
+            JSON.stringify({ writerEntered: true })
+          );
+        },
+        new AbortController().signal
+      );
+    const response = await POST(request());
+    expect(response.status).toBe(200);
+    expect(await image()).toBe((await response.json()).url);
+    expect([...binding.objects.values()]).toEqual(['avatar bytes']);
+    expect(
+      await instance.database.$queryRawUnsafe<{ state: { writerEntered: boolean } }[]>(
+        'SELECT state FROM "SidedoorState" WHERE id=$1',
+        marker
+      )
+    ).toEqual([{ state: { writerEntered: true } }]);
+    expect(await writes()).toEqual([]);
   });
   it('persists local avatar bytes and their exact attributed route', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'sotto-avatar-local-'));

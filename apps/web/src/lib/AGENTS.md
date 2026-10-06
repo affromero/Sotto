@@ -266,8 +266,10 @@ ordered segment content and attributed storage. `initial-stitch-admission.ts`
 prepares an explicit sound policy and atomically records the outbox job, attempt
 identity and STITCHING phase. Producers must use Serializable transactions and
 original request or generation-job authority. Both segment-generation producers
-and the HTTP stitching resume route admit version 2 jobs. Final segment audio,
-storage attribution and stitching admission commit in the same transaction.
+and the HTTP stitching resume route admit version 2 jobs. Segment audio and
+storage attribution commit together before a separate Serializable transaction
+elects stitching work. Published-segment recovery still admits stitching without
+repeating TTS, and generation jobs complete only after that admission settles.
 
 `admitInitialStitch` reconciles concurrent producers using the stored winning
 attempt and returns waiting, admitted or existing work. Allocate identities before
@@ -346,6 +348,12 @@ AI and speech credential reads in `byok.ts` use Sidedoor owned credentials and e
 sharing grants. The returned selection contains auxiliary fields and provenance
 from the same transaction. Speech generation and Cartesia usage must consume that
 selection without rereading another key or borrowing another account's fields.
+Provider admission captures one usage timestamp before its Serializable transaction
+and reuses it on database retries. Each subsequent HTTP request captures a new
+timestamp. Ownership, sharing and revision checks remain inside every admission.
+`credentials/byok-crypto.ts` caches only the current derived instance encryption
+key, returns defensive copies, and clears the cache when the secret changes or
+is removed. It never caches credential selection or authorization.
 `sidedoor/credential-settings.ts` accepts complete credentials or a field patch
 bound to the revision displayed to the user. Patches preserve saved secrets and
 are validated before replacing that exact revision.
@@ -590,7 +598,13 @@ projection with the canonical `generateEpisodeTranscript` renderer.
 `writeReferenceSet` engine. Sidedoor owns immutable artifact allocation, intent
 settlement, atomic reference publication, cancellation checks and commit recovery.
 Sotto supplies Prisma transactions, current backend ports and authority checks.
-It requires the current instance scope and distinct resource scopes before I/O,
+`storage/admission/storage-write-transaction.ts` serializes each database phase through
+a dedicated PostgreSQL session lock acquired before the Serializable snapshot.
+It verifies the actual database, schema and state relation on both connections,
+retains canonical transaction retries, and releases before external storage I/O.
+Acquisition is bounded; cancellation, connection loss and uncertain closure fail
+the phase. The lock is independent of backend cleanup locks.
+The writer requires the current instance scope and distinct resource scopes before I/O,
 and retains canonical journal checks independently of application admission callbacks.
 Its profile adapter commits uploads with instance/profile intents, original request
 authority, and durable asset attribution.

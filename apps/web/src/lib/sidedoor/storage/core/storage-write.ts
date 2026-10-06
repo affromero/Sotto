@@ -16,7 +16,7 @@ import {
 import type { ServerInfraConfig } from '@/lib/site-config';
 import { requireOriginalSottoAdmission as requireOriginalAdmission } from '@/lib/sidedoor/access/core/request-identity';
 import { SIDEDOOR_STATE_ID, sottoStorageInstance } from '@/lib/sidedoor/access/state/store';
-import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
+import { sottoStorageWriteTransaction } from '../admission/storage-write-transaction';
 
 function executor(database: Prisma.TransactionClient) {
   return {
@@ -152,7 +152,8 @@ export async function writeStorageReference<Snapshot>(options: {
       dialect: 'postgres',
       signal: options.signal,
       executor,
-      transaction: (operation) => sottoTransaction(options.database, operation),
+      transaction: (operation) =>
+        sottoStorageWriteTransaction(options.database, operation, options.signal),
       artifacts: [
         {
           name: 'asset',
