@@ -383,6 +383,16 @@ describe('prompt file existence', () => {
   });
 });
 
+describe('listening quiz evidence contract', () => {
+  it('requires explicit support for causal and temporal claims', () => {
+    const prompt = readFileSync(join(PROMPTS_DIR, 'class/generate-listening-quiz.md'), 'utf-8');
+    expect(prompt).toContain(
+      'Two events occurring near each other do not establish that one caused the other.'
+    );
+    expect(prompt).toContain("Preserve the transcript's sequence and certainty.");
+  });
+});
+
 describe('variable contracts', () => {
   for (const [file, expectedVars] of Object.entries(VARIABLE_CONTRACTS)) {
     it(`${file} contains exactly the expected {{VAR}} placeholders`, () => {

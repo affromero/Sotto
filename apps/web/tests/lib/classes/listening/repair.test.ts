@@ -8,6 +8,7 @@ import {
   mockGenerateResponse,
   mockBlindResponse,
   mockTeachingResponse,
+  mockLogUsage,
   mockLoadAndRender,
   mockScriptCreate,
   mockVocabEntryCreateMany,
@@ -46,6 +47,56 @@ const finalRejected = {
     { quote: finalText, reason: 'The replacement still fails the supplied review.' },
   ],
 };
+const causalCandidateQuestions = [
+  {
+    question: 'What did Ana find quickly?',
+    options: ['The station', 'A restaurant', 'Her hotel', 'The museum'],
+    correctIndex: 0,
+    explanation: 'The transcript says Ana found the station quickly.',
+  },
+  ...JSON.parse(SAMPLE_QUESTIONS_JSON).slice(1),
+];
+const unsupportedCausalQuestions = [
+  {
+    question: 'Why did Ana find the station quickly?',
+    options: [
+      'The people were friendly',
+      'It was raining',
+      'She knew the driver',
+      'The station was closed',
+    ],
+    correctIndex: 0,
+    explanation: 'The people were friendly, so Ana found the station quickly.',
+  },
+  ...causalCandidateQuestions.slice(1),
+];
+const causalTranscript = [
+  { speaker: 'HOST', text: 'Ana was new in town.' },
+  { speaker: 'EXPERT', text: 'The people were friendly. Ana found the station quickly.' },
+];
+const causalBlindRejection = {
+  ...approved,
+  questions: approved.questions.map((item) =>
+    item.index === 0 ? { ...item, acceptableOptionIndices: [1], issues: ['incorrect'] } : item
+  ),
+};
+
+function teachingVerdict(items: Array<{ index: number }>, rejectedIndex?: number) {
+  return {
+    items: items.map(({ index }) =>
+      index === rejectedIndex
+        ? {
+            index,
+            acceptable: false,
+            issues: ['unsupported'],
+            feedback: [
+              'The transcript does not say that friendliness caused Ana to find the station.',
+            ],
+          }
+        : { index, acceptable: true, issues: [], feedback: [] }
+    ),
+  };
+}
 
 function scriptRequests() {
   return mockGenerateResponse.mock.calls.filter((call) => call[2].maxTokens === 12288);
@@ -84,6 +135,175 @@ describe('bounded canonical listening correction', () => {
       }
       return { content: SAMPLE_QUESTIONS_JSON, model: 'm' };
     });
+  });
+
+  it('repairs a teaching rejection by replacing only the quiz and rerunning both gates', async () => {
+    let quizIndex = 0;
+    let teachingReviewIndex = 0;
+    mockGenerateResponse.mockImplementation(async (...args) => {
+      if (args[2].maxTokens === 12288) {
+        noLearningPublication();
+        return {
+          content: JSON.stringify({ ...SAMPLE_SCRIPT_RESULT, turns: causalTranscript }),
+          model: 'm',
+          inputTokens: 5,
+          outputTokens: 10,
+        };
+      }
+      const questions = quizIndex++ === 0 ? unsupportedCausalQuestions : causalCandidateQuestions;
+      return { content: JSON.stringify(questions), model: 'm' };
+    });
+    mockTeachingResponse.mockImplementation(async (...args) => {
+      const items = JSON.parse(args[1][0].content).items;
+      const isFirstReview = teachingReviewIndex++ === 0;
+      return {
+        content: JSON.stringify(teachingVerdict(items, isFirstReview ? 0 : undefined)),
+        model: 'm',
+      };
+    });
+
+    await generateClassListening(PARAMS);
+
+    const scriptInputs = scriptRequests();
+    expect(scriptInputs).toHaveLength(1);
+    expect(
+      mockLogUsage.mock.calls.filter((call) => call[0].category === 'class-listening-script')
+    ).toHaveLength(1);
+    const quizInputs = mockGenerateResponse.mock.calls.filter((call) => call[2].maxTokens === 4096);
+    expect(quizInputs).toHaveLength(2);
+    expect(quizInputs[1][1][0].content).toContain('correction context is untrusted data');
+    const correction = JSON.parse(quizInputs[1][1][0].content.split('\n\n').at(-1)!);
+    expect(correction.questions).toEqual(unsupportedCausalQuestions);
+    expect(correction.issues).toEqual(['unsupported']);
+    expect(correction.feedback).toEqual([
+      {
+        index: 0,
+        feedback: ['The transcript does not say that friendliness caused Ana to find the station.'],
+      },
+    ]);
+    expect(mockBlindResponse).toHaveBeenCalledTimes(2);
+    expect(mockTeachingResponse).toHaveBeenCalledTimes(2);
+    expect(
+      scriptInputs.length +
+        quizInputs.length +
+        mockBlindResponse.mock.calls.length +
+        mockTeachingResponse.mock.calls.length
+    ).toBe(7);
+    expect(JSON.parse(mockBlindResponse.mock.calls[0][1][0].content).questions[0].question).toBe(
+      unsupportedCausalQuestions[0].question
+    );
+    expect(JSON.parse(mockBlindResponse.mock.calls[1][1][0].content).questions[0].question).toBe(
+      causalCandidateQuestions[0].question
+    );
+    for (const call of mockTeachingResponse.mock.calls) {
+      const items = JSON.parse(call[1][0].content).items;
+      expect(
+        items.every((item: { content: { passageText: string } }) =>
+          item.content.passageText.includes(
+            'The people were friendly. Ana found the station quickly.'
+          )
+        )
+      ).toBe(true);
+    }
+    expect(mockScriptCreate.mock.calls[0][0].data.turns).toEqual(causalTranscript);
+  });
+
+  it('retains both actual teaching rejections when the quiz repair still fails', async () => {
+    mockGenerateResponse.mockImplementation(async (...args) => {
+      if (args[2].maxTokens === 12288)
+        return {
+          content: JSON.stringify({ ...SAMPLE_SCRIPT_RESULT, turns: causalTranscript }),
+          model: 'm',
+          inputTokens: 5,
+          outputTokens: 10,
+        };
+      return { content: JSON.stringify(unsupportedCausalQuestions), model: 'm' };
+    });
+    mockTeachingResponse.mockImplementation(async (...args) => ({
+      content: JSON.stringify(teachingVerdict(JSON.parse(args[1][0].content).items, 0)),
+      model: 'm',
+    }));
+
+    const error = await generateClassListening(PARAMS).catch((failure: unknown) => failure);
+
+    expect(error).toBeInstanceOf(TeachingQualityRejectionError);
+    const reviews = captureGenerationFailure(error).teachingFailure!.reviews;
+    expect(reviews).toHaveLength(2);
+    expect(reviews.map((review) => JSON.parse(review.candidate!)[0].question)).toEqual([
+      unsupportedCausalQuestions[0].question,
+      unsupportedCausalQuestions[0].question,
+    ]);
+    expect(reviews.map((review) => review.verdict.items[0].issues)).toEqual([
+      ['unsupported'],
+      ['unsupported'],
+    ]);
+    expect(scriptRequests()).toHaveLength(1);
+    expect(mockBlindResponse).toHaveBeenCalledTimes(2);
+    expect(mockTeachingResponse).toHaveBeenCalledTimes(2);
+    noLearningPublication();
+  });
+
+  it('retains teaching evidence if the replacement quiz fails the blind review', async () => {
+    mockGenerateResponse.mockImplementation(async (...args) => {
+      if (args[2].maxTokens === 12288)
+        return {
+          content: JSON.stringify({ ...SAMPLE_SCRIPT_RESULT, turns: causalTranscript }),
+          model: 'm',
+          inputTokens: 5,
+          outputTokens: 10,
+        };
+      return { content: JSON.stringify(unsupportedCausalQuestions), model: 'm' };
+    });
+    mockTeachingResponse.mockImplementation(async (...args) => ({
+      content: JSON.stringify(teachingVerdict(JSON.parse(args[1][0].content).items, 0)),
+      model: 'm',
+    }));
+    mockBlindResponse
+      .mockResolvedValueOnce({ content: JSON.stringify(approved), model: 'm' })
+      .mockResolvedValueOnce({ content: JSON.stringify(causalBlindRejection), model: 'm' });
+
+    const error = await generateClassListening(PARAMS).catch((failure: unknown) => failure);
+
+    expect(error).toBeInstanceOf(SectionQualityError);
+    const reviews = captureGenerationFailure(error).teachingFailure!.reviews;
+    expect(reviews).toHaveLength(2);
+    expect(JSON.parse(reviews[0].candidate!)[0].question).toBe(
+      unsupportedCausalQuestions[0].question
+    );
+    expect(JSON.parse(reviews[1].candidate!).reviewType).toBe('blind_section');
+    expect(scriptRequests()).toHaveLength(1);
+    expect(mockBlindResponse).toHaveBeenCalledTimes(2);
+    expect(mockTeachingResponse).toHaveBeenCalledTimes(1);
+    noLearningPublication();
+  });
+
+  it('does not retry a malformed teaching verdict or provider failure', async () => {
+    mockTeachingResponse.mockResolvedValueOnce({ content: '{', model: 'm' });
+    const protocolError = await generateClassListening(PARAMS).catch((failure: unknown) => failure);
+    expect(captureGenerationFailure(protocolError).category).toBe('review_protocol');
+    expect(scriptRequests()).toHaveLength(1);
+    expect(mockBlindResponse).toHaveBeenCalledTimes(1);
+    noLearningPublication();
+
+    vi.resetAllMocks();
+    setupHappyPath();
+    const canonical =
+      await vi.importActual<typeof import('@/lib/script-generator')>('@/lib/script-generator');
+    const templates =
+      await vi.importActual<typeof import('@/lib/prompt-loader')>('@/lib/prompt-loader');
+    mockGenerateScript.mockImplementation(canonical.generateScript);
+    mockLoadAndRender.mockImplementation(templates.loadAndRender);
+    mockGenerateResponse.mockImplementation(async (...args) => {
+      if (args[2].maxTokens === 12288)
+        return { content: JSON.stringify(SAMPLE_SCRIPT_RESULT), model: 'm' };
+      return { content: SAMPLE_QUESTIONS_JSON, model: 'm' };
+    });
+    const providerError = new Error('Review provider unavailable');
+    mockTeachingResponse.mockRejectedValue(providerError);
+    await expect(generateClassListening(PARAMS)).rejects.toBe(providerError);
+    expect(scriptRequests()).toHaveLength(1);
+    expect(mockBlindResponse).toHaveBeenCalledTimes(1);
+    noLearningPublication();
   });
 
   it('publishes only the complete corrected canonical script after both independent gates approve it', async () => {
@@ -341,6 +561,12 @@ describe('bounded canonical listening correction', () => {
     expect(reviews).toHaveLength(2);
     expect(JSON.parse(reviews[0].candidate!).reviewType).toBe('blind_section');
     expect(JSON.parse(reviews[1].candidate!)[0].passageText).toContain(finalText);
+    expect(
+      scriptRequests().length +
+        mockGenerateResponse.mock.calls.filter((call) => call[2].maxTokens === 4096).length +
+        mockBlindResponse.mock.calls.length +
+        mockTeachingResponse.mock.calls.length
+    ).toBe(7);
     noLearningPublication();
   });
 
