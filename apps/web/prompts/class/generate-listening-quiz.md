@@ -17,6 +17,8 @@ Language policy:
 - Each question has exactly 4 options and exactly 1 correct answer.
 - Match {{LEVEL}} difficulty: A1/A2 questions test literal recall; B1+ questions include inference and contextual vocabulary.
 - Write a one-sentence explanation per question that cites the part of the transcript that supports the correct answer.
+- Ground every answer and explanation in explicit transcript evidence. Two events occurring near each other do not establish that one caused the other. Ask a causal "why" question only when the transcript states or clearly supports that reason; otherwise ask what, where, or when.
+- Preserve the transcript's sequence and certainty. Do not turn a later event into an earlier motive, add an unstated step, or claim a specific route, means, or reason that the transcript does not give.
 - Do NOT repeat the same comprehension point across questions.
 
 ## Output
