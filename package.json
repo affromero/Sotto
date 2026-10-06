@@ -51,6 +51,7 @@
   },
   "overrides": {
     "@hono/node-server": "1.19.14",
+    "@modelcontextprotocol/sdk": "1.31.0",
     "@prisma/config": {
       "deepmerge-ts": "8.0.2"
     },

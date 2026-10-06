@@ -558,7 +558,9 @@ describe('intro teaching gate', () => {
         'explicitly labelled note or tip that also supplies the correct form'
       );
     }
-    expect(boundary.generate.mock.calls[2][0]).toContain('Recheck unchanged fields');
+    expect(boundary.generate.mock.calls[2][0]).toContain(
+      'do not authorize rewriting unflagged fields'
+    );
     expect(boundary.generate.mock.calls[2][1][0].content).toContain(verdict.items[0].feedback[0]);
     expect(boundary.generate.mock.calls[1][0]).toContain('shortened visual claims');
     expect(boundary.generate).toHaveBeenCalledTimes(4);
@@ -738,7 +740,7 @@ describe('intro teaching gate', () => {
       expect(system).toContain('Immediate immersion for A2');
     }
     expect(boundary.generate.mock.calls[2][1][0].content).toContain(
-      'Correct its teaching meaning, grammar, idiomatic usage, and collocations'
+      'Make the smallest field-local correction that resolves each reported defect'
     );
   });
 
