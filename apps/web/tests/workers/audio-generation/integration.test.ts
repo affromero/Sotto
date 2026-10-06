@@ -246,8 +246,8 @@ suite('audio generation through real transactions, local storage and Redis', () 
     }
   );
 
-  it('retries a stale same-speaker voice snapshot without repeating either segment speech request', async () => {
-    const { episode, segment, job } = await fixture();
+  it('adopts a sibling voice assignment and completes both segments without a retry', async () => {
+    const { episode, job } = await fixture();
     const second = await instance.database.segment.create({
       data: { episodeId: episode.id, speaker: 'HOST', text: 'Buenos días.', order: 1 },
     });
@@ -289,15 +289,7 @@ suite('audio generation through real transactions, local storage and Redis', () 
       await captured;
       await processAudioGeneration(secondJob);
       releaseSnapshot();
-      expect(await firstAttempt).toMatchObject({
-        message: 'Episode storage ownership or inputs changed',
-      });
-      expect(requests).toHaveLength(1);
-      expect(
-        (await instance.database.segment.findUniqueOrThrow({ where: { id: segment.id } })).audioUrl
-      ).toBeNull();
-
-      await processAudioGeneration(job);
+      expect(await firstAttempt).toBeNull();
       const voice = await instance.database.episodeVoice.findUniqueOrThrow({
         where: { episodeId_speaker: { episodeId: episode.id, speaker: 'HOST' } },
       });
@@ -313,6 +305,169 @@ suite('audio generation through real transactions, local storage and Redis', () 
       binding.database = instance.database;
     }
   });
+
+  it('pins one winning actor voice when two segments reach assignment together', async () => {
+    const { episode, job } = await fixture();
+    const second = await instance.database.segment.create({
+      data: { episodeId: episode.id, speaker: 'HOST', text: 'Buenos días.', order: 1 },
+    });
+    const secondJob = await audioGenerationQueue.add('generate_audio', {
+      ...job.data,
+      segmentId: second.id,
+      segmentVersion: second.version,
+      text: second.text,
+    });
+    let releaseAssignments!: () => void;
+    const assignmentsReady = new Promise<void>((resolve) => {
+      releaseAssignments = resolve;
+    });
+    let arrivals = 0;
+    binding.database = instance.database.$extends({
+      query: {
+        episodeVoice: {
+          async upsert({ args, query }) {
+            if (arrivals < 2) {
+              arrivals++;
+              if (arrivals === 2) releaseAssignments();
+              await assignmentsReady;
+            }
+            return query(args);
+          },
+        },
+      },
+    }) as unknown as PrismaClient;
+    try {
+      const results = await Promise.allSettled([
+        processAudioGeneration(job),
+        processAudioGeneration(secondJob),
+      ]);
+      expect(results).toEqual([
+        expect.objectContaining({ status: 'fulfilled' }),
+        expect.objectContaining({ status: 'fulfilled' }),
+      ]);
+      const voice = await instance.database.episodeVoice.findUniqueOrThrow({
+        where: { episodeId_speaker: { episodeId: episode.id, speaker: 'HOST' } },
+      });
+      expect(requests.map((request) => request.voice)).toEqual([voice.voiceId, voice.voiceId]);
+      const saved = await instance.database.segment.findMany({ where: { episodeId: episode.id } });
+      expect(saved).toHaveLength(2);
+      expect(saved.every((item) => !!item.audioUrl)).toBe(true);
+      expect(await queuedStitches(episode.id)).toHaveLength(1);
+    } finally {
+      releaseAssignments();
+      binding.database = instance.database;
+    }
+  });
+
+  it('publishes fifteen concurrent segments with one voice per actor and one stitch admission', async () => {
+    const { episode, job } = await fixture();
+    await instance.database.segment.createMany({
+      data: Array.from({ length: 14 }, (_, index) => ({
+        episodeId: episode.id,
+        order: index + 1,
+        speaker: index % 2 === 0 ? 'EXPERT' : 'HOST',
+        text: `Hola número ${index + 1}.`,
+      })),
+    });
+    const segments = await instance.database.segment.findMany({
+      where: { episodeId: episode.id },
+      orderBy: { order: 'asc' },
+    });
+    const jobs = [
+      job,
+      ...(await Promise.all(
+        segments.slice(1).map((segment) =>
+          audioGenerationQueue.add('generate_audio', {
+            ...job.data,
+            segmentId: segment.id,
+            segmentVersion: segment.version,
+            speaker: segment.speaker,
+            text: segment.text,
+          })
+        )
+      )),
+    ];
+    const results = await Promise.allSettled(
+      jobs.map((pending) => processAudioGeneration(pending))
+    );
+    expect(results.filter((result) => result.status === 'rejected')).toEqual([]);
+    expect(requests).toHaveLength(15);
+    const voices = await instance.database.episodeVoice.findMany({
+      where: { episodeId: episode.id },
+    });
+    expect(voices).toHaveLength(2);
+    for (const segment of segments)
+      expect(requests.find((request) => request.text === segment.text)?.voice).toBe(
+        voices.find((voice) => voice.speaker === segment.speaker)?.voiceId
+      );
+    const saved = await instance.database.segment.findMany({ where: { episodeId: episode.id } });
+    expect(saved).toHaveLength(15);
+    expect(saved.every((segment) => !!segment.audioUrl)).toBe(true);
+    expect(await queuedStitches(episode.id)).toHaveLength(1);
+  });
+
+  it.each(['changed selected voice', 'new foreign-provider voice'] as const)(
+    'rejects a %s after the initial snapshot before requesting speech',
+    async (change) => {
+      const { episode, segment, job } = await fixture();
+      if (change === 'changed selected voice')
+        await instance.database.episodeVoice.create({
+          data: { episodeId: episode.id, speaker: 'HOST', provider: 'local', voiceId: 'selected' },
+        });
+      let snapshotRead!: () => void;
+      const captured = new Promise<void>((resolve) => {
+        snapshotRead = resolve;
+      });
+      let releaseSnapshot!: () => void;
+      const released = new Promise<void>((resolve) => {
+        releaseSnapshot = resolve;
+      });
+      let paused = false;
+      binding.database = instance.database.$extends({
+        query: {
+          episode: {
+            async findUniqueOrThrow({ args, query }) {
+              const result = await query(args);
+              if (!paused && args.select?.voices) {
+                paused = true;
+                snapshotRead();
+                await released;
+              }
+              return result;
+            },
+          },
+        },
+      }) as unknown as PrismaClient;
+      const attempt = processAudioGeneration(job).catch((error: unknown) => error);
+      try {
+        await captured;
+        await instance.database.episodeVoice.upsert({
+          where: { episodeId_speaker: { episodeId: episode.id, speaker: 'HOST' } },
+          create: {
+            episodeId: episode.id,
+            speaker: 'HOST',
+            provider: 'cartesia',
+            voiceId: 'foreign',
+          },
+          update: { voiceId: 'replacement' },
+        });
+        releaseSnapshot();
+        expect(await attempt).toMatchObject({
+          message: 'Episode storage ownership or inputs changed',
+        });
+        expect(requests).toEqual([]);
+        expect(
+          (await instance.database.segment.findUniqueOrThrow({ where: { id: segment.id } }))
+            .audioUrl
+        ).toBeNull();
+        expect(await queuedStitches(episode.id)).toEqual([]);
+      } finally {
+        releaseSnapshot();
+        await attempt;
+        binding.database = instance.database;
+      }
+    }
+  );
 
   it('retains unreferenced write attribution when the segment commit fails', async () => {
     const { episode, segment, job } = await fixture();
@@ -368,10 +523,13 @@ suite('audio generation through real transactions, local storage and Redis', () 
   );
 
   it.each(['HOST', 'EXPERT'])(
-    'uses the saved %s voice for the selected provider',
+    'uses the saved %s voice when the segment has no provider override',
     async (speaker) => {
       const { episode, segment, job } = await fixture();
-      await instance.database.segment.update({ where: { id: segment.id }, data: { speaker } });
+      await instance.database.segment.update({
+        where: { id: segment.id },
+        data: { speaker, ttsVoiceId: 'previous-segment-selection' },
+      });
       await job.updateData({ ...job.data, speaker });
       await instance.database.episodeVoice.create({
         data: {
@@ -504,23 +662,23 @@ suite('audio generation through real transactions, local storage and Redis', () 
     expect(requests[2]?.voice).toBe(explicitVoice);
   });
 
-  it('publishes valid audio when optional voice assignment persistence fails', async () => {
+  it('does not request or publish speech when canonical voice assignment cannot persist', async () => {
     const { episode, segment, job } = await fixture();
     await instance.database.$executeRawUnsafe(
       'ALTER TABLE "EpisodeVoice" ADD CONSTRAINT reject_voice_assignment CHECK (false)'
     );
     try {
-      await processAudioGeneration(job);
-      expect(requests).toHaveLength(1);
+      await expect(processAudioGeneration(job)).rejects.toThrow();
+      expect(requests).toEqual([]);
       expect(
         (await instance.database.segment.findUniqueOrThrow({ where: { id: segment.id } })).audioUrl
-      ).not.toBeNull();
+      ).toBeNull();
       expect(
         await instance.database.episodeVoice.findMany({ where: { episodeId: episode.id } })
       ).toEqual([]);
       expect(
         (await instance.database.episode.findUniqueOrThrow({ where: { id: episode.id } })).status
-      ).toBe('STITCHING');
+      ).toBe('GENERATING_AUDIO');
     } finally {
       await instance.database.$executeRawUnsafe(
         'ALTER TABLE "EpisodeVoice" DROP CONSTRAINT reject_voice_assignment'

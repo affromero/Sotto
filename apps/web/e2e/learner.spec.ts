@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { join } from 'node:path';
+import { readingVocabularySchema } from '@sotto/shared';
 import { prismaUnfiltered as database } from '@/lib/prisma';
 import { seedClass } from './class-fixture';
 
@@ -117,6 +118,22 @@ test('Local and Custom save URL, key, and model and use them for a real compatib
 test('a learner plays audio and completes all five skills on a narrow screen', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   const fixture = await seedClass();
+  const preparedClass = await database.courseClass.findUniqueOrThrow({
+    where: { id: fixture.classId },
+  });
+  const readingQuestions = await database.lessonQuestion.findMany({
+    where: { section: { classId: fixture.classId }, skill: 'READING' },
+    orderBy: { order: 'asc' },
+  });
+  expect(readingVocabularySchema.parse(preparedClass.readingVocabulary).words).toEqual([
+    {
+      lemma: 'Hallo',
+      gloss: 'hello',
+      pos: 'interjection',
+      sourceForm: 'Hallo',
+      questionIds: readingQuestions.map(({ id }) => id),
+    },
+  ]);
   await page.goto('/access');
   await page.getByLabel(/password/i).fill('browser test household password');
   await page.getByRole('button', { name: 'Continue', exact: true }).click();

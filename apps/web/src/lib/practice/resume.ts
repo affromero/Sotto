@@ -49,28 +49,45 @@ export async function resumePractice(
   sessionId: string,
   userId: string
 ): Promise<StartPracticeResult> {
-  const session = await prisma.practiceSession.findFirst({
-    where: { id: sessionId, course: { userId } },
-    select: {
-      id: true,
-      kind: true,
-      status: true,
-      items: true,
-      episodeId: true,
-      skillRequirements: true,
-      learnerAnswers: true,
-      writingDrafts: true,
-      submissionResult: true,
-      progressRevision: true,
-      generationState: true,
-    },
-  });
+  const readSession = () =>
+    prisma.practiceSession.findFirst({
+      where: { id: sessionId, course: { userId } },
+      select: {
+        id: true,
+        kind: true,
+        status: true,
+        items: true,
+        episodeId: true,
+        skillRequirements: true,
+        learnerAnswers: true,
+        writingDrafts: true,
+        submissionResult: true,
+        progressRevision: true,
+        generationState: true,
+      },
+    });
+  let session = await readSession();
   if (!session) throw new PracticeSessionNotFoundError('Practice session not found');
   if (session.generationState) {
     const stored = practicePreparationSchema.parse(session.generationState);
     const operation = ['CANCELLING', 'RUNNING'].includes(stored.status)
       ? await reconcilePracticePreparation(sessionId, userId)
       : stored;
+    if (operation.status === 'COMPLETED' && ['CANCELLING', 'RUNNING'].includes(stored.status)) {
+      session = await readSession();
+      if (!session?.generationState)
+        throw new PracticeSessionNotFoundError('Practice preparation changed');
+      const published = practicePreparationSchema.parse(session.generationState);
+      if (
+        published.id !== stored.id ||
+        operation.id !== stored.id ||
+        published.sessionId !== sessionId ||
+        published.userId !== userId ||
+        published.inputFingerprint !== stored.inputFingerprint ||
+        published.status !== 'COMPLETED'
+      )
+        throw new PracticeSessionNotFoundError('Practice preparation changed');
+    }
     if (operation.unavailableReason)
       return { status: 'unavailable', reason: operation.unavailableReason };
     if (

@@ -5,6 +5,11 @@ import { classLanguagePolicy } from '../class-language-policy';
 import { logger } from '../../logger';
 import { captureTeachingFailure, teachingQualityVerdictSchema } from './teaching-failure';
 import {
+  assertReadingReviewQuestion,
+  reviewReadingVocabularyCounterfactual,
+  type ReadingReviewQuestion,
+} from './reading-vocabulary-counterfactual';
+import {
   requestTeachingReview,
   ReviewerProtocolError,
   TeachingQualityRejectionError,
@@ -44,7 +49,7 @@ type ReadingReviewItem = {
   sourceForm: string;
   questionIndices: readonly number[];
   passageText: string;
-  assessedQuestions: readonly unknown[];
+  assessedQuestions: readonly ReadingReviewQuestion[];
 };
 
 /** Admit word quality and each proposed mastery association independently. */
@@ -65,6 +70,8 @@ export async function reviewReadingVocabularyContent(options: {
     )
   )
     throw new ReviewerProtocolError();
+  for (const item of options.items)
+    for (const question of item.assessedQuestions) assertReadingReviewQuestion(question);
   const verdictSchema = readingVerdictSchema(
     Math.max(0, ...options.items.map((item) => item.questionIndices.length))
   );
@@ -131,14 +138,35 @@ export async function reviewReadingVocabularyContent(options: {
       )
     );
   }
-  const denied = parsed.items.flatMap((item) =>
-    item.associations
-      .filter((decision) => decision.canAnswerWithoutWord)
-      .map((decision) => ({
-        batchWordIndex: item.index,
-        questionIndex: decision.questionIndex,
-        supported: false as const,
-      }))
+  const admitted: number[][] = [];
+  for (const [index, source] of options.items.entries()) {
+    const verdict = parsed.items.find((item) => item.index === index)!;
+    const supported = source.questionIndices.filter((questionIndex) =>
+      verdict.associations.some(
+        (decision) => decision.questionIndex === questionIndex && !decision.canAnswerWithoutWord
+      )
+    );
+    admitted.push(
+      await reviewReadingVocabularyCounterfactual({
+        ai: options.ai,
+        provider: options.provider,
+        userId: options.userId,
+        level: options.level,
+        targetLang: options.targetLang,
+        lemma: source.lemma,
+        sourceForm: source.sourceForm,
+        passageText: source.passageText,
+        questions: supported.map((questionIndex) => ({
+          questionIndex,
+          question: source.assessedQuestions[source.questionIndices.indexOf(questionIndex)]!,
+        })),
+      })
+    );
+  }
+  const denied = options.items.flatMap((source, index) =>
+    source.questionIndices
+      .filter((questionIndex) => !admitted[index]!.includes(questionIndex))
+      .map((questionIndex) => ({ batchWordIndex: index, questionIndex, supported: false as const }))
   );
   if (denied.length)
     logger.info('Reading vocabulary associations not admitted', {
@@ -146,12 +174,5 @@ export async function reviewReadingVocabularyContent(options: {
       denied: denied.slice(0, 60),
       omittedCount: Math.max(0, denied.length - 60),
     });
-  return options.items.map((source, index) => {
-    const verdict = parsed.items.find((item) => item.index === index)!;
-    return source.questionIndices.filter((questionIndex) =>
-      verdict.associations.some(
-        (decision) => decision.questionIndex === questionIndex && !decision.canAnswerWithoutWord
-      )
-    );
-  });
+  return admitted;
 }

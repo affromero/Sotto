@@ -61,6 +61,14 @@ const approved = (indices: number[][] = [[0]]) => ({
     })),
   })),
 });
+const meaningRequired = (questionIndices: number[] = [0]) => ({
+  decisions: questionIndices.map((questionIndex) => ({
+    questionIndex,
+    decision: 'WORD_MEANING_REQUIRED',
+    answerIndex: null,
+    reasoning: 'The visible passage cannot distinguish the semantic options.',
+  })),
+});
 const rejected = {
   items: [
     {
@@ -84,9 +92,13 @@ beforeEach(() => {
   generate.mockReset();
   logError.mockReset();
   generate.mockResolvedValueOnce(response([word]));
-  generate.mockResolvedValue({
-    content: JSON.stringify(approved()),
-    model: 'fixture',
+  generate.mockImplementation(async (_system, _messages, settings) => {
+    expect(settings.jsonSchema.name).toMatch(/^reading_vocabulary_(quality|counterfactual)$/);
+    return response(
+      settings.jsonSchema.name === 'reading_vocabulary_counterfactual'
+        ? meaningRequired()
+        : approved()
+    );
   });
 });
 
@@ -216,7 +228,12 @@ describe('reading vocabulary extraction', () => {
     const readingQuestion = {
       id: 'reading-purchase',
       question: 'Was kauft Mara?',
-      options: ['Äpfel', 'Eine Fahrkarte', 'Ein Buch', 'Eine Suppe'],
+      options: [
+        'Runde Früchte, die rot oder grün sein können.',
+        'Ein Getränk aus gerösteten Bohnen.',
+        'Ein Gebäck aus Mehl, Wasser und Hefe.',
+        'Ein Milchprodukt, das in Scheiben verkauft wird.',
+      ],
       correctIndex: 0,
       passageText: 'Mara kauft am Markt an einem Stand Äpfel.',
     };
@@ -271,7 +288,8 @@ describe('reading vocabulary extraction', () => {
     generate.mockReset();
     generate
       .mockResolvedValueOnce(response([market, apple, stall]))
-      .mockResolvedValueOnce(response(attributionVerdict));
+      .mockResolvedValueOnce(response(attributionVerdict))
+      .mockResolvedValueOnce(response(meaningRequired()));
 
     const result = await extractReadingVocabulary({ ...options, questions: [readingQuestion] });
 
@@ -296,8 +314,121 @@ describe('reading vocabulary extraction', () => {
     expect(generate.mock.calls.map((call) => call[2].jsonSchema.name)).toEqual([
       'reading_vocabulary_extraction',
       'reading_vocabulary_quality',
+      'reading_vocabulary_counterfactual',
+    ]);
+    const states = result.words.map((entry, index) => ({
+      id: `word-${index}`,
+      lemma: entry.lemma,
+      ease: 2.5,
+      intervalDays: 0,
+      reps: 0,
+      lapses: 0,
+      mastery: 0,
+    }));
+    const database = {
+      learnerVocab: {
+        findMany: async ({ where }: { where: { lemma: { in: string[] } } }) =>
+          states.filter((state) => where.lemma.in.includes(state.lemma)),
+        update: async ({ where, data }: { where: { id: string }; data: object }) =>
+          Object.assign(
+            states.find((state) => state.id === where.id)!,
+            data
+          ),
+      },
+      learnerGrammar: { findMany: async () => [] },
+    } as unknown as LearningDatabase;
+    expect(
+      await reviewReadingVocabulary(
+        database,
+        'course',
+        result,
+        new Map([['reading-purchase', true]]),
+        new Date('2026-10-05T00:00:00Z')
+      )
+    ).toEqual(new Set(['Apfel']));
+    expect(states.map(({ lemma, reps }) => ({ lemma, reps }))).toEqual([
+      { lemma: 'Markt', reps: 0 },
+      { lemma: 'Apfel', reps: 1 },
+      { lemma: 'der Stand', reps: 0 },
     ]);
   });
+
+  it('preserves copied location metadata without granting word mastery on a correct reading answer', async () => {
+    const r0 = {
+      id: 'r0',
+      question: 'Wo hat Paula ihre Gäste getroffen?',
+      options: ['Im Park.', 'In ihrer Küche.', 'Am Bahnhof.', 'Vor dem Haus der Musiker.'],
+      correctIndex: 2,
+      passageText:
+        'Wir haben dort meine Cousine Paula besucht. Sie hat uns am Bahnhof abgeholt. Dann sind wir zusammen zu ihrer Wohnung gegangen. Am Nachmittag haben wir in Paulas Küche Brot gebacken. Später haben wir das fertige Brot in den Park mitgenommen.',
+    };
+    const station = {
+      lemma: 'der Bahnhof',
+      sourceForm: 'Bahnhof',
+      gloss: 'train station',
+      pos: 'noun',
+      questionIndices: [0],
+    };
+    const original = structuredClone(r0);
+    generate.mockReset();
+    generate
+      .mockResolvedValueOnce(response([station]))
+      .mockResolvedValueOnce(response(approved()))
+      .mockResolvedValueOnce(
+        response({
+          decisions: [
+            {
+              questionIndex: 0,
+              decision: 'ANSWERABLE_WITHOUT_WORD',
+              answerIndex: 2,
+              reasoning: 'The pickup event identifies the same opaque location.',
+            },
+          ],
+        })
+      );
+    const snapshot = await extractReadingVocabulary({ ...options, questions: [r0] });
+    expect(snapshot.words).toEqual([
+      {
+        lemma: 'der Bahnhof',
+        sourceForm: 'Bahnhof',
+        gloss: 'train station',
+        pos: 'noun',
+        questionIds: [],
+      },
+    ]);
+    expect(r0).toEqual(original);
+    const database = new Proxy({} as LearningDatabase, {
+      get() {
+        throw new Error('Denied copied word credit must not access SRS.');
+      },
+    });
+    expect(
+      await reviewReadingVocabulary(
+        database,
+        'course',
+        snapshot,
+        new Map([['r0', true]]),
+        new Date()
+      )
+    ).toEqual(new Set());
+  });
+
+  it.each(['not JSON', JSON.stringify({ decisions: [] })])(
+    'propagates malformed masked review without extraction replacement',
+    async (content) => {
+      generate.mockReset();
+      generate
+        .mockResolvedValueOnce(response([word]))
+        .mockResolvedValueOnce(response(approved()))
+        .mockResolvedValueOnce({ content, model: 'fixture' });
+      await expect(extractReadingVocabulary(options)).rejects.toBeInstanceOf(ReviewerProtocolError);
+      expect(generate.mock.calls.map((call) => call[2].jsonSchema.name)).toEqual([
+        'reading_vocabulary_extraction',
+        'reading_vocabulary_quality',
+        'reading_vocabulary_counterfactual',
+      ]);
+    }
+  );
   it('maps late-batch feedback to whole-candidate indices and reviews all replacement batches', async () => {
     const words = Array.from({ length: 12 }, (_, index) => ({
       ...word,
@@ -502,7 +633,8 @@ describe('reading vocabulary extraction', () => {
       generate.mockReset();
       generate
         .mockResolvedValueOnce(response([word, background]))
-        .mockResolvedValueOnce(response(approved([[0], []])));
+        .mockResolvedValueOnce(response(approved([[0], []])))
+        .mockResolvedValueOnce(response(meaningRequired()));
       const snapshot =
         origin === 'newly admitted'
           ? await extractReadingVocabulary(options)

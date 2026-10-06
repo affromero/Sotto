@@ -115,6 +115,50 @@ export async function startProvider() {
               },
             ],
           });
+        } else if (
+          system.startsWith(
+            'Determine whether each supplied reading question can be correctly answered'
+          )
+        ) {
+          const input = JSON.parse(
+            body.messages.find((message) => message.role === 'user').content
+          );
+          const item = input.items?.[0];
+          const questions = item?.content?.questions;
+          if (
+            Object.keys(input).join(',') !== 'items' ||
+            !Array.isArray(input.items) ||
+            input.items.length !== 1 ||
+            Object.keys(item).sort().join(',') !== 'content,index' ||
+            item.index !== 0 ||
+            Object.keys(item.content).sort().join(',') !== 'passageText,questions' ||
+            item.content.passageText !== 'Anna sagt [WORD] zu ihrem Freund.' ||
+            !Array.isArray(questions) ||
+            questions.length < 1 ||
+            questions.length > 5 ||
+            new Set(questions.map((question) => question.questionIndex)).size !==
+              questions.length ||
+            questions.some(
+              (question) =>
+                Object.keys(question).sort().join(',') !== 'options,question,questionIndex' ||
+                !Number.isSafeInteger(question.questionIndex) ||
+                question.questionIndex < 0 ||
+                question.questionIndex >= 5 ||
+                question.question !== 'Choose the greeting (reading).' ||
+                JSON.stringify(question.options) !==
+                  JSON.stringify(['[WORD]', 'Danke', 'Bitte', 'Tschüss'])
+            )
+          ) {
+            throw new Error('Unexpected masked vocabulary review fixture');
+          }
+          content = JSON.stringify({
+            decisions: questions.map(({ questionIndex }) => ({
+              questionIndex,
+              decision: 'WORD_MEANING_REQUIRED',
+              answerIndex: null,
+              reasoning: "Selecting the greeting requires the hidden word's meaning.",
+            })),
+          });
         } else if (messages.includes('Grade the response.'))
           content = JSON.stringify({
             overallScore: 1,

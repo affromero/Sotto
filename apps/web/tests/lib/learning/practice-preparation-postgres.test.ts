@@ -622,7 +622,14 @@ suite('Durable practice preparation against PostgreSQL', () => {
           const user = payload.messages.at(-1)?.content ?? '';
           let content: unknown;
           let reviewed: {
-            items?: { index: number; content: { questionIndices?: number[] } }[];
+            items?: {
+              index: number;
+              content: {
+                questionIndices?: number[];
+                passageText?: string;
+                questions?: { questionIndex: number; question: string; options: string[] }[];
+              };
+            }[];
             questions?: { index: number }[];
           } = {};
           try {
@@ -642,7 +649,21 @@ suite('Durable practice preparation against PostgreSQL', () => {
                 },
               ],
             };
-          else if (reviewed.items)
+          else if (system.startsWith('Determine whether each supplied reading question')) {
+            expect(reviewed.items).toHaveLength(1);
+            const item = reviewed.items![0]!.content;
+            expect(Object.keys(item).sort()).toEqual(['passageText', 'questions']);
+            expect(item.passageText).toContain('[WORD]');
+            expect(JSON.stringify(item)).not.toMatch(/Hallo|correctIndex|gloss|lemma|explanation/);
+            content = {
+              decisions: item.questions!.map(({ questionIndex }) => ({
+                questionIndex,
+                decision: 'WORD_MEANING_REQUIRED',
+                answerIndex: null,
+                reasoning: 'The visible passage does not reveal the greeting meaning.',
+              })),
+            };
+          } else if (reviewed.items)
             content = {
               items: reviewed.items.map(({ index, content: item }) =>
                 system.startsWith('Independently review reading vocabulary')
