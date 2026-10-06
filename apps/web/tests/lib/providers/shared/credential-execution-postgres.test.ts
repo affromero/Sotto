@@ -36,7 +36,10 @@ suite('credential execution admission with PostgreSQL', () => {
     identity = await instance.reset();
     await instance.seedAiCredential(identity.ownerId, 'openai', 'captured-key');
   });
-  afterEach(() => vi.unstubAllEnvs());
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
   afterAll(async () => {
     await instance?.close();
   });
@@ -79,10 +82,91 @@ suite('credential execution admission with PostgreSQL', () => {
       validateSottoExecutionCredential(tx, authorize, captured!)
     );
     expect((await head()).credential?.metadata.lastUsedAt).toBeNull();
+    const usedAt = Date.now();
     await sottoTransaction(instance.database, (tx) =>
-      admitSottoExecutionCredential(tx, authorize, captured!)
+      admitSottoExecutionCredential(tx, authorize, captured!, usedAt)
     );
-    expect((await head()).credential?.metadata.lastUsedAt).toEqual(expect.any(Number));
+    expect((await head()).credential?.metadata.lastUsedAt).toBe(usedAt);
+  });
+
+  it('preserves newer credential usage when an older admission retries after a concurrent commit', async () => {
+    const authorize = await authority();
+    const captured = await sottoTransaction(instance.database, (tx) =>
+      captureSottoExecutionCredential(tx, authorize, 'ai', 'openai', false)
+    );
+    const usedAtA = Date.now();
+    const usedAtB = usedAtA + 1;
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(usedAtA);
+    let releaseUpdate!: () => void;
+    const released = new Promise<void>((resolve) => {
+      releaseUpdate = resolve;
+    });
+    let reachedUpdate!: () => void;
+    const reached = new Promise<void>((resolve) => {
+      reachedUpdate = resolve;
+    });
+    let holdUpdate = true;
+    const conflicts: unknown[] = [];
+    const older = sottoTransaction(instance.database, (tx) => {
+      const boundary = new Proxy(tx, {
+        get(target, property, receiver) {
+          const value = Reflect.get(target, property, receiver);
+          if (property !== '$queryRawUnsafe' || typeof value !== 'function')
+            return typeof value === 'function' ? value.bind(target) : value;
+          return async (sql: string, ...parameters: unknown[]) => {
+            if (holdUpdate && /^\s*UPDATE\s+"SidedoorState"/i.test(sql)) {
+              holdUpdate = false;
+              reachedUpdate();
+              await released;
+            }
+            try {
+              return await value.call(target, sql, ...parameters);
+            } catch (error) {
+              conflicts.push(error);
+              throw error;
+            }
+          };
+        },
+      });
+      return admitSottoExecutionCredential(boundary, authorize, captured!, usedAtA);
+    });
+    void older.catch(() => undefined);
+    try {
+      await Promise.race([
+        reached,
+        older.then(() => {
+          throw new Error('Older admission completed without reaching the held database update');
+        }),
+      ]);
+      clock.mockReturnValue(usedAtB);
+      await sottoTransaction(instance.database, (tx) =>
+        admitSottoExecutionCredential(tx, authorize, captured!, usedAtB)
+      );
+      const newer = await head();
+      clock.mockReturnValue(usedAtB + 1);
+      releaseUpdate();
+      await older;
+      const settled = await head();
+      expect(conflicts).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            meta: expect.objectContaining({
+              driverAdapterError: expect.objectContaining({
+                cause: expect.objectContaining({ originalCode: '40001' }),
+              }),
+            }),
+          }),
+        ])
+      );
+      expect(settled.credential?.metadata.lastUsedAt).toBe(usedAtB);
+      expect(settled.revision).toBe(newer.revision);
+      expect(settled.credential?.credentialRevision).toBe(
+        captured!.selected.credential.credentialRevision
+      );
+    } finally {
+      releaseUpdate();
+      await older.catch(() => undefined);
+    }
   });
 
   it('captures the configured local URL and key and rejects endpoint changes before dispatch', async () => {
@@ -109,9 +193,10 @@ suite('credential execution admission with PostgreSQL', () => {
       identity.ownerId,
       instance.database
     );
+    const usedAt = Date.now();
     await expect(
       sottoTransaction(instance.database, (tx) =>
-        admitSottoExecutionCredential(tx, authorize, captured!)
+        admitSottoExecutionCredential(tx, authorize, captured!, usedAt)
       )
     ).rejects.toThrow('endpoint changed');
     expect(captured?.binding.endpoint).toBe('http://localhost:11434/v1');
@@ -146,9 +231,10 @@ suite('credential execution admission with PostgreSQL', () => {
               })
             );
         });
+      const usedAt = Date.now();
       await expect(
         sottoTransaction(instance.database, (tx) =>
-          admitSottoExecutionCredential(tx, authorize, captured!, controller.signal)
+          admitSottoExecutionCredential(tx, authorize, captured!, usedAt, controller.signal)
         )
       ).rejects.toThrow();
       expect((await head()).credential?.metadata.lastUsedAt ?? null).toBeNull();
@@ -162,9 +248,10 @@ suite('credential execution admission with PostgreSQL', () => {
       captureSottoExecutionCredential(tx, authorize, 'ai', 'openai', false)
     );
     await identity.access.logout(identity.ownerToken);
+    const usedAt = Date.now();
     await expect(
       sottoTransaction(instance.database, (tx) =>
-        admitSottoExecutionCredential(tx, authorize, captured!)
+        admitSottoExecutionCredential(tx, authorize, captured!, usedAt)
       )
     ).rejects.toThrow();
     expect((await head()).credential?.metadata.lastUsedAt).toBeNull();
@@ -194,9 +281,10 @@ suite('credential execution admission with PostgreSQL', () => {
         excludedRecipients: [captured!.recipient.owner],
       });
     });
+    const usedAt = Date.now();
     await expect(
       sottoTransaction(instance.database, (tx) =>
-        admitSottoExecutionCredential(tx, authorize, captured!)
+        admitSottoExecutionCredential(tx, authorize, captured!, usedAt)
       )
     ).rejects.toThrow();
     expect((await head()).credential?.metadata.lastUsedAt).toBeNull();
@@ -231,8 +319,9 @@ suite('credential execution admission with PostgreSQL', () => {
     );
     expect(captured?.selected.credential.modality).toBe('tts');
     expect(captured?.binding.protocol).not.toBe(captured?.selected.credential.binding.protocol);
+    const usedAt = Date.now();
     await sottoTransaction(instance.database, (tx) =>
-      admitSottoExecutionCredential(tx, authorize, captured!)
+      admitSottoExecutionCredential(tx, authorize, captured!, usedAt)
     );
   });
 });

@@ -181,6 +181,7 @@ export async function admitSottoExecutionCredential(
   database: Prisma.TransactionClient,
   authorize: CredentialExecutionAuthority,
   captured: SottoExecutionCredential,
+  usedAt: number,
   signal?: AbortSignal
 ) {
   await validateSottoExecutionCredential(database, authorize, captured, signal);
@@ -189,7 +190,7 @@ export async function admitSottoExecutionCredential(
   const result = await storage.owned.recordUse(
     { ...storage.slot, owner: expected.credential.owner },
     expected.credential.credentialRevision,
-    Date.now()
+    usedAt
   );
   if (result === 'superseded') throw new AccessError('conflict', 'The selected credential changed');
   signal?.throwIfAborted();

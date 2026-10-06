@@ -7,6 +7,7 @@ import type { Job } from 'bullmq';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PrismaClient } from '@/generated/prisma/client';
 import { processAudioGeneration } from '@/workers/audio-generation.worker';
+import { publishesFullPracticeAudio } from '../../helpers/runtime/full-audio-admission';
 import { audioGenerationQueue, audioStitchingQueue, type GenerateAudioPayload } from '@/lib/queue';
 import { closeRedis } from '@/lib/redis';
 import { invalidateServerInfra } from '@/lib/server-config';
@@ -359,52 +360,19 @@ suite('audio generation through real transactions, local storage and Redis', () 
     }
   });
 
-  it('publishes fifteen concurrent segments with one voice per actor and one stitch admission', async () => {
-    const { episode, job } = await fixture();
-    await instance.database.segment.createMany({
-      data: Array.from({ length: 14 }, (_, index) => ({
-        episodeId: episode.id,
-        order: index + 1,
-        speaker: index % 2 === 0 ? 'EXPERT' : 'HOST',
-        text: `Hola número ${index + 1}.`,
-      })),
+  it('publishes full practice audio through concurrent durable workers without retries', async () => {
+    await publishesFullPracticeAudio({
+      instance,
+      identity,
+      directory,
+      audio,
+      episodes,
+      useDatabase: (database) => {
+        binding.database = database;
+      },
+      queuedStitches,
     });
-    const segments = await instance.database.segment.findMany({
-      where: { episodeId: episode.id },
-      orderBy: { order: 'asc' },
-    });
-    const jobs = [
-      job,
-      ...(await Promise.all(
-        segments.slice(1).map((segment) =>
-          audioGenerationQueue.add('generate_audio', {
-            ...job.data,
-            segmentId: segment.id,
-            segmentVersion: segment.version,
-            speaker: segment.speaker,
-            text: segment.text,
-          })
-        )
-      )),
-    ];
-    const results = await Promise.allSettled(
-      jobs.map((pending) => processAudioGeneration(pending))
-    );
-    expect(results.filter((result) => result.status === 'rejected')).toEqual([]);
-    expect(requests).toHaveLength(15);
-    const voices = await instance.database.episodeVoice.findMany({
-      where: { episodeId: episode.id },
-    });
-    expect(voices).toHaveLength(2);
-    for (const segment of segments)
-      expect(requests.find((request) => request.text === segment.text)?.voice).toBe(
-        voices.find((voice) => voice.speaker === segment.speaker)?.voiceId
-      );
-    const saved = await instance.database.segment.findMany({ where: { episodeId: episode.id } });
-    expect(saved).toHaveLength(15);
-    expect(saved.every((segment) => !!segment.audioUrl)).toBe(true);
-    expect(await queuedStitches(episode.id)).toHaveLength(1);
-  });
+  }, 90_000);
 
   it.each(['changed selected voice', 'new foreign-provider voice'] as const)(
     'rejects a %s after the initial snapshot before requesting speech',
@@ -687,7 +655,7 @@ suite('audio generation through real transactions, local storage and Redis', () 
   });
 
   it.each(['generating', 'stitching', 'ready', 'superseded'] as const)(
-    'reconciles a lost segment commit response while the generation is %s',
+    'preserves published audio after a lost commit response through %s recovery',
     async (state) => {
       const { episode, segment, job } = await fixture();
       if (state === 'generating')
@@ -706,7 +674,15 @@ suite('audio generation through real transactions, local storage and Redis', () 
             where: { id: episode.id },
             data: { audioGenerationKey: randomUUID() },
           });
-        if (state !== 'ready') return;
+        if (state !== 'stitching' && state !== 'ready') return;
+        await processAudioGeneration(job);
+      };
+      if (state === 'superseded')
+        await expect(processAudioGeneration(job)).rejects.toThrow(
+          'Storage publication outcome could not be reconciled'
+        );
+      else await processAudioGeneration(job);
+      if (state === 'ready') {
         const { record } = await sottoTransaction(instance.database, (tx) =>
           verifyCurrentInitialStitch(
             tx,
@@ -721,12 +697,8 @@ suite('audio generation through real transactions, local storage and Redis', () 
           data: { operationId: record.job.id, fingerprint: record.fingerprint },
           updateProgress: (progress) => job.updateProgress(progress),
         });
-      };
-      if (state === 'superseded')
-        await expect(processAudioGeneration(job)).rejects.toThrow(
-          'Storage publication outcome could not be reconciled'
-        );
-      else await processAudioGeneration(job);
+        await processAudioGeneration(job);
+      }
       if (binding.lostHookError) throw binding.lostHookError;
       expect(binding.loseSegment).toBeNull();
       expect(requests).toHaveLength(1);
@@ -736,7 +708,14 @@ suite('audio generation through real transactions, local storage and Redis', () 
       expect(
         (await instance.database.episode.findUniqueOrThrow({ where: { id: episode.id } })).status
       ).toBe(
-        state === 'generating' ? 'GENERATING_AUDIO' : state === 'ready' ? 'READY' : 'STITCHING'
+        state === 'generating' || state === 'superseded'
+          ? 'GENERATING_AUDIO'
+          : state === 'ready'
+            ? 'READY'
+            : 'STITCHING'
+      );
+      expect(await queuedStitches(episode.id)).toHaveLength(
+        state === 'generating' || state === 'superseded' ? 0 : 1
       );
     }
   );

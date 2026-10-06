@@ -63,6 +63,7 @@ export async function createSharedTestInstance(label: string) {
   const url = new URL(databaseUrl);
   if (!['localhost', '127.0.0.1'].includes(url.hostname) || url.pathname !== '/sidedoor_test')
     throw new Error('Use the isolated local sidedoor_test database');
+  const previousDirectDatabaseUrl = process.env.DIRECT_DATABASE_URL;
   const schema = `${label}_${randomUUID().replaceAll('-', '')}`;
   const connection = new Client({
     connectionString: databaseUrl,
@@ -96,6 +97,7 @@ export async function createSharedTestInstance(label: string) {
   });
   const storageRoot = await mkdtemp(join(tmpdir(), `sotto-${label}-`));
   async function reset() {
+    process.env.DIRECT_DATABASE_URL = databaseUrl;
     await database.$executeRawUnsafe(`TRUNCATE "${schema}"."User" CASCADE`);
     await database.$executeRawUnsafe(`TRUNCATE "${schema}"."SidedoorState"`);
     const instanceId = randomUUID();
@@ -142,15 +144,22 @@ export async function createSharedTestInstance(label: string) {
     try {
       await database.$executeRawUnsafe(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`);
     } finally {
-      await Promise.all([
-        database.$disconnect(),
-        rm(storageRoot, { recursive: true, force: true }),
-      ]);
+      try {
+        await Promise.all([
+          database.$disconnect(),
+          rm(storageRoot, { recursive: true, force: true }),
+        ]);
+      } finally {
+        if (process.env.DIRECT_DATABASE_URL === databaseUrl) {
+          if (previousDirectDatabaseUrl === undefined) delete process.env.DIRECT_DATABASE_URL;
+          else process.env.DIRECT_DATABASE_URL = previousDirectDatabaseUrl;
+        }
+      }
     }
   }
   async function seedProfileCredential(
     userId: string,
-    scope: 'ai' | 'tts' | 'music',
+    scope: 'ai' | 'tts' | 'stt' | 'music',
     provider: string,
     values: Record<string, string>
   ) {
