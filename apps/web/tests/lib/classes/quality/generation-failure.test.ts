@@ -15,6 +15,36 @@ import {
 import { captureTeachingFailure } from '@/lib/classes/quality/teaching-failure';
 
 describe('terminal generation failure classification', () => {
+  it('retains exact intro audit evidence when complete repair feedback exceeds its bound', () => {
+    const evidence = captureTeachingFailure(
+      'intro',
+      [
+        {
+          auditFields: ['purpose'],
+          introContext: { purpose: 'Private original intro.' },
+          fields: { purpose: 'Private original intro.' },
+        },
+      ],
+      {
+        items: [
+          {
+            index: 0,
+            acceptable: false,
+            issues: ['unnatural'],
+            feedback: ['Private purpose feedback.'],
+          },
+        ],
+      }
+    );
+    const error = new ReviewerProtocolError(evidence);
+
+    expect(captureGenerationFailure(error)).toEqual({
+      category: 'review_protocol',
+      teachingFailure: evidence,
+    });
+    expect(JSON.stringify(error)).not.toContain('Private');
+  });
+
   it('preserves exact blind evidence in settled FULL stages and the existing strict failure schema', () => {
     const evidence = captureBlindSectionFailure(
       [

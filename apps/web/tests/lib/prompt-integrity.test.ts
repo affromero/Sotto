@@ -59,6 +59,7 @@ const EXPECTED_FILES = [
   'placement/deduce-from-notes.md',
   'class/generate-class-intro.md',
   'class/repair-class-intro.md',
+  'class/review-class-intro.md',
   'class/generate-listening-quiz.md',
   'class/generate-section-quiz.md',
   'class/review-section-quiz.md',
@@ -108,6 +109,16 @@ const EXPECTED_FILES = [
 // If a .md file gains or loses a placeholder, these tests will catch it.
 
 const VARIABLE_CONTRACTS: Record<string, string[]> = {
+  'class/review-class-intro.md': [
+    'GRAMMAR_POINTS',
+    'LANGUAGE_POLICY',
+    'LEVEL',
+    'NATIVE',
+    'OBJECTIVE',
+    'REVIEW_SCHEMA',
+    'TARGET',
+    'TITLE',
+  ],
   'class/review-reading-vocabulary-counterfactual.md': ['LEVEL', 'REVIEW_SCHEMA', 'TARGET'],
   'class/review-reading-vocabulary.md': [
     'LANGUAGE_POLICY',

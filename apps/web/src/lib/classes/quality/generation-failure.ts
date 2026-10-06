@@ -42,9 +42,11 @@ function captureFailureDetail(error: unknown): z.infer<typeof failureDetailSchem
     category: classifyGenerationFailure(error),
     ...(error instanceof TeachingQualityRejectionError && error.teachingFailure
       ? { teachingFailure: error.teachingFailure }
-      : error instanceof SectionQualityError && error.blindReviewFailure
-        ? { teachingFailure: error.blindReviewFailure }
-        : {}),
+      : error instanceof ReviewerProtocolError && error.teachingFailure
+        ? { teachingFailure: error.teachingFailure }
+        : error instanceof SectionQualityError && error.blindReviewFailure
+          ? { teachingFailure: error.blindReviewFailure }
+          : {}),
   });
 }
 

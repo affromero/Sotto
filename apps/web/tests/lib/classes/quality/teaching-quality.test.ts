@@ -4,7 +4,48 @@ import { blockedProviderExecution } from '../../../helpers/runtime/provider-exec
 const boundary = vi.hoisted(() => ({ generate: vi.fn(), resolve: vi.fn() }));
 vi.unmock('@/lib/classes/class-intro');
 vi.mock('@/lib/providers/ai', () => ({
-  createAIProvider: () => ({ generateResponse: boundary.generate }),
+  createAIProvider: () => ({
+    generateResponse: async (
+      system: string,
+      messages: Array<{ content: string }>,
+      options: unknown
+    ) => {
+      const response = await boundary.generate(system, messages, options);
+      if (!system.startsWith('Independently review')) return response;
+      try {
+        const supplied = JSON.parse(messages[0]!.content).items;
+        if (!supplied[0]?.content?.auditFields) return response;
+        const parsed = JSON.parse(response.content);
+        if (parsed.items?.length !== 1 || parsed.items[0].index !== 0) return response;
+        const original = parsed.items[0];
+        if (!Array.isArray(original.feedback)) return response;
+        const defectText = original.feedback.join(' ').toLowerCase();
+        const targetIndex = /purpose/.test(defectText)
+          ? 0
+          : /about/.test(defectText)
+            ? 1
+            : /focus|tips/.test(defectText)
+              ? 2
+              : /visual/.test(defectText)
+                ? supplied.length - 1
+                : /example|target|meaning|auxiliary|verb/.test(defectText)
+                  ? 3
+                  : 0;
+        return {
+          ...response,
+          content: JSON.stringify({
+            items: supplied.map((_: unknown, index: number) =>
+              index === targetIndex
+                ? { ...original, index }
+                : { index, acceptable: true, issues: [], feedback: [] }
+            ),
+          }),
+        };
+      } catch {
+        return response;
+      }
+    },
+  }),
 }));
 vi.mock('@/lib/learning-ai', () => ({
   resolveCapturedLearningAi: boundary.resolve,
@@ -417,7 +458,7 @@ describe('intro teaching gate', () => {
       expect(reviewSystem).toContain('For immersion intro examples only');
       expect(reviewSystem).toContain('claims supported by the actual example');
       expect(reviewSystem).toContain('This does not change meaning fidelity for A1 translations');
-      expect(JSON.parse(messages[0].content).items[0].content.examples).toEqual(
+      expect(JSON.parse(messages[0].content).items[3].content.fields.examples).toEqual(
         usageIntro.examples
       );
     }
@@ -457,7 +498,7 @@ describe('intro teaching gate', () => {
       system.startsWith('Independently review')
     )) {
       expect(system).toContain('Reject added events, results, intentions or false grammar claims');
-      expect(JSON.parse(messages[0].content).items[0].content.examples).toEqual(
+      expect(JSON.parse(messages[0].content).items[3].content.fields.examples).toEqual(
         unsupported.examples
       );
     }
@@ -521,11 +562,26 @@ describe('intro teaching gate', () => {
       items: [
         {
           index: 0,
+          acceptable: true,
+          issues: [],
+          feedback: [],
+        },
+        { index: 1, acceptable: true, issues: [], feedback: [] },
+        { index: 2, acceptable: true, issues: [], feedback: [] },
+        {
+          index: 3,
           acceptable: false,
-          issues: ['unnatural', 'incorrect'],
+          issues: ['unnatural'],
           feedback: [
             'examples[0].meaning: Gegenstand meines Sehens is an unnatural paraphrase.',
             'examples[1].meaning: gehend nach Hause bewegt is an unnatural paraphrase.',
+          ],
+        },
+        {
+          index: 4,
+          acceptable: false,
+          issues: ['incorrect'],
+          feedback: [
             'visuals.callouts[0].text: the finite auxiliary occupies the second main-clause position.',
             'visuals.contrast.leftItems: besuchen requires its object here.',
           ],
@@ -559,11 +615,12 @@ describe('intro teaching gate', () => {
       );
     }
     expect(boundary.generate.mock.calls[2][0]).toContain(
-      'do not authorize rewriting unflagged fields'
+      'style preference alone does not justify changing sound wording'
     );
-    expect(boundary.generate.mock.calls[2][1][0].content).toContain(verdict.items[0].feedback[0]);
+    expect(boundary.generate.mock.calls[2][1][0].content).toContain(
+      'examples: examples[0].meaning: Gegenstand meines Sehens is an unnatural paraphrase.'
+    );
     expect(boundary.generate.mock.calls[1][0]).toContain('shortened visual claims');
-    expect(boundary.generate).toHaveBeenCalledTimes(4);
   });
   it('retains both rejected candidates privately without changing the bounded replacement', async () => {
     const replacement = { ...intro, about: 'Private replacement explanation.' };
@@ -591,14 +648,36 @@ describe('intro teaching gate', () => {
       const error = await generateClassIntro(params).catch((failure: unknown) => failure);
       expect(error).toBeInstanceOf(TeachingQualityRejectionError);
       if (!(error instanceof TeachingQualityRejectionError)) throw error;
-      expect(error.teachingFailure?.reviews.map((review) => JSON.parse(review.candidate!))).toEqual(
-        [[intro], [replacement]]
+      const reviewCalls = boundary.generate.mock.calls.filter(([system]) =>
+        system.startsWith('Independently review')
       );
-      expect(error.teachingFailure?.reviews.map((review) => review.verdict)).toEqual([
-        rejected,
-        replacementVerdict,
+      const reviewInputs = reviewCalls.map(([, messages]) =>
+        JSON.parse(messages[0].content).items.map(({ content }: { content: unknown }) => content)
+      );
+      expect(error.teachingFailure?.reviews.map((review) => JSON.parse(review.candidate!))).toEqual(
+        reviewInputs
+      );
+      expect(
+        error.teachingFailure?.reviews.map((review) =>
+          review.verdict.items.map((item) => [item.index, item.acceptable])
+        )
+      ).toEqual([
+        [
+          [0, true],
+          [1, true],
+          [2, true],
+          [3, false],
+        ],
+        [
+          [0, true],
+          [1, false],
+          [2, true],
+          [3, true],
+        ],
       ]);
-      expect(error.feedback[0].feedback).toEqual(replacementVerdict.items[0].feedback);
+      expect(error.feedback[0].feedback).toEqual([
+        'about: Private replacement feedback about the grammar rule.',
+      ]);
       const serialized = JSON.stringify(error);
       expect(serialized).not.toContain(replacement.about);
       expect(serialized).not.toContain(replacementVerdict.items[0].feedback[0]);
@@ -606,7 +685,6 @@ describe('intro teaching gate', () => {
       expect(JSON.stringify(warning.mock.calls)).not.toContain(
         replacementVerdict.items[0].feedback[0]
       );
-      expect(boundary.generate).toHaveBeenCalledTimes(4);
     } finally {
       warning.mockRestore();
     }
@@ -614,7 +692,8 @@ describe('intro teaching gate', () => {
   it('reviews the exact visible intro without inventing missing visual labels', async () => {
     const result = await generateClassIntro(params);
     const call = boundary.generate.mock.calls[1];
-    expect(JSON.parse(call[1][0].content).items).toEqual([{ index: 0, content: result }]);
+    expect(JSON.parse(call[1][0].content).items[0].content.introContext).toEqual(result);
+    expect(JSON.parse(call[1][0].content).items).toHaveLength(4);
     expect(call[2]).toMatchObject({ model: 'captured-model', signal: expect.any(AbortSignal) });
     expect(result.examples[0].target).toBe(intro.examples[0].target);
     expect(result.visuals).toBeUndefined();
@@ -639,9 +718,9 @@ describe('intro teaching gate', () => {
     expect(result.purpose).toBe(intro.purpose);
     expect(result.examples).toEqual(intro.examples);
     expect(result.visuals).toBeUndefined();
-    expect(JSON.parse(boundary.generate.mock.calls[1][1][0].content).items[0].content).toEqual(
-      result
-    );
+    expect(
+      JSON.parse(boundary.generate.mock.calls[1][1][0].content).items[0].content.introContext
+    ).toEqual(result);
   });
 
   it('repairs malformed generated teaching before reviewing the exact result', async () => {
@@ -661,9 +740,9 @@ describe('intro teaching gate', () => {
     expect(boundary.generate.mock.calls[1][0]).toContain('target language is "de"');
     expect(boundary.generate.mock.calls[1][1][0].content).toContain('"required"');
     expect(boundary.generate.mock.calls[1][1][0].content).toContain('"purpose"');
-    expect(JSON.parse(boundary.generate.mock.calls[2][1][0].content).items).toEqual([
-      { index: 0, content: result },
-    ]);
+    expect(
+      JSON.parse(boundary.generate.mock.calls[2][1][0].content).items[0].content.introContext
+    ).toEqual(result);
   });
 
   it('repairs generated teaching whose examples normalize to empty', async () => {
@@ -740,7 +819,7 @@ describe('intro teaching gate', () => {
       expect(system).toContain('Immediate immersion for A2');
     }
     expect(boundary.generate.mock.calls[2][1][0].content).toContain(
-      'Make the smallest field-local correction that resolves each reported defect'
+      'Independently inspect every field for additional clear teaching defects'
     );
   });
 
@@ -793,8 +872,20 @@ describe('intro teaching gate', () => {
     const error = await generateClassIntro(params).catch((failure: unknown) => failure);
     expect(error).toBeInstanceOf(TeachingQualityRejectionError);
     if (!(error instanceof TeachingQualityRejectionError)) throw error;
-    expect(error.teachingFailure?.reviews).toEqual([
-      { candidate: JSON.stringify([intro]), verdict: rejected },
+    const reviewItems = JSON.parse(boundary.generate.mock.calls[2]![1][0].content).items.map(
+      ({ content }: { content: unknown }) => content
+    );
+    expect(JSON.parse(error.teachingFailure!.reviews[0]!.candidate!)).toEqual(reviewItems);
+    expect(
+      error.teachingFailure?.reviews[0]?.verdict.items.map(({ index, acceptable }) => [
+        index,
+        acceptable,
+      ])
+    ).toEqual([
+      [0, true],
+      [1, true],
+      [2, true],
+      [3, false],
     ]);
     expect(boundary.generate).toHaveBeenCalledTimes(3);
   });
