@@ -72,7 +72,23 @@ const options = () => ({
 beforeEach(() => {
   boundary.generate.mockReset();
   boundary.info.mockReset();
-  boundary.generate.mockResolvedValue({ content: JSON.stringify(verdict), model: 'captured' });
+  boundary.generate.mockImplementation(async (_system, messages, settings) => {
+    if (settings.jsonSchema.name === 'reading_vocabulary_counterfactual') {
+      const payload = JSON.parse(messages[0].content).items[0].content;
+      return {
+        content: JSON.stringify({
+          decisions: payload.questions.map(({ questionIndex }: { questionIndex: number }) => ({
+            questionIndex,
+            decision: 'WORD_MEANING_REQUIRED',
+            answerIndex: null,
+            reasoning: 'The visible passage does not identify the semantic answer.',
+          })),
+        }),
+        model: 'captured',
+      };
+    }
+    return { content: JSON.stringify(verdict), model: 'captured' };
+  });
 });
 
 describe('independent reading vocabulary admission', () => {
@@ -114,6 +130,370 @@ describe('independent reading vocabulary admission', () => {
     expect(JSON.parse(boundary.generate.mock.calls[0]![1][0].content).items[0].content.gloss).toBe(
       'apple'
     );
+    expect(boundary.generate).toHaveBeenCalledTimes(1);
+  });
+
+  it('withholds copied location credit despite an approving original review', async () => {
+    const request = options();
+    request.items = [
+      {
+        ...item,
+        lemma: 'der Bahnhof',
+        sourceForm: 'Bahnhof',
+        gloss: 'train station',
+        passageText: 'Paula hat ihre Gäste am Bahnhof abgeholt.',
+        questionIndices: [0],
+        assessedQuestions: [
+          {
+            ...question,
+            question: 'Wo hat Paula ihre Gäste getroffen?',
+            options: ['Im Park.', 'In ihrer Küche.', 'Am Bahnhof.', 'Vor dem Haus der Musiker.'],
+            correctIndex: 2,
+          },
+        ],
+      },
+    ];
+    boundary.generate
+      .mockResolvedValueOnce({
+        content: JSON.stringify({
+          items: [
+            {
+              index: 0,
+              metadata,
+              associations: [
+                {
+                  questionIndex: 0,
+                  canAnswerWithoutWord: false,
+                  reasoning: 'A location is assessed.',
+                },
+              ],
+            },
+          ],
+        }),
+      })
+      .mockResolvedValueOnce({
+        content: JSON.stringify({
+          decisions: [
+            {
+              questionIndex: 0,
+              decision: 'ANSWERABLE_WITHOUT_WORD',
+              answerIndex: 2,
+              reasoning: 'The pickup event identifies the repeated opaque location.',
+            },
+          ],
+        }),
+      });
+    const original = structuredClone(request.items);
+    expect(await reviewReadingVocabularyContent(request)).toEqual([[]]);
+    expect(request.items).toEqual(original);
+    const [system, messages, settings] = boundary.generate.mock.calls[1]!;
+    const payload = JSON.parse(messages[0].content);
+    expect(payload).toEqual({
+      items: [
+        {
+          index: 0,
+          content: {
+            passageText: 'Paula hat ihre Gäste am [WORD] abgeholt.',
+            questions: [
+              {
+                questionIndex: 0,
+                question: 'Wo hat Paula ihre Gäste getroffen?',
+                options: ['Im Park.', 'In ihrer Küche.', 'Am [WORD].', 'Vor dem Haus der Musiker.'],
+              },
+            ],
+          },
+        },
+      ],
+    });
+    expect(JSON.stringify({ system, payload })).not.toMatch(/Bahnhof|train station/);
+    expect(JSON.stringify(payload)).not.toMatch(/correctIndex|gloss|lemma|explanation/);
+    expect(settings).toMatchObject({
+      model: 'captured',
+      signal: request.ai.execution.signal,
+      temperature: 0,
+      maxTokens: 2048,
+      jsonSchema: { name: 'reading_vocabulary_counterfactual' },
+    });
+  });
+
+  it('isolates each approved word so neighboring passages cannot reveal its identity', async () => {
+    const request = options();
+    request.items = [
+      {
+        ...item,
+        passageText: 'Ana kauft Äpfel und Brot.',
+        questionIndices: [0],
+        assessedQuestions: [question],
+      },
+      {
+        ...item,
+        lemma: 'Brot',
+        sourceForm: 'Brot',
+        gloss: 'bread',
+        passageText: 'Ana kauft Äpfel und Brot.',
+        questionIndices: [0],
+        assessedQuestions: [question],
+      },
+    ];
+    boundary.generate.mockResolvedValueOnce({
+      content: JSON.stringify({
+        items: request.items.map((_, index) => ({
+          index,
+          metadata,
+          associations: [
+            { questionIndex: 0, canAnswerWithoutWord: false, reasoning: 'Meaning required.' },
+          ],
+        })),
+      }),
+    });
+    expect(await reviewReadingVocabularyContent(request)).toEqual([[0], [0]]);
+    const payloads = boundary.generate.mock.calls
+      .slice(1)
+      .map((call) => JSON.parse(call[1][0].content));
+    expect(payloads.map((payload) => payload.items)).toEqual([
+      [
+        {
+          index: 0,
+          content: {
+            passageText: 'Ana kauft [WORD] und Brot.',
+            questions: [
+              { questionIndex: 0, question: question.question, options: question.options },
+            ],
+          },
+        },
+      ],
+      [
+        {
+          index: 0,
+          content: {
+            passageText: 'Ana kauft Äpfel und [WORD].',
+            questions: [
+              { questionIndex: 0, question: question.question, options: question.options },
+            ],
+          },
+        },
+      ],
+    ]);
+  });
+
+  it('normalizes known forms without masking parts of a different word', async () => {
+    const request = options();
+    request.items = [
+      {
+        ...item,
+        lemma: 'das Café',
+        sourceForm: 'café',
+        passageText: 'Ein Cafe\u0301, kein Caféhaus und kein Café_Ort.',
+        questionIndices: [0],
+        assessedQuestions: [
+          { ...question, question: 'Was bedeutet CAFÉ?', options: ['Ein café.', 'A house.'] },
+        ],
+      },
+    ];
+    boundary.generate.mockResolvedValueOnce({
+      content: JSON.stringify({
+        items: [
+          {
+            index: 0,
+            metadata,
+            associations: [
+              { questionIndex: 0, canAnswerWithoutWord: false, reasoning: 'Meaning required.' },
+            ],
+          },
+        ],
+      }),
+    });
+    expect(await reviewReadingVocabularyContent(request)).toEqual([[0]]);
+    expect(JSON.parse(boundary.generate.mock.calls[1]![1][0].content).items[0].content).toEqual({
+      passageText: 'Ein [WORD], kein Caféhaus und kein Café_Ort.',
+      questions: [
+        {
+          questionIndex: 0,
+          question: 'Was bedeutet [WORD]?',
+          options: ['Ein [WORD].', 'A house.'],
+        },
+      ],
+    });
+  });
+
+  it.each(['ANSWERABLE_WITHOUT_WORD', 'UNCERTAIN'])(
+    'withholds original credit on masked %s, including an unsupported answer key',
+    async (decision) => {
+      boundary.generate
+        .mockResolvedValueOnce({ content: JSON.stringify(verdict) })
+        .mockResolvedValueOnce({
+          content: JSON.stringify({
+            decisions: [
+              {
+                questionIndex: 1,
+                decision,
+                answerIndex: decision === 'ANSWERABLE_WITHOUT_WORD' ? 2 : null,
+                reasoning: 'No reliable necessity proof.',
+              },
+            ],
+          }),
+        });
+      expect(await reviewReadingVocabularyContent(options())).toEqual([[]]);
+    }
+  );
+
+  it.each([undefined, -1, 0.5, 4])(
+    'rejects an invalid assessed answer key %s before any review dispatch',
+    async (correctIndex) => {
+      const request = options();
+      request.items[0]!.assessedQuestions[0]!.correctIndex = correctIndex as number;
+      await expect(reviewReadingVocabularyContent(request)).rejects.toBeInstanceOf(
+        ReviewerProtocolError
+      );
+      expect(boundary.generate).not.toHaveBeenCalled();
+    }
+  );
+
+  it('rejects an existing marker in question options without sending an ambiguous mask', async () => {
+    const request = options();
+    request.items[0]!.assessedQuestions[0]!.options[0] = '[WORD]';
+    await expect(reviewReadingVocabularyContent(request)).rejects.toBeInstanceOf(
+      ReviewerProtocolError
+    );
+    expect(boundary.generate).toHaveBeenCalledTimes(1);
+  });
+
+  const twoPairVerdict = {
+    items: [
+      {
+        index: 0,
+        metadata,
+        associations: [1, 3].map((questionIndex) => ({
+          questionIndex,
+          canAnswerWithoutWord: false,
+          reasoning: 'The original review supports this meaning.',
+        })),
+      },
+    ],
+  };
+  const requiredPair = (questionIndex: number) => ({
+    questionIndex,
+    decision: 'WORD_MEANING_REQUIRED',
+    answerIndex: null,
+    reasoning: 'The opaque word meaning is necessary.',
+  });
+  it.each([
+    { label: 'missing one of two pairs', decisions: [requiredPair(1)] },
+    {
+      label: 'duplicate within the expected pair count',
+      decisions: [requiredPair(1), requiredPair(1)],
+    },
+    {
+      label: 'unknown pair replacing an expected pair',
+      decisions: [requiredPair(0), requiredPair(3)],
+    },
+    {
+      label: 'answer valid for another question only',
+      decisions: [
+        {
+          questionIndex: 1,
+          decision: 'ANSWERABLE_WITHOUT_WORD',
+          answerIndex: 2,
+          reasoning: 'An option was selected.',
+        },
+        requiredPair(3),
+      ],
+    },
+  ])('rejects masked $label with per-question bounds', async ({ decisions }) => {
+    const request = options();
+    request.items[0]!.assessedQuestions[0]!.options = ['Apples', 'Bread'];
+    boundary.generate
+      .mockResolvedValueOnce({ content: JSON.stringify(twoPairVerdict) })
+      .mockResolvedValueOnce({ content: JSON.stringify({ decisions }) });
+    await expect(reviewReadingVocabularyContent(request)).rejects.toBeInstanceOf(
+      ReviewerProtocolError
+    );
+    expect(boundary.generate).toHaveBeenCalledTimes(2);
+  });
+
+  it('matches reordered masked decisions to exact pairs while retaining input order', async () => {
+    boundary.generate
+      .mockResolvedValueOnce({ content: JSON.stringify(twoPairVerdict) })
+      .mockResolvedValueOnce({
+        content: JSON.stringify({ decisions: [requiredPair(3), requiredPair(1)] }),
+      });
+    expect(await reviewReadingVocabularyContent(options())).toEqual([[1, 3]]);
+  });
+
+  it.each([
+    { label: 'existing passage marker', passageText: 'Ana kauft Äpfel. [WORD]' },
+    { label: 'missing known source form', passageText: 'Ana trinkt Tee.' },
+    { label: 'only a partial token', passageText: 'Ana besucht Äpfelhaus.' },
+  ])(
+    'rejects an unreliable mask with $label before a counterfactual dispatch',
+    async ({ passageText }) => {
+      await expect(
+        reviewReadingVocabularyContent({ ...options(), items: [{ ...item, passageText }] })
+      ).rejects.toBeInstanceOf(ReviewerProtocolError);
+      expect(boundary.generate).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  const maskedDecision = {
+    questionIndex: 1,
+    decision: 'WORD_MEANING_REQUIRED',
+    answerIndex: null,
+    reasoning: 'The hidden word meaning is necessary.',
+  };
+  it.each([
+    { label: 'malformed JSON', content: 'not JSON' },
+    { label: 'missing pair', content: JSON.stringify({ decisions: [] }) },
+    {
+      label: 'extra pair',
+      content: JSON.stringify({
+        decisions: [maskedDecision, { ...maskedDecision, questionIndex: 3 }],
+      }),
+    },
+    {
+      label: 'duplicate pair',
+      content: JSON.stringify({ decisions: [maskedDecision, maskedDecision] }),
+    },
+    {
+      label: 'invented pair',
+      content: JSON.stringify({ decisions: [{ ...maskedDecision, questionIndex: 0 }] }),
+    },
+    {
+      label: 'answer outside options',
+      content: JSON.stringify({
+        decisions: [{ ...maskedDecision, decision: 'ANSWERABLE_WITHOUT_WORD', answerIndex: 4 }],
+      }),
+    },
+    {
+      label: 'meaning verdict carrying answer',
+      content: JSON.stringify({ decisions: [{ ...maskedDecision, answerIndex: 0 }] }),
+    },
+    {
+      label: 'extra answer key',
+      content: JSON.stringify({ decisions: [{ ...maskedDecision, correctIndex: 0 }] }),
+    },
+    {
+      label: 'blank reasoning',
+      content: JSON.stringify({ decisions: [{ ...maskedDecision, reasoning: ' ' }] }),
+    },
+  ])('fails closed on masked $label without another request', async ({ content }) => {
+    boundary.generate
+      .mockResolvedValueOnce({ content: JSON.stringify(verdict) })
+      .mockResolvedValueOnce({ content });
+    await expect(reviewReadingVocabularyContent(options())).rejects.toBeInstanceOf(
+      ReviewerProtocolError
+    );
+    expect(boundary.generate).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([
+    new Error('Masked provider transport failed'),
+    new DOMException('Cancelled', 'AbortError'),
+  ])('propagates a masked provider failure without a repair request', async (error) => {
+    boundary.generate
+      .mockResolvedValueOnce({ content: JSON.stringify(verdict) })
+      .mockRejectedValueOnce(error);
+    await expect(reviewReadingVocabularyContent(options())).rejects.toBe(error);
+    expect(boundary.generate).toHaveBeenCalledTimes(2);
   });
 
   it('rejects bad metadata even when every association is denied, retaining the actual typed decision separately', async () => {

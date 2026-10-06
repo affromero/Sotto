@@ -213,6 +213,9 @@ export async function processAudioGeneration(
   let source: 'credential' | 'local';
   let voiceId: string;
   let expectedVoice = episode.voices.find((voice) => voice.speaker === speaker);
+  let voicePinned = false;
+  const requestedProvider = existingSegment.ttsProvider ?? episode.ttsProvider;
+  const segmentVoiceOverride = existingSegment.ttsProvider ? existingSegment.ttsVoiceId : null;
   const segmentSettings = {
     ttsProvider: existingSegment.ttsProvider,
     ttsModel: existingSegment.ttsModel,
@@ -246,22 +249,6 @@ export async function processAudioGeneration(
     voiceId =
       existingSegment.ttsVoiceId ??
       provider.getVoiceId(speaker, episodeId, voiceMetadata, episode.language ?? undefined);
-
-    // Persist resolved voice for consistency
-    try {
-      await prisma.episodeVoice.upsert({
-        where: { episodeId_speaker: { episodeId, speaker } },
-        update: { voiceId, provider: providerId },
-        create: { episodeId, speaker, voiceId, provider: providerId },
-      });
-      expectedVoice = { speaker, voiceId, provider: providerId };
-    } catch (err) {
-      logger.warn('Failed to persist voice assignment', {
-        episodeId,
-        speaker,
-        error: err instanceof Error ? err.message : String(err),
-      });
-    }
   } else {
     // ---- Standard flow: resolve provider at episode level ----
     if (!episode.ttsProvider) {
@@ -309,25 +296,40 @@ export async function processAudioGeneration(
       episodeVoice?.voiceId && episodeVoice.provider === providerId
         ? episodeVoice.voiceId
         : provider.getVoiceId(speaker, episodeId, voiceMetadata, episode.language ?? undefined);
-
-    // Persist resolved voice for retry consistency and analytics
-    if (!episodeVoice || episodeVoice.provider !== providerId || episodeVoice.voiceId !== voiceId) {
-      try {
-        await prisma.episodeVoice.upsert({
-          where: { episodeId_speaker: { episodeId, speaker } },
-          update: { voiceId, provider: providerId },
-          create: { episodeId, speaker, voiceId, provider: providerId },
-        });
-        expectedVoice = { speaker, voiceId, provider: providerId };
-      } catch (err) {
-        logger.warn('Failed to persist voice assignment', {
-          episodeId,
-          speaker,
-          error: err instanceof Error ? err.message : String(err),
-        });
-      }
-    }
   }
+
+  const pinnedVoice = await sottoTransaction(
+    prisma,
+    async (tx) => {
+      await validatePreparationAudio(tx, episodeId, audioGenerationKey);
+      await validateEpisodeStorage(tx, episodeId, executionOwnership);
+      const inputs = await readStorageInputs(tx);
+      const currentVoice = inputs.episode.voices[0];
+      const reuseCurrentVoice =
+        currentVoice &&
+        (!expectedVoice ||
+          (currentVoice.provider === providerId && currentVoice.voiceId === voiceId));
+      const assigned = reuseCurrentVoice
+        ? currentVoice
+        : await tx.episodeVoice.upsert({
+            where: { episodeId_speaker: { episodeId, speaker } },
+            update: { voiceId, provider: providerId },
+            create: { episodeId, speaker, voiceId, provider: providerId },
+            select: { voiceId: true, provider: true },
+          });
+      if (
+        !assigned.voiceId ||
+        assigned.provider !== providerId ||
+        (segmentVoiceOverride && assigned.voiceId !== segmentVoiceOverride)
+      )
+        throw new EpisodeStorageChangedError();
+      return { speaker, voiceId: assigned.voiceId, provider: providerId };
+    },
+    { signal }
+  );
+  expectedVoice = pinnedVoice;
+  voiceId = pinnedVoice.voiceId;
+  voicePinned = true;
 
   async function readStorageInputs(
     tx: Prisma.TransactionClient,
@@ -358,6 +360,12 @@ export async function processAudioGeneration(
       },
     });
     const currentVoice = segment?.episode.voices[0];
+    const compatibleInitialAssignment =
+      !voicePinned &&
+      !expectedVoice &&
+      currentVoice?.voiceId &&
+      currentVoice.provider === requestedProvider &&
+      (!segmentVoiceOverride || currentVoice.voiceId === segmentVoiceOverride);
     if (
       !segment ||
       segment.episodeId !== episodeId ||
@@ -373,8 +381,9 @@ export async function processAudioGeneration(
       segment.ttsProvider !== segmentSettings.ttsProvider ||
       segment.ttsModel !== segmentSettings.ttsModel ||
       segment.ttsVoiceId !== segmentSettings.ttsVoiceId ||
-      currentVoice?.voiceId !== expectedVoice?.voiceId ||
-      currentVoice?.provider !== expectedVoice?.provider
+      (!compatibleInitialAssignment &&
+        (currentVoice?.voiceId !== expectedVoice?.voiceId ||
+          currentVoice?.provider !== expectedVoice?.provider))
     )
       throw new EpisodeStorageChangedError();
     if (segment.episode.status !== 'GENERATING_AUDIO') {

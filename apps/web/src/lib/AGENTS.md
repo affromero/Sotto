@@ -106,14 +106,25 @@ summary. Oversized transcript/questions are explicitly omitted without losing th
 exact verdict. Neither raw material nor this diagnostic crosses learner APIs.
 
 Reading vocabulary allows one bounded extraction replacement. Twelve words in
-batches of five require at most two extraction requests and six teaching reviews.
-These are additional bounded requests within the unchanged parent budget. The
+batches of five require at most two extraction requests and six metadata reviews.
+`classes/quality/reading-vocabulary-counterfactual.ts` additionally reviews each
+word with previously supported associations in a separate masked request. It
+withholds lemma, gloss, part of speech, explanations and answer keys, so another
+word's passage cannot reveal the hidden word. Only the original supported links
+also judged meaning-required survive. Answerable or uncertain links remain
+background exposure. Known lemma/source forms use NFC and Unicode word boundaries;
+this does not establish general morphology coverage. Revealing variants require
+uncertainty and abstention. There are at most twelve masked requests per candidate,
+twenty-four with the existing replacement, and thirty-two total reading requests.
+All use captured provider settings and the unchanged parent request budget. No
+masked protocol or provider failure triggers a correction or additional retry. The
 replacement preserves the passage, questions, options, keys, and each source-form
 ordinal/count, while permitting reviewed lemma, gloss, part-of-speech, and
 association corrections. Reading audits return independent metadata and complete
 per-proposed-question counterfactual decisions in the same request. Each pair requires
 `canAnswerWithoutWord` and a bounded nonempty evidence summary; the server admits a
-link only when the counterfactual is false. Rejected word metadata
+link only when the original counterfactual is false and the separate masked
+review returns `WORD_MEANING_REQUIRED`. Rejected word metadata
 requires the existing bounded replacement; unsupported associations are explicitly
 denied and cannot credit SRS. Accepted metadata remains background exposure when
 no link is admitted. Supported links retain word-level reading credit. Missing,
