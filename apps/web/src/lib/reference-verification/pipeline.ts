@@ -142,15 +142,7 @@ export async function runReferenceVerification(
   }));
 
   // AI layer: single batch call with per-ref domain instructions
-  let aiResults: Map<string, VerificationCheck>;
-  try {
-    aiResults = await aiEvaluateWithDomainContext(refsWithDomain, topic, ai);
-  } catch (error) {
-    logger.warn('AI claim-support evaluation failed; affected references will fail closed', {
-      error: error instanceof Error ? error.message : 'Unknown',
-    });
-    aiResults = new Map();
-  }
+  const aiResults = await aiEvaluateWithDomainContext(refsWithDomain, topic, ai);
 
   // Merge AI results into allChecks
   for (const [refId, aiCheck] of aiResults) {

@@ -116,20 +116,21 @@ ${refsContext}
 
 Evaluate each reference according to its domain instructions. Return JSON only.`;
 
-  const AI_TIMEOUT_MS = 60_000;
-
   try {
+    aiSelection.execution.signal?.throwIfAborted();
     const ai = createAIProvider(provider);
-    const response = await Promise.race([
-      ai.generateResponse(systemPrompt, [{ role: 'user', content: userMessage }], {
+    const options = await capturedLearningAiOptions(aiSelection);
+    aiSelection.execution.signal?.throwIfAborted();
+    const response = await ai.generateResponse(
+      systemPrompt,
+      [{ role: 'user', content: userMessage }],
+      {
         maxTokens: 4096,
-        ...(await capturedLearningAiOptions(aiSelection)),
+        ...options,
         useWebSearch: true,
-      }),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('AI evaluation timed out after 60s')), AI_TIMEOUT_MS)
-      ),
-    ]);
+      }
+    );
+    aiSelection.execution.signal?.throwIfAborted();
 
     logUsage({
       service: provider,
@@ -204,15 +205,6 @@ Evaluate each reference according to its domain instructions. Return JSON only.`
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     logger.error('AI reference evaluation failed', { error: message });
-
-    for (const { ref } of refsWithDomain) {
-      results.set(ref.id, {
-        layer: 'ai',
-        passed: false,
-        confidence: 0,
-        detail: `AI evaluation failed: ${message}`,
-      });
-    }
-    return results;
+    throw error;
   }
 }
