@@ -28,7 +28,48 @@ const params = {
   grammarPoints: ['past events'],
   targetVocab: [],
 };
-const approved = { items: [{ index: 0, acceptable: true, issues: [], feedback: [] }] };
+const introAuditFields = [
+  {
+    auditFields: ['purpose'],
+    select: (value: { purpose: string }) => ({ purpose: value.purpose }),
+  },
+  { auditFields: ['about'], select: (value: { about: string }) => ({ about: value.about }) },
+  {
+    auditFields: ['focus', 'tips'],
+    select: (value: { focus: string[]; tips: string[] }) => ({
+      focus: value.focus,
+      tips: value.tips,
+    }),
+  },
+  {
+    auditFields: ['examples'],
+    select: (value: { examples: unknown[] }) => ({ examples: value.examples }),
+  },
+];
+function auditItems(value: {
+  purpose: string;
+  about: string;
+  focus: string[];
+  examples: unknown[];
+  tips: string[];
+}) {
+  return introAuditFields.map(({ auditFields, select }) => ({
+    auditFields,
+    introContext: value,
+    fields: select(value),
+  }));
+}
+function approvedForIntro() {
+  return {
+    items: introAuditFields.map((_, index) => ({
+      index,
+      acceptable: true,
+      issues: [],
+      feedback: [],
+    })),
+  };
+}
+const approved = approvedForIntro();
 const capturedLunaIntro = {
   purpose: 'Du lernst, kurz und klar von Erlebnissen und fertigen Aktivitäten zu erzählen.',
   about:
@@ -87,9 +128,98 @@ beforeEach(() => {
 });
 
 describe('field-local intro repair', () => {
+  it('corrects omitted defects and preserves a sound field behind mistaken review feedback', async () => {
+    const candidate = capturedLunaIntro;
+    const verdict = {
+      items: [
+        { index: 0, acceptable: true, issues: [], feedback: [] },
+        {
+          index: 1,
+          acceptable: false,
+          issues: ['unnatural'],
+          feedback: ['The about text sounds unnatural and needs rewriting.'],
+        },
+        { index: 2, acceptable: true, issues: [], feedback: [] },
+        { index: 3, acceptable: true, issues: [], feedback: [] },
+      ],
+    };
+    const repaired = {
+      purpose: 'Du lernst, kurz und klar zu erzählen, was du erlebt und gemacht hast.',
+      about: candidate.about,
+      focus: candidate.focus,
+      examples: candidate.examples.map((example, index) =>
+        index === 1
+          ? { ...example, meaning: 'Wir waren zu Fuß unterwegs und sind zum Markt gegangen.' }
+          : index === 2
+            ? { ...example, meaning: 'Auf der Reise habe ich viele schöne Orte gesehen.' }
+            : example
+      ),
+      tips: candidate.tips,
+    };
+    boundary.generate
+      .mockResolvedValueOnce({ content: JSON.stringify(candidate), model: 'captured-model' })
+      .mockResolvedValueOnce({ content: JSON.stringify(verdict), model: 'captured-model' })
+      .mockResolvedValueOnce({ content: JSON.stringify(repaired), model: 'captured-model' })
+      .mockResolvedValueOnce({ content: JSON.stringify(approved), model: 'captured-model' });
+
+    const result = await generateClassIntro(params);
+
+    expect(result).toEqual(repaired);
+    expect(result.about).toBe(candidate.about);
+    expect(result.focus).toEqual(candidate.focus);
+    expect(result.tips).toEqual(candidate.tips);
+    expect(result.examples[0]).toEqual(candidate.examples[0]);
+    expect(result.examples[1].target).toBe(candidate.examples[1].target);
+    expect(result.examples[1].note).toBe(candidate.examples[1].note);
+    expect(result.examples[2].target).toBe(candidate.examples[2].target);
+    expect(result.examples[2].note).toBe(candidate.examples[2].note);
+    expect(result.visuals).toBeUndefined();
+    expect(boundary.generate.mock.calls[0][0]).toContain(
+      'Make purpose one short sentence naming a concrete action'
+    );
+    const correction = boundary.generate.mock.calls.find(([system]) =>
+      system.includes('semantic replacement')
+    );
+    expect(correction?.[1][0].content).toContain('may be incomplete or mistaken');
+    expect(correction?.[1][0].content).toContain('Independently inspect every field');
+    expect(correction?.[1][0].content).toContain('correct it only when substantiated');
+    expect(correction?.[1][0].content).toContain('gehend erreicht');
+    expect(correction?.[1][0].content).toContain('The about text sounds unnatural');
+    expect(correction?.[1][0].content).toContain(
+      'The rejected purpose is intentionally omitted from the candidate below'
+    );
+    expect(correction?.[1][0].content).not.toContain(candidate.purpose);
+    const rejectedCandidateText = correction?.[1][0].content.split(
+      'Rejected candidate with its purpose omitted for independent replacement:\n'
+    )[1];
+    expect(JSON.parse(rejectedCandidateText!)).toEqual(
+      Object.fromEntries(Object.entries(candidate).filter(([field]) => field !== 'purpose'))
+    );
+    const firstReview = boundary.generate.mock.calls.find(([system]) =>
+      system.startsWith('Independently review')
+    );
+    expect(JSON.parse(firstReview![1][0].content).items[0].content.introContext.purpose).toBe(
+      candidate.purpose
+    );
+    expect(boundary.generate.mock.calls[2][0]).toContain(
+      'During semantic replacement, the rejected purpose is intentionally omitted'
+    );
+    const finalReview = boundary.generate.mock.calls
+      .filter(([system]) => system.startsWith('Independently review'))
+      .at(-1);
+    expect(JSON.parse(finalReview![1][0].content).items[0].content.introContext).toEqual(repaired);
+  });
+
   it('makes field-local A2 corrections and preserves the captured Luna candidate wording', async () => {
     const candidate = capturedLunaIntro;
-    const verdict = capturedLunaVerdict;
+    const verdict = {
+      items: [
+        { index: 0, acceptable: true, issues: [], feedback: [] },
+        { index: 1, acceptable: true, issues: [], feedback: [] },
+        { index: 2, acceptable: true, issues: [], feedback: [] },
+        { ...capturedLunaVerdict.items[0], index: 3 },
+      ],
+    };
     boundary.generate
       .mockReset()
       .mockResolvedValueOnce({ content: JSON.stringify(candidate), model: 'captured-model' })
@@ -129,21 +259,36 @@ describe('field-local intro repair', () => {
     });
 
     const replacementPrompt = boundary.generate.mock.calls[2][1][0].content;
-    expect(replacementPrompt).toContain('Preserve every unflagged field verbatim');
-    expect(replacementPrompt).toContain('preserve sound wording and supported meaning');
-    expect(replacementPrompt).toContain('Do not rewrite sound content for variety');
+    expect(replacementPrompt).toContain('feedback may be incomplete or mistaken');
+    expect(replacementPrompt).toContain('Independently inspect every field');
+    expect(replacementPrompt).toContain('correct it only when substantiated');
+    expect(replacementPrompt).toContain('Preserve sound wording, supported meaning and facts');
+    expect(replacementPrompt).toContain('do not rewrite sound content for variety');
+    expect(replacementPrompt).toContain(
+      'The rejected purpose is intentionally omitted from the candidate below'
+    );
+    expect(replacementPrompt).not.toContain(candidate.purpose);
     expect(boundary.generate.mock.calls[2][0]).toContain(
-      'In semantic replacement, these style requirements apply to changed fields'
+      'style preference alone does not justify changing sound wording'
     );
     const reviewCalls = boundary.generate.mock.calls.filter(([system]) =>
       system.startsWith('Independently review')
     );
-    expect(JSON.parse(reviewCalls.at(-1)![1][0].content).items[0].content).toEqual(result);
+    expect(JSON.parse(reviewCalls.at(-1)![1][0].content).items[0].content.introContext).toEqual(
+      result
+    );
   });
 
   it('fails closed when whole-candidate review rejects drift introduced by field-local repair', async () => {
     const candidate = capturedLunaIntro;
-    const firstVerdict = capturedLunaVerdict;
+    const firstVerdict = {
+      items: [
+        { index: 0, acceptable: true, issues: [], feedback: [] },
+        { index: 1, acceptable: true, issues: [], feedback: [] },
+        { index: 2, acceptable: true, issues: [], feedback: [] },
+        { ...capturedLunaVerdict.items[0], index: 3 },
+      ],
+    };
     const drifted = {
       ...candidate,
       examples: [
@@ -161,8 +306,11 @@ describe('field-local intro repair', () => {
     };
     const secondVerdict = {
       items: [
+        { index: 0, acceptable: true, issues: [], feedback: [] },
+        { index: 1, acceptable: true, issues: [], feedback: [] },
+        { index: 2, acceptable: true, issues: [], feedback: [] },
         {
-          index: 0,
+          index: 3,
           acceptable: false,
           issues: ['unnatural'],
           feedback: ['examples[2].meaning describes the Schloss as present and sounds unnatural.'],
@@ -180,12 +328,14 @@ describe('field-local intro repair', () => {
     expect(error).toBeInstanceOf(TeachingQualityRejectionError);
     if (!(error instanceof TeachingQualityRejectionError)) throw error;
     expect(error.teachingFailure?.reviews).toEqual([
-      { candidate: JSON.stringify([candidate]), verdict: firstVerdict },
-      { candidate: JSON.stringify([drifted]), verdict: secondVerdict },
+      { candidate: JSON.stringify(auditItems(candidate)), verdict: firstVerdict },
+      { candidate: JSON.stringify(auditItems(drifted)), verdict: secondVerdict },
     ]);
     const reviewCalls = boundary.generate.mock.calls.filter(([system]) =>
       system.startsWith('Independently review')
     );
-    expect(JSON.parse(reviewCalls[1]![1][0].content).items[0].content).toEqual(drifted);
+    expect(JSON.parse(reviewCalls[1]![1][0].content).items[0].content.introContext).toEqual(
+      drifted
+    );
   });
 });

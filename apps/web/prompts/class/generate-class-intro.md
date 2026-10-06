@@ -23,6 +23,7 @@ Rules:
 
 - Follow the language policy exactly.
 - Use natural, everyday wording at the learner's level in every field, including purpose, about, focus and tips. Describe what the learner will do in ordinary language; avoid unnatural literal translations or abstract descriptions of activities.
+- Make purpose one short sentence naming a concrete action the learner can perform, grounded in the class objective and written in the language required by the language policy. Avoid vague claims about why the class matters, abstract activity labels, and literal translations of abstract objective categories.
 - Keep it concise enough to read before practice: no more than 180 words total across prose fields.
 - Do not invent exam claims, official certification claims, or unsupported cultural facts.
 - Make tips specific to the grammar/vocabulary, not generic study advice.
@@ -39,7 +40,7 @@ Rules:
 
 Return ONLY JSON with this shape. The visuals field is optional; omit it when no useful aid is needed:
 {
-"purpose": "1 sentence explaining why this class matters",
+"purpose": "1 short sentence naming a concrete learner action grounded in the objective and language policy",
 "about": "2-3 sentences teaching the core idea before practice",
 "focus": ["3-5 short focus points"],
 "examples": [
