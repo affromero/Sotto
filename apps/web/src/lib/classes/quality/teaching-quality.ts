@@ -365,9 +365,7 @@ function aggregateIntroFeedback(
       item && typeof item === 'object' && 'auditFields' in item && Array.isArray(item.auditFields)
         ? item.auditFields.join(' and ')
         : 'intro';
-    const summary = `${scope}: ${details.join(' ')}`;
-    if (summary.length > 300) throw new ReviewerProtocolError(teachingFailure);
-    return summary;
+    return `${scope}: ${details.join(' ')}`;
   });
   if (feedback.length > 6) throw new ReviewerProtocolError(teachingFailure);
   return [{ index: 0, feedback }];

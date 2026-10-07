@@ -186,10 +186,10 @@ describe('intro audit scopes', () => {
     await expect(reviewTeachingContent(options)).rejects.toBeInstanceOf(ReviewerProtocolError);
   });
 
-  it('fails closed rather than truncating scope feedback beyond the repair bound', async () => {
-    const tooMuchFeedback = ['x'.repeat(170), 'y'.repeat(170)];
+  it('preserves valid scope feedback and its original review evidence beyond 300 aggregate characters', async () => {
+    const validFeedback = ['x'.repeat(170), 'y'.repeat(170)];
     const rawVerdict = verdict([
-      { index: 0, acceptable: false, feedback: tooMuchFeedback },
+      { index: 0, acceptable: false, feedback: validFeedback },
       { index: 1 },
       { index: 2 },
       { index: 3 },
@@ -203,8 +203,11 @@ describe('intro audit scopes', () => {
     });
 
     const error = await reviewTeachingContent(options).catch((failure: unknown) => failure);
-    expect(error).toBeInstanceOf(ReviewerProtocolError);
-    if (!(error instanceof ReviewerProtocolError)) throw error;
+    expect(error).toBeInstanceOf(TeachingQualityRejectionError);
+    if (!(error instanceof TeachingQualityRejectionError)) throw error;
+    expect(error.feedback).toEqual([
+      { index: 0, feedback: [`purpose: ${validFeedback.join(' ')}`] },
+    ]);
     expect(error.teachingFailure?.reviews).toEqual([
       {
         candidate: expect.any(String),
