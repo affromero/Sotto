@@ -10,6 +10,7 @@ vi.mock('@/lib/learning-ai', () => ({
 }));
 vi.mock('@/lib/usage-logger', () => ({ logUsage: vi.fn() }));
 import {
+  getIntroRepairPlan,
   ReviewerProtocolError,
   TeachingQualityRejectionError,
   reviewTeachingContent,
@@ -30,10 +31,6 @@ const candidate = {
   tips: ['Das Partizip steht am Ende.'],
   visuals: { timeline: { title: 'Gestern', steps: ['Wir sind gegangen.'] } },
 };
-const grammarContext = {
-  ...Object.fromEntries(Object.entries(candidate).filter(([field]) => field !== 'visuals')),
-  examples: candidate.examples.map(({ target, note }) => ({ target, note })),
-};
 const options = {
   ai: {
     provider: 'fixture',
@@ -41,9 +38,7 @@ const options = {
     signal: new AbortController().signal,
     execution: blockedProviderExecution('fixture'),
   },
-  provider: {
-    generateResponse: boundary.generate,
-  } as never,
+  provider: { generateResponse: boundary.generate } as never,
   userId: 'fixture',
   level: 'A2',
   nativeLang: 'en',
@@ -68,301 +63,367 @@ function verdict(items: Array<{ index: number; acceptable?: boolean; feedback?: 
   };
 }
 
-describe('intro audit scopes', () => {
+function reviewedBatch(callIndex: number) {
+  return JSON.parse(boundary.generate.mock.calls[callIndex]![1][0].content).items as Array<{
+    index: number;
+    content: { address: { field: string; index?: number }; introContext: unknown; fields: unknown };
+  }>;
+}
+
+function acceptedBatch(size: number) {
+  return verdict(Array.from({ length: size }, (_, index) => ({ index })));
+}
+
+async function rejectedExamples(reviewOptions = options): Promise<TeachingQualityRejectionError> {
+  boundary.generate.mockResolvedValueOnce({
+    content: JSON.stringify(
+      verdict([
+        { index: 0 },
+        { index: 1 },
+        { index: 2 },
+        { index: 3 },
+        { index: 4, acceptable: false, feedback: ['examples[0].meaning is unsupported.'] },
+      ])
+    ),
+    model: 'captured-luna',
+  });
+  const failure = await reviewTeachingContent(reviewOptions).catch((error: unknown) => error);
+  if (!(failure instanceof TeachingQualityRejectionError)) throw failure;
+  return failure;
+}
+
+describe('intro audit addresses', () => {
   beforeEach(() => {
-    boundary.generate.mockReset();
+    boundary.generate
+      .mockReset()
+      .mockImplementation(async (_system: string, messages: Array<{ content: string }>) => {
+        const count = JSON.parse(messages[0]!.content).items.length;
+        return { content: JSON.stringify(acceptedBatch(count)), model: 'captured-luna' };
+      });
   });
 
-  it('keeps exact scope evidence and gives repair field-qualified feedback for every rejected scope', async () => {
-    const rawVerdict = verdict([
-      { index: 0, acceptable: false, feedback: ['“fertigen Aktivitäten” is unnatural here.'] },
-      { index: 1 },
-      { index: 2 },
-      {
-        index: 3,
-        acceptable: false,
-        feedback: [
-          'examples[0].meaning adds being on foot, which is not stated.',
-          'examples[0].note does not describe the supplied example.',
-        ],
-      },
-      { index: 4 },
-    ]);
-    boundary.generate.mockResolvedValue({
-      content: JSON.stringify(rawVerdict),
-      model: 'captured-luna',
-      inputTokens: 12,
-      outputTokens: 8,
-    });
-
-    const result = await reviewTeachingContent(options).catch((error: unknown) => error);
-
-    expect(result).toBeInstanceOf(TeachingQualityRejectionError);
-    if (!(result instanceof TeachingQualityRejectionError)) throw result;
-    const requestItems = JSON.parse(boundary.generate.mock.calls[0]![1][0].content).items;
-    const reviewPrompt = boundary.generate.mock.calls[0]![0] as string;
-    expect(reviewPrompt).toContain('Title: Unterwegs');
-    expect(reviewPrompt).toContain('Objective: Erzähle, was du auf einer Reise erlebt hast.');
-    expect(reviewPrompt).toContain('Grammar focus: Perfekt mit haben und sein');
-    expect(reviewPrompt).toContain('every supplied subfield in assigned visuals');
-    expect(reviewPrompt).not.toContain('For writing items');
-    expect(reviewPrompt).not.toContain('For vocabulary items');
-    expect(requestItems).toHaveLength(5);
-    expect(requestItems.map(({ content }: { content: unknown }) => content)).toEqual([
-      {
-        auditFields: ['purpose'],
-        introContext: grammarContext,
-        fields: { purpose: candidate.purpose },
-      },
-      { auditFields: ['about'], introContext: grammarContext, fields: { about: candidate.about } },
-      {
-        auditFields: ['focus', 'tips'],
-        introContext: grammarContext,
-        fields: { focus: candidate.focus, tips: candidate.tips },
-      },
-      {
-        auditFields: ['examples'],
-        introContext: candidate,
-        fields: { examples: candidate.examples },
-      },
-      { auditFields: ['visuals'], introContext: candidate, fields: { visuals: candidate.visuals } },
-    ]);
-    expect(result.teachingFailure?.reviews).toEqual([
-      {
-        candidate: JSON.stringify(requestItems.map(({ content }: { content: unknown }) => content)),
-        verdict: rawVerdict,
-      },
-    ]);
-    expect(result.feedback).toEqual([
-      {
-        index: 0,
-        feedback: [
-          'purpose: “fertigen Aktivitäten” is unnatural here.',
-          'examples: examples[0].meaning adds being on foot, which is not stated. examples[0].note does not describe the supplied example.',
-        ],
-      },
-    ]);
-  });
-
-  it('reviews the four required prose groups when visuals are absent', async () => {
-    const candidateWithoutVisuals = { ...candidate };
-    delete (candidateWithoutVisuals as Partial<typeof candidate>).visuals;
-    boundary.generate.mockResolvedValue({
-      content: JSON.stringify(verdict([{ index: 0 }, { index: 1 }, { index: 2 }, { index: 3 }])),
-      model: 'captured-luna',
-      inputTokens: 12,
-      outputTokens: 8,
-    });
+  it('reviews all atomic addresses in sequential batches of at most five', async () => {
+    const fullCandidate = {
+      ...candidate,
+      focus: Array.from({ length: 6 }, (_, index) => `focus ${index}`),
+      tips: Array.from({ length: 5 }, (_, index) => `tip ${index}`),
+      examples: Array.from({ length: 5 }, (_, index) => ({
+        target: `target ${index}`,
+        meaning: `meaning ${index}`,
+        note: `note ${index}`,
+      })),
+    };
+    const expectedAddresses = [
+      { field: 'purpose' },
+      { field: 'about' },
+      ...Array.from({ length: 6 }, (_, index) => ({ field: 'focus', index })),
+      ...Array.from({ length: 5 }, (_, index) => ({ field: 'tips', index })),
+      ...Array.from({ length: 5 }, (_, index) => ({ field: 'examples', index })),
+      { field: 'visuals' },
+    ];
+    for (const length of [5, 5, 5, 4])
+      boundary.generate.mockResolvedValueOnce({
+        content: JSON.stringify(acceptedBatch(length)),
+        model: 'captured-luna',
+      });
 
     await expect(
-      reviewTeachingContent({ ...options, items: [candidateWithoutVisuals] })
+      reviewTeachingContent({ ...options, items: [fullCandidate] })
     ).resolves.toBeUndefined();
 
-    const { items } = JSON.parse(boundary.generate.mock.calls[0]![1][0].content);
+    expect(boundary.generate).toHaveBeenCalledTimes(4);
     expect(
-      items.map(({ index, content }: { index: number; content: { auditFields: string[] } }) => [
-        index,
-        content.auditFields,
-      ])
-    ).toEqual([
-      [0, ['purpose']],
-      [1, ['about']],
-      [2, ['focus', 'tips']],
-      [3, ['examples']],
-    ]);
-  });
-
-  it.each([
-    verdict([{ index: 0 }, { index: 1 }, { index: 2 }, { index: 3 }]),
-    verdict([{ index: 0 }, { index: 1 }, { index: 2 }, { index: 3 }, { index: 3 }]),
-  ])('fails closed when an intro review omits or duplicates a scope', async (response) => {
-    boundary.generate.mockResolvedValue({
-      content: JSON.stringify(response),
-      model: 'captured-luna',
-      inputTokens: 12,
-      outputTokens: 8,
-    });
-
-    await expect(reviewTeachingContent(options)).rejects.toBeInstanceOf(ReviewerProtocolError);
-  });
-
-  it('preserves valid scope feedback and its original review evidence beyond 300 aggregate characters', async () => {
-    const validFeedback = ['x'.repeat(170), 'y'.repeat(170)];
-    const rawVerdict = verdict([
-      { index: 0, acceptable: false, feedback: validFeedback },
-      { index: 1 },
-      { index: 2 },
-      { index: 3 },
-      { index: 4 },
-    ]);
-    boundary.generate.mockResolvedValue({
-      content: JSON.stringify(rawVerdict),
-      model: 'captured-luna',
-      inputTokens: 12,
-      outputTokens: 8,
-    });
-
-    const error = await reviewTeachingContent(options).catch((failure: unknown) => failure);
-    expect(error).toBeInstanceOf(TeachingQualityRejectionError);
-    if (!(error instanceof TeachingQualityRejectionError)) throw error;
-    expect(error.feedback).toEqual([
-      { index: 0, feedback: [`purpose: ${validFeedback.join(' ')}`] },
-    ]);
-    expect(error.teachingFailure?.reviews).toEqual([
-      {
-        candidate: expect.any(String),
-        verdict: rawVerdict,
-      },
-    ]);
-    expect(JSON.parse(error.teachingFailure!.reviews[0]!.candidate!)).toEqual(
-      JSON.parse(boundary.generate.mock.calls[0]![1][0].content).items.map(
-        ({ content }: { content: unknown }) => content
+      boundary.generate.mock.calls.map((call) => JSON.parse(call[1][0].content).items.length)
+    ).toEqual([5, 5, 5, 4]);
+    expect(
+      boundary.generate.mock.calls.flatMap((_, index) =>
+        reviewedBatch(index).map(({ content }) => content.address)
       )
-    );
+    ).toEqual(expectedAddresses);
+    expect(reviewedBatch(3).map(({ index, content }) => [index, content.address])).toEqual([
+      [0, { field: 'examples', index: 2 }],
+      [1, { field: 'examples', index: 3 }],
+      [2, { field: 'examples', index: 4 }],
+      [3, { field: 'visuals' }],
+    ]);
+    expect(reviewedBatch(0)[0]!.content.introContext).toEqual(fullCandidate);
   });
 
-  async function rejectedExamples() {
+  it('captures the final global address in bounded intro failure evidence', async () => {
+    const fullCandidate = {
+      ...candidate,
+      focus: Array.from({ length: 6 }, (_, index) => `focus ${index}`),
+      tips: Array.from({ length: 5 }, (_, index) => `tip ${index}`),
+      examples: Array.from({ length: 5 }, (_, index) => ({
+        target: `target ${index}`,
+        meaning: `meaning ${index}`,
+        note: `note ${index}`,
+      })),
+    };
+    for (const length of [5, 5, 5])
+      boundary.generate.mockResolvedValueOnce({
+        content: JSON.stringify(acceptedBatch(length)),
+        model: 'captured-luna',
+      });
     boundary.generate.mockResolvedValueOnce({
       content: JSON.stringify(
         verdict([
           { index: 0 },
           { index: 1 },
           { index: 2 },
-          { index: 3, acceptable: false, feedback: ['examples[0].meaning adds being on foot.'] },
+          { index: 3, acceptable: false, feedback: ['The visual is unsupported.'] },
+        ])
+      ),
+      model: 'captured-luna',
+    });
+
+    const failure = await reviewTeachingContent({ ...options, items: [fullCandidate] }).catch(
+      (error: unknown) => error
+    );
+    expect(failure).toBeInstanceOf(TeachingQualityRejectionError);
+    if (!(failure instanceof TeachingQualityRejectionError)) throw failure;
+    expect(getIntroRepairPlan(failure)).toEqual({
+      rejectedAddresses: [{ field: 'visuals' }],
+      rejectedFields: ['visuals'],
+      preserveVisuals: false,
+    });
+    expect(failure.teachingFailure?.reviews[0]?.verdict.items).toHaveLength(19);
+    expect(failure.teachingFailure?.reviews[0]?.verdict.items.at(-1)).toEqual({
+      index: 18,
+      acceptable: false,
+      issues: ['unnatural'],
+      feedback: ['The visual is unsupported.'],
+    });
+  });
+
+  it.each([
+    verdict([{ index: 0 }, { index: 1 }, { index: 2 }, { index: 3 }]),
+    verdict([{ index: 0 }, { index: 1 }, { index: 2 }, { index: 2 }, { index: 4 }]),
+  ])('fails closed when a batch omits or duplicates an address', async (response) => {
+    boundary.generate.mockResolvedValue({
+      content: JSON.stringify(response),
+      model: 'captured-luna',
+    });
+
+    await expect(reviewTeachingContent(options)).rejects.toBeInstanceOf(ReviewerProtocolError);
+    expect(boundary.generate).toHaveBeenCalledTimes(1);
+  });
+
+  it('accepts a complete batch verdict returned in a different order', async () => {
+    boundary.generate.mockResolvedValueOnce({
+      content: JSON.stringify(
+        verdict([{ index: 4 }, { index: 3 }, { index: 2 }, { index: 1 }, { index: 0 }])
+      ),
+      model: 'captured-luna',
+    });
+
+    await expect(reviewTeachingContent(options)).resolves.toBeUndefined();
+  });
+
+  it('maps exact rejected addresses into the authenticated repair plan and retains full feedback', async () => {
+    const rawVerdict = verdict([
+      { index: 0 },
+      { index: 1 },
+      { index: 2, acceptable: false, feedback: ['focus entry has an unsupported rule.'] },
+      { index: 3 },
+      { index: 4, acceptable: false, feedback: ['example meaning adds an event.'] },
+    ]);
+    boundary.generate
+      .mockResolvedValueOnce({ content: JSON.stringify(rawVerdict), model: 'captured-luna' })
+      .mockResolvedValueOnce({
+        content: JSON.stringify(verdict([{ index: 0 }])),
+        model: 'captured-luna',
+      });
+
+    const failure = await reviewTeachingContent(options).catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(TeachingQualityRejectionError);
+    if (!(failure instanceof TeachingQualityRejectionError)) throw failure;
+    expect(getIntroRepairPlan(failure)).toEqual({
+      rejectedAddresses: [
+        { field: 'focus', index: 0 },
+        { field: 'examples', index: 0 },
+      ],
+      rejectedFields: ['focus', 'examples'],
+      preserveVisuals: true,
+    });
+    expect(failure.feedback).toEqual([
+      {
+        index: 0,
+        feedback: [
+          'focus: focus[0]: focus entry has an unsupported rule.',
+          'examples: examples[0]: example meaning adds an event.',
+        ],
+      },
+    ]);
+    expect(failure.teachingFailure?.reviews[0]?.verdict).toEqual({
+      items: [
+        ...rawVerdict.items.slice(0, 3),
+        { ...rawVerdict.items[3], index: 3 },
+        { ...rawVerdict.items[4], index: 4 },
+        { index: 5, acceptable: true, issues: [], feedback: [] },
+      ],
+    });
+    expect(captureGenerationFailure(failure).category).toBe('teaching_rejected');
+  });
+
+  it('does not expose authenticated addresses through an oversized failure repair plan', async () => {
+    const oversizedCandidate = { ...candidate, purpose: 'x'.repeat(40_000) };
+    boundary.generate.mockResolvedValueOnce({
+      content: JSON.stringify(
+        verdict([
+          { index: 0, acceptable: false, feedback: ['The purpose is unclear.'] },
+          { index: 1 },
+          { index: 2 },
+          { index: 3 },
           { index: 4 },
         ])
       ),
       model: 'captured-luna',
     });
-    const rejection = await reviewTeachingContent(options).catch((error: unknown) => error);
-    if (!(rejection instanceof TeachingQualityRejectionError)) throw rejection;
-    return rejection;
-  }
 
-  it('reviews changed meanings and their visual context with actual subset failure evidence', async () => {
-    const previousIntroRejection = await rejectedExamples();
-    const changed = {
-      ...candidate,
-      examples: [
-        { ...candidate.examples[0], meaning: 'Der Satz berichtet, dass wir gegangen sind.' },
-      ],
-    };
-    boundary.generate.mockResolvedValueOnce({
-      content: JSON.stringify(
-        verdict([
-          { index: 0 },
-          { index: 1, acceptable: false, feedback: ['The visual adds an unsupported claim.'] },
-        ])
-      ),
-      model: 'captured-luna',
-    });
-    const failure = await reviewTeachingContent({
-      ...options,
-      items: [changed],
-      previousIntroRejection,
-    }).catch((error: unknown) => error);
+    const failure = await reviewTeachingContent({ ...options, items: [oversizedCandidate] }).catch(
+      (error: unknown) => error
+    );
     expect(failure).toBeInstanceOf(TeachingQualityRejectionError);
     if (!(failure instanceof TeachingQualityRejectionError)) throw failure;
-    expect(failure.feedback).toEqual([
-      { index: 0, feedback: ['visuals: The visual adds an unsupported claim.'] },
-    ]);
-    const supplied = JSON.parse(boundary.generate.mock.calls.at(-1)![1][0].content).items;
-    expect(
-      supplied.map(({ content }: { content: { auditFields: string[] } }) => content.auditFields)
-    ).toEqual([['examples'], ['visuals']]);
-    expect(JSON.parse(failure.teachingFailure!.reviews[0]!.candidate!)).toEqual(
-      supplied.map(({ content }: { content: unknown }) => content)
-    );
-    expect(
-      failure.teachingFailure!.reviews[0]!.verdict.items.map((item) => [
-        item.index,
-        item.acceptable,
-      ])
-    ).toEqual([
-      [0, true],
-      [1, false],
-    ]);
+    expect(failure.teachingFailure?.reviews[0]).toMatchObject({
+      candidate: null,
+      omitted: 'size_limit',
+    });
+
+    const firstPlan = getIntroRepairPlan(failure);
+    (firstPlan.rejectedAddresses[0] as { field: string }).field = 'visuals';
+    expect(getIntroRepairPlan(failure)).toEqual({
+      rejectedAddresses: [{ field: 'purpose' }],
+      rejectedFields: ['purpose'],
+      preserveVisuals: true,
+    });
   });
 
-  it.each(['target', 'note', 'purpose', 'about', 'focus', 'tips'])(
-    'requires fresh grammar review after changing %s',
-    async (field) => {
-      const previousIntroRejection = await rejectedExamples();
-      const changed = structuredClone(candidate);
-      if (field === 'target' || field === 'note') changed.examples[0][field] += ' Changed.';
-      else if (field === 'purpose' || field === 'about') changed[field] += ' Changed.';
-      else if (field === 'focus' || field === 'tips') changed[field][0] += ' Changed.';
-      boundary.generate.mockResolvedValueOnce({
-        content: JSON.stringify(
-          verdict([
-            { index: 0 },
-            { index: 1 },
-            {
-              index: 2,
-              acceptable: false,
-              feedback: ['focus: The altered context contradicts this rule.'],
-            },
-            { index: 3 },
-            { index: 4 },
-          ])
-        ),
-        model: 'captured-luna',
-      });
-      await expect(
-        reviewTeachingContent({ ...options, items: [changed], previousIntroRejection })
-      ).rejects.toBeInstanceOf(TeachingQualityRejectionError);
-      const supplied = JSON.parse(boundary.generate.mock.calls.at(-1)![1][0].content).items;
-      expect(
-        supplied.map(({ content }: { content: { auditFields: string[] } }) => content.auditFields)
-      ).toEqual([['purpose'], ['about'], ['focus', 'tips'], ['examples'], ['visuals']]);
-    }
-  );
+  it('re-audits every address after repair and catches an initially missed defect', async () => {
+    const manyExamples = {
+      ...candidate,
+      examples: Array.from({ length: 5 }, (_, index) => ({
+        target: `target ${index}`,
+        meaning: `meaning ${index}`,
+        note: `note ${index}`,
+      })),
+    };
+    const initial = (
+      items: Array<{ index: number; content: { address: { field: string; index?: number } } }>
+    ) =>
+      verdict(
+        items.map(({ index, content }) => ({
+          index,
+          acceptable: !(content.address.field === 'examples' && content.address.index === 4),
+          feedback:
+            content.address.field === 'examples' && content.address.index === 4
+              ? ['This example has a meaning defect.']
+              : [],
+        }))
+      );
+    const final = (
+      items: Array<{ index: number; content: { address: { field: string; index?: number } } }>
+    ) =>
+      verdict(
+        items.map(({ index, content }) => {
+          const missed =
+            (content.address.field === 'examples' && content.address.index === 2) ||
+            content.address.field === 'visuals';
+          return {
+            index,
+            acceptable: !missed,
+            feedback: missed
+              ? [`Defect at ${content.address.field}[${content.address.index ?? ''}].`]
+              : [],
+          };
+        })
+      );
+    let initialReview = true;
+    boundary.generate.mockImplementation(
+      async (_system: string, messages: Array<{ content: string }>) => {
+        const items = JSON.parse(messages[0]!.content).items;
+        return {
+          content: JSON.stringify(initialReview ? initial(items) : final(items)),
+          model: 'captured-luna',
+        };
+      }
+    );
+    const firstFailure = await reviewTeachingContent({ ...options, items: [manyExamples] }).catch(
+      (error: unknown) => error
+    );
+    expect(firstFailure).toBeInstanceOf(TeachingQualityRejectionError);
+    if (!(firstFailure instanceof TeachingQualityRejectionError)) throw firstFailure;
+    expect(getIntroRepairPlan(firstFailure).rejectedAddresses).toEqual([
+      { field: 'examples', index: 4 },
+    ]);
+    initialReview = false;
 
-  it('rejects fabricated prior approvals before any review request', async () => {
-    boundary.generate.mockImplementation(() => {
-      throw new Error('No provider dispatch expected');
-    });
-    const previousIntroRejection = new TeachingQualityRejectionError(['incorrect'], [], {
+    const finalFailure = await reviewTeachingContent({
+      ...options,
+      items: [manyExamples],
+      previousIntroRejection: firstFailure,
+    }).catch((error: unknown) => error);
+    expect(finalFailure).toBeInstanceOf(TeachingQualityRejectionError);
+    if (!(finalFailure instanceof TeachingQualityRejectionError)) throw finalFailure;
+    expect(boundary.generate).toHaveBeenCalledTimes(4);
+    expect(reviewedBatch(2)).toHaveLength(5);
+    expect(reviewedBatch(3)).toHaveLength(5);
+    expect(finalFailure.feedback[0]?.feedback).toEqual([
+      'examples: examples[2]: Defect at examples[2].',
+      'visuals: visuals: Defect at visuals[].',
+    ]);
+    expect(firstFailure.teachingFailure?.reviews).toHaveLength(1);
+    expect(finalFailure.teachingFailure?.reviews).toHaveLength(1);
+    expect(captureGenerationFailure(finalFailure).teachingFailure?.reviews).toHaveLength(1);
+  });
+
+  it('rejects fabricated or reused repair authority before sending another review', async () => {
+    const fabricated = new TeachingQualityRejectionError(['incorrect'], [], {
       kind: 'intro',
       reviews: [
         {
           candidate: 'Fabricated review input',
           verdict: {
             items: [
-              {
-                index: 0,
-                acceptable: false,
-                issues: ['incorrect'],
-                feedback: ['Fabricated verdict'],
-              },
+              { index: 0, acceptable: false, issues: ['incorrect'], feedback: ['Fabricated'] },
             ],
           },
         },
       ],
     });
-    const error = await reviewTeachingContent({ ...options, previousIntroRejection }).catch(
-      (error: unknown) => error
-    );
-    expect(error).toBeInstanceOf(ReviewerProtocolError);
-    if (!(error instanceof ReviewerProtocolError)) throw error;
-    expect(error.teachingFailure).toBeUndefined();
-    expect(captureGenerationFailure(error)).toEqual({ category: 'review_protocol' });
+    await expect(
+      reviewTeachingContent({ ...options, previousIntroRejection: fabricated })
+    ).rejects.toBeInstanceOf(ReviewerProtocolError);
+    expect(boundary.generate).not.toHaveBeenCalled();
   });
 
-  it('rejects reused review authority after the single replacement', async () => {
+  it('re-audits every exact address with the changed complete intro after repair', async () => {
     const previousIntroRejection = await rejectedExamples();
-    boundary.generate.mockResolvedValueOnce({
-      content: JSON.stringify(verdict([{ index: 0 }])),
-      model: 'captured-luna',
-    });
-    const changed = { ...candidate };
-    delete (changed as Partial<typeof candidate>).visuals;
+    const changed = structuredClone(candidate);
+    changed.examples[0].target += ' Heute.';
+    changed.purpose += ' Heute.';
+    boundary.generate
+      .mockResolvedValueOnce({ content: JSON.stringify(acceptedBatch(5)), model: 'captured-luna' })
+      .mockResolvedValueOnce({ content: JSON.stringify(acceptedBatch(1)), model: 'captured-luna' });
+
     await expect(
       reviewTeachingContent({ ...options, items: [changed], previousIntroRejection })
     ).resolves.toBeUndefined();
-    await expect(
-      reviewTeachingContent({ ...options, items: [changed], previousIntroRejection })
-    ).rejects.toBeInstanceOf(ReviewerProtocolError);
+    const supplied = [...reviewedBatch(2), ...reviewedBatch(3)];
+    expect(supplied.map(({ content }) => content.address)).toEqual([
+      { field: 'purpose' },
+      { field: 'about' },
+      { field: 'focus', index: 0 },
+      { field: 'tips', index: 0 },
+      { field: 'examples', index: 0 },
+      { field: 'visuals' },
+    ]);
+    expect(
+      supplied.every(
+        ({ content }) => JSON.stringify(content.introContext) === JSON.stringify(changed)
+      )
+    ).toBe(true);
   });
 
   it.each([
@@ -374,41 +435,22 @@ describe('intro audit scopes', () => {
     'authority',
     'transport',
     'selection',
-  ])('rejects prior approvals after changing %s identity', async (identity) => {
+  ])('rejects a prior receipt after changing %s identity', async (identity) => {
     const ai = {
       ...options.ai,
       apiKey: undefined as string | undefined,
       execution: { ...options.ai.execution },
     };
     const initial = { ...options, ai };
-    boundary.generate.mockResolvedValueOnce({
-      content: JSON.stringify(
-        verdict([
-          { index: 0 },
-          { index: 1 },
-          { index: 2 },
-          { index: 3, acceptable: false, feedback: ['examples[0].meaning is unsupported.'] },
-          { index: 4 },
-        ])
-      ),
-      model: 'captured-luna',
-    });
-    const previousIntroRejection = await reviewTeachingContent(initial).catch(
-      (error: unknown) => error
-    );
-    if (!(previousIntroRejection instanceof TeachingQualityRejectionError))
-      throw previousIntroRejection;
+    const previousIntroRejection = await rejectedExamples(initial);
     const replacement = { ...initial, previousIntroRejection };
     if (identity === 'learner') replacement.userId = 'another-learner';
     if (identity === 'context')
-      replacement.lessonContext = {
-        ...initial.lessonContext,
-        objective: 'A different objective',
-      };
+      replacement.lessonContext = { ...initial.lessonContext, objective: 'Different objective' };
     if (identity === 'provider')
       replacement.provider = { generateResponse: boundary.generate } as never;
     if (identity === 'model') ai.model = 'another-model';
-    if (identity === 'key') ai.apiKey = 'a-different-fixture-key';
+    if (identity === 'key') ai.apiKey = 'different-fixture-key';
     if (identity === 'authority')
       ai.execution.authorize = async () => {
         throw new Error('Different authority');
@@ -418,7 +460,7 @@ describe('intro audit scopes', () => {
       ai.execution.learningSelection = {
         provider: 'fixture',
         model: 'captured-luna',
-        credentialFingerprint: 'a-different-selection',
+        credentialFingerprint: 'different-selection',
       };
     boundary.generate.mockImplementation(() => {
       throw new Error('No provider dispatch expected');
@@ -426,16 +468,18 @@ describe('intro audit scopes', () => {
     await expect(reviewTeachingContent(replacement)).rejects.toBeInstanceOf(ReviewerProtocolError);
   });
 
-  it('retains the actual first verdict when mutable error evidence is tampered with', async () => {
+  it('retains the authentic initial evidence when mutable rejection evidence is tampered with', async () => {
     const previousIntroRejection = await rejectedExamples();
     const authentic = structuredClone(previousIntroRejection.teachingFailure);
-    previousIntroRejection.teachingFailure!.reviews[0]!.candidate = 'Tampered content';
-    const error = await reviewTeachingContent({ ...options, previousIntroRejection }).catch(
-      (error: unknown) => error
-    );
-    expect(error).toBeInstanceOf(ReviewerProtocolError);
-    if (!(error instanceof ReviewerProtocolError)) throw error;
-    expect(error.teachingFailure).toEqual(authentic);
-    expect(error.teachingFailure!.reviews).toHaveLength(1);
+    previousIntroRejection.teachingFailure!.reviews[0]!.candidate = 'Tampered candidate';
+
+    const failure = await reviewTeachingContent({
+      ...options,
+      previousIntroRejection,
+    }).catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(ReviewerProtocolError);
+    if (!(failure instanceof ReviewerProtocolError)) throw failure;
+    expect(failure.teachingFailure).toEqual(authentic);
+    expect(failure.teachingFailure?.reviews).toHaveLength(1);
   });
 });

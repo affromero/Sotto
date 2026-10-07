@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 import {
   captureTeachingFailure,
   teachingFailureSchema,
@@ -43,6 +44,59 @@ describe('private teaching failure evidence', () => {
     const evidence = captureTeachingFailure('intro', [candidate], verdict);
     expect(JSON.parse(evidence.reviews[0].candidate!)).toEqual([candidate]);
     expect(evidence.reviews[0].verdict).toEqual(verdict);
+  });
+
+  it('preserves every intro address including a rejection in the final batch', () => {
+    const items = Array.from({ length: 19 }, (_, index) => ({
+      index,
+      acceptable: index !== 18,
+      issues: index === 18 ? ['unsupported' as const] : [],
+      feedback: index === 18 ? ['The visual introduces an unsupported event.'] : [],
+    }));
+    const reviewed = items.map(({ index }) => ({ address: `private address ${index}` }));
+    const evidence = captureTeachingFailure('intro', reviewed, { items });
+    expect(JSON.parse(evidence.reviews[0].candidate!)).toEqual(reviewed);
+    expect(evidence.reviews[0].verdict.items).toEqual(items);
+    const error = new Error('Provider failure after review');
+    retainTeachingFailure(error, evidence);
+    expect(captureGenerationFailure(error)).toEqual({
+      category: 'generation_failed',
+      teachingFailure: evidence,
+    });
+    expect(JSON.stringify(error)).not.toContain('private address');
+    expect(() => captureTeachingFailure('writing', reviewed, { items })).toThrow(z.ZodError);
+  });
+
+  it('reads historical complete intro verdicts whose indices arrived out of order', () => {
+    const shuffled = {
+      items: [{ index: 1, acceptable: true, issues: [], feedback: [] }, ...verdict.items],
+    };
+    const stored = {
+      kind: 'intro',
+      reviews: [
+        { candidate: JSON.stringify([{ about: 'Historical private intro' }]), verdict: shuffled },
+      ],
+    };
+    expect(teachingFailureSchema.parse(stored)).toEqual(stored);
+  });
+
+  it('rejects aggregate intro evidence with missing or duplicate address indices', () => {
+    const evidence = captureTeachingFailure('intro', [{ about: 'Reviewed intro' }], verdict);
+    for (const indices of [
+      [0, 0],
+      [0, 2],
+    ]) {
+      const invalid = {
+        ...evidence,
+        reviews: [
+          {
+            ...evidence.reviews[0],
+            verdict: { items: indices.map((index) => ({ ...verdict.items[0], index })) },
+          },
+        ],
+      };
+      expect(teachingFailureSchema.safeParse(invalid).success).toBe(false);
+    }
   });
 
   it('omits an oversized multibyte candidate while retaining the rejection verdict', () => {

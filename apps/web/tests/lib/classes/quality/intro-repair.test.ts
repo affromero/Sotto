@@ -16,10 +16,11 @@ vi.mock('@/lib/learning-ai', () => ({
 vi.mock('@/lib/usage-logger', () => ({ logUsage: vi.fn() }));
 import { generateClassIntro } from '@/lib/classes/class-intro';
 import {
-  TeachingQualityRejectionError,
   ReviewerProtocolError,
+  TeachingQualityRejectionError,
 } from '@/lib/classes/quality/teaching-quality';
 import { captureGenerationFailure } from '@/lib/classes/quality/generation-failure';
+import { classIntroExampleMeaningPolicy } from '@/lib/classes/class-language-policy';
 
 const params = {
   userId: 'fixture',
@@ -32,60 +33,20 @@ const params = {
   grammarPoints: ['past events'],
   targetVocab: [],
 };
-const introAuditFields = [
-  {
-    auditFields: ['purpose'],
-    select: (value: { purpose: string }) => ({ purpose: value.purpose }),
-  },
-  { auditFields: ['about'], select: (value: { about: string }) => ({ about: value.about }) },
-  {
-    auditFields: ['focus', 'tips'],
-    select: (value: { focus: string[]; tips: string[] }) => ({
-      focus: value.focus,
-      tips: value.tips,
-    }),
-  },
-  {
-    auditFields: ['examples'],
-    select: (value: { examples: unknown[] }) => ({ examples: value.examples }),
-  },
-];
-function auditItems(value: {
+type IntroFixture = {
   purpose: string;
   about: string;
   focus: string[];
-  examples: unknown[];
+  examples: Array<{ target: string; meaning: string; note: string }>;
   tips: string[];
-}) {
-  return introAuditFields.map(({ auditFields, select }) => ({
-    auditFields,
-    introContext: auditFields.includes('examples')
-      ? value
-      : {
-          ...value,
-          examples: value.examples.map((example) =>
-            Object.fromEntries(
-              Object.entries(example as Record<string, unknown>).filter(
-                ([field]) => field !== 'meaning'
-              )
-            )
-          ),
-        },
-    fields: select(value),
-  }));
-}
-function approvedForIntro() {
-  return {
-    items: introAuditFields.map((_, index) => ({
-      index,
-      acceptable: true,
-      issues: [],
-      feedback: [],
-    })),
-  };
-}
-const approved = approvedForIntro();
-const capturedLunaIntro = {
+  visuals?: unknown;
+};
+type IntroAddress =
+  | { field: 'purpose' | 'about' | 'visuals' }
+  | { field: 'focus' | 'tips' | 'examples'; index: number };
+type ReviewIssue = { issues: string[]; feedback: string[] };
+
+const candidate: IntroFixture = {
   purpose: 'Du lernst, kurz und klar von Erlebnissen und fertigen Aktivitäten zu erzählen.',
   about:
     'Im Gespräch benutzt man oft das Perfekt, wenn etwas schon passiert ist. Es besteht meist aus einer Form von „haben“ oder „sein“ und einem Partizip am Satzende. In Hauptsätzen steht das Hilfsverb oft auf Platz zwei.',
@@ -118,20 +79,67 @@ const capturedLunaIntro = {
     'Im Hauptsatz steht das Hilfsverb oft auf Platz zwei und das Partizip am Ende: „Gestern habe ich gekocht.“',
   ],
 };
-const capturedLunaVerdict = {
-  items: [
-    {
-      index: 0,
-      acceptable: false,
-      issues: ['unnatural'],
-      feedback: [
-        'examples[1].meaning: „Wir haben den Markt gehend erreicht“ ist im Deutschen unidiomatisch und für A2 ungeeignet.',
-        'examples[2].meaning: „mit meinen Augen wahrgenommen“ klingt unnötig technisch und unnatürlich als einfache Umschreibung von „gesehen“.',
-      ],
-    },
-  ],
-};
-
+function introAddresses(value: IntroFixture): IntroAddress[] {
+  return [
+    { field: 'purpose' },
+    { field: 'about' },
+    ...value.focus.map((_, index) => ({ field: 'focus' as const, index })),
+    ...value.tips.map((_, index) => ({ field: 'tips' as const, index })),
+    ...value.examples.map((_, index) => ({ field: 'examples' as const, index })),
+    ...(value.visuals === undefined ? [] : [{ field: 'visuals' as const }]),
+  ];
+}
+function addressKey(address: IntroAddress): string {
+  return 'index' in address ? `${address.field}:${address.index}` : address.field;
+}
+function fieldsFor(value: IntroFixture, address: IntroAddress): Record<string, unknown> {
+  if (address.field === 'purpose' || address.field === 'about')
+    return { [address.field]: value[address.field] };
+  if (address.field === 'visuals') return { visuals: value.visuals };
+  if ('index' in address && (address.field === 'focus' || address.field === 'tips'))
+    return { [address.field]: value[address.field][address.index] };
+  if ('index' in address) return { example: value.examples[address.index] };
+  throw new Error('Unknown fixture address');
+}
+function auditItems(value: IntroFixture) {
+  return introAddresses(value).map((address) => ({
+    address,
+    introContext: value,
+    fields: fieldsFor(value, address),
+  }));
+}
+function fullVerdict(value: IntroFixture, rejected: Record<string, ReviewIssue> = {}) {
+  return {
+    items: introAddresses(value).map((address, index) => ({
+      index,
+      acceptable: !rejected[addressKey(address)],
+      issues: rejected[addressKey(address)]?.issues ?? [],
+      feedback: rejected[addressKey(address)]?.feedback ?? [],
+    })),
+  };
+}
+function queueReview(value: IntroFixture, rejected: Record<string, ReviewIssue> = {}) {
+  const allAddresses = introAddresses(value);
+  const verdict = fullVerdict(value, rejected);
+  for (let offset = 0; offset < verdict.items.length; offset += 5) {
+    const batch = verdict.items.slice(offset, offset + 5);
+    boundary.generate.mockResolvedValueOnce({
+      model: 'captured-model',
+      content: JSON.stringify({
+        items: batch.map((item, localIndex) => {
+          const issue = rejected[addressKey(allAddresses[offset + localIndex]!)];
+          return {
+            ...item,
+            index: localIndex,
+            acceptable: !issue,
+            issues: issue?.issues ?? [],
+            feedback: issue?.feedback ?? [],
+          };
+        }),
+      }),
+    });
+  }
+}
 beforeEach(() => {
   boundary.generate.mockReset();
   boundary.resolve.mockReset();
@@ -145,444 +153,395 @@ beforeEach(() => {
 
 describe('field-local intro repair', () => {
   it.each([1, 6])(
-    'repairs rejected fields with every character of %i maximum-length reviewer comments',
+    'preserves every character of %i maximum-length reviewer comments in the repair request',
     async (commentCount) => {
       const feedback = Array.from({ length: commentCount }, (_, index) =>
-        `focus[${index}]: The transport tip needs a concrete learner action.`.padEnd(300, '.')
+        `Comment ${index}: the focus needs a concrete learner action.`.padEnd(300, '.')
       );
-      const verdict = {
-        items: [
-          { index: 0, acceptable: true, issues: [], feedback: [] },
-          { index: 1, acceptable: true, issues: [], feedback: [] },
-          { index: 2, acceptable: false, issues: ['infeasible'], feedback },
-          { index: 3, acceptable: true, issues: [], feedback: [] },
-        ],
+      const rejected = { 'focus:0': { issues: ['infeasible'], feedback } };
+      const repaired = {
+        ...candidate,
+        focus: candidate.focus.map((focus, index) =>
+          index === 0 ? 'Erzähle, wie du zum Markt gegangen bist.' : focus
+        ),
       };
-      const patch = {
-        focus: ['Say how you travelled to the station.'],
-        tips: ['Use Ich bin mit dem Bus gefahren to name the transport.'],
-      };
-      boundary.generate
-        .mockResolvedValueOnce({
-          content: JSON.stringify(capturedLunaIntro),
-          model: 'captured-model',
-        })
-        .mockResolvedValueOnce({ content: JSON.stringify(verdict), model: 'captured-model' })
-        .mockResolvedValueOnce({ content: JSON.stringify(patch), model: 'captured-model' })
-        .mockResolvedValueOnce({ content: JSON.stringify(approved), model: 'captured-model' });
+      boundary.generate.mockResolvedValueOnce({
+        content: JSON.stringify(candidate),
+        model: 'captured-model',
+      });
+      queueReview(candidate, rejected);
+      boundary.generate.mockResolvedValueOnce({
+        content: JSON.stringify({ focus: { '0': repaired.focus[0] } }),
+        model: 'captured-model',
+      });
+      queueReview(repaired);
 
-      await expect(generateClassIntro(params)).resolves.toEqual({ ...capturedLunaIntro, ...patch });
-
+      await expect(generateClassIntro(params)).resolves.toEqual(repaired);
       const repairRequest = boundary.generate.mock.calls.find(
         ([, , options]) => options.jsonSchema?.name === 'class_intro_repair'
       );
-      expect(repairRequest).toBeDefined();
-      const repairPrompt = repairRequest![1][0].content;
-      const feedbackLine = repairPrompt
+      const feedbackLine = repairRequest![1][0].content
         .split('\n')
         .find((line: string) => line.startsWith('Review feedback: '));
       expect(JSON.parse(feedbackLine!.slice('Review feedback: '.length))).toEqual([
-        { index: 0, feedback: [`focus and tips: ${feedback.join(' ')}`] },
+        { index: 0, feedback: [`focus: focus[0]: ${feedback.join(' ')}`] },
       ]);
-      expect(repairRequest![2].jsonSchema.schema.required).toEqual(['focus', 'tips']);
-      expect(repairPrompt).toContain('preserving all other fields exactly');
     }
   );
 
-  it.each([
-    'repair provider',
-    'review provider',
-    'review protocol',
-    'context change',
-    'cancellation',
-  ])(
-    'retains the actual first review after terminal %s without replay or relabeling',
+  it('repairs only rejected example addresses and retains accepted siblings', async () => {
+    const rejected = {
+      'examples:1': { issues: ['unsupported'], feedback: ['Correct the meaning.'] },
+    };
+    const repaired = {
+      ...candidate,
+      examples: candidate.examples.map((example, index) =>
+        index === 1
+          ? {
+              ...example,
+              meaning: 'Die sprechende Gruppe erzählt, dass sie zu Fuß zum Markt gegangen ist.',
+            }
+          : example
+      ),
+    };
+    boundary.generate.mockResolvedValueOnce({
+      content: JSON.stringify(candidate),
+      model: 'captured-model',
+    });
+    queueReview(candidate, rejected);
+    boundary.generate.mockResolvedValueOnce({
+      content: JSON.stringify({ examples: { '1': repaired.examples[1] } }),
+      model: 'captured-model',
+    });
+    queueReview(repaired);
+
+    await expect(generateClassIntro(params)).resolves.toEqual(repaired);
+    expect(repaired.examples[0]).toEqual(candidate.examples[0]);
+    expect(
+      boundary.generate.mock.calls[4]![2].jsonSchema.schema.properties.examples.required
+    ).toEqual(['1']);
+    const finalItems = boundary.generate.mock.calls
+      .filter(([system]) => system.startsWith('Independently review'))
+      .slice(3)
+      .flatMap(([, messages]) =>
+        JSON.parse(messages[0].content).items.map((item: { content: unknown }) => item.content)
+      );
+    expect(finalItems).toHaveLength(introAddresses(repaired).length);
+    expect(
+      finalItems.every(
+        (item) =>
+          JSON.stringify(item.introContext.examples[0]) === JSON.stringify(repaired.examples[0])
+      )
+    ).toBe(true);
+  });
+
+  it('merges multiple rejected indices in the same and different arrays', async () => {
+    const rejected = {
+      'examples:1': { issues: ['unsupported'], feedback: ['Correct example one.'] },
+      'examples:2': { issues: ['unsupported'], feedback: ['Correct example two.'] },
+      'tips:0': { issues: ['incorrect'], feedback: ['Correct tip zero.'] },
+      'tips:2': { issues: ['incorrect'], feedback: ['Correct tip two.'] },
+    };
+    const patch: {
+      examples: Record<string, IntroFixture['examples'][number]>;
+      tips: Record<string, string>;
+    } = {
+      examples: {
+        '1': { ...candidate.examples[1], meaning: 'Wir gingen zu Fuß zum Markt.' },
+        '2': { ...candidate.examples[2], meaning: 'Auf der Reise sah ich schöne Orte.' },
+      },
+      tips: {
+        '0': 'Bei Bewegung zu einem Ziel kann „sein“ stehen.',
+        '2': '„Gestern“ nennt einen vergangenen Zeitpunkt.',
+      },
+    };
+    const repaired: IntroFixture = {
+      ...candidate,
+      examples: candidate.examples.map((example, index) =>
+        Object.hasOwn(patch.examples, String(index)) ? patch.examples[String(index)]! : example
+      ),
+      tips: candidate.tips.map((tip, index) =>
+        Object.hasOwn(patch.tips, String(index)) ? patch.tips[String(index)]! : tip
+      ),
+    };
+    boundary.generate.mockResolvedValueOnce({
+      content: JSON.stringify(candidate),
+      model: 'captured-model',
+    });
+    queueReview(candidate, rejected);
+    boundary.generate.mockResolvedValueOnce({
+      content: JSON.stringify(patch),
+      model: 'captured-model',
+    });
+    queueReview(repaired);
+
+    await expect(generateClassIntro(params)).resolves.toEqual(repaired);
+    expect(repaired.examples[0]).toEqual(candidate.examples[0]);
+    expect(repaired.tips[1]).toBe(candidate.tips[1]);
+    const schema = boundary.generate.mock.calls[4]![2].jsonSchema.schema.properties;
+    expect(schema.examples.required).toEqual(['1', '2']);
+    expect(schema.tips.required).toEqual(['0', '2']);
+  });
+
+  it('removes only a rejected optional visual and audits the merged result again', async () => {
+    const original = {
+      ...candidate,
+      visuals: {
+        timeline: {
+          title: 'Timeline',
+          steps: ['Yesterday: We went.', 'Today: We tell the story.'],
+        },
+        contrast: null,
+        callouts: [],
+        links: [],
+      },
+    };
+    const rejected = {
+      'examples:1': { issues: ['unsupported'], feedback: ['Correct the meaning.'] },
+      visuals: { issues: ['unsupported'], feedback: ['The timeline adds an unsupported event.'] },
+    };
+    const repaired: IntroFixture = {
+      ...original,
+      examples: original.examples.map((example, index) =>
+        index === 1 ? { ...example, meaning: 'Wir gingen zu Fuß zum Markt.' } : example
+      ),
+    };
+    delete repaired.visuals;
+    boundary.generate.mockResolvedValueOnce({
+      content: JSON.stringify(original),
+      model: 'captured-model',
+    });
+    queueReview(original, rejected);
+    boundary.generate.mockResolvedValueOnce({
+      content: JSON.stringify({ examples: { '1': repaired.examples[1] } }),
+      model: 'captured-model',
+    });
+    queueReview(repaired);
+    await expect(generateClassIntro(params)).resolves.toEqual(repaired);
+    const reviewCalls = boundary.generate.mock.calls.filter(([system]) =>
+      system.startsWith('Independently review')
+    );
+    const finalItems = reviewCalls
+      .slice(3)
+      .flatMap(([, messages]) =>
+        JSON.parse(messages[0].content).items.map((item: { content: unknown }) => item.content)
+      );
+    expect(finalItems).toHaveLength(introAddresses(repaired).length);
+    expect(finalItems.some((item) => item.address.field === 'visuals')).toBe(false);
+  });
+
+  it('preserves authentic review evidence when a final review rejects the repair', async () => {
+    const firstRejected = {
+      'examples:1': { issues: ['unsupported'], feedback: ['Correct the meaning.'] },
+    };
+    const repaired = {
+      ...candidate,
+      examples: candidate.examples.map((example, index) =>
+        index === 1 ? { ...example, meaning: 'Wir gingen zum Markt.' } : example
+      ),
+    };
+    const finalRejected = {
+      'examples:1': { issues: ['uncertain'], feedback: ['This changes the described action.'] },
+    };
+    boundary.generate.mockResolvedValueOnce({
+      content: JSON.stringify(candidate),
+      model: 'captured-model',
+    });
+    queueReview(candidate, firstRejected);
+    boundary.generate.mockResolvedValueOnce({
+      content: JSON.stringify({ examples: { '1': repaired.examples[1] } }),
+      model: 'captured-model',
+    });
+    queueReview(repaired, finalRejected);
+    const error = await generateClassIntro(params).catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(TeachingQualityRejectionError);
+    if (!(error instanceof TeachingQualityRejectionError)) throw error;
+    expect(error.teachingFailure?.reviews).toEqual([
+      {
+        candidate: JSON.stringify(auditItems(candidate)),
+        verdict: fullVerdict(candidate, firstRejected),
+      },
+      {
+        candidate: JSON.stringify(auditItems(repaired)),
+        verdict: fullVerdict(repaired, finalRejected),
+      },
+    ]);
+  });
+
+  it('rejects patch keys outside the reviewed address set', async () => {
+    const rejected = {
+      'examples:1': { issues: ['unsupported'], feedback: ['Correct the meaning.'] },
+    };
+    boundary.generate.mockResolvedValueOnce({
+      content: JSON.stringify(candidate),
+      model: 'captured-model',
+    });
+    queueReview(candidate, rejected);
+    boundary.generate.mockResolvedValueOnce({
+      content: JSON.stringify({
+        examples: { '1': candidate.examples[1] },
+        focus: { '0': 'Unreviewed change.' },
+      }),
+      model: 'captured-model',
+    });
+    const error = await generateClassIntro(params).catch((caught: unknown) => caught);
+    const failure = captureGenerationFailure(error);
+    expect(failure.category).toBe('section_quality');
+    expect(failure.teachingFailure?.reviews[0]).toEqual({
+      candidate: JSON.stringify(auditItems(candidate)),
+      verdict: fullVerdict(candidate, rejected),
+    });
+    expect(boundary.generate.mock.calls[4]![2].jsonSchema.schema.properties).toEqual({
+      examples: expect.any(Object),
+    });
+  });
+
+  it.each(['faithful', 'faithful collective', 'unsupported group shift'])(
+    'applies the same example meaning policy to repair: %s',
+    async (outcome) => {
+      const repairedMeaning =
+        outcome === 'unsupported group shift'
+          ? 'Du erzählst, dass ihr zu Fuß zum Markt gegangen seid.'
+          : outcome === 'faithful collective'
+            ? 'Die sprechende Gruppe erzählt, dass sie zu Fuß zum Markt gegangen ist.'
+            : 'Die sprechende Person und ihre Gruppe sind zu Fuß zum Markt gegangen.';
+      const repaired = {
+        ...candidate,
+        examples: candidate.examples.map((example, index) =>
+          index === 1 ? { ...example, meaning: repairedMeaning } : example
+        ),
+      };
+      const rejected = {
+        'examples:1': {
+          issues: ['unsupported'],
+          feedback: ['Preserve the described participants and action.'],
+        },
+      };
+      const finalRejected: Record<string, ReviewIssue> =
+        outcome === 'unsupported group shift'
+          ? {
+              'examples:1': {
+                issues: ['unsupported'],
+                feedback: ['The source does not establish that the addressee is included.'],
+              },
+            }
+          : {};
+      boundary.generate.mockResolvedValueOnce({
+        content: JSON.stringify(candidate),
+        model: 'captured-model',
+      });
+      queueReview(candidate, rejected);
+      boundary.generate.mockResolvedValueOnce({
+        content: JSON.stringify({ examples: { '1': repaired.examples[1] } }),
+        model: 'captured-model',
+      });
+      queueReview(repaired, finalRejected);
+      const result = await generateClassIntro(params).catch((caught: unknown) => caught);
+      if (outcome === 'unsupported group shift')
+        expect(result).toBeInstanceOf(TeachingQualityRejectionError);
+      else expect(result).toEqual(repaired);
+      const policy = classIntroExampleMeaningPolicy(params);
+      expect(boundary.generate.mock.calls.every(([system]) => system.includes(policy))).toBe(true);
+    }
+  );
+
+  it('continues the original error when repair fails while retaining the first review', async () => {
+    const rejected = {
+      'examples:1': { issues: ['unsupported'], feedback: ['Correct the meaning.'] },
+    };
+    const originalError = new Error('repair provider failed');
+    boundary.generate.mockResolvedValueOnce({
+      content: JSON.stringify(candidate),
+      model: 'captured-model',
+    });
+    queueReview(candidate, rejected);
+    boundary.generate.mockRejectedValueOnce(originalError);
+    const error = await generateClassIntro(params).catch((caught: unknown) => caught);
+    expect(error).toBe(originalError);
+    expect(captureGenerationFailure(error).teachingFailure?.reviews[0].candidate).toBe(
+      JSON.stringify(auditItems(candidate))
+    );
+  });
+
+  it('preserves the purpose and re-reviews after a scalar correction', async () => {
+    const rejected = { about: { issues: ['uncertain'], feedback: ['Clarify the explanation.'] } };
+    const patch = { about: 'Das Perfekt beschreibt abgeschlossene Erlebnisse.' };
+    const repaired = { ...candidate, ...patch };
+    boundary.generate.mockResolvedValueOnce({
+      content: JSON.stringify(candidate),
+      model: 'captured-model',
+    });
+    queueReview(candidate, rejected);
+    boundary.generate.mockResolvedValueOnce({
+      content: JSON.stringify(patch),
+      model: 'captured-model',
+    });
+    queueReview(repaired);
+    await expect(generateClassIntro(params)).resolves.toEqual(repaired);
+    const allReviewCalls = boundary.generate.mock.calls.filter(([system]) =>
+      system.startsWith('Independently review')
+    );
+    expect(
+      allReviewCalls.slice(3).flatMap(([, messages]) => JSON.parse(messages[0].content).items)
+    ).toHaveLength(introAddresses(repaired).length);
+  });
+
+  it.each(['review provider', 'review protocol', 'selection change', 'cancellation'])(
+    'retains the first review and terminal outcome after %s',
     async (stage) => {
       const controller = new AbortController();
       const ai = {
         provider: 'fixture',
         model: 'captured-model',
+        signal: controller.signal,
         execution: { ...params.execution, signal: controller.signal },
       };
       boundary.resolve.mockResolvedValue(ai);
-      const initialVerdict = {
-        items: introAuditFields.map(({ auditFields }, index) => ({
-          index,
-          acceptable: !auditFields.includes('examples'),
-          issues: auditFields.includes('examples') ? ['unsupported'] : [],
-          feedback: auditFields.includes('examples')
-            ? ['examples[1].meaning adds an unsupported result.']
-            : [],
-        })),
+      const rejected = {
+        'examples:1': { issues: ['unsupported'], feedback: ['Correct the meaning.'] },
       };
-      const expectedError = new Error('Fixture terminal failure');
-      boundary.generate
-        .mockResolvedValueOnce({ content: JSON.stringify(capturedLunaIntro), model: ai.model })
-        .mockResolvedValueOnce({ content: JSON.stringify(initialVerdict), model: ai.model })
-        .mockImplementationOnce(() => {
-          if (stage === 'repair provider') throw expectedError;
-          if (stage === 'context change') ai.model = 'changed-selection';
-          if (stage === 'cancellation') controller.abort(expectedError);
-          return {
-            content: JSON.stringify({ examples: capturedLunaIntro.examples }),
-            model: 'captured-model',
-          };
-        })
-        .mockImplementationOnce(() => {
-          if (stage === 'review protocol') return { content: '{', model: ai.model };
-          throw expectedError;
-        });
-      const error = await generateClassIntro(params).catch((error: unknown) => error);
-      const protocolFailure = stage === 'review protocol' || stage === 'context change';
-      if (protocolFailure) expect(error).toBeInstanceOf(ReviewerProtocolError);
-      else expect(error).toBe(expectedError);
-      const evidence = captureGenerationFailure(error);
-      expect(evidence.category).toBe(protocolFailure ? 'review_protocol' : 'generation_failed');
-      expect(evidence.teachingFailure!.reviews).toEqual([
-        { candidate: JSON.stringify(auditItems(capturedLunaIntro)), verdict: initialVerdict },
-      ]);
-      expect(JSON.stringify(error)).not.toContain(capturedLunaIntro.about);
-    }
-  );
-
-  it('rejects unexpected approved fields in a semantic patch instead of silently discarding them', async () => {
-    const initialVerdict = {
-      items: introAuditFields.map(({ auditFields }, index) => ({
-        index,
-        acceptable: !auditFields.includes('examples'),
-        issues: auditFields.includes('examples') ? ['unsupported'] : [],
-        feedback: auditFields.includes('examples')
-          ? ['examples[1].meaning adds an unsupported result.']
-          : [],
-      })),
-    };
-    boundary.generate
-      .mockResolvedValueOnce({
-        content: JSON.stringify(capturedLunaIntro),
-        model: 'captured-model',
-      })
-      .mockResolvedValueOnce({ content: JSON.stringify(initialVerdict), model: 'captured-model' })
-      .mockResolvedValueOnce({
-        content: JSON.stringify({
-          examples: capturedLunaIntro.examples,
-          focus: ['An unsolicited changed rule'],
-        }),
-        model: 'captured-model',
-      });
-    const error = await generateClassIntro(params).catch((error: unknown) => error);
-    const failure = captureGenerationFailure(error);
-    expect(failure.category).toBe('section_quality');
-    expect(failure.teachingFailure!.reviews).toEqual([
-      { candidate: JSON.stringify(auditItems(capturedLunaIntro)), verdict: initialVerdict },
-    ]);
-    const schema = boundary.generate.mock.calls.at(-1)![2].jsonSchema.schema;
-    expect(Object.keys(schema.properties)).toEqual(['examples']);
-    expect(schema.additionalProperties).toBe(false);
-  });
-
-  it('retains two actual reviewer rejections even when their content and verdicts are identical', async () => {
-    const rejection = {
-      items: introAuditFields.map(({ auditFields }, index) => ({
-        index,
-        acceptable: false,
-        issues: ['uncertain'],
-        feedback: [`${auditFields.join(' and ')} needs correction.`],
-      })),
-    };
-    for (const response of [capturedLunaIntro, rejection, capturedLunaIntro, rejection]) {
-      boundary.generate.mockResolvedValueOnce({
-        content: JSON.stringify(response),
-        model: 'captured-model',
-      });
-    }
-    const error = await generateClassIntro(params).catch((error: unknown) => error);
-    expect(error).toBeInstanceOf(TeachingQualityRejectionError);
-    const failure = captureGenerationFailure(error);
-    expect(failure.teachingFailure!.reviews).toEqual([
-      { candidate: JSON.stringify(auditItems(capturedLunaIntro)), verdict: rejection },
-      { candidate: JSON.stringify(auditItems(capturedLunaIntro)), verdict: rejection },
-    ]);
-  });
-
-  it.each([false, true])(
-    'keeps passed grammar after a meaning-only correction with visuals=%s',
-    async (withVisuals) => {
-      const visuals = {
-        timeline: {
-          title: 'Gestern und jetzt',
-          steps: ['Gestern: Wir sind gegangen.', 'Jetzt: Wir erzählen davon.'],
-        },
-        contrast: null,
-        callouts: [],
-        links: [],
-      };
-      const candidate = { ...capturedLunaIntro, ...(withVisuals ? { visuals } : {}) };
-      const replacement = {
-        ...capturedLunaIntro,
+      const originalError = new Error('terminal review failure');
+      const repaired = {
+        ...candidate,
         examples: candidate.examples.map((example, index) =>
-          index === 1
-            ? { ...example, meaning: 'Der Satz sagt, dass wir zu Fuß zum Markt gegangen sind.' }
-            : example
+          index === 1 ? { ...example, meaning: 'Wir gingen zum Markt.' } : example
         ),
       };
-      const firstVerdict = {
-        items: [...introAuditFields, ...(withVisuals ? [{ auditFields: ['visuals'] }] : [])].map(
-          ({ auditFields }, index) => ({
-            index,
-            acceptable: !auditFields.includes('examples'),
-            issues: auditFields.includes('examples') ? ['unsupported'] : [],
-            feedback: auditFields.includes('examples')
-              ? ['examples[1].meaning adds an arrival result that the target does not state.']
-              : [],
-          })
-        ),
-      };
-      boundary.generate
-        .mockResolvedValueOnce({ content: JSON.stringify(candidate), model: 'captured-model' })
-        .mockResolvedValueOnce({ content: JSON.stringify(firstVerdict), model: 'captured-model' })
-        .mockResolvedValueOnce({
-          content: JSON.stringify({ examples: replacement.examples }),
+      boundary.generate.mockResolvedValueOnce({
+        content: JSON.stringify(candidate),
+        model: ai.model,
+      });
+      queueReview(candidate, rejected);
+      boundary.generate.mockImplementationOnce(() => {
+        if (stage === 'selection change') ai.model = 'changed-selection';
+        if (stage === 'cancellation') controller.abort(originalError);
+        return {
+          content: JSON.stringify({ examples: { '1': repaired.examples[1] } }),
           model: 'captured-model',
-        })
-        .mockImplementationOnce((_system: string, messages: Array<{ content: string }>) => {
-          const { items } = JSON.parse(messages[0]!.content);
-          return {
-            model: 'captured-model',
-            content: JSON.stringify({
-              items: items.map(
-                ({ index, content }: { index: number; content: { auditFields: string[] } }) => ({
-                  index,
-                  acceptable: !content.auditFields.includes('focus'),
-                  issues: content.auditFields.includes('focus') ? ['incorrect'] : [],
-                  feedback: content.auditFields.includes('focus')
-                    ? ['Fokus 1: gestern steht zuerst, daher steht habe an dritter Stelle.']
-                    : [],
-                })
-              ),
-            }),
-          };
-        });
-
-      await expect(generateClassIntro(params)).resolves.toEqual({
-        ...replacement,
-        ...(withVisuals ? { visuals } : {}),
+        };
+      });
+      boundary.generate.mockImplementationOnce(() => {
+        if (stage === 'review protocol') return { content: '{', model: ai.model };
+        if (stage === 'review provider') throw originalError;
+        throw originalError;
       });
 
-      const finalReview = boundary.generate.mock.calls.at(-1)!;
-      expect(
-        JSON.parse(finalReview[1][0].content).items.map(
-          ({ content }: { content: { auditFields: string[] } }) => content.auditFields
-        )
-      ).toEqual(withVisuals ? [['examples'], ['visuals']] : [['examples']]);
-      expect(finalReview[2]).toMatchObject({
-        model: 'captured-model',
-        signal: expect.any(AbortSignal),
-      });
-      expect(boundary.generate.mock.calls[2][1][0].content).toContain(candidate.purpose);
+      const error = await generateClassIntro(params).catch((caught: unknown) => caught);
+      if (stage === 'review protocol' || stage === 'selection change')
+        expect(error).toBeInstanceOf(ReviewerProtocolError);
+      else expect(error).toBe(originalError);
+      const evidence = captureGenerationFailure(error);
+      expect(evidence.category).toBe(
+        stage === 'review protocol' || stage === 'selection change'
+          ? 'review_protocol'
+          : 'generation_failed'
+      );
+      expect(evidence.teachingFailure?.reviews).toEqual([
+        {
+          candidate: JSON.stringify(auditItems(candidate)),
+          verdict: fullVerdict(candidate, rejected),
+        },
+      ]);
     }
   );
-
-  it('repairs rejected prose while preserving the approved purpose and examples', async () => {
-    const candidate = capturedLunaIntro;
-    const verdict = {
-      items: [
-        { index: 0, acceptable: true, issues: [], feedback: [] },
-        {
-          index: 1,
-          acceptable: false,
-          issues: ['unnatural'],
-          feedback: ['The about text sounds unnatural and needs rewriting.'],
-        },
-        { index: 2, acceptable: true, issues: [], feedback: [] },
-        { index: 3, acceptable: true, issues: [], feedback: [] },
-      ],
-    };
-    const patch = { about: 'Das Perfekt beschreibt hier abgeschlossene Erlebnisse.' };
-    const repaired = { ...candidate, ...patch };
-    boundary.generate
-      .mockResolvedValueOnce({ content: JSON.stringify(candidate), model: 'captured-model' })
-      .mockResolvedValueOnce({ content: JSON.stringify(verdict), model: 'captured-model' })
-      .mockResolvedValueOnce({ content: JSON.stringify(patch), model: 'captured-model' })
-      .mockResolvedValueOnce({ content: JSON.stringify(approved), model: 'captured-model' });
-
-    const result = await generateClassIntro(params);
-
-    expect(result).toEqual(repaired);
-    expect(result.about).toBe(patch.about);
-    expect(result.focus).toEqual(candidate.focus);
-    expect(result.tips).toEqual(candidate.tips);
-    expect(result.examples[0]).toEqual(candidate.examples[0]);
-    expect(result.examples[1].target).toBe(candidate.examples[1].target);
-    expect(result.examples[1].note).toBe(candidate.examples[1].note);
-    expect(result.examples[2].target).toBe(candidate.examples[2].target);
-    expect(result.examples[2].note).toBe(candidate.examples[2].note);
-    expect(result.visuals).toBeUndefined();
-    expect(boundary.generate.mock.calls[0][0]).toContain(
-      'Make purpose one short sentence naming a concrete action'
-    );
-    const correction = boundary.generate.mock.calls.find(([system]) =>
-      system.includes('semantic replacement')
-    );
-    expect(correction?.[1][0].content).toContain('may be incomplete or mistaken');
-    expect(correction?.[1][0].content).toContain('correct it only when substantiated');
-    expect(correction?.[1][0].content).toContain('gehend erreicht');
-    expect(correction?.[1][0].content).toContain('The about text sounds unnatural');
-    const rejectedCandidateText = correction?.[1][0].content.split(
-      'Complete original candidate for context:\n'
-    )[1];
-    expect(JSON.parse(rejectedCandidateText!)).toEqual(candidate);
-    const firstReview = boundary.generate.mock.calls.find(([system]) =>
-      system.startsWith('Independently review')
-    );
-    expect(JSON.parse(firstReview![1][0].content).items[0].content.introContext.purpose).toBe(
-      candidate.purpose
-    );
-    const finalReview = boundary.generate.mock.calls
-      .filter(([system]) => system.startsWith('Independently review'))
-      .at(-1);
-    expect(
-      JSON.parse(finalReview![1][0].content).items.find(
-        ({ content }: { content: { auditFields: string[] } }) =>
-          content.auditFields.includes('examples')
-      ).content.introContext
-    ).toEqual(repaired);
-  });
-
-  it('makes field-local A2 corrections and preserves the captured Luna candidate wording', async () => {
-    const candidate = capturedLunaIntro;
-    const verdict = {
-      items: [
-        { index: 0, acceptable: true, issues: [], feedback: [] },
-        { index: 1, acceptable: true, issues: [], feedback: [] },
-        { index: 2, acceptable: true, issues: [], feedback: [] },
-        { ...capturedLunaVerdict.items[0], index: 3 },
-      ],
-    };
-    boundary.generate
-      .mockReset()
-      .mockResolvedValueOnce({ content: JSON.stringify(candidate), model: 'captured-model' })
-      .mockResolvedValueOnce({ content: JSON.stringify(verdict), model: 'captured-model' })
-      .mockResolvedValueOnce({
-        content: JSON.stringify({
-          examples: candidate.examples.map((example, index) =>
-            index === 1
-              ? { ...example, meaning: 'Wir waren zu Fuß unterwegs und sind zum Markt gegangen.' }
-              : index === 2
-                ? { ...example, meaning: 'Auf meiner Reise habe ich viele schöne Orte gesehen.' }
-                : example
-          ),
-        }),
-        model: 'captured-model',
-      })
-      .mockResolvedValueOnce({
-        content: JSON.stringify({
-          items: [{ index: 0, acceptable: true, issues: [], feedback: [] }],
-        }),
-        model: 'captured-model',
-      });
-
-    const result = await generateClassIntro(params);
-    expect(result.examples).toEqual([
-      candidate.examples[0],
-      {
-        ...candidate.examples[1],
-        meaning: 'Wir waren zu Fuß unterwegs und sind zum Markt gegangen.',
-      },
-      {
-        ...candidate.examples[2],
-        meaning: 'Auf meiner Reise habe ich viele schöne Orte gesehen.',
-      },
-    ]);
-    expect(result).toMatchObject({
-      purpose: candidate.purpose,
-      about: candidate.about,
-      focus: candidate.focus,
-      tips: candidate.tips,
-    });
-
-    const replacementPrompt = boundary.generate.mock.calls[2][1][0].content;
-    expect(replacementPrompt).toContain('feedback may be incomplete or mistaken');
-    expect(replacementPrompt).toContain('correct it only when substantiated');
-    expect(replacementPrompt).toContain('Preserve supported meaning and facts');
-    expect(replacementPrompt).toContain('preserving all other fields exactly');
-    expect(replacementPrompt).toContain(candidate.purpose);
-    expect(boundary.generate.mock.calls[2][0]).toContain(
-      'style preference alone does not justify changing sound wording'
-    );
-    const reviewCalls = boundary.generate.mock.calls.filter(([system]) =>
-      system.startsWith('Independently review')
-    );
-    expect(
-      JSON.parse(reviewCalls.at(-1)![1][0].content).items.find(
-        ({ content }: { content: { auditFields: string[] } }) =>
-          content.auditFields.includes('examples')
-      ).content.introContext
-    ).toEqual(result);
-  });
-
-  it('fails closed when whole-candidate review rejects drift introduced by field-local repair', async () => {
-    const candidate = capturedLunaIntro;
-    const firstVerdict = {
-      items: [
-        { index: 0, acceptable: true, issues: [], feedback: [] },
-        { index: 1, acceptable: true, issues: [], feedback: [] },
-        { index: 2, acceptable: true, issues: [], feedback: [] },
-        { ...capturedLunaVerdict.items[0], index: 3 },
-      ],
-    };
-    const drifted = {
-      ...candidate,
-      examples: [
-        { ...candidate.examples[0], target: 'Ich habe gestern meine Cousine besucht.' },
-        {
-          ...candidate.examples[1],
-          meaning: 'Wir waren nach dem Essen zu Fuß am Fluss unterwegs.',
-        },
-        {
-          ...candidate.examples[2],
-          target: 'Auf der Reise habe ich ein altes Schloss gesehen.',
-          meaning: 'Das Schloss war auf meiner Reise da, und ich habe es gesehen.',
-        },
-      ],
-    };
-    const secondVerdict = {
-      items: [
-        { index: 0, acceptable: true, issues: [], feedback: [] },
-        { index: 1, acceptable: true, issues: [], feedback: [] },
-        { index: 2, acceptable: true, issues: [], feedback: [] },
-        {
-          index: 3,
-          acceptable: false,
-          issues: ['unnatural'],
-          feedback: ['examples[2].meaning describes the Schloss as present and sounds unnatural.'],
-        },
-      ],
-    };
-    boundary.generate
-      .mockReset()
-      .mockResolvedValueOnce({ content: JSON.stringify(candidate), model: 'captured-model' })
-      .mockResolvedValueOnce({ content: JSON.stringify(firstVerdict), model: 'captured-model' })
-      .mockResolvedValueOnce({
-        content: JSON.stringify({ examples: drifted.examples }),
-        model: 'captured-model',
-      })
-      .mockResolvedValueOnce({ content: JSON.stringify(secondVerdict), model: 'captured-model' });
-
-    const error = await generateClassIntro(params).catch((failure: unknown) => failure);
-    expect(error).toBeInstanceOf(TeachingQualityRejectionError);
-    if (!(error instanceof TeachingQualityRejectionError)) throw error;
-    expect(error.teachingFailure?.reviews).toEqual([
-      { candidate: JSON.stringify(auditItems(candidate)), verdict: firstVerdict },
-      { candidate: JSON.stringify(auditItems(drifted)), verdict: secondVerdict },
-    ]);
-    const reviewCalls = boundary.generate.mock.calls.filter(([system]) =>
-      system.startsWith('Independently review')
-    );
-    expect(
-      JSON.parse(reviewCalls[1]![1][0].content).items.find(
-        ({ content }: { content: { auditFields: string[] } }) =>
-          content.auditFields.includes('examples')
-      ).content.introContext
-    ).toEqual(drifted);
-  });
 });

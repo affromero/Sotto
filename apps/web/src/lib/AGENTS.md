@@ -190,26 +190,28 @@ separate request so keys and explanations never reach the blind solver. Writing
 review distinguishes intentional correction sources from instructions requiring
 incorrect output. Provider, cancellation, and review failures propagate. These
 requests use the same captured provider and consume its existing request budget:
-intro uses at most four calls when a structurally valid candidate needs one
-bounded quality replacement and a second review,
-writing uses at most four calls when a structurally valid set needs one bounded
-quality replacement and a second review, and section generation uses at most seven
-including two candidates, optional JSON repair, blind reviews and teaching
-reviews. A teaching-quality rejection enters the same bounded replacement path
-as a blind-review rejection.
+intro reviews each scalar field, focus entry, tip, example and optional visual as a
+separate address. Reviews are sent in sequential batches of at most five items.
+A maximum-size intro uses ten requests total: one generation, four review batches
+before and after one bounded repair, plus the repair request. Writing uses at most
+four calls when a structurally valid set needs one bounded quality replacement
+and a second review. Section generation uses at most seven, including two
+candidates, optional JSON repair, blind reviews and teaching reviews. A
+teaching-quality rejection enters the same bounded replacement path as a
+blind-review rejection.
 Teaching verdicts carry indexed feedback bounded to six 300-character entries
 per item. Replacements treat it as untrusted data and preserve the captured
 context and request limits. Logs contain only static protocol diagnostics and
 issue codes. Generated and restored intros preserve absent visuals; only explicit
 metadata fallback construction derives visuals. Intro repair uses its dedicated
 trusted-context template without the initial generation template's visual schema.
-Intro semantic repair returns a strict patch of the actual rejected prose fields.
-Accepted fields remain exact, accepted visuals are retained, and rejected optional
-visuals are removed. The initial full audit binds its private receipt to the captured
-execution and trusted lesson context. Replacement audits reuse an accepted scope
-only when its complete declared audit input is unchanged. Prose scopes exclude
-example meanings and visuals from context; examples and visuals retain full context.
-Changed targets, notes or prose invalidate the relevant prior inputs. Private failure
+Intro semantic repair returns a strict patch of the actual rejected addresses.
+Accepted fields and array entries remain exact, accepted visuals are retained, and
+rejected optional visuals are removed. The initial full audit binds its private
+receipt to the captured execution and trusted lesson context. The replacement audit
+reviews every current address again and never reuses prior approvals. Every address
+receives the complete intro as untrusted contextual content alongside the trusted
+lesson context; only its assigned field or entry can be rejected. Private failure
 evidence records actual requests and retains initial reviews through terminal provider,
 protocol and cancellation failures without replacing those errors or replaying work.
 
