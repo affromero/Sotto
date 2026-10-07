@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { createEpisodeStatusSubscriber } from '@/lib/redis';
 import { openSottoSemaphore } from '@/lib/sidedoor/jobs/core/redis-semaphore';
 import { logger } from '@/lib/logger';
+import { getSseShutdownSignal } from '@/lib/sse/shutdown';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -21,28 +22,35 @@ async function releaseCapacity(sessions: readonly CapacitySession[]): Promise<vo
 }
 
 export async function GET(request: NextRequest, { params }: RouteParams) {
+  const shutdownSignal = getSseShutdownSignal();
+  const signal = AbortSignal.any([request.signal, shutdownSignal]);
+  signal.throwIfAborted();
   const authenticated = await authenticateRequest(request);
+  signal.throwIfAborted();
   if (!authenticated) {
     return new Response('Unauthorized', { status: 401 });
   }
 
   const { episodeId } = await params;
+  signal.throwIfAborted();
   const episode = await prisma.episode.findUnique({
     where: { id: episodeId },
     select: { userId: true },
   });
+  signal.throwIfAborted();
   if (!episode) {
     return new Response('Not found', { status: 404 });
   }
-  if (episode.userId !== authenticated.userId && !(await isUserAdmin(authenticated))) {
-    return new Response('Forbidden', { status: 403 });
+  if (episode.userId !== authenticated.userId) {
+    const isAdmin = await isUserAdmin(authenticated);
+    signal.throwIfAborted();
+    if (!isAdmin) return new Response('Forbidden', { status: 403 });
   }
 
   const sessions: CapacitySession[] = [];
   let subscriber: ReturnType<typeof createEpisodeStatusSubscriber>;
   const throwIfAborted = () => {
-    if (request.signal.aborted)
-      throw request.signal.reason ?? new DOMException('Request aborted', 'AbortError');
+    signal.throwIfAborted();
   };
   try {
     throwIfAborted();
@@ -53,7 +61,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     });
     sessions.push(userCapacity);
     throwIfAborted();
-    if (!(await userCapacity.acquire())) {
+    const userAcquired = await userCapacity.acquire();
+    throwIfAborted();
+    if (!userAcquired) {
       await releaseCapacity(sessions);
       return new Response('Too many active streams', { status: 429 });
     }
@@ -65,7 +75,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     });
     sessions.push(globalCapacity);
     throwIfAborted();
-    if (!(await globalCapacity.acquire())) {
+    const globalAcquired = await globalCapacity.acquire();
+    throwIfAborted();
+    if (!globalAcquired) {
       await releaseCapacity(sessions);
       return new Response('Too many active streams', { status: 503 });
     }
@@ -111,7 +123,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   };
   try {
     await subscriber.subscribe((data) => deliverMessage(data), {
-      signal: request.signal,
+      signal,
       onLoss: (error) => terminateForSubscriberLoss(error),
     });
     throwIfAborted();
@@ -155,7 +167,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           }
         );
       };
-      terminateForSubscriberLoss = terminate;
+      terminateForSubscriberLoss = (error) =>
+        terminate(
+          shutdownSignal.aborted && !request.signal.aborted && error === shutdownSignal.reason
+            ? undefined
+            : error
+        );
       if (pendingSubscriberLoss) {
         terminate(pendingSubscriberLoss);
         return;
@@ -184,10 +201,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         }, terminate);
       }, 30_000);
 
-      const aborted = () => terminate(request.signal.reason);
-      request.signal.addEventListener('abort', aborted, { once: true });
-      removeAbort = () => request.signal.removeEventListener('abort', aborted);
-      if (request.signal.aborted) aborted();
+      const aborted = () => terminate(request.signal.aborted ? signal.reason : undefined);
+      signal.addEventListener('abort', aborted, { once: true });
+      removeAbort = () => signal.removeEventListener('abort', aborted);
+      if (signal.aborted) aborted();
     },
     cancel() {
       terminated = true;

@@ -14,6 +14,7 @@ const mockGlobalRelease = vi.fn();
 const mockUserRenew = vi.fn();
 const mockGlobalRenew = vi.fn();
 const mockOpenSottoSemaphore = vi.fn();
+let mockShutdownController = new AbortController();
 
 vi.mock('@/lib/api-keys', () => ({
   authenticateRequest: (...args: unknown[]) => mockAuthenticateRequest(...args),
@@ -42,6 +43,9 @@ vi.mock('@/lib/sidedoor/jobs/core/redis-semaphore', () => ({
 vi.mock('@/lib/logger', () => ({
   logger: { warn: vi.fn() },
 }));
+vi.mock('@/lib/sse/shutdown', () => ({
+  getSseShutdownSignal: () => mockShutdownController.signal,
+}));
 
 import { GET } from '@/app/api/v1/episodes/[episodeId]/stream/route';
 
@@ -54,6 +58,7 @@ const params = { params: Promise.resolve({ episodeId: 'episode-1' }) };
 describe('GET episode status stream', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockShutdownController = new AbortController();
     mockOpenSottoSemaphore.mockReset();
     mockUserAcquire.mockReset();
     mockGlobalAcquire.mockReset();
@@ -286,5 +291,106 @@ describe('GET episode status stream', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('closes an active stream and releases subscriber capacity on server shutdown', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockEpisodeFindUnique.mockResolvedValue({ userId: 'user-1' });
+
+    const response = await GET(request(), params);
+    const reader = response.body!.getReader();
+    expect((await reader.read()).done).toBe(false);
+
+    mockShutdownController.abort(new Error('Server is shutting down'));
+
+    await expect(reader.read()).resolves.toMatchObject({ done: true });
+    expect(mockCleanup).toHaveBeenCalledOnce();
+    expect(mockUserRelease).toHaveBeenCalledOnce();
+    expect(mockGlobalRelease).toHaveBeenCalledOnce();
+  });
+
+  it('closes cleanly when subscriber abort handling reports the shutdown reason first', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockEpisodeFindUnique.mockResolvedValue({ userId: 'user-1' });
+    mockSubscribe.mockImplementationOnce(
+      async (
+        _onMessage: unknown,
+        options: { signal: AbortSignal; onLoss: (error: Error) => void }
+      ) => {
+        options.signal.addEventListener(
+          'abort',
+          () => options.onLoss(options.signal.reason as Error),
+          { once: true }
+        );
+      }
+    );
+    const response = await GET(request(), params);
+    const reader = response.body!.getReader();
+    expect((await reader.read()).done).toBe(false);
+
+    mockShutdownController.abort(new Error('Server is shutting down'));
+
+    await expect(reader.read()).resolves.toMatchObject({ done: true });
+    expect(mockCleanup).toHaveBeenCalledOnce();
+    expect(mockUserRelease).toHaveBeenCalledOnce();
+    expect(mockGlobalRelease).toHaveBeenCalledOnce();
+  });
+
+  it('keeps a distinct Redis loss observable when it races server shutdown', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockEpisodeFindUnique.mockResolvedValue({ userId: 'user-1' });
+    const failure = new Error('Redis subscriber connection ended');
+    mockSubscribe.mockImplementationOnce(
+      async (
+        _onMessage: unknown,
+        options: { signal: AbortSignal; onLoss: (error: Error) => void }
+      ) => {
+        options.signal.addEventListener('abort', () => options.onLoss(failure), { once: true });
+      }
+    );
+    const response = await GET(request(), params);
+    const reader = response.body!.getReader();
+    expect((await reader.read()).done).toBe(false);
+
+    mockShutdownController.abort(new Error('Server is shutting down'));
+
+    await expect(reader.read()).rejects.toBe(failure);
+    expect(mockCleanup).toHaveBeenCalledOnce();
+    expect(mockUserRelease).toHaveBeenCalledOnce();
+    expect(mockGlobalRelease).toHaveBeenCalledOnce();
+  });
+
+  it('releases subscriber capacity when shutdown interrupts admission', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockEpisodeFindUnique.mockResolvedValue({ userId: 'user-1' });
+    let admissionSignal!: AbortSignal;
+    mockSubscribe.mockImplementationOnce(
+      (_onMessage: unknown, options: { signal: AbortSignal }) => {
+        admissionSignal = options.signal;
+        return new Promise<void>((_resolve, reject) => {
+          options.signal.addEventListener('abort', () => reject(options.signal.reason), {
+            once: true,
+          });
+        });
+      }
+    );
+    const pending = GET(request(), params);
+    await vi.waitFor(() => expect(admissionSignal).toBeDefined());
+    const reason = new Error('Server is shutting down');
+    mockShutdownController.abort(reason);
+
+    await expect(pending).rejects.toBe(reason);
+    expect(mockCleanup).toHaveBeenCalledOnce();
+    expect(mockUserRelease).toHaveBeenCalledOnce();
+    expect(mockGlobalRelease).toHaveBeenCalledOnce();
+  });
+
+  it('does not open capacity after server shutdown', async () => {
+    const reason = new Error('Server is shutting down');
+    mockShutdownController.abort(reason);
+
+    await expect(GET(request(), params)).rejects.toBe(reason);
+    expect(mockAuthenticateRequest).not.toHaveBeenCalled();
+    expect(mockOpenSottoSemaphore).not.toHaveBeenCalled();
   });
 });
