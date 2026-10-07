@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { Prisma } from '@/generated/prisma/client';
 import { SectionQualityError } from '../section-quality';
 import { ReviewerProtocolError, TeachingQualityRejectionError } from './teaching-quality';
-import { teachingFailureSchema } from './teaching-failure';
+import { retainedTeachingFailure, teachingFailureSchema } from './teaching-failure';
 import { generationAttemptFailures, generationAttemptFailuresSchema } from './generation-structure';
 
 const generationFailureCategorySchema = z.enum([
@@ -41,15 +41,17 @@ const parallelFailures = new WeakMap<
 
 function captureFailureDetail(error: unknown): z.infer<typeof failureDetailSchema> {
   const attemptFailures = generationAttemptFailures(error);
+  const teachingFailure =
+    error instanceof TeachingQualityRejectionError && error.teachingFailure
+      ? error.teachingFailure
+      : error instanceof ReviewerProtocolError && error.teachingFailure
+        ? (retainedTeachingFailure(error) ?? error.teachingFailure)
+        : error instanceof SectionQualityError && error.blindReviewFailure
+          ? error.blindReviewFailure
+          : retainedTeachingFailure(error);
   return failureDetailSchema.parse({
     category: classifyGenerationFailure(error),
-    ...(error instanceof TeachingQualityRejectionError && error.teachingFailure
-      ? { teachingFailure: error.teachingFailure }
-      : error instanceof ReviewerProtocolError && error.teachingFailure
-        ? { teachingFailure: error.teachingFailure }
-        : error instanceof SectionQualityError && error.blindReviewFailure
-          ? { teachingFailure: error.blindReviewFailure }
-          : {}),
+    ...(teachingFailure ? { teachingFailure } : {}),
     ...(attemptFailures ? { attemptFailures } : {}),
   });
 }

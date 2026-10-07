@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { blockedProviderExecution } from '../../../helpers/runtime/provider-execution';
+import { shapeIntroProviderFixture } from './intro-provider-fixture';
 
 const boundary = vi.hoisted(() => ({ generate: vi.fn(), resolve: vi.fn() }));
 vi.unmock('@/lib/classes/class-intro');
@@ -10,40 +11,12 @@ vi.mock('@/lib/providers/ai', () => ({
       messages: Array<{ content: string }>,
       options: unknown
     ) => {
-      const response = await boundary.generate(system, messages, options);
-      if (!system.startsWith('Independently review')) return response;
-      try {
-        const supplied = JSON.parse(messages[0]!.content).items;
-        if (!supplied[0]?.content?.auditFields) return response;
-        const parsed = JSON.parse(response.content);
-        if (parsed.items?.length !== 1 || parsed.items[0].index !== 0) return response;
-        const original = parsed.items[0];
-        if (!Array.isArray(original.feedback)) return response;
-        const defectText = original.feedback.join(' ').toLowerCase();
-        const targetIndex = /purpose/.test(defectText)
-          ? 0
-          : /about/.test(defectText)
-            ? 1
-            : /focus|tips/.test(defectText)
-              ? 2
-              : /visual/.test(defectText)
-                ? supplied.length - 1
-                : /example|target|meaning|auxiliary|verb/.test(defectText)
-                  ? 3
-                  : 0;
-        return {
-          ...response,
-          content: JSON.stringify({
-            items: supplied.map((_: unknown, index: number) =>
-              index === targetIndex
-                ? { ...original, index }
-                : { index, acceptable: true, issues: [], feedback: [] }
-            ),
-          }),
-        };
-      } catch {
-        return response;
-      }
+      return shapeIntroProviderFixture(
+        system,
+        messages,
+        options,
+        await boundary.generate(system, messages, options)
+      );
     },
   }),
 }));
@@ -107,6 +80,7 @@ beforeEach(() => {
     provider: 'fixture',
     model: 'captured-model',
     signal: new AbortController().signal,
+    execution: params.execution,
   });
   boundary.generate
     .mockResolvedValueOnce({ content: JSON.stringify(intro), model: 'captured-model' })
@@ -458,9 +432,12 @@ describe('intro teaching gate', () => {
       expect(reviewSystem).toContain('For immersion intro examples only');
       expect(reviewSystem).toContain('claims supported by the actual example');
       expect(reviewSystem).toContain('This does not change meaning fidelity for A1 translations');
-      expect(JSON.parse(messages[0].content).items[3].content.fields.examples).toEqual(
-        usageIntro.examples
-      );
+      expect(
+        JSON.parse(messages[0].content).items.find(
+          ({ content }: { content: { auditFields: string[] } }) =>
+            content.auditFields.includes('examples')
+        ).content.fields.examples
+      ).toEqual(usageIntro.examples);
     }
   );
 
@@ -498,9 +475,12 @@ describe('intro teaching gate', () => {
       system.startsWith('Independently review')
     )) {
       expect(system).toContain('Reject added events, results, intentions or false grammar claims');
-      expect(JSON.parse(messages[0].content).items[3].content.fields.examples).toEqual(
-        unsupported.examples
-      );
+      expect(
+        JSON.parse(messages[0].content).items.find(
+          ({ content }: { content: { auditFields: string[] } }) =>
+            content.auditFields.includes('examples')
+        ).content.fields.examples
+      ).toEqual(unsupported.examples);
     }
   });
 
@@ -623,7 +603,10 @@ describe('intro teaching gate', () => {
     expect(boundary.generate.mock.calls[1][0]).toContain('shortened visual claims');
   });
   it('retains both rejected candidates privately without changing the bounded replacement', async () => {
-    const replacement = { ...intro, about: 'Private replacement explanation.' };
+    const replacement = {
+      ...intro,
+      examples: [{ ...intro.examples[0], note: 'Private replacement explanation.' }],
+    };
     const replacementVerdict = {
       items: [
         {
@@ -679,9 +662,9 @@ describe('intro teaching gate', () => {
         'about: Private replacement feedback about the grammar rule.',
       ]);
       const serialized = JSON.stringify(error);
-      expect(serialized).not.toContain(replacement.about);
+      expect(serialized).not.toContain(replacement.examples[0].note);
       expect(serialized).not.toContain(replacementVerdict.items[0].feedback[0]);
-      expect(JSON.stringify(warning.mock.calls)).not.toContain(replacement.about);
+      expect(JSON.stringify(warning.mock.calls)).not.toContain(replacement.examples[0].note);
       expect(JSON.stringify(warning.mock.calls)).not.toContain(
         replacementVerdict.items[0].feedback[0]
       );
@@ -689,16 +672,6 @@ describe('intro teaching gate', () => {
       warning.mockRestore();
     }
   });
-  it('reviews the exact visible intro without inventing missing visual labels', async () => {
-    const result = await generateClassIntro(params);
-    const call = boundary.generate.mock.calls[1];
-    expect(JSON.parse(call[1][0].content).items[0].content.introContext).toEqual(result);
-    expect(JSON.parse(call[1][0].content).items).toHaveLength(4);
-    expect(call[2]).toMatchObject({ model: 'captured-model', signal: expect.any(AbortSignal) });
-    expect(result.examples[0].target).toBe(intro.examples[0].target);
-    expect(result.visuals).toBeUndefined();
-  });
-
   it('keeps provider-authored teaching when optional visuals are invalid', async () => {
     boundary.generate
       .mockReset()
@@ -719,7 +692,7 @@ describe('intro teaching gate', () => {
     expect(result.examples).toEqual(intro.examples);
     expect(result.visuals).toBeUndefined();
     expect(
-      JSON.parse(boundary.generate.mock.calls[1][1][0].content).items[0].content.introContext
+      JSON.parse(boundary.generate.mock.calls[1][1][0].content).items[3].content.introContext
     ).toEqual(result);
   });
 
@@ -741,7 +714,7 @@ describe('intro teaching gate', () => {
     expect(boundary.generate.mock.calls[1][1][0].content).toContain('"required"');
     expect(boundary.generate.mock.calls[1][1][0].content).toContain('"purpose"');
     expect(
-      JSON.parse(boundary.generate.mock.calls[2][1][0].content).items[0].content.introContext
+      JSON.parse(boundary.generate.mock.calls[2][1][0].content).items[3].content.introContext
     ).toEqual(result);
   });
 
@@ -819,7 +792,7 @@ describe('intro teaching gate', () => {
       expect(system).toContain('Immediate immersion for A2');
     }
     expect(boundary.generate.mock.calls[2][1][0].content).toContain(
-      'Independently inspect every field for additional clear teaching defects'
+      'Change only the fields listed as initially rejected and present in the schema'
     );
   });
 

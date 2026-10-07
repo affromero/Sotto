@@ -144,6 +144,7 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
     'NATIVE',
     'NOTES',
     'OBJECTIVE',
+    'REPAIR_MODE_POLICY',
     'SOURCE',
     'TARGET',
     'TITLE',
