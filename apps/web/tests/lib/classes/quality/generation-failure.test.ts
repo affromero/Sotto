@@ -12,7 +12,10 @@ import {
   retainParallelGenerationFailures,
   generationFailureSchema,
 } from '@/lib/classes/quality/generation-failure';
-import { captureTeachingFailure } from '@/lib/classes/quality/teaching-failure';
+import {
+  captureTeachingFailure,
+  retainTeachingFailure,
+} from '@/lib/classes/quality/teaching-failure';
 import {
   captureStructureAttempt,
   captureTeachingAttempt,
@@ -21,6 +24,23 @@ import {
 } from '@/lib/classes/quality/generation-structure';
 
 describe('terminal generation failure classification', () => {
+  it('keeps prior and final review evidence without reclassifying a terminal protocol error', () => {
+    const first = captureTeachingFailure('intro', [{ about: 'Original teaching' }], {
+      items: [{ index: 0, acceptable: false, issues: ['incorrect'], feedback: ['First defect'] }],
+    });
+    const final = captureTeachingFailure('intro', [{ about: 'Replacement teaching' }], {
+      items: [{ index: 0, acceptable: false, issues: ['unsupported'], feedback: ['Final defect'] }],
+    });
+    const error = new ReviewerProtocolError(final);
+    const complete = { kind: first.kind, reviews: [...first.reviews, ...final.reviews] };
+    retainTeachingFailure(error, complete);
+    expect(captureGenerationFailure(error)).toEqual({
+      category: 'review_protocol',
+      teachingFailure: complete,
+    });
+    expect(error.teachingFailure).toEqual(final);
+    expect(JSON.stringify(error)).not.toContain('Original teaching');
+  });
   it('retains exact intro audit evidence when complete repair feedback exceeds its bound', () => {
     const evidence = captureTeachingFailure(
       'intro',

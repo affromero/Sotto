@@ -199,6 +199,15 @@ context and request limits. Logs contain only static protocol diagnostics and
 issue codes. Generated and restored intros preserve absent visuals; only explicit
 metadata fallback construction derives visuals. Intro repair uses its dedicated
 trusted-context template without the initial generation template's visual schema.
+Intro semantic repair returns a strict patch of the actual rejected prose fields.
+Accepted fields remain exact, accepted visuals are retained, and rejected optional
+visuals are removed. The initial full audit binds its private receipt to the captured
+execution and trusted lesson context. Replacement audits reuse an accepted scope
+only when its complete declared audit input is unchanged. Prose scopes exclude
+example meanings and visuals from context; examples and visuals retain full context.
+Changed targets, notes or prose invalidate the relevant prior inputs. Private failure
+evidence records actual requests and retains initial reviews through terminal provider,
+protocol and cancellation failures without replacing those errors or replaying work.
 
 `script-generator.ts` aligns vocabulary marker numbers before producing markdown.
 It remaps only a unique exact word identity already in the generated vocabulary,

@@ -51,6 +51,23 @@ export const teachingFailureSchema = z
 
 export type TeachingFailure = z.infer<typeof teachingFailureSchema>;
 
+const retainedFailures = new WeakMap<object, TeachingFailure>();
+
+export function retainTeachingFailure(error: unknown, failure: TeachingFailure | undefined): void {
+  if (!failure || ((typeof error !== 'object' || error === null) && typeof error !== 'function'))
+    return;
+  if (retainedFailures.has(error)) return;
+  const parsed = teachingFailureSchema.safeParse(failure);
+  if (parsed.success) retainedFailures.set(error, parsed.data);
+}
+
+export function retainedTeachingFailure(error: unknown): TeachingFailure | undefined {
+  if ((typeof error !== 'object' || error === null) && typeof error !== 'function')
+    return undefined;
+  const failure = retainedFailures.get(error);
+  return failure ? structuredClone(failure) : undefined;
+}
+
 /** Private normalized output only. Prompts and provider credentials are never captured. */
 export function captureTeachingFailure(
   kind: TeachingFailure['kind'],
