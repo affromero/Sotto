@@ -19,12 +19,16 @@ Generate exactly {{COUNT}} short target phrases the learner should say aloud. Ea
 
 ## Output
 
-Return ONLY a JSON array — no markdown fences, no preamble, no trailing commentary. Each element:
+Return ONLY a JSON object with a `prompts` property containing exactly {{COUNT}} items. Each item must have all three properties. Set `ipa` to `null` when you are unsure. Do not add properties, markdown fences, a preamble, or trailing commentary.
 
 ```
 {
-  "targetPhrase": "phrase in {{TARGET}}",
-  "translation": "meaning or support note that follows the language policy",
-  "ipa": "optional IPA transcription of the phrase"
+  "prompts": [
+    {
+      "targetPhrase": "phrase in {{TARGET}}",
+      "translation": "meaning or support note that follows the language policy",
+      "ipa": "IPA transcription of the phrase, or null when unsure"
+    }
+  ]
 }
 ```

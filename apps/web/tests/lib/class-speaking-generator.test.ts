@@ -139,16 +139,18 @@ import type { ClassSpeakingParams } from '@/lib/class-speaking-generator';
 
 // ---- Fixtures ----
 
-const SAMPLE_PHRASES_JSON = JSON.stringify([
-  {
-    targetPhrase: 'Hola, ¿cómo estás?',
-    translation: 'Hello, how are you?',
-    ipa: 'ˈola ˈkomo esˈtas',
-  },
-  { targetPhrase: 'Me llamo Ana.', translation: 'My name is Ana.', ipa: 'me ˈʎamo ˈana' },
-  { targetPhrase: 'Buenos días.', translation: 'Good morning.', ipa: 'ˈbwenos ˈdias' },
-  { targetPhrase: 'Hasta luego.', translation: 'See you later.', ipa: 'ˈasta ˈlweɣo' },
-]);
+const SAMPLE_PHRASES_JSON = JSON.stringify({
+  prompts: [
+    {
+      targetPhrase: 'Hola, ¿cómo estás?',
+      translation: 'Hello, how are you?',
+      ipa: 'ˈola ˈkomo esˈtas',
+    },
+    { targetPhrase: 'Me llamo Ana.', translation: 'My name is Ana.', ipa: 'me ˈʎamo ˈana' },
+    { targetPhrase: 'Buenos días.', translation: 'Good morning.', ipa: 'ˈbwenos ˈdias' },
+    { targetPhrase: 'Hasta luego.', translation: 'See you later.', ipa: 'ˈasta ˈlweɣo' },
+  ],
+});
 
 const PARAMS: ClassSpeakingParams = {
   execution: authorizedLearnerExecution('u1'),
@@ -434,7 +436,7 @@ describe('generateClassSpeaking', () => {
       mockGetAiProviderMeta.mockReturnValue({ defaultModel: 'm' });
       mockLoadAndRender.mockReturnValue('system prompt');
       mockGenerateResponse.mockResolvedValue({
-        content: JSON.stringify([{ bad: 'shape' }, { also: 'bad' }]),
+        content: JSON.stringify({ prompts: [{ bad: 'shape' }, { also: 'bad' }] }),
         inputTokens: 10,
         outputTokens: 10,
         model: 'm',
@@ -517,9 +519,12 @@ describe('composeSpeakingPrompts', () => {
 
   it('rejects an invalid optional phonetic transcription before creating reference audio', async () => {
     setupHappyPath();
-    const phrases = JSON.parse(SAMPLE_PHRASES_JSON);
+    const phrases = JSON.parse(SAMPLE_PHRASES_JSON).prompts;
     phrases[0].ipa = false;
-    mockGenerateResponse.mockResolvedValue({ content: JSON.stringify(phrases), model: 'm' });
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify({ prompts: phrases }),
+      model: 'm',
+    });
     const error = await composeSpeakingPrompts({
       execution: authorizedLearnerExecution('u1'),
       userId: 'u1',

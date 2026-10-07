@@ -224,32 +224,34 @@ const SAMPLE_SCRIPT_RESULT = {
   model: 'm',
 };
 
-const SAMPLE_QUESTIONS_JSON = JSON.stringify([
-  {
-    question: 'What does "hola" mean?',
-    options: ['hello', 'goodbye', 'please', 'thanks'],
-    correctIndex: 0,
-    explanation: '"Hola" is a greeting.',
-  },
-  {
-    question: 'What skill is being practiced?',
-    options: ['Writing', 'Reading', 'Listening', 'Speaking'],
-    correctIndex: 2,
-    explanation: 'This is a listening section.',
-  },
-  {
-    question: 'Who is the host?',
-    options: ['HOST', 'EXPERT', 'NARRATOR', 'GUEST'],
-    correctIndex: 0,
-    explanation: 'The host introduces the episode.',
-  },
-  {
-    question: 'What is the topic?',
-    options: ['Weather', 'Numbers', 'Greetings', 'Food'],
-    correctIndex: 2,
-    explanation: 'Saludos means greetings.',
-  },
-]);
+const SAMPLE_QUESTIONS_JSON = JSON.stringify({
+  questions: [
+    {
+      question: 'What does "hola" mean?',
+      options: ['hello', 'goodbye', 'please', 'thanks'],
+      correctIndex: 0,
+      explanation: '"Hola" is a greeting.',
+    },
+    {
+      question: 'What skill is being practiced?',
+      options: ['Writing', 'Reading', 'Listening', 'Speaking'],
+      correctIndex: 2,
+      explanation: 'This is a listening section.',
+    },
+    {
+      question: 'Who is the host?',
+      options: ['HOST', 'EXPERT', 'NARRATOR', 'GUEST'],
+      correctIndex: 0,
+      explanation: 'The host introduces the episode.',
+    },
+    {
+      question: 'What is the topic?',
+      options: ['Weather', 'Numbers', 'Greetings', 'Food'],
+      correctIndex: 2,
+      explanation: 'Saludos means greetings.',
+    },
+  ],
+});
 
 const PARAMS: ClassListeningParams = {
   userId: 'u1',

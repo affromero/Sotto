@@ -616,7 +616,10 @@ suite('Durable practice preparation against PostgreSQL', () => {
           let body = '';
           for await (const chunk of request) body += chunk.toString();
           requests.push(body);
-          const payload = JSON.parse(body) as { messages: { role: string; content: string }[] };
+          const payload = JSON.parse(body) as {
+            messages: { role: string; content: string }[];
+            response_format?: unknown;
+          };
           const system =
             payload.messages.find((message) => message.role === 'system')?.content ?? '';
           const user = payload.messages.at(-1)?.content ?? '';
@@ -695,32 +698,64 @@ suite('Durable practice preparation against PostgreSQL', () => {
                 issues: [],
               })),
             };
-          else if (system.startsWith('You are a writing-practice'))
-            content = [
-              {
-                taskType: 'transformation',
-                sourceText: 'Ich wohne in Berlin. Change Ich to Mia.',
-                task: 'Rewrite the supplied sentence about Mia.',
+          else if (system.startsWith('You are a writing-practice')) {
+            expect(payload.response_format).toMatchObject({
+              type: 'json_schema',
+              json_schema: {
+                name: 'class_writing_prompts',
+                strict: true,
+                schema: {
+                  type: 'object',
+                  required: ['prompts'],
+                  additionalProperties: false,
+                },
               },
-              {
-                taskType: 'correction',
-                sourceText: 'Mia wohnen in Berlin.',
-                task: 'Correct the verb in the supplied sentence.',
+            });
+            content = {
+              prompts: [
+                {
+                  taskType: 'transformation',
+                  sourceText: 'Ich wohne in Berlin. Change Ich to Mia.',
+                  task: 'Rewrite the supplied sentence about Mia.',
+                },
+                {
+                  taskType: 'correction',
+                  sourceText: 'Mia wohnen in Berlin.',
+                  task: 'Correct the verb in the supplied sentence.',
+                },
+                {
+                  taskType: 'completion',
+                  sourceText: 'Mia sagt ____. Complete with Hallo.',
+                  task: 'Complete the supplied greeting.',
+                },
+              ].map((prompt) => ({ ...prompt, guidance: null, ideas: null })),
+            };
+          } else if (system.startsWith('You are a speaking-practice')) {
+            expect(payload.response_format).toMatchObject({
+              type: 'json_schema',
+              json_schema: {
+                name: 'class_speaking_prompts',
+                strict: true,
+                schema: {
+                  type: 'object',
+                  required: ['prompts'],
+                  additionalProperties: false,
+                },
               },
-              {
-                taskType: 'completion',
-                sourceText: 'Mia sagt ____. Complete with Hallo.',
-                task: 'Complete the supplied greeting.',
-              },
-            ];
-          else if (system.startsWith('You are a speaking-practice'))
-            content = [
-              'Hallo Ana.',
-              'Ich wohne in Berlin.',
-              'Ich lerne Deutsch.',
-              'Heute treffen wir uns.',
-            ].map((targetPhrase) => ({ targetPhrase, translation: 'A short everyday phrase.' }));
-          else if (/Generate 5 (grammar|reading) questions/.test(user))
+            });
+            content = {
+              prompts: [
+                'Hallo Ana.',
+                'Ich wohne in Berlin.',
+                'Ich lerne Deutsch.',
+                'Heute treffen wir uns.',
+              ].map((targetPhrase) => ({
+                targetPhrase,
+                translation: 'A short everyday phrase.',
+                ipa: null,
+              })),
+            };
+          } else if (/Generate 5 (grammar|reading) questions/.test(user))
             content = {
               passage: user.includes('reading') ? passage : '',
               questions: Array.from({ length: 5 }, (_, index) => ({

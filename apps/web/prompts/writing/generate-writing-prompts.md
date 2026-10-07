@@ -29,15 +29,19 @@ Generate exactly {{COUNT}} short, scaffolded writing tasks the learner should re
 
 ## Output
 
-Return ONLY a JSON array — no markdown fences, no preamble, no trailing commentary. Each element:
+Return ONLY a JSON object with a `prompts` property containing exactly {{COUNT}} tasks. Each task must include every property shown below. Set `guidance` and `ideas` to `null` when absent. Do not add properties, markdown fences, a preamble, or trailing commentary.
 
 ```
 {
-  "taskType": "transformation | correction | completion | guided_reply",
-  "task": "the writing task / prompt the learner responds to",
-  "sourceText": "required original sentence(s), clauses, or complete facts needed for the answer, following the language policy",
-  "guidance": "optional one-line hint on what to include",
-  "ideas": ["short opening in the target language", "a different one", "a third"]
+  "prompts": [
+    {
+      "taskType": "transformation | correction | completion | guided_reply",
+      "task": "the writing task / prompt the learner responds to",
+      "sourceText": "required original sentence(s), clauses, or complete facts needed for the answer, following the language policy",
+      "guidance": "optional one-line hint on what to include",
+      "ideas": ["short opening in the target language", "a different one", "a third"]
+    }
+  ]
 }
 ```
 

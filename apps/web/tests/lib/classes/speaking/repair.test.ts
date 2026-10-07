@@ -40,7 +40,9 @@ vi.mock('@/lib/providers/ai', () => ({
         options: Record<string, unknown>
       ) => {
         runtime.requests.push({ system, messages, options });
-        const review = Boolean(options.jsonSchema);
+        const schemaName = (options.jsonSchema as { name?: string } | undefined)?.name;
+        const review =
+          schemaName === 'class_teaching_quality' || schemaName === 'class_section_quality';
         runtime.events.push(review ? 'review' : 'generation');
         const reply = runtime.replies.shift();
         if (!reply) throw new Error('Unexpected additional provider request');
@@ -130,6 +132,14 @@ function verdict(reject = false) {
 function reply(value: unknown) {
   return { content: JSON.stringify(value), model: 'configured-model' };
 }
+function promptJson(value: Array<Record<string, unknown>>) {
+  return JSON.stringify({
+    prompts: value.map((prompt) => ({ ...prompt, ipa: prompt.ipa ?? null })),
+  });
+}
+function promptReply(value: Array<Record<string, unknown>>) {
+  return { content: promptJson(value), model: 'configured-model' };
+}
 function noAudio() {
   expect(runtime.spoken).toEqual([]);
   expect(runtime.events).not.toContain('tts');
@@ -146,7 +156,7 @@ describe('canonical speaking correction before reference audio', () => {
   });
 
   it('renders the reviewed complete set without a correction request', async () => {
-    runtime.replies.push(reply(corrected), reply(verdict()));
+    runtime.replies.push(promptReply(corrected), reply(verdict()));
     const result = await composeSpeakingPrompts(params);
     expect(result.map((item) => item.targetPhrase)).toEqual(
       corrected.map((item) => item.targetPhrase)
@@ -156,7 +166,12 @@ describe('canonical speaking correction before reference audio', () => {
   });
 
   it('renders only the corrected set after the same canonical reviewer approves every phrase', async () => {
-    runtime.replies.push(reply(phrases), reply(verdict(true)), reply(corrected), reply(verdict()));
+    runtime.replies.push(
+      promptReply(phrases),
+      reply(verdict(true)),
+      promptReply(corrected),
+      reply(verdict())
+    );
     const result = await composeSpeakingPrompts(params);
     expect(result.map((item) => item.targetPhrase)).toEqual(
       corrected.map((item) => item.targetPhrase)
@@ -176,6 +191,17 @@ describe('canonical speaking correction before reference audio', () => {
       'tts',
     ]);
     const correction = runtime.requests[2];
+    const schemas = [runtime.requests[0].options.jsonSchema, correction.options.jsonSchema];
+    expect(schemas[0]).toMatchObject({
+      name: 'class_speaking_prompts',
+      schema: {
+        type: 'object',
+        properties: { prompts: { type: 'array', minItems: 4, maxItems: 4 } },
+        required: ['prompts'],
+        additionalProperties: false,
+      },
+    });
+    expect(schemas[1]).toEqual(schemas[0]);
     expect(correction.system).toContain(params.objective);
     expect(correction.system).toContain('verpassen');
     expect(correction.messages[0].content).toContain(JSON.stringify(phrases));
@@ -197,9 +223,9 @@ describe('canonical speaking correction before reference audio', () => {
 
   it('retains both actual rejected sets and verdicts without rendering any audio', async () => {
     runtime.replies.push(
-      reply(phrases),
+      promptReply(phrases),
       reply(verdict(true)),
-      reply(corrected),
+      promptReply(corrected),
       reply(verdict(true))
     );
     const error = await composeSpeakingPrompts(params).catch((failure: unknown) => failure);
@@ -219,12 +245,10 @@ describe('canonical speaking correction before reference audio', () => {
 
   it.each([
     '{',
-    JSON.stringify(phrases.slice(0, 3)),
-    JSON.stringify([...phrases, phrases[0]]),
-    JSON.stringify(
-      phrases.map((phrase, index) => (index === 0 ? { ...phrase, ipa: false } : phrase))
-    ),
-    JSON.stringify(
+    promptJson(phrases.slice(0, 3)),
+    promptJson([...phrases, phrases[0]]),
+    promptJson(phrases.map((phrase, index) => (index === 0 ? { ...phrase, ipa: false } : phrase))),
+    promptJson(
       phrases.map((phrase, index) => (index === 0 ? { ...phrase, translation: ' ' } : phrase))
     ),
   ])(
@@ -232,7 +256,7 @@ describe('canonical speaking correction before reference audio', () => {
     async (content) => {
       runtime.replies.push(
         { content, model: 'configured-model' },
-        reply(corrected),
+        promptReply(corrected),
         reply(verdict())
       );
       const result = await composeSpeakingPrompts(params);
@@ -256,7 +280,9 @@ describe('canonical speaking correction before reference audio', () => {
   );
 
   it('retains both malformed outputs after the single replacement is exhausted', async () => {
-    const content = JSON.stringify(phrases.slice(0, 3));
+    const content = JSON.stringify({
+      prompts: phrases.slice(0, 3).map((phrase) => ({ ...phrase, ipa: null })),
+    });
     runtime.replies.push(
       { content, model: 'configured-model' },
       { content: '{', model: 'configured-model' }
@@ -287,7 +313,7 @@ describe('canonical speaking correction before reference audio', () => {
   it('does not add a semantic replacement after repairing structure', async () => {
     runtime.replies.push(
       { content: '{', model: 'configured-model' },
-      reply(phrases),
+      promptReply(phrases),
       reply(verdict(true))
     );
     const error = await composeSpeakingPrompts(params).catch((failure: unknown) => failure);
@@ -304,8 +330,9 @@ describe('canonical speaking correction before reference audio', () => {
   });
 
   it('retains the actual review when a semantic replacement is malformed', async () => {
-    runtime.replies.push(reply(phrases), reply(verdict(true)), {
-      content: '{',
+    const malformedReplacement = `${promptJson(corrected)}"`;
+    runtime.replies.push(promptReply(phrases), reply(verdict(true)), {
+      content: malformedReplacement,
       model: 'configured-model',
     });
     const error = await composeSpeakingPrompts(params).catch((failure: unknown) => failure);
@@ -319,6 +346,12 @@ describe('canonical speaking correction before reference audio', () => {
     expect(initial?.type === 'teaching' && initial.failure.reviews[0].verdict).toEqual(
       verdict(true)
     );
+    expect(failure.attemptFailures?.[1]).toMatchObject({
+      attempt: 2,
+      type: 'structure',
+      issues: [{ code: 'invalid_json' }],
+      candidate: malformedReplacement,
+    });
     expect(runtime.events).toEqual(['generation', 'review', 'generation']);
     noAudio();
   });
@@ -340,7 +373,7 @@ describe('canonical speaking correction before reference audio', () => {
     runtime.afterGeneration = () => {
       if (++generations === 2) controller.abort(cancelled);
     };
-    runtime.replies.push({ content: '{', model: 'configured-model' }, reply(corrected));
+    runtime.replies.push({ content: '{', model: 'configured-model' }, promptReply(corrected));
     const error = await composeSpeakingPrompts({
       ...params,
       execution: { ...params.execution, signal: controller.signal },
@@ -359,7 +392,7 @@ describe('canonical speaking correction before reference audio', () => {
       items: verdict().items.map((item) => ({ ...item, feedback: ['Conflicting approval'] })),
     }),
   ])('propagates malformed or inconsistent review without another generation', async (content) => {
-    runtime.replies.push(reply(phrases), { content, model: 'configured-model' });
+    runtime.replies.push(promptReply(phrases), { content, model: 'configured-model' });
     await expect(composeSpeakingPrompts(params)).rejects.toBeInstanceOf(ReviewerProtocolError);
     expect(runtime.events).toEqual(['generation', 'review']);
     noAudio();
@@ -368,7 +401,7 @@ describe('canonical speaking correction before reference audio', () => {
   it.each([new Error('Provider unavailable'), new DOMException('Cancelled', 'AbortError')])(
     'preserves an external failure during correction without disguising it as a teaching verdict',
     async (failure) => {
-      runtime.replies.push(reply(phrases), reply(verdict(true)), failure);
+      runtime.replies.push(promptReply(phrases), reply(verdict(true)), failure);
       await expect(composeSpeakingPrompts(params)).rejects.toBe(failure);
       expect(runtime.events).toEqual(['generation', 'review', 'generation']);
       noAudio();
@@ -379,7 +412,7 @@ describe('canonical speaking correction before reference audio', () => {
     const controller = new AbortController();
     const reason = new Error('Learner cancelled');
     runtime.afterReview = () => controller.abort(reason);
-    runtime.replies.push(reply(phrases), reply(verdict(true)));
+    runtime.replies.push(promptReply(phrases), reply(verdict(true)));
     const error = await composeSpeakingPrompts({
       ...params,
       execution: { ...params.execution, signal: controller.signal },
@@ -402,7 +435,7 @@ describe('canonical speaking correction before reference audio', () => {
     const oversized = phrases.map((phrase, index) =>
       index === 0 ? { ...phrase, targetPhrase: 'x'.repeat(40000) } : phrase
     );
-    runtime.replies.push(reply(oversized), reply(verdict(true)));
+    runtime.replies.push(promptReply(oversized), reply(verdict(true)));
     const error = await composeSpeakingPrompts(params).catch((failure: unknown) => failure);
     expect(error).toBeInstanceOf(TeachingQualityRejectionError);
     expect((error as TeachingQualityRejectionError).teachingFailure?.reviews[0]).toMatchObject({
@@ -419,9 +452,9 @@ describe('canonical speaking correction before reference audio', () => {
       index === 0 ? { ...phrase, targetPhrase: 'x'.repeat(40000) } : phrase
     );
     runtime.replies.push(
-      reply(phrases),
+      promptReply(phrases),
       reply(verdict(true)),
-      reply(oversized),
+      promptReply(oversized),
       reply(verdict(true))
     );
     const error = await composeSpeakingPrompts(params).catch((failure: unknown) => failure);
@@ -447,7 +480,7 @@ describe('canonical speaking correction before reference audio', () => {
         verdict(true) as Parameters<typeof captureTeachingFailure>[2]
       )
     );
-    runtime.replies.push(reply(phrases), failure);
+    runtime.replies.push(promptReply(phrases), failure);
     await expect(composeSpeakingPrompts(params)).rejects.toBe(failure);
     expect(runtime.events).toEqual(['generation', 'review']);
     noAudio();

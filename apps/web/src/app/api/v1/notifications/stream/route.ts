@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { authenticateRequest } from '@/lib/api-keys';
 import { createNotificationSubscriber } from '@/lib/redis';
 import { logger } from '@/lib/logger';
+import { getSseShutdownSignal } from '@/lib/sse/shutdown';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -14,14 +15,17 @@ export const runtime = 'nodejs';
  * EventSource sends cookies automatically, so session auth works.
  */
 export async function GET(request: NextRequest) {
+  const shutdownSignal = getSseShutdownSignal();
+  const signal = AbortSignal.any([request.signal, shutdownSignal]);
+  signal.throwIfAborted();
   const authed = await authenticateRequest(request);
+  signal.throwIfAborted();
   if (!authed) {
     return new Response('Unauthorized', { status: 401 });
   }
 
   const { userId } = authed;
-  if (request.signal.aborted)
-    throw request.signal.reason ?? new DOMException('Request aborted', 'AbortError');
+  signal.throwIfAborted();
   const subscriber = createNotificationSubscriber(userId);
 
   const pendingMessages: string[] = [];
@@ -34,11 +38,10 @@ export async function GET(request: NextRequest) {
   };
   try {
     await subscriber.subscribe((data) => deliverMessage(data), {
-      signal: request.signal,
+      signal,
       onLoss: (error) => terminateForSubscriberLoss(error),
     });
-    if (request.signal.aborted)
-      throw request.signal.reason ?? new DOMException('Request aborted', 'AbortError');
+    signal.throwIfAborted();
   } catch (error) {
     try {
       await subscriber.cleanup();
@@ -96,7 +99,12 @@ export async function GET(request: NextRequest) {
           }
         );
       };
-      terminateForSubscriberLoss = terminate;
+      terminateForSubscriberLoss = (error) =>
+        terminate(
+          shutdownSignal.aborted && !request.signal.aborted && error === shutdownSignal.reason
+            ? undefined
+            : error
+        );
       if (pendingSubscriberLoss) {
         terminate(pendingSubscriberLoss);
         return;
@@ -121,10 +129,10 @@ export async function GET(request: NextRequest) {
         }
       }, 30_000);
 
-      const aborted = () => terminate(request.signal.reason);
-      request.signal.addEventListener('abort', aborted, { once: true });
-      removeAbort = () => request.signal.removeEventListener('abort', aborted);
-      if (request.signal.aborted) aborted();
+      const aborted = () => terminate(request.signal.aborted ? signal.reason : undefined);
+      signal.addEventListener('abort', aborted, { once: true });
+      removeAbort = () => signal.removeEventListener('abort', aborted);
+      if (signal.aborted) aborted();
     },
     cancel() {
       terminated = true;

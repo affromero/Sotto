@@ -16,6 +16,7 @@ import {
   mockCreateSegmentsAndQueueAudio,
   mockPersistGeneratedReferences,
   mockClassSectionCreate,
+  mockLessonQuestionCreateMany,
 } from '../../../helpers/runtime/listening-generation';
 import { generateClassListening } from '@/lib/class-listening-generator';
 import { SectionQualityError } from '@/lib/classes/section-quality';
@@ -54,7 +55,7 @@ const causalCandidateQuestions = [
     correctIndex: 0,
     explanation: 'The transcript says Ana found the station quickly.',
   },
-  ...JSON.parse(SAMPLE_QUESTIONS_JSON).slice(1),
+  ...JSON.parse(SAMPLE_QUESTIONS_JSON).questions.slice(1),
 ];
 const unsupportedCausalQuestions = [
   {
@@ -108,6 +109,12 @@ function noLearningPublication() {
   expect(mockLearnerVocabUpsert).not.toHaveBeenCalled();
   expect(mockPersistGeneratedReferences).not.toHaveBeenCalled();
   expect(mockCreateSegmentsAndQueueAudio).not.toHaveBeenCalled();
+  expect(mockClassSectionCreate).not.toHaveBeenCalled();
+  expect(mockLessonQuestionCreateMany).not.toHaveBeenCalled();
+}
+
+function listeningQuizJson(questions: unknown) {
+  return JSON.stringify({ questions });
 }
 
 function useQuizResponseSequence(contents: readonly string[]) {
@@ -126,15 +133,41 @@ function quizRequests() {
   return mockGenerateResponse.mock.calls.filter((call) => call[2].maxTokens === 4096);
 }
 
+function expectListeningQuizSchemaOnEveryRequest() {
+  const schemas = quizRequests().map((call) => call[2].jsonSchema);
+  expect(schemas).toHaveLength(2);
+  expect(schemas[0]).toMatchObject({
+    name: 'class_listening_quiz',
+    schema: {
+      type: 'object',
+      properties: {
+        questions: {
+          type: 'array',
+          minItems: 4,
+          maxItems: 4,
+          items: {
+            type: 'object',
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ['questions'],
+      additionalProperties: false,
+    },
+  });
+  expect(schemas[1]).toEqual(schemas[0]);
+}
+
 const malformedQuizResponses = [
   ['malformed JSON', '{'],
-  ['wrong count', JSON.stringify(JSON.parse(SAMPLE_QUESTIONS_JSON).slice(0, 3))],
-  ['wrong container', JSON.stringify({ questions: JSON.parse(SAMPLE_QUESTIONS_JSON) })],
+  ['wrong count', listeningQuizJson(JSON.parse(SAMPLE_QUESTIONS_JSON).questions.slice(0, 3))],
+  ['wrong container', JSON.stringify(JSON.parse(SAMPLE_QUESTIONS_JSON).questions)],
   [
     'invalid item',
-    JSON.stringify(
-      JSON.parse(SAMPLE_QUESTIONS_JSON).map((question: Record<string, unknown>, index: number) =>
-        index === 0 ? { ...question, options: ['only one option'] } : question
+    listeningQuizJson(
+      JSON.parse(SAMPLE_QUESTIONS_JSON).questions.map(
+        (question: Record<string, unknown>, index: number) =>
+          index === 0 ? { ...question, options: ['only one option'] } : question
       )
     ),
   ],
@@ -181,7 +214,7 @@ describe('bounded canonical listening correction', () => {
         };
       }
       const questions = quizIndex++ === 0 ? unsupportedCausalQuestions : causalCandidateQuestions;
-      return { content: JSON.stringify(questions), model: 'm' };
+      return { content: listeningQuizJson(questions), model: 'm' };
     });
     mockTeachingResponse.mockImplementation(async (...args) => {
       const items = JSON.parse(args[1][0].content).items;
@@ -247,7 +280,7 @@ describe('bounded canonical listening correction', () => {
           inputTokens: 5,
           outputTokens: 10,
         };
-      return { content: JSON.stringify(unsupportedCausalQuestions), model: 'm' };
+      return { content: listeningQuizJson(unsupportedCausalQuestions), model: 'm' };
     });
     mockTeachingResponse.mockImplementation(async (...args) => ({
       content: JSON.stringify(teachingVerdict(JSON.parse(args[1][0].content).items, 0)),
@@ -282,7 +315,7 @@ describe('bounded canonical listening correction', () => {
           inputTokens: 5,
           outputTokens: 10,
         };
-      return { content: JSON.stringify(unsupportedCausalQuestions), model: 'm' };
+      return { content: listeningQuizJson(unsupportedCausalQuestions), model: 'm' };
     });
     mockTeachingResponse.mockImplementation(async (...args) => ({
       content: JSON.stringify(teachingVerdict(JSON.parse(args[1][0].content).items, 0)),
@@ -455,7 +488,7 @@ describe('bounded canonical listening correction', () => {
       expect(system).toContain(transcript);
       expect(system).not.toContain('[V1:');
       expect(system).not.toContain('[SFX:');
-      return { content: JSON.stringify(questions), model: 'm' };
+      return { content: listeningQuizJson(questions), model: 'm' };
     });
 
     await generateClassListening({ ...PARAMS, targetLang: 'de', level: 'A2' });
@@ -641,6 +674,7 @@ describe('bounded canonical listening correction', () => {
       await generateClassListening(PARAMS);
 
       expect(quizRequests()).toHaveLength(2);
+      expectListeningQuizSchemaOnEveryRequest();
       expect(mockGenerateScript).toHaveBeenCalledTimes(1);
       expect(scriptRequests()).toHaveLength(1);
       expect(mockBlindResponse).toHaveBeenCalledTimes(1);
@@ -659,7 +693,9 @@ describe('bounded canonical listening correction', () => {
   );
 
   it('retains both shape failures and publishes nothing after the one replacement is malformed', async () => {
-    const secondMalformed = JSON.stringify(JSON.parse(SAMPLE_QUESTIONS_JSON).slice(0, 2));
+    const secondMalformed = listeningQuizJson(
+      JSON.parse(SAMPLE_QUESTIONS_JSON).questions.slice(0, 2)
+    );
     useQuizResponseSequence(['{', secondMalformed]);
 
     const error = await generateClassListening(PARAMS).catch((failure: unknown) => failure);
@@ -672,8 +708,48 @@ describe('bounded canonical listening correction', () => {
       ],
     });
     expect(quizRequests()).toHaveLength(2);
+    expectListeningQuizSchemaOnEveryRequest();
     expect(mockGenerateScript).toHaveBeenCalledTimes(1);
     expect(mockBlindResponse).not.toHaveBeenCalled();
+    expect(mockTeachingResponse).not.toHaveBeenCalled();
+    noLearningPublication();
+  });
+
+  it('fails closed when a corrected script is followed by a quiz replacement with a trailing quote', async () => {
+    const trailingQuote = `${SAMPLE_QUESTIONS_JSON}"`;
+    useQuizResponseSequence([SAMPLE_QUESTIONS_JSON, trailingQuote]);
+    mockBlindResponse.mockResolvedValueOnce({
+      content: JSON.stringify({
+        ...approved,
+        passageAcceptable: false,
+        issues: ['unsupported'],
+        passageFeedback: [
+          { quote: firstText, reason: 'The episode passage is not suitable for the stated task.' },
+        ],
+      }),
+      model: 'm',
+    });
+
+    const error = await generateClassListening(PARAMS).catch((failure: unknown) => failure);
+
+    expect(captureGenerationFailure(error)).toMatchObject({
+      category: 'generation_failed',
+      attemptFailures: [
+        { attempt: 1, type: 'teaching' },
+        {
+          attempt: 2,
+          type: 'structure',
+          kind: 'listening',
+          candidate: trailingQuote,
+          issues: [{ code: 'invalid_json' }],
+        },
+      ],
+    });
+    expect(quizRequests()).toHaveLength(2);
+    expectListeningQuizSchemaOnEveryRequest();
+    expect(mockGenerateScript).toHaveBeenCalledTimes(2);
+    expect(scriptRequests()).toHaveLength(2);
+    expect(mockBlindResponse).toHaveBeenCalledTimes(1);
     expect(mockTeachingResponse).not.toHaveBeenCalled();
     noLearningPublication();
   });

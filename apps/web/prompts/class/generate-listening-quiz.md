@@ -23,13 +23,17 @@ Language policy:
 
 ## Output
 
-Return ONLY a JSON array — no markdown fences, no preamble. Each element:
+Return ONLY a JSON object with a `questions` property containing the complete question array. Do not return a bare array, markdown fences, or a preamble.
 
 ```
 {
-  "question": "…",
-  "options": ["…", "…", "…", "…"],
-  "correctIndex": 0,
-  "explanation": "…"
+  "questions": [
+    {
+      "question": "…",
+      "options": ["…", "…", "…", "…"],
+      "correctIndex": 0,
+      "explanation": "…"
+    }
+  ]
 }
 ```

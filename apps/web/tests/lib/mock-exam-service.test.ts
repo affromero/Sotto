@@ -193,8 +193,12 @@ suite('persisted mock exams', () => {
         throw new Error(`Unexpected provider destination: ${request.url}`);
       const body = (await request.json()) as {
         messages: Array<{ role: string; content: string }>;
-        response_format?: { json_schema?: { name?: string } };
+        response_format?: {
+          type?: string;
+          json_schema?: { name?: string; strict?: boolean; schema?: unknown };
+        };
       };
+      const schemaName = body.response_format?.json_schema?.name;
       const prompt = body.messages
         .filter((message) => message.role === 'user')
         .map((message) => message.content)
@@ -220,33 +224,66 @@ suite('persisted mock exams', () => {
             issues: [],
           })),
         };
-      } else if (/writing tasks/.test(prompt))
-        content = [
-          {
-            task: 'Schreibe eine Einladung mit diesen Angaben.',
-            taskType: 'guided_reply',
-            sourceText: 'Kaffee mit Anna, Samstag um 15 Uhr im Café am Markt.',
-            guidance: 'Verwende alle Angaben.',
+      } else if (schemaName === 'class_writing_prompts') {
+        expect(body.response_format).toMatchObject({
+          type: 'json_schema',
+          json_schema: {
+            name: 'class_writing_prompts',
+            strict: true,
+            schema: {
+              type: 'object',
+              required: ['prompts'],
+              additionalProperties: false,
+            },
           },
-          {
-            task: 'Setze den Satz ins Perfekt.',
-            taskType: 'transformation',
-            sourceText: 'Anna trinkt einen Kaffee.',
+        });
+        content = {
+          prompts: [
+            {
+              task: 'Schreibe eine Einladung mit diesen Angaben.',
+              taskType: 'guided_reply',
+              sourceText: 'Kaffee mit Anna, Samstag um 15 Uhr im Café am Markt.',
+              guidance: 'Verwende alle Angaben.',
+              ideas: null,
+            },
+            {
+              task: 'Setze den Satz ins Perfekt.',
+              taskType: 'transformation',
+              sourceText: 'Anna trinkt einen Kaffee.',
+              guidance: null,
+              ideas: null,
+            },
+            {
+              task: 'Korrigiere den Satz.',
+              taskType: 'correction',
+              sourceText: 'Anna trinken einen Kaffee.',
+              guidance: null,
+              ideas: null,
+            },
+          ],
+        };
+      } else if (schemaName === 'class_speaking_prompts') {
+        expect(body.response_format).toMatchObject({
+          type: 'json_schema',
+          json_schema: {
+            name: 'class_speaking_prompts',
+            strict: true,
+            schema: {
+              type: 'object',
+              required: ['prompts'],
+              additionalProperties: false,
+            },
           },
-          {
-            task: 'Korrigiere den Satz.',
-            taskType: 'correction',
-            sourceText: 'Anna trinken einen Kaffee.',
-          },
-        ];
-      else if (/speaking prompts/.test(prompt))
-        content = [
-          { targetPhrase: 'Guten Morgen', translation: 'Good morning' },
-          { targetPhrase: 'Einen Kaffee, bitte.', translation: 'A coffee, please.' },
-          { targetPhrase: 'Vielen Dank.', translation: 'Thank you very much.' },
-          { targetPhrase: 'Auf Wiedersehen.', translation: 'Goodbye.' },
-        ];
-      else if (/questions|quiz/i.test(prompt))
+        });
+        content = {
+          prompts: [
+            { targetPhrase: 'Guten Morgen', translation: 'Good morning', ipa: null },
+            { targetPhrase: 'Einen Kaffee, bitte.', translation: 'A coffee, please.', ipa: null },
+            { targetPhrase: 'Vielen Dank.', translation: 'Thank you very much.', ipa: null },
+            { targetPhrase: 'Auf Wiedersehen.', translation: 'Goodbye.', ipa: null },
+          ],
+        };
+      } else if (/questions|quiz/i.test(prompt))
         content = {
           passage: 'Anna trinkt morgens Kaffee.',
           questions: [

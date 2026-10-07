@@ -14,6 +14,10 @@ acknowledges them separately. A missing attached workspace fails closed.
 
 All shared business logic and external service integrations live here.
 
+`sse/shutdown.ts` shares the Node server shutdown signal with active SSE routes.
+The getter installs process listeners synchronously before route admission; stream
+routes compose that signal with request cancellation and use their existing cleanup paths.
+
 Codex generation forwards requested JSON schemas to the CLI through private
 per-invocation files. Local completion and stream cancellation remove those
 files after child settlement. SSH runs use a remote wrapper that reports schema
