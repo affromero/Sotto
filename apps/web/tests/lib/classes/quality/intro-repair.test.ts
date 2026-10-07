@@ -144,6 +144,51 @@ beforeEach(() => {
 });
 
 describe('field-local intro repair', () => {
+  it.each([1, 6])(
+    'repairs rejected fields with every character of %i maximum-length reviewer comments',
+    async (commentCount) => {
+      const feedback = Array.from({ length: commentCount }, (_, index) =>
+        `focus[${index}]: The transport tip needs a concrete learner action.`.padEnd(300, '.')
+      );
+      const verdict = {
+        items: [
+          { index: 0, acceptable: true, issues: [], feedback: [] },
+          { index: 1, acceptable: true, issues: [], feedback: [] },
+          { index: 2, acceptable: false, issues: ['infeasible'], feedback },
+          { index: 3, acceptable: true, issues: [], feedback: [] },
+        ],
+      };
+      const patch = {
+        focus: ['Say how you travelled to the station.'],
+        tips: ['Use Ich bin mit dem Bus gefahren to name the transport.'],
+      };
+      boundary.generate
+        .mockResolvedValueOnce({
+          content: JSON.stringify(capturedLunaIntro),
+          model: 'captured-model',
+        })
+        .mockResolvedValueOnce({ content: JSON.stringify(verdict), model: 'captured-model' })
+        .mockResolvedValueOnce({ content: JSON.stringify(patch), model: 'captured-model' })
+        .mockResolvedValueOnce({ content: JSON.stringify(approved), model: 'captured-model' });
+
+      await expect(generateClassIntro(params)).resolves.toEqual({ ...capturedLunaIntro, ...patch });
+
+      const repairRequest = boundary.generate.mock.calls.find(
+        ([, , options]) => options.jsonSchema?.name === 'class_intro_repair'
+      );
+      expect(repairRequest).toBeDefined();
+      const repairPrompt = repairRequest![1][0].content;
+      const feedbackLine = repairPrompt
+        .split('\n')
+        .find((line: string) => line.startsWith('Review feedback: '));
+      expect(JSON.parse(feedbackLine!.slice('Review feedback: '.length))).toEqual([
+        { index: 0, feedback: [`focus and tips: ${feedback.join(' ')}`] },
+      ]);
+      expect(repairRequest![2].jsonSchema.schema.required).toEqual(['focus', 'tips']);
+      expect(repairPrompt).toContain('preserving all other fields exactly');
+    }
+  );
+
   it.each([
     'repair provider',
     'review provider',
