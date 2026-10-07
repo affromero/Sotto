@@ -110,6 +110,36 @@ function noLearningPublication() {
   expect(mockCreateSegmentsAndQueueAudio).not.toHaveBeenCalled();
 }
 
+function useQuizResponseSequence(contents: readonly string[]) {
+  const original = mockGenerateResponse.getMockImplementation();
+  if (!original) throw new Error('Listening provider fixture is not configured.');
+  let quizIndex = 0;
+  mockGenerateResponse.mockImplementation(async (...args) => {
+    if (args[2].maxTokens === 4096 && quizIndex < contents.length) {
+      return { content: contents[quizIndex++]!, model: 'm' };
+    }
+    return original(...args);
+  });
+}
+
+function quizRequests() {
+  return mockGenerateResponse.mock.calls.filter((call) => call[2].maxTokens === 4096);
+}
+
+const malformedQuizResponses = [
+  ['malformed JSON', '{'],
+  ['wrong count', JSON.stringify(JSON.parse(SAMPLE_QUESTIONS_JSON).slice(0, 3))],
+  ['wrong container', JSON.stringify({ questions: JSON.parse(SAMPLE_QUESTIONS_JSON) })],
+  [
+    'invalid item',
+    JSON.stringify(
+      JSON.parse(SAMPLE_QUESTIONS_JSON).map((question: Record<string, unknown>, index: number) =>
+        index === 0 ? { ...question, options: ['only one option'] } : question
+      )
+    ),
+  ],
+];
+
 describe('bounded canonical listening correction', () => {
   beforeEach(async () => {
     vi.resetAllMocks();
@@ -600,6 +630,175 @@ describe('bounded canonical listening correction', () => {
     const error = await generateClassListening(PARAMS).catch((failure: unknown) => failure);
     expect(captureGenerationFailure(error).category).toBe('review_protocol');
     expect(scriptRequests()).toHaveLength(2);
+    noLearningPublication();
+  });
+
+  it.each(malformedQuizResponses)(
+    'repairs %s quiz structure against the exact cached script before publishing',
+    async (_shape, malformed) => {
+      useQuizResponseSequence([malformed, SAMPLE_QUESTIONS_JSON]);
+
+      await generateClassListening(PARAMS);
+
+      expect(quizRequests()).toHaveLength(2);
+      expect(mockGenerateScript).toHaveBeenCalledTimes(1);
+      expect(scriptRequests()).toHaveLength(1);
+      expect(mockBlindResponse).toHaveBeenCalledTimes(1);
+      expect(mockTeachingResponse).toHaveBeenCalledTimes(1);
+      expect(mockScriptCreate.mock.calls[0][0].data.turns).toEqual([
+        { speaker: 'HOST', text: firstText },
+      ]);
+      expect(mockCreateSegmentsAndQueueAudio).toHaveBeenCalledTimes(1);
+      const correction = quizRequests()[1];
+      expect(correction[1][0].content).toContain('untrusted correction data');
+      expect(JSON.parse(correction[1][0].content.split('\n\n').at(-1)!)).toMatchObject([
+        { attempt: 1, type: 'structure', kind: 'listening', candidate: malformed },
+      ]);
+      expect(correction[0]).toBe(quizRequests()[0][0]);
+    }
+  );
+
+  it('retains both shape failures and publishes nothing after the one replacement is malformed', async () => {
+    const secondMalformed = JSON.stringify(JSON.parse(SAMPLE_QUESTIONS_JSON).slice(0, 2));
+    useQuizResponseSequence(['{', secondMalformed]);
+
+    const error = await generateClassListening(PARAMS).catch((failure: unknown) => failure);
+
+    expect(captureGenerationFailure(error)).toMatchObject({
+      category: 'generation_failed',
+      attemptFailures: [
+        { attempt: 1, type: 'structure', kind: 'listening', candidate: '{' },
+        { attempt: 2, type: 'structure', kind: 'listening', candidate: secondMalformed },
+      ],
+    });
+    expect(quizRequests()).toHaveLength(2);
+    expect(mockGenerateScript).toHaveBeenCalledTimes(1);
+    expect(mockBlindResponse).not.toHaveBeenCalled();
+    expect(mockTeachingResponse).not.toHaveBeenCalled();
+    noLearningPublication();
+  });
+
+  it('keeps the first shape failure when the corrected quiz fails the blind gate', async () => {
+    useQuizResponseSequence(['{', SAMPLE_QUESTIONS_JSON]);
+    mockBlindResponse.mockResolvedValueOnce({
+      content: JSON.stringify(causalBlindRejection),
+      model: 'm',
+    });
+
+    const error = await generateClassListening(PARAMS).catch((failure: unknown) => failure);
+
+    expect(error).toBeInstanceOf(SectionQualityError);
+    expect(captureGenerationFailure(error).attemptFailures).toMatchObject([
+      { attempt: 1, type: 'structure', kind: 'listening', candidate: '{' },
+      { attempt: 2, type: 'teaching' },
+    ]);
+    expect(mockTeachingResponse).not.toHaveBeenCalled();
+    expect(mockBlindResponse).toHaveBeenCalledTimes(1);
+    noLearningPublication();
+  });
+
+  it('keeps the first shape failure when the corrected quiz fails the teaching gate', async () => {
+    useQuizResponseSequence(['{', SAMPLE_QUESTIONS_JSON]);
+    mockTeachingResponse.mockImplementationOnce(async (...args) => ({
+      content: JSON.stringify({
+        items: JSON.parse(args[1][0].content).items.map((item: { index: number }) => ({
+          index: item.index,
+          acceptable: false,
+          issues: ['unnatural'],
+          feedback: ['The explanation is not supported.'],
+        })),
+      }),
+      model: 'm',
+    }));
+
+    const error = await generateClassListening(PARAMS).catch((failure: unknown) => failure);
+
+    expect(error).toBeInstanceOf(TeachingQualityRejectionError);
+    expect(captureGenerationFailure(error).attemptFailures).toMatchObject([
+      { attempt: 1, type: 'structure', kind: 'listening', candidate: '{' },
+      { attempt: 2, type: 'teaching' },
+    ]);
+    expect(mockBlindResponse).toHaveBeenCalledTimes(1);
+    expect(mockTeachingResponse).toHaveBeenCalledTimes(1);
+    noLearningPublication();
+  });
+
+  it('retains a semantic rejection before the malformed replacement in actual attempt order', async () => {
+    useQuizResponseSequence([SAMPLE_QUESTIONS_JSON, '{']);
+    mockTeachingResponse.mockImplementationOnce(async (...args) => ({
+      content: JSON.stringify(teachingVerdict(JSON.parse(args[1][0].content).items, 0)),
+      model: 'm',
+    }));
+
+    const error = await generateClassListening(PARAMS).catch((failure: unknown) => failure);
+
+    expect(captureGenerationFailure(error).attemptFailures).toMatchObject([
+      { attempt: 1, type: 'teaching', failure: expect.any(Object) },
+      { attempt: 2, type: 'structure', kind: 'listening', candidate: '{' },
+    ]);
+    expect(mockGenerateScript).toHaveBeenCalledTimes(1);
+    expect(scriptRequests()).toHaveLength(1);
+    expect(quizRequests()).toHaveLength(2);
+    expect(mockBlindResponse).toHaveBeenCalledTimes(1);
+    expect(mockTeachingResponse).toHaveBeenCalledTimes(1);
+    noLearningPublication();
+  });
+
+  it('propagates a review-provider error after quiz repair with the prior shape evidence intact', async () => {
+    useQuizResponseSequence(['{', SAMPLE_QUESTIONS_JSON]);
+    const failure = new Error('review provider unavailable');
+    mockBlindResponse.mockRejectedValueOnce(failure);
+
+    await expect(generateClassListening(PARAMS)).rejects.toBe(failure);
+
+    expect(captureGenerationFailure(failure).attemptFailures).toMatchObject([
+      { attempt: 1, type: 'structure', kind: 'listening', candidate: '{' },
+    ]);
+    expect(quizRequests()).toHaveLength(2);
+    expect(mockTeachingResponse).not.toHaveBeenCalled();
+    noLearningPublication();
+  });
+
+  it('propagates malformed reviewer output after quiz repair with prior shape evidence', async () => {
+    useQuizResponseSequence(['{', SAMPLE_QUESTIONS_JSON]);
+    mockBlindResponse.mockResolvedValueOnce({ content: '{', model: 'm' });
+
+    const error = await generateClassListening(PARAMS).catch((failure: unknown) => failure);
+
+    expect(error).toBeInstanceOf(SectionQualityError);
+    expect(captureGenerationFailure(error).category).toBe('section_quality');
+    expect(captureGenerationFailure(error).attemptFailures).toMatchObject([
+      { attempt: 1, type: 'structure', kind: 'listening', candidate: '{' },
+    ]);
+    expect(quizRequests()).toHaveLength(2);
+    expect(mockTeachingResponse).not.toHaveBeenCalled();
+    noLearningPublication();
+  });
+
+  it('propagates cancellation after quiz repair without losing the first structural failure', async () => {
+    const controller = new AbortController();
+    const cancellation = new DOMException('Cancelled', 'AbortError');
+    useQuizResponseSequence(['{', SAMPLE_QUESTIONS_JSON]);
+    const response = mockGenerateResponse.getMockImplementation()!;
+    let quizIndex = 0;
+    mockGenerateResponse.mockImplementation(async (...args) => {
+      if (args[2].maxTokens === 4096 && ++quizIndex === 2) controller.abort(cancellation);
+      return response(...args);
+    });
+
+    await expect(
+      generateClassListening({
+        ...PARAMS,
+        execution: { ...PARAMS.execution, signal: controller.signal },
+      })
+    ).rejects.toBe(cancellation);
+
+    expect(captureGenerationFailure(cancellation).attemptFailures).toMatchObject([
+      { attempt: 1, type: 'structure', kind: 'listening', candidate: '{' },
+    ]);
+    expect(quizRequests()).toHaveLength(2);
+    expect(mockBlindResponse).not.toHaveBeenCalled();
+    expect(mockTeachingResponse).not.toHaveBeenCalled();
     noLearningPublication();
   });
 });

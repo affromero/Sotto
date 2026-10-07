@@ -39,6 +39,7 @@ import {
 } from '@/lib/class-listening-generator';
 import type { ListeningContentParams } from '@/lib/class-listening-generator';
 import { authorizedLearnerExecution } from '../helpers/runtime/provider-execution';
+import { captureGenerationFailure } from '@/lib/classes/quality/generation-failure';
 
 describe('Listening audio admission', () => {
   it('rejects obsolete class audio inside admission while preserving the saved episode', async () => {
@@ -385,7 +386,7 @@ describe('generateClassListening', () => {
       );
     });
 
-    it('throws when quiz LLM response is malformed JSON', async () => {
+    it('retains both malformed quizzes without publishing an incomplete listening section', async () => {
       setupHappyPath();
       mockGenerateResponse.mockResolvedValue({
         content: 'not json at all',
@@ -394,7 +395,21 @@ describe('generateClassListening', () => {
         model: 'm',
       });
 
-      await expect(generateClassListening(PARAMS)).rejects.toThrow(/malformed output/);
+      const error = await generateClassListening(PARAMS).catch((failure: unknown) => failure);
+      expect(error).toBeInstanceOf(Error);
+      const attempts = captureGenerationFailure(error).attemptFailures;
+      expect(
+        attempts?.map((attempt) => ({ attempt: attempt.attempt, type: attempt.type }))
+      ).toEqual([
+        { attempt: 1, type: 'structure' },
+        { attempt: 2, type: 'structure' },
+      ]);
+      expect(
+        attempts?.every(
+          (attempt) => attempt.type === 'structure' && attempt.candidate === 'not json at all'
+        )
+      ).toBe(true);
+      expect(mockClassSectionCreate).not.toHaveBeenCalled();
       // Episode should be marked FAILED on error
       expect(mockEpisodeUpdate).toHaveBeenCalledWith(
         expect.objectContaining({ data: { status: 'FAILED' } })

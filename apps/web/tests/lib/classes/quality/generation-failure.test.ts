@@ -13,6 +13,12 @@ import {
   generationFailureSchema,
 } from '@/lib/classes/quality/generation-failure';
 import { captureTeachingFailure } from '@/lib/classes/quality/teaching-failure';
+import {
+  captureStructureAttempt,
+  captureTeachingAttempt,
+  generationAttemptFailuresSchema,
+  recordGenerationAttemptFailures,
+} from '@/lib/classes/quality/generation-structure';
 
 describe('terminal generation failure classification', () => {
   it('retains exact intro audit evidence when complete repair feedback exceeds its bound', () => {
@@ -134,6 +140,82 @@ describe('terminal generation failure classification', () => {
       category: 'generation_failed',
     });
     expect(generationCleanupUnconfirmed('Private transport text.')).toBe(false);
+  });
+
+  it('seals ordered actual shape and teaching attempts without exposing error text', () => {
+    const teaching = captureTeachingFailure('speaking', [{ targetPhrase: 'Private phrase.' }], {
+      items: [
+        {
+          index: 0,
+          acceptable: false,
+          issues: ['incorrect'],
+          feedback: ['Private teaching feedback.'],
+        },
+      ],
+    });
+    const error = new Error('Private provider response diagnostic.');
+    recordGenerationAttemptFailures(error, [
+      captureTeachingAttempt(1, teaching),
+      captureStructureAttempt('speaking', 2, 'Private malformed output.', [
+        { code: 'invalid_json' },
+      ]),
+    ]);
+
+    const captured = captureGenerationFailure(error);
+    expect(captured).toEqual({
+      category: 'generation_failed',
+      attemptFailures: [
+        { attempt: 1, type: 'teaching', failure: teaching },
+        {
+          attempt: 2,
+          type: 'structure',
+          kind: 'speaking',
+          candidate: 'Private malformed output.',
+          issues: [{ code: 'invalid_json' }],
+        },
+      ],
+    });
+    expect(generationFailureSchema.parse(captured)).toEqual(captured);
+    expect(JSON.stringify(error)).not.toContain('Private');
+    expect(JSON.stringify(captured)).not.toContain('provider response diagnostic');
+  });
+
+  it('omits oversized malformed candidates while retaining static structural issues', () => {
+    const error = new Error('Private response diagnostic.');
+    recordGenerationAttemptFailures(error, [
+      captureStructureAttempt('listening', 1, 'x'.repeat(32 * 1024 + 1), [{ code: 'wrong_count' }]),
+    ]);
+
+    expect(captureGenerationFailure(error).attemptFailures).toEqual([
+      {
+        attempt: 1,
+        type: 'structure',
+        kind: 'listening',
+        candidate: null,
+        omitted: 'size_limit',
+        issues: [{ code: 'wrong_count' }],
+      },
+    ]);
+    expect(JSON.stringify(error)).not.toContain('response diagnostic');
+  });
+
+  it('rejects out-of-order, excessive, or unbounded structural attempt evidence', () => {
+    const first = captureStructureAttempt('speaking', 1, '{', [{ code: 'invalid_json' }]);
+    const second = captureStructureAttempt('speaking', 2, '[]', [{ code: 'wrong_count' }]);
+
+    expect(() => generationAttemptFailuresSchema.parse([second, first])).toThrow();
+    expect(() => generationAttemptFailuresSchema.parse([first, second, second])).toThrow();
+    expect(() =>
+      generationAttemptFailuresSchema.parse([
+        {
+          attempt: 1,
+          type: 'structure',
+          kind: 'speaking',
+          candidate: '{',
+          issues: [{ code: 'invalid_json', index: 5 }],
+        },
+      ])
+    ).toThrow();
   });
   it.each([
     [new TeachingQualityRejectionError(['incorrect']), 'teaching_rejected'],

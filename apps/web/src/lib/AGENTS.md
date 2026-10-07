@@ -88,8 +88,10 @@ stage summaries. `classes/quality/teaching-failure-store.ts` stores those summar
 in sealed snapshots owned by the existing preparation job and cleanup policy.
 Learner responses receive static failure reasons after ownership and erasure checks.
 
-Listening permits one semantic replacement after a complete, schema-valid blind
-or teaching rejection. A blind rejection replaces the complete script and quiz
+Listening permits one replacement for a malformed quiz or a complete, schema-valid
+blind or teaching rejection. A malformed quiz preserves the exact script and
+regenerates only its four questions using bounded original output and static
+server validation codes. A blind rejection replaces the complete script and quiz
 through `generateScript` with bounded untrusted correction context. A teaching-only
 rejection preserves the exact generated script and regenerates only its quiz with
 the indexed teaching feedback and rejected questions as separate untrusted context.
@@ -142,14 +144,22 @@ evidence preserves batch-local candidates/verdicts; offsets apply to correction
 feedback only. Metadata failure evidence labels the complete actual private decision
 and its derived metadata-only outer verdict inside the unchanged sealed envelope.
 
-Speaking permits one complete four-phrase replacement after the canonical teaching
-review rejects a valid set. The replacement uses the same captured provider,
+Speaking permits one complete four-phrase replacement after structural validation
+or the canonical teaching review rejects the first set. Writing shares its existing
+single replacement between structural validation and teaching rejection of three
+complete tasks. A structural replacement receives bounded original output and
+static validation codes as untrusted data. The replacement uses the same captured provider,
 model, objective, vocabulary, language policy, and execution authority. Candidate
 and indexed feedback are untrusted correction data. Both generation and review
-must succeed before reference TTS. Malformed output or verdicts, provider errors,
-and cancellation propagate without repair. At most four application model requests
-are made; TTS remains separate. A second rejection retains both actual private
-candidates and verdicts, with explicit omission for oversized evidence.
+must succeed before reference TTS or writing persistence. Provider errors,
+cancellation, and malformed reviewer verdicts propagate without repair. Structural
+and teaching failures share one replacement slot; a second rejection is terminal.
+At most four application model requests are made per skill; TTS remains separate.
+`classes/quality/generation-structure.ts` preserves an ordered ledger of at most two
+actual rejected attempts through the existing sealed generation-failure snapshots.
+Original output is limited to 32 KiB per attempt with explicit size omission.
+Static structural diagnostics remain distinct from real teaching verdicts. The
+ledger is private error metadata and never enters ordinary error serialization.
 
 `classes/section-quality.ts` validates independent review verdicts for grammar,
 reading, and contextual vocabulary. `class-generation.ts` rejects malformed

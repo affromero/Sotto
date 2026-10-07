@@ -134,6 +134,7 @@ vi.mock('@/lib/logger', () => ({
 // ---- Import under test (must come AFTER vi.mock calls) ----
 
 import { generateClassSpeaking, composeSpeakingPrompts } from '@/lib/class-speaking-generator';
+import { captureGenerationFailure } from '@/lib/classes/quality/generation-failure';
 import type { ClassSpeakingParams } from '@/lib/class-speaking-generator';
 
 // ---- Fixtures ----
@@ -519,18 +520,26 @@ describe('composeSpeakingPrompts', () => {
     const phrases = JSON.parse(SAMPLE_PHRASES_JSON);
     phrases[0].ipa = false;
     mockGenerateResponse.mockResolvedValue({ content: JSON.stringify(phrases), model: 'm' });
-    await expect(
-      composeSpeakingPrompts({
-        execution: authorizedLearnerExecution('u1'),
-        userId: 'u1',
-        level: 'A1',
-        nativeLang: 'en',
-        targetLang: 'es',
-        objective: 'Practice everyday greetings',
-        targetVocab: [{ lemma: 'hola', gloss: 'hello' }],
-        refId: 'practice-1',
-      })
-    ).rejects.toThrow('usable phrases');
+    const error = await composeSpeakingPrompts({
+      execution: authorizedLearnerExecution('u1'),
+      userId: 'u1',
+      level: 'A1',
+      nativeLang: 'en',
+      targetLang: 'es',
+      objective: 'Practice everyday greetings',
+      targetVocab: [{ lemma: 'hola', gloss: 'hello' }],
+      refId: 'practice-1',
+    }).catch((failure: unknown) => failure);
+    expect(error).toBeInstanceOf(Error);
+    expect(
+      captureGenerationFailure(error).attemptFailures?.map((attempt) => ({
+        type: attempt.type,
+        attempt: attempt.attempt,
+      }))
+    ).toEqual([
+      { type: 'structure', attempt: 1 },
+      { type: 'structure', attempt: 2 },
+    ]);
     expect(mockResolveTtsProvider).not.toHaveBeenCalled();
     expect(mockClassSectionCreate).not.toHaveBeenCalled();
   });
