@@ -3,6 +3,7 @@ import { Prisma } from '@/generated/prisma/client';
 import { SectionQualityError } from '../section-quality';
 import { ReviewerProtocolError, TeachingQualityRejectionError } from './teaching-quality';
 import { teachingFailureSchema } from './teaching-failure';
+import { generationAttemptFailures, generationAttemptFailuresSchema } from './generation-structure';
 
 const generationFailureCategorySchema = z.enum([
   'teaching_rejected',
@@ -18,6 +19,7 @@ const failureDetailSchema = z
   .object({
     category: generationFailureCategorySchema,
     teachingFailure: teachingFailureSchema.optional(),
+    attemptFailures: generationAttemptFailuresSchema.optional(),
   })
   .strict();
 const stageFailureSchema = failureDetailSchema.extend({
@@ -38,6 +40,7 @@ const parallelFailures = new WeakMap<
 >();
 
 function captureFailureDetail(error: unknown): z.infer<typeof failureDetailSchema> {
+  const attemptFailures = generationAttemptFailures(error);
   return failureDetailSchema.parse({
     category: classifyGenerationFailure(error),
     ...(error instanceof TeachingQualityRejectionError && error.teachingFailure
@@ -47,6 +50,7 @@ function captureFailureDetail(error: unknown): z.infer<typeof failureDetailSchem
         : error instanceof SectionQualityError && error.blindReviewFailure
           ? { teachingFailure: error.blindReviewFailure }
           : {}),
+    ...(attemptFailures ? { attemptFailures } : {}),
   });
 }
 

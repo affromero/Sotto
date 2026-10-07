@@ -9,6 +9,10 @@ import {
   generationCleanupUnconfirmed,
 } from '@/lib/classes/quality/generation-failure';
 import { recordFullPracticeFailures } from '@/lib/learning/practice-generation-failures';
+import {
+  captureStructureAttempt,
+  recordGenerationAttemptFailures,
+} from '@/lib/classes/quality/generation-structure';
 
 describe('settled full practice failure visibility', () => {
   it('retains every rejected branch while keeping the first error identity unchanged', async () => {
@@ -31,6 +35,44 @@ describe('settled full practice failure visibility', () => {
       ],
     });
     expect(JSON.stringify(outcome)).not.toContain('private-provider-detail');
+  });
+
+  it('forwards bounded attempt evidence into each strict full-practice stage', async () => {
+    const grammar = new Error('private grammar provider detail');
+    const listening = new Error('private listening provider detail');
+    recordGenerationAttemptFailures(listening, [
+      captureStructureAttempt('listening', 1, '{"incomplete":true}', [
+        { code: 'invalid_item', index: 0 },
+      ]),
+    ]);
+    const results = await Promise.allSettled([
+      Promise.reject(grammar),
+      Promise.resolve('reading'),
+      Promise.reject(listening),
+      Promise.resolve('writing'),
+    ]);
+
+    const outcome = recordFullPracticeFailures(results);
+
+    expect(outcome?.stages).toEqual([
+      { stage: 'grammar', category: 'generation_failed' },
+      {
+        stage: 'listening',
+        category: 'generation_failed',
+        attemptFailures: [
+          {
+            attempt: 1,
+            type: 'structure',
+            kind: 'listening',
+            candidate: '{"incomplete":true}',
+            issues: [{ code: 'invalid_item', index: 0 }],
+          },
+        ],
+      },
+    ]);
+    expect(JSON.stringify(outcome)).not.toMatch(
+      /private grammar provider detail|private listening provider detail/
+    );
   });
 
   it.each(['typed', 'primitive'] as const)(

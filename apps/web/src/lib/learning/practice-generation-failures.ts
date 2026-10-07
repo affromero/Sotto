@@ -23,8 +23,13 @@ export function recordFullPracticeFailures(
   return generationFailureSchema.parse({
     ...captureGenerationFailure(failures[0]!.error),
     stages: failures.map((failure) => {
-      const { category, teachingFailure } = captureGenerationFailure(failure.error);
-      return { stage: failure.stage, category, ...(teachingFailure ? { teachingFailure } : {}) };
+      const detail = captureGenerationFailure(failure.error);
+      return {
+        stage: failure.stage,
+        category: detail.category,
+        ...(detail.teachingFailure ? { teachingFailure: detail.teachingFailure } : {}),
+        ...(detail.attemptFailures ? { attemptFailures: detail.attemptFailures } : {}),
+      };
     }),
   });
 }

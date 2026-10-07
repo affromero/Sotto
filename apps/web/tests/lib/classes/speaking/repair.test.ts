@@ -11,6 +11,7 @@ const runtime = vi.hoisted(() => ({
   spoken: [] as string[],
   events: [] as string[],
   afterReview: undefined as (() => void) | undefined,
+  afterGeneration: undefined as (() => void) | undefined,
 }));
 
 vi.mock('@/lib/learning-ai', () => ({
@@ -45,6 +46,7 @@ vi.mock('@/lib/providers/ai', () => ({
         if (!reply) throw new Error('Unexpected additional provider request');
         if (!('content' in reply)) throw reply;
         if (review) runtime.afterReview?.();
+        else runtime.afterGeneration?.();
         return reply;
       },
     };
@@ -87,6 +89,7 @@ import {
   TeachingQualityRejectionError,
 } from '@/lib/classes/quality/teaching-quality';
 import { captureTeachingFailure } from '@/lib/classes/quality/teaching-failure';
+import { captureGenerationFailure } from '@/lib/classes/quality/generation-failure';
 
 const phrases = [
   { targetPhrase: 'Ich habe den Bus verpasst.', translation: 'I took the bus.' },
@@ -139,6 +142,7 @@ describe('canonical speaking correction before reference audio', () => {
     runtime.spoken = [];
     runtime.events = [];
     runtime.afterReview = undefined;
+    runtime.afterGeneration = undefined;
   });
 
   it('renders the reviewed complete set without a correction request', async () => {
@@ -223,10 +227,127 @@ describe('canonical speaking correction before reference audio', () => {
     JSON.stringify(
       phrases.map((phrase, index) => (index === 0 ? { ...phrase, translation: ' ' } : phrase))
     ),
-  ])('rejects malformed or incomplete generation before review or audio', async (content) => {
-    runtime.replies.push({ content, model: 'configured-model' });
-    await expect(composeSpeakingPrompts(params)).rejects.toThrow('usable phrases');
-    expect(runtime.events).toEqual(['generation']);
+  ])(
+    'repairs malformed generation and reviews every replacement before reference audio',
+    async (content) => {
+      runtime.replies.push(
+        { content, model: 'configured-model' },
+        reply(corrected),
+        reply(verdict())
+      );
+      const result = await composeSpeakingPrompts(params);
+      expect(result.map((item) => item.targetPhrase)).toEqual(
+        corrected.map((item) => item.targetPhrase)
+      );
+      expect(runtime.events).toEqual([
+        'generation',
+        'generation',
+        'review',
+        'tts',
+        'tts',
+        'tts',
+        'tts',
+      ]);
+      expect(runtime.requests[1].messages[0].content).toContain('untrusted correction data');
+      const evidence = JSON.parse(runtime.requests[1].messages[0].content.split('\n\n').at(-1)!);
+      expect(evidence[0].candidate).toBe(content);
+      expect(runtime.spoken).toEqual(corrected.map((item) => item.targetPhrase));
+    }
+  );
+
+  it('retains both malformed outputs after the single replacement is exhausted', async () => {
+    const content = JSON.stringify(phrases.slice(0, 3));
+    runtime.replies.push(
+      { content, model: 'configured-model' },
+      { content: '{', model: 'configured-model' }
+    );
+    const error = await composeSpeakingPrompts(params).catch((failure: unknown) => failure);
+    expect(error).toBeInstanceOf(Error);
+    expect(captureGenerationFailure(error).attemptFailures).toEqual([
+      {
+        attempt: 1,
+        type: 'structure',
+        kind: 'speaking',
+        candidate: content,
+        issues: [{ code: 'wrong_count' }],
+      },
+      {
+        attempt: 2,
+        type: 'structure',
+        kind: 'speaking',
+        candidate: '{',
+        issues: [{ code: 'invalid_json' }],
+      },
+    ]);
+    expect(runtime.events).toEqual(['generation', 'generation']);
+    expect(JSON.stringify(error)).not.toContain(phrases[0].targetPhrase);
+    noAudio();
+  });
+
+  it('does not add a semantic replacement after repairing structure', async () => {
+    runtime.replies.push(
+      { content: '{', model: 'configured-model' },
+      reply(phrases),
+      reply(verdict(true))
+    );
+    const error = await composeSpeakingPrompts(params).catch((failure: unknown) => failure);
+    expect(error).toBeInstanceOf(TeachingQualityRejectionError);
+    const failure = captureGenerationFailure(error);
+    expect(failure.category).toBe('teaching_rejected');
+    expect(failure.attemptFailures?.map(({ attempt, type }) => ({ attempt, type }))).toEqual([
+      { attempt: 1, type: 'structure' },
+      { attempt: 2, type: 'teaching' },
+    ]);
+    expect(failure.teachingFailure?.reviews[0].verdict).toEqual(verdict(true));
+    expect(runtime.events).toEqual(['generation', 'generation', 'review']);
+    noAudio();
+  });
+
+  it('retains the actual review when a semantic replacement is malformed', async () => {
+    runtime.replies.push(reply(phrases), reply(verdict(true)), {
+      content: '{',
+      model: 'configured-model',
+    });
+    const error = await composeSpeakingPrompts(params).catch((failure: unknown) => failure);
+    const failure = captureGenerationFailure(error);
+    expect(failure.category).toBe('generation_failed');
+    expect(failure.attemptFailures?.map(({ attempt, type }) => ({ attempt, type }))).toEqual([
+      { attempt: 1, type: 'teaching' },
+      { attempt: 2, type: 'structure' },
+    ]);
+    const initial = failure.attemptFailures?.[0];
+    expect(initial?.type === 'teaching' && initial.failure.reviews[0].verdict).toEqual(
+      verdict(true)
+    );
+    expect(runtime.events).toEqual(['generation', 'review', 'generation']);
+    noAudio();
+  });
+
+  it('preserves a provider failure after structural rejection without another request', async () => {
+    const providerError = new Error('Provider unavailable');
+    runtime.replies.push({ content: '{', model: 'configured-model' }, providerError);
+    const error = await composeSpeakingPrompts(params).catch((failure: unknown) => failure);
+    expect(error).toBe(providerError);
+    expect(captureGenerationFailure(error).attemptFailures).toHaveLength(1);
+    expect(runtime.events).toEqual(['generation', 'generation']);
+    noAudio();
+  });
+
+  it('retains the initial rejection when the replacement is cancelled before validation', async () => {
+    const controller = new AbortController();
+    const cancelled = new DOMException('Cancelled', 'AbortError');
+    let generations = 0;
+    runtime.afterGeneration = () => {
+      if (++generations === 2) controller.abort(cancelled);
+    };
+    runtime.replies.push({ content: '{', model: 'configured-model' }, reply(corrected));
+    const error = await composeSpeakingPrompts({
+      ...params,
+      execution: { ...params.execution, signal: controller.signal },
+    }).catch((failure: unknown) => failure);
+    expect(error).toBe(cancelled);
+    expect(captureGenerationFailure(error).attemptFailures).toHaveLength(1);
+    expect(runtime.events).toEqual(['generation', 'generation']);
     noAudio();
   });
 
@@ -259,12 +380,20 @@ describe('canonical speaking correction before reference audio', () => {
     const reason = new Error('Learner cancelled');
     runtime.afterReview = () => controller.abort(reason);
     runtime.replies.push(reply(phrases), reply(verdict(true)));
-    await expect(
-      composeSpeakingPrompts({
-        ...params,
-        execution: { ...params.execution, signal: controller.signal },
-      })
-    ).rejects.toBe(reason);
+    const error = await composeSpeakingPrompts({
+      ...params,
+      execution: { ...params.execution, signal: controller.signal },
+    }).catch((failure: unknown) => failure);
+    expect(error).toBe(reason);
+    expect(captureGenerationFailure(error).attemptFailures).toEqual([
+      expect.objectContaining({
+        attempt: 1,
+        type: 'teaching',
+        failure: expect.objectContaining({
+          reviews: [expect.objectContaining({ verdict: verdict(true) })],
+        }),
+      }),
+    ]);
     expect(runtime.events).toEqual(['generation', 'review']);
     noAudio();
   });
