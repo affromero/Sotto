@@ -14,6 +14,8 @@ import {
   ReviewerProtocolError,
   TeachingQualityRejectionError,
   reviewTeachingContent,
+  requestTeachingReview,
+  TEACHING_QUALITY_JSON_SCHEMA,
 } from '@/lib/classes/quality/teaching-quality';
 import { captureGenerationFailure } from '@/lib/classes/quality/generation-failure';
 
@@ -66,7 +68,7 @@ function verdict(items: Array<{ index: number; acceptable?: boolean; feedback?: 
 function reviewedBatch(callIndex: number) {
   return JSON.parse(boundary.generate.mock.calls[callIndex]![1][0].content).items as Array<{
     index: number;
-    content: { address: { field: string; index?: number }; introContext: unknown; fields: unknown };
+    content: { address: { field: string; index?: number }; fields: unknown };
   }>;
 }
 
@@ -100,6 +102,22 @@ describe('intro audit addresses', () => {
         const count = JSON.parse(messages[0]!.content).items.length;
         return { content: JSON.stringify(acceptedBatch(count)), model: 'captured-luna' };
       });
+  });
+
+  it('rejects intro context attached to another teaching audit before provider dispatch', async () => {
+    await expect(
+      requestTeachingReview({
+        ai: options.ai,
+        provider: options.provider,
+        userId: options.userId,
+        prompt: 'class/review-teaching-content.md',
+        variables: {},
+        items: [{ explanation: 'Reviewed explanation.' }],
+        introContext: candidate,
+        jsonSchema: TEACHING_QUALITY_JSON_SCHEMA,
+      })
+    ).rejects.toBeInstanceOf(ReviewerProtocolError);
+    expect(boundary.generate).not.toHaveBeenCalled();
   });
 
   it('reviews all atomic addresses in sequential batches of at most five', async () => {
@@ -146,7 +164,15 @@ describe('intro audit addresses', () => {
       [2, { field: 'examples', index: 4 }],
       [3, { field: 'visuals' }],
     ]);
-    expect(reviewedBatch(0)[0]!.content.introContext).toEqual(fullCandidate);
+    for (const call of boundary.generate.mock.calls) {
+      const request = JSON.parse(call[1][0].content);
+      expect(request.introContext).toEqual(fullCandidate);
+      expect(
+        request.items.every(
+          ({ content }: { content: object }) => !Object.hasOwn(content, 'introContext')
+        )
+      ).toBe(true);
+    }
   });
 
   it('captures the final global address in bounded intro failure evidence', async () => {
@@ -419,11 +445,11 @@ describe('intro audit addresses', () => {
       { field: 'examples', index: 0 },
       { field: 'visuals' },
     ]);
-    expect(
-      supplied.every(
-        ({ content }) => JSON.stringify(content.introContext) === JSON.stringify(changed)
-      )
-    ).toBe(true);
+    for (const callIndex of [2, 3]) {
+      expect(
+        JSON.parse(boundary.generate.mock.calls[callIndex]![1][0].content).introContext
+      ).toEqual(changed);
+    }
   });
 
   it.each([

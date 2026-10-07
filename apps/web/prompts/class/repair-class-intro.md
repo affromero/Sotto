@@ -27,6 +27,8 @@ The purpose must be one short sentence naming a concrete action the learner can 
 
 When validating a structural repair or a field changed in semantic replacement, check idiomatic verb-object combinations and correct auxiliary/participle pairs. Use vocabulary only where it fits naturally; do not force every supplied word into an example. Distinguish going on foot from travelling by vehicle. State each grammar rule's scope explicitly, including whether it applies to main clauses. Do not present a common pattern as a universal rule.
 
+Ground repaired grammar rules in the exact verbs and forms shown in the examples. Do not infer a categorical rule from a broad label such as movement or activity.
+
 {{EXAMPLE_MEANING_POLICY}}
 
 Use natural, everyday wording at the learner's level in every field, including purpose, about, focus and tips. Describe what the learner will do in ordinary language; avoid unnatural literal translations or abstract descriptions of activities. In semantic replacement, style preference alone does not justify changing sound wording.

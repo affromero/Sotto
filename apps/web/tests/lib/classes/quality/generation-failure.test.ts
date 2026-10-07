@@ -46,9 +46,8 @@ describe('terminal generation failure classification', () => {
       'intro',
       [
         {
-          auditFields: ['purpose'],
           introContext: { purpose: 'Private original intro.' },
-          fields: { purpose: 'Private original intro.' },
+          addresses: [{ field: 'purpose' }],
         },
       ],
       {

@@ -59,8 +59,12 @@ export type IntroAuditAddress =
 
 type IntroAuditItem = {
   address: IntroAuditAddress;
-  introContext: Record<string, unknown>;
   fields: Record<string, unknown>;
+};
+
+type IntroAudit = {
+  introContext: Record<string, unknown>;
+  items: readonly IntroAuditItem[];
 };
 
 type PriorIntroReview = {
@@ -90,6 +94,7 @@ type PriorIntroReview = {
   failureEvidence: string;
   issuesEvidence: string;
   feedbackEvidence: string;
+  introContext: Record<string, unknown>;
   items: readonly IntroAuditItem[];
   verdict: z.infer<typeof introTeachingQualityVerdictSchema>;
   consumed: boolean;
@@ -140,15 +145,19 @@ export async function requestTeachingReview(options: {
   prompt: string;
   variables: Record<string, string>;
   items: readonly unknown[];
+  introContext?: Record<string, unknown>;
   jsonSchema: NonNullable<AIOptions['jsonSchema']>;
 }): Promise<string> {
   if (options.items.length < 1 || options.items.length > 5) throw new SectionQualityError();
+  if (options.introContext && options.prompt !== 'class/review-class-intro.md')
+    throw new ReviewerProtocolError();
   const response = await options.provider.generateResponse(
     loadAndRender(options.prompt, options.variables),
     [
       {
         role: 'user',
         content: JSON.stringify({
+          ...(options.introContext ? { introContext: options.introContext } : {}),
           items: options.items.map((content, index) => ({ index, content })),
         }),
       },
@@ -225,7 +234,8 @@ export async function reviewTeachingContent(options: {
 }): Promise<void> {
   if (options.previousIntroRejection && options.kind !== 'intro')
     throw new ReviewerProtocolError(authenticIntroTeachingFailure(options.previousIntroRejection));
-  const introItems = options.kind === 'intro' ? buildIntroAuditItems(options.items) : undefined;
+  const introAudit = options.kind === 'intro' ? buildIntroAuditItems(options.items) : undefined;
+  const introItems = introAudit?.items;
   const allReviewedItems = introItems ?? options.items;
   if (introItems && options.previousIntroRejection)
     takePriorIntroReview(options, introItems, options.previousIntroRejection);
@@ -258,13 +268,14 @@ export async function reviewTeachingContent(options: {
     GRAMMAR_POINTS: options.lessonContext?.grammarPoints.join(', ') ?? '',
   };
   let parsed: z.infer<typeof verdictSchema> | z.infer<typeof introTeachingQualityVerdictSchema>;
-  if (introItems) {
+  if (introAudit) {
     const aggregate: z.infer<typeof introTeachingQualityVerdictSchema>['items'] = [];
     for (let offset = 0; offset < reviewedItems.length; offset += 5) {
       const batch = reviewedItems.slice(offset, offset + 5);
       const content = await requestTeachingReview({
         ...options,
         items: batch,
+        introContext: introAudit.introContext,
         prompt: 'class/review-class-intro.md',
         jsonSchema: TEACHING_QUALITY_JSON_SCHEMA,
         variables: reviewVariables,
@@ -289,7 +300,11 @@ export async function reviewTeachingContent(options: {
   if (parsed.items.some((item) => !item.acceptable || item.issues.length > 0)) {
     const issues = [...new Set(parsed.items.flatMap((item) => item.issues))];
     logger.warn('Teaching quality review rejected content', { kind: options.kind, issues });
-    const failure = captureTeachingFailure(options.kind, reviewedItems, parsed);
+    const failure = captureTeachingFailure(
+      options.kind,
+      introAudit ? introAuditEvidence(introAudit) : reviewedItems,
+      parsed
+    );
     const rejection = new TeachingQualityRejectionError(
       issues,
       options.kind === 'intro'
@@ -303,7 +318,7 @@ export async function reviewTeachingContent(options: {
             .map(({ index, feedback }) => ({ index, feedback })),
       failure
     );
-    if (options.kind === 'intro' && !options.previousIntroRejection) {
+    if (introAudit && !options.previousIntroRejection) {
       const storedItems = JSON.parse(JSON.stringify(allReviewedItems)) as readonly IntroAuditItem[];
       priorIntroReviews.set(rejection, {
         ai: options.ai,
@@ -340,6 +355,7 @@ export async function reviewTeachingContent(options: {
         failureEvidence: JSON.stringify(failure),
         issuesEvidence: JSON.stringify(rejection.issues),
         feedbackEvidence: JSON.stringify(rejection.feedback),
+        introContext: JSON.parse(JSON.stringify(introAudit.introContext)),
         items: storedItems,
         verdict: introTeachingQualityVerdictSchema.parse(parsed),
         consumed: false,
@@ -349,7 +365,7 @@ export async function reviewTeachingContent(options: {
   }
 }
 
-function buildIntroAuditItems(items: readonly unknown[]): readonly IntroAuditItem[] {
+function buildIntroAuditItems(items: readonly unknown[]): IntroAudit {
   if (items.length !== 1 || !items[0] || typeof items[0] !== 'object' || Array.isArray(items[0]))
     throw new ReviewerProtocolError();
 
@@ -380,7 +396,13 @@ function buildIntroAuditItems(items: readonly unknown[]): readonly IntroAuditIte
   if (intro.visuals !== undefined)
     scopes.push({ address: { field: 'visuals' }, fields: { visuals: intro.visuals } });
 
-  return scopes.map(({ address, fields }) => ({ address, introContext: intro, fields }));
+  return { introContext: intro, items: scopes };
+}
+
+function introAuditEvidence(audit: IntroAudit) {
+  return [
+    { introContext: audit.introContext, addresses: audit.items.map(({ address }) => address) },
+  ];
 }
 
 function aggregateIntroFeedback(
@@ -494,7 +516,7 @@ function priorReceiptIsIntact(
   rejection: TeachingQualityRejectionError
 ): boolean {
   const evidence = prior.failure.reviews[0];
-  const sourceIntro = prior.items[0]?.introContext;
+  const sourceIntro = prior.introContext;
   return (
     prior.failure === rejection.teachingFailure &&
     prior.failureEvidence === JSON.stringify(rejection.teachingFailure) &&
@@ -502,7 +524,9 @@ function priorReceiptIsIntact(
     prior.feedbackEvidence === JSON.stringify(rejection.feedback) &&
     prior.failure.kind === 'intro' &&
     prior.failure.reviews.length === 1 &&
-    (evidence?.candidate === JSON.stringify(prior.items) || evidence?.omitted === 'size_limit') &&
+    (evidence?.candidate ===
+      JSON.stringify(introAuditEvidence({ introContext: sourceIntro, items: prior.items })) ||
+      evidence?.omitted === 'size_limit') &&
     JSON.stringify(evidence?.verdict) === JSON.stringify(prior.verdict) &&
     Boolean(sourceIntro) &&
     JSON.stringify([sourceIntro]) === prior.candidate

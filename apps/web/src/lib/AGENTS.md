@@ -220,9 +220,10 @@ Accepted fields and array entries remain exact, accepted visuals are retained, a
 rejected optional visuals are removed. The initial full audit binds its private
 receipt to the captured execution and trusted lesson context. The replacement audit
 reviews every current address again and never reuses prior approvals. Every address
-receives the complete intro as untrusted contextual content alongside the trusted
-lesson context; only its assigned field or entry can be rejected. Private failure
-evidence records actual requests and retains initial reviews through terminal provider,
+uses the complete intro, supplied once per batch as untrusted contextual content
+alongside the trusted lesson context; only its assigned field or entry can be rejected.
+Private intro evidence retains the complete root once with its ordered audit addresses
+under the unchanged size limit and retains initial reviews through terminal provider,
 protocol and cancellation failures without replacing those errors or replaying work.
 
 `script-generator.ts` aligns vocabulary marker numbers before producing markdown.
