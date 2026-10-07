@@ -6,10 +6,11 @@ import { loadAndRender } from '../../prompt-loader';
 import { logUsage } from '../../usage-logger';
 import { SectionQualityError } from '../section-quality';
 import { logger } from '../../logger';
-import { classLanguagePolicy } from '../class-language-policy';
+import { classIntroExampleMeaningPolicy, classLanguagePolicy } from '../class-language-policy';
 import { learningCredentialFingerprint } from '../preparation-selection';
 import {
   captureTeachingFailure,
+  introTeachingQualityVerdictSchema,
   teachingFailureSchema,
   teachingQualityVerdictSchema as verdictSchema,
   type TeachingFailure,
@@ -52,8 +53,12 @@ export class ReviewerProtocolError extends SectionQualityError {
   }
 }
 
+export type IntroAuditAddress =
+  | { field: 'purpose' | 'about' | 'visuals' }
+  | { field: 'focus' | 'tips' | 'examples'; index: number };
+
 type IntroAuditItem = {
-  auditFields: string[];
+  address: IntroAuditAddress;
   introContext: Record<string, unknown>;
   fields: Record<string, unknown>;
 };
@@ -86,7 +91,7 @@ type PriorIntroReview = {
   issuesEvidence: string;
   feedbackEvidence: string;
   items: readonly IntroAuditItem[];
-  verdict: z.infer<typeof verdictSchema>;
+  verdict: z.infer<typeof introTeachingQualityVerdictSchema>;
   consumed: boolean;
 };
 
@@ -101,6 +106,7 @@ export function authenticIntroTeachingFailure(
 }
 
 export function getIntroRepairPlan(rejection: TeachingQualityRejectionError): {
+  rejectedAddresses: readonly IntroAuditAddress[];
   rejectedFields: readonly string[];
   preserveVisuals: boolean;
 } {
@@ -109,19 +115,21 @@ export function getIntroRepairPlan(rejection: TeachingQualityRejectionError): {
     throw new ReviewerProtocolError(authenticIntroTeachingFailure(rejection));
 
   const rejectedFields = new Set<string>();
+  const rejectedAddresses: IntroAuditAddress[] = [];
   let preserveVisuals = false;
   for (const item of prior.verdict.items) {
     const auditItem = prior.items[item.index];
     if (!auditItem) throw new ReviewerProtocolError(authenticIntroTeachingFailure(rejection));
     if (!item.acceptable || item.issues.length > 0) {
-      for (const field of auditItem.auditFields) rejectedFields.add(field);
-    } else if (auditItem.auditFields.includes('visuals')) {
+      rejectedAddresses.push({ ...auditItem.address });
+      rejectedFields.add(auditItem.address.field);
+    } else if (auditItem.address.field === 'visuals') {
       preserveVisuals = true;
     }
   }
   if (rejectedFields.size === 0)
     throw new ReviewerProtocolError(authenticIntroTeachingFailure(rejection));
-  return { rejectedFields: [...rejectedFields], preserveVisuals };
+  return { rejectedAddresses, rejectedFields: [...rejectedFields], preserveVisuals };
 }
 
 /** Shared provider boundary for canonical teaching audits. */
@@ -163,6 +171,45 @@ export async function requestTeachingReview(options: {
   return response.content;
 }
 
+function parseTeachingVerdict(
+  content: string,
+  expectedItems: number,
+  kind: TeachingFailure['kind']
+): z.infer<typeof verdictSchema> {
+  let parsed: z.infer<typeof verdictSchema>;
+  try {
+    parsed = verdictSchema.parse(JSON.parse(content));
+  } catch {
+    logger.warn('Teaching review protocol rejected content', {
+      kind,
+      reason: 'invalid_verdict',
+    });
+    throw new ReviewerProtocolError();
+  }
+  if (
+    parsed.items.length !== expectedItems ||
+    new Set(parsed.items.map((item) => item.index)).size !== expectedItems ||
+    parsed.items.some((item) => item.index >= expectedItems)
+  ) {
+    logger.warn('Teaching review protocol rejected content', { kind, reason: 'indices' });
+    throw new ReviewerProtocolError();
+  }
+  if (
+    parsed.items.some((item) =>
+      item.acceptable
+        ? item.issues.length > 0 || item.feedback.length > 0
+        : item.issues.length === 0 || item.feedback.length === 0
+    )
+  ) {
+    logger.warn('Teaching review protocol rejected content', {
+      kind,
+      reason: 'inconsistent_verdict',
+    });
+    throw new ReviewerProtocolError();
+  }
+  return parsed;
+}
+
 /** Review exact learner-visible teaching content after independent question solving. */
 export async function reviewTeachingContent(options: {
   ai: CapturedLearningAi;
@@ -180,17 +227,9 @@ export async function reviewTeachingContent(options: {
     throw new ReviewerProtocolError(authenticIntroTeachingFailure(options.previousIntroRejection));
   const introItems = options.kind === 'intro' ? buildIntroAuditItems(options.items) : undefined;
   const allReviewedItems = introItems ?? options.items;
-  const priorReview =
-    introItems && options.previousIntroRejection
-      ? takePriorIntroReview(options, introItems, options.previousIntroRejection)
-      : undefined;
-  const reviewedItems = priorReview
-    ? allReviewedItems.filter((_, index) => !priorReview.reusableIndexes.has(index))
-    : allReviewedItems;
-  if (reviewedItems.length === 0) {
-    options.ai.execution.signal?.throwIfAborted();
-    return;
-  }
+  if (introItems && options.previousIntroRejection)
+    takePriorIntroReview(options, introItems, options.previousIntroRejection);
+  const reviewedItems = allReviewedItems;
   let languagePolicy = classLanguagePolicy(options);
   if (options.kind === 'vocabulary')
     languagePolicy = [
@@ -204,57 +243,48 @@ export async function reviewTeachingContent(options: {
       'This exemption applies only to those transcript controls, never to arbitrary bracketed English, spoken words, questions, options or explanations. Preserve speaker attribution when checking the proposed key and explanation.',
       `Apply the class language policy to all spoken transcript content and the full questions, options and explanations: ${languagePolicy}`,
     ].join(' ');
-  const content = await requestTeachingReview({
-    ...options,
-    items: reviewedItems,
-    prompt:
-      options.kind === 'intro' ? 'class/review-class-intro.md' : 'class/review-teaching-content.md',
-    jsonSchema: TEACHING_QUALITY_JSON_SCHEMA,
-    variables: {
-      REVIEW_SCHEMA: JSON.stringify(TEACHING_QUALITY_JSON_SCHEMA.schema),
-      LEVEL: options.level,
-      NATIVE: options.nativeLang,
-      TARGET: options.targetLang,
-      KIND: options.kind,
-      LANGUAGE_POLICY: languagePolicy,
-      TITLE: options.lessonContext?.title ?? '',
-      OBJECTIVE: options.lessonContext?.objective ?? '',
-      GRAMMAR_POINTS: options.lessonContext?.grammarPoints.join(', ') ?? '',
-    },
-  });
-  let parsed: z.infer<typeof verdictSchema>;
-  try {
-    parsed = verdictSchema.parse(JSON.parse(content));
-  } catch {
-    logger.warn('Teaching review protocol rejected content', {
-      kind: options.kind,
-      reason: 'invalid_verdict',
+  const reviewVariables = {
+    REVIEW_SCHEMA: JSON.stringify(TEACHING_QUALITY_JSON_SCHEMA.schema),
+    LEVEL: options.level,
+    NATIVE: options.nativeLang,
+    TARGET: options.targetLang,
+    KIND: options.kind,
+    LANGUAGE_POLICY: languagePolicy,
+    ...(options.kind === 'intro'
+      ? { EXAMPLE_MEANING_POLICY: classIntroExampleMeaningPolicy(options) }
+      : {}),
+    TITLE: options.lessonContext?.title ?? '',
+    OBJECTIVE: options.lessonContext?.objective ?? '',
+    GRAMMAR_POINTS: options.lessonContext?.grammarPoints.join(', ') ?? '',
+  };
+  let parsed: z.infer<typeof verdictSchema> | z.infer<typeof introTeachingQualityVerdictSchema>;
+  if (introItems) {
+    const aggregate: z.infer<typeof introTeachingQualityVerdictSchema>['items'] = [];
+    for (let offset = 0; offset < reviewedItems.length; offset += 5) {
+      const batch = reviewedItems.slice(offset, offset + 5);
+      const content = await requestTeachingReview({
+        ...options,
+        items: batch,
+        prompt: 'class/review-class-intro.md',
+        jsonSchema: TEACHING_QUALITY_JSON_SCHEMA,
+        variables: reviewVariables,
+      });
+      const batchVerdict = parseTeachingVerdict(content, batch.length, options.kind);
+      aggregate.push(
+        ...batchVerdict.items.map((item) => ({ ...item, index: item.index + offset }))
+      );
+    }
+    aggregate.sort((left, right) => left.index - right.index);
+    parsed = introTeachingQualityVerdictSchema.parse({ items: aggregate });
+  } else {
+    const content = await requestTeachingReview({
+      ...options,
+      items: reviewedItems,
+      prompt: 'class/review-teaching-content.md',
+      jsonSchema: TEACHING_QUALITY_JSON_SCHEMA,
+      variables: reviewVariables,
     });
-    throw new ReviewerProtocolError();
-  }
-  if (
-    parsed.items.length !== reviewedItems.length ||
-    new Set(parsed.items.map((item) => item.index)).size !== reviewedItems.length ||
-    parsed.items.some((item) => item.index >= reviewedItems.length)
-  ) {
-    logger.warn('Teaching review protocol rejected content', {
-      kind: options.kind,
-      reason: 'indices',
-    });
-    throw new ReviewerProtocolError();
-  }
-  if (
-    parsed.items.some((item) =>
-      item.acceptable
-        ? item.issues.length > 0 || item.feedback.length > 0
-        : item.issues.length === 0 || item.feedback.length === 0
-    )
-  ) {
-    logger.warn('Teaching review protocol rejected content', {
-      kind: options.kind,
-      reason: 'inconsistent_verdict',
-    });
-    throw new ReviewerProtocolError();
+    parsed = parseTeachingVerdict(content, reviewedItems.length, options.kind);
   }
   if (parsed.items.some((item) => !item.acceptable || item.issues.length > 0)) {
     const issues = [...new Set(parsed.items.flatMap((item) => item.issues))];
@@ -311,7 +341,7 @@ export async function reviewTeachingContent(options: {
         issuesEvidence: JSON.stringify(rejection.issues),
         feedbackEvidence: JSON.stringify(rejection.feedback),
         items: storedItems,
-        verdict: parsed,
+        verdict: introTeachingQualityVerdictSchema.parse(parsed),
         consumed: false,
       });
     }
@@ -324,34 +354,33 @@ function buildIntroAuditItems(items: readonly unknown[]): readonly IntroAuditIte
     throw new ReviewerProtocolError();
 
   const intro = items[0] as Record<string, unknown>;
-  const scopes: Array<{ auditFields: string[]; fields: Record<string, unknown> }> = [
-    { auditFields: ['purpose'], fields: { purpose: intro.purpose } },
-    { auditFields: ['about'], fields: { about: intro.about } },
-    { auditFields: ['focus', 'tips'], fields: { focus: intro.focus, tips: intro.tips } },
-    { auditFields: ['examples'], fields: { examples: intro.examples } },
-  ];
-  if (intro.visuals !== undefined)
-    scopes.push({ auditFields: ['visuals'], fields: { visuals: intro.visuals } });
-
-  const contextWithoutMeanings = { ...intro };
-  delete contextWithoutMeanings.visuals;
-  if (Array.isArray(intro.examples)) {
-    contextWithoutMeanings.examples = intro.examples.map((example) => {
-      if (!example || typeof example !== 'object' || Array.isArray(example)) return example;
-      const targetAndNote = { ...(example as Record<string, unknown>) };
-      delete targetAndNote.meaning;
-      return targetAndNote;
-    });
+  const arrays = ['focus', 'tips', 'examples'] as const;
+  for (const field of arrays) {
+    if (!Array.isArray(intro[field])) throw new ReviewerProtocolError();
   }
+  if (
+    (intro.focus as unknown[]).length < 1 ||
+    (intro.focus as unknown[]).length > 6 ||
+    (intro.tips as unknown[]).length < 1 ||
+    (intro.tips as unknown[]).length > 5 ||
+    (intro.examples as unknown[]).length < 1 ||
+    (intro.examples as unknown[]).length > 5
+  )
+    throw new ReviewerProtocolError();
+  const scopes: Array<{ address: IntroAuditAddress; fields: Record<string, unknown> }> = [
+    { address: { field: 'purpose' }, fields: { purpose: intro.purpose } },
+    { address: { field: 'about' }, fields: { about: intro.about } },
+  ];
+  for (const [index, focus] of (Array.isArray(intro.focus) ? intro.focus : []).entries())
+    scopes.push({ address: { field: 'focus', index }, fields: { focus } });
+  for (const [index, tip] of (Array.isArray(intro.tips) ? intro.tips : []).entries())
+    scopes.push({ address: { field: 'tips', index }, fields: { tips: tip } });
+  for (const [index, example] of (Array.isArray(intro.examples) ? intro.examples : []).entries())
+    scopes.push({ address: { field: 'examples', index }, fields: { example } });
+  if (intro.visuals !== undefined)
+    scopes.push({ address: { field: 'visuals' }, fields: { visuals: intro.visuals } });
 
-  return scopes.map(({ auditFields, fields }) => ({
-    auditFields,
-    introContext:
-      auditFields.includes('examples') || auditFields.includes('visuals')
-        ? intro
-        : contextWithoutMeanings,
-    fields,
-  }));
+  return scopes.map(({ address, fields }) => ({ address, introContext: intro, fields }));
 }
 
 function aggregateIntroFeedback(
@@ -359,16 +388,30 @@ function aggregateIntroFeedback(
   reviewedItems: readonly unknown[],
   teachingFailure: TeachingFailure
 ): Array<{ index: number; feedback: string[] }> {
-  const feedback = rejected.map(({ index, feedback: details }) => {
-    const item = reviewedItems[index];
-    const scope =
-      item && typeof item === 'object' && 'auditFields' in item && Array.isArray(item.auditFields)
-        ? item.auditFields.join(' and ')
-        : 'intro';
-    return `${scope}: ${details.join(' ')}`;
-  });
-  if (feedback.length > 6) throw new ReviewerProtocolError(teachingFailure);
-  return [{ index: 0, feedback }];
+  const grouped = new Map<string, string[]>();
+  for (const { index, feedback: details } of rejected) {
+    const item = reviewedItems[index] as IntroAuditItem | undefined;
+    if (!item) throw new ReviewerProtocolError(teachingFailure);
+    const field = item.address.field;
+    const detail = `${formatIntroAuditAddress(item.address)}: ${details.join(' ')}`;
+    const entries = grouped.get(field) ?? [];
+    entries.push(detail);
+    grouped.set(field, entries);
+  }
+  return [
+    {
+      index: 0,
+      feedback: [...grouped].map(([field, entries]) => `${field}: ${entries.join(' ')}`),
+    },
+  ];
+}
+
+function formatIntroAuditAddress(address: IntroAuditAddress): string {
+  return 'index' in address ? `${address.field}[${address.index}]` : address.field;
+}
+
+function introAuditAddressKey(address: IntroAuditAddress): string {
+  return 'index' in address ? `${address.field}:${address.index}` : address.field;
 }
 
 function introReviewContext(options: {
@@ -398,7 +441,7 @@ function takePriorIntroReview(
   },
   currentItems: readonly IntroAuditItem[],
   rejection: TeachingQualityRejectionError
-): { reusableIndexes: ReadonlySet<number> } {
+): void {
   const prior = priorIntroReviews.get(rejection);
   if (!prior || prior.consumed || !priorReceiptIsIntact(prior, rejection))
     throw new ReviewerProtocolError(authenticIntroTeachingFailure(rejection));
@@ -428,26 +471,22 @@ function takePriorIntroReview(
   )
     throw new ReviewerProtocolError(authenticIntroTeachingFailure(rejection));
 
-  const priorIndexes = new Map<string, number>();
-  for (const [index, item] of prior.items.entries()) {
-    const key = item.auditFields.join('|');
-    if (priorIndexes.has(key))
-      throw new ReviewerProtocolError(authenticIntroTeachingFailure(rejection));
-    priorIndexes.set(key, index);
-  }
-  const reusableIndexes = new Set<number>();
-  for (const [index, current] of currentItems.entries()) {
-    const priorIndex = priorIndexes.get(current.auditFields.join('|'));
-    if (priorIndex === undefined) continue;
-    const priorVerdict = prior.verdict.items.find((item) => item.index === priorIndex);
-    if (
-      priorVerdict?.acceptable &&
-      priorVerdict.issues.length === 0 &&
-      JSON.stringify(prior.items[priorIndex]) === JSON.stringify(current)
+  const priorAddresses = new Set(prior.items.map((item) => introAuditAddressKey(item.address)));
+  const currentAddresses = new Set(currentItems.map((item) => introAuditAddressKey(item.address)));
+  const rejectedVisual = prior.items.some((item, index) => {
+    if (item.address.field !== 'visuals') return false;
+    const verdict = prior.verdict.items[index];
+    return verdict && (!verdict.acceptable || verdict.issues.length > 0);
+  });
+  if (
+    priorAddresses.size !== prior.items.length ||
+    currentAddresses.size !== currentItems.length ||
+    [...currentAddresses].some((address) => !priorAddresses.has(address)) ||
+    [...priorAddresses].some(
+      (address) => !currentAddresses.has(address) && !(address === 'visuals' && rejectedVisual)
     )
-      reusableIndexes.add(index);
-  }
-  return { reusableIndexes };
+  )
+    throw new ReviewerProtocolError(authenticIntroTeachingFailure(rejection));
 }
 
 function priorReceiptIsIntact(
@@ -455,9 +494,7 @@ function priorReceiptIsIntact(
   rejection: TeachingQualityRejectionError
 ): boolean {
   const evidence = prior.failure.reviews[0];
-  const sourceIntro = prior.items.find((item) =>
-    item.auditFields.includes('examples')
-  )?.introContext;
+  const sourceIntro = prior.items[0]?.introContext;
   return (
     prior.failure === rejection.teachingFailure &&
     prior.failureEvidence === JSON.stringify(rejection.teachingFailure) &&

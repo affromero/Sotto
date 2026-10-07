@@ -21,6 +21,7 @@ import {
   resolveSottoRequest,
 } from '@/lib/sidedoor/access/core/request-identity';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
+import { sottoStateWriteTransaction } from '@/lib/sidedoor/access/state/write-transaction';
 import { captureSottoExecutionCredential } from '@/lib/sidedoor/credentials/runtime/credential-execution';
 import {
   captureSottoCredentialOwner,
@@ -43,7 +44,28 @@ const boundary = vi.hoisted(() => ({
   token: '',
   allowed: true,
   usageCache: new Map<string, unknown>(),
+  admissionWaiting: null as (() => void) | null,
 }));
+vi.mock('@/lib/sidedoor/storage/core/storage-connection', async (original) => {
+  const actual = await original<typeof import('@/lib/sidedoor/storage/core/storage-connection')>();
+  return {
+    ...actual,
+    openSottoStorageConnection: async (
+      ...parameters: Parameters<typeof actual.openSottoStorageConnection>
+    ) => {
+      const connection = await actual.openSottoStorageConnection(...parameters);
+      return {
+        ...connection,
+        query: async (sql: string, values: readonly unknown[]) => {
+          const rows = await connection.query(sql, values);
+          if (sql.includes('pg_try_advisory_lock') && rows[0]?.acquired === false)
+            boundary.admissionWaiting?.();
+          return rows;
+        },
+      };
+    },
+  };
+});
 vi.mock('openai', async () => {
   const { createRequire } = await import('node:module');
   return { default: createRequire(import.meta.url)('openai') };
@@ -86,6 +108,7 @@ suite('speech tooling uses complete canonical credentials', () => {
     invalidateServerInfra();
   });
   afterEach(() => {
+    boundary.admissionWaiting = null;
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
@@ -160,6 +183,138 @@ suite('speech tooling uses complete canonical credentials', () => {
     );
     return { userId: original.userId, authorize, credential, signal: originalRequest.signal };
   }
+
+  function barrier() {
+    let release!: () => void;
+    return {
+      promise: new Promise<void>((resolve) => {
+        release = resolve;
+      }),
+      release: () => release(),
+    };
+  }
+
+  it.each(['revoked', 'cancelled'] as const)(
+    'refuses a caller %s while credential use waits for a state write',
+    async (failureKind) => {
+      await seed();
+      const controller = new AbortController();
+      const cancellation = new Error('Provider request cancelled while awaiting state admission');
+      const admission = await captureSottoProviderAdmission({
+        ...(await execution()),
+        signal: controller.signal,
+      });
+      const url = 'https://api.play.ht/api/v2/voices';
+      const sent: Request[] = [];
+      vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+        sent.push(new Request(input, init));
+        return new Response('accepted');
+      });
+      const transport = admission.createTransport([{ method: 'GET', url }]);
+      const entered = barrier();
+      const release = barrier();
+      const waiting = barrier();
+      boundary.admissionWaiting = waiting.release;
+      const holder = sottoStateWriteTransaction(
+        instance.database,
+        async () => {
+          entered.release();
+          await release.promise;
+        },
+        new AbortController().signal
+      );
+      void holder.catch(() => undefined);
+      let response: Promise<Response> | undefined;
+      try {
+        await Promise.race([
+          entered.promise,
+          holder.then(() => {
+            throw new Error('State writer completed before its barrier');
+          }),
+        ]);
+        response = transport.authenticatedFetch(url);
+        void response.catch(() => undefined);
+        await Promise.race([
+          waiting.promise,
+          response.then(() => {
+            throw new Error('Provider dispatched before waiting for state admission');
+          }),
+        ]);
+        if (failureKind === 'revoked') await identity.access.logout(identity.ownerToken);
+        else controller.abort(cancellation);
+        release.release();
+        await holder;
+        if (failureKind === 'revoked')
+          await expect(response).rejects.toMatchObject({ code: 'unauthorized' });
+        else await expect(response).rejects.toBe(cancellation);
+        expect(sent).toEqual([]);
+        const recorded = await sottoTransaction(instance.database, async (tx) => {
+          const storage = await sottoCredentialStorage(tx, 'tts', 'playht');
+          const owner = await captureSottoCredentialOwner(tx, identity.ownerId);
+          return (await storage.owned.head({ ...storage.slot, owner })).credential?.metadata
+            .lastUsedAt;
+        });
+        expect(recorded).toBeNull();
+      } finally {
+        boundary.admissionWaiting = null;
+        release.release();
+        await Promise.allSettled([holder, ...(response ? [response] : [])]);
+      }
+    }
+  );
+
+  it('admits concurrent credential requests while an earlier HTTP response remains pending', async () => {
+    await seed();
+    const admission = await captureSottoProviderAdmission(await execution());
+    const url = 'https://api.play.ht/api/v2/voices';
+    const entered = barrier();
+    const release = barrier();
+    let firstRequest = true;
+    vi.stubGlobal('fetch', async () => {
+      if (firstRequest) {
+        firstRequest = false;
+        entered.release();
+        await release.promise;
+      }
+      return new Response('accepted');
+    });
+    const transport = admission.createTransport([{ method: 'GET', url }]);
+    const usedAt = Date.now();
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(usedAt);
+    const first = transport.authenticatedFetch(url);
+    void first.catch(() => undefined);
+    const pending: Promise<Response>[] = [];
+    try {
+      await Promise.race([
+        entered.promise,
+        first.then(() => {
+          throw new Error('Provider completed before its response barrier');
+        }),
+      ]);
+      clock.mockReturnValue(usedAt + 1);
+      for (let index = 0; index < 15; index++) {
+        const request = transport.authenticatedFetch(url);
+        void request.catch(() => undefined);
+        pending.push(request);
+      }
+      const responses = await Promise.all(pending);
+      expect(await Promise.all(responses.map((response) => response.text()))).toEqual(
+        Array.from({ length: 15 }, () => 'accepted')
+      );
+      const recorded = await sottoTransaction(instance.database, async (tx) => {
+        const storage = await sottoCredentialStorage(tx, 'tts', 'playht');
+        const owner = await captureSottoCredentialOwner(tx, identity.ownerId);
+        return (await storage.owned.head({ ...storage.slot, owner })).credential?.metadata
+          .lastUsedAt;
+      });
+      expect(recorded).toBe(usedAt + 1);
+      release.release();
+      expect(await (await first).text()).toBe('accepted');
+    } finally {
+      release.release();
+      await Promise.allSettled([first, ...pending]);
+    }
+  });
 
   it('generates sound effects with the captured personal key and refuses revoked callers', async () => {
     await seed('enabled', 'elevenlabs');

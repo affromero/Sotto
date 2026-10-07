@@ -110,6 +110,7 @@ const EXPECTED_FILES = [
 
 const VARIABLE_CONTRACTS: Record<string, string[]> = {
   'class/review-class-intro.md': [
+    'EXAMPLE_MEANING_POLICY',
     'GRAMMAR_POINTS',
     'LANGUAGE_POLICY',
     'LEVEL',

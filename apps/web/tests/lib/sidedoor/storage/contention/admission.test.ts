@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Prisma } from '@/generated/prisma/client';
 import { sottoStorageWriteTransaction } from '@/lib/sidedoor/storage/admission/storage-write-transaction';
+import { sottoStateWriteTransaction } from '@/lib/sidedoor/access/state/write-transaction';
 import {
   createSharedTestInstance,
   type SharedTestInstance,
@@ -119,7 +120,7 @@ suite('storage write phase admission with PostgreSQL', () => {
     ]);
   }
 
-  it('starts a waiting phase with the predecessor committed snapshot', async () => {
+  it('starts a waiting state writer with the storage predecessor committed snapshot', async () => {
     const entered = barrier();
     const release = barrier();
     const id = randomUUID();
@@ -137,7 +138,7 @@ suite('storage write phase admission with PostgreSQL', () => {
     let secondEntered = false;
     try {
       await reached(entered, first);
-      second = sottoStorageWriteTransaction(
+      second = sottoStateWriteTransaction(
         instance.database,
         async (tx) => {
           secondEntered = true;

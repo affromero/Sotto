@@ -42,6 +42,30 @@ describe('classIntroFromSeed', () => {
     expect(restored.visuals).toBeUndefined();
   });
   it.each([
+    'Die sprechende Person und ihre Gruppe sind zu Fuß zum Markt gegangen.',
+    'Die sprechende Gruppe erzählt, dass sie zu Fuß zum Markt gegangen ist.',
+  ])('preserves a stored group explanation: %s', async (meaning) => {
+    const { classIntroFromSeed } = await loadClassIntro();
+    const example = {
+      target: 'Wir sind zu Fuß zum Markt gegangen.',
+      meaning,
+      note: '„Gehen“ bildet das Perfekt mit „sein“.',
+    };
+    const restored = classIntroFromSeed(
+      {
+        intro: {
+          purpose: 'Erzähle von gestern.',
+          about: 'Mit dem Perfekt erzählst du von Vergangenem.',
+          focus: ['Perfekt mit sein'],
+          examples: [example],
+          tips: ['Achte auf das Hilfsverb.'],
+        },
+      },
+      { ...FALLBACK, level: 'A2' }
+    );
+    expect(restored.examples).toEqual([example]);
+  });
+  it.each([
     ['Perfekt for completed activities', 'Präteritum with war and hatte'],
     ['Use als for a past event', 'Use wenn for repeated conditions'],
   ])('preserves stored teaching without inventing visuals from focus %s', async (left, right) => {

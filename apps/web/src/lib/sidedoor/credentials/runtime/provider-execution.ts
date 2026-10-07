@@ -19,6 +19,7 @@ import {
   type SottoExecutionCredential,
 } from '@/lib/sidedoor/credentials/runtime/credential-execution';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
+import { sottoStateWriteTransaction } from '@/lib/sidedoor/access/state/write-transaction';
 import type { AuthenticatedRequest } from '@/lib/api-keys';
 import { requireOriginalSottoAdmission } from '@/lib/sidedoor/access/core/request-identity';
 
@@ -90,35 +91,33 @@ export async function captureSottoProviderAdmission(execution: SottoProviderExec
   const admit = async (suppliedSignal: AbortSignal, recordUse: boolean) => {
     const requestSignal = signal ? AbortSignal.any([signal, suppliedSignal]) : suppliedSignal;
     const usedAt = Date.now();
-    await sottoTransaction(
-      prismaUnfiltered,
-      async (database) => {
-        requestSignal.throwIfAborted();
-        if (!isDeepStrictEqual((await sottoCredentialRows(database)).instance, owner.instance))
-          throw new AccessError('conflict', 'The execution instance changed');
-        if (credential) {
-          if (recordUse)
-            await admitSottoExecutionCredential(
-              database,
-              authorize,
-              credential,
-              usedAt,
-              requestSignal
-            );
-          else
-            await validateSottoExecutionCredential(database, authorize, credential, requestSignal);
-        } else {
-          const current = await authorize(database);
-          if (
-            current.userId !== userId ||
-            !isDeepStrictEqual(await captureSottoCredentialOwner(database, userId), owner.recipient)
-          )
-            throw new AccessError('conflict', 'The execution recipient changed');
-        }
-        requestSignal.throwIfAborted();
-      },
-      { signal: requestSignal }
-    );
+    const operation = async (database: Prisma.TransactionClient) => {
+      requestSignal.throwIfAborted();
+      if (!isDeepStrictEqual((await sottoCredentialRows(database)).instance, owner.instance))
+        throw new AccessError('conflict', 'The execution instance changed');
+      if (credential) {
+        if (recordUse)
+          await admitSottoExecutionCredential(
+            database,
+            authorize,
+            credential,
+            usedAt,
+            requestSignal
+          );
+        else await validateSottoExecutionCredential(database, authorize, credential, requestSignal);
+      } else {
+        const current = await authorize(database);
+        if (
+          current.userId !== userId ||
+          !isDeepStrictEqual(await captureSottoCredentialOwner(database, userId), owner.recipient)
+        )
+          throw new AccessError('conflict', 'The execution recipient changed');
+      }
+      requestSignal.throwIfAborted();
+    };
+    if (credential && recordUse)
+      await sottoStateWriteTransaction(prismaUnfiltered, operation, requestSignal);
+    else await sottoTransaction(prismaUnfiltered, operation, { signal: requestSignal });
   };
   return Object.freeze({
     get identity() {
