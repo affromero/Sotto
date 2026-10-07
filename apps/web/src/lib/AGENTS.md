@@ -14,6 +14,13 @@ acknowledges them separately. A missing attached workspace fails closed.
 
 All shared business logic and external service integrations live here.
 
+`providers/capacity/tts.ts` admits speech and sound-effect requests from the shared TTS
+factory. Requests with the same captured provider credential and endpoint share
+capacity across profiles, workers, reference audio, previews, and provider tests.
+The lease remains held through response consumption and renews during active work.
+Cancellation and uncertain renewal or release prevent a successful result.
+Listening passes its parent-stop check into the same admission path.
+
 `sse/shutdown.ts` shares the Node server shutdown signal with active SSE routes.
 The getter installs process listeners synchronously before route admission; stream
 routes compose that signal with request cancellation and use their existing cleanup paths.
@@ -174,6 +181,9 @@ optional repair bound the work, with at most one review per valid candidate.
 Semantic retries include the normalized rejected passage and indexed questions,
 including rejected keys and explanations, as untrusted correction context alongside
 bounded review issue codes. Blind reviewers still receive neither keys nor explanations.
+For a single contiguous gap, blind review also receives every option inserted
+literally into the question. Review exact word order without relocating fragments;
+this supplies context and still requires semantic judgment.
 Rewrite generated content for meaning and evidence; supplied source passages remain
 immutable. Parser repair remains separate from semantic revision.
 Vocabulary coverage retries receive bounded missing/duplicate target feedback,

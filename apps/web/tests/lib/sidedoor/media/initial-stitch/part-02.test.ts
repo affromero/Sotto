@@ -555,7 +555,13 @@ suite('initial stitching admission with PostgreSQL and attributed storage', () =
     });
     const requests: Request[] = [];
     vi.stubGlobal('fetch', async (request: RequestInfo | URL, init?: RequestInit) => {
-      requests.push(new Request(request, init));
+      const captured = new Request(request, init);
+      if (captured.url === 'https://api.elevenlabs.io/v1/user/subscription') {
+        expect(captured.method).toBe('GET');
+        expect(captured.headers.get('xi-api-key')).toBe('personal-sfx-key');
+        return Response.json({ tier: 'creator' });
+      }
+      requests.push(captured);
       if (scenario === 'revoked' || (scenario === 'revoked-last' && requests.length === 2))
         await sottoTransaction(instance.database, async (tx) => {
           const storage = await sottoCredentialStorage(tx, 'tts', 'elevenlabs');
@@ -660,6 +666,12 @@ suite('initial stitching admission with PostgreSQL and attributed storage', () =
           request.headers.get('xi-api-key') === 'personal-sfx-key'
       )
     ).toBe(true);
+    if (scenario === 'premium') {
+      expect(await Promise.all(requests.map((request) => request.json()))).toMatchObject([
+        { text: 'Warm intro', duration_seconds: 2 },
+        { text: 'Gentle transition', duration_seconds: 2 },
+      ]);
+    }
   });
 
   it('rejects an unsupported sound policy before preparing durable work', async () => {

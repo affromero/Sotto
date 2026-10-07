@@ -17,9 +17,11 @@ beforeAll(async () => {
 
 const mockSemaphoreWait = vi.fn().mockResolvedValue(true);
 const mockSemaphoreRelease = vi.fn().mockResolvedValue(undefined);
+const mockSemaphoreRenew = vi.fn().mockResolvedValue(true);
 const mockOpenSottoSemaphore = vi.fn().mockImplementation(async () => ({
   wait: (...args: unknown[]) => mockSemaphoreWait(...args),
   release: (...args: unknown[]) => mockSemaphoreRelease(...args),
+  renew: (...args: unknown[]) => mockSemaphoreRenew(...args),
 }));
 
 vi.mock('@/lib/sidedoor/jobs/core/redis-semaphore', () => ({
@@ -71,6 +73,7 @@ vi.mock('@/lib/logger', () => ({
 
 // ---- Import under test ----
 import { generateTtsAudio, type TtsGenerationParams } from '@/lib/tts-generation';
+import { decorateTtsProvider } from '@/lib/providers/capacity/tts';
 import { splitTextForTts } from '@/lib/tts-text-cleaner';
 import type { TtsProviderId } from '@/lib/providers/tts-registry';
 import { MediaCleanupError } from '@/lib/audio/media-process';
@@ -84,7 +87,7 @@ const mockObserveConcurrencyError = vi.fn().mockResolvedValue(undefined);
 const mockGenerateSpeech = vi.fn().mockResolvedValue(Buffer.from('audio-data'));
 
 function defaultParams(overrides?: Partial<TtsGenerationParams>): TtsGenerationParams {
-  return {
+  const params: TtsGenerationParams = {
     text: 'Hello world',
     voiceId: 'voice-1',
     speaker: 'HOST',
@@ -104,6 +107,11 @@ function defaultParams(overrides?: Partial<TtsGenerationParams>): TtsGenerationP
     isAborted: vi.fn().mockResolvedValue(false),
     ...overrides,
   };
+  params.provider = decorateTtsProvider(params.provider, {
+    resource: `tts:sem:${params.userId}:${params.providerId}`,
+    signal: params.signal,
+  });
+  return params;
 }
 
 // ---- Tests ----
@@ -117,6 +125,7 @@ describe('generateTtsAudio', () => {
     mockObserveConcurrencyError.mockResolvedValue(undefined);
     mockSemaphoreWait.mockResolvedValue(true);
     mockSemaphoreRelease.mockResolvedValue(undefined);
+    mockSemaphoreRenew.mockResolvedValue(true);
     mockGenerateSpeech.mockResolvedValue(Buffer.from('audio-data'));
     mockGetAudioDuration.mockResolvedValue(5.0);
   });
@@ -129,6 +138,13 @@ describe('generateTtsAudio', () => {
     expect(result!.segmentDuration).toBe(5.0);
     expect(result!.service).toBe('elevenlabs');
     expect(result!.wordTimings).toBeNull();
+  });
+
+  it('preserves a provider rejection even when it has no error value', async () => {
+    mockGenerateSpeech.mockRejectedValue(undefined);
+
+    await expect(generateTtsAudio(defaultParams())).rejects.toBeUndefined();
+    expect(mockLogUsage).not.toHaveBeenCalled();
   });
 
   it.each(['saved', 'failed'] as const)(
@@ -291,13 +307,14 @@ describe('generateTtsAudio', () => {
     expect(mockGenerateSpeech).not.toHaveBeenCalled();
   });
 
-  it('throws when semaphore times out after 30 attempts', async () => {
+  it('refuses speech after capacity admission times out', async () => {
     mockSemaphoreWait.mockResolvedValue(false);
     const isAborted = vi.fn().mockResolvedValue(false);
 
     const error = await generateTtsAudio(defaultParams({ isAborted })).catch((e: Error) => e);
     expect(error).toBeInstanceOf(Error);
-    expect((error as Error).message).toMatch('Timed out waiting for TTS semaphore');
+    expect((error as Error).message).toMatch(/Timed out/);
+    expect(mockGenerateSpeech).not.toHaveBeenCalled();
   });
 
   it('uses ElevenLabs concurrency limit when provider is elevenlabs', async () => {

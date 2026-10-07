@@ -3,6 +3,7 @@ import {
   assessSectionReview,
   SectionQualityError,
   captureBlindSectionFailure,
+  sectionReviewInput,
 } from '@/lib/classes/section-quality';
 import {
   captureGenerationFailure,
@@ -19,8 +20,8 @@ const questions: GeneratedQuestion[] = [
     explanation: 'The context must distinguish cooking from cleaning.',
   },
   {
-    question: 'Ergänze das Perfekt von gehen: Wir _____ ins Kino.',
-    options: ['sind gegangen', 'ist gegangen', 'haben gegangen', 'seid gegangen'],
+    question: 'Ergänze das Perfekt von gehen: Wir _____ ins Kino gegangen.',
+    options: ['sind', 'ist', 'haben', 'seid'],
     correctIndex: 0,
     explanation: 'Wir uses sind as the auxiliary for gehen.',
   },
@@ -50,6 +51,56 @@ const rejected = {
 };
 
 describe('section review correction feedback', () => {
+  it('shows every literal gap completion without exposing the proposed key or explanation', () => {
+    const question = {
+      question: 'Am Samstag _____ wir einen kleinen Kuchen für Oma.',
+      options: ['haben gebacken', 'sind gebacken', 'haben gebackt', 'sind backen'],
+      correctIndex: 0,
+      explanation: 'Private proposed explanation.',
+    };
+    const input = JSON.parse(sectionReviewInput([question]));
+    expect(input.questions[0].completedOptions).toEqual([
+      'Am Samstag haben gebacken wir einen kleinen Kuchen für Oma.',
+      'Am Samstag sind gebacken wir einen kleinen Kuchen für Oma.',
+      'Am Samstag haben gebackt wir einen kleinen Kuchen für Oma.',
+      'Am Samstag sind backen wir einen kleinen Kuchen für Oma.',
+    ]);
+    expect(input.questions[0]).not.toHaveProperty('correctIndex');
+    expect(input.questions[0]).not.toHaveProperty('explanation');
+    expect(sectionReviewInput([question])).not.toContain(question.explanation);
+    const corrected = {
+      ...question,
+      question: 'Am Samstag _____ wir einen kleinen Kuchen für Oma gebacken.',
+      options: ['haben', 'sind', 'hat', 'ist'],
+    };
+    expect(JSON.parse(sectionReviewInput([corrected])).questions[0].completedOptions[0]).toBe(
+      'Am Samstag haben wir einen kleinen Kuchen für Oma gebacken.'
+    );
+  });
+
+  it('preserves literal replacement text and omits completions when gap placement is unspecified', () => {
+    const literal = {
+      ...questions[0],
+      question: 'Das Zeichen heißt _____.',
+      options: ['$&', '$`', "$'", '$$'],
+    };
+    expect(JSON.parse(sectionReviewInput([literal])).questions[0].completedOptions).toEqual([
+      'Das Zeichen heißt $&.',
+      'Das Zeichen heißt $`.',
+      "Das Zeichen heißt $'.",
+      'Das Zeichen heißt $$.',
+    ]);
+    const unfilled = questions.map((question, index) => ({
+      ...question,
+      question: index === 0 ? 'Welche Aussage passt?' : 'Wir _____ gestern _____.',
+    }));
+    expect(
+      JSON.parse(sectionReviewInput(unfilled)).questions.every(
+        (question: { completedOptions?: string[] }) => question.completedOptions === undefined
+      )
+    ).toBe(true);
+  });
+
   it('identifies the ambiguous question and every independently defensible option', () => {
     const result = assessSectionReview(JSON.stringify(verdict), questions, false);
     expect(result.issues).toEqual(['ambiguous']);

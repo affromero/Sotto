@@ -155,6 +155,96 @@ describe('section review through the Codex provider', () => {
     expect(result).toEqual([expect.objectContaining(replacement)]);
   });
 
+  it('replaces a rejected literal Perfekt completion before returning grammar material', async () => {
+    const initial = {
+      question:
+        'Lea erzählt von sich und ihrem Bruder. Sie sagt: „Am Samstag _____ wir einen kleinen Kuchen für Oma.“ Welche Form passt im Perfekt?',
+      options: ['haben gebacken', 'sind gebacken', 'haben gebackt', 'sind backen'],
+      correctIndex: 0,
+      explanation: '„Backen“ bildet das Perfekt mit „haben“; das Partizip II lautet „gebacken“.',
+    };
+    const replacement = {
+      ...initial,
+      question:
+        'Lea erzählt von sich und ihrem Bruder. Sie sagt: „Am Samstag _____ wir einen kleinen Kuchen für Oma gebacken.“ Welches Hilfsverb passt im Perfekt?',
+      options: ['haben', 'sind', 'hat', 'ist'],
+    };
+    const otherQuestions = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch'].map((day) => ({
+      ...replacement,
+      question: `Am ${day} _____ wir einen Kuchen gebacken. Welches Hilfsverb passt im Perfekt?`,
+    }));
+    let rewritten = false;
+    execute.mockImplementation(async (system: string, user: string) => {
+      if (system.includes('teaching content for')) {
+        return {
+          content: JSON.stringify({
+            items: Array.from({ length: 5 }, (_, index) => ({
+              index,
+              acceptable: true,
+              issues: [],
+              feedback: [],
+            })),
+          }),
+          model: 'fixture-model',
+        };
+      }
+      if (system.includes('independently evaluate')) {
+        const input = JSON.parse(user);
+        expect(input.questions[0].completedOptions[0]).toBe(
+          rewritten
+            ? 'Lea erzählt von sich und ihrem Bruder. Sie sagt: „Am Samstag haben wir einen kleinen Kuchen für Oma gebacken.“ Welches Hilfsverb passt im Perfekt?'
+            : 'Lea erzählt von sich und ihrem Bruder. Sie sagt: „Am Samstag haben gebacken wir einen kleinen Kuchen für Oma.“ Welche Form passt im Perfekt?'
+        );
+        expect(user).not.toContain('correctIndex');
+        expect(user).not.toContain(initial.explanation);
+        return {
+          content: JSON.stringify({
+            passageAcceptable: true,
+            passageFeedback: [],
+            issues: [],
+            questions: Array.from({ length: 5 }, (_, index) => ({
+              index,
+              acceptableOptionIndices: index === 0 && !rewritten ? [] : [0],
+              issues: index === 0 && !rewritten ? ['incorrect'] : [],
+            })),
+          }),
+          model: 'fixture-model',
+        };
+      }
+      if (user.includes('Blind review feedback:')) {
+        const feedback = JSON.parse(user.split('Blind review feedback: ')[1].split('\n')[0]);
+        expect(feedback.questions[0]).toMatchObject({
+          index: 0,
+          acceptableOptionIndices: [],
+          issues: ['incorrect'],
+        });
+        rewritten = true;
+      }
+      return {
+        content: JSON.stringify({
+          passage: '',
+          questions: [rewritten ? replacement : initial, ...otherQuestions],
+        }),
+        model: 'fixture-model',
+      };
+    });
+    const result = await generateSectionQuestions({
+      userId: 'learner',
+      execution: blockedProviderExecution('learner'),
+      skill: 'GRAMMAR',
+      level: 'A2',
+      nativeLang: 'en',
+      targetLang: 'de',
+      objective: 'Report completed activities',
+      grammarPoints: ['Perfekt'],
+      targetVocab: [],
+      seed: 'literal-perfekt',
+    });
+    expect(result[0]).toMatchObject(replacement);
+    expect(result).toHaveLength(5);
+    expect(result.some((question) => question.question === initial.question)).toBe(false);
+  });
+
   it.each([
     { passageAcceptable: true },
     { passageAcceptable: false, passageFeedback: [] },

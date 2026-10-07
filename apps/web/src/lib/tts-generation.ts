@@ -11,7 +11,7 @@
 import type { WordTiming } from '@sotto/shared';
 import type { TtsProvider } from '@/lib/providers/tts';
 import { getProviderMeta, type TtsProviderId } from '@/lib/providers/tts-registry';
-import { openSottoSemaphore } from '@/lib/sidedoor/jobs/core/redis-semaphore';
+import { TtsParentStoppedError } from '@/lib/providers/capacity/tts';
 import { cleanTextForTts, splitTextForTts } from '@/lib/tts-text-cleaner';
 import { concatenateTtsAudio, measureTtsAudio } from '@/lib/audio/tts-media';
 import { estimateDurationFromText } from '@/lib/duration';
@@ -101,56 +101,9 @@ export async function generateTtsAudio(
   const startTime = Date.now();
 
   params.signal?.throwIfAborted();
-  const concurrencyLimit = provider.getConcurrencyLimit
-    ? await provider.getConcurrencyLimit(params.signal)
-    : providerId === 'replicate'
-      ? 1
-      : 5;
-
-  const semaphoreKey = `tts:sem:${userId}:${providerId}`;
-
-  logger.info('Using TTS provider', {
-    speaker,
-    providerId,
-    source,
-    voiceId,
-    episodeId,
-    concurrencyLimit,
-  });
-
   const meta = getProviderMeta(providerId);
   let audioBuffer: Buffer;
   let wordTimings: WordTiming[] | null = null;
-  // 3. Acquire one exact-token provider slot. The dedicated session never replays commands.
-  const capacity = await openSottoSemaphore({
-    resource: semaphoreKey,
-    limit: concurrencyLimit,
-    ttlMs: 120_000,
-  });
-  let parentStopped = false;
-  const acquired = await capacity.wait({
-    signal: params.signal,
-    delaysMs: Array.from({ length: 29 }, (_, attempt) =>
-      Math.round(Math.min(1000 * Math.pow(1.5, attempt), 15_000))
-    ),
-    shouldStop: async () => {
-      parentStopped = await isAborted();
-      return parentStopped;
-    },
-  });
-
-  if (!acquired) {
-    if (parentStopped) {
-      logger.info('Parent entity failed while waiting for semaphore, aborting', { episodeId });
-      return null;
-    }
-    throw new Error(
-      `Timed out waiting for TTS semaphore (${providerId}, limit ${concurrencyLimit})`
-    );
-  }
-
-  let primaryFailure: unknown;
-  let failed = false;
   try {
     params.signal?.throwIfAborted();
     // 4. Clean text and split into chunks if it exceeds provider char limit
@@ -168,148 +121,110 @@ export async function generateTtsAudio(
     }
 
     const supportsTimestamps = typeof provider.generateSpeechWithTimestamps === 'function';
-    try {
-      if (chunks.length === 1) {
-        // Fast path — single chunk, no splitting needed
+    if (chunks.length === 1) {
+      // Fast path — single chunk, no splitting needed
+      const speechParams = {
+        signal: params.signal,
+        text: ttsText,
+        voiceId,
+        previousText,
+        nextText,
+        direction,
+        speaker,
+        language: langHint,
+        onDispatch: params.onDispatch,
+        onSettled: params.onSettled,
+        shouldStop: isAborted,
+      };
+      if (supportsTimestamps) {
+        const result = await provider.generateSpeechWithTimestamps!(speechParams);
+        audioBuffer = result.audio;
+        wordTimings = result.wordTimings;
+      } else {
+        audioBuffer = await provider.generateSpeech(speechParams);
+      }
+    } else {
+      // Multi-chunk: generate each with context bridging for voice continuity
+      const chunkBuffers: Buffer[] = [];
+      const allWordTimings: WordTiming[] = [];
+      let cumulativeDuration = 0;
+      const skipTextContext = meta.modelsWithoutTextContext.includes(provider.getModelId());
+      const continuityIds: string[] = [];
+
+      for (let i = 0; i < chunks.length; i++) {
+        const isFirst = i === 0;
+        const isLast = i === chunks.length - 1;
+
+        // Bridge context: first chunk uses the original previousText, last uses
+        // original nextText, inner chunks use adjacent chunk text for continuity.
+        // Skip text context for models that don't support it (e.g. eleven_v3).
+        const chunkPrev = skipTextContext
+          ? undefined
+          : isFirst
+            ? previousText
+            : chunks[i - 1].slice(-500);
+        const chunkNext = skipTextContext
+          ? undefined
+          : isLast
+            ? nextText
+            : chunks[i + 1].slice(0, 500);
+
         const speechParams = {
           signal: params.signal,
-          text: ttsText,
+          text: chunks[i],
           voiceId,
-          previousText,
-          nextText,
           direction,
           speaker,
+          previousText: chunkPrev,
+          nextText: chunkNext,
+          continuityIds: continuityIds.length > 0 ? continuityIds.slice(-3) : undefined,
           language: langHint,
           onDispatch: params.onDispatch,
           onSettled: params.onSettled,
+          shouldStop: isAborted,
         };
+
         if (supportsTimestamps) {
           const result = await provider.generateSpeechWithTimestamps!(speechParams);
-          audioBuffer = result.audio;
-          wordTimings = result.wordTimings;
+          chunkBuffers.push(result.audio);
+
+          // Offset word timings by cumulative duration of previous chunks
+          for (const wt of result.wordTimings) {
+            allWordTimings.push({
+              word: wt.word,
+              start: wt.start + cumulativeDuration,
+              end: wt.end + cumulativeDuration,
+            });
+          }
+
+          // Estimate chunk duration from word timings (last word's end time)
+          if (result.wordTimings.length > 0) {
+            cumulativeDuration = allWordTimings[allWordTimings.length - 1].end;
+          }
         } else {
-          audioBuffer = await provider.generateSpeech(speechParams);
-        }
-      } else {
-        // Multi-chunk: generate each with context bridging for voice continuity
-        const chunkBuffers: Buffer[] = [];
-        const allWordTimings: WordTiming[] = [];
-        let cumulativeDuration = 0;
-        const skipTextContext = meta.modelsWithoutTextContext.includes(provider.getModelId());
-        const continuityIds: string[] = [];
-
-        for (let i = 0; i < chunks.length; i++) {
-          const isFirst = i === 0;
-          const isLast = i === chunks.length - 1;
-
-          // Bridge context: first chunk uses the original previousText, last uses
-          // original nextText, inner chunks use adjacent chunk text for continuity.
-          // Skip text context for models that don't support it (e.g. eleven_v3).
-          const chunkPrev = skipTextContext
-            ? undefined
-            : isFirst
-              ? previousText
-              : chunks[i - 1].slice(-500);
-          const chunkNext = skipTextContext
-            ? undefined
-            : isLast
-              ? nextText
-              : chunks[i + 1].slice(0, 500);
-
-          const speechParams = {
-            signal: params.signal,
-            text: chunks[i],
-            voiceId,
-            direction,
-            speaker,
-            previousText: chunkPrev,
-            nextText: chunkNext,
-            continuityIds: continuityIds.length > 0 ? continuityIds.slice(-3) : undefined,
-            language: langHint,
-            onDispatch: params.onDispatch,
-            onSettled: params.onSettled,
-          };
-
-          if (supportsTimestamps) {
-            const result = await provider.generateSpeechWithTimestamps!(speechParams);
-            chunkBuffers.push(result.audio);
-
-            // Offset word timings by cumulative duration of previous chunks
-            for (const wt of result.wordTimings) {
-              allWordTimings.push({
-                word: wt.word,
-                start: wt.start + cumulativeDuration,
-                end: wt.end + cumulativeDuration,
-              });
-            }
-
-            // Estimate chunk duration from word timings (last word's end time)
-            if (result.wordTimings.length > 0) {
-              cumulativeDuration = allWordTimings[allWordTimings.length - 1].end;
-            }
-          } else {
-            chunkBuffers.push(await provider.generateSpeech(speechParams));
-          }
-
-          // Collect continuity ID for next chunk (if provider supports it)
-          const contId = provider.getLastContinuityId?.();
-          if (contId) continuityIds.push(contId);
+          chunkBuffers.push(await provider.generateSpeech(speechParams));
         }
 
-        // Concatenate chunk audio via FFmpeg (lossless concat demuxer)
-        audioBuffer = await concatenateTtsAudio(chunkBuffers, {
-          signal: params.signal,
-          directory: params.executionDirectory,
-        });
-        if (allWordTimings.length > 0) {
-          wordTimings = allWordTimings;
-        }
+        // Collect continuity ID for next chunk (if provider supports it)
+        const contId = provider.getLastContinuityId?.();
+        if (contId) continuityIds.push(contId);
       }
-    } catch (err) {
-      const errMsg = err instanceof Error ? err.message : String(err);
-      // 5. On 429, update cached concurrency limit
-      if (provider.observeConcurrencyError && /\(429\)/.test(errMsg)) {
-        try {
-          await provider.observeConcurrencyError(errMsg, params.signal);
-        } catch (observationError) {
-          try {
-            rethrowMediaInterruption(observationError, params.signal);
-          } catch {
-            throw new AggregateError(
-              [err, observationError],
-              'TTS generation and concurrency observation failed',
-              { cause: err }
-            );
-          }
-          logger.warn('TTS concurrency observation failed', {
-            providerId,
-            error:
-              observationError instanceof Error
-                ? observationError.message
-                : String(observationError),
-          });
-        }
-        logger.warn('TTS provider rate limit rejected generation', {
-          providerId,
-          episodeId,
-        });
+
+      // Concatenate chunk audio via FFmpeg (lossless concat demuxer)
+      audioBuffer = await concatenateTtsAudio(chunkBuffers, {
+        signal: params.signal,
+        directory: params.executionDirectory,
+      });
+      if (allWordTimings.length > 0) {
+        wordTimings = allWordTimings;
       }
-      throw err;
     }
   } catch (error) {
-    failed = true;
-    primaryFailure = error;
-    throw error;
-  } finally {
-    try {
-      await capacity.release();
-    } catch (releaseError) {
-      throw new AggregateError(
-        failed ? [primaryFailure, releaseError] : [releaseError],
-        'TTS semaphore release could not be confirmed',
-        { cause: releaseError }
-      );
+    if (error instanceof TtsParentStoppedError) {
+      logger.info('Parent entity stopped while waiting for TTS capacity', { episodeId });
+      return null;
     }
+    throw error;
   }
 
   const service = providerId;

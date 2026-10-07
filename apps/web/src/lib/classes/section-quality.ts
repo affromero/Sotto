@@ -162,11 +162,21 @@ export function captureBlindSectionFailure(
 export function sectionReviewInput(questions: GeneratedQuestion[]): string {
   return JSON.stringify({
     passage: questions[0]?.passageText ?? '',
-    questions: questions.map((question, index) => ({
-      index,
-      question: question.question,
-      options: question.options,
-    })),
+    questions: questions.map((question, index) => {
+      const gaps = question.question.match(/_{2,}/g);
+      return {
+        index,
+        question: question.question,
+        options: question.options,
+        ...(gaps?.length === 1
+          ? {
+              completedOptions: question.options.map((option) =>
+                question.question.replace(/_{2,}/, () => option)
+              ),
+            }
+          : {}),
+      };
+    }),
   });
 }
 
