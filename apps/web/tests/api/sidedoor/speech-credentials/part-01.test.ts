@@ -32,6 +32,8 @@ import { setSiteConfig } from '@/lib/site-config';
 import { NextRequest } from 'next/server';
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
+import { setTimeout as delay } from 'node:timers/promises';
+import Redis from 'ioredis';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createSharedTestInstance,
@@ -194,6 +196,111 @@ suite('speech tooling uses complete canonical credentials', () => {
     };
   }
 
+  it.skipIf(!process.env.SIDEDOOR_TEST_REDIS_URL)(
+    'shares speech capacity across profiles with the same account while another account proceeds',
+    async () => {
+      vi.stubEnv('REDIS_URL', process.env.SIDEDOOR_TEST_REDIS_URL!);
+      const redis = new Redis(process.env.REDIS_URL!, { maxRetriesPerRequest: 1 });
+      const controller = new AbortController();
+      const bodies = new Map<string, ReadableStreamDefaultController<Uint8Array>>();
+      const sent: string[] = [];
+      const calls: Array<Promise<Buffer>> = [];
+      const sameKey = `speech-test-${randomUUID()}`;
+      const otherKey = `speech-test-${randomUUID()}`;
+      const finish = (text: string) => {
+        const body = bodies.get(text);
+        if (!body) throw new Error(`Expected a pending response for ${text}`);
+        bodies.delete(text);
+        body.enqueue(new Uint8Array([1, 2, 3]));
+        body.close();
+      };
+      vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+        const outgoing = new Request(input, init);
+        expect(outgoing.url).toBe('https://api.cartesia.ai/tts/bytes');
+        const { transcript } = (await outgoing.json()) as { transcript: string };
+        expect(outgoing.headers.get('X-API-Key')).toBe(
+          transcript === 'other account' ? otherKey : sameKey
+        );
+        sent.push(transcript);
+        return new Response(
+          new ReadableStream<Uint8Array>({
+            start(body) {
+              body.enqueue(new Uint8Array([0x49, 0x44, 0x33]));
+              bodies.set(transcript, body);
+            },
+            cancel() {
+              bodies.delete(transcript);
+            },
+          })
+        );
+      });
+      try {
+        await seed('enabled', 'cartesia', { apiKey: sameKey });
+        const first = await createTtsProviderAsync('cartesia', {
+          ...(await execution('cartesia')),
+          signal: controller.signal,
+        });
+        const secondProfile = await identity.household('Same speech account');
+        await instance.seedProfileCredential(secondProfile.id, 'tts', 'cartesia', {
+          apiKey: ` ${sameKey} `,
+        });
+        boundary.token = secondProfile.token;
+        const second = await createTtsProviderAsync('cartesia', {
+          ...(await execution('cartesia')),
+          signal: controller.signal,
+        });
+        calls.push(first.generateSpeech({ text: 'first profile', voiceId: 'voice' }));
+        calls.push(second.generateSpeech({ text: 'second profile', voiceId: 'voice' }));
+        await expect.poll(() => sent.length).toBe(2);
+        calls.push(second.generateSpeech({ text: 'third shared request', voiceId: 'voice' }));
+        await expect
+          .poll(
+            async () =>
+              String(await redis.client('LIST'))
+                .split('\n')
+                .filter((line) => line.includes('name=sotto-sidedoor-semaphore:')).length
+          )
+          .toBe(3);
+        await delay(100);
+        expect(sent).toEqual(expect.arrayContaining(['first profile', 'second profile']));
+        expect(sent).not.toContain('third shared request');
+
+        const thirdProfile = await identity.household('Different speech account');
+        await instance.seedProfileCredential(thirdProfile.id, 'tts', 'cartesia', {
+          apiKey: otherKey,
+        });
+        boundary.token = thirdProfile.token;
+        const independent = await createTtsProviderAsync('cartesia', {
+          ...(await execution('cartesia')),
+          signal: controller.signal,
+        });
+        const independentCall = independent.generateSpeech({
+          text: 'other account',
+          voiceId: 'voice',
+        });
+        calls.push(independentCall);
+        await expect.poll(() => sent.includes('other account')).toBe(true);
+        expect(sent).not.toContain('third shared request');
+        finish('other account');
+        expect(await independentCall).toEqual(Buffer.from([0x49, 0x44, 0x33, 1, 2, 3]));
+
+        finish('first profile');
+        await calls[0];
+        await expect.poll(() => sent.includes('third shared request')).toBe(true);
+        finish('second profile');
+        finish('third shared request');
+        expect(await Promise.all(calls)).toEqual(
+          Array.from({ length: 4 }, () => Buffer.from([0x49, 0x44, 0x33, 1, 2, 3]))
+        );
+      } finally {
+        for (const text of [...bodies.keys()]) finish(text);
+        controller.abort(new Error('Speech capacity test completed'));
+        await Promise.allSettled(calls);
+        await redis.quit();
+      }
+    }
+  );
+
   it.each(['revoked', 'cancelled'] as const)(
     'refuses a caller %s while credential use waits for a state write',
     async (failureKind) => {
@@ -323,7 +430,10 @@ suite('speech tooling uses complete canonical credentials', () => {
     );
     const sent: Request[] = [];
     vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
-      sent.push(new Request(input, init));
+      const outgoing = new Request(input, init);
+      sent.push(outgoing);
+      if (outgoing.url === 'https://api.elevenlabs.io/v1/user/subscription')
+        return Response.json({ tier: 'free' });
       return new Response(audio);
     });
     const provider = await createTtsProviderAsync('elevenlabs', await execution('elevenlabs'));
@@ -332,14 +442,15 @@ suite('speech tooling uses complete canonical credentials', () => {
       await provider.generateSoundEffect({ prompt: 'Ocean waves', durationSeconds: 8 })
     ).toEqual(audio);
     expect(sent.map((request) => [request.url, request.headers.get('xi-api-key')])).toEqual([
+      ['https://api.elevenlabs.io/v1/user/subscription', 'personal-key'],
       ['https://api.elevenlabs.io/v1/sound-generation', 'personal-key'],
     ]);
-    expect(await sent[0].json()).toEqual({ text: 'Ocean waves', duration_seconds: 8 });
+    expect(await sent[1].json()).toEqual({ text: 'Ocean waves', duration_seconds: 8 });
     await identity.access.logout(identity.ownerToken);
     await expect(provider.generateSoundEffect({ prompt: 'Ocean waves' })).rejects.toMatchObject({
       code: 'unauthorized',
     });
-    expect(sent).toHaveLength(1);
+    expect(sent).toHaveLength(2);
   });
 
   it('does not dispatch a cancelled sound effect request', async () => {

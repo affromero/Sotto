@@ -20,6 +20,8 @@ import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 import { prismaUnfiltered } from '../prisma';
 import { captureApiEndpoint } from '@/lib/providers/shared/api-selection';
 import { captureLocalTtsConnection } from '@/lib/providers/shared/local-tts-connection';
+import { createHmac, createHash } from 'node:crypto';
+import { decorateTtsProvider } from '@/lib/providers/capacity/tts';
 
 export interface SpeechParams {
   signal?: AbortSignal;
@@ -45,6 +47,8 @@ export interface SpeechParams {
   onDispatch?: () => void;
   /** The complete synchronous provider response was consumed. */
   onSettled?: () => void;
+  /** Parent execution cancellation observation used while waiting for shared capacity. */
+  shouldStop?: () => Promise<boolean>;
 }
 
 export interface SfxParams {
@@ -185,6 +189,52 @@ export async function createTtsProviderAsync(
   extraData?: Record<string, string>,
   model?: string
 ): Promise<TtsProvider> {
+  let capturedEndpoint: string | undefined;
+  const provider = await createTtsProviderBare(
+    providerId,
+    execution,
+    apiKey,
+    extraData,
+    model,
+    (endpoint) => {
+      capturedEndpoint = endpoint;
+    }
+  );
+  const selectedKey = execution.credential
+    ? sottoExecutionCredentialFields(execution.credential).apiKey
+    : apiKey;
+  const endpoint =
+    execution.credential?.binding.endpoint ??
+    capturedEndpoint ??
+    (() => {
+      try {
+        return captureApiEndpoint(providerId);
+      } catch {
+        return undefined;
+      }
+    })();
+  const identity = JSON.stringify([providerId, endpoint ?? '']);
+  const resource = selectedKey?.trim()
+    ? `tts:account:${createHmac('sha256', selectedKey.trim()).update(identity).digest('hex')}`
+    : endpoint
+      ? `tts:local:${createHash('sha256').update(identity).digest('hex')}`
+      : undefined;
+  if (!resource) throw new Error('Cannot establish a stable shared TTS capacity identity');
+  return decorateTtsProvider(provider, {
+    resource,
+    signal: execution.signal,
+    onCleanupError: (error) => execution.onCleanupError?.(error),
+  });
+}
+
+async function createTtsProviderBare(
+  providerId: TtsProviderId,
+  execution: SottoProviderExecution,
+  apiKey?: string,
+  extraData?: Record<string, string>,
+  model?: string,
+  onEndpoint?: (endpoint: string) => void
+): Promise<TtsProvider> {
   if (execution.credential && execution.credential.provider !== providerId)
     throw new Error('The selected credential belongs to another provider');
   if (execution.credential) {
@@ -302,6 +352,7 @@ export async function createTtsProviderAsync(
     }
     case 'kokoro': {
       const connection = await captureLocalTtsConnection('kokoro', model, apiKey, execution.signal);
+      onEndpoint?.(connection.endpoint);
       const Cls = await importKokoro();
       const transport = await createSottoProviderTransport(execution, [
         { method: 'POST', url: connection.endpoint },
@@ -310,6 +361,7 @@ export async function createTtsProviderAsync(
     }
     case 'local': {
       const connection = await captureLocalTtsConnection('local', model, apiKey, execution.signal);
+      onEndpoint?.(connection.endpoint);
       const Cls = await importLocalTts();
       const transport = await createSottoProviderTransport(execution, [
         { method: 'POST', url: connection.endpoint },

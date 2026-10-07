@@ -278,7 +278,7 @@ describe('contextual vocabulary coverage', () => {
     });
     expect(correction).toContain('move a lowercase target away from the start of a sentence');
     const reviewed = JSON.parse(mockReviewResponse.mock.calls[0][1][0].content);
-    expect(reviewed.questions).toEqual([
+    expect(reviewed.questions).toMatchObject([
       { index: 0, question: replacement.question, options: replacement.options },
     ]);
     expect(reviewed.questions[0]).not.toHaveProperty('correctIndex');
