@@ -625,16 +625,20 @@ projection with the canonical `generateEpisodeTranscript` renderer.
 
 `sidedoor/transaction.ts` opens fresh Serializable transactions using the shared bounded retry driver. Callbacks contain database changes and repeatable computation; perform external effects after commit.
 
+`sidedoor/access/state/write-transaction.ts` serializes mutations of the shared
+Sidedoor state before opening a Serializable transaction. Provider credential-use
+recording and storage writes share its database/schema/relation-scoped advisory
+lock; the lock connection closes before provider HTTP dispatch or storage I/O.
+
 `sidedoor/storage-write.ts` adapts profile and single-file writes to the shared
 `writeReferenceSet` engine. Sidedoor owns immutable artifact allocation, intent
 settlement, atomic reference publication, cancellation checks and commit recovery.
 Sotto supplies Prisma transactions, current backend ports and authority checks.
-`storage/admission/storage-write-transaction.ts` serializes each database phase through
-a dedicated PostgreSQL session lock acquired before the Serializable snapshot.
-It verifies the actual database, schema and state relation on both connections,
-retains canonical transaction retries, and releases before external storage I/O.
-Acquisition is bounded; cancellation, connection loss and uncertain closure fail
-the phase. The lock is independent of backend cleanup locks.
+`storage/admission/storage-write-transaction.ts` delegates database phases to the
+shared-state writer transaction, retaining canonical transaction retries and
+releasing the session lock before external storage I/O. Acquisition is bounded;
+cancellation, connection loss and uncertain closure fail the phase. The lock is
+independent of backend cleanup locks.
 The writer requires the current instance scope and distinct resource scopes before I/O,
 and retains canonical journal checks independently of application admission callbacks.
 Its profile adapter commits uploads with instance/profile intents, original request

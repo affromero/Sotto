@@ -150,7 +150,7 @@ repos:
       # --- pre-push: the full CI-equivalent gate, run once per push ---
       - id: web-test
         name: vitest (web)
-        entry: npm run test --workspace=@sotto/web
+        entry: bash -c './scripts/run-with-env.sh npm run test --workspace=@sotto/web -- --no-file-parallelism'
         language: system
         stages: [pre-push]
         always_run: true
