@@ -63,6 +63,11 @@ const intro = {
   tips: ['Name the transport.'],
 };
 const approved = { items: [{ index: 0, acceptable: true, issues: [], feedback: [] }] };
+function reviewedIntro(content: string) {
+  const { introContext, items } = JSON.parse(content);
+  const addresses = items.map(({ content }: { content: { address: unknown } }) => content.address);
+  return [{ introContext, addresses }];
+}
 const rejected = {
   items: [
     {
@@ -651,9 +656,7 @@ describe('intro teaching gate', () => {
       const reviewCalls = boundary.generate.mock.calls.filter(([system]) =>
         system.startsWith('Independently review')
       );
-      const reviewInputs = reviewCalls.map(([, messages]) =>
-        JSON.parse(messages[0].content).items.map(({ content }: { content: unknown }) => content)
-      );
+      const reviewInputs = reviewCalls.map(([, messages]) => reviewedIntro(messages[0].content));
       expect(error.teachingFailure?.reviews.map((review) => JSON.parse(review.candidate!))).toEqual(
         reviewInputs
       );
@@ -710,9 +713,8 @@ describe('intro teaching gate', () => {
     expect(result.purpose).toBe(intro.purpose);
     expect(result.examples).toEqual(intro.examples);
     expect(result.visuals).toBeUndefined();
-    expect(
-      JSON.parse(boundary.generate.mock.calls[1][1][0].content).items[4].content.introContext
-    ).toEqual(result);
+    const review = boundary.generate.mock.calls[1];
+    expect(JSON.parse(review[1][0].content).introContext).toEqual(result);
   });
 
   it('repairs malformed generated teaching before reviewing the exact result', async () => {
@@ -732,9 +734,8 @@ describe('intro teaching gate', () => {
     expect(boundary.generate.mock.calls[1][0]).toContain('target language is "de"');
     expect(boundary.generate.mock.calls[1][1][0].content).toContain('"required"');
     expect(boundary.generate.mock.calls[1][1][0].content).toContain('"purpose"');
-    expect(
-      JSON.parse(boundary.generate.mock.calls[2][1][0].content).items[4].content.introContext
-    ).toEqual(result);
+    const review = boundary.generate.mock.calls[2];
+    expect(JSON.parse(review[1][0].content).introContext).toEqual(result);
   });
 
   it('repairs generated teaching whose examples normalize to empty', async () => {
@@ -870,10 +871,9 @@ describe('intro teaching gate', () => {
     const error = await generateClassIntro(params).catch((failure: unknown) => failure);
     expect(error).toBeInstanceOf(TeachingQualityRejectionError);
     if (!(error instanceof TeachingQualityRejectionError)) throw error;
-    const reviewItems = JSON.parse(boundary.generate.mock.calls[2]![1][0].content).items.map(
-      ({ content }: { content: unknown }) => content
+    expect(JSON.parse(error.teachingFailure!.reviews[0]!.candidate!)).toEqual(
+      reviewedIntro(boundary.generate.mock.calls[2]![1][0].content)
     );
-    expect(JSON.parse(error.teachingFailure!.reviews[0]!.candidate!)).toEqual(reviewItems);
     expect(
       error.teachingFailure?.reviews[0]?.verdict.items.map(({ index, acceptable }) => [
         index,

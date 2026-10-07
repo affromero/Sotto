@@ -92,21 +92,8 @@ function introAddresses(value: IntroFixture): IntroAddress[] {
 function addressKey(address: IntroAddress): string {
   return 'index' in address ? `${address.field}:${address.index}` : address.field;
 }
-function fieldsFor(value: IntroFixture, address: IntroAddress): Record<string, unknown> {
-  if (address.field === 'purpose' || address.field === 'about')
-    return { [address.field]: value[address.field] };
-  if (address.field === 'visuals') return { visuals: value.visuals };
-  if ('index' in address && (address.field === 'focus' || address.field === 'tips'))
-    return { [address.field]: value[address.field][address.index] };
-  if ('index' in address) return { example: value.examples[address.index] };
-  throw new Error('Unknown fixture address');
-}
 function auditItems(value: IntroFixture) {
-  return introAddresses(value).map((address) => ({
-    address,
-    introContext: value,
-    fields: fieldsFor(value, address),
-  }));
+  return [{ introContext: value, addresses: introAddresses(value) }];
 }
 function fullVerdict(value: IntroFixture, rejected: Record<string, ReviewIssue> = {}) {
   return {
@@ -220,19 +207,16 @@ describe('field-local intro repair', () => {
     expect(
       boundary.generate.mock.calls[4]![2].jsonSchema.schema.properties.examples.required
     ).toEqual(['1']);
-    const finalItems = boundary.generate.mock.calls
+    const finalBatches = boundary.generate.mock.calls
       .filter(([system]) => system.startsWith('Independently review'))
       .slice(3)
-      .flatMap(([, messages]) =>
-        JSON.parse(messages[0].content).items.map((item: { content: unknown }) => item.content)
-      );
+      .map(([, messages]) => JSON.parse(messages[0].content));
+    const finalItems = finalBatches.flatMap((batch) => batch.items);
     expect(finalItems).toHaveLength(introAddresses(repaired).length);
-    expect(
-      finalItems.every(
-        (item) =>
-          JSON.stringify(item.introContext.examples[0]) === JSON.stringify(repaired.examples[0])
-      )
-    ).toBe(true);
+    for (const batch of finalBatches) {
+      expect(batch.introContext).toEqual(repaired);
+      expect(batch.introContext.examples[0]).toEqual(candidate.examples[0]);
+    }
   });
 
   it('merges multiple rejected indices in the same and different arrays', async () => {
@@ -366,6 +350,161 @@ describe('field-local intro repair', () => {
         verdict: fullVerdict(repaired, finalRejected),
       },
     ]);
+  });
+
+  it('retains complete compact candidates when a preserved visual fails the final audit', async () => {
+    const original = {
+      purpose: 'Erzähle, was du gestern gemacht hast.',
+      about:
+        'Das Perfekt besteht aus „haben“ oder „sein“ und einem Partizip. In Hauptsätzen steht das Hilfsverb auf Position zwei und das Partizip am Ende.',
+      focus: [
+        '„besuchen“: habe besucht',
+        '„gehen“: bin gegangen',
+        '„sehen“: habe gesehen',
+        '„machen“: habe gemacht',
+        '„fahren“ mit einem Ziel: bin gefahren',
+        '„gestern“ nennt die vergangene Zeit.',
+      ],
+      examples: [
+        {
+          target: 'Ich habe gestern meine Freundin besucht.',
+          meaning: 'Der Besuch war gestern.',
+          note: '„besuchen“: haben + besucht.',
+        },
+        {
+          target: 'Wir sind zu Fuß zum Markt gegangen.',
+          meaning: 'Wir sind mit dem Bus zum Markt gefahren.',
+          note: '„gehen“: sein + gegangen.',
+        },
+        {
+          target: 'Auf der Reise habe ich alte Häuser gesehen.',
+          meaning: 'Ich habe alte Häuser auf einer Reise gesehen.',
+          note: '„sehen“: haben + gesehen.',
+        },
+        {
+          target: 'Ich habe einen Kuchen gemacht.',
+          meaning: 'Der Kuchen ist fertig.',
+          note: '„machen“: haben + gemacht.',
+        },
+        {
+          target: 'Er ist mit dem Bus nach Berlin gefahren.',
+          meaning: 'Er ist mit einem Bus nach Berlin gereist.',
+          note: 'Mit einem Ziel steht „fahren“ hier mit „sein“.',
+        },
+      ],
+      tips: [
+        'Lerne das Hilfsverb mit dem Verb.',
+        '„Gestern“ besetzt hier Position eins.',
+        '„Gestern habe ich gekocht.“ ist ein Hauptsatz.',
+        'Frage nach dem Ziel: „zum Markt“.',
+        'Vergleiche vollständige Sätze.',
+      ],
+      visuals: {
+        timeline: {
+          title: 'Gestern auf der Reise',
+          steps: ['Wir sind zu Fuß zum Markt gegangen.', 'Er sieht alte Häuser.'],
+        },
+        contrast: {
+          title: 'Ein Hauptsatz im Perfekt',
+          leftLabel: 'Zeitangabe zuerst',
+          leftItems: [
+            'Gestern habe ich meine Freundin besucht.',
+            'Auf der Reise habe ich alte Häuser gesehen.',
+          ],
+          rightLabel: 'Subjekt zuerst',
+          rightItems: [
+            'Ich habe gestern meine Freundin besucht.',
+            'Ich habe auf der Reise alte Häuser gesehen.',
+          ],
+        },
+        callouts: [
+          {
+            label: 'Hilfsverb',
+            text: 'Lerne „gehen“ mit „sein“: „Wir sind zum Markt gegangen.“',
+            tone: 'blue',
+          },
+          {
+            label: 'Partizip',
+            text: '„Ich habe meine Freundin besucht.“: „besucht“ steht am Ende.',
+            tone: 'teal',
+          },
+        ],
+        links: [],
+      },
+    };
+    const prose = [
+      original.purpose,
+      original.about,
+      ...original.focus,
+      ...original.tips,
+      ...original.examples.flatMap(({ target, meaning, note }) => [target, meaning, note]),
+    ];
+    expect(prose.join(' ').split(/\s+/).length).toBeLessThanOrEqual(180);
+    const originalAddresses = introAddresses(original);
+    const duplicatedContext = originalAddresses.map((address) => ({
+      address,
+      introContext: original,
+    }));
+    expect(Buffer.byteLength(JSON.stringify(duplicatedContext), 'utf8')).toBeGreaterThan(32 * 1024);
+    expect(Buffer.byteLength(JSON.stringify(auditItems(original)), 'utf8')).toBeLessThan(32 * 1024);
+    const firstRejected = {
+      'examples:1': { issues: ['unsupported'], feedback: ['Correct the meaning.'] },
+    };
+    const repaired = {
+      ...original,
+      examples: original.examples.map((example, index) =>
+        index === 1 ? { ...example, meaning: 'Die Gruppe ist zu Fuß zum Markt gegangen.' } : example
+      ),
+    };
+    const finalRejected = {
+      visuals: { issues: ['incorrect'], feedback: ['The timeline adds a present-tense event.'] },
+    };
+    boundary.generate.mockResolvedValueOnce({
+      content: JSON.stringify(original),
+      model: 'captured-model',
+    });
+    queueReview(original, firstRejected);
+    boundary.generate.mockResolvedValueOnce({
+      content: JSON.stringify({ examples: { '1': repaired.examples[1] } }),
+      model: 'captured-model',
+    });
+    queueReview(repaired, finalRejected);
+
+    const error = await generateClassIntro(params).catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(TeachingQualityRejectionError);
+    if (!(error instanceof TeachingQualityRejectionError)) throw error;
+    expect(
+      error.teachingFailure?.reviews.map(({ candidate: retained, ...review }) => ({
+        ...review,
+        candidate: retained === null ? null : JSON.parse(retained),
+      }))
+    ).toEqual([
+      {
+        candidate: auditItems(original),
+        verdict: fullVerdict(original, firstRejected),
+      },
+      {
+        candidate: auditItems(repaired),
+        verdict: fullVerdict(repaired, finalRejected),
+      },
+    ]);
+    const finalBatches = boundary.generate.mock.calls
+      .filter(([system]) => system.startsWith('Independently review'))
+      .slice(4)
+      .map(([, messages]) => JSON.parse(messages[0].content));
+    expect(
+      finalBatches.flatMap((batch) =>
+        batch.items.map(({ content }: { content: { address: IntroAddress } }) => content.address)
+      )
+    ).toEqual(originalAddresses);
+    for (const batch of finalBatches) {
+      expect(batch.introContext).toEqual(repaired);
+      expect(batch.introContext.visuals).toEqual(original.visuals);
+      expect(batch.introContext.focus).toEqual(original.focus);
+      expect(batch.introContext.tips).toEqual(original.tips);
+      expect(batch.introContext.examples[0]).toEqual(original.examples[0]);
+    }
+    expect(JSON.stringify(error)).not.toContain(original.about);
   });
 
   it('rejects patch keys outside the reviewed address set', async () => {

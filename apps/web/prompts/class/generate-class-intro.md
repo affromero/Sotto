@@ -32,9 +32,11 @@ Rules:
 - {{EXAMPLE_MEANING_POLICY}}
 - Use plain, everyday wording at the learner's level for meanings. Distinguish going on foot from travelling by vehicle. Do not force lexical variety or replace ordinary actions with abstract noun phrases.
 - State the scope of every grammar rule. A verb-position rule for a main clause must explicitly say that it applies to main clauses. Do not present a common pattern as a universal rule.
+- Ground each grammar rule in the exact verbs and forms shown in the examples. Do not infer a categorical rule from a broad label such as movement or activity.
 - Meanings, notes and tips must use grammatical explanatory prose. When mentioning a word, infinitive phrase or other citation form, clearly quote that expression and make the surrounding sentence grammatical. A quoted example may be a fragment; explanatory prose must not treat an unquoted fragment as a grammatically integrated phrase.
 - Visuals must be pedagogical, not decorative: timelines, contrast maps, memory callouts, and helpful external links only when directly useful.
 - Every visual claim must be as accurate and precise as the prose, including the scope and exact position of a grammar rule. Preserve a verb's required complements when shortening examples. If showing only verb forms or a sentence pattern, explicitly label it as study notation and mark missing slots rather than presenting it as a complete sentence.
+- Every complete target-language example sentence in a visual must match an examples[].target exactly. Reuse its wording, tense, participants and complements instead of inventing another scenario.
 - Omit visuals when they add no useful teaching aid. A timeline or contrast may be null, and callouts or links may be empty. Do not invent content just to fill the visual fields below.
 - Use links sparingly. Only include stable, relevant URLs that help the learner inspect a real reference or official explanation.
 
