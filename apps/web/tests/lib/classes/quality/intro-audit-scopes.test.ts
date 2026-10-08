@@ -16,7 +16,7 @@ import {
   TeachingQualityRejectionError,
   reviewTeachingContent,
   requestTeachingReview,
-  TEACHING_QUALITY_JSON_SCHEMA,
+  TEACHING_ADJUDICATOR_JSON_SCHEMA,
 } from '@/lib/classes/quality/teaching-quality';
 import { captureGenerationFailure } from '@/lib/classes/quality/generation-failure';
 
@@ -145,7 +145,7 @@ describe('intro audit addresses', () => {
         variables: {},
         items: [{ explanation: 'Reviewed explanation.' }],
         introContext: candidate,
-        jsonSchema: TEACHING_QUALITY_JSON_SCHEMA,
+        jsonSchema: TEACHING_ADJUDICATOR_JSON_SCHEMA,
       })
     ).rejects.toBeInstanceOf(ReviewerProtocolError);
     expect(boundary.generate).not.toHaveBeenCalled();

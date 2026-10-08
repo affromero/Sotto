@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { authorizedLearnerExecution } from '../helpers/runtime/provider-execution';
+import {
+  emptyTeachingCriticFixture,
+  shapeTeachingProviderFixture,
+} from './classes/quality/intro-provider-fixture';
 
 // ---- Hoisted mock handles ----
 
@@ -34,13 +38,23 @@ const { mockCreateAIProvider, mockGenerateResponse } = vi.hoisted(() => {
   const generateResponse = vi.fn();
   return {
     mockCreateAIProvider: vi.fn((..._args: unknown[]) => ({
-      generateResponse: (...args: unknown[]) => {
-        const name = (args[2] as { jsonSchema?: { name: string } })?.jsonSchema?.name;
-        return name === 'class_teaching_quality'
-          ? mockTeachingResponse(...args)
-          : name === 'class_section_quality'
-            ? mockBlindResponse(...args)
-            : generateResponse(...args);
+      generateResponse: async (
+        system: string,
+        messages: Array<{ content: string }>,
+        options: unknown
+      ) => {
+        const name = (options as { jsonSchema?: { name: string } })?.jsonSchema?.name;
+        if (name === 'class_teaching_critic') return emptyTeachingCriticFixture(messages);
+        if (name === 'class_teaching_adjudicator')
+          return shapeTeachingProviderFixture(
+            system,
+            messages,
+            options,
+            await mockTeachingResponse(system, messages, options)
+          );
+        return name === 'class_section_quality'
+          ? mockBlindResponse(system, messages, options)
+          : generateResponse(system, messages, options);
       },
     })),
     mockGenerateResponse: generateResponse,

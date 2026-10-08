@@ -5,6 +5,10 @@ import { createMockExam, ExamCourseNotFoundError } from '@/lib/mock-exam-service
 import { invalidateServerInfra } from '@/lib/server-config';
 import { resolveSottoRequest } from '@/lib/sidedoor/access/core/request-identity';
 import {
+  emptyTeachingCriticFixture,
+  shapeTeachingProviderFixture,
+} from './classes/quality/intro-provider-fixture';
+import {
   createSharedTestInstance,
   type SharedTestInstance,
   type SharedTestIdentity,
@@ -204,7 +208,9 @@ suite('persisted mock exams', () => {
         .map((message) => message.content)
         .join('\n');
       let content: unknown;
-      if (body.response_format?.json_schema?.name === 'class_teaching_quality') {
+      if (schemaName === 'class_teaching_critic') {
+        content = JSON.parse(emptyTeachingCriticFixture([{ content: prompt }]).content);
+      } else if (schemaName === 'class_teaching_adjudicator') {
         content = {
           items: JSON.parse(prompt).items.map((item: { index: number }) => ({
             index: item.index,
@@ -213,6 +219,14 @@ suite('persisted mock exams', () => {
             feedback: [],
           })),
         };
+        content = JSON.parse(
+          shapeTeachingProviderFixture(
+            body.messages.find((message) => message.role === 'system')!.content,
+            [{ content: prompt }],
+            { jsonSchema: { name: schemaName } },
+            { content: JSON.stringify(content), model: 'exam-fixture' }
+          ).content
+        );
       } else if (body.response_format?.json_schema?.name === 'class_section_quality') {
         content = {
           passageAcceptable: true,

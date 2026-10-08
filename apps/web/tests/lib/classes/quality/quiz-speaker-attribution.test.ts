@@ -1,9 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { blockedProviderExecution } from '../../../helpers/runtime/provider-execution';
+import { emptyTeachingCriticFixture, shapeTeachingProviderFixture } from './intro-provider-fixture';
 
 const boundary = vi.hoisted(() => ({ generate: vi.fn(), resolve: vi.fn() }));
 vi.mock('@/lib/providers/ai', () => ({
-  createAIProvider: () => ({ generateResponse: boundary.generate }),
+  createAIProvider: () => ({
+    generateResponse: async (
+      system: string,
+      messages: Array<{ content: string }>,
+      options: unknown
+    ) => {
+      if ((options as { jsonSchema: { name: string } }).jsonSchema.name === 'class_teaching_critic')
+        return emptyTeachingCriticFixture(messages);
+      return shapeTeachingProviderFixture(system, messages, options, {
+        model: 'm',
+        ...(await boundary.generate(system, messages, options)),
+      });
+    },
+  }),
 }));
 vi.mock('@/lib/learning-ai', () => ({
   resolveCapturedLearningAi: boundary.resolve,
@@ -139,7 +153,7 @@ describe('grammar speaker attribution at the provider boundary', () => {
             }),
           };
         }
-        expect(schema).toBe('class_teaching_quality');
+        expect(schema).toBe('class_teaching_adjudicator');
         expect(system).toContain('For explanation items involving grammar tasks');
         expect(system).toContain('Reject unquoted transformations that change the stated actor');
         const reject = path === 'replacement' && taught++ === 0;
@@ -184,7 +198,7 @@ describe('grammar speaker attribution at the provider boundary', () => {
           };
         }
         expect(stage).toBe('keyed');
-        expect(options.jsonSchema.name).toBe('class_teaching_quality');
+        expect(options.jsonSchema.name).toBe('class_teaching_adjudicator');
         expect(system).toContain('For explanation items involving grammar tasks');
         expect(JSON.parse(messages[0].content).items[1].content).toEqual(unassigned[1]);
         return { content: JSON.stringify(verdict(true)) };
@@ -202,7 +216,7 @@ describe('grammar speaker attribution at the provider boundary', () => {
         verdict(true),
       ]);
       for (const review of failure.teachingFailure?.reviews ?? [])
-        expect(JSON.parse(review.candidate!)[1]).toEqual(unassigned[1]);
+        expect(JSON.parse(review.candidate!)[0].items[1]).toEqual(unassigned[1]);
     }
   );
 });

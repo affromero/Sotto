@@ -27,6 +27,10 @@ import {
 import { learningPreparationProviderRequest } from '@/lib/learning/preparation/preparation-provider';
 import { processPracticePreparation } from '@/workers/practice/practice-preparation.worker';
 import { readLearningFailure } from '@/lib/classes/quality/teaching-failure-store';
+import {
+  TEACHING_CRITIC_JSON_SCHEMA,
+  TEACHING_ADJUDICATOR_JSON_SCHEMA,
+} from '@/lib/classes/quality/teaching-quality';
 import { resumePractice } from '@/lib/practice/resume';
 import { practicePreparingSchema } from '@sotto/shared';
 import {
@@ -618,8 +622,9 @@ suite('Durable practice preparation against PostgreSQL', () => {
           requests.push(body);
           const payload = JSON.parse(body) as {
             messages: { role: string; content: string }[];
-            response_format?: unknown;
+            response_format?: { json_schema?: { name?: string } };
           };
+          const schemaName = payload.response_format?.json_schema?.name;
           const system =
             payload.messages.find((message) => message.role === 'system')?.content ?? '';
           const user = payload.messages.at(-1)?.content ?? '';
@@ -634,6 +639,7 @@ suite('Durable practice preparation against PostgreSQL', () => {
               };
             }[];
             questions?: { index: number }[];
+            criticisms?: { items: { index: number; findings: unknown[] }[] };
           } = {};
           try {
             reviewed = JSON.parse(user);
@@ -664,6 +670,32 @@ suite('Durable practice preparation against PostgreSQL', () => {
                 decision: 'WORD_MEANING_REQUIRED',
                 answerIndex: null,
                 reasoning: 'The visible passage does not reveal the greeting meaning.',
+              })),
+            };
+          } else if (schemaName === 'class_teaching_critic') {
+            expect(payload.response_format).toMatchObject({
+              type: 'json_schema',
+              json_schema: { ...TEACHING_CRITIC_JSON_SCHEMA, strict: true },
+            });
+            content = {
+              items: reviewed.items!.map(({ index }) => ({ index, findings: [] })),
+            };
+          } else if (schemaName === 'class_teaching_adjudicator') {
+            expect(payload.response_format).toMatchObject({
+              type: 'json_schema',
+              json_schema: { ...TEACHING_ADJUDICATOR_JSON_SCHEMA, strict: true },
+            });
+            expect(reviewed.criticisms).toEqual({
+              items: reviewed.items!.map(({ index }) => ({ index, findings: [] })),
+            });
+            content = {
+              items: reviewed.items!.map(({ index }) => ({
+                index,
+                acceptable: true,
+                issues: [],
+                feedback: [],
+                findings: [],
+                criticDecisions: [],
               })),
             };
           } else if (reviewed.items)

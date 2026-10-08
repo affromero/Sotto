@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { beforeEach, expect, it } from 'vitest';
+import type { Job } from 'bullmq';
+import { beforeEach, expect, it, vi } from 'vitest';
 import {
   StorageWriteJournal,
   prepareStorageTombstone,
@@ -26,6 +27,7 @@ import { readPristineRegenerationSnapshot } from '@/lib/classes/regeneration/pri
 import { captureEpisodeStorage } from '@/lib/sidedoor/storage/core/episode-storage';
 import { sottoJobExecutions } from '@/lib/sidedoor/jobs/core/job-execution-lifetime';
 import { preparationSchema, type ClassPreparation } from '@/lib/classes/preparation-state';
+import { processClassPreparation } from '@/workers/classes/class-preparation.worker';
 import {
   readLearningFailure,
   writeLearningFailure,
@@ -100,9 +102,13 @@ export function registerPreparationFailureTests(context: () => PreparationFailur
     return { operation: current, parent };
   }
 
-  it.each(['generation_failed', 'source_unreadable'] as const)(
-    'preserves known %s after audio cleanup and permits a fresh pristine attempt',
-    async (failure) => {
+  it.each(
+    (['generation_failed', 'source_unreadable'] as const).flatMap((failure) =>
+      [false, true].map((activeAudio) => ({ failure, activeAudio }))
+    )
+  )(
+    'preserves known $failure through audio cleanup while fencing active audio ($activeAudio)',
+    async ({ failure, activeAudio }) => {
       const lessonRecord = await lesson();
       const cls = await instance.database.courseClass.create({
         data: { courseId, lessonId: lessonRecord.id, order: 1, status: 'AVAILABLE' },
@@ -186,7 +192,7 @@ export function registerPreparationFailureTests(context: () => PreparationFailur
         executorId: randomUUID(),
       };
       await sottoTransaction(instance.database, async (database) => {
-        await sottoJobExecutions(database).begin(binding);
+        if (activeAudio) await sottoJobExecutions(database).begin(binding);
         const parent = await sottoJobOutbox(database).read(operation.id);
         if (!parent) throw new Error('Missing parent fixture');
         await recordClassPreparationFailure(
@@ -206,25 +212,41 @@ export function registerPreparationFailureTests(context: () => PreparationFailur
             readLearningFailure(database, unresolved!)
           )
         ).toEqual(privateFailure);
+      const retainedSections = await instance.database.classSection.findMany({
+        where: { classId: cls.id },
+        orderBy: { id: 'asc' },
+      });
+      const parent = await sottoTransaction(instance.database, (database) =>
+        sottoJobOutbox(database).read(operation.id)
+      );
+      if (!parent) throw new Error('Missing parent fixture');
+      const job = {
+        id: operation.id,
+        name: 'class-preparation.v1',
+        data: { operationId: operation.id, fingerprint: parent.fingerprint },
+      } as Job<unknown>;
       await sottoTransaction(instance.database, (database) =>
         settleCancelledPreparation(database, unresolved!)
       );
-      expect((await classPreparationStore(instance.database, courseId).read())?.status).toBe(
-        'UNRESOLVED'
-      );
-      await expect(requestClassPreparation(courseId, execution)).rejects.toThrow();
-      await expect(
-        recoverClassPreparation(courseId, execution, { acknowledgeUnknownOutcome: true })
-      ).rejects.toThrow(/cleanup/);
-      expect(
-        (await instance.database.courseClass.findUniqueOrThrow({ where: { id: cls.id } })).status
-      ).toBe('GENERATING');
-      await sottoTransaction(instance.database, (database) =>
-        sottoJobExecutions(database).settle(binding)
-      );
-      const recovered = await recoverClassPreparation(courseId, execution, {
-        acknowledgeUnknownOutcome: true,
-      });
+      if (activeAudio) {
+        expect((await classPreparationStore(instance.database, courseId).read())?.status).toBe(
+          'UNRESOLVED'
+        );
+        await expect(requestClassPreparation(courseId, execution)).rejects.toThrow();
+        await expect(
+          recoverClassPreparation(courseId, execution, { acknowledgeUnknownOutcome: true })
+        ).rejects.toThrow(/cleanup/);
+        expect(
+          (await instance.database.courseClass.findUniqueOrThrow({ where: { id: cls.id } })).status
+        ).toBe('GENERATING');
+        await sottoTransaction(instance.database, (database) =>
+          sottoJobExecutions(database).settle(binding)
+        );
+        await recoverClassPreparation(courseId, execution, {
+          acknowledgeUnknownOutcome: true,
+        });
+      }
+      const recovered = await classPreparationStore(instance.database, courseId).read();
       expect(recovered).toMatchObject({ id: operation.id, status: 'FAILED', failure });
       expect(
         (await instance.database.courseClass.findUniqueOrThrow({ where: { id: cls.id } })).status
@@ -234,6 +256,14 @@ export function registerPreparationFailureTests(context: () => PreparationFailur
           sottoJobOutbox(database).read(child.job.id)
         )
       ).toMatchObject({ complete: true });
+      await processClassPreparation(job);
+      expect(await classPreparationStore(instance.database, courseId).read()).toEqual(recovered);
+      expect(
+        await instance.database.classSection.findMany({
+          where: { classId: cls.id },
+          orderBy: { id: 'asc' },
+        })
+      ).toEqual(retainedSections);
       const freshSnapshot = await readPristineRegenerationSnapshot(cls.id, execution);
       const next = await requestClassPreparation(courseId, execution, {
         maxProviderRequests: 2,
@@ -252,9 +282,163 @@ export function registerPreparationFailureTests(context: () => PreparationFailur
       if (failure === 'generation_failed')
         expect(
           await sottoTransaction(instance.database, (database) =>
-            readLearningFailure(database, recovered)
+            readLearningFailure(database, recovered!)
           )
         ).toEqual(privateFailure);
+    }
+  );
+
+  it.each([
+    { activeAudio: false, unknownOutcome: false },
+    { activeAudio: true, unknownOutcome: false },
+    { activeAudio: false, unknownOutcome: true },
+  ])(
+    'settles known worker failures while fencing active audio ($activeAudio) and unknown outcomes ($unknownOutcome)',
+    async ({ activeAudio, unknownOutcome }) => {
+      const target = await lesson();
+      const cls = await instance.database.courseClass.create({
+        data: { courseId, lessonId: target.id, order: 1, status: 'AVAILABLE' },
+      });
+      const operation = await requestClassPreparation(courseId, execution, {
+        maxProviderRequests: 2,
+        intent: {
+          kind: 'REGENERATE',
+          classId: cls.id,
+          expectedAttempt: 1,
+          pristineSnapshot: await readPristineRegenerationSnapshot(cls.id, execution),
+        },
+      });
+      const parent = await sottoTransaction(instance.database, (database) =>
+        sottoJobOutbox(database).read(operation.id)
+      );
+      if (!parent) throw new Error('Missing worker fixture');
+      const episode = await instance.database.episode.create({
+        data: {
+          userId: execution.userId,
+          title: 'Retained partial audio',
+          topic: 'Travel',
+          source: 'CLASS',
+          audioGenerationKey: randomUUID(),
+        },
+      });
+      const retained = await instance.database.classSection.create({
+        data: {
+          classId: cls.id,
+          skill: 'READING',
+          status: 'READY',
+          seed: randomUUID(),
+          spec: {},
+          attempt: 1,
+        },
+      });
+      let childBinding:
+        | {
+            id: string;
+            parentId: string;
+            fingerprint: string;
+            executorId: string;
+          }
+        | undefined;
+      vi.stubGlobal('fetch', async () => {
+        await sottoTransaction(instance.database, async (database) => {
+          await registerPreparationAudio(
+            database,
+            operation,
+            episode.id,
+            episode.audioGenerationKey!
+          );
+          if (activeAudio && !childBinding) {
+            const storage = await captureEpisodeStorage(database, episode.id);
+            const child = await sottoJobOutbox(database).enqueue(
+              prepareJob({
+                id: randomUUID(),
+                namespace: SIDEDOOR_STATE_ID,
+                handler: 'audio-generation',
+                version: 1,
+                payload: {
+                  type: 'generate-audio',
+                  payload: { episodeId: episode.id },
+                  authority: {
+                    kind: 'episode',
+                    episodeId: episode.id,
+                    ownerUserId: execution.userId,
+                    userId: execution.userId,
+                    pipelineGeneration: null,
+                    preparationAudioGenerationKey: episode.audioGenerationKey!,
+                    snapshot: storage,
+                  },
+                },
+                scopes: storage.scopes,
+                delivery: { attempts: 1, priority: 0, availableAt: Date.now() },
+              })
+            );
+            childBinding = {
+              id: randomUUID(),
+              parentId: child.job.id,
+              fingerprint: child.fingerprint,
+              executorId: randomUUID(),
+            };
+            await sottoJobExecutions(database).begin(childBinding);
+          }
+        });
+        if (unknownOutcome) throw new Error('Fixture connection lost after provider admission');
+        return new Response(JSON.stringify({ error: { message: 'Rejected fixture request' } }), {
+          status: 422,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      });
+      const job = {
+        id: operation.id,
+        name: 'class-preparation.v1',
+        data: { operationId: operation.id, fingerprint: parent.fingerprint },
+      } as Job<unknown>;
+      if (unknownOutcome) {
+        await expect(processClassPreparation(job)).rejects.toThrow();
+        expect(await classPreparationStore(instance.database, courseId).read()).toMatchObject({
+          id: operation.id,
+          status: 'UNRESOLVED',
+          failure: 'interrupted',
+          audioEpisodeIds: [episode.id],
+        });
+        expect(
+          (await instance.database.courseClass.findUniqueOrThrow({ where: { id: cls.id } })).status
+        ).toBe('GENERATING');
+        await expect(
+          recoverClassPreparation(courseId, execution, { acknowledgeUnknownOutcome: true })
+        ).rejects.toThrow(/cleanup/);
+        expect(
+          await instance.database.classSection.findUniqueOrThrow({ where: { id: retained.id } })
+        ).toEqual(retained);
+        return;
+      }
+      await processClassPreparation(job);
+      const failed = await classPreparationStore(instance.database, courseId).read();
+      expect(failed).toMatchObject({
+        id: operation.id,
+        status: activeAudio ? 'UNRESOLVED' : 'FAILED',
+        failure: 'generation_failed',
+        audioEpisodeIds: [episode.id],
+      });
+      expect(
+        (await instance.database.courseClass.findUniqueOrThrow({ where: { id: cls.id } })).status
+      ).toBe(activeAudio ? 'GENERATING' : 'FAILED');
+      if (childBinding) {
+        await sottoTransaction(instance.database, (database) =>
+          sottoJobExecutions(database).settle(childBinding!)
+        );
+        expect(
+          await recoverClassPreparation(courseId, execution, { acknowledgeUnknownOutcome: true })
+        ).toMatchObject({ id: operation.id, status: 'FAILED', failure: 'generation_failed' });
+      }
+      const settled = await classPreparationStore(instance.database, courseId).read();
+      await processClassPreparation(job);
+      expect(await classPreparationStore(instance.database, courseId).read()).toEqual(settled);
+      expect(
+        await instance.database.classSection.findUniqueOrThrow({ where: { id: retained.id } })
+      ).toEqual(retained);
+      expect(
+        await instance.database.episode.findUniqueOrThrow({ where: { id: episode.id } })
+      ).toEqual(episode);
     }
   );
 

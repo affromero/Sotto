@@ -192,8 +192,9 @@ describe('intro teaching gate', () => {
         const error = await review.catch((failure: unknown) => failure);
         expect(error).toBeInstanceOf(TeachingQualityRejectionError);
         if (!(error instanceof TeachingQualityRejectionError)) throw error;
-        expect(error.teachingFailure?.reviews).toEqual([
-          { candidate: JSON.stringify([content]), verdict },
+        expect(error.teachingFailure?.reviews[0].verdict).toEqual(verdict);
+        expect(JSON.parse(error.teachingFailure!.reviews[0].candidate!)[0].items).toEqual([
+          content,
         ]);
       }
       const [system, messages, options] = boundary.generate.mock.calls[0]!;
@@ -220,9 +221,9 @@ describe('intro teaching gate', () => {
       expect(JSON.parse(messages[0].content)).toEqual({ items: [{ index: 0, content }] });
       expect(options).toMatchObject({
         model: 'captured-model',
-        maxTokens: 2048,
+        maxTokens: 4096,
         temperature: 0,
-        jsonSchema: { name: 'class_teaching_quality' },
+        jsonSchema: { name: 'class_teaching_critic' },
       });
     }
   );
@@ -339,8 +340,9 @@ describe('intro teaching gate', () => {
         const error = await review.catch((failure: unknown) => failure);
         expect(error).toBeInstanceOf(TeachingQualityRejectionError);
         if (!(error instanceof TeachingQualityRejectionError)) throw error;
-        expect(error.teachingFailure?.reviews).toEqual([
-          { candidate: JSON.stringify([content]), verdict },
+        expect(error.teachingFailure?.reviews[0].verdict).toEqual(verdict);
+        expect(JSON.parse(error.teachingFailure!.reviews[0].candidate!)[0].items).toEqual([
+          content,
         ]);
       }
       const [system, messages] = boundary.generate.mock.calls[0]!;
@@ -390,9 +392,9 @@ describe('intro teaching gate', () => {
       'Incidental locations, objects or events are unsupported associations'
     );
     expect(boundary.generate.mock.calls[0]![2]).toMatchObject({
-      maxTokens: 2048,
+      maxTokens: 4096,
       temperature: 0,
-      jsonSchema: { name: 'class_teaching_quality' },
+      jsonSchema: { name: 'class_teaching_critic' },
     });
     expect(JSON.parse(messages[0].content)).toEqual({ items: [{ index: 0, content }] });
   });

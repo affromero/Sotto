@@ -112,10 +112,10 @@ verdicts, provider errors, and cancellation never trigger replay. Every path
 preserves the original objective, course, vocabulary requirements, provider,
 model, and execution authority. Both gates must pass before script, vocabulary,
 or learner graph publication. Canonical reference verification still gates
-readiness, and audio waits for the learning association. The maximum remains seven
+readiness, and audio waits for the learning association. The maximum is nine
 application AI requests. A blind-first replacement uses at most two scripts, two
-quizzes, two blind reviews, and one teaching review. A teaching-first replacement
-uses one script, two quizzes, two blind reviews, and two teaching reviews.
+quizzes, two blind reviews, and one paired teaching review. A teaching-first replacement
+uses one script, two quizzes, two blind reviews, and two paired teaching reviews.
 Reference verification, provider transport or search subrequests, and
 later TTS/audio are separate. Parent request budgets remain unchanged. Private
 blind diagnostics use the existing sealed failure envelope with
@@ -165,7 +165,7 @@ and indexed feedback are untrusted correction data. Both generation and review
 must succeed before reference TTS or writing persistence. Provider errors,
 cancellation, and malformed reviewer verdicts propagate without repair. Structural
 and teaching failures share one replacement slot; a second rejection is terminal.
-At most four application model requests are made per skill; TTS remains separate.
+At most six application model requests are made per skill; TTS remains separate.
 `classes/quality/generation-structure.ts` preserves an ordered ledger of at most two
 actual rejected attempts through the existing sealed generation-failure snapshots.
 Original output is limited to 32 KiB per attempt with explicit size omission.
@@ -211,11 +211,25 @@ publication. Malformed or unbound evidence is terminal. This protocol proves
 evidence binding, not linguistic truth; semantic judgment remains probabilistic.
 A maximum-size intro uses ten requests total: one generation, four review requests
 before and after one bounded repair, plus the repair request. Writing uses at most
-four calls when a structurally valid set needs one bounded quality replacement
-and a second review. Section generation uses at most seven, including two
-candidates, optional JSON repair, blind reviews and teaching reviews. A
+six calls when a structurally valid set needs one bounded quality replacement
+and a second review. Section generation uses at most nine, including two
+candidates, optional JSON repair, blind reviews and paired teaching reviews. A
 teaching-quality rejection enters the same bounded replacement path as a
 blind-review rejection.
+The same evidence protocol reviews every indexed writing, speaking, listening,
+question explanation and vocabulary item through the shared teaching entry point.
+`classes/quality/teaching-review-protocol.ts` owns strict role schemas, exact string-leaf
+quotation binding, complete coverage and adjudication consistency. Nonintro calls
+contain at most fifty items, reviewed sequentially in batches of five with complete
+global verdict offsets. Critic and adjudicator packets are retained with the exact
+candidate in the existing private 32 KiB envelope, with explicit size omission.
+Only the final adjudicated summary controls rejection and correction. Speaking
+replacement authenticates the actual issued error, original phrases, final verdict
+and diagnostic bytes through a WeakMap; copied or modified evidence cannot authorize
+repair. Its correction receives the original phrases and adjudicated verdict rather
+than unsupported criticisms. Specialized reading metadata and masked SRS association
+reviews retain their separate contracts. All requests consume the unchanged parent
+budget; exhaustion never changes provider, waives a gate or adds a replacement.
 Teaching verdicts carry indexed feedback bounded to six 300-character entries
 per item. Replacements treat it as untrusted data and preserve the captured
 context and request limits. Logs contain only static protocol diagnostics and

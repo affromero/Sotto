@@ -137,6 +137,7 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
     'NATIVE',
     'REVIEW_SCHEMA',
     'TARGET',
+    'TEACHING_REVIEW_ROLE',
   ],
   'class/repair-class-intro.md': [
     'EXAMPLE_MEANING_POLICY',
