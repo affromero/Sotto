@@ -67,6 +67,13 @@ until the user checks its status.
 `settings/LocalAiSettings` is shown to admins on `/settings`; it updates the shared
 OpenAI-compatible AI endpoint and model and manages its optional encrypted key.
 
+`settings/LocalSpeechSettings` lets each learner explicitly disable audio or return to
+configured speech. Owners can select a local endpoint, model and distinct voices. Its
+atomic settings route preserves cloud provider configuration and credentials. Returning to configured
+speech clears the profile's provider and model preferences together.
+Audio can be explicitly disabled. The panel shows observed selected-provider exhaustion and
+offers an explicit credit check after a top-up without switching speech providers.
+
 1. Create `src/components/domain/ComponentName.tsx`
 2. Create `src/components/domain/ComponentName.module.css`
 3. Export from component (no barrel files needed — import directly)

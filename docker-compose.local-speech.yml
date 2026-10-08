@@ -1,0 +1,46 @@
+# Optional speech service. Build and verify the image offserver, then supply
+# its full repository@sha256 reference. Connect Sotto Settings to
+# http://local-tts:8000 through the existing shared Docker network.
+services:
+  local-tts:
+    image: ${SOTTO_LOCAL_TTS_IMAGE:?Set the verified immutable local speech image reference}
+    restart: unless-stopped
+    user: '1000:1000'
+    read_only: true
+    tmpfs:
+      - /tmp:size=128m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 64
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: '2'
+          pids: 64
+    ports:
+      - '127.0.0.1:${SOTTO_LOCAL_TTS_PORT:-8001}:8000'
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - sotto-network
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+networks:
+  sotto-network:
+    external: true
+    name: sotto-network

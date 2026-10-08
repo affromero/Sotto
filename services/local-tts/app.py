@@ -1,21 +1,21 @@
 """
-Local Kokoro TTS sidecar — a keyless, self-hosted text-to-speech server.
+Local speech sidecar with explicitly selected Kokoro or German Piper engines.
 
-Wraps the open-source Kokoro-82M model (https://github.com/hexgrad/kokoro) in a
-small FastAPI service with a custom HTTP contract that the Sotto `kokoro` TTS
-provider talks to. No API key is required; the server ignores auth entirely.
+The existing Kokoro provider and generic Local provider use this private-network
+HTTP service. No cloud credential is needed. Engine selection never changes
+in response to a synthesis failure.
 
 HTTP contract
 -------------
 POST /tts
     Request JSON:  { "text": str, "voice": str, "language"?: str }
-    Response:      audio/wav bytes (24 kHz, mono, 16-bit PCM)
+    Response:      audio/wav bytes (native sample rate, mono, 16-bit PCM)
 
 GET /voices
     Response JSON: { "voices": [ { "id": str, "language": str, "label": str }, ... ] }
 
 GET /health
-    Response JSON: { "status": "ok" }
+    Response JSON: { "status": "ok", "engine": "kokoro" | "piper" }
 
 Kokoro voices follow the `{lang}{gender}_{name}` convention. The first letter of
 the voice id selects the Kokoro pipeline language code (`a` = American English,
@@ -27,13 +27,16 @@ from __future__ import annotations
 
 import io
 import logging
-from functools import lru_cache
+import os
+from contextlib import asynccontextmanager
+from functools import cache
+from pathlib import Path
 
 import numpy as np
 import soundfile as sf
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("local-tts")
@@ -91,16 +94,22 @@ VOICES = [
 
 DEFAULT_VOICE = "af_heart"
 
-app = FastAPI(title="Sotto Local Kokoro TTS", version="1.0.0")
-
 
 class TtsRequest(BaseModel):
-    text: str = Field(..., min_length=1)
-    voice: str = Field(default=DEFAULT_VOICE, min_length=1)
-    language: str | None = None
+    text: str = Field(..., min_length=1, max_length=4096)
+    voice: str | None = Field(default=None, min_length=1)
+    language: str | None = Field(default=None, min_length=1)
+    model: str | None = None
+
+    @field_validator("text")
+    @classmethod
+    def text_has_words(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Speech text must not be blank.")
+        return value
 
 
-@lru_cache(maxsize=None)
+@cache
 def _get_pipeline(lang_code: str):
     """Lazily build (and cache) one Kokoro KPipeline per language code."""
     from kokoro import KPipeline
@@ -138,33 +147,79 @@ def _synthesize(text: str, voice: str) -> np.ndarray:
             chunks.append(array)
 
     if not chunks:
-        raise HTTPException(status_code=500, detail="Kokoro produced no audio for the given text.")
+        raise HTTPException(
+            status_code=500, detail="Kokoro produced no audio for the given text."
+        )
 
     return np.concatenate(chunks)
 
 
-@app.get("/health")
-def health() -> JSONResponse:
-    return JSONResponse({"status": "ok"})
+def create_app() -> FastAPI:
+    engine = os.environ.get("LOCAL_TTS_ENGINE", "kokoro")
+    if engine not in ("kokoro", "piper"):
+        raise ValueError("Unknown local TTS engine.")
+
+    @asynccontextmanager
+    async def lifespan(application: FastAPI):
+        if engine == "piper":
+            from piper_backend import PiperBackend
+
+            path = Path(
+                os.environ.get(
+                    "PIPER_VOICE_MANIFEST", "/opt/piper/models/manifest.json"
+                )
+            )
+            application.state.piper = PiperBackend(path)
+        yield
+
+    application = FastAPI(title="Sotto Local TTS", version="1.0.0", lifespan=lifespan)
+
+    @application.get("/health")
+    def health() -> JSONResponse:
+        return JSONResponse({"status": "ok", "engine": engine})
+
+    @application.get("/voices")
+    def voices() -> JSONResponse:
+        catalogue = application.state.piper.catalogue() if engine == "piper" else VOICES
+        return JSONResponse({"voices": catalogue})
+
+    @application.post("/tts")
+    def tts(req: TtsRequest) -> Response:
+        if engine == "piper":
+            from piper_backend import PiperRequestError
+
+            try:
+                data = application.state.piper.synthesize(
+                    req.text, req.voice, req.language, req.model
+                )
+            except PiperRequestError as error:
+                raise HTTPException(status_code=400, detail=str(error)) from error
+            except Exception as error:
+                logger.error("Piper synthesis failed: %s", type(error).__name__)
+                raise HTTPException(
+                    status_code=500, detail="Local speech synthesis failed."
+                ) from error
+            return Response(content=data, media_type="audio/wav")
+        voice = req.voice or DEFAULT_VOICE
+        if not any(item["id"] == voice for item in VOICES):
+            raise HTTPException(status_code=400, detail="Unknown Kokoro voice.")
+        language = next(item["language"] for item in VOICES if item["id"] == voice)
+        if (
+            req.language
+            and req.language.replace("_", "-").split("-")[0].lower() != language
+        ):
+            raise HTTPException(
+                status_code=400, detail="The language does not match the voice."
+            )
+        if req.model not in (None, "kokoro", "local"):
+            raise HTTPException(status_code=400, detail="Unknown Kokoro model.")
+        audio = _synthesize(req.text, voice)
+        buffer = io.BytesIO()
+        sf.write(buffer, audio, SAMPLE_RATE, format="WAV", subtype="PCM_16")
+        logger.info("Synthesized %d samples for voice=%s", audio.size, voice)
+        return Response(content=buffer.getvalue(), media_type="audio/wav")
+
+    return application
 
 
-@app.get("/voices")
-def voices() -> JSONResponse:
-    return JSONResponse({"voices": VOICES})
-
-
-@app.post("/tts")
-def tts(req: TtsRequest) -> Response:
-    audio = _synthesize(req.text, req.voice)
-
-    buffer = io.BytesIO()
-    sf.write(buffer, audio, SAMPLE_RATE, format="WAV", subtype="PCM_16")
-    buffer.seek(0)
-
-    logger.info(
-        "Synthesized %d samples (%.2fs) for voice=%s",
-        audio.size,
-        audio.size / SAMPLE_RATE,
-        req.voice,
-    )
-    return Response(content=buffer.read(), media_type="audio/wav")
+app = create_app()

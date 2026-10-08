@@ -21,6 +21,7 @@ vi.mock('@/lib/classes/preparation', () => ({
 
 import { POST as POSTNextClass } from '@/app/api/v1/courses/[courseId]/next-class/route';
 import { PreparationConflictError } from '@/lib/classes/preparation-state';
+import { ProviderCreditsExhaustedError } from '@/lib/providers/shared/speech-availability';
 
 function makeRequest(url: string, method: string): NextRequest {
   return new NextRequest(url, { method });
@@ -54,6 +55,16 @@ describe('POST /api/v1/courses/[courseId]/next-class', () => {
   it('returns 401 when unauthenticated', async () => {
     mockAuthenticateRequest.mockResolvedValue(null);
     expect((await next()).status).toBe(401);
+  });
+
+  it('alerts an exhausted-credit learner before accepting background generation', async () => {
+    mockRequestPreparation.mockRejectedValue(new ProviderCreditsExhaustedError('cartesia'));
+    const response = await next('?background=1');
+    expect(response.status).toBe(402);
+    expect(await response.json()).toMatchObject({
+      code: 'PROVIDER_CREDITS_EXHAUSTED',
+      error: expect.stringContaining('explicitly disable audio'),
+    });
   });
 
   it('returns the persisted class result to a synchronous client', async () => {

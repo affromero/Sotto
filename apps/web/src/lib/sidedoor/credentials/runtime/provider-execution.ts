@@ -5,6 +5,7 @@ import {
   createProviderTransport,
   createMediaTransport,
   type ProviderRequestRule,
+  type ProviderTransport,
 } from 'thesidedoor-core/providers/transport';
 import { prismaUnfiltered } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
@@ -22,6 +23,7 @@ import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 import { sottoStateWriteTransaction } from '@/lib/sidedoor/access/state/write-transaction';
 import type { AuthenticatedRequest } from '@/lib/api-keys';
 import { requireOriginalSottoAdmission } from '@/lib/sidedoor/access/core/request-identity';
+import { captureSpeechAvailability } from '@/lib/providers/shared/speech-availability';
 
 export interface SottoProviderExecution {
   userId: string;
@@ -88,6 +90,7 @@ export async function captureSottoProviderAdmission(execution: SottoProviderExec
     },
     { signal }
   );
+  const availability = await captureSpeechAvailability(execution);
   const admit = async (suppliedSignal: AbortSignal, recordUse: boolean) => {
     const requestSignal = signal ? AbortSignal.any([signal, suppliedSignal]) : suppliedSignal;
     const usedAt = Date.now();
@@ -124,24 +127,23 @@ export async function captureSottoProviderAdmission(execution: SottoProviderExec
       return structuredClone(owner);
     },
     validate: (requestSignal: AbortSignal) => admit(requestSignal, false),
-    createTransport: (rules: readonly ProviderRequestRule[]) =>
-      createProviderTransport({
+    createTransport: (rules: readonly ProviderRequestRule[]): ProviderTransport => {
+      const transport = createProviderTransport({
         rules: structuredClone(rules),
         signal,
-        ...(providerRequest
-          ? {
-              implementation: (input, init) => {
-                const request = new Request(input, init);
-                return providerRequest(request, () => globalThis.fetch(request));
-              },
-            }
-          : {}),
+        implementation: async (input, init) => {
+          const request = new Request(input, init);
+          return providerRequest
+            ? await providerRequest(request, () => globalThis.fetch(request))
+            : await globalThis.fetch(request);
+        },
         admit: async (request, requestSignal) => {
           if (
             credential &&
             new URL(request.url).origin !== new URL(credential.binding.endpoint).origin
           )
             throw new AccessError('conflict', 'The provider destination changed');
+          await availability?.admitRequest(request.method, requestSignal);
           await admit(requestSignal, true);
         },
         onCleanupError: (error) => {
@@ -150,7 +152,17 @@ export async function captureSottoProviderAdmission(execution: SottoProviderExec
             error: error instanceof Error ? error.message : String(error),
           });
         },
-      }),
+      });
+      const observed: ProviderTransport = {
+        authenticatedFetch: async (input, init, observation) => {
+          const request = new Request(input, init);
+          const response = await transport.authenticatedFetch(request, undefined, observation);
+          const requestSignal = signal ? AbortSignal.any([signal, request.signal]) : request.signal;
+          return availability?.observeResponse(response, request.method, requestSignal) ?? response;
+        },
+      };
+      return Object.freeze(observed);
+    },
     createMediaTransport: ({ maxBytes, timeoutMs, admitDestination }: SottoMediaOptions) =>
       createMediaTransport({
         maxBytes,

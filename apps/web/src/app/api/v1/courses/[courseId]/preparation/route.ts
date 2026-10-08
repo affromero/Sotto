@@ -10,6 +10,10 @@ import {
   requestClassPreparation,
 } from '@/lib/classes/preparation';
 import { PreparationConflictError } from '@/lib/classes/preparation-state';
+import {
+  ProviderCreditsExhaustedError,
+  speechCreditsMessage,
+} from '@/lib/providers/shared/speech-availability';
 
 export const runtime = 'nodejs';
 
@@ -123,6 +127,8 @@ export async function POST(
     );
   } catch (error) {
     if (error instanceof PreparationConflictError) return errorResponse(error.message, 409);
+    if (error instanceof ProviderCreditsExhaustedError)
+      return errorResponse(speechCreditsMessage(error), 402, { code: error.code });
     return errorResponse('Could not schedule class preparation.', 500);
   }
 }

@@ -1,8 +1,13 @@
 import { isDeepStrictEqual } from 'node:util';
 import { prisma, prismaUnfiltered } from './prisma';
 import { getAutoModelConfig } from './auto-model-config';
-import { getConfiguredTtsProviderId, resolveTtsProvider } from './providers/tts';
-import { isValidProviderId, type TtsProviderId } from './providers/tts-registry';
+import {
+  getConfiguredTtsProviderId,
+  resolveTtsProvider,
+  selectTtsProviderId,
+  isSpeechDisabled,
+} from './providers/tts';
+import type { TtsProviderId } from './providers/tts-registry';
 import { getVisualCueKey } from './visual-cue-keys';
 import { logger } from './logger';
 import { captureFocusTargetStorage } from '@/lib/sidedoor/storage/core/focus-target-storage';
@@ -352,7 +357,10 @@ export async function addVisualCue(
 }
 
 async function resolvePronunciationRouting(target: Awaited<ReturnType<typeof findTargetForUser>>) {
-  const configured = getConfiguredTtsProviderId();
+  if (isSpeechDisabled(target.course.user))
+    throw new LearningTargetUnavailableError('Audio is disabled for this profile.');
+  const preferred = target.course.user.preferredTtsProvider;
+  const configured = selectTtsProviderId(preferred, getConfiguredTtsProviderId());
   if (configured) {
     const config = await getAutoModelConfig().catch(() => null);
     return {
@@ -360,16 +368,7 @@ async function resolvePronunciationRouting(target: Awaited<ReturnType<typeof fin
       model:
         target.course.user.preferredTtsModel ??
         (config?.model.ttsProvider === configured ? config.model.ttsModel : null),
-      source: 'server-configured',
-    };
-  }
-
-  const preferredProvider = target.course.user.preferredTtsProvider;
-  if (preferredProvider && isValidProviderId(preferredProvider)) {
-    return {
-      providerId: preferredProvider,
-      model: target.course.user.preferredTtsModel,
-      source: 'user-preferred',
+      source: preferred ? 'user-preferred' : 'server-configured',
     };
   }
 

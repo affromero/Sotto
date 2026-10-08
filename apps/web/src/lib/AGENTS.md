@@ -63,6 +63,23 @@ section; complete practice remains finishable at low scores.
 
 `learning/skill-requirements.ts`, `speech-configuration.ts`, and `speech-selection.ts`
 capture versioned requirements and explicit provider bindings without paid probes.
+Personal TTS selection precedes the configured server provider. An explicit local
+selection keeps its model and endpoint through canonical credential, transport,
+capacity and preparation admission. Explicit durable provider overrides retain
+their captured bindings. The profile's `disabled` speech policy exempts both oral
+skills and prevents default audio paths from selecting another provider. Speech
+fingerprints also fence changes from exempt to enabled audio. New whole-class
+regeneration captures current requirements; section repair keeps its stored requirements.
+Sidedoor `providers/availability` owns persistent provider account availability,
+scoped by instance, provider, billing origin and exact credential. Its catalogue
+classifies documented credit errors, separately from authentication and rate limits.
+Sotto `providers/shared/speech-availability.ts` composes authorized SQL state and
+observes complete bounded error bodies through the canonical transport. Known TTS
+exhaustion blocks lesson admission; each new paid request checks its captured account.
+Explicit Settings recheck permits one request-local TTS call through the captured
+factory, validates decoded audio and cleanup, and clears only the original revision.
+A concurrent newer credit failure remains blocked. GET polling remains available.
+Usage metadata does not prove restored credits, and no backend fallback is automatic.
 `learning/script-hash.ts` binds listening questions to the preserved script.
 `learning/session-evaluation.ts` validates complete material and current evidence.
 `learning/reading-vocabulary.ts` extracts passage vocabulary independently of

@@ -7,6 +7,10 @@ import { prisma } from '@/lib/prisma';
 import { deleteClassForUser, getClassForUser } from '@/lib/class-service';
 import { requestClassPreparation } from '@/lib/classes/preparation';
 import { PreparationConflictError } from '@/lib/classes/preparation-state';
+import {
+  ProviderCreditsExhaustedError,
+  speechCreditsMessage,
+} from '@/lib/providers/shared/speech-availability';
 import { classIntroFromSeed } from '@/lib/classes/class-intro';
 import { z } from 'zod';
 import { patchLearningProgress } from '@/lib/learning/progress-route';
@@ -227,6 +231,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   } catch (error: unknown) {
     if (error instanceof PristineRegenerationConflict || error instanceof PreparationConflictError)
       return errorResponse(error.message, 409);
+    if (error instanceof ProviderCreditsExhaustedError)
+      return errorResponse(speechCreditsMessage(error), 402, { code: error.code });
     const message = error instanceof Error ? error.message : 'Failed to regenerate sections';
     logger.error('Failed to regenerate sections', { error: message });
     return errorResponse(message, 500);

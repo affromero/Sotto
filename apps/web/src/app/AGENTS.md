@@ -5,6 +5,15 @@ The `courses/[courseId]/preparation` route exposes explicit scheduling (POST),
 sanitized activity (GET), and acknowledged recovery after verified cleanup (PATCH).
 Generation status and cancellation include queued work before a class exists.
 
+`settings/local-speech` atomically changes the authenticated selected profile's speech
+preference. Local endpoint/voice configuration and paid credit checks require owner
+authority. Browser origin checks and transactional identity revalidation precede writes.
+Configured mode clears the profile provider/model preferences while preserving server
+provider settings and credentials.
+Disabled mode skips audio for the selected profile. Credit status reports only observed
+selected provider exhaustion. An explicit check makes one short canonical speech request
+and clears its latch only after valid audio, without changing speech preferences.
+
 ## Page Index
 
 | Path                           | File                                                                                  | Auth  | Description                                                                                                                                                                                                                                                                                                                                                                                                              |

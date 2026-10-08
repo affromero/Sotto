@@ -403,6 +403,7 @@ const serverInfraSchema = z.object({
   sttModel: infraField,
   ttsProvider: infraField,
   ttsBaseUrl: infraField,
+  ttsVoices: infraField,
   storageProvider: infraField,
   localStorageRoot: infraField,
   objectStorageEndpoint: infraField,
@@ -412,6 +413,36 @@ const serverInfraSchema = z.object({
 });
 
 export const siteConfigUpdateSchema = serverInfraSchema;
+
+const localSpeechId = z
+  .string()
+  .trim()
+  .min(1)
+  .max(128)
+  .regex(/^[a-zA-Z0-9][a-zA-Z0-9_.:/+-]*$/);
+export const localSpeechSettingsSchema = z.discriminatedUnion('mode', [
+  z
+    .object({
+      mode: z.literal('local'),
+      endpoint: z.string().trim().min(1).max(512),
+      model: localSpeechId,
+      voices: z
+        .array(localSpeechId)
+        .min(2)
+        .max(8)
+        .refine((voices) => new Set(voices).size === voices.length, 'Choose distinct voice IDs')
+        .refine((voices) => voices.join(',').length <= 512, 'Voice IDs are too long'),
+    })
+    .strict(),
+  z.object({ mode: z.literal('configured') }).strict(),
+  z.object({ mode: z.literal('disabled') }).strict(),
+  z
+    .object({
+      mode: z.literal('check-credits'),
+      expectedProvider: z.string().trim().min(1).max(64),
+    })
+    .strict(),
+]);
 
 // Unified onboarding-wizard save. Per-user fields persist on every self-hosted
 // save; `infra` persists only when the caller is the owner (enforced server-side).

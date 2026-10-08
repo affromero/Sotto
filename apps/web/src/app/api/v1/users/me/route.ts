@@ -6,7 +6,11 @@ import { generateTagSlug } from '@/lib/slugify';
 import { logger } from '@/lib/logger';
 import { getProviderForModel, isValidModelId } from '@/lib/providers/ai-registry';
 import { getAutoModelConfig } from '@/lib/auto-model-config';
-import { getConfiguredTtsProviderId } from '@/lib/providers/tts';
+import {
+  getConfiguredTtsProviderId,
+  selectTtsProviderId,
+  isSpeechDisabled,
+} from '@/lib/providers/tts';
 import { getProviderMeta } from '@/lib/providers/tts-registry';
 import { getSttProviderMeta, isValidSttProviderId } from '@/lib/providers/stt-registry';
 import { getServerInfra } from '@/lib/server-config';
@@ -18,8 +22,11 @@ import { z } from 'zod';
 import { deleteSottoProfile } from '@/lib/sidedoor/access/deletion/profile-deletion';
 import { ACTIVE_PROFILE_COOKIE } from '@/lib/profiles/profile-cookie';
 import { SHARED_SESSION_COOKIE } from '@/lib/sidedoor/access/core/session-identity';
+import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 
 const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365;
+
+class SpeechPreferenceConflictError extends Error {}
 
 const updateUserSchema = z
   .object({
@@ -45,7 +52,7 @@ const updateUserSchema = z
       .optional(),
     preferredLanguage: z.string().max(5).nullable().optional(),
     preferredAiModel: z.string().nullable().optional(),
-    preferredTtsModel: z.string().nullable().optional(),
+    preferredTtsModel: z.string().trim().min(1).max(120).nullable().optional(),
     preferredSttModel: z.string().nullable().optional(),
     emailNotifications: z.boolean().optional(),
     pushNotifications: z.boolean().optional(),
@@ -97,6 +104,7 @@ export async function GET(request: NextRequest) {
       voicePreferences: user.voicePreferences,
       preferredLanguage: user.preferredLanguage,
       preferredAiModel: user.preferredAiModel,
+      preferredTtsProvider: user.preferredTtsProvider,
       preferredTtsModel: user.preferredTtsModel,
       preferredSttModel: user.preferredSttModel,
       showAgentUsageStatus: user.showAgentUsageStatus,
@@ -151,27 +159,38 @@ export async function PATCH(request: NextRequest) {
         : null;
     }
 
+    let validatedTtsProvider: string | null | undefined;
     if (preferredTtsModel !== undefined || preferredSttModel !== undefined) {
       const [autoConfig, infra, currentUser] = await Promise.all([
         getAutoModelConfig(),
         getServerInfra(),
         prisma.user.findUnique({
           where: { id: authResult.userId },
-          select: { preferredLanguage: true },
+          select: { preferredLanguage: true, preferredTtsProvider: true },
         }),
       ]);
       const language = validation.data.preferredLanguage ?? currentUser?.preferredLanguage ?? null;
+      if (preferredTtsModel !== undefined)
+        validatedTtsProvider = currentUser?.preferredTtsProvider ?? null;
 
       if (preferredTtsModel) {
-        const provider = getConfiguredTtsProviderId() ?? autoConfig.model.ttsProvider;
+        if (isSpeechDisabled(currentUser))
+          return errorResponse('Enable speech before choosing a speech model.', 400);
+        const provider =
+          selectTtsProviderId(currentUser?.preferredTtsProvider, getConfiguredTtsProviderId()) ??
+          autoConfig.model.ttsProvider;
         const meta = getProviderMeta(provider);
-        if (!meta.models.some((model) => model.id === preferredTtsModel)) {
+        if (provider !== 'local' && !meta.models.some((model) => model.id === preferredTtsModel)) {
           return errorResponse(
             `TTS model "${preferredTtsModel}" is not available on provider "${provider}".`,
             400
           );
         }
-        if (language && !supportsLanguage(provider, preferredTtsModel, language)) {
+        if (
+          provider !== 'local' &&
+          language &&
+          !supportsLanguage(provider, preferredTtsModel, language)
+        ) {
           return errorResponse(
             `TTS model "${preferredTtsModel}" does not support language "${language}".`,
             400
@@ -199,11 +218,21 @@ export async function PATCH(request: NextRequest) {
         }
       }
 
-      (data as Record<string, unknown>).preferredTtsModel = preferredTtsModel ?? null;
-      (data as Record<string, unknown>).preferredSttModel = preferredSttModel ?? null;
+      if (preferredTtsModel !== undefined)
+        (data as Record<string, unknown>).preferredTtsModel = preferredTtsModel;
+      if (preferredSttModel !== undefined)
+        (data as Record<string, unknown>).preferredSttModel = preferredSttModel;
     }
 
-    const updatedUser = await prisma.$transaction(async (tx) => {
+    const updatedUser = await sottoTransaction(prismaUnfiltered, async (tx) => {
+      if (validatedTtsProvider !== undefined) {
+        const current = await tx.user.findUnique({
+          where: { id: authResult.userId },
+          select: { preferredTtsProvider: true },
+        });
+        if (!current || (current.preferredTtsProvider ?? null) !== validatedTtsProvider)
+          throw new SpeechPreferenceConflictError('Speech selection changed. Reload Settings.');
+      }
       const user = await tx.user.update({
         where: { id: authResult.userId },
         data,
@@ -309,6 +338,7 @@ export async function PATCH(request: NextRequest) {
       voicePreferences: updatedUser.voicePreferences,
       preferredLanguage: updatedUser.preferredLanguage,
       preferredAiModel: updatedUser.preferredAiModel,
+      preferredTtsProvider: updatedUser.preferredTtsProvider,
       preferredTtsModel: updatedUser.preferredTtsModel,
       preferredSttModel: updatedUser.preferredSttModel,
       showAgentUsageStatus: updatedUser.showAgentUsageStatus,
@@ -325,6 +355,7 @@ export async function PATCH(request: NextRequest) {
     });
     return response;
   } catch (error: unknown) {
+    if (error instanceof SpeechPreferenceConflictError) return errorResponse(error.message, 409);
     logger.error('Failed to update user', {
       error: error instanceof Error ? error.message : String(error),
     });

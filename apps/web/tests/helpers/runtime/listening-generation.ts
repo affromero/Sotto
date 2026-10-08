@@ -193,7 +193,11 @@ const mockGetServerInfra = vi.fn().mockResolvedValue({});
 vi.mock('@/lib/server-config', () => ({
   getServerInfra: () => mockGetServerInfra(),
 }));
-vi.mock('@/lib/providers/tts', () => ({
+vi.mock('@/lib/providers/tts', async (importOriginal) => ({
+  selectTtsProviderId: (await importOriginal<typeof import('@/lib/providers/tts')>())
+    .selectTtsProviderId,
+  selectedTtsModel: (await importOriginal<typeof import('@/lib/providers/tts')>()).selectedTtsModel,
+  isSpeechDisabled: (await importOriginal<typeof import('@/lib/providers/tts')>()).isSpeechDisabled,
   getConfiguredTtsProviderId: () => mockGetConfiguredTtsProviderId(),
   resolveTtsProvider: (...args: unknown[]) => mockResolveTtsProvider(...args),
 }));

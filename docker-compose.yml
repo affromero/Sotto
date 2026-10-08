@@ -112,18 +112,27 @@ services:
       - sotto_whisper_data:/root/.cache/huggingface
 
   local-tts:
-    # Keyless Kokoro TTS sidecar (services/local-tts). Multilingual, CPU-friendly.
+    # Explicit optional engine. Kokoro remains the default; Piper supplies German.
     # Context is the service dir (its Dockerfile uses bare `COPY app.py`, matching
     # `docker build ... services/local-tts` in services/local-tts/AGENTS.md).
     build:
       context: ./services/local-tts
       dockerfile: Dockerfile
+      target: ${LOCAL_TTS_ENGINE:-kokoro}
     container_name: sotto-local-tts
     profiles: ['local']
+    environment:
+      LOCAL_TTS_ENGINE: ${LOCAL_TTS_ENGINE:-kokoro}
     ports:
       - '127.0.0.1:8000:8000'
     healthcheck:
-      test: ['CMD-SHELL', 'wget -q --spider http://localhost:8000/health || exit 1']
+      test:
+        [
+          'CMD',
+          'python',
+          '-c',
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)",
+        ]
       interval: 15s
       timeout: 5s
       retries: 10

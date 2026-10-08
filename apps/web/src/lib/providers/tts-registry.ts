@@ -47,6 +47,8 @@ export interface TtsProviderMeta {
   getApiKeyUrl: string;
   supportsSfx: boolean;
   supportsStreaming: boolean;
+  /** A paid check can verify the exact raw audio bytes returned by one HTTP200 POST. */
+  availabilityCheck?: 'direct_audio';
   maxSegmentChars: number;
   defaultModel: string;
   models: TtsModelOption[];
@@ -96,6 +98,7 @@ const {
 const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
   elevenlabs: {
     id: 'elevenlabs',
+    availabilityCheck: 'direct_audio',
     displayName: 'ElevenLabs',
     getApiKeyUrl: providerCredentialForm('elevenlabs', 'speech').getApiKeyUrl,
     supportsSfx: true,
@@ -138,6 +141,7 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
 
   openai: {
     id: 'openai',
+    availabilityCheck: 'direct_audio',
     displayName: 'OpenAI',
     getApiKeyUrl: providerCredentialForm('openai', 'speech').getApiKeyUrl,
     supportsSfx: false,
@@ -169,6 +173,7 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
 
   cartesia: {
     id: 'cartesia',
+    availabilityCheck: 'direct_audio',
     displayName: 'Cartesia',
     getApiKeyUrl: providerCredentialForm('cartesia', 'speech').getApiKeyUrl,
     supportsSfx: false,

@@ -12,6 +12,10 @@ import {
 } from '@/lib/practice/preparation';
 import { resumePractice } from '@/lib/practice/resume';
 import { PreparationConflictError } from '@/lib/classes/preparation-state';
+import {
+  ProviderCreditsExhaustedError,
+  speechCreditsMessage,
+} from '@/lib/providers/shared/speech-availability';
 
 type RouteParams = { params: Promise<{ courseId: string }> };
 
@@ -44,6 +48,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json(await resumePractice(operation.sessionId, authed.userId));
     return NextResponse.json(practicePreparationProgress(operation), { status: 202 });
   } catch (error: unknown) {
+    if (error instanceof ProviderCreditsExhaustedError)
+      return errorResponse(speechCreditsMessage(error), 402, { code: error.code });
     if (error instanceof PreparationConflictError) return errorResponse(error.message, 409);
     if (error instanceof PracticeCourseNotFoundError) return errorResponse('Course not found', 404);
     const message = error instanceof Error ? error.message : 'Failed to start practice';

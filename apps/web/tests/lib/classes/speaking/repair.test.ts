@@ -68,7 +68,11 @@ vi.mock('@/lib/prisma', () => ({
   prisma: { user: { findUnique: async () => ({ preferredTtsModel: 'configured-tts-model' }) } },
   prismaUnfiltered: {},
 }));
-vi.mock('@/lib/providers/tts', () => ({
+vi.mock('@/lib/providers/tts', async (importOriginal) => ({
+  selectTtsProviderId: (await importOriginal<typeof import('@/lib/providers/tts')>())
+    .selectTtsProviderId,
+  selectedTtsModel: (await importOriginal<typeof import('@/lib/providers/tts')>()).selectedTtsModel,
+  isSpeechDisabled: (await importOriginal<typeof import('@/lib/providers/tts')>()).isSpeechDisabled,
   canResolveTts: async () => true,
   getConfiguredTtsProviderId: () => 'cartesia',
   resolveTtsProvider: async () => ({

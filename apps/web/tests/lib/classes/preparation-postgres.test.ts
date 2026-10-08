@@ -43,6 +43,8 @@ import { processClassPreparation } from '@/workers/classes/class-preparation.wor
 import { recoverIsolatedPreparationExecution } from '@/lib/agents/isolated/isolated-agent-recovery';
 import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import { createSottoProviderTransport } from '@/lib/sidedoor/credentials/runtime/provider-execution';
+import { createSkillRequirements } from '@sotto/shared';
+import { setSiteConfig } from '@/lib/site-config';
 import {
   createSharedTestInstance,
   type SharedTestInstance,
@@ -138,6 +140,105 @@ suite('durable preparation admission and provider accounting', () => {
   }
 
   registerPreparationFailureTests(() => ({ instance, courseId, execution, running, lesson }));
+
+  it.each(['local', 'disabled'] as const)(
+    'captures the current %s speech policy for a new whole-class regeneration without changing old material',
+    async (provider) => {
+      const priorRequirements = createSkillRequirements({
+        scope: 'CLASS',
+        nativeLang: 'en',
+        targetLang: 'de',
+        level: 'A1',
+        ttsProvider: 'cartesia',
+        sttProvider: 'cartesia',
+      });
+      const cls = await instance.database.courseClass.create({
+        data: {
+          courseId,
+          lessonId: (await lesson()).id,
+          order: 1,
+          status: 'FAILED',
+          attempt: 1,
+          skillRequirements: priorRequirements,
+        },
+      });
+      const section = await instance.database.classSection.create({
+        data: {
+          classId: cls.id,
+          skill: 'GRAMMAR',
+          seed: 'retained-grammar-seed',
+          spec: { objective: 'Use the present tense of gehen' },
+          attempt: 1,
+          status: 'READY',
+        },
+      });
+      const vocabulary = await instance.database.learnerVocab.create({
+        data: {
+          courseId,
+          lemma: 'gehen',
+          translation: 'go',
+          partOfSpeech: 'verb',
+          mastery: 0.8,
+        },
+      });
+      await sottoTransaction(instance.database, async (database) => {
+        await setSiteConfig(
+          {
+            ttsProvider: 'cartesia',
+            ttsBaseUrl: 'http://local-tts:8000',
+            ttsVoices: 'de-host,de-expert',
+            sttProvider: 'local',
+            sttBaseUrl: 'http://local-stt:8000',
+          },
+          identity.ownerId,
+          database
+        );
+        await database.user.update({
+          where: { id: identity.ownerId },
+          data: {
+            preferredTtsProvider: provider,
+            preferredTtsModel: provider === 'local' ? 'piper-de' : null,
+          },
+        });
+      });
+      vi.stubGlobal('fetch', () => {
+        throw new Error('Admission must not dispatch provider work');
+      });
+      const operation = await requestClassPreparation(courseId, execution, {
+        intent: {
+          kind: 'REGENERATE',
+          classId: cls.id,
+          expectedAttempt: 1,
+        },
+      });
+      expect(operation.status).toBe('QUEUED');
+      expect(operation.intent?.attempt).toBe(2);
+      expect(operation.requirements).toMatchObject({
+        ttsProvider: provider === 'local' ? 'local' : null,
+        sttProvider: provider === 'local' ? 'local' : null,
+      });
+      expect(operation.intent?.skills).toEqual(
+        provider === 'local'
+          ? ['GRAMMAR', 'READING', 'LISTENING', 'SPEAKING', 'WRITING']
+          : ['GRAMMAR', 'READING', 'WRITING']
+      );
+      expect(
+        (await instance.database.courseClass.findUniqueOrThrow({ where: { id: cls.id } }))
+          .skillRequirements
+      ).toEqual(operation.requirements);
+      expect(await instance.database.classSection.findMany({ where: { classId: cls.id } })).toEqual(
+        [section]
+      );
+      expect(await instance.database.learnerVocab.findMany({ where: { courseId } })).toEqual([
+        vocabulary,
+      ]);
+      expect(
+        await sottoTransaction(instance.database, (database) =>
+          sottoJobOutbox(database).read(operation.id)
+        )
+      ).toMatchObject({ complete: false });
+    }
+  );
 
   async function queuedJob(operationId: string) {
     const record = await sottoTransaction(instance.database, (database) =>
