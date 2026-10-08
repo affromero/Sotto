@@ -112,6 +112,8 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
   'class/review-class-intro.md': [
     'EXAMPLE_MEANING_POLICY',
     'GRAMMAR_POINTS',
+    'GRAMMAR_RULE_POLICY',
+    'INTRO_REVIEW_ROLE',
     'LANGUAGE_POLICY',
     'LEVEL',
     'NATIVE',
@@ -139,6 +141,7 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
   'class/repair-class-intro.md': [
     'EXAMPLE_MEANING_POLICY',
     'GRAMMAR_POINTS',
+    'GRAMMAR_RULE_POLICY',
     'INTRO_SCHEMA',
     'LANGUAGE_POLICY',
     'LEVEL',
@@ -338,6 +341,8 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
   'class/generate-class-intro.md': [
     'EXAMPLE_MEANING_POLICY',
     'GRAMMAR_POINTS',
+    'GRAMMAR_RULE_POLICY',
+    'INTRO_SCHEMA',
     'LANGUAGE_POLICY',
     'LEVEL',
     'NATIVE',

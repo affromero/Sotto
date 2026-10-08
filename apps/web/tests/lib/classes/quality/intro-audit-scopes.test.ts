@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { blockedProviderExecution } from '../../../helpers/runtime/provider-execution';
+import { shapeIntroProviderFixture } from './intro-provider-fixture';
 
 const boundary = vi.hoisted(() => ({ generate: vi.fn() }));
 vi.mock('@/lib/learning-ai', () => ({
@@ -33,6 +34,19 @@ const candidate = {
   tips: ['Das Partizip steht am Ende.'],
   visuals: { timeline: { title: 'Gestern', steps: ['Wir sind gegangen.'] } },
 };
+const provider = {
+  generateResponse: async (
+    system: string,
+    messages: Array<{ content: string }>,
+    options: unknown
+  ) =>
+    shapeIntroProviderFixture(
+      system,
+      messages,
+      options,
+      await boundary.generate(system, messages, options)
+    ),
+};
 const options = {
   ai: {
     provider: 'fixture',
@@ -40,7 +54,7 @@ const options = {
     signal: new AbortController().signal,
     execution: blockedProviderExecution('fixture'),
   },
-  provider: { generateResponse: boundary.generate } as never,
+  provider: provider as never,
   userId: 'fixture',
   level: 'A2',
   nativeLang: 'en',
@@ -76,19 +90,36 @@ function acceptedBatch(size: number) {
   return verdict(Array.from({ length: size }, (_, index) => ({ index })));
 }
 
+function queueReview(response: ReturnType<typeof verdict>) {
+  for (let phase = 0; phase < 2; phase++)
+    boundary.generate.mockResolvedValueOnce({
+      content: JSON.stringify(response),
+      model: 'captured-luna',
+    });
+}
+
+function finding(fieldPath: string[], quote: string, defect: string) {
+  return {
+    issue: 'unnatural',
+    fieldPath,
+    quote: quote.slice(0, 120),
+    rule: 'fixture teaching contract',
+    defect,
+    correction: 'Use accurate supported teaching.',
+    counterexample: null,
+  };
+}
+
 async function rejectedExamples(reviewOptions = options): Promise<TeachingQualityRejectionError> {
-  boundary.generate.mockResolvedValueOnce({
-    content: JSON.stringify(
-      verdict([
-        { index: 0 },
-        { index: 1 },
-        { index: 2 },
-        { index: 3 },
-        { index: 4, acceptable: false, feedback: ['examples[0].meaning is unsupported.'] },
-      ])
-    ),
-    model: 'captured-luna',
-  });
+  queueReview(
+    verdict([
+      { index: 0 },
+      { index: 1 },
+      { index: 2 },
+      { index: 3 },
+      { index: 4, acceptable: false, feedback: ['examples[0].meaning is unsupported.'] },
+    ])
+  );
   const failure = await reviewTeachingContent(reviewOptions).catch((error: unknown) => error);
   if (!(failure instanceof TeachingQualityRejectionError)) throw failure;
   return failure;
@@ -123,9 +154,9 @@ describe('intro audit addresses', () => {
   it('reviews all atomic addresses in sequential batches of at most five', async () => {
     const fullCandidate = {
       ...candidate,
-      focus: Array.from({ length: 6 }, (_, index) => `focus ${index}`),
-      tips: Array.from({ length: 5 }, (_, index) => `tip ${index}`),
-      examples: Array.from({ length: 5 }, (_, index) => ({
+      focus: Array.from({ length: 2 }, (_, index) => `focus ${index}`),
+      tips: Array.from({ length: 2 }, (_, index) => `tip ${index}`),
+      examples: Array.from({ length: 3 }, (_, index) => ({
         target: `target ${index}`,
         meaning: `meaning ${index}`,
         note: `note ${index}`,
@@ -134,16 +165,12 @@ describe('intro audit addresses', () => {
     const expectedAddresses = [
       { field: 'purpose' },
       { field: 'about' },
-      ...Array.from({ length: 6 }, (_, index) => ({ field: 'focus', index })),
-      ...Array.from({ length: 5 }, (_, index) => ({ field: 'tips', index })),
-      ...Array.from({ length: 5 }, (_, index) => ({ field: 'examples', index })),
+      ...Array.from({ length: 2 }, (_, index) => ({ field: 'focus', index })),
+      ...Array.from({ length: 2 }, (_, index) => ({ field: 'tips', index })),
+      ...Array.from({ length: 3 }, (_, index) => ({ field: 'examples', index })),
       { field: 'visuals' },
     ];
-    for (const length of [5, 5, 5, 4])
-      boundary.generate.mockResolvedValueOnce({
-        content: JSON.stringify(acceptedBatch(length)),
-        model: 'captured-luna',
-      });
+    for (const length of [5, 5]) queueReview(acceptedBatch(length));
 
     await expect(
       reviewTeachingContent({ ...options, items: [fullCandidate] })
@@ -152,17 +179,18 @@ describe('intro audit addresses', () => {
     expect(boundary.generate).toHaveBeenCalledTimes(4);
     expect(
       boundary.generate.mock.calls.map((call) => JSON.parse(call[1][0].content).items.length)
-    ).toEqual([5, 5, 5, 4]);
+    ).toEqual([5, 5, 5, 5]);
     expect(
       boundary.generate.mock.calls.flatMap((_, index) =>
-        reviewedBatch(index).map(({ content }) => content.address)
+        index % 2 === 0 ? reviewedBatch(index).map(({ content }) => content.address) : []
       )
     ).toEqual(expectedAddresses);
-    expect(reviewedBatch(3).map(({ index, content }) => [index, content.address])).toEqual([
-      [0, { field: 'examples', index: 2 }],
-      [1, { field: 'examples', index: 3 }],
-      [2, { field: 'examples', index: 4 }],
-      [3, { field: 'visuals' }],
+    expect(reviewedBatch(2).map(({ index, content }) => [index, content.address])).toEqual([
+      [0, { field: 'tips', index: 1 }],
+      [1, { field: 'examples', index: 0 }],
+      [2, { field: 'examples', index: 1 }],
+      [3, { field: 'examples', index: 2 }],
+      [4, { field: 'visuals' }],
     ]);
     for (const call of boundary.generate.mock.calls) {
       const request = JSON.parse(call[1][0].content);
@@ -178,30 +206,24 @@ describe('intro audit addresses', () => {
   it('captures the final global address in bounded intro failure evidence', async () => {
     const fullCandidate = {
       ...candidate,
-      focus: Array.from({ length: 6 }, (_, index) => `focus ${index}`),
-      tips: Array.from({ length: 5 }, (_, index) => `tip ${index}`),
-      examples: Array.from({ length: 5 }, (_, index) => ({
+      focus: Array.from({ length: 2 }, (_, index) => `focus ${index}`),
+      tips: Array.from({ length: 2 }, (_, index) => `tip ${index}`),
+      examples: Array.from({ length: 3 }, (_, index) => ({
         target: `target ${index}`,
         meaning: `meaning ${index}`,
         note: `note ${index}`,
       })),
     };
-    for (const length of [5, 5, 5])
-      boundary.generate.mockResolvedValueOnce({
-        content: JSON.stringify(acceptedBatch(length)),
-        model: 'captured-luna',
-      });
-    boundary.generate.mockResolvedValueOnce({
-      content: JSON.stringify(
-        verdict([
-          { index: 0 },
-          { index: 1 },
-          { index: 2 },
-          { index: 3, acceptable: false, feedback: ['The visual is unsupported.'] },
-        ])
-      ),
-      model: 'captured-luna',
-    });
+    queueReview(acceptedBatch(5));
+    queueReview(
+      verdict([
+        { index: 0 },
+        { index: 1 },
+        { index: 2 },
+        { index: 3 },
+        { index: 4, acceptable: false, feedback: ['The visual is unsupported.'] },
+      ])
+    );
 
     const failure = await reviewTeachingContent({ ...options, items: [fullCandidate] }).catch(
       (error: unknown) => error
@@ -212,14 +234,39 @@ describe('intro audit addresses', () => {
       rejectedAddresses: [{ field: 'visuals' }],
       rejectedFields: ['visuals'],
       preserveVisuals: false,
+      rejectionEvidence: [
+        {
+          address: { field: 'visuals' },
+          findings: [
+            finding(['visuals', 'timeline', 'title'], 'Gestern', 'The visual is unsupported.'),
+          ],
+        },
+      ],
     });
-    expect(failure.teachingFailure?.reviews[0]?.verdict.items).toHaveLength(19);
+    expect(failure.teachingFailure?.reviews[0]?.verdict.items).toHaveLength(10);
     expect(failure.teachingFailure?.reviews[0]?.verdict.items.at(-1)).toEqual({
-      index: 18,
+      index: 9,
       acceptable: false,
       issues: ['unnatural'],
       feedback: ['The visual is unsupported.'],
     });
+  });
+
+  it('rejects an intro with nineteen addresses before provider dispatch', async () => {
+    const oversized = {
+      ...candidate,
+      focus: Array.from({ length: 6 }, (_, index) => `focus ${index}`),
+      tips: Array.from({ length: 5 }, (_, index) => `tip ${index}`),
+      examples: Array.from({ length: 5 }, (_, index) => ({
+        target: `target ${index}`,
+        meaning: `meaning ${index}`,
+        note: `note ${index}`,
+      })),
+    };
+    await expect(reviewTeachingContent({ ...options, items: [oversized] })).rejects.toBeInstanceOf(
+      ReviewerProtocolError
+    );
+    expect(boundary.generate).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -236,12 +283,7 @@ describe('intro audit addresses', () => {
   });
 
   it('accepts a complete batch verdict returned in a different order', async () => {
-    boundary.generate.mockResolvedValueOnce({
-      content: JSON.stringify(
-        verdict([{ index: 4 }, { index: 3 }, { index: 2 }, { index: 1 }, { index: 0 }])
-      ),
-      model: 'captured-luna',
-    });
+    queueReview(verdict([{ index: 4 }, { index: 3 }, { index: 2 }, { index: 1 }, { index: 0 }]));
 
     await expect(reviewTeachingContent(options)).resolves.toBeUndefined();
   });
@@ -254,12 +296,8 @@ describe('intro audit addresses', () => {
       { index: 3 },
       { index: 4, acceptable: false, feedback: ['example meaning adds an event.'] },
     ]);
-    boundary.generate
-      .mockResolvedValueOnce({ content: JSON.stringify(rawVerdict), model: 'captured-luna' })
-      .mockResolvedValueOnce({
-        content: JSON.stringify(verdict([{ index: 0 }])),
-        model: 'captured-luna',
-      });
+    queueReview(rawVerdict);
+    queueReview(verdict([{ index: 0 }]));
 
     const failure = await reviewTeachingContent(options).catch((error: unknown) => error);
     expect(failure).toBeInstanceOf(TeachingQualityRejectionError);
@@ -271,6 +309,24 @@ describe('intro audit addresses', () => {
       ],
       rejectedFields: ['focus', 'examples'],
       preserveVisuals: true,
+      rejectionEvidence: [
+        {
+          address: { field: 'focus', index: 0 },
+          findings: [
+            finding(['focus'], candidate.focus[0]!, 'focus entry has an unsupported rule.'),
+          ],
+        },
+        {
+          address: { field: 'examples', index: 0 },
+          findings: [
+            finding(
+              ['example', 'target'],
+              candidate.examples[0]!.target,
+              'example meaning adds an event.'
+            ),
+          ],
+        },
+      ],
     });
     expect(failure.feedback).toEqual([
       {
@@ -294,18 +350,15 @@ describe('intro audit addresses', () => {
 
   it('does not expose authenticated addresses through an oversized failure repair plan', async () => {
     const oversizedCandidate = { ...candidate, purpose: 'x'.repeat(40_000) };
-    boundary.generate.mockResolvedValueOnce({
-      content: JSON.stringify(
-        verdict([
-          { index: 0, acceptable: false, feedback: ['The purpose is unclear.'] },
-          { index: 1 },
-          { index: 2 },
-          { index: 3 },
-          { index: 4 },
-        ])
-      ),
-      model: 'captured-luna',
-    });
+    queueReview(
+      verdict([
+        { index: 0, acceptable: false, feedback: ['The purpose is unclear.'] },
+        { index: 1 },
+        { index: 2 },
+        { index: 3 },
+        { index: 4 },
+      ])
+    );
 
     const failure = await reviewTeachingContent({ ...options, items: [oversizedCandidate] }).catch(
       (error: unknown) => error
@@ -319,10 +372,17 @@ describe('intro audit addresses', () => {
 
     const firstPlan = getIntroRepairPlan(failure);
     (firstPlan.rejectedAddresses[0] as { field: string }).field = 'visuals';
+    firstPlan.rejectionEvidence[0]!.findings[0]!.quote = 'Tampered returned evidence';
     expect(getIntroRepairPlan(failure)).toEqual({
       rejectedAddresses: [{ field: 'purpose' }],
       rejectedFields: ['purpose'],
       preserveVisuals: true,
+      rejectionEvidence: [
+        {
+          address: { field: 'purpose' },
+          findings: [finding(['purpose'], oversizedCandidate.purpose, 'The purpose is unclear.')],
+        },
+      ],
     });
   });
 
@@ -392,9 +452,9 @@ describe('intro audit addresses', () => {
     }).catch((error: unknown) => error);
     expect(finalFailure).toBeInstanceOf(TeachingQualityRejectionError);
     if (!(finalFailure instanceof TeachingQualityRejectionError)) throw finalFailure;
-    expect(boundary.generate).toHaveBeenCalledTimes(4);
-    expect(reviewedBatch(2)).toHaveLength(5);
-    expect(reviewedBatch(3)).toHaveLength(5);
+    expect(boundary.generate).toHaveBeenCalledTimes(8);
+    expect(reviewedBatch(4)).toHaveLength(5);
+    expect(reviewedBatch(6)).toHaveLength(5);
     expect(finalFailure.feedback[0]?.feedback).toEqual([
       'examples: examples[2]: Defect at examples[2].',
       'visuals: visuals: Defect at visuals[].',
@@ -429,14 +489,13 @@ describe('intro audit addresses', () => {
     const changed = structuredClone(candidate);
     changed.examples[0].target += ' Heute.';
     changed.purpose += ' Heute.';
-    boundary.generate
-      .mockResolvedValueOnce({ content: JSON.stringify(acceptedBatch(5)), model: 'captured-luna' })
-      .mockResolvedValueOnce({ content: JSON.stringify(acceptedBatch(1)), model: 'captured-luna' });
+    queueReview(acceptedBatch(5));
+    queueReview(acceptedBatch(1));
 
     await expect(
       reviewTeachingContent({ ...options, items: [changed], previousIntroRejection })
     ).resolves.toBeUndefined();
-    const supplied = [...reviewedBatch(2), ...reviewedBatch(3)];
+    const supplied = [...reviewedBatch(4), ...reviewedBatch(6)];
     expect(supplied.map(({ content }) => content.address)).toEqual([
       { field: 'purpose' },
       { field: 'about' },
@@ -445,7 +504,7 @@ describe('intro audit addresses', () => {
       { field: 'examples', index: 0 },
       { field: 'visuals' },
     ]);
-    for (const callIndex of [2, 3]) {
+    for (const callIndex of [4, 5, 6, 7]) {
       expect(
         JSON.parse(boundary.generate.mock.calls[callIndex]![1][0].content).introContext
       ).toEqual(changed);

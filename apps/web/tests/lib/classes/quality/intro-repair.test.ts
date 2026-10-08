@@ -1,10 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { blockedProviderExecution } from '../../../helpers/runtime/provider-execution';
+import { scopedIntroFixture, shapeIntroProviderFixture } from './intro-provider-fixture';
 
 const boundary = vi.hoisted(() => ({ generate: vi.fn(), resolve: vi.fn() }));
 vi.unmock('@/lib/classes/class-intro');
 vi.mock('@/lib/providers/ai', () => ({
-  createAIProvider: () => ({ generateResponse: boundary.generate }),
+  createAIProvider: () => ({
+    generateResponse: async (
+      system: string,
+      messages: Array<{ content: string }>,
+      options: unknown
+    ) =>
+      shapeIntroProviderFixture(
+        system,
+        messages,
+        options,
+        await boundary.generate(system, messages, options)
+      ),
+  }),
 }));
 vi.mock('@/lib/learning-ai', () => ({
   resolveCapturedLearningAi: boundary.resolve,
@@ -20,7 +33,10 @@ import {
   TeachingQualityRejectionError,
 } from '@/lib/classes/quality/teaching-quality';
 import { captureGenerationFailure } from '@/lib/classes/quality/generation-failure';
-import { classIntroExampleMeaningPolicy } from '@/lib/classes/class-language-policy';
+import {
+  classIntroExampleMeaningPolicy,
+  classIntroGrammarRulePolicy,
+} from '@/lib/classes/class-language-policy';
 
 const params = {
   userId: 'fixture',
@@ -47,38 +63,51 @@ type IntroAddress =
 type ReviewIssue = { issues: string[]; feedback: string[] };
 
 const candidate: IntroFixture = {
-  purpose: 'Du lernst, kurz und klar von Erlebnissen und fertigen Aktivitäten zu erzählen.',
-  about:
-    'Im Gespräch benutzt man oft das Perfekt, wenn etwas schon passiert ist. Es besteht meist aus einer Form von „haben“ oder „sein“ und einem Partizip am Satzende. In Hauptsätzen steht das Hilfsverb oft auf Platz zwei.',
+  purpose: 'Erzähle klar von vergangenen Erlebnissen.',
+  about: '„Ich habe gestern meine Freundin besucht.“: Gestern besuchte ich meine Freundin.',
   focus: [
-    '„haben“ oder „sein“ passend zum Verb wählen',
-    'Das Partizip steht im Hauptsatz oft am Ende',
-    '„gestern“ nennt einen Zeitpunkt in der Vergangenheit',
-    '„gemacht“, „gesehen“ und „besucht“ in Alltagssätzen verwenden',
+    '„Ich habe gestern meine Freundin besucht.“: Wähle das passende Hilfsverb.',
+    '„Ich habe gestern meine Freundin besucht.“: Beachte die Wortstellung.',
   ],
   examples: [
     {
       target: 'Ich habe gestern meine Freundin besucht.',
-      meaning: 'Der Besuch bei meiner Freundin war gestern.',
-      note: 'Bei „besuchen“ steht das Perfekt mit „haben“.',
+      meaning: 'Gestern besuchte ich meine Freundin.',
+      note: '„Ich habe gestern meine Freundin besucht.“: „Besuchen“ verwendet „haben“.',
     },
     {
       target: 'Wir sind zu Fuß zum Markt gegangen.',
-      meaning: 'Wir haben den Markt gehend erreicht.',
-      note: '„Gehen“ bildet das Perfekt mit „sein“. „Zu Fuß“ zeigt: Wir waren nicht mit einem Fahrzeug unterwegs.',
+      meaning: 'Wir gingen zu Fuß zum Markt.',
+      note: '„Wir sind zu Fuß zum Markt gegangen.“: „Gehen“ verwendet „sein“.',
     },
     {
-      target: 'Auf der Reise habe ich viele schöne Orte gesehen.',
-      meaning: 'Während der Reise habe ich viele Orte mit meinen Augen wahrgenommen.',
-      note: '„Sehen“ bildet das Perfekt mit „haben“; das Partizip „gesehen“ steht hier am Satzende.',
+      target: 'Auf der Reise habe ich schöne Orte gesehen.',
+      meaning: 'Auf der Reise sah ich schöne Orte.',
+      note: '„Auf der Reise habe ich schöne Orte gesehen.“: „Sehen“ verwendet „haben“.',
     },
   ],
   tips: [
-    'Bei einer Bewegung von einem Ort zu einem anderen steht oft „sein“: „Ich bin zum Bahnhof gegangen.“',
-    'Für viele andere Verben steht „haben“, zum Beispiel: „Ich habe etwas gemacht“ oder „Ich habe einen Film gesehen.“',
-    'Im Hauptsatz steht das Hilfsverb oft auf Platz zwei und das Partizip am Ende: „Gestern habe ich gekocht.“',
+    '„Ich habe gestern meine Freundin besucht.“: Lerne das Hilfsverb.',
+    '„Ich habe gestern meine Freundin besucht.“: Nenne die vergangene Zeit.',
+    '„Ich habe gestern meine Freundin besucht.“: Vergleiche vollständige Sätze.',
   ],
 };
+
+function introWithWordCount(count: number, token = 'größer'): IntroFixture {
+  return {
+    purpose: 'Erzähle von gestern. ' + Array.from({ length: count - 31 }, () => token).join(' '),
+    about: '„Ich bin gegangen.“: Ich ging.',
+    focus: ['„Ich bin gegangen.“: Perfekt mit sein'],
+    examples: [
+      {
+        target: 'Ich bin gegangen.',
+        meaning: 'Ich ging.',
+        note: '„Ich bin gegangen.“: Gehen verwendet sein.',
+      },
+    ],
+    tips: ['„Ich bin gegangen.“: Nenne das Ziel.'],
+  };
+}
 function introAddresses(value: IntroFixture): IntroAddress[] {
   return [
     { field: 'purpose' },
@@ -92,8 +121,14 @@ function introAddresses(value: IntroFixture): IntroAddress[] {
 function addressKey(address: IntroAddress): string {
   return 'index' in address ? `${address.field}:${address.index}` : address.field;
 }
-function auditItems(value: IntroFixture) {
-  return [{ introContext: value, addresses: introAddresses(value) }];
+function auditItems(value: IntroFixture, rejected: Record<string, ReviewIssue> = {}) {
+  return [
+    {
+      introContext: value,
+      addresses: introAddresses(value),
+      reviewPackets: reviewPackets(value, rejected),
+    },
+  ];
 }
 function fullVerdict(value: IntroFixture, rejected: Record<string, ReviewIssue> = {}) {
   return {
@@ -105,26 +140,59 @@ function fullVerdict(value: IntroFixture, rejected: Record<string, ReviewIssue> 
     })),
   };
 }
-function queueReview(value: IntroFixture, rejected: Record<string, ReviewIssue> = {}) {
+function reviewPackets(value: IntroFixture, rejected: Record<string, ReviewIssue> = {}) {
   const allAddresses = introAddresses(value);
   const verdict = fullVerdict(value, rejected);
+  const packets = [];
   for (let offset = 0; offset < verdict.items.length; offset += 5) {
     const batch = verdict.items.slice(offset, offset + 5);
-    boundary.generate.mockResolvedValueOnce({
-      model: 'captured-model',
-      content: JSON.stringify({
-        items: batch.map((item, localIndex) => {
-          const issue = rejected[addressKey(allAddresses[offset + localIndex]!)];
-          return {
-            ...item,
-            index: localIndex,
-            acceptable: !issue,
-            issues: issue?.issues ?? [],
-            feedback: issue?.feedback ?? [],
-          };
-        }),
+    const critic = { items: batch.map((_, index) => ({ index, findings: [] })) };
+    const adjudicator = {
+      items: batch.map((item, localIndex) => {
+        const address = allAddresses[offset + localIndex]!;
+        const issue = rejected[addressKey(address)];
+        const fieldPath =
+          address.field === 'examples'
+            ? ['example', 'target']
+            : address.field === 'visuals'
+              ? ['visuals', 'timeline', 'title']
+              : [address.field === 'tips' ? 'tips' : address.field];
+        const text =
+          address.field === 'examples'
+            ? value.examples['index' in address ? address.index : 0]!.target
+            : address.field === 'visuals'
+              ? (value.visuals as { timeline: { title: string } }).timeline.title
+              : 'index' in address
+                ? (value[address.field][address.index] as string)
+                : value[address.field];
+        return {
+          ...item,
+          index: localIndex,
+          acceptable: !issue,
+          issues: issue?.issues ?? [],
+          feedback: issue?.feedback ?? [],
+          findings: (issue?.issues ?? []).map((code) => ({
+            issue: code,
+            fieldPath,
+            quote: text.slice(0, 120),
+            rule: 'Correct teaching in the assigned field.',
+            defect: issue!.feedback[0]!.slice(0, 120),
+            correction: 'Correct the identified teaching defect.',
+            counterexample: null,
+          })),
+          criticDecisions: [],
+        };
       }),
-    });
+    };
+    packets.push({ offset, critic, adjudicator });
+  }
+  return packets;
+}
+function queueReview(value: IntroFixture, rejected: Record<string, ReviewIssue> = {}) {
+  for (const { critic, adjudicator } of reviewPackets(value, rejected)) {
+    boundary.generate
+      .mockResolvedValueOnce({ model: 'captured-model', content: JSON.stringify(critic) })
+      .mockResolvedValueOnce({ model: 'captured-model', content: JSON.stringify(adjudicator) });
   }
 }
 beforeEach(() => {
@@ -139,6 +207,206 @@ beforeEach(() => {
 });
 
 describe('field-local intro repair', () => {
+  it('derives the overview from the selected example meaning before either review role', async () => {
+    const raw = {
+      ...scopedIntroFixture(candidate),
+      about: { exampleIndex: 1 },
+      visuals: null,
+    };
+    const framed = {
+      ...candidate,
+      about: '„Wir sind zu Fuß zum Markt gegangen.“: Wir gingen zu Fuß zum Markt.',
+    };
+    boundary.generate.mockResolvedValueOnce({ content: JSON.stringify(raw) });
+    queueReview(framed);
+
+    await expect(generateClassIntro(params)).resolves.toEqual(framed);
+    const reviews = boundary.generate.mock.calls.filter(([, , options]) =>
+      ['class_intro_critic', 'class_intro_adjudicator'].includes(options.jsonSchema?.name)
+    );
+    for (const [, messages] of reviews)
+      expect(JSON.parse(messages[0].content).introContext.about).toBe(framed.about);
+  });
+
+  it.each([false, true])(
+    'changes the first example and frames only a rejected overview: %s',
+    async (rejectAbout) => {
+      const correctedExample = {
+        target: 'Ich habe gestern einen Film gesehen.',
+        meaning: 'Gestern sah ich einen Film.',
+        note: '„Ich habe gestern einen Film gesehen.“: „Sehen“ steht hier mit „haben“.',
+      };
+      const rejected: Record<string, ReviewIssue> = {
+        'examples:0': { issues: ['unsupported'], feedback: ['Correct the example.'] },
+        ...(rejectAbout
+          ? { about: { issues: ['incorrect'], feedback: ['Correct the rule.'] } }
+          : {}),
+      };
+      const repaired = {
+        ...candidate,
+        about: rejectAbout
+          ? `„${correctedExample.target}“: ${correctedExample.meaning}`
+          : candidate.about,
+        examples: [correctedExample, ...candidate.examples.slice(1)],
+      };
+      boundary.generate.mockResolvedValueOnce({ content: JSON.stringify(candidate) });
+      queueReview(candidate, rejected);
+      boundary.generate.mockResolvedValueOnce({
+        content: JSON.stringify({
+          ...(rejectAbout ? { about: { exampleIndex: 0 } } : {}),
+          examples: { '0': correctedExample },
+        }),
+      });
+      queueReview(repaired);
+
+      await expect(generateClassIntro(params)).resolves.toEqual(repaired);
+      const finalReviews = boundary.generate.mock.calls
+        .filter(([, , options]) => options.jsonSchema?.name === 'class_intro_adjudicator')
+        .slice(2);
+      for (const [, messages] of finalReviews)
+        expect(JSON.parse(messages[0].content).introContext.about).toBe(repaired.about);
+    }
+  );
+  it.each(['größer', 'größer'.normalize('NFD'), '42'])(
+    'accepts exactly 180 words with Unicode-safe tokens: %s',
+    async (token) => {
+      const original = introWithWordCount(180, token);
+      original.purpose += '\t→ + …\n';
+      boundary.generate.mockResolvedValueOnce({ content: JSON.stringify(original) });
+      queueReview(original);
+
+      await expect(generateClassIntro(params)).resolves.toEqual(original);
+      expect(
+        boundary.generate.mock.calls.some(
+          ([, , options]) => options.jsonSchema?.name === 'class_intro_repair'
+        )
+      ).toBe(false);
+    }
+  );
+
+  it.each([181, 238])(
+    'repairs an initial %i-word intro using its measured rejection',
+    async (count) => {
+      const oversized = introWithWordCount(count);
+      boundary.generate
+        .mockResolvedValueOnce({ content: JSON.stringify(oversized) })
+        .mockResolvedValueOnce({ content: JSON.stringify(candidate) });
+      queueReview(candidate);
+
+      await expect(generateClassIntro(params)).resolves.toEqual(candidate);
+      const [, messages, options] = boundary.generate.mock.calls[1]!;
+      expect(options.jsonSchema.name).toBe('class_intro_repair');
+      expect(messages[0].content).toContain(
+        JSON.stringify(scopedIntroFixture({ ...oversized, visuals: null }))
+      );
+      const prefix = 'Structural validation diagnostics: ';
+      const diagnostics = messages[0].content
+        .split('\n')
+        .find((line: string) => line.startsWith(prefix));
+      expect(diagnostics).toBeDefined();
+      expect(JSON.parse(diagnostics!.slice(prefix.length))).toEqual([
+        { reason: 'prose_word_limit', maxWords: 180, actualWords: count },
+      ]);
+      const reviews = boundary.generate.mock.calls.filter(
+        ([, , options]) => options.jsonSchema?.name === 'class_intro_adjudicator'
+      );
+      const reviewedAddresses = reviews.flatMap(([, messages]) => {
+        const batch = JSON.parse(messages[0].content);
+        expect(batch.introContext).toEqual(candidate);
+        return batch.items.map(
+          ({ content }: { content: { address: IntroAddress } }) => content.address
+        );
+      });
+      expect(reviewedAddresses).toEqual(introAddresses(candidate));
+    }
+  );
+
+  it('repairs malformed JSON without inventing a measured word-limit rejection', async () => {
+    boundary.generate
+      .mockResolvedValueOnce({ content: '{' })
+      .mockResolvedValueOnce({ content: JSON.stringify(candidate) });
+    queueReview(candidate);
+
+    await expect(generateClassIntro(params)).resolves.toEqual(candidate);
+    const repair = boundary.generate.mock.calls.find(
+      ([, , options]) => options.jsonSchema?.name === 'class_intro_repair'
+    )!;
+    expect(repair[1][0].content).not.toContain('prose_word_limit');
+  });
+
+  it('compacts eleven addresses using the measured limit before any semantic audit', async () => {
+    const oversized = { ...candidate, focus: [...candidate.focus, 'Nenne die vergangene Zeit.'] };
+    boundary.generate
+      .mockResolvedValueOnce({ content: JSON.stringify(oversized) })
+      .mockResolvedValueOnce({ content: JSON.stringify(candidate) });
+    queueReview(candidate);
+
+    await expect(generateClassIntro(params)).resolves.toEqual(candidate);
+    const repair = boundary.generate.mock.calls.find(
+      ([, , options]) => options.jsonSchema?.name === 'class_intro_repair'
+    )!;
+    const prefix = 'Structural validation diagnostics: ';
+    const line = repair[1][0].content.split('\n').find((value: string) => value.startsWith(prefix));
+    expect(JSON.parse(line.slice(prefix.length))).toEqual([
+      { reason: 'audit_address_limit', maxAddresses: 10, actualAddresses: 11 },
+    ]);
+  });
+
+  it('rejects an eleven-address structural replacement without a second repair', async () => {
+    const oversized = { ...candidate, focus: [...candidate.focus, 'Nenne die vergangene Zeit.'] };
+    boundary.generate
+      .mockResolvedValueOnce({ content: JSON.stringify(oversized) })
+      .mockResolvedValueOnce({ content: JSON.stringify(oversized) });
+
+    await expect(generateClassIntro(params)).rejects.toThrow('educational quality');
+    expect(boundary.generate.mock.calls.map(([, , options]) => options.jsonSchema?.name)).toEqual([
+      'class_intro_generation',
+      'class_intro_repair',
+    ]);
+  });
+
+  it('fails closed when the one structural repair still exceeds 180 words', async () => {
+    const oversized = introWithWordCount(181);
+    boundary.generate
+      .mockResolvedValueOnce({ content: JSON.stringify(oversized) })
+      .mockResolvedValueOnce({ content: JSON.stringify(oversized) });
+
+    await expect(generateClassIntro(params)).rejects.toThrow('educational quality');
+    expect(boundary.generate.mock.calls.map(([, , options]) => options.jsonSchema?.name)).toEqual([
+      'class_intro_generation',
+      'class_intro_repair',
+    ]);
+  });
+
+  it('rejects a semantic patch whose complete merged intro exceeds 180 words', async () => {
+    const original = introWithWordCount(180);
+    const rejected = {
+      'examples:0': { issues: ['incorrect'], feedback: ['Clarify the usage note.'] },
+    };
+    const patch = {
+      examples: { '0': { ...original.examples[0], note: 'Gehen verwendet hier sein.' } },
+    };
+    boundary.generate.mockResolvedValueOnce({ content: JSON.stringify(original) });
+    queueReview(original, rejected);
+    boundary.generate.mockResolvedValueOnce({ content: JSON.stringify(patch) });
+
+    await expect(generateClassIntro(params)).rejects.toThrow('educational quality');
+    const repair = boundary.generate.mock.calls.at(-1)!;
+    expect(repair[2].jsonSchema.schema.properties).toEqual({ examples: expect.any(Object) });
+    expect(repair[1][0].content).toContain(original.about);
+    expect(repair[1][0].content).not.toContain('Structural validation diagnostics:');
+    const originalReview = boundary.generate.mock.calls.find(([system]) =>
+      system.startsWith('Independently review')
+    )!;
+    expect(JSON.parse(originalReview[1][0].content).introContext).toEqual(original);
+    expect(boundary.generate.mock.calls.map(([, , options]) => options.jsonSchema?.name)).toEqual([
+      'class_intro_generation',
+      'class_intro_critic',
+      'class_intro_adjudicator',
+      'class_intro_repair',
+    ]);
+  });
+
   it.each([1, 6])(
     'preserves every character of %i maximum-length reviewer comments in the repair request',
     async (commentCount) => {
@@ -149,7 +417,9 @@ describe('field-local intro repair', () => {
       const repaired = {
         ...candidate,
         focus: candidate.focus.map((focus, index) =>
-          index === 0 ? 'Erzähle, wie du zum Markt gegangen bist.' : focus
+          index === 0
+            ? '„Ich habe gestern meine Freundin besucht.“: Erzähle von deinem Besuch.'
+            : focus
         ),
       };
       boundary.generate.mockResolvedValueOnce({
@@ -172,6 +442,16 @@ describe('field-local intro repair', () => {
         .find((line: string) => line.startsWith('Review feedback: '));
       expect(JSON.parse(feedbackLine!.slice('Review feedback: '.length))).toEqual([
         { index: 0, feedback: [`focus: focus[0]: ${feedback.join(' ')}`] },
+      ]);
+      const evidencePrefix = 'Adjudicated defect evidence: ';
+      const evidenceLine = repairRequest![1][0].content
+        .split('\n')
+        .find((line: string) => line.startsWith(evidencePrefix));
+      expect(JSON.parse(evidenceLine!.slice(evidencePrefix.length))).toEqual([
+        {
+          address: { field: 'focus', index: 0 },
+          findings: reviewPackets(candidate, rejected)[0]!.adjudicator.items[2]!.findings,
+        },
       ]);
     }
   );
@@ -205,11 +485,13 @@ describe('field-local intro repair', () => {
     await expect(generateClassIntro(params)).resolves.toEqual(repaired);
     expect(repaired.examples[0]).toEqual(candidate.examples[0]);
     expect(
-      boundary.generate.mock.calls[4]![2].jsonSchema.schema.properties.examples.required
+      boundary.generate.mock.calls.find(
+        ([, , options]) => options.jsonSchema?.name === 'class_intro_repair'
+      )![2].jsonSchema.schema.properties.examples.required
     ).toEqual(['1']);
     const finalBatches = boundary.generate.mock.calls
-      .filter(([system]) => system.startsWith('Independently review'))
-      .slice(3)
+      .filter(([, , options]) => options.jsonSchema?.name === 'class_intro_adjudicator')
+      .slice(2)
       .map(([, messages]) => JSON.parse(messages[0].content));
     const finalItems = finalBatches.flatMap((batch) => batch.items);
     expect(finalItems).toHaveLength(introAddresses(repaired).length);
@@ -235,8 +517,8 @@ describe('field-local intro repair', () => {
         '2': { ...candidate.examples[2], meaning: 'Auf der Reise sah ich schöne Orte.' },
       },
       tips: {
-        '0': 'Bei Bewegung zu einem Ziel kann „sein“ stehen.',
-        '2': '„Gestern“ nennt einen vergangenen Zeitpunkt.',
+        '0': '„Ich habe gestern meine Freundin besucht.“: Lerne „besuchen“ mit „haben“.',
+        '2': '„Ich habe gestern meine Freundin besucht.“: „Gestern“ nennt einen vergangenen Zeitpunkt.',
       },
     };
     const repaired: IntroFixture = {
@@ -262,7 +544,9 @@ describe('field-local intro repair', () => {
     await expect(generateClassIntro(params)).resolves.toEqual(repaired);
     expect(repaired.examples[0]).toEqual(candidate.examples[0]);
     expect(repaired.tips[1]).toBe(candidate.tips[1]);
-    const schema = boundary.generate.mock.calls[4]![2].jsonSchema.schema.properties;
+    const schema = boundary.generate.mock.calls.find(
+      ([, , options]) => options.jsonSchema?.name === 'class_intro_repair'
+    )![2].jsonSchema.schema.properties;
     expect(schema.examples.required).toEqual(['1', '2']);
     expect(schema.tips.required).toEqual(['0', '2']);
   });
@@ -270,10 +554,11 @@ describe('field-local intro repair', () => {
   it('removes only a rejected optional visual and audits the merged result again', async () => {
     const original = {
       ...candidate,
+      focus: candidate.focus.slice(0, 1),
       visuals: {
         timeline: {
-          title: 'Timeline',
-          steps: ['Yesterday: We went.', 'Today: We tell the story.'],
+          title: candidate.about,
+          steps: [candidate.examples[0]!.target, candidate.examples[1]!.target],
         },
         contrast: null,
         callouts: [],
@@ -282,7 +567,7 @@ describe('field-local intro repair', () => {
     };
     const rejected = {
       'examples:1': { issues: ['unsupported'], feedback: ['Correct the meaning.'] },
-      visuals: { issues: ['unsupported'], feedback: ['The timeline adds an unsupported event.'] },
+      visuals: { issues: ['unsupported'], feedback: ['The timeline order is unsupported.'] },
     };
     const repaired: IntroFixture = {
       ...original,
@@ -302,11 +587,11 @@ describe('field-local intro repair', () => {
     });
     queueReview(repaired);
     await expect(generateClassIntro(params)).resolves.toEqual(repaired);
-    const reviewCalls = boundary.generate.mock.calls.filter(([system]) =>
-      system.startsWith('Independently review')
+    const reviewCalls = boundary.generate.mock.calls.filter(
+      ([, , options]) => options.jsonSchema?.name === 'class_intro_adjudicator'
     );
     const finalItems = reviewCalls
-      .slice(3)
+      .slice(2)
       .flatMap(([, messages]) =>
         JSON.parse(messages[0].content).items.map((item: { content: unknown }) => item.content)
       );
@@ -342,11 +627,11 @@ describe('field-local intro repair', () => {
     if (!(error instanceof TeachingQualityRejectionError)) throw error;
     expect(error.teachingFailure?.reviews).toEqual([
       {
-        candidate: JSON.stringify(auditItems(candidate)),
+        candidate: JSON.stringify(auditItems(candidate, firstRejected)),
         verdict: fullVerdict(candidate, firstRejected),
       },
       {
-        candidate: JSON.stringify(auditItems(repaired)),
+        candidate: JSON.stringify(auditItems(repaired, finalRejected)),
         verdict: fullVerdict(repaired, finalRejected),
       },
     ]);
@@ -354,78 +639,30 @@ describe('field-local intro repair', () => {
 
   it('retains complete compact candidates when a preserved visual fails the final audit', async () => {
     const original = {
-      purpose: 'Erzähle, was du gestern gemacht hast.',
-      about:
-        'Das Perfekt besteht aus „haben“ oder „sein“ und einem Partizip. In Hauptsätzen steht das Hilfsverb auf Position zwei und das Partizip am Ende.',
-      focus: [
-        '„besuchen“: habe besucht',
-        '„gehen“: bin gegangen',
-        '„sehen“: habe gesehen',
-        '„machen“: habe gemacht',
-        '„fahren“ mit einem Ziel: bin gefahren',
-        '„gestern“ nennt die vergangene Zeit.',
-      ],
-      examples: [
-        {
-          target: 'Ich habe gestern meine Freundin besucht.',
-          meaning: 'Der Besuch war gestern.',
-          note: '„besuchen“: haben + besucht.',
-        },
-        {
-          target: 'Wir sind zu Fuß zum Markt gegangen.',
-          meaning: 'Wir sind mit dem Bus zum Markt gefahren.',
-          note: '„gehen“: sein + gegangen.',
-        },
-        {
-          target: 'Auf der Reise habe ich alte Häuser gesehen.',
-          meaning: 'Ich habe alte Häuser auf einer Reise gesehen.',
-          note: '„sehen“: haben + gesehen.',
-        },
-        {
-          target: 'Ich habe einen Kuchen gemacht.',
-          meaning: 'Der Kuchen ist fertig.',
-          note: '„machen“: haben + gemacht.',
-        },
-        {
-          target: 'Er ist mit dem Bus nach Berlin gefahren.',
-          meaning: 'Er ist mit einem Bus nach Berlin gereist.',
-          note: 'Mit einem Ziel steht „fahren“ hier mit „sein“.',
-        },
-      ],
-      tips: [
-        'Lerne das Hilfsverb mit dem Verb.',
-        '„Gestern“ besetzt hier Position eins.',
-        '„Gestern habe ich gekocht.“ ist ein Hauptsatz.',
-        'Frage nach dem Ziel: „zum Markt“.',
-        'Vergleiche vollständige Sätze.',
-      ],
+      ...candidate,
+      focus: candidate.focus.slice(0, 2),
+      tips: candidate.tips.slice(0, 2),
       visuals: {
         timeline: {
-          title: 'Gestern auf der Reise',
-          steps: ['Wir sind zu Fuß zum Markt gegangen.', 'Er sieht alte Häuser.'],
+          title: candidate.about,
+          steps: [candidate.examples[0]!.target, candidate.examples[1]!.target],
         },
         contrast: {
-          title: 'Ein Hauptsatz im Perfekt',
-          leftLabel: 'Zeitangabe zuerst',
-          leftItems: [
-            'Gestern habe ich meine Freundin besucht.',
-            'Auf der Reise habe ich alte Häuser gesehen.',
-          ],
-          rightLabel: 'Subjekt zuerst',
-          rightItems: [
-            'Ich habe gestern meine Freundin besucht.',
-            'Ich habe auf der Reise alte Häuser gesehen.',
-          ],
+          title: candidate.about,
+          leftLabel: candidate.focus[0],
+          leftItems: [candidate.examples[0]!.target],
+          rightLabel: candidate.focus[1],
+          rightItems: [candidate.examples[1]!.target],
         },
         callouts: [
           {
-            label: 'Hilfsverb',
-            text: 'Lerne „gehen“ mit „sein“: „Wir sind zum Markt gegangen.“',
+            label: candidate.focus[0],
+            text: candidate.examples[0]!.note,
             tone: 'blue',
           },
           {
-            label: 'Partizip',
-            text: '„Ich habe meine Freundin besucht.“: „besucht“ steht am Ende.',
+            label: candidate.focus[1],
+            text: candidate.examples[1]!.note,
             tone: 'teal',
           },
         ],
@@ -445,7 +682,9 @@ describe('field-local intro repair', () => {
       address,
       introContext: original,
     }));
-    expect(Buffer.byteLength(JSON.stringify(duplicatedContext), 'utf8')).toBeGreaterThan(32 * 1024);
+    expect(Buffer.byteLength(JSON.stringify(duplicatedContext), 'utf8')).toBeGreaterThan(
+      Buffer.byteLength(JSON.stringify(auditItems(original)), 'utf8')
+    );
     expect(Buffer.byteLength(JSON.stringify(auditItems(original)), 'utf8')).toBeLessThan(32 * 1024);
     const firstRejected = {
       'examples:1': { issues: ['unsupported'], feedback: ['Correct the meaning.'] },
@@ -457,7 +696,7 @@ describe('field-local intro repair', () => {
       ),
     };
     const finalRejected = {
-      visuals: { issues: ['incorrect'], feedback: ['The timeline adds a present-tense event.'] },
+      visuals: { issues: ['incorrect'], feedback: ['The timeline order is unsupported.'] },
     };
     boundary.generate.mockResolvedValueOnce({
       content: JSON.stringify(original),
@@ -480,17 +719,17 @@ describe('field-local intro repair', () => {
       }))
     ).toEqual([
       {
-        candidate: auditItems(original),
+        candidate: auditItems(original, firstRejected),
         verdict: fullVerdict(original, firstRejected),
       },
       {
-        candidate: auditItems(repaired),
+        candidate: auditItems(repaired, finalRejected),
         verdict: fullVerdict(repaired, finalRejected),
       },
     ]);
     const finalBatches = boundary.generate.mock.calls
-      .filter(([system]) => system.startsWith('Independently review'))
-      .slice(4)
+      .filter(([, , options]) => options.jsonSchema?.name === 'class_intro_adjudicator')
+      .slice(2)
       .map(([, messages]) => JSON.parse(messages[0].content));
     expect(
       finalBatches.flatMap((batch) =>
@@ -527,10 +766,14 @@ describe('field-local intro repair', () => {
     const failure = captureGenerationFailure(error);
     expect(failure.category).toBe('section_quality');
     expect(failure.teachingFailure?.reviews[0]).toEqual({
-      candidate: JSON.stringify(auditItems(candidate)),
+      candidate: JSON.stringify(auditItems(candidate, rejected)),
       verdict: fullVerdict(candidate, rejected),
     });
-    expect(boundary.generate.mock.calls[4]![2].jsonSchema.schema.properties).toEqual({
+    expect(
+      boundary.generate.mock.calls.find(
+        ([, , options]) => options.jsonSchema?.name === 'class_intro_repair'
+      )![2].jsonSchema.schema.properties
+    ).toEqual({
       examples: expect.any(Object),
     });
   });
@@ -580,7 +823,17 @@ describe('field-local intro repair', () => {
         expect(result).toBeInstanceOf(TeachingQualityRejectionError);
       else expect(result).toEqual(repaired);
       const policy = classIntroExampleMeaningPolicy(params);
+      expect(policy).toContain('same event time and aspect');
+      expect(policy).toContain('need not repeat the target’s grammatical tense');
       expect(boundary.generate.mock.calls.every(([system]) => system.includes(policy))).toBe(true);
+      expect(classIntroGrammarRulePolicy()).toContain(
+        'A word-order claim must explicitly identify the clause type'
+      );
+      expect(
+        boundary.generate.mock.calls.every(([system]) =>
+          system.includes(classIntroGrammarRulePolicy())
+        )
+      ).toBe(true);
     }
   );
 
@@ -598,14 +851,17 @@ describe('field-local intro repair', () => {
     const error = await generateClassIntro(params).catch((caught: unknown) => caught);
     expect(error).toBe(originalError);
     expect(captureGenerationFailure(error).teachingFailure?.reviews[0].candidate).toBe(
-      JSON.stringify(auditItems(candidate))
+      JSON.stringify(auditItems(candidate, rejected))
     );
   });
 
-  it('preserves the purpose and re-reviews after a scalar correction', async () => {
+  it('preserves the purpose and re-reviews after selecting another overview example', async () => {
     const rejected = { about: { issues: ['uncertain'], feedback: ['Clarify the explanation.'] } };
-    const patch = { about: 'Das Perfekt beschreibt abgeschlossene Erlebnisse.' };
-    const repaired = { ...candidate, ...patch };
+    const patch = { about: { exampleIndex: 1 } };
+    const repaired = {
+      ...candidate,
+      about: '„Wir sind zu Fuß zum Markt gegangen.“: Wir gingen zu Fuß zum Markt.',
+    };
     boundary.generate.mockResolvedValueOnce({
       content: JSON.stringify(candidate),
       model: 'captured-model',
@@ -617,11 +873,11 @@ describe('field-local intro repair', () => {
     });
     queueReview(repaired);
     await expect(generateClassIntro(params)).resolves.toEqual(repaired);
-    const allReviewCalls = boundary.generate.mock.calls.filter(([system]) =>
-      system.startsWith('Independently review')
+    const allReviewCalls = boundary.generate.mock.calls.filter(
+      ([, , options]) => options.jsonSchema?.name === 'class_intro_adjudicator'
     );
     expect(
-      allReviewCalls.slice(3).flatMap(([, messages]) => JSON.parse(messages[0].content).items)
+      allReviewCalls.slice(2).flatMap(([, messages]) => JSON.parse(messages[0].content).items)
     ).toHaveLength(introAddresses(repaired).length);
   });
 
@@ -677,7 +933,7 @@ describe('field-local intro repair', () => {
       );
       expect(evidence.teachingFailure?.reviews).toEqual([
         {
-          candidate: JSON.stringify(auditItems(candidate)),
+          candidate: JSON.stringify(auditItems(candidate, rejected)),
           verdict: fullVerdict(candidate, rejected),
         },
       ]);

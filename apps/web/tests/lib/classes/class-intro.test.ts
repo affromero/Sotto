@@ -23,6 +23,113 @@ const FALLBACK = {
 };
 
 describe('classIntroFromSeed', () => {
+  it('restores useful own-target notes without counting their display quote as teaching content', async () => {
+    const { classIntroFromSeed } = await loadClassIntro();
+    const stored = {
+      purpose: 'Begrüße und erzähle vom Tag.',
+      about: 'Begrüßungen und Erlebnisse.',
+      focus: ['Grüße am Morgen.'],
+      examples: [
+        {
+          target: 'Guten Morgen',
+          meaning: '„Guten Morgen“ sagt man früh am Tag.',
+          note: '„Guten Morgen“: Sagt man früh am Tag.',
+        },
+        { target: 'Wir sind gegangen.', meaning: 'Wir gingen.', note: 'Gehen verwendet sein.' },
+      ],
+      tips: ['Nenne den Tag.'],
+    };
+    expect(classIntroFromSeed({ intro: stored }, FALLBACK)).toEqual(stored);
+  });
+  it.each([
+    {
+      meaning: 'Sagt man früh am Tag.',
+      note: 'Sagt man früh am Tag.',
+      name: 'ordinary redundant unprefixed note',
+    },
+    {
+      meaning: 'Eine Begrüßung am Morgen.',
+      note: '„Guten Morgen“: ',
+      name: 'own-target quote without a note body',
+    },
+    {
+      meaning: 'Eine Begrüßung am Morgen.',
+      note: '„Guten Morgen“: Früh.',
+      name: 'own-target quote with one-word body',
+    },
+    {
+      meaning: 'Eine Begrüßung am Morgen.',
+      note: '„Guten Morgen“: Früh vormittags.',
+      name: 'own-target quote with two-word body',
+    },
+    {
+      meaning: '„Guten Abend“ sagt man früh am Tag.',
+      note: '„Guten Abend“: Sagt man früh am Tag.',
+      name: 'mismatched quote that must remain part of the note',
+    },
+  ])('filters a stored short example with $name', async ({ meaning, note }) => {
+    const { classIntroFromSeed } = await loadClassIntro();
+    const useful = {
+      target: 'Wir sind gegangen.',
+      meaning: 'Wir gingen.',
+      note: 'Gehen verwendet sein.',
+    };
+    const stored = {
+      purpose: 'Begrüße und erzähle vom Tag.',
+      about: 'Begrüßungen und Erlebnisse.',
+      focus: ['Grüße am Morgen.'],
+      examples: [{ target: 'Guten Morgen', meaning, note }, useful],
+      tips: ['Nenne den Tag.'],
+    };
+    expect(classIntroFromSeed({ intro: stored }, FALLBACK)).toEqual({
+      ...stored,
+      examples: [useful],
+    });
+  });
+  it('restores an existing quote without rebinding accepted historical prose to the first example', async () => {
+    const { classIntroFromSeed } = await loadClassIntro();
+    const stored = {
+      purpose: 'Erzähle von gestern.',
+      about: '„Wir sind gegangen.“: Gehen verwendet sein.',
+      focus: ['Historische Erklärung ohne Beispielzitat.'],
+      examples: [
+        { target: 'Ich habe gekocht.', meaning: 'Ich kochte.', note: 'Kochen verwendet haben.' },
+      ],
+      tips: ['„Wir sind gegangen.“: Lerne das Hilfsverb.'],
+    };
+    expect(classIntroFromSeed({ intro: stored }, FALLBACK)).toEqual(stored);
+  });
+  it('preserves historical teaching with nineteen review addresses', async () => {
+    const { classIntroFromSeed } = await loadClassIntro();
+    const stored = {
+      purpose: 'Erzähle von gestern.',
+      about: 'Das Perfekt beschreibt Vergangenes.',
+      focus: Array.from({ length: 6 }, (_, index) => `Fokus ${index}`),
+      examples: Array.from({ length: 5 }, () => ({
+        target: 'Ich bin gegangen.',
+        meaning: 'Ich ging.',
+        note: '„Gehen“ verwendet hier „sein“.',
+      })),
+      tips: Array.from({ length: 5 }, (_, index) => `Tipp ${index}`),
+      visuals: { timeline: null, contrast: null, callouts: [], links: [] },
+    };
+    expect(classIntroFromSeed({ intro: stored }, FALLBACK)).toEqual(stored);
+  });
+  it('preserves persisted teaching that exceeds the fresh-generation 180-word limit', async () => {
+    const { classIntroFromSeed } = await loadClassIntro();
+    const stored = {
+      purpose: 'Erzähle von gestern.',
+      about: Array.from({ length: 164 }, () => 'größer').join(' '),
+      focus: ['Perfekt mit sein'],
+      examples: [
+        { target: 'Ich bin gegangen.', meaning: 'Ich ging.', note: 'Gehen verwendet sein.' },
+      ],
+      tips: ['Nenne das Ziel.'],
+    };
+
+    expect(classIntroFromSeed({ intro: stored }, { ...FALLBACK, level: 'A2' })).toEqual(stored);
+  });
+
   it('preserves an immersion usage note without replacing it with a paraphrase', async () => {
     const { classIntroFromSeed } = await loadClassIntro();
     const example = {
