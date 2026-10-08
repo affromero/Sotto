@@ -940,14 +940,17 @@ describe('intro teaching gate', () => {
     JSON.stringify({
       items: [{ index: 0, acceptable: false, issues: [], feedback: ['Correct the auxiliary.'] }],
     }),
-  ])('fails closed on malformed review protocol %s without replacement', async (content) => {
-    boundary.generate
-      .mockReset()
-      .mockResolvedValueOnce({ content: JSON.stringify(intro), model: 'captured-model' })
-      .mockResolvedValue({ content, model: 'captured-model' });
-    await expect(generateClassIntro(params)).rejects.toBeInstanceOf(ReviewerProtocolError);
-    expect(boundary.generate.mock.calls).toHaveLength(2);
-  });
+  ])(
+    'fails closed after one protocol correction without content replacement %s',
+    async (content) => {
+      boundary.generate
+        .mockReset()
+        .mockResolvedValueOnce({ content: JSON.stringify(intro), model: 'captured-model' })
+        .mockResolvedValue({ content, model: 'captured-model' });
+      await expect(generateClassIntro(params)).rejects.toBeInstanceOf(ReviewerProtocolError);
+      expect(boundary.generate.mock.calls).toHaveLength(3);
+    }
+  );
 
   it.each([
     JSON.stringify({

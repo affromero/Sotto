@@ -117,7 +117,12 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockGenerateResponse.mockReset();
   mockTeachingResponse.mockReset();
-  mockResolveLearningAi.mockResolvedValue({ provider: 'anthropic', model: 'm', apiKey: 'k' });
+  mockResolveLearningAi.mockResolvedValue({
+    provider: 'anthropic',
+    model: 'm',
+    apiKey: 'k',
+    execution: PARAMS.execution,
+  });
   mockTeachingResponse.mockImplementation(async (_system, messages) => ({
     content: JSON.stringify({
       items: JSON.parse(messages[0].content).items.map((item: { index: number }) => ({

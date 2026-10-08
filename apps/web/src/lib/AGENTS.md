@@ -163,9 +163,12 @@ static validation codes as untrusted data. The replacement uses the same capture
 model, objective, vocabulary, language policy, and execution authority. Candidate
 and indexed feedback are untrusted correction data. Both generation and review
 must succeed before reference TTS or writing persistence. Provider errors,
-cancellation, and malformed reviewer verdicts propagate without repair. Structural
+cancellation propagate without repair. A malformed reviewer response permits one
+protocol correction per entire teaching review invocation, shared by both roles
+and all batches. Structural
 and teaching failures share one replacement slot; a second rejection is terminal.
-At most six application model requests are made per skill; TTS remains separate.
+The normal path uses at most six application model requests per skill; protocol
+correction consumes the unchanged parent request budget. TTS remains separate.
 `classes/quality/generation-structure.ts` preserves an ordered ledger of at most two
 actual rejected attempts through the existing sealed generation-failure snapshots.
 Original output is limited to 32 KiB per attempt with explicit size omission.
@@ -207,9 +210,10 @@ request using the same captured provider and authority. Exact quotations bind
 reported defects to the assigned content. The adjudicator independently checks
 every assigned address, evaluates criticisms, dismisses unsupported findings and
 reports defects the critic missed. Only adjudicated verdicts guide repair and
-publication. Malformed or unbound evidence is terminal. This protocol proves
+publication. Malformed or unbound evidence permits one correction of the same role
+response per whole review invocation. A second invalid response is terminal. This protocol proves
 evidence binding, not linguistic truth; semantic judgment remains probabilistic.
-A maximum-size intro uses ten requests total: one generation, four review requests
+A maximum-size intro normally uses ten requests total: one generation, four review requests
 before and after one bounded repair, plus the repair request. Writing uses at most
 six calls when a structurally valid set needs one bounded quality replacement
 and a second review. Section generation uses at most nine, including two
@@ -227,7 +231,19 @@ Only the final adjudicated summary controls rejection and correction. Speaking
 replacement authenticates the actual issued error, original phrases, final verdict
 and diagnostic bytes through a WeakMap; copied or modified evidence cannot authorize
 repair. Its correction receives the original phrases and adjudicated verdict rather
-than unsupported criticisms. Specialized reading metadata and masked SRS association
+than unsupported criticisms. Protocol correction only follows authenticated canonical
+validation of a completed response. It fixes the same role output against the exact
+frozen candidate, critic and schema through the same captured provider and authority.
+Provider, admission, cancellation and cleanup failures are never retried. Correction
+does not add a semantic content replacement or raise any parent request limit.
+`classes/quality/private-protocol-evidence.ts` retains at most two authenticated
+validation failures on the original terminal error. Each private record carries static
+reason and path codes, kind, role, batch offset and the exact candidate, supplied critic
+and offending response together in a 32 KiB UTF8 envelope. Oversized records retain
+their byte count and SHA256 with explicit omission. Generation-failure snapshots retain
+this evidence, including when correction succeeds before a later semantic or provider
+failure. Ordinary error serialization and logs never expose these payloads.
+Specialized reading metadata and masked SRS association
 reviews retain their separate contracts. All requests consume the unchanged parent
 budget; exhaustion never changes provider, waives a gate or adds a replacement.
 Teaching verdicts carry indexed feedback bounded to six 300-character entries

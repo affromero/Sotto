@@ -279,7 +279,7 @@ describe('intro audit addresses', () => {
     });
 
     await expect(reviewTeachingContent(options)).rejects.toBeInstanceOf(ReviewerProtocolError);
-    expect(boundary.generate).toHaveBeenCalledTimes(1);
+    expect(boundary.generate).toHaveBeenCalledTimes(2);
   });
 
   it('accepts a complete batch verdict returned in a different order', async () => {
