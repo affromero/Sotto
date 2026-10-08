@@ -44,7 +44,7 @@ vi.mock('@/lib/providers/ai', () => ({
                     lemma: sourceForm,
                     gloss: 'greeting',
                     pos: 'expression',
-                    sourceForm,
+                    sourceSpan: { startWordIndex: 0, endWordIndex: 0 },
                     questionIndices: [],
                   },
                 ],
@@ -316,6 +316,12 @@ describe('startPractice — GRAMMAR', () => {
     expect(JSON.stringify(result)).not.toContain('correctIndex');
     expect(mockReadingProviderInput).toHaveBeenCalledWith({
       passageText: 'Mia war im Kino.',
+      passageWords: [
+        { index: 0, surface: 'Mia' },
+        { index: 1, surface: 'war' },
+        { index: 2, surface: 'im' },
+        { index: 3, surface: 'Kino' },
+      ],
       questions: [
         { question: 'Wo war Mia?', options: ['Kino', 'Park', 'Bonn', 'Berlin'], correctIndex: 0 },
       ],

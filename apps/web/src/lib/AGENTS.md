@@ -86,7 +86,16 @@ Usage metadata does not prove restored credits, and no backend fallback is autom
 listening and credits only assessed targets backed by course memory.
 `learning/reading/vocabulary-protocol.ts` shares the strict private model-output
 schema between reading requests and parsing. Initial and replacement responses
-use a structured `words` object. Protocol rejection logs contain only static codes,
+use a structured `words` object. Private source spans use inclusive word indices from the canonical
+`Intl.Segmenter` table for the target language. Both request and parser use the
+same original UTF16 offsets; the parser derives public `sourceForm` strings from
+the exact contiguous passage slice. Empty tables, unsupported languages and
+invalid indices fail closed. Questions and options cannot supply source quotes.
+A first parse rejection may consume the same single replacement as teaching rejection. Its distinct protocol correction carries
+at most 32KiB of untrusted output and static indexed violations. Invalid original
+forms and counts are not identity anchors; the replacement must pass full parsing
+and teaching review. A later teaching rejection cannot add a third extraction.
+Protocol rejection logs contain only static codes,
 the passage hash, and bounded question identities with an explicit hash and omission
 for oversized identity lists. Stored vocabulary and sealed failure formats stay unchanged.
 `learning/progress.ts` and `progress-route.ts` persist revision-bound choices and
@@ -155,7 +164,8 @@ uncertainty and abstention. There are at most twelve masked requests per candida
 twenty-four with the existing replacement, and thirty-two total reading requests.
 All use captured provider settings and the unchanged parent request budget. No
 masked protocol or provider failure triggers a correction or additional retry. The
-replacement preserves the passage, questions, options, keys, and each source-form
+replacement preserves the passage, questions, options and keys. When the initial
+extraction is valid, teaching replacement also preserves each source-form
 ordinal/count, while permitting reviewed lemma, gloss, part-of-speech, and
 association corrections. Reading audits return independent metadata and complete
 per-proposed-question counterfactual decisions in the same request. Each pair requires

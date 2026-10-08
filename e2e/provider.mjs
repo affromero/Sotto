@@ -63,8 +63,13 @@ export async function startProvider() {
           const input = JSON.parse(
             body.messages.find((message) => message.role === 'user').content
           );
+          const sourceWords = input.passageWords?.filter((word) => word.surface === 'Hallo');
           if (
             input.passageText !== 'Anna sagt Hallo zu ihrem Freund.' ||
+            !Array.isArray(sourceWords) ||
+            sourceWords.length !== 1 ||
+            !Number.isSafeInteger(sourceWords[0].index) ||
+            sourceWords[0].index < 0 ||
             !Array.isArray(input.questions) ||
             !input.questions.length ||
             input.questions.some(
@@ -82,7 +87,10 @@ export async function startProvider() {
                 lemma: 'Hallo',
                 gloss: 'hello',
                 pos: 'interjection',
-                sourceForm: 'Hallo',
+                sourceSpan: {
+                  startWordIndex: sourceWords[0].index,
+                  endWordIndex: sourceWords[0].index,
+                },
                 questionIndices: input.questions.map((_, index) => index),
               },
             ],

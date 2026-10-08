@@ -64,7 +64,7 @@ const READING_SAMPLE = JSON.stringify({
       lemma: 'bestellen',
       gloss: 'to order',
       pos: 'verb',
-      sourceForm: 'bestellt',
+      sourceSpan: { startWordIndex: 1, endWordIndex: 1 },
       questionIndices: [0],
     },
   ],
@@ -121,6 +121,11 @@ describe('keyed reading extraction requests', () => {
     expect(system).toContain('including associations not mentioned in the feedback');
     expect(JSON.parse(messages[0].content)).toEqual({
       passageText: reading.text,
+      passageWords: [
+        { index: 0, surface: 'Ana' },
+        { index: 1, surface: 'bestellt' },
+        { index: 2, surface: 'Kaffee' },
+      ],
       questions: [question],
       correction,
     });
@@ -138,7 +143,7 @@ describe('keyed reading extraction requests', () => {
             maxItems: 12,
             items: {
               type: 'object',
-              required: ['lemma', 'gloss', 'pos', 'sourceForm', 'questionIndices'],
+              required: ['lemma', 'gloss', 'pos', 'sourceSpan', 'questionIndices'],
               additionalProperties: false,
               properties: {
                 questionIndices: {
@@ -203,13 +208,68 @@ describe('keyed reading extraction requests', () => {
       expect(JSON.stringify(schema)).not.toContain('uniqueItems');
       expect(prompt).toContain(`unique integers from 0 through ${questionCount - 1}, inclusive`);
       expect(prompt).toContain('Every canonical lemma must be unique');
-      expect(prompt).toContain("passage's original spelling and case");
+      expect(prompt).toContain('retaining spelling, case, spacing and punctuation');
     }
+  });
+  it('sends invalid output as untrusted protocol data without requiring its source identities', async () => {
+    const protocolCorrection = {
+      rawCandidate: JSON.stringify({ words: [{ sourceForm: 'invented' }] }),
+      code: 'source_attribution' as const,
+      violations: [{ code: 'invalid_source_span' as const, wordIndex: 0 }],
+    };
+    await expect(
+      requestVocabularyExtraction({ ...reading, readingProtocolCorrection: protocolCorrection })
+    ).resolves.toBe(READING_SAMPLE);
+    const [system, messages, settings] = mockGenerateResponse.mock.calls[0]!;
+    expect(system).toContain(
+      'Invalid prior source spans and counts are not identities to preserve'
+    );
+    expect(system).toContain('rules above apply only when correction is supplied');
+    expect(JSON.parse(messages[0].content)).toEqual({
+      passageText: reading.text,
+      passageWords: [
+        { index: 0, surface: 'Ana' },
+        { index: 1, surface: 'bestellt' },
+        { index: 2, surface: 'Kaffee' },
+      ],
+      questions: [question],
+      protocolCorrection,
+    });
+    expect(settings).toMatchObject({ model: 'captured', maxTokens: 2048, temperature: 0.2 });
+  });
+  it('refuses oversized, unkeyed, conflicting and invalid protocol feedback before provider access', async () => {
+    const correction = {
+      rawCandidate: 'invalid JSON',
+      code: 'malformed_json' as const,
+      violations: [],
+    };
+    const invalidRequests = [
+      { ...reading, readingProtocolCorrection: { ...correction, rawCandidate: 'x'.repeat(33000) } },
+      { ...reading, readingQuestions: undefined, readingProtocolCorrection: correction },
+      {
+        ...reading,
+        readingCorrection: { words: [{ sourceForm: 'bestellt' }], issues: [], feedback: [] },
+        readingProtocolCorrection: correction,
+      },
+      {
+        ...reading,
+        readingProtocolCorrection: {
+          ...correction,
+          violations: [{ code: 'invalid_source_span' as const, wordIndex: 12 }],
+        },
+      },
+    ];
+    for (const request of invalidRequests)
+      await expect(requestVocabularyExtraction(request)).rejects.toThrow('bounded metadata');
+    expect(mockGenerateResponse).not.toHaveBeenCalled();
+    expect(mockResolveLearningAi).not.toHaveBeenCalled();
   });
   it.each([0, -1, 0.5, Number.NaN, Number.POSITIVE_INFINITY, Number.MAX_SAFE_INTEGER + 1])(
     'refuses an invalid schema question count %s',
     (questionCount) => {
-      expect(() => buildReadingVocabularyJsonSchema(questionCount)).toThrow('safe question count');
+      expect(() => buildReadingVocabularyJsonSchema(questionCount, 3)).toThrow(
+        'safe question count'
+      );
     }
   );
   it.each([-1, 4, 0.5, undefined])(

@@ -41,10 +41,20 @@ cancellation fail closed. Reference verification, provider transport and search
 subrequests, and later audio usage are separate.
 
 Reading vocabulary receives teaching review in batches of five words and allows
-one extraction replacement. Twelve words permit at most two extraction calls and
-six teaching reviews. These requests use the unchanged parent budget. Replacement
-preserves the reading passage and questions while correcting the reviewed word
-metadata. A background word may have no associated question and therefore adds no
+one extraction replacement shared by initial output-protocol and teaching rejection.
+Private extraction selects inclusive word spans from the target-language
+`Intl.Segmenter` passage table. The server derives exact contiguous source quotes
+from original UTF16 offsets. Question or option words cannot become source quotes;
+stored vocabulary and reviewer inputs keep their existing `sourceForm` strings.
+Twelve words permit at most two extraction calls and six teaching reviews. These
+requests use the unchanged parent budget. Protocol correction receives bounded
+untrusted output and static indexed defects; it reparses and reviews a complete
+replacement without trusting invalid original source forms or counts. If that
+replacement fails teaching review, generation stops without a third extraction.
+Teaching correction of a valid initial extraction preserves each exact source
+form and its ordinal/count. Both paths preserve the reading passage and questions.
+Provider errors and cancellation never trigger an extraction replacement.
+A background word may have no associated question and therefore adds no
 SRS evidence; the extracted word list remains nonempty. The same review request
 independently checks word metadata and every proposed assessment link. Each link
 requires an explicit answer to whether the question can be answered without
