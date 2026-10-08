@@ -193,7 +193,7 @@ These coverage failures precede both independent reviews, which still gate repla
 These review requests consume the existing preparation budget. Provider errors
 and cancellation propagate without retrying under another provider. This is a
 probabilistic check, not a guarantee of pedagogical correctness.
-`classes/quality/teaching-quality.ts` adds one fail-closed review of the exact normalized
+`classes/quality/teaching-quality.ts` adds fail-closed reviews of the exact normalized
 intro (including repaired content and visuals), writing tasks, or question
 explanations after a successful blind solve. The keyed teaching audit remains a
 separate request so keys and explanations never reach the blind solver. Writing
@@ -201,8 +201,15 @@ review distinguishes intentional correction sources from instructions requiring
 incorrect output. Provider, cancellation, and review failures propagate. These
 requests use the same captured provider and consume its existing request budget:
 intro reviews each scalar field, focus entry, tip, example and optional visual as a
-separate address. Reviews are sent in sequential batches of at most five items.
-A maximum-size intro uses ten requests total: one generation, four review batches
+separate address. Fresh intros contain at most ten addresses. Sequential batches
+of at most five items each receive a critic request followed by an adjudicator
+request using the same captured provider and authority. Exact quotations bind
+reported defects to the assigned content. The adjudicator independently checks
+every assigned address, evaluates criticisms, dismisses unsupported findings and
+reports defects the critic missed. Only adjudicated verdicts guide repair and
+publication. Malformed or unbound evidence is terminal. This protocol proves
+evidence binding, not linguistic truth; semantic judgment remains probabilistic.
+A maximum-size intro uses ten requests total: one generation, four review requests
 before and after one bounded repair, plus the repair request. Writing uses at most
 four calls when a structurally valid set needs one bounded quality replacement
 and a second review. Section generation uses at most seven, including two
@@ -215,6 +222,53 @@ context and request limits. Logs contain only static protocol diagnostics and
 issue codes. Generated and restored intros preserve absent visuals; only explicit
 metadata fallback construction derives visuals. Intro repair uses its dedicated
 trusted-context template without the initial generation template's visual schema.
+Generation, repair and review share example-meaning and grammar-scope policies.
+Fresh generation uses the strict `class_intro_generation` wire schema. Every
+object declares all its keys required and rejects additional properties, including
+nullable visual branches. The root visuals field is required and nullable;
+null becomes absent public visuals. A visual object requires timeline and contrast
+(each nullable), callouts and links arrays, and an explicit enum tone on each callout.
+Historical optional visual fields and their defaults remain unchanged.
+The generation wire schema omits the unsupported URL `format: uri` annotation
+through the Zod converter override; runtime URL validation still uses `z.string().url()`.
+About is a strict `{exampleIndex}` reference with no text. Its compiler always
+concatenates the selected exact target quote and exact meaning, preserving every
+meaning byte after the prefix even if the meaning already includes a quote.
+This removes independently authored overview claims; it does not prove the meaning true.
+Focus points and tips are `{text, exampleIndex}` observations with zero-based
+references to complete examples. Structural repair uses the same wire shape
+without visuals under `class_intro_repair`. The compiler adds the selected exact
+target quote to every focus or tip observation and each example's own note before either
+review role and before measuring the prose limit. Meanings remain unchanged.
+Fresh candidates reject every unusable raw example before compilation. Fresh
+validated example arrays are never filtered after quote framing or semantic merging,
+so their indices and accepted entries remain intact. Historical restoration retains
+the example filter. Usefulness checks remove only the exact own-target note prefix
+before comparing and counting the note body, preserving display bytes and useful
+compiled examples after reload. Ordinary unframed historical filtering remains unchanged.
+Semantic patches use a reference for rejected about and atoms for rejected
+focus and tip entries. An about-only rejection never expands repair authority to
+an accepted example; select another useful example or fail the final audit closed.
+All example patches merge first; references then resolve against the complete
+merged array. Only rejected about, observations and example notes are compiled. Accepted
+strings retain their exact bytes and original quote even when an example changes;
+the full final audit checks that retained sentence. Historical restoration never
+adds framing. Explicit local scope does not prove linguistic correctness.
+Every fresh visual text, including titles and labels, must exactly reuse a compiled
+observation, complete target or paired meaning. URLs remain typed URL fields.
+Validation precedes visual normalization, so discarded content cannot hide an
+unscoped claim. Accepted and historical visuals retain their representation.
+The rule permits redundant reuse, not arbitrary new labels or generalizations;
+generation should omit visuals when exact reuse adds no value. Static private
+structural diagnostics distinguish invalid references, unusable examples and visual
+scope from measured word and address limits. Logs never include the rejected text.
+Meaning notes preserve event time and aspect without requiring the example's
+grammatical tense. Each word-order claim states its own applicable clause or
+quoted-example scope. Fresh intros and complete merged replacements must fit the
+180-word prose budget and ten-address limit; historical seed restoration preserves existing content.
+Structural repair receives measured word-limit and address-limit diagnostics,
+may remove redundant whole entries, and aims for 80 raw words to leave room for
+compiled quotes. Semantic repair preserves every accepted entry even when shortening.
 Intro semantic repair returns a strict patch of the actual rejected addresses.
 Accepted fields and array entries remain exact, accepted visuals are retained, and
 rejected optional visuals are removed. The initial full audit binds its private
@@ -223,6 +277,7 @@ reviews every current address again and never reuses prior approvals. Every addr
 uses the complete intro, supplied once per batch as untrusted contextual content
 alongside the trusted lesson context; only its assigned field or entry can be rejected.
 Private intro evidence retains the complete root once with its ordered audit addresses
+and the actual critic and adjudicator packets alongside the derived final verdict,
 under the unchanged size limit and retains initial reviews through terminal provider,
 protocol and cancellation failures without replacing those errors or replaying work.
 

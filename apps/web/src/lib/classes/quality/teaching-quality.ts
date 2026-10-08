@@ -6,7 +6,11 @@ import { loadAndRender } from '../../prompt-loader';
 import { logUsage } from '../../usage-logger';
 import { SectionQualityError } from '../section-quality';
 import { logger } from '../../logger';
-import { classIntroExampleMeaningPolicy, classLanguagePolicy } from '../class-language-policy';
+import {
+  classIntroExampleMeaningPolicy,
+  classIntroGrammarRulePolicy,
+  classLanguagePolicy,
+} from '../class-language-policy';
 import { learningCredentialFingerprint } from '../preparation-selection';
 import {
   captureTeachingFailure,
@@ -19,6 +23,76 @@ import {
 export const TEACHING_QUALITY_JSON_SCHEMA = {
   name: 'class_teaching_quality',
   schema: z.toJSONSchema(verdictSchema, { target: 'draft-7' }),
+};
+
+const introFindingSchema = z
+  .object({
+    issue: verdictSchema.shape.items.element.shape.issues.element,
+    fieldPath: z.array(z.string().min(1).max(80)).min(1).max(6),
+    quote: z.string().min(1).max(120),
+    rule: z.string().trim().min(1).max(80),
+    defect: z.string().trim().min(1).max(120),
+    correction: z.string().trim().min(1).max(120).nullable(),
+    counterexample: z.string().trim().min(1).max(120).nullable(),
+  })
+  .strict();
+
+const introCriticSchema = z
+  .object({
+    items: z
+      .array(
+        z
+          .object({
+            index: verdictSchema.shape.items.element.shape.index,
+            findings: z.array(introFindingSchema).max(3),
+          })
+          .strict()
+      )
+      .min(1)
+      .max(5),
+  })
+  .strict();
+
+const introAdjudicatorSchema = z
+  .object({
+    items: z
+      .array(
+        verdictSchema.shape.items.element.extend({
+          findings: z.array(introFindingSchema).max(3),
+          criticDecisions: z
+            .array(
+              z
+                .object({
+                  findingIndex: z.number().int().min(0).max(2),
+                  decision: z.enum(['supported', 'dismissed']),
+                  reason: z.string().trim().min(1).max(120),
+                })
+                .strict()
+            )
+            .max(3),
+        })
+      )
+      .min(1)
+      .max(5),
+  })
+  .strict();
+
+const INTRO_CRITIC_JSON_SCHEMA = {
+  name: 'class_intro_critic',
+  schema: z.toJSONSchema(introCriticSchema, { target: 'draft-7' }),
+};
+const INTRO_ADJUDICATOR_JSON_SCHEMA = {
+  name: 'class_intro_adjudicator',
+  schema: z.toJSONSchema(introAdjudicatorSchema, { target: 'draft-7' }),
+};
+
+type IntroFinding = z.infer<typeof introFindingSchema>;
+type IntroCritic = z.infer<typeof introCriticSchema>;
+type IntroAdjudicator = z.infer<typeof introAdjudicatorSchema>;
+type IntroReviewPacket = {
+  offset: number;
+  critic: IntroCritic;
+  adjudicator: IntroAdjudicator;
 };
 
 /** A complete, protocol-valid review that rejects the learner-visible content. */
@@ -65,6 +139,7 @@ type IntroAuditItem = {
 type IntroAudit = {
   introContext: Record<string, unknown>;
   items: readonly IntroAuditItem[];
+  reviewPackets?: readonly IntroReviewPacket[];
 };
 
 type PriorIntroReview = {
@@ -97,6 +172,7 @@ type PriorIntroReview = {
   introContext: Record<string, unknown>;
   items: readonly IntroAuditItem[];
   verdict: z.infer<typeof introTeachingQualityVerdictSchema>;
+  reviewPackets: readonly IntroReviewPacket[];
   consumed: boolean;
 };
 
@@ -114,6 +190,10 @@ export function getIntroRepairPlan(rejection: TeachingQualityRejectionError): {
   rejectedAddresses: readonly IntroAuditAddress[];
   rejectedFields: readonly string[];
   preserveVisuals: boolean;
+  rejectionEvidence: ReadonlyArray<{
+    address: IntroAuditAddress;
+    findings: readonly IntroFinding[];
+  }>;
 } {
   const prior = priorIntroReviews.get(rejection);
   if (!prior || prior.consumed || !priorReceiptIsIntact(prior, rejection))
@@ -121,6 +201,7 @@ export function getIntroRepairPlan(rejection: TeachingQualityRejectionError): {
 
   const rejectedFields = new Set<string>();
   const rejectedAddresses: IntroAuditAddress[] = [];
+  const rejectionEvidence: Array<{ address: IntroAuditAddress; findings: IntroFinding[] }> = [];
   let preserveVisuals = false;
   for (const item of prior.verdict.items) {
     const auditItem = prior.items[item.index];
@@ -128,13 +209,27 @@ export function getIntroRepairPlan(rejection: TeachingQualityRejectionError): {
     if (!item.acceptable || item.issues.length > 0) {
       rejectedAddresses.push({ ...auditItem.address });
       rejectedFields.add(auditItem.address.field);
+      const packet = prior.reviewPackets.find(({ offset, adjudicator }) =>
+        adjudicator.items.some(({ index }) => offset + index === item.index)
+      );
+      const adjudicated = packet?.adjudicator.items.find(
+        ({ index }) => packet.offset + index === item.index
+      );
+      if (!adjudicated || adjudicated.acceptable || adjudicated.findings.length === 0)
+        throw new ReviewerProtocolError(authenticIntroTeachingFailure(rejection));
+      rejectionEvidence.push({ address: { ...auditItem.address }, findings: adjudicated.findings });
     } else if (auditItem.address.field === 'visuals') {
       preserveVisuals = true;
     }
   }
   if (rejectedFields.size === 0)
     throw new ReviewerProtocolError(authenticIntroTeachingFailure(rejection));
-  return { rejectedAddresses, rejectedFields: [...rejectedFields], preserveVisuals };
+  return {
+    rejectedAddresses,
+    rejectedFields: [...rejectedFields],
+    preserveVisuals,
+    rejectionEvidence: structuredClone(rejectionEvidence),
+  };
 }
 
 /** Shared provider boundary for canonical teaching audits. */
@@ -146,10 +241,19 @@ export async function requestTeachingReview(options: {
   variables: Record<string, string>;
   items: readonly unknown[];
   introContext?: Record<string, unknown>;
+  criticisms?: IntroCritic;
+  maxTokens?: number;
   jsonSchema: NonNullable<AIOptions['jsonSchema']>;
 }): Promise<string> {
   if (options.items.length < 1 || options.items.length > 5) throw new SectionQualityError();
   if (options.introContext && options.prompt !== 'class/review-class-intro.md')
+    throw new ReviewerProtocolError();
+  if (
+    options.criticisms &&
+    (!options.introContext ||
+      options.prompt !== 'class/review-class-intro.md' ||
+      options.variables.INTRO_REVIEW_ROLE !== 'adjudicator')
+  )
     throw new ReviewerProtocolError();
   const response = await options.provider.generateResponse(
     loadAndRender(options.prompt, options.variables),
@@ -159,12 +263,13 @@ export async function requestTeachingReview(options: {
         content: JSON.stringify({
           ...(options.introContext ? { introContext: options.introContext } : {}),
           items: options.items.map((content, index) => ({ index, content })),
+          ...(options.criticisms ? { criticisms: options.criticisms } : {}),
         }),
       },
     ],
     {
       ...(await capturedLearningAiOptions(options.ai)),
-      maxTokens: 2048,
+      maxTokens: options.maxTokens ?? 2048,
       temperature: 0,
       jsonSchema: options.jsonSchema,
     }
@@ -219,6 +324,104 @@ function parseTeachingVerdict(
   return parsed;
 }
 
+function parseIntroReview<T>(content: string, schema: z.ZodType<T>): T {
+  try {
+    return schema.parse(JSON.parse(content));
+  } catch {
+    throw new ReviewerProtocolError();
+  }
+}
+
+function assertIntroReviewCoverage(items: readonly { index: number }[], expected: number): void {
+  if (
+    items.length !== expected ||
+    new Set(items.map(({ index }) => index)).size !== expected ||
+    items.some(({ index }) => index >= expected)
+  )
+    throw new ReviewerProtocolError();
+}
+
+function assertIntroFindingBound(finding: IntroFinding, item: IntroAuditItem): void {
+  let value: unknown = item.fields;
+  for (const key of finding.fieldPath) {
+    if (
+      !value ||
+      typeof value !== 'object' ||
+      !Object.hasOwn(value, key) ||
+      (Array.isArray(value) && !/^(0|[1-9][0-9]*)$/.test(key))
+    )
+      throw new ReviewerProtocolError();
+    value = (value as Record<string, unknown>)[key];
+  }
+  if (
+    typeof value !== 'string' ||
+    !finding.quote.trim() ||
+    !value.includes(finding.quote) ||
+    (finding.correction === null && finding.counterexample === null)
+  )
+    throw new ReviewerProtocolError();
+}
+
+function parseIntroCritic(content: string, items: readonly IntroAuditItem[]): IntroCritic {
+  const critic = parseIntroReview(content, introCriticSchema);
+  assertIntroReviewCoverage(critic.items, items.length);
+  for (const row of critic.items) {
+    for (const finding of row.findings) assertIntroFindingBound(finding, items[row.index]!);
+  }
+  return critic;
+}
+
+function parseIntroAdjudicator(
+  content: string,
+  items: readonly IntroAuditItem[],
+  critic: IntroCritic
+): IntroAdjudicator {
+  const adjudicator = parseIntroReview(content, introAdjudicatorSchema);
+  assertIntroReviewCoverage(adjudicator.items, items.length);
+  for (const row of adjudicator.items) {
+    const criticisms = critic.items.find(({ index }) => index === row.index)!.findings;
+    assertIntroReviewCoverage(
+      row.criticDecisions.map(({ findingIndex }) => ({ index: findingIndex })),
+      criticisms.length
+    );
+    for (const finding of row.findings) assertIntroFindingBound(finding, items[row.index]!);
+    const findingIssues = [...new Set(row.findings.map(({ issue }) => issue))].sort();
+    if (
+      (row.acceptable && row.findings.length > 0) ||
+      (!row.acceptable && row.findings.length === 0) ||
+      !isDeepStrictEqual([...new Set(row.issues)].sort(), findingIssues)
+    )
+      throw new ReviewerProtocolError();
+    for (const decision of row.criticDecisions) {
+      if (decision.decision !== 'supported') continue;
+      const finding = criticisms[decision.findingIndex]!;
+      if (
+        row.acceptable ||
+        !row.findings.some(
+          (own) =>
+            own.issue === finding.issue &&
+            own.quote === finding.quote &&
+            isDeepStrictEqual(own.fieldPath, finding.fieldPath)
+        )
+      )
+        throw new ReviewerProtocolError();
+    }
+  }
+  parseTeachingVerdict(
+    JSON.stringify({
+      items: adjudicator.items.map(({ index, acceptable, issues, feedback }) => ({
+        index,
+        acceptable,
+        issues,
+        feedback,
+      })),
+    }),
+    items.length,
+    'intro'
+  );
+  return adjudicator;
+}
+
 /** Review exact learner-visible teaching content after independent question solving. */
 export async function reviewTeachingContent(options: {
   ai: CapturedLearningAi;
@@ -236,6 +439,7 @@ export async function reviewTeachingContent(options: {
     throw new ReviewerProtocolError(authenticIntroTeachingFailure(options.previousIntroRejection));
   const introAudit = options.kind === 'intro' ? buildIntroAuditItems(options.items) : undefined;
   const introItems = introAudit?.items;
+  if (introItems && introItems.length > 10) throw new ReviewerProtocolError();
   const allReviewedItems = introItems ?? options.items;
   if (introItems && options.previousIntroRejection)
     takePriorIntroReview(options, introItems, options.previousIntroRejection);
@@ -261,7 +465,10 @@ export async function reviewTeachingContent(options: {
     KIND: options.kind,
     LANGUAGE_POLICY: languagePolicy,
     ...(options.kind === 'intro'
-      ? { EXAMPLE_MEANING_POLICY: classIntroExampleMeaningPolicy(options) }
+      ? {
+          EXAMPLE_MEANING_POLICY: classIntroExampleMeaningPolicy(options),
+          GRAMMAR_RULE_POLICY: classIntroGrammarRulePolicy(),
+        }
       : {}),
     TITLE: options.lessonContext?.title ?? '',
     OBJECTIVE: options.lessonContext?.objective ?? '',
@@ -270,19 +477,47 @@ export async function reviewTeachingContent(options: {
   let parsed: z.infer<typeof verdictSchema> | z.infer<typeof introTeachingQualityVerdictSchema>;
   if (introAudit) {
     const aggregate: z.infer<typeof introTeachingQualityVerdictSchema>['items'] = [];
+    const reviewPackets: IntroReviewPacket[] = [];
+    introAudit.reviewPackets = reviewPackets;
     for (let offset = 0; offset < reviewedItems.length; offset += 5) {
-      const batch = reviewedItems.slice(offset, offset + 5);
-      const content = await requestTeachingReview({
+      const batch = introAudit.items.slice(offset, offset + 5);
+      const criticContent = await requestTeachingReview({
         ...options,
         items: batch,
         introContext: introAudit.introContext,
         prompt: 'class/review-class-intro.md',
-        jsonSchema: TEACHING_QUALITY_JSON_SCHEMA,
-        variables: reviewVariables,
+        jsonSchema: INTRO_CRITIC_JSON_SCHEMA,
+        variables: {
+          ...reviewVariables,
+          INTRO_REVIEW_ROLE: 'critic',
+          REVIEW_SCHEMA: JSON.stringify(INTRO_CRITIC_JSON_SCHEMA.schema),
+        },
+        maxTokens: 4096,
       });
-      const batchVerdict = parseTeachingVerdict(content, batch.length, options.kind);
+      const critic = parseIntroCritic(criticContent, batch);
+      const adjudicatorContent = await requestTeachingReview({
+        ...options,
+        items: batch,
+        introContext: introAudit.introContext,
+        criticisms: critic,
+        prompt: 'class/review-class-intro.md',
+        jsonSchema: INTRO_ADJUDICATOR_JSON_SCHEMA,
+        variables: {
+          ...reviewVariables,
+          INTRO_REVIEW_ROLE: 'adjudicator',
+          REVIEW_SCHEMA: JSON.stringify(INTRO_ADJUDICATOR_JSON_SCHEMA.schema),
+        },
+        maxTokens: 4096,
+      });
+      const adjudicator = parseIntroAdjudicator(adjudicatorContent, batch, critic);
+      reviewPackets.push({ offset, critic, adjudicator });
       aggregate.push(
-        ...batchVerdict.items.map((item) => ({ ...item, index: item.index + offset }))
+        ...adjudicator.items.map(({ index, acceptable, issues, feedback }) => ({
+          index: index + offset,
+          acceptable,
+          issues,
+          feedback,
+        }))
       );
     }
     aggregate.sort((left, right) => left.index - right.index);
@@ -358,6 +593,7 @@ export async function reviewTeachingContent(options: {
         introContext: JSON.parse(JSON.stringify(introAudit.introContext)),
         items: storedItems,
         verdict: introTeachingQualityVerdictSchema.parse(parsed),
+        reviewPackets: structuredClone(introAudit.reviewPackets ?? []),
         consumed: false,
       });
     }
@@ -399,9 +635,17 @@ function buildIntroAuditItems(items: readonly unknown[]): IntroAudit {
   return { introContext: intro, items: scopes };
 }
 
+export function classIntroAuditAddressCount(intro: unknown): number {
+  return buildIntroAuditItems([intro]).items.length;
+}
+
 function introAuditEvidence(audit: IntroAudit) {
   return [
-    { introContext: audit.introContext, addresses: audit.items.map(({ address }) => address) },
+    {
+      introContext: audit.introContext,
+      addresses: audit.items.map(({ address }) => address),
+      reviewPackets: audit.reviewPackets,
+    },
   ];
 }
 
@@ -525,7 +769,13 @@ function priorReceiptIsIntact(
     prior.failure.kind === 'intro' &&
     prior.failure.reviews.length === 1 &&
     (evidence?.candidate ===
-      JSON.stringify(introAuditEvidence({ introContext: sourceIntro, items: prior.items })) ||
+      JSON.stringify(
+        introAuditEvidence({
+          introContext: sourceIntro,
+          items: prior.items,
+          reviewPackets: prior.reviewPackets,
+        })
+      ) ||
       evidence?.omitted === 'size_limit') &&
     JSON.stringify(evidence?.verdict) === JSON.stringify(prior.verdict) &&
     Boolean(sourceIntro) &&
