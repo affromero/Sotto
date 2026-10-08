@@ -120,19 +120,20 @@ Listening permits one replacement for a malformed quiz or a complete, schema-val
 blind or teaching rejection. A malformed quiz preserves the exact script and
 regenerates only its four questions using bounded original output and static
 server validation codes. A blind rejection replaces the complete script and quiz
-through `generateScript` with bounded untrusted correction context. A teaching-only
-rejection preserves the exact generated script and regenerates only its quiz with
-the indexed teaching feedback and rejected questions as separate untrusted context.
+through `generateScript` with bounded untrusted correction context. An authenticated
+teaching rejection targeting the spoken transcript also replaces the script and quiz.
+An unchanged rejected transcript remains rejected. Findings confined to quiz fields
+preserve the script and regenerate its quiz with indexed teaching feedback.
 Both blind and teaching checks run again on the replacement. Mixed rejection or a
 second rejection is terminal and retains each actual tagged failure. Malformed
 verdicts, provider errors, and cancellation never trigger replay. Every path
 preserves the original objective, course, vocabulary requirements, provider,
 model, and execution authority. Both gates must pass before script, vocabulary,
 or learner graph publication. Canonical reference verification still gates
-readiness, and audio waits for the learning association. The maximum is nine
-application AI requests. A blind-first replacement uses at most two scripts, two
-quizzes, two blind reviews, and one paired teaching review. A teaching-first replacement
-uses one script, two quizzes, two blind reviews, and two paired teaching reviews.
+readiness, and audio waits for the learning association. A source teaching repair
+uses at most ten application AI requests: two scripts, two quizzes, two blind reviews,
+and two paired teaching reviews. A quiz-only teaching repair uses nine requests.
+Each paired review retains its existing bounded protocol correction under the same parent budget.
 Reference verification, provider transport or search subrequests, and
 later TTS/audio are separate. Parent request budgets remain unchanged. Private
 blind diagnostics use the existing sealed failure envelope with

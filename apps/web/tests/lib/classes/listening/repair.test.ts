@@ -24,6 +24,8 @@ import { SectionQualityError } from '@/lib/classes/section-quality';
 import { TeachingQualityRejectionError } from '@/lib/classes/quality/teaching-quality';
 import { captureGenerationFailure } from '@/lib/classes/quality/generation-failure';
 import { learningScriptHash } from '@/lib/learning/script-hash';
+import { listeningRepairPlan } from '@/lib/classes/quality/listening-repair';
+import { configureSpokenTeachingRejection } from './teaching-repair-fixture';
 
 const approved = {
   passageAcceptable: true,
@@ -199,6 +201,109 @@ describe('bounded canonical listening correction', () => {
       }
       return { content: SAMPLE_QUESTIONS_JSON, model: 'm' };
     });
+  });
+
+  function rejectSpokenDefect(mixed = false) {
+    configureSpokenTeachingRejection(approved, firstText, finalText, mixed);
+  }
+
+  it.each([false, true])(
+    'repairs spoken teaching defects with a new script and fully reviewed quiz (mixed=%s)',
+    async (mixed) => {
+      rejectSpokenDefect(mixed);
+      await generateClassListening(PARAMS);
+      expect(mockScriptCreate.mock.calls[0][0].data.turns).toEqual([
+        { speaker: 'HOST', text: finalText },
+      ]);
+      const requests = scriptRequests();
+      const correction = JSON.parse(requests[1][1][0].content.split('\n').at(-1)!);
+      expect(correction.verdict.kind).toBe('teaching');
+      expect(correction.verdict.findings[0].findings[0]).toMatchObject({
+        fieldPath: ['passageText'],
+        quote: firstText,
+      });
+      expect(
+        mockBlindResponse.mock.calls.map((call) => JSON.parse(call[1][0].content).passage)
+      ).toEqual([`HOST: ${firstText}`, `HOST: ${finalText}`]);
+      expect(mockCreateSegmentsAndQueueAudio.mock.calls[0][1]).toEqual([
+        { speaker: 'HOST', text: finalText },
+      ]);
+    }
+  );
+
+  it('keeps the original rejection when script repair returns identical spoken content', async () => {
+    rejectSpokenDefect();
+    mockGenerateResponse.mockImplementation(async (...args) => ({
+      content:
+        args[2].maxTokens === 12288
+          ? JSON.stringify({
+              ...SAMPLE_SCRIPT_RESULT,
+              turns: [{ speaker: 'HOST', text: firstText }],
+            })
+          : SAMPLE_QUESTIONS_JSON,
+      model: 'm',
+    }));
+    await expect(generateClassListening(PARAMS)).rejects.toBeInstanceOf(
+      TeachingQualityRejectionError
+    );
+    noLearningPublication();
+  });
+
+  it('fails closed when admission denies the source repair without publishing a cached script', async () => {
+    rejectSpokenDefect();
+    let script = 0;
+    mockGenerateResponse.mockImplementation(async (...args) => {
+      if (args[2].maxTokens === 12288 && script++ > 0)
+        throw new Error('Captured request budget exhausted');
+      return {
+        model: 'm',
+        content:
+          args[2].maxTokens === 12288
+            ? JSON.stringify({
+                ...SAMPLE_SCRIPT_RESULT,
+                turns: [{ speaker: 'HOST', text: firstText }],
+              })
+            : SAMPLE_QUESTIONS_JSON,
+      };
+    });
+    await expect(generateClassListening(PARAMS)).rejects.toThrow(
+      'Captured request budget exhausted'
+    );
+    noLearningPublication();
+  });
+
+  it('does not authorize repair from a caller-constructed teaching rejection', () => {
+    expect(
+      listeningRepairPlan(
+        new TeachingQualityRejectionError(
+          ['unnatural'],
+          [{ index: 0, feedback: ['Change this.'] }]
+        ),
+        []
+      )
+    ).toBeNull();
+  });
+
+  it('stops when bounded diagnostics omit the rejected candidate instead of guessing its repair target', async () => {
+    rejectSpokenDefect();
+    mockGenerateResponse.mockImplementation(async (...args) => ({
+      content:
+        args[2].maxTokens === 12288
+          ? JSON.stringify({
+              ...SAMPLE_SCRIPT_RESULT,
+              turns: [{ speaker: 'HOST', text: firstText + ' Hallo.'.repeat(1500) }],
+            })
+          : SAMPLE_QUESTIONS_JSON,
+      model: 'm',
+    }));
+    const error = await generateClassListening(PARAMS).catch((value) => value);
+    expect(error).toBeInstanceOf(TeachingQualityRejectionError);
+    expect(error.teachingFailure.reviews[0]).toMatchObject({
+      candidate: null,
+      omitted: 'size_limit',
+    });
+    expect(scriptRequests()).toHaveLength(1);
+    noLearningPublication();
   });
 
   it('repairs a teaching rejection by replacing only the quiz and rerunning both gates', async () => {
