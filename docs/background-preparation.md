@@ -27,13 +27,17 @@ Grammar, reading, and contextual vocabulary candidates receive an independent re
 
 These multiple-choice sections permit two generation attempts and, when needed, one JSON repair. Each structurally valid candidate adds one blind review request. Passing that review adds one teaching review request, including for repaired output. This allows at most seven application-level model calls per section; provider transport retries can consume additional admitted requests. A section that passes both reviews on its first attempt uses three calls. Reviews use the existing request budget and fail when admission is denied; no alternate provider is selected. Allow for these requests when scheduling preparation.
 
-Listening allows one complete script and quiz replacement after a valid blind
-review rejects their content. It uses the original model, objective, vocabulary,
-and execution authority. Both independent reviews must approve the final material
-before publication. Malformed verdicts, provider errors, cancellation, and teaching
-review rejection stop generation without another replacement. Listening uses at
-most seven application model calls: two scripts, two quizzes, two blind reviews,
-and one teaching review. Reference verification, provider transport and search
+Listening allows one replacement after a valid content rejection. Spoken-script
+findings replace the script and quiz through the canonical script generator;
+quiz-only findings preserve the script. An unchanged rejected transcript cannot
+pass merely because a later reviewer overlooks its defect. Both blind solving and
+paired teaching review must approve the final material before publication.
+The original model, objective, vocabulary, execution authority and request budget
+remain unchanged. Source teaching repair uses at most ten application model calls:
+two scripts, two quizzes, two blind reviews and four critic/adjudicator requests.
+Quiz-only teaching repair uses nine. Each paired review retains its existing
+bounded protocol correction under the same budget. Admission denial, provider failure and
+cancellation fail closed. Reference verification, provider transport and search
 subrequests, and later audio usage are separate.
 
 Reading vocabulary receives teaching review in batches of five words and allows

@@ -30,6 +30,7 @@ import {
   TeachingQualityRejectionError,
 } from './classes/quality/teaching-quality';
 import { combineTeachingFailures, type TeachingFailure } from './classes/quality/teaching-failure';
+import { listeningRepairPlan } from './classes/quality/listening-repair';
 import {
   captureStructureAttempt,
   captureTeachingAttempt,
@@ -230,6 +231,8 @@ export async function composeListeningContent(
     let learningRepair: Parameters<typeof generateScript>[0]['learningRepair'];
     let priorFailure: TeachingFailure | undefined;
     let cachedResult: Awaited<ReturnType<typeof generateScript>> | undefined;
+    let rejectedTeachingScript:
+      { transcript: string; error: TeachingQualityRejectionError } | undefined;
     let quizTeachingRepair:
       | {
           questions: z.infer<typeof listeningQuizSchema>;
@@ -291,6 +294,7 @@ export async function composeListeningContent(
       const transcript = result.turns
         .map((turn) => `${turn.speaker}: ${cleanTextForTts(turn.text)}`)
         .join('\n');
+      if (rejectedTeachingScript?.transcript === transcript) throw rejectedTeachingScript.error;
 
       // Step 9: generate comprehension questions
       const systemPrompt = loadAndRender('class/generate-listening-quiz.md', {
@@ -500,14 +504,32 @@ export async function composeListeningContent(
       } catch (error) {
         if (!(error instanceof TeachingQualityRejectionError)) throw error;
         if (!error.teachingFailure || error.feedback.length === 0) throw error;
-        const evidence = combineTeachingFailures(priorFailure, error.teachingFailure);
-        failures.push(captureTeachingAttempt(attempt === 0 ? 1 : 2, error.teachingFailure));
+        const repair = listeningRepairPlan(error, reviewedQuestions);
+        if (!repair) throw error;
+        const evidence = combineTeachingFailures(priorFailure, repair.failure);
+        failures.push(captureTeachingAttempt(attempt === 0 ? 1 : 2, repair.failure));
         if (attempt === 1)
           throw new TeachingQualityRejectionError(error.issues, error.feedback, evidence);
         priorFailure = evidence;
-        cachedResult = result;
-        quizTeachingRepair = { questions, issues: error.issues, feedback: error.feedback };
-        learningRepair = undefined;
+        if (repair.target === 'script') {
+          learningRepair = {
+            candidate: {
+              turns: result.turns,
+              soundCues: result.soundCues,
+              references: result.references,
+              vocabulary: result.vocabulary,
+              places: result.places,
+            },
+            questions,
+            verdict: repair.verdict,
+          };
+          rejectedTeachingScript = { transcript, error };
+          cachedResult = undefined;
+        } else {
+          cachedResult = result;
+          quizTeachingRepair = { questions, issues: error.issues, feedback: error.feedback };
+          learningRepair = undefined;
+        }
         continue;
       }
 

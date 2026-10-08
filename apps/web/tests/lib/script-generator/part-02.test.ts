@@ -142,6 +142,10 @@ describe('generateScript', () => {
     await expect(generateScript({ ...params, forLearning: true })).rejects.toThrow(
       'bounded context'
     );
+    learningRepair.verdict = { kind: 'teaching', findings: [] };
+    await expect(generateScript({ ...params, forLearning: true })).rejects.toThrow(
+      'bounded context'
+    );
     expect(mockGenerateResponse).not.toHaveBeenCalled();
   });
 
