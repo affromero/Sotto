@@ -920,6 +920,8 @@ describe('field-local intro repair', () => {
         if (stage === 'review provider') throw originalError;
         throw originalError;
       });
+      if (stage === 'review protocol')
+        boundary.generate.mockResolvedValueOnce({ content: '{', model: ai.model });
 
       const error = await generateClassIntro(params).catch((caught: unknown) => caught);
       if (stage === 'review protocol' || stage === 'selection change')

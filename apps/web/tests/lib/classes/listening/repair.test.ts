@@ -342,8 +342,8 @@ describe('bounded canonical listening correction', () => {
     noLearningPublication();
   });
 
-  it('does not retry a malformed teaching verdict or provider failure', async () => {
-    mockTeachingResponse.mockResolvedValueOnce({ content: '{', model: 'm' });
+  it('fails a repeated malformed teaching verdict without content replacement or provider replay', async () => {
+    mockTeachingResponse.mockResolvedValue({ content: '{', model: 'm' });
     const protocolError = await generateClassListening(PARAMS).catch((failure: unknown) => failure);
     expect(captureGenerationFailure(protocolError).category).toBe('review_protocol');
     expect(scriptRequests()).toHaveLength(1);

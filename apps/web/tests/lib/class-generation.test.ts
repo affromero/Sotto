@@ -319,7 +319,12 @@ describe('contextual vocabulary coverage', () => {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockResolveLearningAi.mockResolvedValue({ provider: 'anthropic', model: 'm', apiKey: 'k' });
+  mockResolveLearningAi.mockResolvedValue({
+    provider: 'anthropic',
+    model: 'm',
+    apiKey: 'k',
+    execution: BASE.execution,
+  });
   mockTeachingResponse.mockImplementation(async (_system, messages) => ({
     content: JSON.stringify({
       items: JSON.parse(messages[0].content).items.map((item: { index: number }) => ({
@@ -422,7 +427,7 @@ describe('generateSectionQuestions', () => {
     await expect(generateSectionQuestions(BASE)).rejects.toThrow('educational quality');
     expect(mockGenerateResponse).toHaveBeenCalledTimes(1);
     expect(mockReviewResponse).toHaveBeenCalledTimes(1);
-    expect(mockTeachingResponse).toHaveBeenCalledTimes(1);
+    expect(mockTeachingResponse).toHaveBeenCalledTimes(2);
   });
 
   it('retries a teaching-quality rejection and publishes the reviewed replacement', async () => {

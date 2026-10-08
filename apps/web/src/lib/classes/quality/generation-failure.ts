@@ -4,6 +4,10 @@ import { SectionQualityError } from '../section-quality';
 import { ReviewerProtocolError, TeachingQualityRejectionError } from './teaching-quality';
 import { retainedTeachingFailure, teachingFailureSchema } from './teaching-failure';
 import { generationAttemptFailures, generationAttemptFailuresSchema } from './generation-structure';
+import {
+  reviewerProtocolEvidence,
+  reviewerProtocolEvidenceSchema,
+} from './private-protocol-evidence';
 
 const generationFailureCategorySchema = z.enum([
   'teaching_rejected',
@@ -20,6 +24,7 @@ const failureDetailSchema = z
     category: generationFailureCategorySchema,
     teachingFailure: teachingFailureSchema.optional(),
     attemptFailures: generationAttemptFailuresSchema.optional(),
+    protocolEvidence: reviewerProtocolEvidenceSchema.optional(),
   })
   .strict();
 const stageFailureSchema = failureDetailSchema.extend({
@@ -41,6 +46,7 @@ const parallelFailures = new WeakMap<
 
 function captureFailureDetail(error: unknown): z.infer<typeof failureDetailSchema> {
   const attemptFailures = generationAttemptFailures(error);
+  const protocolEvidence = reviewerProtocolEvidence(error);
   const teachingFailure =
     error instanceof TeachingQualityRejectionError && error.teachingFailure
       ? error.teachingFailure
@@ -53,6 +59,7 @@ function captureFailureDetail(error: unknown): z.infer<typeof failureDetailSchem
     category: classifyGenerationFailure(error),
     ...(teachingFailure ? { teachingFailure } : {}),
     ...(attemptFailures ? { attemptFailures } : {}),
+    ...(protocolEvidence ? { protocolEvidence } : {}),
   });
 }
 

@@ -69,8 +69,13 @@ Cancellation revokes the preparation grant. Queued work cannot begin new model r
 
 Class preparations recorded as `FAILED` retain that outcome after cleanup.
 Known generation failures with unfinished audio cleanup temporarily remain
-`UNRESOLVED` and retain their private diagnostic. Canonical recovery restores
-`FAILED` after the owned execution and audio receipts settle.
+`UNRESOLVED` and retain their private diagnostic. For an existing class repair or
+regeneration, authenticated progress and activity reads reconcile the known
+failure through canonical cleanup. They return `FAILED` after the owned parent
+execution and linked audio receipts settle. Reads preserve active or unconfirmed
+cleanup and do not dispatch generation. This reconciliation runs when the task
+is read, rather than through an unattended background job. Interrupted requests
+still require explicit recovery and acknowledgement.
 Completing cleanup does not mean the learner cancelled the task. A new class attempt is admitted only after
 the execution and descendant audio receipts confirm that cleanup settled.
 Practice failures report unsuccessful generation without assuming the provider

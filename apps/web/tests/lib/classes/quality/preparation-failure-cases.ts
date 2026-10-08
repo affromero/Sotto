@@ -17,6 +17,7 @@ import { sottoJobOutbox, sottoJobSnapshot } from '@/lib/sidedoor/jobs/core/job-d
 import {
   classPreparationStore,
   requestClassPreparation,
+  readClassPreparation,
   readPreparationActivity,
   recordClassPreparationFailure,
   recoverClassPreparation,
@@ -35,13 +36,22 @@ import {
   type LearningFailure,
 } from '@/lib/classes/quality/teaching-failure-store';
 import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
+import {
+  captureSottoCredentialOwner,
+  sottoCredentialStorage,
+} from '@/lib/sidedoor/credentials/runtime/provider-credentials';
+import { preparationProviderRequest } from '@/lib/classes/preparation-provider';
+import { resolveCapturedLearningAi } from '@/lib/learning-ai';
+import { createAIProvider } from '@/lib/providers/ai';
+import { reviewTeachingContent } from '@/lib/classes/quality/teaching-quality';
+import { captureGenerationFailure } from '@/lib/classes/quality/generation-failure';
 import type { SharedTestInstance } from '../../../helpers/setup/shared-instance';
 
 interface PreparationFailureContext {
   instance: SharedTestInstance;
   courseId: string;
   execution: SottoProviderExecution;
-  running: () => Promise<ClassPreparation>;
+  running: (maxProviderRequests?: number) => Promise<ClassPreparation>;
   lesson: () => Promise<{ id: string }>;
 }
 
@@ -50,7 +60,7 @@ export function registerPreparationFailureTests(context: () => PreparationFailur
   let instance: SharedTestInstance;
   let courseId: string;
   let execution: SottoProviderExecution;
-  const running = () => context().running();
+  const running = (maxProviderRequests?: number) => context().running(maxProviderRequests);
   const lesson = () => context().lesson();
   beforeEach(() => {
     ({ instance, courseId, execution } = context());
@@ -77,8 +87,8 @@ export function registerPreparationFailureTests(context: () => PreparationFailur
     },
   };
 
-  async function failureFixture() {
-    const operation = await running();
+  async function failureFixture(maxProviderRequests?: number) {
+    const operation = await running(maxProviderRequests);
     const lessonRecord = await lesson();
     const cls = await instance.database.courseClass.create({
       data: {
@@ -102,19 +112,181 @@ export function registerPreparationFailureTests(context: () => PreparationFailur
     return { operation: current, parent };
   }
 
+  it.each([1, 2])(
+    'keeps protocol correction within the admitted parent cap of %i and preserves known failure evidence',
+    async (cap) => {
+      await sottoTransaction(instance.database, async (database) => {
+        const storage = await sottoCredentialStorage(database, 'ai', 'openai');
+        const owner = await captureSottoCredentialOwner(database, execution.userId);
+        const target = { ...storage.slot, owner };
+        const head = await storage.owned.head(target);
+        await storage.owned.remove(target, head.revision, randomUUID());
+      });
+      const endpoint = 'http://localhost:8000/v1';
+      await instance.configureInfrastructure({
+        aiProvider: 'local',
+        aiModel: 'protocol-fixture',
+        aiBaseUrl: endpoint,
+      });
+      await instance.seedAiCredential(execution.userId, 'local', 'protocol-fixture-secret');
+      await instance.database.user.update({
+        where: { id: execution.userId },
+        data: { preferredAiProvider: 'local', preferredAiModel: 'local:protocol-fixture' },
+      });
+      const { operation, parent } = await failureFixture(cap);
+      const retained = await instance.database.classSection.create({
+        data: {
+          classId: operation.classId!,
+          skill: 'READING',
+          status: 'READY',
+          attempt: 1,
+          seed: randomUUID(),
+          spec: { passage: 'Retained learner material' },
+        },
+      });
+      const vocabulary = await instance.database.learnerVocab.create({
+        data: { courseId, lemma: 'Reise', translation: 'journey', mastery: 0.75, reps: 3 },
+      });
+      const sent: Record<string, unknown>[] = [];
+      vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+        const request = new Request(input, init);
+        expect(request.url).toBe(endpoint + '/chat/completions');
+        expect(request.headers.get('authorization')).toBe('Bearer protocol-fixture-secret');
+        sent.push(await request.json());
+        return Response.json({
+          id: 'protocol-response',
+          object: 'chat.completion',
+          created: 1,
+          model: 'protocol-fixture',
+          choices: [
+            {
+              index: 0,
+              message: {
+                role: 'assistant',
+                content:
+                  sent.length === 1
+                    ? '{}'
+                    : JSON.stringify({ items: [{ index: 0, findings: [] }] }),
+              },
+              finish_reason: 'stop',
+            },
+          ],
+          usage: { prompt_tokens: 5, completion_tokens: 3, total_tokens: 8 },
+        });
+      });
+      const ai = await resolveCapturedLearningAi(execution.userId, {
+        ...execution,
+        learningSelection: operation.selection,
+        providerRequest: preparationProviderRequest(operation, new AbortController().signal, () => {
+          throw new Error('Unexpected uncertain provider outcome');
+        }),
+      });
+      const items = [{ targetPhrase: 'Ich bin hier.', translation: 'I am here.', ipa: null }];
+      let failure: unknown;
+      try {
+        await reviewTeachingContent({
+          ai,
+          provider: createAIProvider(ai.provider),
+          userId: execution.userId,
+          level: 'A2',
+          nativeLang: 'en',
+          targetLang: 'de',
+          kind: 'speaking',
+          items,
+        });
+      } catch (error) {
+        failure = error;
+      }
+      expect(failure).toMatchObject({ cause: { code: 'budget' } });
+      expect(sent).toHaveLength(cap);
+      for (const body of sent)
+        expect(body.response_format).toMatchObject({
+          json_schema: { name: 'class_teaching_critic' },
+        });
+      const diagnostic = captureGenerationFailure(failure);
+      expect(diagnostic).toMatchObject({
+        category: 'generation_failed',
+        protocolEvidence: [
+          {
+            kind: 'speaking',
+            role: 'critic',
+            offset: 0,
+            reason: 'schema',
+            pathCodes: ['response'],
+            payload: { omitted: null },
+          },
+        ],
+      });
+      expect(diagnostic.protocolEvidence).toHaveLength(1);
+      const evidence = diagnostic.protocolEvidence![0];
+      expect(JSON.parse(evidence.payload.json!)).toEqual({
+        candidate: { items: [{ index: 0, content: items[0] }] },
+        response: '{}',
+      });
+      if (cap === 2) {
+        const messages = sent[1].messages as { role: string; content: string }[];
+        expect(JSON.parse(messages.find(({ role }) => role === 'user')!.content)).toEqual({
+          items: [{ index: 0, content: items[0] }],
+          priorProtocolOutput: evidence,
+        });
+      }
+      await sottoTransaction(instance.database, (database) =>
+        recordClassPreparationFailure(
+          database,
+          operation,
+          parent.fingerprint,
+          false,
+          'generation_failed',
+          diagnostic
+        )
+      );
+      const failed = await classPreparationStore(instance.database, courseId).read();
+      expect(failed).toMatchObject({ status: 'FAILED', failure: 'generation_failed' });
+      expect(
+        await sottoTransaction(instance.database, (database) =>
+          readLearningFailure(database, failed!)
+        )
+      ).toEqual(diagnostic);
+      const activity = await readPreparationActivity(courseId, execution);
+      expect(activity).toMatchObject({
+        status: 'FAILED',
+        maxProviderRequests: cap,
+        providerRequestsAdmitted: cap,
+      });
+      expect(activity?.events.filter(({ type }) => type === 'succeeded')).toHaveLength(cap);
+      expect(JSON.stringify(activity)).not.toMatch(
+        /protocolEvidence|Ich bin hier|protocol-fixture-secret/
+      );
+      expect(
+        await instance.database.classSection.findUniqueOrThrow({
+          where: { id: retained.id },
+        })
+      ).toEqual(retained);
+      expect(
+        await instance.database.learnerVocab.findUniqueOrThrow({
+          where: { id: vocabulary.id },
+        })
+      ).toEqual(vocabulary);
+    }
+  );
+
   it.each(
-    (['generation_failed', 'source_unreadable'] as const).flatMap((failure) =>
-      [false, true].map((activeAudio) => ({ failure, activeAudio }))
-    )
+    (['generation_failed', 'source_unreadable'] as const).flatMap((failure) => [
+      ...[false, true].map((activeAudio) => ({ failure, activeAudio, settlement: 'recovery' })),
+      ...['progress', 'activity'].map((settlement) => ({ failure, activeAudio: true, settlement })),
+    ])
   )(
-    'preserves known $failure through audio cleanup while fencing active audio ($activeAudio)',
-    async ({ failure, activeAudio }) => {
+    'preserves known $failure through $settlement cleanup while fencing active audio ($activeAudio)',
+    async ({ failure, activeAudio, settlement }) => {
       const lessonRecord = await lesson();
       const cls = await instance.database.courseClass.create({
         data: { courseId, lessonId: lessonRecord.id, order: 1, status: 'AVAILABLE' },
       });
       const originalProfile = await instance.database.user.findUniqueOrThrow({
         where: { id: execution.userId },
+      });
+      const retainedVocabulary = await instance.database.learnerVocab.create({
+        data: { courseId, lemma: 'Reise', translation: 'journey', mastery: 0.75, reps: 3 },
       });
       const snapshot = await readPristineRegenerationSnapshot(cls.id, execution);
       const operation = await requestClassPreparation(courseId, execution, {
@@ -239,15 +411,40 @@ export function registerPreparationFailureTests(context: () => PreparationFailur
         expect(
           (await instance.database.courseClass.findUniqueOrThrow({ where: { id: cls.id } })).status
         ).toBe('GENERATING');
+        if (settlement !== 'recovery') {
+          expect((await readClassPreparation(courseId, execution.userId))?.status).toBe(
+            'UNRESOLVED'
+          );
+          expect((await readPreparationActivity(courseId, execution))?.status).toBe('UNRESOLVED');
+          expect(await readClassPreparation(courseId, 'another-learner')).toBeNull();
+          expect(await classPreparationStore(instance.database, courseId).read()).toEqual(
+            unresolved
+          );
+        }
         await sottoTransaction(instance.database, (database) =>
           sottoJobExecutions(database).settle(binding)
         );
-        await recoverClassPreparation(courseId, execution, {
-          acknowledgeUnknownOutcome: true,
-        });
+        if (settlement === 'recovery')
+          await recoverClassPreparation(courseId, execution, { acknowledgeUnknownOutcome: true });
+        else {
+          const reconciled =
+            settlement === 'progress'
+              ? await readClassPreparation(courseId, execution.userId)
+              : await readPreparationActivity(courseId, execution);
+          expect(reconciled?.status).toBe('FAILED');
+        }
       }
       const recovered = await classPreparationStore(instance.database, courseId).read();
       expect(recovered).toMatchObject({ id: operation.id, status: 'FAILED', failure });
+      if (settlement !== 'recovery') {
+        expect((await readClassPreparation(courseId, execution.userId))?.status).toBe('FAILED');
+        const activity = await readPreparationActivity(courseId, execution);
+        expect(activity?.status).toBe('FAILED');
+        expect(JSON.stringify(activity)).not.toMatch(
+          /private-candidate-sentinel|private-feedback-sentinel/
+        );
+        expect(await classPreparationStore(instance.database, courseId).read()).toEqual(recovered);
+      }
       expect(
         (await instance.database.courseClass.findUniqueOrThrow({ where: { id: cls.id } })).status
       ).toBe('FAILED');
@@ -264,6 +461,12 @@ export function registerPreparationFailureTests(context: () => PreparationFailur
           orderBy: { id: 'asc' },
         })
       ).toEqual(retainedSections);
+      expect(await instance.database.learnerVocab.findMany({ where: { courseId } })).toEqual([
+        retainedVocabulary,
+      ]);
+      expect(
+        await instance.database.episode.findUniqueOrThrow({ where: { id: episode.id } })
+      ).toEqual(episode);
       const freshSnapshot = await readPristineRegenerationSnapshot(cls.id, execution);
       const next = await requestClassPreparation(courseId, execution, {
         maxProviderRequests: 2,
@@ -287,6 +490,35 @@ export function registerPreparationFailureTests(context: () => PreparationFailur
         ).toEqual(privateFailure);
     }
   );
+
+  it('keeps interrupted regeneration fenced on both reads after local execution has drained', async () => {
+    const target = await lesson();
+    const cls = await instance.database.courseClass.create({
+      data: { courseId, lessonId: target.id, order: 1, status: 'AVAILABLE' },
+    });
+    const operation = await requestClassPreparation(courseId, execution, {
+      maxProviderRequests: 2,
+      intent: { kind: 'REGENERATE', classId: cls.id, expectedAttempt: 1 },
+    });
+    await sottoTransaction(instance.database, async (database) => {
+      await classPreparationStore(database, courseId).transact((current) => {
+        if (!current) throw new Error('Missing interrupted fixture');
+        current.status = 'RUNNING';
+      });
+      const parent = await sottoJobOutbox(database).read(operation.id);
+      if (!parent) throw new Error('Missing interrupted parent');
+      await recordClassPreparationFailure(database, operation, parent.fingerprint, true);
+      await sottoJobExecutions(database).requireParentDrained(operation.id, parent.fingerprint);
+    });
+    const interrupted = await classPreparationStore(instance.database, courseId).read();
+    expect(interrupted).toMatchObject({ status: 'UNRESOLVED', failure: 'interrupted' });
+    expect((await readClassPreparation(courseId, execution.userId))?.status).toBe('UNRESOLVED');
+    expect((await readPreparationActivity(courseId, execution))?.status).toBe('UNRESOLVED');
+    expect(await classPreparationStore(instance.database, courseId).read()).toEqual(interrupted);
+    expect(
+      (await instance.database.courseClass.findUniqueOrThrow({ where: { id: cls.id } })).status
+    ).toBe('GENERATING');
+  });
 
   it.each([
     { activeAudio: false, unknownOutcome: false },
@@ -403,6 +635,12 @@ export function registerPreparationFailureTests(context: () => PreparationFailur
         expect(
           (await instance.database.courseClass.findUniqueOrThrow({ where: { id: cls.id } })).status
         ).toBe('GENERATING');
+        const interrupted = await classPreparationStore(instance.database, courseId).read();
+        expect((await readClassPreparation(courseId, execution.userId))?.status).toBe('UNRESOLVED');
+        expect((await readPreparationActivity(courseId, execution))?.status).toBe('UNRESOLVED');
+        expect(await classPreparationStore(instance.database, courseId).read()).toEqual(
+          interrupted
+        );
         await expect(
           recoverClassPreparation(courseId, execution, { acknowledgeUnknownOutcome: true })
         ).rejects.toThrow(/cleanup/);

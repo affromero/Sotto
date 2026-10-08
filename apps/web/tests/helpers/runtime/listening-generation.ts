@@ -44,15 +44,24 @@ const {
 
 const { mockGenerateScript } = vi.hoisted(() => ({ mockGenerateScript: vi.fn() }));
 vi.mock('@/lib/learning-ai', () => ({
-  resolveCapturedLearningAi: async () => {
+  resolveCapturedLearningAi: async (userId: string, execution: { signal?: AbortSignal }) => {
     const key = await mockGetAiKey();
     if (key) {
       const model = mockGetAiProviderMeta(key.provider)?.defaultModel;
       if (!model) throw new Error(`No default AI model configured for provider "${key.provider}".`);
-      return { provider: key.provider, model, apiKey: key.apiKey };
+      return {
+        provider: key.provider,
+        model,
+        apiKey: key.apiKey,
+        execution: { ...execution, userId },
+      };
     }
     if (process.env.AI_PROVIDER === 'claude-code')
-      return { provider: 'claude-code', model: 'claude-sonnet-4-6' };
+      return {
+        provider: 'claude-code',
+        model: 'claude-sonnet-4-6',
+        execution: { ...execution, userId },
+      };
     throw new Error('No AI provider available');
   },
   capturedLearningAiOptions: async (ai: { model: string; apiKey?: string }) => ({

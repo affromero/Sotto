@@ -412,9 +412,13 @@ describe('canonical speaking correction before reference audio', () => {
       items: verdict().items.map((item) => ({ ...item, feedback: ['Conflicting approval'] })),
     }),
   ])('propagates malformed or inconsistent review without another generation', async (content) => {
-    runtime.replies.push(promptReply(phrases), { content, model: 'configured-model' });
+    runtime.replies.push(
+      promptReply(phrases),
+      { content, model: 'configured-model' },
+      { content, model: 'configured-model' }
+    );
     await expect(composeSpeakingPrompts(params)).rejects.toBeInstanceOf(ReviewerProtocolError);
-    expect(runtime.events).toEqual(['generation', 'critic', 'review']);
+    expect(runtime.events).toEqual(['generation', 'critic', 'review', 'review']);
     noAudio();
   });
 

@@ -24,6 +24,28 @@ import {
 } from '@/lib/classes/quality/generation-structure';
 
 describe('terminal generation failure classification', () => {
+  it('never snapshots protocol diagnostics supplied as an unauthenticated error property', () => {
+    const error = Object.assign(new ReviewerProtocolError(), {
+      protocolEvidence: [{ role: 'critic', response: 'Private forged provider response.' }],
+    });
+    expect(captureGenerationFailure(error)).toEqual({ category: 'review_protocol' });
+    expect(JSON.stringify(captureGenerationFailure(error))).not.toContain('Private');
+    expect(
+      generationFailureSchema.safeParse({
+        category: 'review_protocol',
+        protocolEvidence: [
+          {
+            kind: 'speaking',
+            role: 'critic',
+            offset: 0,
+            reason: 'schema',
+            pathCodes: ['response'],
+            payload: { json: null, byteCount: 1, sha256: 'a'.repeat(64), omitted: 'size_limit' },
+          },
+        ],
+      }).success
+    ).toBe(false);
+  });
   it('keeps prior and final review evidence without reclassifying a terminal protocol error', () => {
     const first = captureTeachingFailure('intro', [{ about: 'Original teaching' }], {
       items: [{ index: 0, acceptable: false, issues: ['incorrect'], feedback: ['First defect'] }],

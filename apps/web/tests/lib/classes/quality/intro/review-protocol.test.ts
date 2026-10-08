@@ -271,7 +271,11 @@ describe('evidence-bound intro review', () => {
       return response(packet);
     });
     await expect(generateClassIntro(params)).rejects.toBeInstanceOf(ReviewerProtocolError);
-    expect(schemaNames()).toEqual(['class_intro_generation', 'class_intro_critic']);
+    expect(schemaNames()).toEqual([
+      'class_intro_generation',
+      'class_intro_critic',
+      'class_intro_critic',
+    ]);
   });
 
   it('rejects adjudicator evidence quoted from a sibling field', async () => {
@@ -288,7 +292,11 @@ describe('evidence-bound intro review', () => {
       );
     });
     await expect(review()).rejects.toBeInstanceOf(ReviewerProtocolError);
-    expect(schemaNames()).toEqual(['class_intro_critic', 'class_intro_adjudicator']);
+    expect(schemaNames()).toEqual([
+      'class_intro_critic',
+      'class_intro_adjudicator',
+      'class_intro_adjudicator',
+    ]);
   });
 
   it.each(['missing decision', 'accepted supported criticism', 'different supported quote'])(
@@ -317,7 +325,11 @@ describe('evidence-bound intro review', () => {
         return response(packet);
       });
       await expect(review()).rejects.toBeInstanceOf(ReviewerProtocolError);
-      expect(schemaNames()).toEqual(['class_intro_critic', 'class_intro_adjudicator']);
+      expect(schemaNames()).toEqual([
+        'class_intro_critic',
+        'class_intro_adjudicator',
+        'class_intro_adjudicator',
+      ]);
     }
   );
 
@@ -396,5 +408,65 @@ describe('evidence-bound intro review', () => {
       'class_intro_critic',
       'class_intro_adjudicator',
     ]);
+  });
+
+  it('corrects final reviewer output without replaying consumed intro authority or skipping accepted fields', async () => {
+    let finalPhase = false;
+    let malformed = false;
+    const finalAddresses: Array<{ field: string; index?: number }> = [];
+    const repaired = {
+      ...intro,
+      examples: intro.examples.map((example, index) =>
+        index === 1 ? { ...example, meaning: arrivalFinding.correction! } : example
+      ),
+    };
+    boundary.generate.mockImplementation(async (_system, messages, options) => {
+      const payload: Payload = JSON.parse(messages[0].content);
+      if (finalPhase && options.jsonSchema.name === 'class_intro_critic' && !malformed) {
+        malformed = true;
+        return { content: '{', model: 'captured-model' };
+      }
+      if (options.jsonSchema.name === 'class_intro_critic') return response(critic(payload));
+      if (finalPhase) finalAddresses.push(...payload.items.map(({ content }) => content.address));
+      return response(
+        judge(payload, (item) =>
+          !finalPhase &&
+          item.content.address.field === 'examples' &&
+          item.content.address.index === 1
+            ? [arrivalFinding]
+            : []
+        )
+      );
+    });
+    const ai = await boundary.resolve();
+    const provider = createAIProvider('fixture');
+    const options = { ...params, ai, provider, kind: 'intro' as const };
+    const first = await reviewTeachingContent({ ...options, items: [intro] }).catch(
+      (error: unknown) => error
+    );
+    if (!(first instanceof TeachingQualityRejectionError)) throw first;
+    expect(getIntroRepairPlan(first).rejectedAddresses).toEqual([{ field: 'examples', index: 1 }]);
+    finalPhase = true;
+    await expect(
+      reviewTeachingContent({ ...options, items: [repaired], previousIntroRejection: first })
+    ).resolves.toBeUndefined();
+    expect(finalAddresses).toHaveLength(9);
+    const finalCalls = boundary.generate.mock.calls.slice(4);
+    expect(finalCalls.map(([, , options]) => options.jsonSchema.name)).toEqual([
+      'class_intro_critic',
+      'class_intro_critic',
+      'class_intro_adjudicator',
+      'class_intro_critic',
+      'class_intro_adjudicator',
+    ]);
+    expect(JSON.parse(finalCalls[0][1][0].content).introContext.about).toBe(intro.about);
+    expect(JSON.parse(finalCalls[1][1][0].content).items).toEqual(
+      JSON.parse(finalCalls[0][1][0].content).items
+    );
+    const callsBeforeReplay = boundary.generate.mock.calls.length;
+    await expect(
+      reviewTeachingContent({ ...options, items: [repaired], previousIntroRejection: first })
+    ).rejects.toBeInstanceOf(ReviewerProtocolError);
+    expect(boundary.generate.mock.calls).toHaveLength(callsBeforeReplay);
   });
 });

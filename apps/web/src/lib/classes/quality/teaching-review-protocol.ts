@@ -14,6 +14,52 @@ export class ReviewerProtocolError extends SectionQualityError {
   }
 }
 
+export const reviewerProtocolDiagnosticSchema = z
+  .object({
+    reason: z.enum([
+      'invalid_json',
+      'schema',
+      'coverage',
+      'field_path',
+      'quote_binding',
+      'missing_remedy',
+      'adjudicator_consistency',
+      'supported_evidence',
+    ]),
+    pathCodes: z
+      .array(
+        z.enum([
+          'response',
+          'items',
+          'criticDecisions',
+          'findings.fieldPath',
+          'findings.quote',
+          'findings.remedy',
+          'adjudicator',
+        ])
+      )
+      .min(1)
+      .max(2),
+  })
+  .strict();
+const responseDiagnostics = new WeakMap<object, z.infer<typeof reviewerProtocolDiagnosticSchema>>();
+
+function invalidResponse(
+  reason: z.infer<typeof reviewerProtocolDiagnosticSchema>['reason'],
+  path: z.infer<typeof reviewerProtocolDiagnosticSchema>['pathCodes'][number]
+): ReviewerProtocolError {
+  const error = new ReviewerProtocolError();
+  responseDiagnostics.set(error, { reason, pathCodes: [path] });
+  return error;
+}
+
+/** Only validation of a completed response can authorize protocol correction. */
+export function reviewerProtocolDiagnostic(error: unknown) {
+  if (!(error instanceof ReviewerProtocolError)) return undefined;
+  const diagnostic = responseDiagnostics.get(error);
+  return diagnostic ? structuredClone(diagnostic) : undefined;
+}
+
 const teachingFindingSchema = z
   .object({
     issue: teachingQualityVerdictSchema.shape.items.element.shape.issues.element,
@@ -76,20 +122,28 @@ export type TeachingReviewPacket = {
 };
 
 function parseReview<T>(content: string, schema: z.ZodType<T>): T {
+  let value: unknown;
   try {
-    return schema.parse(JSON.parse(content));
+    value = JSON.parse(content);
   } catch {
-    throw new ReviewerProtocolError();
+    throw invalidResponse('invalid_json', 'response');
   }
+  const parsed = schema.safeParse(value);
+  if (!parsed.success) throw invalidResponse('schema', 'response');
+  return parsed.data;
 }
 
-function assertReviewCoverage(items: readonly { index: number }[], expected: number): void {
+function assertReviewCoverage(
+  items: readonly { index: number }[],
+  expected: number,
+  path: 'items' | 'criticDecisions' = 'items'
+): void {
   if (
     items.length !== expected ||
     new Set(items.map(({ index }) => index)).size !== expected ||
     items.some(({ index }) => index >= expected)
   )
-    throw new ReviewerProtocolError();
+    throw invalidResponse('coverage', path);
 }
 
 /** Bind evidence to an own string leaf of the exact assigned content. */
@@ -102,16 +156,13 @@ function assertFindingBound(finding: TeachingFinding, fields: unknown): void {
       !Object.hasOwn(value, key) ||
       (Array.isArray(value) && !/^(0|[1-9][0-9]*)$/.test(key))
     )
-      throw new ReviewerProtocolError();
+      throw invalidResponse('field_path', 'findings.fieldPath');
     value = (value as Record<string, unknown>)[key];
   }
-  if (
-    typeof value !== 'string' ||
-    !finding.quote.trim() ||
-    !value.includes(finding.quote) ||
-    (finding.correction === null && finding.counterexample === null)
-  )
-    throw new ReviewerProtocolError();
+  if (typeof value !== 'string' || !finding.quote.trim() || !value.includes(finding.quote))
+    throw invalidResponse('quote_binding', 'findings.quote');
+  if (finding.correction === null && finding.counterexample === null)
+    throw invalidResponse('missing_remedy', 'findings.remedy');
 }
 
 export function parseTeachingCritic(content: string, fields: readonly unknown[]): TeachingCritic {
@@ -133,7 +184,8 @@ export function parseTeachingAdjudicator(
     const criticisms = critic.items.find(({ index }) => index === row.index)!.findings;
     assertReviewCoverage(
       row.criticDecisions.map(({ findingIndex }) => ({ index: findingIndex })),
-      criticisms.length
+      criticisms.length,
+      'criticDecisions'
     );
     for (const finding of row.findings) assertFindingBound(finding, fields[row.index]);
     const findingIssues = [...new Set(row.findings.map(({ issue }) => issue))].sort();
@@ -144,7 +196,7 @@ export function parseTeachingAdjudicator(
         (row.findings.length === 0 || row.issues.length === 0 || row.feedback.length === 0)) ||
       !isDeepStrictEqual([...new Set(row.issues)].sort(), findingIssues)
     )
-      throw new ReviewerProtocolError();
+      throw invalidResponse('adjudicator_consistency', 'adjudicator');
     for (const decision of row.criticDecisions) {
       if (decision.decision !== 'supported') continue;
       const finding = criticisms[decision.findingIndex]!;
@@ -157,7 +209,7 @@ export function parseTeachingAdjudicator(
             isDeepStrictEqual(own.fieldPath, finding.fieldPath)
         )
       )
-        throw new ReviewerProtocolError();
+        throw invalidResponse('supported_evidence', 'criticDecisions');
     }
   }
   return adjudicator;

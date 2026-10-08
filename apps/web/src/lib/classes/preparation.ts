@@ -438,6 +438,20 @@ export async function requestClassPreparation(
   );
 }
 
+async function reconcileKnownPreparationFailure(
+  database: Prisma.TransactionClient,
+  operation: ClassPreparation
+) {
+  const current = await validateClassPreparation(database, operation.courseId, operation.id, true);
+  if (
+    current.intent &&
+    current.status === 'UNRESOLVED' &&
+    (current.failure === 'generation_failed' || current.failure === 'source_unreadable')
+  )
+    return settleCancelledPreparation(database, current);
+  return current;
+}
+
 export async function readClassPreparation(courseId: string, userId: string) {
   return sottoTransaction(prisma, async (database) => {
     const course = await database.course.findFirst({
@@ -447,7 +461,7 @@ export async function readClassPreparation(courseId: string, userId: string) {
     if (!course) return null;
     const operation = await classPreparationStore(database, courseId).read();
     if (!operation) return null;
-    return validateClassPreparation(database, courseId, operation.id, true);
+    return reconcileKnownPreparationFailure(database, operation);
   });
 }
 
@@ -462,11 +476,11 @@ export async function readPreparationActivity(
       const identity = await execution.authorize(database);
       if (identity.userId !== execution.userId)
         throw new PreparationConflictError('The learner changed.');
-      const operation = await classPreparationStore(database, courseId).read();
+      let operation = await classPreparationStore(database, courseId).read();
       if (!operation) return null;
       if (operation.userId !== identity.userId)
         throw new PreparationConflictError('Course not found.');
-      await validateClassPreparation(database, courseId, operation.id, true);
+      operation = await reconcileKnownPreparationFailure(database, operation);
       const grant = classPreparationGrant(database, operation);
       const record = await grant.read(operation.grant);
       const privateFailure =
