@@ -102,8 +102,8 @@ class TtsRequest(BaseModel):
     model: str | None = None
 
     @field_validator("text")
-    @classmethod
-    def text_has_words(cls, value: str) -> str:
+    @staticmethod
+    def text_has_words(value: str) -> str:
         if not value.strip():
             raise ValueError("Speech text must not be blank.")
         return value
