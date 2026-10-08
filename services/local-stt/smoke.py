@@ -95,14 +95,14 @@ def main() -> None:
     provenance = json.loads(
         Path("/home/ubuntu/speaches/sotto-model-provenance.json").read_bytes()
     )
-    assert provenance["model"] == "Systran/faster-whisper-base"
-    assert provenance["revision"] == "ebe41f70d5b6dfa9166e2c581c45c9c0cfc57b66"
+    assert provenance["model"] == "Systran/faster-whisper-small"
+    assert provenance["revision"] == "536b0662742c02347bc0e980a01041f333bce120"
     assert provenance["aliases"] == {"whisper-1": provenance["model"]}
     aliases = Path("/home/ubuntu/speaches/model_aliases.json")
     assert sha256(aliases) == provenance["aliasSha256"]
     snapshot = (
         Path(os.environ["HF_HUB_CACHE"])
-        / "models--Systran--faster-whisper-base"
+        / "models--Systran--faster-whisper-small"
         / "snapshots"
         / provenance["revision"]
     )
@@ -226,8 +226,8 @@ def main() -> None:
         failures.append("The baked model or alias bytes changed.")
     if unknown_status != 404:
         failures.append("The unknown model did not return HTTP 404.")
-    if not 0 < peak < 1073741824 or not 0 < rss < 1073741824:
-        failures.append("STT memory exceeded the unchanged 1GiB qualification gate.")
+    if not 0 < peak < 2147483648 or not 0 < rss < 2147483648:
+        failures.append("STT memory exceeded the 2GiB qualification gate.")
     receipt = {
         "version": 1,
         "qualification": "Task-specific synthetic oral pipeline, not human pronunciation or general German ASR accuracy.",

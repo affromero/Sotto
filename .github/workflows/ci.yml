@@ -87,6 +87,7 @@ jobs:
           curl --proto '=https' --tlsv1.2 -LsSf https://astral.sh/uv/0.11.17/install.sh | sh
           "$HOME/.local/bin/uv" sync --locked --python 3.11
           "$HOME/.local/bin/uv" run pytest
+          "$HOME/.local/bin/uv" run pytest ../local-stt/tests
           "$HOME/.local/bin/uv" run ruff check .
           "$HOME/.local/bin/uv" run ruff format --check .
           "$HOME/.local/bin/uv" run ruff check ../local-stt
