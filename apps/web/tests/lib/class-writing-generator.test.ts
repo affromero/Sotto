@@ -5,6 +5,10 @@
  * creates the ClassSection + WritingPrompt rows.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import {
+  emptyTeachingCriticFixture,
+  shapeTeachingProviderFixture,
+} from './classes/quality/intro-provider-fixture';
 
 const mockClassSectionCreate = vi.fn();
 const mockWritingPromptCreateMany = vi.fn();
@@ -39,10 +43,22 @@ const mockGenerateResponse = vi.fn();
 const mockTeachingResponse = vi.fn();
 vi.mock('@/lib/providers/ai', () => ({
   createAIProvider: () => ({
-    generateResponse: (...args: unknown[]) =>
-      (args[2] as { jsonSchema?: { name: string } })?.jsonSchema?.name === 'class_teaching_quality'
-        ? mockTeachingResponse(...args)
-        : mockGenerateResponse(...args),
+    generateResponse: async (
+      system: string,
+      messages: Array<{ content: string }>,
+      options: unknown
+    ) => {
+      const name = (options as { jsonSchema?: { name: string } }).jsonSchema?.name;
+      if (name === 'class_teaching_critic') return emptyTeachingCriticFixture(messages);
+      if (name === 'class_teaching_adjudicator')
+        return shapeTeachingProviderFixture(
+          system,
+          messages,
+          options,
+          await mockTeachingResponse(system, messages, options)
+        );
+      return mockGenerateResponse(system, messages, options);
+    },
   }),
 }));
 
@@ -54,7 +70,10 @@ vi.mock('@/lib/usage-logger', () => ({ logUsage: vi.fn() }));
 vi.mock('@/lib/logger', () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 
 import { composeWritingPrompts, generateClassWriting } from '@/lib/class-writing-generator';
-import { TeachingQualityRejectionError } from '@/lib/classes/quality/teaching-quality';
+import {
+  ReviewerProtocolError,
+  TeachingQualityRejectionError,
+} from '@/lib/classes/quality/teaching-quality';
 import { generationAttemptFailures } from '@/lib/classes/quality/generation-structure';
 import { authorizedLearnerExecution } from '../helpers/runtime/provider-execution';
 
@@ -122,6 +141,55 @@ beforeEach(() => {
 });
 
 describe('composeWritingPrompts', () => {
+  it.each(['unbound quote', 'unmatched criticism', 'mismatched issue'])(
+    'refuses a modern adjudicator response with %s before replacement or persistence',
+    async (defect) => {
+      mockTeachingResponse.mockResolvedValue({
+        model: 'm',
+        content: JSON.stringify({
+          items: SAMPLE_PROMPTS.map((_, index) => ({
+            index,
+            acceptable: index !== 0,
+            issues: index === 0 ? ['unsupported'] : [],
+            feedback: index === 0 ? ['The source supplies no additional event.'] : [],
+            findings:
+              index === 0
+                ? [
+                    {
+                      issue: defect === 'mismatched issue' ? 'incorrect' : 'unsupported',
+                      fieldPath: ['sourceText'],
+                      quote:
+                        defect === 'unbound quote'
+                          ? 'Unpublished invented event.'
+                          : 'Dinner invitation',
+                      rule: 'Preserve supplied facts.',
+                      defect: 'The task adds an unsupported event.',
+                      correction: 'Use only the supplied invitation facts.',
+                      counterexample: null,
+                    },
+                  ]
+                : [],
+            criticDecisions:
+              index === 0 && defect === 'unmatched criticism'
+                ? [
+                    {
+                      findingIndex: 0,
+                      decision: 'supported',
+                      reason: 'This criticism is supported.',
+                    },
+                  ]
+                : [],
+          })),
+        }),
+      });
+
+      await expect(composeWritingPrompts(PARAMS)).rejects.toBeInstanceOf(ReviewerProtocolError);
+      expect(mockGenerateResponse).toHaveBeenCalledTimes(1);
+      expect(mockClassSectionCreate).not.toHaveBeenCalled();
+      expect(mockWritingPromptCreateMany).not.toHaveBeenCalled();
+    }
+  );
+
   it('uses the existing replacement for a structurally invalid first candidate', async () => {
     const malformed = writingResponse([
       { task: 'Missing source text.', taskType: 'completion' },
@@ -404,7 +472,9 @@ describe('composeWritingPrompts', () => {
     expect(error).toBeInstanceOf(TeachingQualityRejectionError);
     if (!(error instanceof TeachingQualityRejectionError)) throw error;
     expect(error.teachingFailure?.kind).toBe('writing');
-    expect(error.teachingFailure?.reviews.map((review) => JSON.parse(review.candidate!))).toEqual(
+    expect(
+      error.teachingFailure?.reviews.map((review) => JSON.parse(review.candidate!)[0].items)
+    ).toEqual(
       mockTeachingResponse.mock.calls.map((call) =>
         JSON.parse(call[1][0].content).items.map((item: { content: unknown }) => item.content)
       )

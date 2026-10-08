@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { z } from 'zod';
 import {
   captureTeachingFailure,
   teachingFailureSchema,
@@ -64,7 +63,9 @@ describe('private teaching failure evidence', () => {
       teachingFailure: evidence,
     });
     expect(JSON.stringify(error)).not.toContain('private address');
-    expect(() => captureTeachingFailure('writing', reviewed, { items })).toThrow(z.ZodError);
+    expect(captureTeachingFailure('writing', reviewed, { items }).reviews[0].verdict.items).toEqual(
+      items
+    );
   });
 
   it('reads historical complete intro verdicts whose indices arrived out of order', () => {

@@ -8,6 +8,7 @@ import {
   mockGenerateResponse,
   mockBlindResponse,
   mockTeachingResponse,
+  mockTeachingCriticResponse,
   mockLogUsage,
   mockLoadAndRender,
   mockScriptCreate,
@@ -250,8 +251,9 @@ describe('bounded canonical listening correction', () => {
       scriptInputs.length +
         quizInputs.length +
         mockBlindResponse.mock.calls.length +
-        mockTeachingResponse.mock.calls.length
-    ).toBe(7);
+        mockTeachingResponse.mock.calls.length +
+        mockTeachingCriticResponse.mock.calls.length
+    ).toBe(9);
     expect(JSON.parse(mockBlindResponse.mock.calls[0][1][0].content).questions[0].question).toBe(
       unsupportedCausalQuestions[0].question
     );
@@ -292,7 +294,7 @@ describe('bounded canonical listening correction', () => {
     expect(error).toBeInstanceOf(TeachingQualityRejectionError);
     const reviews = captureGenerationFailure(error).teachingFailure!.reviews;
     expect(reviews).toHaveLength(2);
-    expect(reviews.map((review) => JSON.parse(review.candidate!)[0].question)).toEqual([
+    expect(reviews.map((review) => JSON.parse(review.candidate!)[0].items[0].question)).toEqual([
       unsupportedCausalQuestions[0].question,
       unsupportedCausalQuestions[0].question,
     ]);
@@ -330,7 +332,7 @@ describe('bounded canonical listening correction', () => {
     expect(error).toBeInstanceOf(SectionQualityError);
     const reviews = captureGenerationFailure(error).teachingFailure!.reviews;
     expect(reviews).toHaveLength(2);
-    expect(JSON.parse(reviews[0].candidate!)[0].question).toBe(
+    expect(JSON.parse(reviews[0].candidate!)[0].items[0].question).toBe(
       unsupportedCausalQuestions[0].question
     );
     expect(JSON.parse(reviews[1].candidate!).reviewType).toBe('blind_section');
@@ -623,13 +625,14 @@ describe('bounded canonical listening correction', () => {
     const reviews = failure.teachingFailure!.reviews;
     expect(reviews).toHaveLength(2);
     expect(JSON.parse(reviews[0].candidate!).reviewType).toBe('blind_section');
-    expect(JSON.parse(reviews[1].candidate!)[0].passageText).toContain(finalText);
+    expect(JSON.parse(reviews[1].candidate!)[0].items[0].passageText).toContain(finalText);
     expect(
       scriptRequests().length +
         mockGenerateResponse.mock.calls.filter((call) => call[2].maxTokens === 4096).length +
         mockBlindResponse.mock.calls.length +
-        mockTeachingResponse.mock.calls.length
-    ).toBe(7);
+        mockTeachingResponse.mock.calls.length +
+        mockTeachingCriticResponse.mock.calls.length
+    ).toBe(8);
     noLearningPublication();
   });
 

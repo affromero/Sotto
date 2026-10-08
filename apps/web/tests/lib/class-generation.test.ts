@@ -1,5 +1,9 @@
 /** MCQ generation preserves complete generated or immutable sourced reading passages. */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import {
+  emptyTeachingCriticFixture,
+  shapeTeachingProviderFixture,
+} from './classes/quality/intro-provider-fixture';
 
 const mockResolveLearningAi = vi.fn();
 vi.mock('@/lib/learning-ai', () => ({
@@ -20,14 +24,29 @@ vi.mock('@/lib/learning-ai', () => ({
 const mockGenerateResponse = vi.fn();
 const mockReviewResponse = vi.fn();
 const mockTeachingResponse = vi.fn();
+const mockTeachingCriticResponse = vi.fn((_system: string, messages: Array<{ content: string }>) =>
+  emptyTeachingCriticFixture(messages)
+);
 vi.mock('@/lib/providers/ai', () => ({
   createAIProvider: () => ({
-    generateResponse: (...args: unknown[]) =>
-      (args[2] as { jsonSchema: { name: string } }).jsonSchema.name === 'class_teaching_quality'
-        ? mockTeachingResponse(...args)
-        : (args[2] as { jsonSchema: { name: string } }).jsonSchema.name === 'class_section_quality'
-          ? mockReviewResponse(...args)
-          : mockGenerateResponse(...args),
+    generateResponse: async (
+      system: string,
+      messages: Array<{ content: string }>,
+      options: unknown
+    ) => {
+      const name = (options as { jsonSchema: { name: string } }).jsonSchema.name;
+      if (name === 'class_teaching_critic') return mockTeachingCriticResponse(system, messages);
+      if (name === 'class_teaching_adjudicator')
+        return shapeTeachingProviderFixture(
+          system,
+          messages,
+          options,
+          await mockTeachingResponse(system, messages, options)
+        );
+      return name === 'class_section_quality'
+        ? mockReviewResponse(system, messages, options)
+        : mockGenerateResponse(system, messages, options);
+    },
   }),
 }));
 
@@ -41,39 +60,13 @@ import { TeachingQualityRejectionError } from '@/lib/classes/quality/teaching-qu
 import type { SectionGenParams } from '@/lib/class-generation';
 import type { SkillType } from '@sotto/shared';
 import { blockedProviderExecution } from '../helpers/runtime/provider-execution';
-
-const GENERATED_PASSAGE =
-  'En el laboratorio, la científica Marta encontró una nota antigua y decidió investigar.';
-
-const SAMPLE_QUESTIONS = [
-  {
-    question: '¿Qué descubrió el científico?',
-    options: ['a', 'b', 'c', 'd'],
-    correctIndex: 0,
-    explanation: 'x',
-    passageRef: 'L1',
-  },
-  {
-    question: '¿Cuándo ocurrió?',
-    options: ['a', 'b', 'c', 'd'],
-    correctIndex: 1,
-    explanation: 'y',
-  },
-];
-SAMPLE_QUESTIONS.push(
-  ...[2, 3, 4].map((index) => ({
-    ...SAMPLE_QUESTIONS[0],
-    question: `Question ${index}`,
-    correctIndex: 0,
-  }))
-);
+import {
+  GENERATED_PASSAGE,
+  SAMPLE_QUESTIONS,
+  SAMPLE_SECTION_RESPONSE as SAMPLE,
+} from '../helpers/runtime/section-generation';
 
 const SAMPLE_ARRAY = JSON.stringify(SAMPLE_QUESTIONS);
-const SAMPLE = JSON.stringify({
-  passage: GENERATED_PASSAGE,
-  questions: SAMPLE_QUESTIONS,
-});
-
 const BASE: SectionGenParams = {
   userId: 'u1',
   execution: blockedProviderExecution('u1'),
@@ -756,7 +749,7 @@ describe('generateSectionQuestions', () => {
     expect(mockGenerateResponse.mock.calls[2][0]).toContain('repairing malformed JSON');
   });
 
-  it('bounds mixed quality and syntax retries to six model requests including teaching review', async () => {
+  it('bounds mixed quality and syntax retries to seven model requests including both review roles', async () => {
     mockGenerateResponse
       .mockResolvedValueOnce({ content: SAMPLE })
       .mockResolvedValueOnce({ content: '{' });
@@ -766,8 +759,9 @@ describe('generateSectionQuestions', () => {
     expect(
       mockGenerateResponse.mock.calls.length +
         mockReviewResponse.mock.calls.length +
-        mockTeachingResponse.mock.calls.length
-    ).toBe(6);
+        mockTeachingResponse.mock.calls.length +
+        mockTeachingCriticResponse.mock.calls.length
+    ).toBe(7);
     expect(mockGenerateResponse.mock.calls[2][0]).toContain('repairing malformed JSON');
   });
 

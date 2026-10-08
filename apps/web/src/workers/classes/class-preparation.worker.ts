@@ -263,7 +263,9 @@ export async function processClassPreparation(job: Job<unknown>, workerSignal?: 
     if (
       current?.id === operationId &&
       current.intent &&
-      ['FAILED', 'CANCELLING', 'CANCELLED'].includes(current.status)
+      (['FAILED', 'CANCELLING', 'CANCELLED'].includes(current.status) ||
+        (current.status === 'UNRESOLVED' &&
+          (current.failure === 'generation_failed' || current.failure === 'source_unreadable')))
     )
       await settleCancelledPreparation(database, current);
   });

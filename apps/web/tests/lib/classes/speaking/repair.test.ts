@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { authorizedLearnerExecution } from '../../../helpers/runtime/provider-execution';
+import {
+  emptyTeachingCriticFixture,
+  shapeTeachingProviderFixture,
+} from '../quality/intro-provider-fixture';
 
 const runtime = vi.hoisted(() => ({
   replies: [] as Array<{ content: string; model: string } | Error>,
@@ -41,15 +45,21 @@ vi.mock('@/lib/providers/ai', () => ({
       ) => {
         runtime.requests.push({ system, messages, options });
         const schemaName = (options.jsonSchema as { name?: string } | undefined)?.name;
+        if (schemaName === 'class_teaching_critic') {
+          runtime.events.push('critic');
+          return { ...emptyTeachingCriticFixture(messages), model: 'configured-model' };
+        }
         const review =
-          schemaName === 'class_teaching_quality' || schemaName === 'class_section_quality';
+          schemaName === 'class_teaching_adjudicator' || schemaName === 'class_section_quality';
         runtime.events.push(review ? 'review' : 'generation');
         const reply = runtime.replies.shift();
         if (!reply) throw new Error('Unexpected additional provider request');
         if (!('content' in reply)) throw reply;
         if (review) runtime.afterReview?.();
         else runtime.afterGeneration?.();
-        return reply;
+        return schemaName === 'class_teaching_adjudicator'
+          ? shapeTeachingProviderFixture(system, messages, options, reply)
+          : reply;
       },
     };
   },
@@ -162,7 +172,7 @@ describe('canonical speaking correction before reference audio', () => {
       corrected.map((item) => item.targetPhrase)
     );
     expect(result.every((item) => item.referenceTtsAudio?.byteLength === 3)).toBe(true);
-    expect(runtime.events).toEqual(['generation', 'review', 'tts', 'tts', 'tts', 'tts']);
+    expect(runtime.events).toEqual(['generation', 'critic', 'review', 'tts', 'tts', 'tts', 'tts']);
   });
 
   it('renders only the corrected set after the same canonical reviewer approves every phrase', async () => {
@@ -182,15 +192,17 @@ describe('canonical speaking correction before reference audio', () => {
     expect(runtime.spoken).toEqual(corrected.map((item) => item.targetPhrase));
     expect(runtime.events).toEqual([
       'generation',
+      'critic',
       'review',
       'generation',
+      'critic',
       'review',
       'tts',
       'tts',
       'tts',
       'tts',
     ]);
-    const correction = runtime.requests[2];
+    const correction = runtime.requests[3];
     const schemas = [runtime.requests[0].options.jsonSchema, correction.options.jsonSchema];
     expect(schemas[0]).toMatchObject({
       name: 'class_speaking_prompts',
@@ -215,7 +227,7 @@ describe('canonical speaking correction before reference audio', () => {
       )
     ).toBe(true);
     expect(
-      JSON.parse(runtime.requests[3].messages[0].content).items.map(
+      JSON.parse(runtime.requests[5].messages[0].content).items.map(
         (item: { content: unknown }) => item.content
       )
     ).toEqual(corrected);
@@ -232,14 +244,21 @@ describe('canonical speaking correction before reference audio', () => {
     expect(error).toBeInstanceOf(TeachingQualityRejectionError);
     const rejection = error as TeachingQualityRejectionError;
     expect(
-      rejection.teachingFailure?.reviews.map((review) => JSON.parse(review.candidate!))
+      rejection.teachingFailure?.reviews.map((review) => JSON.parse(review.candidate!)[0].items)
     ).toEqual([phrases, corrected]);
     expect(rejection.teachingFailure?.reviews.map((review) => review.verdict)).toEqual([
       verdict(true),
       verdict(true),
     ]);
     expect(JSON.stringify(error)).not.toContain(phrases[0].targetPhrase);
-    expect(runtime.events).toEqual(['generation', 'review', 'generation', 'review']);
+    expect(runtime.events).toEqual([
+      'generation',
+      'critic',
+      'review',
+      'generation',
+      'critic',
+      'review',
+    ]);
     noAudio();
   });
 
@@ -266,6 +285,7 @@ describe('canonical speaking correction before reference audio', () => {
       expect(runtime.events).toEqual([
         'generation',
         'generation',
+        'critic',
         'review',
         'tts',
         'tts',
@@ -325,7 +345,7 @@ describe('canonical speaking correction before reference audio', () => {
       { attempt: 2, type: 'teaching' },
     ]);
     expect(failure.teachingFailure?.reviews[0].verdict).toEqual(verdict(true));
-    expect(runtime.events).toEqual(['generation', 'generation', 'review']);
+    expect(runtime.events).toEqual(['generation', 'generation', 'critic', 'review']);
     noAudio();
   });
 
@@ -352,7 +372,7 @@ describe('canonical speaking correction before reference audio', () => {
       issues: [{ code: 'invalid_json' }],
       candidate: malformedReplacement,
     });
-    expect(runtime.events).toEqual(['generation', 'review', 'generation']);
+    expect(runtime.events).toEqual(['generation', 'critic', 'review', 'generation']);
     noAudio();
   });
 
@@ -394,7 +414,7 @@ describe('canonical speaking correction before reference audio', () => {
   ])('propagates malformed or inconsistent review without another generation', async (content) => {
     runtime.replies.push(promptReply(phrases), { content, model: 'configured-model' });
     await expect(composeSpeakingPrompts(params)).rejects.toBeInstanceOf(ReviewerProtocolError);
-    expect(runtime.events).toEqual(['generation', 'review']);
+    expect(runtime.events).toEqual(['generation', 'critic', 'review']);
     noAudio();
   });
 
@@ -403,7 +423,7 @@ describe('canonical speaking correction before reference audio', () => {
     async (failure) => {
       runtime.replies.push(promptReply(phrases), reply(verdict(true)), failure);
       await expect(composeSpeakingPrompts(params)).rejects.toBe(failure);
-      expect(runtime.events).toEqual(['generation', 'review', 'generation']);
+      expect(runtime.events).toEqual(['generation', 'critic', 'review', 'generation']);
       noAudio();
     }
   );
@@ -427,7 +447,7 @@ describe('canonical speaking correction before reference audio', () => {
         }),
       }),
     ]);
-    expect(runtime.events).toEqual(['generation', 'review']);
+    expect(runtime.events).toEqual(['generation', 'critic', 'review']);
     noAudio();
   });
 
@@ -443,7 +463,7 @@ describe('canonical speaking correction before reference audio', () => {
       omitted: 'size_limit',
       verdict: verdict(true),
     });
-    expect(runtime.events).toEqual(['generation', 'review']);
+    expect(runtime.events).toEqual(['generation', 'critic', 'review']);
     noAudio();
   });
 
@@ -460,13 +480,20 @@ describe('canonical speaking correction before reference audio', () => {
     const error = await composeSpeakingPrompts(params).catch((failure: unknown) => failure);
     const failure = (error as TeachingQualityRejectionError).teachingFailure;
     expect(failure?.reviews).toHaveLength(2);
-    expect(JSON.parse(failure!.reviews[0].candidate!)).toEqual(phrases);
+    expect(JSON.parse(failure!.reviews[0].candidate!)[0].items).toEqual(phrases);
     expect(failure!.reviews[1]).toEqual({
       candidate: null,
       omitted: 'size_limit',
       verdict: verdict(true),
     });
-    expect(runtime.events).toEqual(['generation', 'review', 'generation', 'review']);
+    expect(runtime.events).toEqual([
+      'generation',
+      'critic',
+      'review',
+      'generation',
+      'critic',
+      'review',
+    ]);
     noAudio();
   });
 
@@ -482,7 +509,7 @@ describe('canonical speaking correction before reference audio', () => {
     );
     runtime.replies.push(promptReply(phrases), failure);
     await expect(composeSpeakingPrompts(params)).rejects.toBe(failure);
-    expect(runtime.events).toEqual(['generation', 'review']);
+    expect(runtime.events).toEqual(['generation', 'critic', 'review']);
     noAudio();
   });
 });

@@ -1,6 +1,10 @@
 import { vi } from 'vitest';
 import type { ClassListeningParams } from '@/lib/class-listening-generator';
 import { authorizedLearnerExecution } from './provider-execution';
+import {
+  emptyTeachingCriticFixture,
+  shapeTeachingProviderFixture,
+} from '../../lib/classes/quality/intro-provider-fixture';
 
 // ---- Hoisted mock handles (vi.hoisted so they are available before vi.mock calls) ----
 
@@ -67,8 +71,9 @@ const { mockVerifyEpisodeReferences } = vi.hoisted(() => ({
 }));
 const { mockGetAiKey } = vi.hoisted(() => ({ mockGetAiKey: vi.fn() }));
 const { mockGetAiProviderMeta } = vi.hoisted(() => ({ mockGetAiProviderMeta: vi.fn() }));
-const { mockTeachingResponse, mockBlindResponse } = vi.hoisted(() => ({
+const { mockTeachingResponse, mockTeachingCriticResponse, mockBlindResponse } = vi.hoisted(() => ({
   mockTeachingResponse: vi.fn(),
+  mockTeachingCriticResponse: vi.fn(),
   mockBlindResponse: vi.fn(),
 }));
 const { mockCreateAIProvider, mockGenerateResponse } = vi.hoisted(() => {
@@ -77,13 +82,24 @@ const { mockCreateAIProvider, mockGenerateResponse } = vi.hoisted(() => {
     mockCreateAIProvider: vi.fn((provider: string) => {
       if (!provider) throw new Error('A provider must be explicitly selected.');
       return {
-        generateResponse: (...args: unknown[]) => {
-          const name = (args[2] as { jsonSchema?: { name: string } })?.jsonSchema?.name;
-          return name === 'class_teaching_quality'
-            ? mockTeachingResponse(...args)
-            : name === 'class_section_quality'
-              ? mockBlindResponse(...args)
-              : generateResponse(...args);
+        generateResponse: async (
+          system: string,
+          messages: Array<{ content: string }>,
+          options: unknown
+        ) => {
+          const name = (options as { jsonSchema?: { name: string } })?.jsonSchema?.name;
+          if (name === 'class_teaching_critic')
+            return mockTeachingCriticResponse(system, messages, options);
+          if (name === 'class_teaching_adjudicator')
+            return shapeTeachingProviderFixture(
+              system,
+              messages,
+              options,
+              await mockTeachingResponse(system, messages, options)
+            );
+          return name === 'class_section_quality'
+            ? mockBlindResponse(system, messages, options)
+            : generateResponse(system, messages, options);
         },
       };
     }),
@@ -270,6 +286,9 @@ const PARAMS: ClassListeningParams = {
 /** Wire all happy-path mocks. */
 function setupHappyPath() {
   mockGetServerInfra.mockResolvedValue({});
+  mockTeachingCriticResponse.mockImplementation((_system, messages) =>
+    emptyTeachingCriticFixture(messages)
+  );
   mockTeachingResponse.mockImplementation(async (...args) => ({
     content: JSON.stringify({
       items: JSON.parse(args[1][0].content).items.map((item: { index: number }) => ({
@@ -352,6 +371,7 @@ export {
   mockPersistGeneratedReferences,
   mockVerifyEpisodeReferences,
   mockTeachingResponse,
+  mockTeachingCriticResponse,
   mockBlindResponse,
   mockCreateAIProvider,
   mockGenerateResponse,

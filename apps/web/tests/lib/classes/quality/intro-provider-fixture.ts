@@ -3,6 +3,104 @@ interface FixtureResponse {
   model: string;
 }
 
+export function emptyTeachingCriticFixture(messages: Array<{ content: string }>): FixtureResponse {
+  const payload = JSON.parse(messages[0]!.content);
+  return {
+    content: JSON.stringify({
+      items: payload.items.map(({ index }: { index: number }) => ({ index, findings: [] })),
+    }),
+    model: 'm',
+  };
+}
+
+/** Translate only legacy verdicts at the mock model boundary, never modern evidence. */
+export function shapeTeachingProviderFixture(
+  system: string,
+  messages: Array<{ content: string }>,
+  options: unknown,
+  response: FixtureResponse
+): FixtureResponse {
+  if (!system.trim()) return response;
+  const name = (options as { jsonSchema?: { name: string } }).jsonSchema?.name;
+  if (name !== 'class_teaching_critic' && name !== 'class_teaching_adjudicator') return response;
+  try {
+    const parsed = JSON.parse(response.content);
+    if (
+      !Array.isArray(parsed.items) ||
+      parsed.items.some(
+        (item: Record<string, unknown>) =>
+          Object.hasOwn(item, 'findings') || Object.hasOwn(item, 'criticDecisions')
+      )
+    )
+      return response;
+    if (
+      parsed.items.some(
+        (item: { acceptable: unknown; issues: unknown; feedback: unknown }) =>
+          typeof item.acceptable !== 'boolean' ||
+          !Array.isArray(item.issues) ||
+          !Array.isArray(item.feedback) ||
+          item.feedback.some(
+            (text: unknown) => typeof text !== 'string' || !text.trim() || text.length > 300
+          ) ||
+          (item.acceptable
+            ? item.issues.length !== 0 || item.feedback.length !== 0
+            : item.issues.length === 0 || item.feedback.length === 0)
+      )
+    )
+      return response;
+    const payload = JSON.parse(messages[0]!.content);
+    const leaf = (
+      value: unknown,
+      fieldPath: string[] = []
+    ): { fieldPath: string[]; quote: string } => {
+      if (typeof value === 'string') return { fieldPath, quote: value.slice(0, 120) };
+      if (value && typeof value === 'object')
+        for (const [key, child] of Object.entries(value)) {
+          const found = leaf(child, [...fieldPath, key]);
+          if (found.quote.trim()) return found;
+        }
+      return { fieldPath, quote: '' };
+    };
+    return {
+      ...response,
+      content: JSON.stringify({
+        items: parsed.items.map(
+          (item: { index: number; acceptable: boolean; issues: string[]; feedback: string[] }) => {
+            const content = payload.items.find(
+              (entry: { index: number }) => entry.index === item.index
+            )?.content;
+            const findings = item.acceptable
+              ? []
+              : [...new Set(item.issues)].slice(0, 3).map((issue) => ({
+                  issue,
+                  ...leaf(content),
+                  rule: 'fixture teaching contract',
+                  defect: item.feedback[0]?.slice(0, 120) ?? '',
+                  correction: 'Use accurate supported teaching.',
+                  counterexample: null,
+                }));
+            if (name === 'class_teaching_critic') return { index: item.index, findings };
+            const criticisms = payload.criticisms.items.find(
+              (entry: { index: number }) => entry.index === item.index
+            ).findings;
+            return {
+              ...item,
+              findings,
+              criticDecisions: criticisms.map((_: unknown, findingIndex: number) => ({
+                findingIndex,
+                decision: item.acceptable ? 'dismissed' : 'supported',
+                reason: 'Fixture adjudication of the cited field.',
+              })),
+            };
+          }
+        ),
+      }),
+    };
+  } catch {
+    return response;
+  }
+}
+
 /** Convert persisted-string fixtures only at the model response boundary. */
 export function scopedIntroFixture(value: Record<string, unknown>): Record<string, unknown> {
   const examples = Array.isArray(value.examples) ? value.examples : [];
@@ -163,6 +261,8 @@ export function shapeIntroProviderFixture(
   response: FixtureResponse
 ): FixtureResponse {
   const schemaName = (options as { jsonSchema?: { name: string } }).jsonSchema?.name;
+  if (schemaName === 'class_teaching_critic' || schemaName === 'class_teaching_adjudicator')
+    return shapeTeachingProviderFixture(system, messages, options, response);
   if (schemaName === 'class_intro_generation' || schemaName === 'class_intro_repair') {
     try {
       const legacy = shapeLegacyIntroFixture(system, messages, options, response);

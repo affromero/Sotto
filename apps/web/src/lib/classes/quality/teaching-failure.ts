@@ -20,6 +20,37 @@ export const teachingQualityVerdictSchema = z
   })
   .strict();
 
+export const MAX_TEACHING_REVIEW_ITEMS = 50;
+
+/** Separate global indices for bounded nonintro review batches. */
+export const teachingQualityAggregateVerdictSchema = z
+  .object({
+    items: z
+      .array(
+        teachingQualityVerdictItemSchema.extend({
+          index: z
+            .number()
+            .int()
+            .min(0)
+            .max(MAX_TEACHING_REVIEW_ITEMS - 1),
+        })
+      )
+      .min(1)
+      .max(MAX_TEACHING_REVIEW_ITEMS),
+  })
+  .strict()
+  .superRefine(({ items }, context) => {
+    if (
+      new Set(items.map(({ index }) => index)).size !== items.length ||
+      items.some(({ index }) => index >= items.length)
+    )
+      context.addIssue({
+        code: 'custom',
+        path: ['items'],
+        message: 'Teaching evidence must cover each item once.',
+      });
+  });
+
 /** Aggregated intro evidence may contain up to 19 addresses after bounded batches. */
 export const introTeachingQualityVerdictSchema = z
   .object({
@@ -49,7 +80,7 @@ const reviewEvidenceSchema = z
       .refine((value) => Buffer.byteLength(value, 'utf8') <= MAX_CANDIDATE_BYTES)
       .nullable(),
     omitted: z.literal('size_limit').optional(),
-    verdict: z.union([teachingQualityVerdictSchema, introTeachingQualityVerdictSchema]),
+    verdict: z.union([teachingQualityAggregateVerdictSchema, introTeachingQualityVerdictSchema]),
   })
   .strict()
   .refine((review) => (review.candidate === null) === (review.omitted === 'size_limit'));
@@ -62,7 +93,9 @@ export const teachingFailureSchema = z
   .strict()
   .superRefine((failure, context) => {
     const schema =
-      failure.kind === 'intro' ? introTeachingQualityVerdictSchema : teachingQualityVerdictSchema;
+      failure.kind === 'intro'
+        ? introTeachingQualityVerdictSchema
+        : teachingQualityAggregateVerdictSchema;
     failure.reviews.forEach((review, index) => {
       if (!schema.safeParse(review.verdict).success)
         context.addIssue({
@@ -102,7 +135,7 @@ export function captureTeachingFailure(
   const checkedVerdict =
     kind === 'intro'
       ? introTeachingQualityVerdictSchema.parse(verdict)
-      : teachingQualityVerdictSchema.parse(verdict);
+      : teachingQualityAggregateVerdictSchema.parse(verdict);
   const candidate = JSON.stringify(items);
   const review =
     Buffer.byteLength(candidate, 'utf8') <= MAX_CANDIDATE_BYTES

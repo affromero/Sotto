@@ -1,7 +1,10 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SECTION_QUALITY_JSON_SCHEMA, SectionQualityError } from '@/lib/classes/section-quality';
-import { TEACHING_QUALITY_JSON_SCHEMA } from '@/lib/classes/quality/teaching-quality';
+import {
+  TEACHING_CRITIC_JSON_SCHEMA,
+  TEACHING_ADJUDICATOR_JSON_SCHEMA,
+} from '@/lib/classes/quality/teaching-quality';
 import { generateSectionQuestions } from '@/lib/class-generation';
 import { blockedProviderExecution } from '../../helpers/runtime/provider-execution';
 
@@ -30,12 +33,23 @@ describe('section review through the Codex provider', () => {
     execute.mockImplementation(async (system: string, user: string) => {
       if (system.includes('teaching content for')) {
         expect(JSON.parse(/```json\s*([\s\S]*?)\s*```/.exec(system)![1])).toEqual(
-          TEACHING_QUALITY_JSON_SCHEMA.schema
+          (system.includes('Teaching review role: critic.')
+            ? TEACHING_CRITIC_JSON_SCHEMA
+            : TEACHING_ADJUDICATOR_JSON_SCHEMA
+          ).schema
         );
         expect(user).toContain(question.explanation);
         return {
           content: JSON.stringify({
-            items: [{ index: 0, acceptable: true, issues: [], feedback: [] }],
+            items: [
+              {
+                index: 0,
+                findings: [],
+                ...(system.includes('Teaching review role: critic.')
+                  ? {}
+                  : { acceptable: true, issues: [], feedback: [], criticDecisions: [] }),
+              },
+            ],
           }),
           model: 'fixture-model',
         };
@@ -98,7 +112,15 @@ describe('section review through the Codex provider', () => {
       if (system.includes('teaching content for')) {
         return {
           content: JSON.stringify({
-            items: [{ index: 0, acceptable: true, issues: [], feedback: [] }],
+            items: [
+              {
+                index: 0,
+                findings: [],
+                ...(system.includes('Teaching review role: critic.')
+                  ? {}
+                  : { acceptable: true, issues: [], feedback: [], criticDecisions: [] }),
+              },
+            ],
           }),
           model: 'fixture-model',
         };
@@ -180,9 +202,10 @@ describe('section review through the Codex provider', () => {
           content: JSON.stringify({
             items: Array.from({ length: 5 }, (_, index) => ({
               index,
-              acceptable: true,
-              issues: [],
-              feedback: [],
+              findings: [],
+              ...(system.includes('Teaching review role: critic.')
+                ? {}
+                : { acceptable: true, issues: [], feedback: [], criticDecisions: [] }),
             })),
           }),
           model: 'fixture-model',
