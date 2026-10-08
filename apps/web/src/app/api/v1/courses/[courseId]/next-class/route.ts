@@ -7,6 +7,10 @@ import { prisma } from '@/lib/prisma';
 import { sourcedClassSchema } from '@/lib/validations';
 import { readClassPreparation, requestClassPreparation } from '@/lib/classes/preparation';
 import { PreparationConflictError } from '@/lib/classes/preparation-state';
+import {
+  ProviderCreditsExhaustedError,
+  speechCreditsMessage,
+} from '@/lib/providers/shared/speech-availability';
 
 type RouteParams = { params: Promise<{ courseId: string }> };
 export const runtime = 'nodejs';
@@ -68,6 +72,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
     return accepted();
   } catch (error) {
+    if (error instanceof ProviderCreditsExhaustedError)
+      return errorResponse(speechCreditsMessage(error), 402, { code: error.code });
     if (error instanceof PreparationConflictError) return errorResponse(error.message, 409);
     return errorResponse('Could not admit or read class preparation.', 500);
   }

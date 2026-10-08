@@ -34,6 +34,13 @@ it('retains valid provider selection and metadata lookup', () => {
   );
 });
 
+it('offers the direct audio credit check only for adapters with a verifiable synchronous response', () => {
+  for (const id of ['cartesia', 'openai', 'elevenlabs'] as const)
+    expect(getProviderMeta(id).availabilityCheck).toBe('direct_audio');
+  for (const id of ['fal', 'replicate', 'hume', 'minimax', 'mistral', 'local', 'kokoro'] as const)
+    expect(getProviderMeta(id).availabilityCheck).toBeUndefined();
+});
+
 it('preserves every existing credential form and help link after shared catalog migration', () => {
   for (const [section, providers] of [
     ['sotto-ai', getAllAiProviderClientMeta()],

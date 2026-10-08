@@ -54,7 +54,7 @@ interface SettingsFormProps {
   role: string;
   preferredLanguage: string | null;
   speechLanguage: string | null;
-  selectedTtsProvider: string;
+  selectedTtsProvider: string | null;
   selectedSttProvider: string;
   ttsProviderAvailable: boolean;
   sttProviderAvailable: boolean;
@@ -84,10 +84,14 @@ function compatibleModels(
 }
 
 function providerLabel(
-  providerId: string,
+  providerId: string | null,
   providers: Array<{ id: string; displayName: string }>
 ): string {
-  return providers.find((provider) => provider.id === providerId)?.displayName ?? providerId;
+  return (
+    providers.find((provider) => provider.id === providerId)?.displayName ??
+    providerId ??
+    'No speech provider selected'
+  );
 }
 
 export function SettingsForm({
@@ -138,7 +142,7 @@ export function SettingsForm({
   const [languageSaved, setLanguageSaved] = useState(false);
 
   const isAdmin = role === 'ADMIN';
-  const activeSpeechLanguage = preferredLanguage ?? speechLanguage;
+  const activeSpeechLanguage = speechLanguage ?? preferredLanguage;
   const activeSpeechLanguageName = languageName(activeSpeechLanguage);
   const selectedTtsProviderMeta = speechTtsProviderMeta.find(
     (provider) => provider.id === selectedTtsProvider
@@ -484,11 +488,11 @@ export function SettingsForm({
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Speech models</h2>
         <p className={styles.sectionDesc}>
-          Choose the models Sotto should use for {activeSpeechLanguageName}. Providers are set by
-          the admin so every learner uses the same available speech stack.
+          Choose speech models compatible with {activeSpeechLanguageName} for your selected
+          provider.
         </p>
 
-        {!ttsProviderAvailable && !isAdmin ? (
+        {!ttsProviderAvailable && !isAdmin && selectedTtsProvider !== 'disabled' ? (
           <div className={styles.accessBanner} role="alert">
             <strong>Text-to-speech provider unavailable.</strong>
             <span>
@@ -499,7 +503,7 @@ export function SettingsForm({
           </div>
         ) : null}
 
-        {!sttProviderAvailable && !isAdmin ? (
+        {!sttProviderAvailable && !isAdmin && selectedTtsProvider !== 'disabled' ? (
           <div className={styles.accessBanner} role="alert">
             <strong>Speech-to-text provider unavailable.</strong>
             <span>
@@ -514,7 +518,9 @@ export function SettingsForm({
           <div className={styles.speechModelPanel}>
             <div className={styles.speechModelTopline}>Text to speech</div>
             <div className={styles.speechModelProvider}>
-              {providerLabel(selectedTtsProvider, speechTtsProviderMeta)}
+              {selectedTtsProvider === 'disabled'
+                ? 'Audio disabled'
+                : providerLabel(selectedTtsProvider, speechTtsProviderMeta)}
             </div>
             <label htmlFor="preferredTtsModel" className={styles.fieldLabel}>
               Model
@@ -529,7 +535,9 @@ export function SettingsForm({
               disabled={!ttsProviderAvailable || ttsModels.length === 0}
               aria-label="Preferred text-to-speech model"
             >
-              <option value="">Best compatible default</option>
+              <option value="">
+                {selectedTtsProvider === 'disabled' ? 'Audio disabled' : 'Best compatible default'}
+              </option>
               {ttsModels.map((model) => (
                 <option key={model.id} value={model.id}>
                   {model.displayName} — {model.tier}
@@ -537,9 +545,11 @@ export function SettingsForm({
               ))}
             </select>
             <p className={styles.speechModelHint}>
-              {ttsModels.length > 0
-                ? `${ttsModels.length} model${ttsModels.length === 1 ? '' : 's'} available for ${activeSpeechLanguageName}.`
-                : `No ${activeSpeechLanguageName} TTS model is available on this provider.`}
+              {selectedTtsProvider === 'disabled'
+                ? 'Text learning continues; listening and speaking are skipped until you turn audio on.'
+                : ttsModels.length > 0
+                  ? `${ttsModels.length} model${ttsModels.length === 1 ? '' : 's'} available for ${activeSpeechLanguageName}.`
+                  : `No ${activeSpeechLanguageName} TTS model is available on this provider.`}
             </p>
           </div>
 
@@ -558,7 +568,11 @@ export function SettingsForm({
                 sttModels.some((model) => model.id === preferredSttModel) ? preferredSttModel : ''
               }
               onChange={(event) => setPreferredSttModel(event.target.value)}
-              disabled={!sttProviderAvailable || sttModels.length === 0}
+              disabled={
+                selectedTtsProvider === 'disabled' ||
+                !sttProviderAvailable ||
+                sttModels.length === 0
+              }
               aria-label="Preferred speech-to-text model"
             >
               <option value="">Best compatible default</option>

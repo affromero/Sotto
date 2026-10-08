@@ -2,7 +2,11 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { ONBOARDING_TAG_SLUGS } from '@/lib/tag-icons';
 import { listByokProviders, listAiProviders } from '@/lib/byok';
-import { getAllProviderMeta as getAllTtsProviderMeta } from '@/lib/providers/tts-registry';
+import {
+  getAllProviderMeta as getAllTtsProviderMeta,
+  getProviderMeta as getTtsProviderMeta,
+} from '@/lib/providers/tts-registry';
+import { getDefaultModelForLanguage } from '@/lib/tts-language-support';
 import {
   getAllSttProviderMeta,
   sttUsesTtsCredentials,
@@ -10,9 +14,14 @@ import {
 } from '@/lib/providers/stt-registry';
 import { getAutoModelConfig } from '@/lib/auto-model-config';
 import { getServerInfra } from '@/lib/server-config';
-import { getConfiguredTtsProviderId } from '@/lib/providers/tts';
+import {
+  getConfiguredTtsProviderId,
+  isSpeechDisabled,
+  selectTtsProviderId,
+} from '@/lib/providers/tts';
 import { SettingsForm } from './SettingsForm';
 import { LocalAiSettings } from '@/components/settings/LocalAiSettings';
+import { LocalSpeechSettings } from '@/components/settings/LocalSpeechSettings';
 import { CourseManagement } from '@/components/settings/CourseManagement';
 import styles from './page.module.css';
 
@@ -46,6 +55,7 @@ export default async function SettingsPage() {
         role: true,
         preferredLanguage: true,
         preferredTtsModel: true,
+        preferredTtsProvider: true,
         preferredSttModel: true,
         preferredAiModel: true,
         emailNotifications: true,
@@ -115,7 +125,42 @@ export default async function SettingsPage() {
       supportedLanguages: [...model.supportedLanguages],
     })),
   }));
-  const selectedTtsProvider = getConfiguredTtsProviderId() ?? autoConfig.model.ttsProvider;
+  const configuredTtsProvider = getConfiguredTtsProviderId();
+  const selectedTtsProvider = isSpeechDisabled(user)
+    ? 'disabled'
+    : selectTtsProviderId(user.preferredTtsProvider, configuredTtsProvider);
+  const configuredTtsMeta = configuredTtsProvider
+    ? getTtsProviderMeta(configuredTtsProvider)
+    : null;
+  const selectedTtsMeta =
+    selectedTtsProvider && selectedTtsProvider !== 'disabled'
+      ? getTtsProviderMeta(selectedTtsProvider)
+      : null;
+  const speechLanguage = latestCourse?.targetLang ?? user.preferredLanguage ?? null;
+  const configuredDefaultModel =
+    !configuredTtsProvider || !configuredTtsMeta
+      ? null
+      : speechLanguage
+        ? getDefaultModelForLanguage(
+            configuredTtsProvider,
+            speechLanguage,
+            configuredTtsMeta.defaultModel
+          )
+        : configuredTtsMeta.defaultModel;
+  const configuredModelLabel =
+    configuredTtsMeta?.models.find((model) => model.id === configuredDefaultModel)?.displayName ??
+    configuredDefaultModel;
+  if (selectedTtsProvider === 'local' && user.preferredTtsModel) {
+    const localMeta = speechTtsProviderMeta.find((meta) => meta.id === 'local');
+    if (localMeta && !localMeta.models.some((model) => model.id === user.preferredTtsModel)) {
+      localMeta.models.push({
+        id: user.preferredTtsModel,
+        displayName: user.preferredTtsModel,
+        tier: 'standard',
+        supportedLanguages: localMeta.models[0]?.supportedLanguages ?? [],
+      });
+    }
+  }
   const selectedSttProvider = (infra.sttProvider ?? autoConfig.model.sttProvider) as string;
   if (selectedTtsProvider === 'kokoro' || selectedTtsProvider === 'local') {
     if (infra.ttsBaseUrl) accessibleTtsProviders.add(selectedTtsProvider);
@@ -161,15 +206,18 @@ export default async function SettingsPage() {
       <h1 className={styles.pageTitle}>Settings</h1>
 
       <SettingsForm
+        key={`${selectedTtsProvider}:${user.preferredTtsModel ?? ''}`}
         initialName={user.name ?? ''}
         email={user.email}
         image={user.image}
         role={user.role}
         preferredLanguage={user.preferredLanguage}
-        speechLanguage={user.preferredLanguage ?? latestCourse?.targetLang ?? null}
+        speechLanguage={speechLanguage}
         selectedTtsProvider={selectedTtsProvider}
         selectedSttProvider={selectedSttProvider}
-        ttsProviderAvailable={accessibleTtsProviders.has(selectedTtsProvider)}
+        ttsProviderAvailable={
+          selectedTtsProvider !== null && accessibleTtsProviders.has(selectedTtsProvider)
+        }
         sttProviderAvailable={accessibleAiProviders.has(selectedSttProvider)}
         initialPreferredTtsModel={user.preferredTtsModel}
         initialPreferredSttModel={user.preferredSttModel}
@@ -184,8 +232,33 @@ export default async function SettingsPage() {
       />
 
       {user.role === 'ADMIN' && (
-        <LocalAiSettings initialBaseUrl={infra.aiBaseUrl ?? ''} initialModel={infra.aiModel ?? ''} />
+        <LocalAiSettings
+          initialBaseUrl={infra.aiBaseUrl ?? ''}
+          initialModel={infra.aiModel ?? ''}
+        />
       )}
+
+      <LocalSpeechSettings
+        canManageSharedSpeech={session?.isOwner === true}
+        key={`${selectedTtsProvider}:${user.preferredTtsModel ?? ''}:${infra.ttsBaseUrl ?? ''}`}
+        initialEndpoint={infra.ttsBaseUrl ?? ''}
+        initialModel={selectedTtsProvider === 'local' ? (user.preferredTtsModel ?? '') : ''}
+        initialVoices={(infra.ttsVoices ?? '')
+          .split(',')
+          .map((voice) => voice.trim())
+          .filter(Boolean)}
+        initialMode={
+          selectedTtsProvider === 'local' || selectedTtsProvider === 'disabled'
+            ? selectedTtsProvider
+            : 'configured'
+        }
+        configuredProviderLabel={configuredTtsMeta?.displayName ?? null}
+        configuredModelLabel={configuredModelLabel}
+        selectedProviderLabel={selectedTtsMeta?.displayName ?? null}
+        initialUsesConfiguredProvider={
+          !user.preferredTtsProvider?.trim() && !user.preferredTtsModel?.trim()
+        }
+      />
 
       <CourseManagement courses={managedCourses} />
     </main>

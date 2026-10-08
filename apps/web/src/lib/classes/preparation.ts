@@ -298,7 +298,9 @@ export async function requestClassPreparation(
       if (input.intent && (!target || target.status === 'PASSED'))
         throw new PreparationConflictError('Class not found or already passed.');
       const requirements =
-        (target && readSkillRequirements(target.skillRequirements)) ??
+        (input.intent?.kind !== 'REGENERATE' && target
+          ? readSkillRequirements(target.skillRequirements)
+          : null) ??
         (await resolveSkillRequirementsInTransaction(database, execution, {
           scope: 'CLASS',
           nativeLang: course.nativeLang,

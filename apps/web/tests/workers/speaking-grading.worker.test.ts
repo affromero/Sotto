@@ -167,7 +167,6 @@ vi.mock('@/lib/server-config', () => ({
   infra: vi.fn(() => undefined),
   getServerInfra: vi.fn().mockResolvedValue({}),
 }));
-vi.mock('@/lib/audio/media-process', () => ({ isMediaCleanupFailure: vi.fn(() => false) }));
 
 import { processSpeakingGrading } from '@/workers/speaking-grading.worker';
 import { resolveCapturedSttProvider } from '@/lib/providers/stt';

@@ -21,6 +21,7 @@ import { prismaUnfiltered } from '../prisma';
 import { captureApiEndpoint } from '@/lib/providers/shared/api-selection';
 import { captureLocalTtsConnection } from '@/lib/providers/shared/local-tts-connection';
 import { createHmac, createHash } from 'node:crypto';
+import { withSpeechAvailabilityFailure } from './shared/speech-availability';
 import { decorateTtsProvider } from '@/lib/providers/capacity/tts';
 
 export interface SpeechParams {
@@ -220,6 +221,34 @@ export async function createTtsProviderAsync(
       ? `tts:local:${createHash('sha256').update(identity).digest('hex')}`
       : undefined;
   if (!resource) throw new Error('Cannot establish a stable shared TTS capacity identity');
+  const generateSpeech = provider.generateSpeech.bind(provider);
+  provider.generateSpeech = (params) =>
+    withSpeechAvailabilityFailure(
+      () => generateSpeech(params),
+      params.signal && execution.signal
+        ? AbortSignal.any([params.signal, execution.signal])
+        : (params.signal ?? execution.signal)
+    );
+  if (provider.generateSpeechWithTimestamps) {
+    const generate = provider.generateSpeechWithTimestamps.bind(provider);
+    provider.generateSpeechWithTimestamps = (params) =>
+      withSpeechAvailabilityFailure(
+        () => generate(params),
+        params.signal && execution.signal
+          ? AbortSignal.any([params.signal, execution.signal])
+          : (params.signal ?? execution.signal)
+      );
+  }
+  if (provider.generateSoundEffect) {
+    const generate = provider.generateSoundEffect.bind(provider);
+    provider.generateSoundEffect = (params) =>
+      withSpeechAvailabilityFailure(
+        () => generate(params),
+        params.signal && execution.signal
+          ? AbortSignal.any([params.signal, execution.signal])
+          : (params.signal ?? execution.signal)
+      );
+  }
   return decorateTtsProvider(provider, {
     resource,
     signal: execution.signal,
@@ -519,18 +548,48 @@ export function getConfiguredTtsProviderId(): TtsProviderId | null {
   return isValidProviderId(raw) ? raw : null;
 }
 
+/** Personal selection precedes the server default, never credential availability. */
+export function selectTtsProviderId(
+  preferredProvider: string | null | undefined,
+  configuredProvider: TtsProviderId | null
+): TtsProviderId | null {
+  const preferred = preferredProvider?.trim();
+  if (preferred === 'disabled') return null;
+  if (!preferred) return configuredProvider;
+  if (!isValidProviderId(preferred)) throw new Error('The saved TTS provider is invalid.');
+  return preferred;
+}
+
+export function isSpeechDisabled(
+  preferences: { preferredTtsProvider?: string | null } | null | undefined
+): boolean {
+  return preferences?.preferredTtsProvider?.trim() === 'disabled';
+}
+
+/** An explicit provider override cannot inherit another provider's personal model. */
+export function selectedTtsModel(
+  preferences: { preferredTtsProvider?: string | null; preferredTtsModel?: string | null } | null,
+  provider: TtsProviderId | null
+): string | undefined {
+  if (
+    preferences?.preferredTtsProvider?.trim() &&
+    preferences.preferredTtsProvider.trim() !== provider
+  )
+    return undefined;
+  return preferences?.preferredTtsModel ?? undefined;
+}
+
 /**
  * Check if TTS can be resolved for a user without throwing.
  */
 export async function canResolveTts(userId: string): Promise<boolean> {
-  if (await hasSharedByokKey(userId)) return true;
-  // Keyless local TTS sidecars count only when explicitly configured AND given a
-  // reachable endpoint — never auto-selected by mere availability.
-  const configuredTtsProvider = getConfiguredTtsProviderId();
-  if (
-    (configuredTtsProvider === 'kokoro' || configuredTtsProvider === 'local') &&
-    infra('ttsBaseUrl')
-  )
-    return true;
-  return false;
+  const user = await prismaUnfiltered.user.findUnique({
+    where: { id: userId },
+    select: { preferredTtsProvider: true },
+  });
+  if (isSpeechDisabled(user)) return false;
+  const selected = selectTtsProviderId(user?.preferredTtsProvider, getConfiguredTtsProviderId());
+  // Keyless local sidecars require an explicit selection and a saved endpoint.
+  if ((selected === 'local' || selected === 'kokoro') && infra('ttsBaseUrl')) return true;
+  return hasSharedByokKey(userId);
 }

@@ -12,7 +12,10 @@ const mockEpisodeCount = vi.fn();
 const mockFollowCount = vi.fn();
 
 const txClient = {
-  user: { update: (...args: unknown[]) => mockUserUpdate(...args) },
+  user: {
+    update: (...args: unknown[]) => mockUserUpdate(...args),
+    findUnique: (...args: unknown[]) => mockUserFindUnique(...args),
+  },
   tag: { findMany: (...args: unknown[]) => mockTagFindMany(...args) },
   userInterest: {
     deleteMany: (...args: unknown[]) => mockUserInterestDeleteMany(...args),
@@ -47,11 +50,16 @@ vi.mock('@/lib/auto-model-config', () => ({
   }),
 }));
 
-vi.mock('@/lib/providers/tts', () => ({
+vi.mock('@/lib/providers/tts', async (importOriginal) => ({
+  selectTtsProviderId: (await importOriginal<typeof import('@/lib/providers/tts')>())
+    .selectTtsProviderId,
+  isSpeechDisabled: (await importOriginal<typeof import('@/lib/providers/tts')>()).isSpeechDisabled,
   getConfiguredTtsProviderId: vi.fn(() => 'openai'),
 }));
 
-vi.mock('@/lib/providers/tts-registry', () => ({
+vi.mock('@/lib/providers/tts-registry', async (importOriginal) => ({
+  isValidProviderId: (await importOriginal<typeof import('@/lib/providers/tts-registry')>())
+    .isValidProviderId,
   getProviderMeta: vi.fn(() => ({
     models: [{ id: 'tts-1-hd', displayName: 'TTS HD', supportedLanguages: new Set(['en', 'es']) }],
   })),
@@ -411,6 +419,75 @@ describe('PATCH /api/v1/users/me', () => {
       })
     );
   });
+
+  it('allows a custom German model only for the explicitly selected personal local provider', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockPrisma.user.findUnique.mockResolvedValue({
+      preferredLanguage: 'de',
+      preferredTtsProvider: 'local',
+    });
+    mockPrisma.user.update.mockResolvedValue({
+      ...mockUser,
+      preferredTtsProvider: 'local',
+      preferredTtsModel: 'piper-de',
+    });
+    const response = await PATCH(createPatchRequest({ preferredTtsModel: 'piper-de' }));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      preferredTtsProvider: 'local',
+      preferredTtsModel: 'piper-de',
+    });
+    expect(mockPrisma.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ preferredTtsModel: 'piper-de' }) })
+    );
+    expect(mockPrisma.user.update.mock.calls[0][0].data).not.toHaveProperty('preferredSttModel');
+  });
+
+  it('requires enabling speech before choosing a model for a disabled profile', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockPrisma.user.findUnique.mockResolvedValue({
+      preferredLanguage: 'de',
+      preferredTtsProvider: 'disabled',
+    });
+    const response = await PATCH(createPatchRequest({ preferredTtsModel: 'tts-1-hd' }));
+    expect(response.status).toBe(400);
+    expect(mockPrisma.user.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects a speech model edit if the selected provider changes before the write transaction', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockPrisma.user.findUnique
+      .mockResolvedValueOnce({ preferredLanguage: 'de', preferredTtsProvider: 'local' })
+      .mockResolvedValueOnce({ preferredTtsProvider: 'cartesia' });
+    const response = await PATCH(createPatchRequest({ preferredTtsModel: 'piper-de' }));
+    expect(response.status).toBe(409);
+    expect(mockPrisma.user.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects a custom local model for an explicitly selected cloud provider', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockPrisma.user.findUnique.mockResolvedValue({
+      preferredLanguage: 'en',
+      preferredTtsProvider: 'cartesia',
+    });
+    const response = await PATCH(createPatchRequest({ preferredTtsModel: 'piper-de' }));
+    expect(response.status).toBe(400);
+    expect(mockPrisma.user.update).not.toHaveBeenCalled();
+  });
+
+  it.each(['', ' '.repeat(2), 'm'.repeat(121)])(
+    'rejects an invalid custom local model without writing preferences',
+    async (model) => {
+      mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+      mockPrisma.user.findUnique.mockResolvedValue({
+        preferredLanguage: 'de',
+        preferredTtsProvider: 'local',
+      });
+      const response = await PATCH(createPatchRequest({ preferredTtsModel: model }));
+      expect(response.status).toBe(400);
+      expect(mockPrisma.user.update).not.toHaveBeenCalled();
+    }
+  );
 
   it('accepts per-profile appearance prefs and refreshes the theme cookie', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });

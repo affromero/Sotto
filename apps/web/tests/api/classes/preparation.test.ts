@@ -18,6 +18,7 @@ vi.mock('@/lib/classes/preparation', () => ({
 
 import { GET, PATCH, POST } from '@/app/api/v1/courses/[courseId]/preparation/route';
 import { PreparationConflictError } from '@/lib/classes/preparation-state';
+import { ProviderCreditsExhaustedError } from '@/lib/providers/shared/speech-availability';
 
 const schedule = {
   availableAt: '2026-09-28T08:00:00-05:00',
@@ -100,6 +101,16 @@ describe('class preparation recovery', () => {
 });
 
 describe('scheduled class preparation admission', () => {
+  it('requires restored credits or an explicit audio choice before scheduling', async () => {
+    boundary.admit.mockRejectedValue(new ProviderCreditsExhaustedError('openai'));
+    const response = await post();
+    expect(response.status).toBe(402);
+    expect(await response.json()).toMatchObject({
+      code: 'PROVIDER_CREDITS_EXHAUSTED',
+      error: expect.stringContaining('Settings'),
+    });
+  });
+
   it('requires authentication', async () => {
     boundary.authenticate.mockResolvedValue(null);
     expect((await post()).status).toBe(401);

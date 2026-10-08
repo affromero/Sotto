@@ -93,4 +93,17 @@ describe('PATCH /api/v1/admin/site-config', () => {
     expect(res.status).toBe(400);
     expect(mockSetSiteConfig).not.toHaveBeenCalled();
   });
+
+  it('persists explicitly configured voice IDs without dropping them from the patch', async () => {
+    mockRequireAdmin.mockResolvedValue('owner-1');
+    mockGetSiteConfig.mockResolvedValue({ ttsProvider: 'cartesia', ttsVoices: 'voice-a,voice-b' });
+    const { PATCH } = await getHandlers();
+    const response = await PATCH(patchRequest({ ttsVoices: 'voice-a,voice-b' }));
+    expect(response.status).toBe(200);
+    expect(mockSetSiteConfig).toHaveBeenCalledWith({ ttsVoices: 'voice-a,voice-b' }, 'owner-1');
+    expect(await response.json()).toEqual({
+      ttsProvider: 'cartesia',
+      ttsVoices: 'voice-a,voice-b',
+    });
+  });
 });

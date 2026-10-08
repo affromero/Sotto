@@ -38,6 +38,7 @@ import {
 import { POST as submitPost } from '@/app/api/v1/practice/[sessionId]/submit/route';
 import { PracticeCourseNotFoundError, PracticeSessionNotFoundError } from '@/lib/practice-service';
 import { PreparationConflictError } from '@/lib/classes/preparation-state';
+import { ProviderCreditsExhaustedError } from '@/lib/providers/shared/speech-availability';
 
 const courseParams = { params: Promise.resolve({ courseId: 'c1' }) };
 const sessionParams = { params: Promise.resolve({ sessionId: 'ps1' }) };
@@ -54,6 +55,16 @@ beforeEach(() => {
 });
 
 describe('Practice HTTP contract', () => {
+  it('explains the explicit choices when credits prevent FULL generation', async () => {
+    mocks.admit.mockRejectedValue(new ProviderCreditsExhaustedError('cartesia'));
+    const response = await startPost(jsonReq({ kind: 'FULL' }), courseParams);
+    expect(response.status).toBe(402);
+    expect(await response.json()).toMatchObject({
+      code: 'PROVIDER_CREDITS_EXHAUSTED',
+      error: expect.stringContaining('select local speech'),
+    });
+  });
+
   it('acknowledges durable FULL preparation with a saved identity and public status', async () => {
     const response = await startPost(
       jsonReq({ kind: 'FULL', requestId: randomUUID(), focusTargetId: 'ft1' }),

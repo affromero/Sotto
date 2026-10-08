@@ -12,7 +12,14 @@ import { capturedLearningAiOptions, resolveCapturedLearningAi } from './learning
 import { formatNotesForPrompt } from './course-notes';
 import { createAIProvider } from './providers/ai';
 import { loadAndRender } from './prompt-loader';
-import { canResolveTts, resolveTtsProvider, getConfiguredTtsProviderId } from './providers/tts';
+import {
+  canResolveTts,
+  resolveTtsProvider,
+  getConfiguredTtsProviderId,
+  selectTtsProviderId,
+  selectedTtsModel,
+  isSpeechDisabled,
+} from './providers/tts';
 import { getAutoModelConfig } from './auto-model-config';
 import { logUsage } from './usage-logger';
 import { logger } from './logger';
@@ -331,11 +338,20 @@ export async function composeSpeakingPrompts(
   // Step 3: resolve TTS for reference audio under the required/optional policy.
   // Prefer the saved provider so a self-hoster using Kokoro renders reference
   // audio with the local sidecar. Otherwise use the configured model default.
+  const userSpeechPrefs = await prisma.user.findUnique({
+    where: { id: p.userId },
+    select: { preferredTtsModel: true, preferredTtsProvider: true },
+  });
   const ttsAvailable =
-    p.ttsProvider === undefined ? await canResolveTts(p.userId) : p.ttsProvider !== null;
+    p.ttsProvider === undefined
+      ? !isSpeechDisabled(userSpeechPrefs) && (await canResolveTts(p.userId))
+      : p.ttsProvider !== null;
   let requestedTtsProvider: string | null = p.ttsProvider ?? null;
   if (ttsAvailable && p.ttsProvider === undefined) {
-    const configured = getConfiguredTtsProviderId();
+    const configured = selectTtsProviderId(
+      userSpeechPrefs?.preferredTtsProvider,
+      getConfiguredTtsProviderId()
+    );
     if (configured) {
       requestedTtsProvider = configured;
     } else {
@@ -347,10 +363,6 @@ export async function composeSpeakingPrompts(
       }
     }
   }
-  const userSpeechPrefs = await prisma.user.findUnique({
-    where: { id: p.userId },
-    select: { preferredTtsModel: true },
-  });
   const referenceTtsAudio: (Uint8Array | null)[] = [];
   for (let i = 0; i < phrases.length; i++) {
     if (!ttsAvailable || !requestedTtsProvider) {
@@ -365,7 +377,10 @@ export async function composeSpeakingPrompts(
         requestedProvider: requestedTtsProvider as Parameters<
           typeof resolveTtsProvider
         >[0]['requestedProvider'],
-        requestedModel: userSpeechPrefs?.preferredTtsModel ?? undefined,
+        requestedModel: selectedTtsModel(
+          userSpeechPrefs,
+          requestedTtsProvider as Parameters<typeof selectedTtsModel>[1]
+        ),
         language: p.targetLang,
       });
       const voiceId = provider.getVoiceId('HOST', p.refId, undefined, p.targetLang);

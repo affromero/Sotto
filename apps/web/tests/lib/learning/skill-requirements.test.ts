@@ -1,131 +1,195 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+// @vitest-environment node
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { randomUUID } from 'node:crypto';
 import { requiredLearningSkills } from '@sotto/shared';
-
-const boundary = vi.hoisted(() => ({
-  configuration: {
-    ttsProvider: null as string | null,
-    sttProvider: null as string | null,
-    ttsBaseUrl: null as string | null,
-    sttBaseUrl: null as string | null,
-  },
-  preference: null as string | null,
-  credentials: new Set<string>(),
-  storageError: null as Error | null,
-}));
-vi.mock('@/lib/prisma', () => ({
-  prismaUnfiltered: {
-    $transaction: async (operation: (database: unknown) => Promise<unknown>) =>
-      operation({
-        user: { findUnique: async () => ({ preferredTtsProvider: boundary.preference }) },
-      }),
-  },
-}));
-vi.mock('@/lib/site-config', () => ({ getSiteConfig: async () => boundary.configuration }));
-vi.mock('@/lib/sidedoor/credentials/runtime/provider-credentials', () => ({
-  resolveSottoProfileCredential: async (
-    _database: unknown,
-    _userId: string,
-    scope: string,
-    provider: string
-  ) => {
-    if (boundary.storageError) throw boundary.storageError;
-    return boundary.credentials.has(`${scope}:${provider}`) ? { credential: { provider } } : null;
-  },
-}));
-
+import type { PrismaClient } from '@/generated/prisma/client';
+import { useProviderCredentialDatabase } from '../../helpers/runtime/provider-credentials-postgres';
+import { EMPTY_INFRA } from '@/lib/site-config';
+import { sidedoorStateStore } from '@/lib/sidedoor/access/state/store';
+import {
+  captureSottoCredentialOwner,
+  sottoCredentialStorage,
+} from '@/lib/sidedoor/credentials/runtime/provider-credentials';
+import { captureConfiguredSottoCredentialProbe } from '@/lib/providers/shared/credential-validation';
+import { captureSottoExecutionCredential } from '@/lib/sidedoor/credentials/runtime/credential-execution';
+import {
+  sottoRequestExecution,
+  createSottoProviderTransport,
+} from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import { readSkillRequirements, resolveSkillRequirements } from '@/lib/learning/skill-requirements';
 
-const execution = { userId: 'learner', authorize: async () => ({ userId: 'learner' }) };
+let database: PrismaClient;
+vi.mock('@/lib/prisma', () => ({
+  get prismaUnfiltered() {
+    return database;
+  },
+}));
 const context = {
   scope: 'FULL' as const,
   nativeLang: 'en',
   targetLang: 'de',
   level: 'A2' as const,
 };
-
-beforeEach(() => {
-  boundary.configuration = {
-    ttsProvider: null,
-    sttProvider: null,
-    ttsBaseUrl: null,
-    sttBaseUrl: null,
-  };
-  boundary.preference = null;
-  boundary.credentials.clear();
-  boundary.storageError = null;
-});
-
-describe('learner speech access', () => {
-  it('keeps all text skills available without speech configuration', async () => {
-    expect(requiredLearningSkills(await resolveSkillRequirements(execution, context))).toEqual([
-      'GRAMMAR',
-      'READING',
-      'WRITING',
-    ]);
+const suite = process.env.SIDEDOOR_TEST_DATABASE_URL ? describe : describe.skip;
+suite('learner speech access with canonical PostgreSQL credential selection', () => {
+  const fixture = useProviderCredentialDatabase();
+  beforeAll(() => {
+    database = fixture.database;
   });
+  beforeEach(() => configure({}));
+  async function execution() {
+    const admission = await fixture.transaction((tx) => fixture.admission(tx));
+    return sottoRequestExecution(admission.request, admission.identity);
+  }
+  async function configure(
+    settings: Record<string, string | null>,
+    preference: string | null = null
+  ) {
+    await fixture.transaction(async (tx) => {
+      await sidedoorStateStore(tx).transact((state) => {
+        state.configuration.site = { ...EMPTY_INFRA, ...settings };
+      });
+      await tx.user.update({
+        where: { id: 'alice' },
+        data: { preferredTtsProvider: preference },
+        select: { id: true },
+      });
+    });
+  }
+  async function seed(provider: string, scope: 'tts' | 'stt' = 'tts', enabled = true) {
+    await fixture.transaction(async (tx) => {
+      const storage = await sottoCredentialStorage(tx, scope, provider);
+      const owner = await captureSottoCredentialOwner(tx, 'alice');
+      const probe = await captureConfiguredSottoCredentialProbe(
+        tx,
+        storage.slot.modality,
+        provider,
+        {}
+      );
+      if (probe.kind === 'unsupported') throw new Error('Missing fixture provider transport');
+      await storage.owned.replace(
+        storage.owned.prepareReplacement(
+          { ...storage.slot, owner },
+          {
+            expectedHeadRevision: null,
+            credentialRevision: randomUUID(),
+            values: { apiKey: `speech-access-${randomUUID()}` },
+            binding: probe.binding,
+            availability: enabled ? 'enabled' : 'disabled',
+            label: 'Fixture speech credential',
+            metadata: { createdAt: 1, updatedAt: 1, lastUsedAt: null },
+          }
+        )
+      );
+    });
+  }
+  async function exhaust() {
+    const actor = await execution();
+    const credential = await fixture.transaction((tx) =>
+      captureSottoExecutionCredential(tx, actor.authorize, 'tts', 'cartesia', true)
+    );
+    if (!credential) throw new Error('Missing fixture Cartesia credential');
+    const transport = await createSottoProviderTransport({ ...actor, credential }, [
+      { method: 'POST', url: 'https://api.cartesia.ai/tts/bytes' },
+    ]);
+    vi.stubGlobal(
+      'fetch',
+      async () => new Response('Model credits limit reached: exhausted', { status: 402 })
+    );
+    await (
+      await transport.authenticatedFetch('https://api.cartesia.ai/tts/bytes', { method: 'POST' })
+    ).text();
+  }
+  const requirements = async () => resolveSkillRequirements(await execution(), context);
 
+  it('blocks known exhausted access before oral requirements and permits a distinct explicit account', async () => {
+    await configure({ ttsProvider: 'cartesia' });
+    await seed('cartesia');
+    await exhaust();
+    await expect(requirements()).rejects.toMatchObject({ code: 'PROVIDER_CREDITS_EXHAUSTED' });
+    await seed('openai');
+    await configure({ ttsProvider: 'cartesia' }, 'openai');
+    expect((await requirements()).ttsProvider).toBe('openai');
+  });
+  it('honors disabled audio despite invalid configured speech credentials', async () => {
+    await seed('cartesia', 'tts', false);
+    await configure({ ttsProvider: 'cartesia', sttProvider: 'cartesia' }, 'disabled');
+    const selected = await requirements();
+    expect(requiredLearningSkills(selected)).toEqual(['GRAMMAR', 'READING', 'WRITING']);
+    expect(selected.ttsProvider).toBeNull();
+    expect(selected.sttProvider).toBeNull();
+  });
+  it('allows local lesson speech while retaining a latched future transcription requirement', async () => {
+    await configure({ ttsProvider: 'cartesia' });
+    await seed('cartesia');
+    await exhaust();
+    await configure(
+      { ttsProvider: 'cartesia', sttProvider: 'cartesia', ttsBaseUrl: 'http://local-tts:8000' },
+      'local'
+    );
+    const selected = await requirements();
+    expect(selected.ttsProvider).toBe('local');
+    expect(selected.sttProvider).toBe('cartesia');
+    expect(selected.skills.SPEAKING.state).toBe('REQUIRED');
+    expect(selected.skills.LISTENING.state).toBe('REQUIRED');
+  });
+  it('keeps all text skills available without speech configuration', async () => {
+    expect(requiredLearningSkills(await requirements())).toEqual(['GRAMMAR', 'READING', 'WRITING']);
+  });
   it('does not infer audio access from an unrelated provider key', async () => {
-    boundary.configuration.ttsProvider = 'cartesia';
-    boundary.credentials.add('tts:elevenlabs');
-    const requirements = await resolveSkillRequirements(execution, context);
-    expect(requirements.skills.LISTENING).toEqual({
+    await configure({ ttsProvider: 'cartesia' });
+    await seed('elevenlabs');
+    expect((await requirements()).skills.LISTENING).toEqual({
       state: 'EXEMPT_NO_PROVIDER',
       reason: 'NO_TTS_PROVIDER',
     });
   });
-
   it('uses the explicit instance provider when a personal override is absent', async () => {
-    boundary.configuration.ttsProvider = 'cartesia';
-    boundary.credentials.add('tts:cartesia');
-    const requirements = await resolveSkillRequirements(execution, context);
-    expect(requirements.ttsProvider).toBe('cartesia');
-    expect(requirements.skills.LISTENING.state).toBe('REQUIRED');
+    await configure({ ttsProvider: 'cartesia' });
+    await seed('cartesia');
+    const selected = await requirements();
+    expect(selected.ttsProvider).toBe('cartesia');
+    expect(selected.skills.LISTENING.state).toBe('REQUIRED');
   });
-
   it('honors a personal TTS selection independently of the instance provider', async () => {
-    boundary.configuration.ttsProvider = 'cartesia';
-    boundary.preference = 'openai';
-    boundary.credentials.add('tts:openai');
-    expect((await resolveSkillRequirements(execution, context)).ttsProvider).toBe('openai');
+    await configure({ ttsProvider: 'cartesia' }, 'openai');
+    await seed('openai');
+    expect((await requirements()).ttsProvider).toBe('openai');
   });
-
-  it('requires both audio skills for explicitly configured keyless local providers', async () => {
-    boundary.configuration = {
+  it('requires both oral skills for explicitly configured keyless local providers', async () => {
+    await configure({
       ttsProvider: 'local',
       sttProvider: 'local',
       ttsBaseUrl: 'http://local-tts:8000',
       sttBaseUrl: 'http://local-stt:8000',
-    };
-    expect(requiredLearningSkills(await resolveSkillRequirements(execution, context))).toContain(
-      'LISTENING'
-    );
-    expect(requiredLearningSkills(await resolveSkillRequirements(execution, context))).toContain(
-      'SPEAKING'
-    );
+    });
+    expect(requiredLearningSkills(await requirements())).toEqual([
+      'GRAMMAR',
+      'READING',
+      'LISTENING',
+      'SPEAKING',
+      'WRITING',
+    ]);
   });
-
   it.each(['unknown-provider', 'auto'])(
-    'rejects saved invalid selection %s instead of waiving listening',
+    'rejects invalid selection %s instead of waiving listening',
     async (provider) => {
-      boundary.configuration.ttsProvider = provider;
-      await expect(resolveSkillRequirements(execution, context)).rejects.toMatchObject({
+      await configure({ ttsProvider: provider });
+      await expect(requirements()).rejects.toMatchObject({
         name: 'LearningConfigurationError',
         message: expect.stringMatching(/TTS provider/),
       });
     }
   );
-
-  it('surfaces unavailable credential storage instead of waiving an audio skill', async () => {
-    boundary.configuration.sttProvider = 'openai';
-    boundary.storageError = new Error('Selected credential is disabled');
-    await expect(resolveSkillRequirements(execution, context)).rejects.toThrow(/disabled/);
+  it('surfaces a disabled selected credential instead of waiving an audio skill', async () => {
+    await seed('openai', 'stt', false);
+    await configure({ sttProvider: 'openai' });
+    await expect(requirements()).rejects.toThrow(/disabled|unavailable/i);
   });
-
   it('rejects an incomplete local provider configuration', async () => {
-    boundary.configuration.sttProvider = 'local';
-    await expect(resolveSkillRequirements(execution, context)).rejects.toThrow(/endpoint/);
+    await configure({ sttProvider: 'local' });
+    await expect(requirements()).rejects.toThrow(/endpoint/);
   });
-
   it('rejects malformed persisted requirements instead of treating the session as legacy', () => {
     expect(readSkillRequirements(null)).toBeNull();
     expect(() => readSkillRequirements({ version: 1 })).toThrow();

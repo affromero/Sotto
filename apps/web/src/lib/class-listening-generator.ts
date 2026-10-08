@@ -12,7 +12,13 @@ import { generateScript } from './script-generator';
 import { createSegmentsAndQueueAudio } from './segment-creator';
 import { cleanTextForTts } from './tts-text-cleaner';
 import { persistGeneratedReferences } from './references';
-import { getConfiguredTtsProviderId, resolveTtsProvider } from './providers/tts';
+import {
+  getConfiguredTtsProviderId,
+  resolveTtsProvider,
+  selectTtsProviderId,
+  selectedTtsModel,
+  isSpeechDisabled,
+} from './providers/tts';
 import { getServerInfra } from './server-config';
 import { logUsage } from './usage-logger';
 import { logger } from './logger';
@@ -174,11 +180,15 @@ export async function composeListeningContent(
   const ai = await resolveCapturedLearningAi(p.userId, p.execution);
   const userSpeechPrefs = await prisma.user.findUnique({
     where: { id: p.userId },
-    select: { preferredTtsModel: true },
+    select: { preferredTtsModel: true, preferredTtsProvider: true },
   });
   await getServerInfra();
   const configuredTtsProvider =
-    p.ttsProvider === undefined ? getConfiguredTtsProviderId() : p.ttsProvider;
+    p.ttsProvider === undefined
+      ? selectTtsProviderId(userSpeechPrefs?.preferredTtsProvider, getConfiguredTtsProviderId())
+      : p.ttsProvider;
+  if (p.ttsProvider === undefined && isSpeechDisabled(userSpeechPrefs))
+    throw new Error('Audio is disabled for this profile. Enable speech before starting listening.');
   if (!p.deferAudio && !configuredTtsProvider) {
     throw new Error(
       'AI audio is not enabled. Select a speech provider in Settings before starting listening practice.'
@@ -191,7 +201,7 @@ export async function composeListeningContent(
         execution: p.execution,
         episodeId: p.firstSeenClassId ?? p.courseId,
         requestedProvider: configuredTtsProvider,
-        requestedModel: userSpeechPrefs?.preferredTtsModel,
+        requestedModel: selectedTtsModel(userSpeechPrefs, configuredTtsProvider),
         language: p.targetLang,
       });
 
@@ -209,7 +219,8 @@ export async function composeListeningContent(
       status: 'PENDING',
       ttsProvider: resolvedTts?.providerId ?? configuredTtsProvider ?? undefined,
       ttsModel:
-        resolvedTts?.provider.getModelId() ?? userSpeechPrefs?.preferredTtsModel ?? undefined,
+        resolvedTts?.provider.getModelId() ??
+        selectedTtsModel(userSpeechPrefs, configuredTtsProvider),
     },
   });
   const episodeId = episode.id;

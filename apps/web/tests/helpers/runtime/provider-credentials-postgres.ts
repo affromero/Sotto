@@ -19,6 +19,7 @@ export function useProviderCredentialDatabase() {
     const url = new URL(databaseUrl!);
     if (!['localhost', '127.0.0.1'].includes(url.hostname) || url.pathname !== '/sidedoor_test')
       throw new Error('Requires isolated local sidedoor_test database');
+    vi.stubEnv('DIRECT_DATABASE_URL', databaseUrl!);
     vi.stubEnv('BYOK_ENCRYPTION_KEY', 'provider-storage-test-secret');
     database = new PrismaClient({
       adapter: new PrismaPg(

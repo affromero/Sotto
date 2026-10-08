@@ -1,0 +1,45 @@
+# Optional STT. Build and verify offserver, then use an immutable image digest.
+# Select this endpoint explicitly in Admin: http://local-stt:8000/v1.
+services:
+  local-stt:
+    image: ${SOTTO_LOCAL_STT_IMAGE:?Set the verified immutable local STT image reference}
+    restart: unless-stopped
+    user: '1000:1000'
+    read_only: true
+    tmpfs:
+      - /tmp:size=128m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    deploy:
+      resources:
+        limits:
+          memory: 1024m
+          cpus: '2'
+          pids: 128
+    ports:
+      - '127.0.0.1:${SOTTO_LOCAL_STT_PORT:-8002}:8000'
+    healthcheck:
+      test:
+        - CMD
+        - /home/ubuntu/speaches/.venv/bin/python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - sotto-network
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+networks:
+  sotto-network:
+    external: true
+    name: sotto-network

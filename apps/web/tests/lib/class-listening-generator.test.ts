@@ -70,6 +70,50 @@ describe('Listening audio admission', () => {
 // ---- Tests ----
 
 describe('generateClassListening', () => {
+  it('blocks default listening while speech is disabled even with a configured cloud provider', async () => {
+    setupHappyPath();
+    mockGetConfiguredTtsProviderId.mockReturnValue('cartesia');
+    mockUserFindUnique.mockResolvedValue({
+      preferredTtsProvider: 'disabled',
+      preferredTtsModel: null,
+    });
+    await expect(generateClassListening(PARAMS)).rejects.toThrow(/disabled/);
+    expect(mockEpisodeCreate).not.toHaveBeenCalled();
+    expect(mockResolveTtsProvider).not.toHaveBeenCalled();
+  });
+
+  it('pins the personal local provider and custom model before listening audio generation', async () => {
+    setupHappyPath();
+    mockGetConfiguredTtsProviderId.mockReturnValue('cartesia');
+    mockUserFindUnique.mockResolvedValue({
+      preferredTtsProvider: 'local',
+      preferredTtsModel: 'piper-de',
+    });
+    mockResolveTtsProvider.mockResolvedValue({
+      providerId: 'local',
+      provider: { getModelId: () => 'piper-de' },
+    });
+    await generateClassListening(PARAMS);
+    expect(mockEpisodeCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          ttsProvider: 'local',
+          ttsModel: 'piper-de',
+        }),
+      })
+    );
+  });
+
+  it('keeps an explicit listening provider authoritative over the personal local preference', async () => {
+    setupHappyPath();
+    mockUserFindUnique.mockResolvedValue({
+      preferredTtsProvider: 'local',
+      preferredTtsModel: 'piper-de',
+    });
+    await generateClassListening({ ...PARAMS, ttsProvider: 'cartesia' });
+    expect(mockEpisodeCreate.mock.calls[0][0].data.ttsProvider).toBe('cartesia');
+  });
+
   it('rejects malformed blind review before publishing listening questions', async () => {
     setupHappyPath();
     mockBlindResponse.mockResolvedValue({ content: '{"questions":[]}', model: 'm' });

@@ -8,6 +8,7 @@ import {
   type CredentialExecutionAuthority,
 } from '../sidedoor/credentials/runtime/credential-execution';
 import { learningCredentialFingerprint } from '../classes/preparation-selection';
+import { isSpeechDisabled } from '../providers/tts';
 
 /** Hash selected speech configuration and immutable credential metadata without secrets. */
 export async function learningSpeechFingerprint(
@@ -19,24 +20,21 @@ export async function learningSpeechFingerprint(
   const actor = await authorize(database);
   const user = await database.user.findUniqueOrThrow({
     where: { id: actor.userId },
-    select: { preferredTtsModel: true, preferredSttModel: true },
+    select: { preferredTtsModel: true, preferredSttModel: true, preferredTtsProvider: true },
   });
   const configuration = await getSiteConfig({ database });
-  if (requirements.ttsProvider || requirements.sttProvider) {
-    const selected = await resolveSkillRequirementsInTransaction(
-      database,
-      { userId: actor.userId, authorize, signal },
-      requirements
-    );
-    if (
-      (requirements.ttsProvider && selected.ttsProvider !== requirements.ttsProvider) ||
-      (requirements.sttProvider && selected.sttProvider !== requirements.sttProvider)
-    )
-      throw new Error(
-        'The selected speech provider changed or its required access is unavailable.'
-      );
-  }
+  const selected = await resolveSkillRequirementsInTransaction(
+    database,
+    { userId: actor.userId, authorize, signal },
+    requirements
+  );
+  if (
+    selected.ttsProvider !== requirements.ttsProvider ||
+    selected.sttProvider !== requirements.sttProvider
+  )
+    throw new Error('The selected speech provider changed or its required access is unavailable.');
   const fingerprints: Record<string, unknown> = {};
+  if (isSpeechDisabled(user)) fingerprints.audioDisabled = true;
   for (const [scope, provider] of [
     ['tts', requirements.ttsProvider],
     ['stt', requirements.sttProvider],

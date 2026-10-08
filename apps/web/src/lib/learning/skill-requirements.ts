@@ -11,6 +11,9 @@ import { resolveSottoProfileCredential } from '../sidedoor/credentials/runtime/p
 import type { SottoProviderExecution } from '../sidedoor/credentials/runtime/provider-execution';
 import { sottoTransaction } from '../sidedoor/access/state/transaction';
 import type { Prisma } from '@/generated/prisma/client';
+import { captureSpeechAvailability } from '../providers/shared/speech-availability';
+import { captureSottoExecutionCredential } from '../sidedoor/credentials/runtime/credential-execution';
+import { isSpeechDisabled } from '../providers/tts';
 
 class LearningConfigurationError extends Error {
   constructor(message: string) {
@@ -45,8 +48,9 @@ export async function resolveSkillRequirementsInTransaction(
     select: { preferredTtsProvider: true },
   });
   if (!user) throw new LearningConfigurationError('Learner no longer exists.');
-  const wantsTts = ['CLASS', 'FULL', 'LISTENING', 'SPEAKING'].includes(context.scope);
-  const wantsStt = ['CLASS', 'FULL', 'SPEAKING'].includes(context.scope);
+  const disabled = isSpeechDisabled(user);
+  const wantsTts = !disabled && ['CLASS', 'FULL', 'LISTENING', 'SPEAKING'].includes(context.scope);
+  const wantsStt = !disabled && ['CLASS', 'FULL', 'SPEAKING'].includes(context.scope);
   const selectedTts = wantsTts
     ? user.preferredTtsProvider?.trim() || configuration.ttsProvider?.trim() || null
     : null;
@@ -92,6 +96,27 @@ export async function resolveSkillRequirementsInTransaction(
       provider,
       true
     );
+    if (credential) {
+      const apiKey = credential.credential.values.apiKey;
+      if (typeof apiKey !== 'string' || !apiKey.trim())
+        throw new LearningConfigurationError('The selected speech credential is invalid.');
+      // Generation uses TTS now. STT availability is enforced before an actual recording request.
+      if (scope === 'tts') {
+        const captured = await captureSottoExecutionCredential(
+          database,
+          execution.authorize,
+          scope,
+          provider,
+          true,
+          execution.signal
+        );
+        if (!captured)
+          throw new LearningConfigurationError('The selected speech credential changed.');
+        await (
+          await captureSpeechAvailability({ ...execution, credential: captured }, database)
+        )?.assertAvailable();
+      }
+    }
     return credential ? provider : null;
   };
   const ttsProvider = await available('tts', selectedTts);

@@ -120,7 +120,11 @@ vi.mock('@/lib/prompt-loader', () => ({
   loadAndRender: (...args: unknown[]) => mockLoadAndRender(...args),
 }));
 
-vi.mock('@/lib/providers/tts', () => ({
+vi.mock('@/lib/providers/tts', async (importOriginal) => ({
+  selectTtsProviderId: (await importOriginal<typeof import('@/lib/providers/tts')>())
+    .selectTtsProviderId,
+  selectedTtsModel: (await importOriginal<typeof import('@/lib/providers/tts')>()).selectedTtsModel,
+  isSpeechDisabled: (await importOriginal<typeof import('@/lib/providers/tts')>()).isSpeechDisabled,
   canResolveTts: (...args: unknown[]) => mockCanResolveTts(...args),
   resolveTtsProvider: (...args: unknown[]) => mockResolveTtsProvider(...args),
   getConfiguredTtsProviderId: () => null,
@@ -244,6 +248,67 @@ function setupHappyPath({ withTts = true }: { withTts?: boolean } = {}) {
 // ---- Tests ----
 
 describe('generateClassSpeaking', () => {
+  it('omits optional reference audio when the learner explicitly disables speech', async () => {
+    setupHappyPath({ withTts: true });
+    mockUserFindUnique.mockResolvedValue({
+      preferredTtsProvider: 'disabled',
+      preferredTtsModel: null,
+    });
+    mockGenerateSpeech.mockRejectedValue(new Error('Disabled speech must not dispatch'));
+    const result = await generateClassSpeaking(PARAMS);
+    expect(result).toEqual({ sectionId: 'section-1' });
+    expect(mockResolveTtsProvider).not.toHaveBeenCalled();
+    expect(mockWriteStorageReference).not.toHaveBeenCalled();
+  });
+
+  it('renders required reference audio with the personal local model instead of the cloud default', async () => {
+    setupHappyPath({ withTts: true });
+    mockUserFindUnique.mockResolvedValue({
+      preferredTtsProvider: 'local',
+      preferredTtsModel: 'piper-de',
+    });
+    const result = await generateClassSpeaking({ ...PARAMS, referenceAudioRequired: true });
+    expect(result).toEqual({ sectionId: 'section-1' });
+    expect(mockResolveTtsProvider).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestedProvider: 'local',
+        requestedModel: 'piper-de',
+      })
+    );
+  });
+
+  it('preserves an explicitly requested cloud provider despite a personal local preference', async () => {
+    setupHappyPath({ withTts: true });
+    mockUserFindUnique.mockResolvedValue({
+      preferredTtsProvider: 'local',
+      preferredTtsModel: 'piper-de',
+    });
+    await generateClassSpeaking({
+      ...PARAMS,
+      ttsProvider: 'cartesia',
+      referenceAudioRequired: true,
+    });
+    expect(mockResolveTtsProvider).toHaveBeenCalledWith(
+      expect.objectContaining({ requestedProvider: 'cartesia', requestedModel: undefined })
+    );
+  });
+
+  it('surfaces a selected local service error without selecting another speech provider', async () => {
+    setupHappyPath({ withTts: true });
+    mockUserFindUnique.mockResolvedValue({
+      preferredTtsProvider: 'local',
+      preferredTtsModel: 'piper-de',
+    });
+    mockGenerateSpeech.mockRejectedValue(new Error('Local TTS sidecar error (503)'));
+    await expect(
+      generateClassSpeaking({ ...PARAMS, referenceAudioRequired: true })
+    ).rejects.toThrow(/Local TTS/);
+    expect(mockClassSectionCreate).not.toHaveBeenCalled();
+    expect(
+      mockResolveTtsProvider.mock.calls.every(([options]) => options.requestedProvider === 'local')
+    ).toBe(true);
+  });
+
   it('surfaces required reference audio failure instead of publishing incomplete speaking', async () => {
     setupHappyPath({ withTts: true });
     mockResolveTtsProvider.mockRejectedValue(new Error('Selected TTS provider is unavailable'));

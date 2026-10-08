@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { PristineRegenerationConflict } from '@/lib/classes/regeneration/pristine';
+import { ProviderCreditsExhaustedError } from '@/lib/providers/shared/speech-availability';
 const mockRequestPreparation = vi.fn();
 vi.mock('@/lib/classes/preparation', () => ({
   requestClassPreparation: (...args: unknown[]) => mockRequestPreparation(...args),
@@ -37,6 +38,22 @@ function classParams(classId: string) {
 }
 describe('pristine regeneration HTTP admission', () => {
   beforeEach(() => vi.resetAllMocks());
+  it('reports exhausted credits without accepting a class regeneration', async () => {
+    mockRequestPreparation.mockRejectedValue(new ProviderCreditsExhaustedError('elevenlabs'));
+    const response = await POST(
+      makeRequest('http://localhost/api/v1/classes/class-1', 'POST', {
+        scope: 'class',
+        expectedAttempt: 1,
+      }),
+      classParams('class-1')
+    );
+    expect(response.status).toBe(402);
+    expect(await response.json()).toMatchObject({
+      code: 'PROVIDER_CREDITS_EXHAUSTED',
+      error: expect.stringContaining('Restore provider credits'),
+    });
+  });
+
   it('rejects a snapshot when the visible class changes during the read', async () => {
     mockSnapshot.mockResolvedValue('a'.repeat(64));
     mockGetClass.mockResolvedValue({ id: 'class-1' });

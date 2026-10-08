@@ -39,7 +39,10 @@ vi.mock('@/lib/sidedoor/storage/core/focus-target-storage', () => ({
 vi.mock('@/lib/auto-model-config', () => ({
   getAutoModelConfig: (...a: unknown[]) => mockGetAutoModelConfig(...a),
 }));
-vi.mock('@/lib/providers/tts', () => ({
+vi.mock('@/lib/providers/tts', async (importOriginal) => ({
+  selectTtsProviderId: (await importOriginal<typeof import('@/lib/providers/tts')>())
+    .selectTtsProviderId,
+  isSpeechDisabled: (await importOriginal<typeof import('@/lib/providers/tts')>()).isSpeechDisabled,
   getConfiguredTtsProviderId: (...a: unknown[]) => mockGetConfiguredTtsProviderId(...a),
   resolveTtsProvider: (...a: unknown[]) => mockResolveTtsProvider(...a),
 }));
@@ -161,7 +164,25 @@ describe('addVisualCue', () => {
 });
 
 describe('generateTargetPronunciation', () => {
+  it('does not generate pronunciation through the cloud default when audio is explicitly disabled', async () => {
+    mockGetConfiguredTtsProviderId.mockReturnValue('cartesia');
+    mockLearnerFocusTargetFindFirst.mockResolvedValue({
+      ...TARGET_ROW,
+      course: {
+        userId: 'u1',
+        targetLang: 'de',
+        user: { preferredTtsProvider: 'disabled', preferredTtsModel: null },
+      },
+    });
+    await expect(
+      generateTargetPronunciation('c1', 'u1', 'ft1', blockedProviderExecution('u1'))
+    ).rejects.toThrow(/disabled/);
+    expect(mockWriteStorageReference).not.toHaveBeenCalled();
+    expect(mockResolveTtsProvider).not.toHaveBeenCalled();
+  });
+
   it('uses the learner preferred TTS provider and model for pronunciation', async () => {
+    mockGetConfiguredTtsProviderId.mockReturnValue('openai');
     const generateSpeech = vi.fn().mockResolvedValue(Buffer.from('mp3'));
     mockLearnerFocusTargetFindFirst.mockResolvedValue({
       ...TARGET_ROW,
@@ -209,7 +230,7 @@ describe('generateTargetPronunciation', () => {
     );
   });
 
-  it('uses the admin-selected TTS provider with the learner preferred model', async () => {
+  it('uses the server TTS provider and model when the learner has no provider preference', async () => {
     const generateSpeech = vi.fn().mockResolvedValue(Buffer.from('mp3'));
     mockGetConfiguredTtsProviderId.mockReturnValue('openai');
     mockLearnerFocusTargetFindFirst.mockResolvedValue({
@@ -217,7 +238,7 @@ describe('generateTargetPronunciation', () => {
       course: {
         userId: 'u1',
         targetLang: 'es',
-        user: { preferredTtsProvider: 'cartesia', preferredTtsModel: 'tts-1-hd' },
+        user: { preferredTtsProvider: null, preferredTtsModel: 'tts-1-hd' },
       },
     });
     mockResolveTtsProvider.mockResolvedValue({
