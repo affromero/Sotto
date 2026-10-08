@@ -113,7 +113,7 @@ done
 chmod 644 "$evidence/piper-receipt.json"
 
 stt_container=$(docker create --pull never --network none --read-only --user 1000:1000 \
-  --memory 1024m --cpus 2 --pids-limit 128 --cap-drop ALL \
+  --memory 2048m --cpus 2 --pids-limit 128 --cap-drop ALL \
   --security-opt no-new-privileges --tmpfs /tmp:size=128m,mode=1777 \
   --mount "type=bind,source=$evidence/piper,target=/piper,readonly" \
   --mount "type=bind,source=$evidence/piper-receipt.json,target=/piper-receipt.json,readonly" \

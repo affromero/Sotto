@@ -5,8 +5,8 @@ manual. It does not change cloud credentials, provider defaults or learner progr
 
 The base is Speaches 0.8.3 CPU, pinned to its published linux/amd64 manifest
 `sha256:1d4f852ff5b148d675bcd751f414835c0bcef2541c1df8ffdeb43714968aafe6`.
-The build downloads multilingual `Systran/faster-whisper-base` at revision
-`ebe41f70d5b6dfa9166e2c581c45c9c0cfc57b66`, which includes German. It writes
+The build downloads multilingual `Systran/faster-whisper-small` at revision
+`536b0662742c02347bc0e980a01041f333bce120`, which includes German. It writes
 `sotto-model-provenance.json` with the model file hashes and the explicit alias
 `whisper-1` to that model. This alias replaces Speaches' larger default model.
 The runtime uses CPU int8, two inference threads and one worker. Hugging Face
@@ -20,7 +20,7 @@ docker build --platform linux/amd64 --build-arg COMMIT_SHA="$SOURCE" \
 ```
 
 Before publishing, run the image with a read-only filesystem, a temporary `/tmp`,
-two CPUs, a 1024 MiB memory limit and no network egress. Send a public German WAV
+two CPUs, a 2048 MiB memory limit and no network egress. Send a public German WAV
 synthesized by Piper to `/v1/audio/transcriptions` with `model=whisper-1`,
 `language=de`, `response_format=verbose_json`, and word/segment timestamps.
 Check the transcript, finite timestamp bounds, model/alias hashes and rejection
@@ -46,8 +46,15 @@ An optional fourth argument names a new evidence directory and retains the
 public WAVs and receipts. An existing directory is rejected. Without it, the
 script cleans temporary samples and its containers after printing the receipt.
 Both images run without network egress, as UID 1000 on a read-only filesystem.
-Piper has a 512 MiB limit; STT keeps the 1024 MiB limit, two CPUs and 128 process
-limit. Stronger ASR diagnostic images are not substituted by this smoke.
+Piper has a 512 MiB limit; STT has a 2048 MiB limit, two CPUs and a 128 process
+limit. The published image contains Small itself; no model overlay or alternate
+image is substituted by this smoke.
+
+The previous Base model failed this whole-sentence check on newly synthesized
+audio. Piper generates fresh samples, so one passing pair does not guarantee
+other generated samples will pass. CI retains the public WAVs, full transcripts,
+timestamps and resource receipts on success and failure. Its publication gate
+still requires every fresh voice sample to pass the unchanged whole sentence.
 
 Publish the verified image offserver and supply its full `repository@sha256`
 reference as `SOTTO_LOCAL_STT_IMAGE` to `docker-compose.local-stt.yml`. The optional
@@ -62,4 +69,4 @@ to cloud STT requires an explicit Admin provider change. Errors do not switch pr
 
 Upstream references: [Speaches aliases](https://github.com/speaches-ai/speaches/blob/v0.8.3/src/speaches/model_aliases.py),
 [CPU image](https://github.com/speaches-ai/speaches/pkgs/container/speaches/519955595?tag=0.8.3-cpu),
-[pinned model](https://huggingface.co/Systran/faster-whisper-base/tree/ebe41f70d5b6dfa9166e2c581c45c9c0cfc57b66).
+[pinned model](https://huggingface.co/Systran/faster-whisper-small/tree/536b0662742c02347bc0e980a01041f333bce120).

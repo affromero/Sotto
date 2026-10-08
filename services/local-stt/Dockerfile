@@ -3,8 +3,8 @@ FROM ghcr.io/speaches-ai/speaches:0.8.3-cpu@sha256:1d4f852ff5b148d675bcd751f4148
 
 ARG COMMIT_SHA=local
 LABEL org.opencontainers.image.revision=$COMMIT_SHA \
-      co.afromero.sotto.stt.model="Systran/faster-whisper-base" \
-      co.afromero.sotto.stt.model-revision="ebe41f70d5b6dfa9166e2c581c45c9c0cfc57b66" \
+      co.afromero.sotto.stt.model="Systran/faster-whisper-small" \
+      co.afromero.sotto.stt.model-revision="536b0662742c02347bc0e980a01041f333bce120" \
       co.afromero.sotto.stt.model-alias="whisper-1"
 
 WORKDIR /home/ubuntu/speaches
@@ -17,8 +17,8 @@ import json
 from pathlib import Path
 from huggingface_hub import snapshot_download
 
-model = "Systran/faster-whisper-base"
-revision = "ebe41f70d5b6dfa9166e2c581c45c9c0cfc57b66"
+model = "Systran/faster-whisper-small"
+revision = "536b0662742c02347bc0e980a01041f333bce120"
 snapshot = Path(snapshot_download(repo_id=model, revision=revision))
 assert snapshot.name == revision
 for required in ("README.md", "config.json", "model.bin", "tokenizer.json", "vocabulary.txt"):
