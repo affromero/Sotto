@@ -146,19 +146,36 @@ function assertReviewCoverage(
     throw invalidResponse('coverage', path);
 }
 
-/** Bind evidence to an own string leaf of the exact assigned content. */
-function assertFindingBound(finding: TeachingFinding, fields: unknown): void {
+function ownField(fields: unknown, path: readonly string[]): { value: unknown } | undefined {
   let value = fields;
-  for (const key of finding.fieldPath) {
+  for (const key of path) {
     if (
       !value ||
       typeof value !== 'object' ||
       !Object.hasOwn(value, key) ||
       (Array.isArray(value) && !/^(0|[1-9][0-9]*)$/.test(key))
     )
-      throw invalidResponse('field_path', 'findings.fieldPath');
+      return undefined;
     value = (value as Record<string, unknown>)[key];
   }
+  return { value };
+}
+
+/** Bind evidence to an own string leaf of the exact assigned content. */
+function assertFindingBound(finding: TeachingFinding, fields: unknown): void {
+  if (finding.fieldPath[0] === 'content' && finding.fieldPath.length > 1) {
+    const relativePath = finding.fieldPath.slice(1);
+    if (fields && typeof fields === 'object' && Object.hasOwn(fields, 'content')) {
+      if (
+        typeof ownField(fields, finding.fieldPath)?.value === 'string' &&
+        typeof ownField(fields, relativePath)?.value === 'string'
+      )
+        throw invalidResponse('field_path', 'findings.fieldPath');
+    } else finding.fieldPath = relativePath;
+  }
+  const field = ownField(fields, finding.fieldPath);
+  if (!field) throw invalidResponse('field_path', 'findings.fieldPath');
+  const { value } = field;
   if (typeof value !== 'string' || !finding.quote.trim() || !value.includes(finding.quote))
     throw invalidResponse('quote_binding', 'findings.quote');
   if (finding.correction === null && finding.counterexample === null)

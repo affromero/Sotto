@@ -7,6 +7,7 @@ import {
 
 const runtime = vi.hoisted(() => ({
   replies: [] as Array<{ content: string; model: string } | Error>,
+  criticReplies: [] as Array<{ content: string; model: string }>,
   requests: [] as Array<{
     system: string;
     messages: Array<{ role: string; content: string }>;
@@ -47,7 +48,12 @@ vi.mock('@/lib/providers/ai', () => ({
         const schemaName = (options.jsonSchema as { name?: string } | undefined)?.name;
         if (schemaName === 'class_teaching_critic') {
           runtime.events.push('critic');
-          return { ...emptyTeachingCriticFixture(messages), model: 'configured-model' };
+          return (
+            runtime.criticReplies.shift() ?? {
+              ...emptyTeachingCriticFixture(messages),
+              model: 'configured-model',
+            }
+          );
         }
         const review =
           schemaName === 'class_teaching_adjudicator' || schemaName === 'class_section_quality';
@@ -162,6 +168,7 @@ function noAudio() {
 describe('canonical speaking correction before reference audio', () => {
   beforeEach(() => {
     runtime.replies = [];
+    runtime.criticReplies = [];
     runtime.requests = [];
     runtime.spoken = [];
     runtime.events = [];
@@ -177,6 +184,130 @@ describe('canonical speaking correction before reference audio', () => {
     );
     expect(result.every((item) => item.referenceTtsAudio?.byteLength === 3)).toBe(true);
     expect(runtime.events).toEqual(['generation', 'critic', 'review', 'tts', 'tts', 'tts', 'tts']);
+  });
+
+  it('keeps faithful German meanings in the initial immersion set before reference audio', async () => {
+    const faithful = [
+      {
+        targetPhrase: 'Was hast du gestern gemacht?',
+        translation: 'Was hast du am Tag vor heute gemacht?',
+      },
+      {
+        targetPhrase: 'Ich bin gestern ins Café gegangen.',
+        translation: 'Gestern bin ich ins Café gegangen.',
+      },
+      {
+        targetPhrase: 'Auf meiner Reise habe ich ein Schloss besucht.',
+        translation: 'Ich habe auf meiner Reise ein Schloss besucht.',
+      },
+      {
+        targetPhrase: 'Wir haben gestern einen lustigen Film gesehen.',
+        translation: 'Gestern haben wir einen lustigen Film angeschaut.',
+      },
+    ];
+    runtime.replies.push(promptReply(faithful), reply(verdict()));
+    runtime.afterReview = () => expect(runtime.spoken).toEqual([]);
+    const result = await composeSpeakingPrompts(params);
+    expect(result.map(({ targetPhrase, translation }) => ({ targetPhrase, translation }))).toEqual(
+      faithful
+    );
+    expect(runtime.spoken).toEqual(faithful.map((phrase) => phrase.targetPhrase));
+    expect(runtime.requests[0].system).toContain(
+      'every learner-visible field must be in the target language (de)'
+    );
+    expect(runtime.requests[0].system).toContain('Do not replace its meaning with instructions');
+    expect(
+      runtime.requests.filter(
+        (request) =>
+          (request.options.jsonSchema as { name?: string }).name === 'class_speaking_prompts'
+      )
+    ).toHaveLength(1);
+  });
+
+  it('replaces instructional speaking meanings after bound criticism and publishes only the faithful set', async () => {
+    const initial = [
+      {
+        targetPhrase: 'Was hast du gestern gemacht?',
+        translation: 'Frage nach einer Aktivität am Vortag.',
+      },
+      {
+        targetPhrase: 'Ich bin gestern ins Café gegangen.',
+        translation: 'Berichte von einem Weg, den du am Vortag gemacht hast.',
+      },
+      {
+        targetPhrase: 'Auf meiner Reise habe ich ein Schloss besucht.',
+        translation: 'Erzähle von einem Ort, den du auf einer Reise besucht hast.',
+      },
+      {
+        targetPhrase: 'Wir haben gestern einen lustigen Film gesehen.',
+        translation: 'Berichte, was ihr am Vortag zusammen angeschaut habt.',
+      },
+    ];
+    const faithful = [
+      { ...initial[0], translation: 'Was hast du am Tag vor heute gemacht?' },
+      { ...initial[1], translation: 'Gestern bin ich ins Café gegangen.' },
+      { ...initial[2], translation: 'Ich habe auf meiner Reise ein Schloss besucht.' },
+      { ...initial[3], translation: 'Gestern haben wir einen lustigen Film angeschaut.' },
+    ];
+    const findings = initial.map((phrase, index) => ({
+      issue: 'incorrect',
+      fieldPath: ['content', 'translation'],
+      quote: phrase.translation,
+      rule: 'The meaning must preserve the exact utterance and its participants.',
+      defect: 'Instructions replace the utterance and omit its actor, action, or stated facts.',
+      correction: faithful[index].translation,
+      counterexample: null,
+    }));
+    runtime.criticReplies.push(
+      reply({
+        items: Array.from(initial.keys(), (index) => ({
+          index,
+          findings: index === 0 ? [] : [findings[index]],
+        })),
+      })
+    );
+    const rejected = {
+      items: Array.from(initial.keys(), (index) => ({
+        index,
+        acceptable: false,
+        issues: ['incorrect'],
+        feedback: ['Replace the instruction with the exact meaning of the supplied utterance.'],
+        findings: [findings[index]],
+        criticDecisions:
+          index === 0
+            ? []
+            : [
+                {
+                  findingIndex: 0,
+                  decision: 'supported',
+                  reason: 'The quoted instruction omits facts from the exact utterance.',
+                },
+              ],
+      })),
+    };
+    runtime.replies.push(
+      promptReply(initial),
+      reply(rejected),
+      promptReply(faithful),
+      reply(verdict())
+    );
+    runtime.afterGeneration = () => expect(runtime.spoken).toEqual([]);
+    runtime.afterReview = () => expect(runtime.spoken).toEqual([]);
+    const result = await composeSpeakingPrompts(params);
+    expect(result.map(({ targetPhrase, translation }) => ({ targetPhrase, translation }))).toEqual(
+      faithful
+    );
+    expect(runtime.spoken).toEqual(faithful.map((phrase) => phrase.targetPhrase));
+    const generationRequests = runtime.requests.filter(
+      (request) =>
+        (request.options.jsonSchema as { name?: string }).name === 'class_speaking_prompts'
+    );
+    expect(generationRequests).toHaveLength(2);
+    expect(generationRequests[1].messages[0].content).toContain(JSON.stringify(initial));
+    expect(generationRequests[1].messages[0].content).toContain(
+      'faithfully preserve its meaning, actor, grammatical person, tense, and facts'
+    );
+    expect(generationRequests[0].system).toContain('Do not replace its meaning with instructions');
   });
 
   it('renders only the corrected set after the same canonical reviewer approves every phrase', async () => {
