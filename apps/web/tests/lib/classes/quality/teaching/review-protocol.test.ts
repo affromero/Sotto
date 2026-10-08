@@ -172,6 +172,83 @@ describe('bound teaching evidence', () => {
         .findings[0].fieldPath
     ).toEqual(['task']);
   });
+  it.each([
+    [
+      ['ideas', '0'],
+      ['ideas', '0'],
+    ],
+    [
+      ['content', 'ideas', '0'],
+      ['ideas', '0'],
+    ],
+    [
+      ['ideas', '0'],
+      ['content', 'ideas', '0'],
+    ],
+    [
+      ['content', 'ideas', '0'],
+      ['content', 'ideas', '0'],
+    ],
+  ])(
+    'binds equivalent relative and envelope paths before adjudication %#',
+    (criticPath, judgePath) => {
+      const objection = finding(criticPath, content.ideas[0]);
+      const bound = parseTeachingCritic(
+        JSON.stringify({ items: [{ index: 0, findings: [objection] }] }),
+        [content]
+      );
+      const row = rejected(0, finding(judgePath, content.ideas[0]), bound.items[0].findings);
+      const judged = parseTeachingAdjudicator(JSON.stringify({ items: [row] }), [content], bound);
+      expect(bound.items[0].findings[0].fieldPath).toEqual(['ideas', '0']);
+      expect(judged.items[0]).toMatchObject({
+        acceptable: false,
+        findings: [{ fieldPath: ['ideas', '0'] }],
+        criticDecisions: [{ decision: 'supported' }],
+      });
+    }
+  );
+  it('retains a genuine nested content path with no competing relative leaf', () => {
+    const fields = { content: { translation: 'Nested supplied wording.' } };
+    const entry = finding(['content', 'translation'], fields.content.translation);
+    const parsed = parseTeachingCritic(
+      JSON.stringify({ items: [{ index: 0, findings: [entry] }] }),
+      [fields]
+    );
+    expect(parsed.items[0].findings).toEqual([entry]);
+  });
+  it.each([
+    { fields: content, path: ['content', 'content', 'task'], quote: content.task },
+    { fields: content, path: ['content', 'missing'], quote: content.task },
+    { fields: content, path: ['content', 'ideas', '01'], quote: content.ideas[0] },
+    { fields: content, path: ['content', 'toString'], quote: content.task },
+    { fields: content, path: ['content', '__proto__', 'task'], quote: content.task },
+    { fields: content, path: ['items', '1', 'content', 'task'], quote: content.task },
+    { fields: content, path: ['content', 'task'], quote: 'Sibling item wording.' },
+    {
+      fields: { content: { task: content.task }, task: content.task },
+      path: ['content', 'task'],
+      quote: content.task,
+    },
+    {
+      fields: { content: { task: 'Different nested wording.' }, task: content.task },
+      path: ['content', 'task'],
+      quote: content.task,
+    },
+    { fields: { content: {}, task: content.task }, path: ['content', 'task'], quote: content.task },
+  ])(
+    'rejects unsafe, ambiguous or unbound envelope paths in either role %#',
+    ({ fields, path, quote }) => {
+      const entry = finding(path, quote);
+      expect(() =>
+        parseTeachingCritic(JSON.stringify({ items: [{ index: 0, findings: [entry] }] }), [fields])
+      ).toThrow(ReviewerProtocolError);
+      expect(() =>
+        parseTeachingAdjudicator(JSON.stringify({ items: [rejected(0, entry)] }), [fields], {
+          items: [{ index: 0, findings: [] }],
+        })
+      ).toThrow(ReviewerProtocolError);
+    }
+  );
   it('emits strict required properties recursively for both actual role schemas', () => {
     const audit = (value: unknown) => {
       if (!value || typeof value !== 'object') return;
@@ -197,6 +274,54 @@ describe('bound teaching evidence', () => {
 });
 
 describe('shared teaching adjudication', () => {
+  it('adjudicates the captured speaking meaning defect after binding its envelope path', async () => {
+    const item = {
+      targetPhrase: 'Ich bin gestern ins Café gegangen.',
+      translation: 'Berichte von einem Weg, den du am Vortag gemacht hast.',
+      ipa: 'ɪç bɪn ˈɡɛstɐn ɪns kaˈfeː ɡəˈɡaŋən',
+    };
+    const objection = {
+      ...finding(['content', 'translation'], item.translation),
+      issue: 'incorrect' as const,
+      rule: 'Preserve the meaning of the target phrase.',
+      defect: 'The wording omits the destination and describes an unspecified route.',
+      correction: 'Berichte, dass du am Vortag in ein Café gegangen bist.',
+    };
+    const { boundary, generateResponse } = provider(
+      () => ({ items: [{ index: 0, findings: [objection] }] }),
+      (packet) => ({
+        items: [
+          rejected(
+            0,
+            { ...objection, fieldPath: ['translation'] },
+            packet.criticisms!.items[0].findings
+          ),
+        ],
+      })
+    );
+    const error = await reviewTeachingContent({
+      ...base,
+      provider: boundary,
+      kind: 'speaking',
+      items: [item],
+    }).catch((value: unknown) => value);
+    expect(error).toBeInstanceOf(TeachingQualityRejectionError);
+    if (!(error instanceof TeachingQualityRejectionError)) throw error;
+    expect(
+      authenticTeachingFailure(error, 'speaking', [item])?.reviews[0].verdict.items[0]
+    ).toMatchObject({
+      acceptable: false,
+      issues: ['incorrect'],
+      feedback: [objection.defect],
+    });
+    expect(generateResponse.mock.calls.map((call) => call[2]?.jsonSchema?.name)).toEqual([
+      'class_teaching_critic',
+      'class_teaching_adjudicator',
+    ]);
+    const judged = JSON.parse(generateResponse.mock.calls[1][1][0].content as string);
+    expect(judged.items[0].content).toEqual(item);
+    expect(judged.criticisms.items[0].findings[0].fieldPath).toEqual(['translation']);
+  });
   it.each(['writing', 'speaking', 'listening', 'explanations', 'vocabulary'] as const)(
     'independently inspects %s even when the critic reports no defects',
     async (kind) => {
