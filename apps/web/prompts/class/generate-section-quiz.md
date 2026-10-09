@@ -8,7 +8,7 @@ Language policy:
 {{LANGUAGE_POLICY}}
 
 Variation token: {{SEED}}
-Produce a DIFFERENT set of items than any previous attempt for this lesson — do not reuse the same sentences, examples, or distractors. Cover the same competencies with fresh material.
+For a fresh generation, vary the sentences, examples and distractors while covering the same competencies. When correcting a rejected candidate, correction takes precedence over novelty. Preserve supported passage facts and valid items; change only what is needed to resolve the reported defects, then recheck the complete result. Never change a supplied source passage.
 {{NOTES}}
 {{SOURCE}}
 

@@ -82,6 +82,7 @@ const EXPECTED_FILES = [
   'interaction/qa-assistant.md',
   'interaction/incorporate-segment.md',
   'generation/script-generator.md',
+  'generation/learning-script-generator.md',
   'generation/repair-learning-script.md',
   'generation/monologue-guidelines.md',
   'generation/dialogue-guidelines.md',
@@ -113,6 +114,25 @@ const EXPECTED_FILES = [
 // If a .md file gains or loses a placeholder, these tests will catch it.
 
 const VARIABLE_CONTRACTS: Record<string, string[]> = {
+  'generation/learning-script-generator.md': [
+    'AUDIENCE',
+    'AUDIENCE_LEVEL',
+    'BIAS_GUIDANCE',
+    'CONTENT_SAFETY',
+    'DEPTH',
+    'DURATION_TARGET',
+    'FOCUS_AREAS',
+    'HOST_SPEAKER',
+    'LANGUAGE_INSTRUCTION',
+    'SPEAKER_COUNT',
+    'SPEAKER_SECTION',
+    'TONE',
+    'VOCABULARY_INSTRUCTION',
+    'VOICE_REALISM',
+    'WORD_COUNT_IDEAL',
+    'WORD_COUNT_MAX',
+    'WORD_COUNT_MIN',
+  ],
   'generation/repair-learning-script.md': [
     'AUDIENCE_LEVEL',
     'CONTENT_SAFETY',

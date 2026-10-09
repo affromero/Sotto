@@ -174,20 +174,28 @@ describe('generateScript', () => {
         if (!forLearning) {
           expect(providerInstruction).toContain(VOICE_REALISM_INSTRUCTIONS);
           expect(providerInstruction).not.toContain('Voice Realism for Language Learning');
+          expect(providerInstruction).toContain('Hard Minimum Reference Count');
+          expect(providerInstruction).toContain('cliffhanger');
+        } else {
+          expect(providerInstruction).not.toMatch(/Hard Minimum Reference Count|cliffhanger/);
+          expect(providerInstruction).not.toContain('pop culture references');
         }
       }
     );
 
-    it('preserves the captured transport, endpoint and cancellation for listening generation', async () => {
+    it('preserves source, solo speaker, vocabulary and captured transport for learning generation', async () => {
       const controller = new AbortController();
       const dispatched: string[] = [];
+      const source = 'Lucía viajó a Madrid ayer.';
+      const spoken = 'Lucía [V1:viajó] a Madrid ayer.';
       const fetch = async (input: RequestInfo | URL) => {
         dispatched.push(String(input));
         return new Response(
           JSON.stringify({
-            turns: [{ speaker: 'HOST', text: 'Hola' }],
+            turns: [{ speaker: 'NARRATOR', text: spoken }],
             soundCues: [],
             references: [],
+            vocabulary: [{ number: 1, word: 'viajó', translation: 'traveled' }],
           })
         );
       };
@@ -209,11 +217,31 @@ describe('generateScript', () => {
         focusAreas: [],
         tone: 'casual',
         durationTarget: 1,
+        forLearning: true,
+        targetLanguage: 'es',
+        languageMode: 'full_immersion',
+        speakers: [{ name: 'NARRATOR', description: 'A calm narrator.' }],
+        sourceContent: source,
+        mustIncludeVocabulary: [{ word: 'viajó', translation: 'traveled' }],
+        webSearchEnabled: false,
         fetch,
         signal: controller.signal,
         endpoint: 'https://provider.invalid/v1',
       });
-      expect(result.turns[0].text).toBe('Hola');
+      const [system, messages, options] = mockGenerateResponse.mock.calls[0];
+      expect(messages[0].content).toContain(source);
+      expect(system).toContain('NARRATOR: A calm narrator.');
+      expect(system).toContain('A1');
+      expect(system).toContain('Tone: casual. Depth: standard.');
+      expect(system).toContain('- viajó — traveled');
+      expect(system).not.toMatch(/Hard Minimum Reference Count|cliffhanger|pop culture references/);
+      expect(options).toMatchObject({
+        model: AI_RUNTIME.model,
+        maxTokens: 12288,
+        useWebSearch: false,
+      });
+      expect(result.turns).toEqual([{ speaker: 'NARRATOR', text: spoken }]);
+      expect(result.vocabulary[0]).toMatchObject({ number: 1, word: 'viajó' });
       expect(dispatched).toEqual(['https://provider.invalid/v1']);
     });
 
@@ -539,6 +567,9 @@ describe('generateScript', () => {
             : {}),
         });
         const [system, messages, options] = mockGenerateResponse.mock.calls[0];
+        expect(system).not.toMatch(
+          /Hard Minimum Reference Count|cliffhanger|pop culture references/
+        );
         expect(system).toContain(
           'lexical review targets, not mandatory verbatim sentence fragments'
         );

@@ -668,6 +668,9 @@ export async function generateScript(params: {
     mustIncludeVocabulary: params.mustIncludeVocabulary,
     forLearning: params.forLearning,
   });
+  const generationPrompt = params.forLearning
+    ? 'generation/learning-script-generator.md'
+    : 'generation/script-generator.md';
   const teachingRepair =
     params.learningRepair &&
     !('kind' in params.learningRepair) &&
@@ -680,7 +683,7 @@ export async function generateScript(params: {
         LANGUAGE_INSTRUCTION: langInstr.languageInstruction,
         CONTENT_SAFETY: CONTENT_SAFETY_INSTRUCTIONS,
       })
-    : loadAndRender('generation/script-generator.md', {
+    : loadAndRender(generationPrompt, {
         SPEAKER_COUNT: String(speakerCount),
         SPEAKER_SECTION: speakerSection,
         VOICE_DELIVERY_GUIDELINES: voiceDeliveryGuidelines,
@@ -690,6 +693,7 @@ export async function generateScript(params: {
           ? loadPrompt('shared/voice-realism-learning.md')
           : VOICE_REALISM_INSTRUCTIONS,
         TONE_GUIDANCE: TONE_GUIDANCE_MAIN[params.tone] || '',
+        TONE: params.tone,
         ELI5_SECTION: eli5Section,
         AUDIENCE: params.audience || 'general',
         AUDIENCE_GUIDANCE: getAudienceGuidance(params.audience),
