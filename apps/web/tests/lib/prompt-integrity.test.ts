@@ -13,7 +13,7 @@ import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import * as globModule from 'glob';
 import { loadAndRender } from '@/lib/prompt-loader';
-import { SECTION_QUALITY_JSON_SCHEMA } from '@/lib/classes/section-quality';
+import { sectionReviewSchema } from '@/lib/classes/section-quality';
 
 type GlobSync = (
   pattern: string,
@@ -326,6 +326,7 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
     'TRANSCRIPT',
   ].sort(),
   'class/generate-section-quiz.md': [
+    'CHOICES_FIELDS',
     'COUNT',
     'GRAMMAR_POINTS',
     'LANGUAGE_POLICY',
@@ -337,6 +338,7 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
     'SKILL',
     'SOURCE',
     'TARGET',
+    'TASK_CONTEXT_FIELD',
     'VOCAB',
   ].sort(),
   'class/generate-class-intro.md': [
@@ -466,16 +468,28 @@ describe('generation templates', () => {
       NATIVE: 'en',
       SKILL: 'LISTENING',
       LANGUAGE_POLICY: 'Use the target language for learner-visible content.',
-      REVIEW_SCHEMA: JSON.stringify(SECTION_QUALITY_JSON_SCHEMA.schema),
+      REVIEW_SCHEMA: JSON.stringify(
+        sectionReviewSchema([
+          {
+            question: 'Was hat sie gemacht?',
+            options: ['Gelesen', 'Geschlafen', 'Gekocht', 'Gesungen'],
+            correctIndex: 0,
+            explanation: 'Sie hat gelesen.',
+            passageText: 'Sie hat gelesen.',
+          },
+        ]).schema
+      ),
     });
     const schema = JSON.parse(/```json\s*([\s\S]*?)\s*```/.exec(prompt)![1]);
-    expect(schema.required).toContain('passageFeedback');
-    expect(schema.properties.passageFeedback.maxItems).toBe(3);
-    expect(schema.properties.passageFeedback.items.properties.quote.maxLength).toBe(240);
-    expect(schema.properties.passageFeedback.items.properties.reason.maxLength).toBe(300);
+    expect(schema.required).toContain('passageFindings');
+    expect(schema.properties.passageFindings.maxItems).toBe(3);
+    expect(schema.properties.passageFindings.items.properties.sourcePartIndex.const).toBe(0);
+    expect(schema.properties.passageFindings.items.properties.reason.maxLength).toBe(300);
+    expect(schema.properties).not.toHaveProperty('passageAcceptable');
+    expect(schema.properties.passageFindings.items.properties).not.toHaveProperty('quote');
     expect(prompt).toContain('learner sentence starters');
     expect(prompt).toContain('reject incorrect complete positive examples');
-    expect(prompt).toContain('quote copied exactly from the supplied passage');
+    expect(prompt).toContain('sourcePartIndex');
   });
   it('script-generator.md references JSON output format', () => {
     const content = readFileSync(join(PROMPTS_DIR, 'generation/script-generator.md'), 'utf-8');
@@ -510,6 +524,20 @@ describe('generation templates', () => {
 });
 
 describe('verification templates', () => {
+  it.each([
+    'class/review-section-quiz.md',
+    'class/review-teaching-content.md',
+    'shared/voice-realism-learning.md',
+  ])('%s scopes grammar claims to the actual target-language clause and constituents', (file) => {
+    const content = readFileSync(join(PROMPTS_DIR, file), 'utf-8');
+    expect(content).toContain('declarative clauses');
+    expect(content).toContain('polar (yes/no) questions');
+    expect(content).toContain('content questions with a question phrase');
+    expect(content).toContain('target language');
+    expect(content).toContain('literal example');
+    expect(content).toContain('syntactic constituents, including multiword phrases');
+    expect(content).toContain('false explanation');
+  });
   it('script-verifier parts concatenate into a coherent prompt', () => {
     const base = readFileSync(join(PROMPTS_DIR, 'verification/script-verifier-base.md'), 'utf-8');
     const output = readFileSync(

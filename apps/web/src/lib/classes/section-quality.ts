@@ -1,15 +1,14 @@
 import { z } from 'zod';
 import type { GeneratedQuestion } from '../class-generation';
 import { teachingFailureSchema, type TeachingFailure } from './quality/teaching-failure';
+import {
+  blindReviewIssueSchema,
+  blindReviewQuestionsSchema,
+  blindReviewResponseSchema,
+  buildBlindReviewSourceParts,
+} from './quality/blind-review/protocol';
 
-const issueCode = z.enum([
-  'ambiguous',
-  'incorrect',
-  'unnatural',
-  'unsupported',
-  'level',
-  'uncertain',
-]);
+const issueCode = blindReviewIssueSchema;
 const verdictSchema = z
   .object({
     passageAcceptable: z.boolean(),
@@ -24,25 +23,32 @@ const verdictSchema = z
       )
       .max(3),
     issues: z.array(issueCode).max(6),
-    questions: z
-      .array(
-        z
-          .object({
-            index: z.number().int().min(0).max(4),
-            acceptableOptionIndices: z.array(z.number().int().min(0).max(3)).max(4),
-            issues: z.array(issueCode).max(6),
-          })
-          .strict()
-      )
-      .min(1)
-      .max(5),
+    questions: blindReviewQuestionsSchema,
   })
   .strict();
 
-export const SECTION_QUALITY_JSON_SCHEMA = {
-  name: 'class_section_quality',
-  schema: z.toJSONSchema(verdictSchema, { target: 'draft-7' }),
-};
+export function sectionReviewSchema(questions: GeneratedQuestion[]) {
+  const parts = buildBlindReviewSourceParts(questions[0]?.passageText ?? '');
+  return {
+    name: 'class_section_quality',
+    schema: z.toJSONSchema(blindReviewResponseSchema(parts), { target: 'draft-7' }),
+  };
+}
+
+const blindProtocolFailures = new WeakMap<object, 'invalid_json' | 'schema' | 'coverage'>();
+
+/** Only failures issued while parsing an actual blind response carry diagnostics. */
+export function blindReviewProtocolDiagnostic(error: unknown) {
+  if (typeof error !== 'object' || error === null) return undefined;
+  const reason = blindProtocolFailures.get(error);
+  return reason ? { reason, pathCodes: ['response'] as const } : undefined;
+}
+
+function invalidBlindReview(reason: 'invalid_json' | 'schema' | 'coverage'): never {
+  const error = new SectionQualityError('Blind review returned an invalid protocol response.');
+  blindProtocolFailures.set(error, reason);
+  throw error;
+}
 
 export type SectionReviewFeedback = z.infer<typeof verdictSchema>;
 
@@ -162,6 +168,12 @@ export function captureBlindSectionFailure(
 export function sectionReviewInput(questions: GeneratedQuestion[]): string {
   return JSON.stringify({
     passage: questions[0]?.passageText ?? '',
+    sourceParts: buildBlindReviewSourceParts(questions[0]?.passageText ?? '').map(
+      (text, index) => ({
+        index,
+        text,
+      })
+    ),
     questions: questions.map((question, index) => {
       const gaps = question.question.match(/_{2,}/g);
       return {
@@ -190,35 +202,26 @@ export function assessSectionReview(
   try {
     raw = JSON.parse(content);
   } catch {
-    return { issues: ['invalid_review'] };
+    return invalidBlindReview('invalid_json');
   }
-  if (typeof raw === 'object' && raw !== null && !Array.isArray(raw)) {
-    const candidate = raw as Record<string, unknown>;
-    const feedback = verdictSchema.shape.passageFeedback.safeParse(candidate.passageFeedback);
-    if (!feedback.success)
-      throw new SectionQualityError('Blind review passage feedback is malformed.');
-    if (
-      typeof candidate.passageAcceptable === 'boolean' &&
-      !validPassageFeedback(
-        {
-          passageAcceptable: candidate.passageAcceptable,
-          passageFeedback: feedback.data,
-          issues: Array.isArray(candidate.issues) ? candidate.issues : [],
-        },
-        questions
-      )
-    )
-      throw new SectionQualityError(
-        'Blind review passage feedback does not match its passage verdict.'
-      );
-  }
-  let verdict: z.infer<typeof verdictSchema>;
-  try {
-    verdict = verdictSchema.parse(raw);
-  } catch {
-    return { issues: ['invalid_review'] };
-  }
-  if (!completeReview(verdict, questions)) return { issues: ['invalid_review'] };
+  const sourceParts = buildBlindReviewSourceParts(questions[0]?.passageText ?? '');
+  const parsed = blindReviewResponseSchema(sourceParts).safeParse(raw);
+  if (!parsed.success) return invalidBlindReview('schema');
+  const privateVerdict = parsed.data;
+  const verdict: SectionReviewFeedback = {
+    passageAcceptable: privateVerdict.passageFindings.length === 0,
+    passageFeedback: privateVerdict.passageFindings.map(({ sourcePartIndex, reason }) => ({
+      quote: sourceParts[sourcePartIndex]!,
+      reason,
+    })),
+    issues: [
+      ...new Set(
+        privateVerdict.issues.concat(privateVerdict.passageFindings.map(({ issue }) => issue))
+      ),
+    ],
+    questions: privateVerdict.questions,
+  };
+  if (!completeReview(verdict, questions)) return invalidBlindReview('coverage');
   if (!verdict.passageAcceptable && immutablePassage) {
     throw new SectionQualityError(
       'The supplied reading passage failed its language quality check.',

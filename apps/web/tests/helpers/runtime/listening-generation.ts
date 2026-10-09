@@ -98,7 +98,12 @@ const { mockCreateAIProvider, mockGenerateResponse } = vi.hoisted(() => {
         ) => {
           const name = (options as { jsonSchema?: { name: string } })?.jsonSchema?.name;
           if (name === 'class_teaching_critic')
-            return mockTeachingCriticResponse(system, messages, options);
+            return shapeTeachingProviderFixture(
+              system,
+              messages,
+              options,
+              await mockTeachingCriticResponse(system, messages, options)
+            );
           if (name === 'class_teaching_adjudicator')
             return shapeTeachingProviderFixture(
               system,
@@ -315,8 +320,7 @@ function setupHappyPath() {
   }));
   mockBlindResponse.mockResolvedValue({
     content: JSON.stringify({
-      passageAcceptable: true,
-      passageFeedback: [],
+      passageFindings: [],
       issues: [],
       questions: [0, 2, 0, 2].map((key, index) => ({
         index,

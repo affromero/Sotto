@@ -48,7 +48,10 @@ vi.mock('@/lib/providers/ai', () => ({
         const schemaName = (options.jsonSchema as { name?: string } | undefined)?.name;
         if (schemaName === 'class_teaching_critic') {
           runtime.events.push('critic');
-          return (
+          return shapeTeachingProviderFixture(
+            system,
+            messages,
+            options,
             runtime.criticReplies.shift() ?? {
               ...emptyTeachingCriticFixture(messages),
               model: 'configured-model',
@@ -146,6 +149,15 @@ function verdict(reject = false) {
         reject && index === 0
           ? [`For "${phrase.targetPhrase}", the translation changes the supplied event.`]
           : [],
+    })),
+  };
+}
+function derivedVerdict(reject = false) {
+  const result = verdict(reject);
+  return {
+    items: result.items.map((item) => ({
+      ...item,
+      feedback: item.feedback.map((text) => `${text} Correction: Use accurate supported teaching.`),
     })),
   };
 }
@@ -352,7 +364,7 @@ describe('canonical speaking correction before reference audio', () => {
     expect(correction.system).toContain(params.objective);
     expect(correction.system).toContain('verpassen');
     expect(correction.messages[0].content).toContain(JSON.stringify(phrases));
-    expect(correction.messages[0].content).toContain(JSON.stringify(verdict(true)));
+    expect(correction.messages[0].content).toContain(JSON.stringify(derivedVerdict(true)));
     expect(correction.messages[0].content).toContain('untrusted data');
     expect(
       runtime.requests.every(
@@ -382,8 +394,8 @@ describe('canonical speaking correction before reference audio', () => {
       rejection.teachingFailure?.reviews.map((review) => JSON.parse(review.candidate!)[0].items)
     ).toEqual([phrases, corrected]);
     expect(rejection.teachingFailure?.reviews.map((review) => review.verdict)).toEqual([
-      verdict(true),
-      verdict(true),
+      derivedVerdict(true),
+      derivedVerdict(true),
     ]);
     expect(JSON.stringify(error)).not.toContain(phrases[0].targetPhrase);
     expect(runtime.events).toEqual([
@@ -479,7 +491,7 @@ describe('canonical speaking correction before reference audio', () => {
       { attempt: 1, type: 'structure' },
       { attempt: 2, type: 'teaching' },
     ]);
-    expect(failure.teachingFailure?.reviews[0].verdict).toEqual(verdict(true));
+    expect(failure.teachingFailure?.reviews[0].verdict).toEqual(derivedVerdict(true));
     expect(runtime.events).toEqual(['generation', 'generation', 'critic', 'review']);
     noAudio();
   });
@@ -499,7 +511,7 @@ describe('canonical speaking correction before reference audio', () => {
     ]);
     const initial = failure.attemptFailures?.[0];
     expect(initial?.type === 'teaching' && initial.failure.reviews[0].verdict).toEqual(
-      verdict(true)
+      derivedVerdict(true)
     );
     expect(failure.attemptFailures?.[1]).toMatchObject({
       attempt: 2,
@@ -582,7 +594,7 @@ describe('canonical speaking correction before reference audio', () => {
         attempt: 1,
         type: 'teaching',
         failure: expect.objectContaining({
-          reviews: [expect.objectContaining({ verdict: verdict(true) })],
+          reviews: [expect.objectContaining({ verdict: derivedVerdict(true) })],
         }),
       }),
     ]);
@@ -600,7 +612,7 @@ describe('canonical speaking correction before reference audio', () => {
     expect((error as TeachingQualityRejectionError).teachingFailure?.reviews[0]).toMatchObject({
       candidate: null,
       omitted: 'size_limit',
-      verdict: verdict(true),
+      verdict: derivedVerdict(true),
     });
     expect(runtime.events).toEqual(['generation', 'critic', 'review']);
     noAudio();
@@ -623,7 +635,7 @@ describe('canonical speaking correction before reference audio', () => {
     expect(failure!.reviews[1]).toEqual({
       candidate: null,
       omitted: 'size_limit',
-      verdict: verdict(true),
+      verdict: derivedVerdict(true),
     });
     expect(runtime.events).toEqual([
       'generation',

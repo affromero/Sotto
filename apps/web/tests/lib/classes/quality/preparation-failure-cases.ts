@@ -219,14 +219,26 @@ export function registerPreparationFailureTests(context: () => PreparationFailur
       });
       expect(diagnostic.protocolEvidence).toHaveLength(1);
       const evidence = diagnostic.protocolEvidence![0];
+      const candidate = {
+        items: [
+          {
+            index: 0,
+            content: items[0],
+            sourceParts: [
+              { index: 0, fieldPath: ['targetPhrase'], quote: 'Ich bin hier.' },
+              { index: 1, fieldPath: ['translation'], quote: 'I am here.' },
+            ],
+          },
+        ],
+      };
       expect(JSON.parse(evidence.payload.json!)).toEqual({
-        candidate: { items: [{ index: 0, content: items[0] }] },
+        candidate,
         response: '{}',
       });
       if (cap === 2) {
         const messages = sent[1].messages as { role: string; content: string }[];
         expect(JSON.parse(messages.find(({ role }) => role === 'user')!.content)).toEqual({
-          items: [{ index: 0, content: items[0] }],
+          ...candidate,
           priorProtocolOutput: evidence,
         });
       }

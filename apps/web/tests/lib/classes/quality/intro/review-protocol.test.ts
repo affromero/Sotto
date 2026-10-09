@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { blockedProviderExecution } from '../../../../helpers/runtime/provider-execution';
-import { shapeIntroProviderFixture } from '../intro-provider-fixture';
+import { shapeIntroProviderFixture, teachingFindingFixture } from '../intro-provider-fixture';
 
 const boundary = vi.hoisted(() => ({ generate: vi.fn(), resolve: vi.fn() }));
 vi.unmock('@/lib/classes/class-intro');
@@ -86,6 +86,7 @@ type Finding = {
 type AuditItem = {
   index: number;
   content: { address: { field: string; index?: number }; fields: Record<string, unknown> };
+  sourceParts: Array<{ index: number; fieldPath: string[]; quote: string }>;
 };
 type Payload = {
   introContext: typeof intro;
@@ -122,7 +123,12 @@ const aboutFinding: Finding = {
 };
 function critic(payload: Payload, findingsFor: (item: AuditItem) => Finding[] = () => []) {
   return {
-    items: payload.items.map((item) => ({ index: item.index, findings: findingsFor(item) })),
+    items: payload.items.map((item) => ({
+      index: item.index,
+      findings: findingsFor(item).map((finding) =>
+        teachingFindingFixture(finding, item.sourceParts)
+      ),
+    })),
   };
 }
 function judge(payload: Payload, findingsFor: (item: AuditItem) => Finding[] = () => []) {
@@ -132,10 +138,7 @@ function judge(payload: Payload, findingsFor: (item: AuditItem) => Finding[] = (
       const criticisms = payload.criticisms!.items.find(({ index }) => index === item.index)!;
       return {
         index: item.index,
-        acceptable: findings.length === 0,
-        issues: [...new Set(findings.map(({ issue }) => issue))],
-        feedback: findings.map(({ defect }) => defect),
-        findings,
+        newFindings: findings.map((finding) => teachingFindingFixture(finding, item.sourceParts)),
         criticDecisions: criticisms.findings.map((_, findingIndex) => ({
           findingIndex,
           decision: 'dismissed',
@@ -195,7 +198,7 @@ describe('evidence-bound intro review', () => {
         )
     );
     expect(JSON.parse(adjudication![1][0].content).criticisms.items[1].findings).toEqual([
-      scopeCriticism,
+      { ...scopeCriticism, quote: intro.tips[1]!.slice(120) },
     ]);
     expect(schemaNames()).toEqual([
       'class_intro_critic',
@@ -224,15 +227,23 @@ describe('evidence-bound intro review', () => {
     expect(
       failure.teachingFailure!.reviews[0]!.verdict.items.filter(({ acceptable }) => !acceptable)
     ).toEqual([
-      { index: 8, acceptable: false, issues: ['unsupported'], feedback: [arrivalFinding.defect] },
+      {
+        index: 8,
+        acceptable: false,
+        issues: ['unsupported'],
+        feedback: [`${arrivalFinding.defect} Correction: ${arrivalFinding.correction}`],
+      },
     ]);
     const plan = getIntroRepairPlan(failure);
     expect(plan.rejectionEvidence).toEqual([
-      { address: { field: 'examples', index: 1 }, findings: [arrivalFinding] },
+      {
+        address: { field: 'examples', index: 1 },
+        findings: [{ ...arrivalFinding, quote: intro.examples[1]!.meaning }],
+      },
     ]);
     plan.rejectionEvidence[0]!.findings[0]!.quote = 'tampered returned evidence';
     expect(getIntroRepairPlan(failure).rejectionEvidence[0]!.findings[0]!.quote).toBe(
-      arrivalFinding.quote
+      intro.examples[1]!.meaning
     );
     const evidence = JSON.parse(failure.teachingFailure!.reviews[0]!.candidate!)[0];
     expect(evidence.addresses).toHaveLength(9);
@@ -241,7 +252,9 @@ describe('evidence-bound intro review', () => {
         (item: { findings: Finding[] }) => item.findings.length === 0
       )
     ).toBe(true);
-    expect(evidence.reviewPackets[1].adjudicator.items[3].findings).toEqual([arrivalFinding]);
+    expect(evidence.reviewPackets[1].adjudicator.items[3].findings).toEqual([
+      { ...arrivalFinding, quote: intro.examples[1]!.meaning },
+    ]);
     expect(JSON.stringify(failure)).not.toContain(arrivalFinding.quote);
     evidence.reviewPackets[1].adjudicator.items[3].findings[0].quote = 'tampered stored packet';
     failure.teachingFailure!.reviews[0]!.candidate = JSON.stringify([evidence]);
@@ -261,13 +274,18 @@ describe('evidence-bound intro review', () => {
       if (kind === 'duplicate address') packet.items[1]!.index = 0;
       else if (kind === 'missing address') packet.items.pop();
       else
-        packet.items[0]!.findings.push({
-          ...aboutFinding,
-          fieldPath: ['purpose'],
-          quote: kind === 'missing correction' ? intro.purpose : 'invented quote',
-          correction: null,
-          counterexample: kind === 'missing correction' ? null : aboutFinding.counterexample,
-        });
+        packet.items[0]!.findings.push(
+          teachingFindingFixture(
+            {
+              ...aboutFinding,
+              fieldPath: ['purpose'],
+              quote: kind === 'missing correction' ? intro.purpose : 'invented quote',
+              correction: null,
+              counterexample: kind === 'missing correction' ? null : aboutFinding.counterexample,
+            },
+            payload.items[0]!.sourceParts
+          )
+        );
       return response(packet);
     });
     await expect(generateClassIntro(params)).rejects.toBeInstanceOf(ReviewerProtocolError);
@@ -299,7 +317,7 @@ describe('evidence-bound intro review', () => {
     ]);
   });
 
-  it.each(['missing decision', 'accepted supported criticism', 'different supported quote'])(
+  it.each(['missing decision', 'extra verdict field', 'extra quote field'])(
     'rejects an adjudicator packet with %s',
     async (kind) => {
       boundary.generate.mockImplementation(async (_system, messages, options) => {
@@ -310,17 +328,21 @@ describe('evidence-bound intro review', () => {
               item.content.address.field === 'about' ? [aboutFinding] : []
             )
           );
-        const packet = judge(payload);
+        const packet = judge(payload) as {
+          items: Array<{
+            index: number;
+            criticDecisions: Array<{ findingIndex: number; decision: string; reason: string }>;
+            newFindings: unknown[];
+            acceptable?: boolean;
+            quote?: string;
+          }>;
+        };
         const row = packet.items[1]!;
         if (kind === 'missing decision') row.criticDecisions = [];
         else {
           row.criticDecisions[0]!.decision = 'supported';
-          if (kind === 'different supported quote') {
-            row.acceptable = false;
-            row.issues = ['incorrect'];
-            row.feedback = [aboutFinding.defect];
-            row.findings = [{ ...aboutFinding, quote: 'das Perfekt' }];
-          }
+          if (kind === 'extra verdict field') row.acceptable = true;
+          if (kind === 'extra quote field') row.quote = 'das Perfekt';
         }
         return response(packet);
       });
@@ -394,7 +416,12 @@ describe('evidence-bound intro review', () => {
     expect(
       failure.teachingFailure!.reviews[1]!.verdict.items.filter(({ acceptable }) => !acceptable)
     ).toEqual([
-      { index: 7, acceptable: false, issues: ['incorrect'], feedback: [noteFinding.defect] },
+      {
+        index: 7,
+        acceptable: false,
+        issues: ['incorrect'],
+        feedback: [`${noteFinding.defect} Correction: ${noteFinding.correction}`],
+      },
     ]);
     expect(schemaNames()).toEqual([
       'class_intro_generation',

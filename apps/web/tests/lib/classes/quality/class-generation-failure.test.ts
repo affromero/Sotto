@@ -92,8 +92,7 @@ beforeEach(() => {
   }));
   mockReviewResponse.mockImplementation(async (_system, messages) => ({
     content: JSON.stringify({
-      passageAcceptable: true,
-      passageFeedback: [],
+      passageFindings: [],
       issues: [],
       questions: JSON.parse(messages[0].content).questions.map((q: { index: number }) => ({
         index: q.index,
@@ -174,8 +173,7 @@ describe('terminal section generation failures', () => {
         mockReviewResponse
           .mockImplementationOnce(async (_system, messages) => ({
             content: JSON.stringify({
-              passageAcceptable: true,
-              passageFeedback: [],
+              passageFindings: [],
               issues: [],
               questions: JSON.parse(messages[0].content).questions.map((q: { index: number }) => ({
                 index: q.index,
@@ -187,8 +185,7 @@ describe('terminal section generation failures', () => {
           }))
           .mockResolvedValue({
             content: JSON.stringify({
-              passageAcceptable: true,
-              passageFeedback: [],
+              passageFindings: [],
               issues: ['ambiguous'],
               questions: SAMPLE_QUESTIONS.map((_, index) => ({
                 index,

@@ -13,25 +13,30 @@ export function configureSpokenTeachingRejection(
   mockTeachingResponse.mockImplementation(async (...args) => {
     const items = JSON.parse(args[1][0].content).items as Array<{
       index: number;
-      content: { passageText: string; question: string };
+      content: { passageText?: string; question?: string };
     }>;
+    const rejectedScript = items[0].content.passageText?.includes(firstText);
     return {
       model: 'm',
       content: JSON.stringify({
         items: items.map(({ index, content }) => {
-          const rejected = content.passageText.includes(firstText);
+          const rejected = rejectedScript && (index === 0 || (mixed && index === 1));
           const findings = rejected
             ? [
-                {
-                  issue: 'unnatural',
-                  fieldPath: ['passageText'],
-                  quote: firstText,
-                  rule: 'Grammar terminology must be accurate.',
-                  defect: 'Endlich does not mean finite.',
-                  correction: finalText,
-                  counterexample: null,
-                },
-                ...(mixed
+                ...(index === 0
+                  ? [
+                      {
+                        issue: 'unnatural',
+                        fieldPath: ['passageText'],
+                        quote: firstText,
+                        rule: 'Grammar terminology must be accurate.',
+                        defect: 'Endlich does not mean finite.',
+                        correction: finalText,
+                        counterexample: null,
+                      },
+                    ]
+                  : []),
+                ...(index === 1
                   ? [
                       {
                         issue: 'unsupported',

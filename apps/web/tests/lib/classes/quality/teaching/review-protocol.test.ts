@@ -14,6 +14,7 @@ import {
   teachingCriticSchema,
   teachingAdjudicatorSchema,
   ReviewerProtocolError,
+  reviewerProtocolDiagnostic,
   type TeachingFinding,
   type TeachingCritic,
 } from '@/lib/classes/quality/teaching-review-protocol';
@@ -22,8 +23,8 @@ import {
   requestTeachingReview,
   TeachingQualityRejectionError,
   authenticTeachingFailure,
-  TEACHING_CRITIC_JSON_SCHEMA,
-  TEACHING_ADJUDICATOR_JSON_SCHEMA,
+  buildTeachingCriticJsonSchema,
+  buildTeachingAdjudicatorJsonSchema,
 } from '@/lib/classes/quality/teaching-quality';
 import { teachingFailureSchema } from '@/lib/classes/quality/teaching-failure';
 import { createHash } from 'node:crypto';
@@ -32,6 +33,42 @@ import {
   retainParallelGenerationFailures,
 } from '@/lib/classes/quality/generation-failure';
 import { captureReviewerProtocolEvidence } from '@/lib/classes/quality/private-protocol-evidence';
+import { assessSectionReview, SectionQualityError } from '@/lib/classes/section-quality';
+import { shapeTeachingProviderFixture } from '../intro-provider-fixture';
+import { buildTeachingSourceParts } from '@/lib/classes/quality/teaching-source/protocol';
+import { listeningRepairPlan } from '@/lib/classes/quality/listening-repair';
+
+const TEACHING_CRITIC_JSON_SCHEMA = buildTeachingCriticJsonSchema([{ task: 'Fixture.' }]);
+const TEACHING_ADJUDICATOR_JSON_SCHEMA = buildTeachingAdjudicatorJsonSchema(
+  [{ task: 'Fixture.' }],
+  { items: [{ index: 0, findings: [] }] }
+);
+
+it('retains only authenticated blind protocol failures with bounded private payloads', () => {
+  const question = { question: 'Which?', options: ['A', 'B'], correctIndex: 0, explanation: 'A.' };
+  let failure: unknown;
+  try {
+    assessSectionReview('{', [question], false);
+  } catch (error) {
+    failure = error;
+  }
+  expect(reviewerProtocolDiagnostic(failure)).toEqual({
+    reason: 'invalid_json',
+    pathCodes: ['response'],
+  });
+  expect(reviewerProtocolDiagnostic(new SectionQualityError())).toBeUndefined();
+  const response = 'private '.repeat(5000);
+  const evidence = captureReviewerProtocolEvidence(failure, {
+    kind: 'grammar',
+    role: 'blind_section',
+    offset: 0,
+    candidate: question,
+    response,
+  });
+  expect(evidence?.payload).toMatchObject({ json: null, omitted: 'size_limit' });
+  expect(evidence?.payload.sha256).toMatch(/^[a-f0-9]{64}$/);
+  expect(JSON.stringify(evidence)).not.toContain('private ');
+});
 
 const execution = blockedProviderExecution('fixture');
 const base = {
@@ -92,7 +129,12 @@ function provider(critic: (packet: Packet) => unknown, adjudicator: (packet: Pac
       expect(['class_teaching_critic', 'class_teaching_adjudicator']).toContain(name);
       const content = name === 'class_teaching_critic' ? critic(packet) : adjudicator(packet);
       return {
-        content: JSON.stringify(content),
+        content: shapeTeachingProviderFixture(
+          system,
+          messages as Array<{ content: string }>,
+          options,
+          { content: JSON.stringify(content), model: 'captured-luna' }
+        ).content,
         model: 'captured-luna',
         inputTokens: 0,
         outputTokens: 0,
@@ -274,6 +316,110 @@ describe('bound teaching evidence', () => {
 });
 
 describe('shared teaching adjudication', () => {
+  it('maps a scoped question-only rejection back to the original quiz index', async () => {
+    const items = Array.from({ length: 4 }, (_, index) => ({
+      passageText: 'One shared passage.',
+      question: `Question ${index}?`,
+    }));
+    const { boundary, generateResponse } = provider(emptyCritic, (packet) => ({
+      items: packet.items.map(({ index, content }) =>
+        index === 4
+          ? rejected(index, finding(['question'], content.question as string))
+          : accepted(index)
+      ),
+    }));
+    const error = await reviewTeachingContent({
+      ...base,
+      provider: boundary,
+      kind: 'listening',
+      items,
+    }).catch((value: unknown) => value);
+    expect(error).toBeInstanceOf(TeachingQualityRejectionError);
+    if (!(error instanceof TeachingQualityRejectionError)) throw error;
+    const plan = listeningRepairPlan(error, items);
+    expect(plan?.target).toBe('quiz');
+    expect(plan?.feedback).toEqual([
+      {
+        index: 3,
+        feedback: ['Unsupported teaching claim. Correction: Use only the supplied facts.'],
+      },
+    ]);
+    expect(plan?.verdict.findings[0]).toMatchObject({
+      index: 3,
+      findings: [{ fieldPath: ['question'], quote: 'Question 3?' }],
+    });
+    const request = JSON.parse(generateResponse.mock.calls[0][1][0].content as string);
+    expect(request.items.map((row: { content: unknown }) => row.content)).toEqual([
+      { passageText: items[0].passageText },
+      ...items.map(({ question }) => ({ question })),
+    ]);
+    expect(generateResponse.mock.calls.map((call) => call[2]?.jsonSchema?.name)).toEqual([
+      'class_teaching_critic',
+      'class_teaching_adjudicator',
+    ]);
+    expect(listeningRepairPlan(error, [...items].reverse())).toBeNull();
+  });
+  it('preserves twelve separate passage and question defects in an authentic listening script repair', async () => {
+    const item = { passageText: 'A passage with a teaching defect.', question: 'A question.' };
+    const objection = finding(['passageText'], item.passageText);
+    const privateFinding = {
+      sourcePartIndex: 0,
+      issue: objection.issue,
+      rule: objection.rule,
+      defect: objection.defect,
+      remedy: { kind: 'correction', text: objection.correction },
+    };
+    const { boundary } = provider(
+      (packet) => ({
+        items: packet.items.map(({ index }) => ({
+          index,
+          findings: Array.from({ length: 3 }, () => privateFinding),
+        })),
+      }),
+      (packet) => ({
+        items: packet.items.map(({ index }) => ({
+          index,
+          criticDecisions: Array.from({ length: 3 }, (_, findingIndex) => ({
+            findingIndex,
+            decision: 'supported',
+            reason: 'The passage defect remains.',
+          })),
+          newFindings: Array.from({ length: 3 }, () => ({
+            ...privateFinding,
+            sourcePartIndex: 0,
+          })),
+        })),
+      })
+    );
+    const error = await reviewTeachingContent({
+      ...base,
+      provider: boundary,
+      kind: 'listening',
+      items: [item],
+    }).catch((value: unknown) => value);
+    expect(error).toBeInstanceOf(TeachingQualityRejectionError);
+    if (!(error instanceof TeachingQualityRejectionError)) throw error;
+    const plan = listeningRepairPlan(error, [item]);
+    expect(plan?.target).toBe('script');
+    expect(
+      plan?.verdict.findings.flatMap((row) => row.findings.map(({ fieldPath }) => fieldPath))
+    ).toEqual([
+      ['passageText'],
+      ['passageText'],
+      ['passageText'],
+      ['passageText'],
+      ['passageText'],
+      ['passageText'],
+      ['question'],
+      ['question'],
+      ['question'],
+      ['question'],
+      ['question'],
+      ['question'],
+    ]);
+    expect(plan?.failure.reviews[0].verdict.items[0].feedback).toHaveLength(6);
+    expect(plan?.verdict.findings.map((row) => row.index)).toEqual([0, 0]);
+  });
   it('adjudicates the captured speaking meaning defect after binding its envelope path', async () => {
     const item = {
       targetPhrase: 'Ich bin gestern ins Café gegangen.',
@@ -289,13 +435,15 @@ describe('shared teaching adjudication', () => {
     };
     const { boundary, generateResponse } = provider(
       () => ({ items: [{ index: 0, findings: [objection] }] }),
-      (packet) => ({
+      () => ({
         items: [
-          rejected(
-            0,
-            { ...objection, fieldPath: ['translation'] },
-            packet.criticisms!.items[0].findings
-          ),
+          {
+            index: 0,
+            criticDecisions: [
+              { findingIndex: 0, decision: 'supported', reason: 'The destination is missing.' },
+            ],
+            newFindings: [],
+          },
         ],
       })
     );
@@ -312,7 +460,7 @@ describe('shared teaching adjudication', () => {
     ).toMatchObject({
       acceptable: false,
       issues: ['incorrect'],
-      feedback: [objection.defect],
+      feedback: [`${objection.defect} Correction: ${objection.correction}`],
     });
     expect(generateResponse.mock.calls.map((call) => call[2]?.jsonSchema?.name)).toEqual([
       'class_teaching_critic',
@@ -325,10 +473,15 @@ describe('shared teaching adjudication', () => {
   it.each(['writing', 'speaking', 'listening', 'explanations', 'vocabulary'] as const)(
     'independently inspects %s even when the critic reports no defects',
     async (kind) => {
-      const item = { explanation: 'An unsupported conclusion.' };
+      const item = {
+        explanation: 'An unsupported conclusion.',
+        ...(kind === 'listening' ? { passageText: 'An unsupported conclusion.' } : {}),
+      };
       const entry = finding(['explanation'], item.explanation);
       const { boundary } = provider(emptyCritic, (packet) => ({
-        items: packet.items.map(({ index }) => rejected(index, entry)),
+        items: packet.items.map(({ index }) =>
+          kind === 'listening' && index === 0 ? accepted(index) : rejected(index, entry)
+        ),
       }));
       await expect(
         reviewTeachingContent({ ...base, provider: boundary, kind, items: [item] })
@@ -417,7 +570,7 @@ describe('shared teaching adjudication', () => {
     expect(evidence.reviewPackets[0].adjudicator.items[0].findings).toEqual([entry]);
     expect(failure.reviews[0].verdict.items[0]).toMatchObject({
       acceptable: false,
-      feedback: [entry.defect],
+      feedback: [`${entry.defect} Correction: ${entry.correction}`],
     });
   });
   it('retains every item, packet and rejected global index across more than five items', async () => {
@@ -565,7 +718,17 @@ describe('bounded protocol correction', () => {
           typeof next === 'function'
             ? JSON.stringify(next(JSON.parse(messages[0].content as string)))
             : next;
-        return { content: value, model: base.ai.model, inputTokens: 0, outputTokens: 0 };
+        return {
+          content: shapeTeachingProviderFixture(
+            _system,
+            messages as Array<{ content: string }>,
+            options,
+            { content: value, model: base.ai.model }
+          ).content,
+          model: base.ai.model,
+          inputTokens: 0,
+          outputTokens: 0,
+        };
       }
     );
     const boundary: AIProvider = {
@@ -688,9 +851,22 @@ describe('bounded protocol correction', () => {
     expect(captureGenerationFailure(error).protocolEvidence![0].payload.json).not.toBe('tampered');
   });
 
-  it('does not accept a corrected critic with an unbound quote or dispatch its judge', async () => {
+  it('does not accept a corrected critic with an unknown source part or dispatch its judge', async () => {
     const invalid = JSON.stringify({
-      items: [{ index: 0, findings: [finding(['task'], 'Absent claim.')] }],
+      items: [
+        {
+          index: 0,
+          findings: [
+            {
+              sourcePartIndex: 999,
+              issue: 'unsupported',
+              rule: 'Use supplied facts.',
+              defect: 'Absent claim.',
+              remedy: { kind: 'correction', text: 'Use the supplied task.' },
+            },
+          ],
+        },
+      ],
     });
     const { boundary, generateResponse } = scripted(['{', invalid]);
     const error = await audit(boundary).catch((value: unknown) => value);
@@ -701,7 +877,7 @@ describe('bounded protocol correction', () => {
     ]);
     expect(captureGenerationFailure(error).protocolEvidence?.map(({ reason }) => reason)).toEqual([
       'invalid_json',
-      'quote_binding',
+      'schema',
     ]);
   });
 
@@ -789,7 +965,9 @@ describe('bounded protocol correction', () => {
   it.each([32768, 32769])(
     'retains or explicitly omits an exact UTF8 %s-byte diagnostic payload',
     async (bytes) => {
-      const candidate = { items: [{ index: 0, content: task[0] }] };
+      const candidate = {
+        items: [{ index: 0, content: task[0], sourceParts: buildTeachingSourceParts(task[0]) }],
+      };
       const overhead = Buffer.byteLength(JSON.stringify({ candidate, response: '' }), 'utf8');
       const room = bytes - overhead;
       const response = '語'.repeat(Math.floor(room / 3)) + 'x'.repeat(room % 3);

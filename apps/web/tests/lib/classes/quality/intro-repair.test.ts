@@ -136,7 +136,10 @@ function fullVerdict(value: IntroFixture, rejected: Record<string, ReviewIssue> 
       index,
       acceptable: !rejected[addressKey(address)],
       issues: rejected[addressKey(address)]?.issues ?? [],
-      feedback: rejected[addressKey(address)]?.feedback ?? [],
+      feedback: (rejected[addressKey(address)]?.issues ?? []).map(
+        (_, index) =>
+          `${(rejected[addressKey(address)]!.feedback[index] ?? rejected[addressKey(address)]!.feedback[0]!).slice(0, 120)} Correction: Correct the identified teaching defect.`
+      ),
     })),
   };
 }
@@ -170,13 +173,13 @@ function reviewPackets(value: IntroFixture, rejected: Record<string, ReviewIssue
           index: localIndex,
           acceptable: !issue,
           issues: issue?.issues ?? [],
-          feedback: issue?.feedback ?? [],
-          findings: (issue?.issues ?? []).map((code) => ({
+          feedback: item.feedback,
+          findings: (issue?.issues ?? []).map((code, findingIndex) => ({
             issue: code,
             fieldPath,
             quote: text.slice(0, 120),
             rule: 'Correct teaching in the assigned field.',
-            defect: issue!.feedback[0]!.slice(0, 120),
+            defect: (issue!.feedback[findingIndex] ?? issue!.feedback[0]!).slice(0, 120),
             correction: 'Correct the identified teaching defect.',
             counterexample: null,
           })),
@@ -407,13 +410,18 @@ describe('field-local intro repair', () => {
     ]);
   });
 
-  it.each([1, 6])(
-    'preserves every character of %i maximum-length reviewer comments in the repair request',
+  it.each([1, 3])(
+    'preserves %i bounded adjudicated defects and their remedies in the repair request',
     async (commentCount) => {
       const feedback = Array.from({ length: commentCount }, (_, index) =>
-        `Comment ${index}: the focus needs a concrete learner action.`.padEnd(300, '.')
+        `Comment ${index}: the focus needs a concrete learner action.`.padEnd(120, '.')
       );
-      const rejected = { 'focus:0': { issues: ['infeasible'], feedback } };
+      const rejected = {
+        'focus:0': {
+          issues: ['infeasible', 'incorrect', 'unsupported'].slice(0, commentCount),
+          feedback,
+        },
+      };
       const repaired = {
         ...candidate,
         focus: candidate.focus.map((focus, index) =>
@@ -441,7 +449,12 @@ describe('field-local intro repair', () => {
         .split('\n')
         .find((line: string) => line.startsWith('Review feedback: '));
       expect(JSON.parse(feedbackLine!.slice('Review feedback: '.length))).toEqual([
-        { index: 0, feedback: [`focus: focus[0]: ${feedback.join(' ')}`] },
+        {
+          index: 0,
+          feedback: [
+            `focus: focus[0]: ${feedback.map((text) => `${text} Correction: Correct the identified teaching defect.`).join(' ')}`,
+          ],
+        },
       ]);
       const evidencePrefix = 'Adjudicated defect evidence: ';
       const evidenceLine = repairRequest![1][0].content

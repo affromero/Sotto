@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { blockedProviderExecution } from '../../../helpers/runtime/provider-execution';
+import {
+  sectionProviderFixture,
+  compiledGrammarFixture,
+} from '../../../helpers/runtime/section-generation';
 import { emptyTeachingCriticFixture, shapeTeachingProviderFixture } from './intro-provider-fixture';
 
 const boundary = vi.hoisted(() => ({ generate: vi.fn(), resolve: vi.fn() }));
@@ -12,10 +16,15 @@ vi.mock('@/lib/providers/ai', () => ({
     ) => {
       if ((options as { jsonSchema: { name: string } }).jsonSchema.name === 'class_teaching_critic')
         return emptyTeachingCriticFixture(messages);
-      return shapeTeachingProviderFixture(system, messages, options, {
-        model: 'm',
-        ...(await boundary.generate(system, messages, options)),
-      });
+      return shapeTeachingProviderFixture(
+        system,
+        messages,
+        options,
+        sectionProviderFixture(system, options, {
+          model: 'm',
+          ...(await boundary.generate(system, messages, options)),
+        })
+      );
     },
   }),
 }));
@@ -142,8 +151,7 @@ describe('grammar speaker attribution at the provider boundary', () => {
           expect(input.questions.every((item: object) => !('explanation' in item))).toBe(true);
           return {
             content: JSON.stringify({
-              passageAcceptable: true,
-              passageFeedback: [],
+              passageFindings: [],
               issues: [],
               questions: input.questions.map((item: { index: number }) => ({
                 index: item.index,
@@ -159,11 +167,11 @@ describe('grammar speaker attribution at the provider boundary', () => {
         const reject = path === 'replacement' && taught++ === 0;
         expect(
           JSON.parse(messages[0].content).items.map((item: { content: object }) => item.content)
-        ).toEqual(reject ? unassigned : questions);
+        ).toEqual((reject ? unassigned : questions).map(compiledGrammarFixture));
         return { content: JSON.stringify(verdict(reject)) };
       });
       const result = await generateSectionQuestions(params);
-      expect(result).toEqual(questions);
+      expect(result).toEqual(questions.map(compiledGrammarFixture));
       expect(result[0]?.question).toContain('Wir');
       expect(result[1]?.question).toContain('Nora erzählt: „Ich');
     }
@@ -181,13 +189,14 @@ describe('grammar speaker attribution at the provider boundary', () => {
         if (options.jsonSchema.name === 'class_section_quality') {
           expect(system).toContain('Reject unquoted transformations that change the stated actor');
           const input = JSON.parse(messages[0].content);
-          expect(input.questions[1].question).toEqual(unassigned[1]?.question);
+          expect(input.questions[1].question).toEqual(
+            compiledGrammarFixture(unassigned[1]!).question
+          );
           expect(input.questions.every((item: object) => !('correctIndex' in item))).toBe(true);
           expect(input.questions.every((item: object) => !('explanation' in item))).toBe(true);
           return {
             content: JSON.stringify({
-              passageAcceptable: true,
-              passageFeedback: [],
+              passageFindings: [],
               issues: [],
               questions: questions.map((_, index) => ({
                 index,
@@ -200,7 +209,9 @@ describe('grammar speaker attribution at the provider boundary', () => {
         expect(stage).toBe('keyed');
         expect(options.jsonSchema.name).toBe('class_teaching_adjudicator');
         expect(system).toContain('For explanation items involving grammar tasks');
-        expect(JSON.parse(messages[0].content).items[1].content).toEqual(unassigned[1]);
+        expect(JSON.parse(messages[0].content).items[1].content).toEqual(
+          compiledGrammarFixture(unassigned[1]!)
+        );
         return { content: JSON.stringify(verdict(true)) };
       });
       const failure = await generateSectionQuestions(params).catch((error: unknown) => error);
@@ -210,13 +221,31 @@ describe('grammar speaker attribution at the provider boundary', () => {
         return;
       }
       if (!(failure instanceof TeachingQualityRejectionError)) throw failure;
-      expect(failure.feedback).toEqual([{ index: 1, feedback: [feedback] }]);
+      expect(failure.feedback).toEqual([
+        { index: 1, feedback: [`${feedback} Correction: Use accurate supported teaching.`] },
+      ]);
       expect(failure.teachingFailure?.reviews.map((review) => review.verdict)).toEqual([
-        verdict(true),
-        verdict(true),
+        {
+          items: verdict(true).items.map((item) => ({
+            ...item,
+            feedback: item.feedback.map(
+              (text) => `${text} Correction: Use accurate supported teaching.`
+            ),
+          })),
+        },
+        {
+          items: verdict(true).items.map((item) => ({
+            ...item,
+            feedback: item.feedback.map(
+              (text) => `${text} Correction: Use accurate supported teaching.`
+            ),
+          })),
+        },
       ]);
       for (const review of failure.teachingFailure?.reviews ?? [])
-        expect(JSON.parse(review.candidate!)[0].items[1]).toEqual(unassigned[1]);
+        expect(JSON.parse(review.candidate!)[0].items[1]).toEqual(
+          compiledGrammarFixture(unassigned[1]!)
+        );
     }
   );
 });

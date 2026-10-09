@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { blockedProviderExecution } from '../../../../helpers/runtime/provider-execution';
+import { teachingFindingFixture } from '../intro-provider-fixture';
 
 const boundary = vi.hoisted(() => ({ generate: vi.fn(), resolve: vi.fn() }));
 vi.unmock('@/lib/classes/class-intro');
@@ -73,7 +74,11 @@ const shortExampleIntro = {
   examples: [shortCompiledExample, compiled.examples[1]],
 };
 type Address = { field: string; index?: number };
-type Item = { index: number; content: { address: Address; fields: Record<string, unknown> } };
+type Item = {
+  index: number;
+  content: { address: Address; fields: Record<string, unknown> };
+  sourceParts: Array<{ index: number; fieldPath: string[]; quote: string }>;
+};
 type Payload = { introContext: typeof compiled; items: Item[] };
 
 function requireProviderObjectSchemas(value: unknown): void {
@@ -123,7 +128,7 @@ function respond(initial: unknown, replacement: unknown = initial, rejected: str
     return {
       model: 'captured-model',
       content: JSON.stringify({
-        items: payload.items.map(({ index, content }) => {
+        items: payload.items.map(({ index, content, sourceParts }) => {
           if (name === 'class_intro_critic') return { index, findings: [] };
           const key =
             content.address.field +
@@ -137,20 +142,20 @@ function respond(initial: unknown, replacement: unknown = initial, rejected: str
               : (content.fields[content.address.field] as string);
           return {
             index,
-            acceptable: !unacceptable,
-            issues: unacceptable ? ['incorrect'] : [],
-            feedback: unacceptable ? ['Correct this observation.'] : [],
-            findings: unacceptable
+            newFindings: unacceptable
               ? [
-                  {
-                    issue: 'incorrect',
-                    fieldPath,
-                    quote: text.slice(0, 120),
-                    rule: 'Describe the selected example accurately.',
-                    defect: 'Correct this observation.',
-                    correction: 'Use the corrected observation.',
-                    counterexample: null,
-                  },
+                  teachingFindingFixture(
+                    {
+                      issue: 'incorrect',
+                      fieldPath,
+                      quote: text.slice(0, 120),
+                      rule: 'Describe the selected example accurately.',
+                      defect: 'Correct this observation.',
+                      correction: 'Use the corrected observation.',
+                      counterexample: null,
+                    },
+                    sourceParts
+                  ),
                 ]
               : [],
             criticDecisions: [],

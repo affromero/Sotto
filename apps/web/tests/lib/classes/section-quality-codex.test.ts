@@ -1,12 +1,30 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { SECTION_QUALITY_JSON_SCHEMA, SectionQualityError } from '@/lib/classes/section-quality';
+import { sectionReviewSchema, SectionQualityError } from '@/lib/classes/section-quality';
 import {
-  TEACHING_CRITIC_JSON_SCHEMA,
-  TEACHING_ADJUDICATOR_JSON_SCHEMA,
+  buildTeachingCriticJsonSchema,
+  buildTeachingAdjudicatorJsonSchema,
 } from '@/lib/classes/quality/teaching-quality';
 import { generateSectionQuestions } from '@/lib/class-generation';
 import { blockedProviderExecution } from '../../helpers/runtime/provider-execution';
+import {
+  GRAMMAR_TASK_CONTEXT,
+  VOCABULARY_TASK_CONTEXT,
+  compiledGrammarFixture,
+} from '../../helpers/runtime/section-generation';
+
+function vocabularyWireFixture(question: { options: string[]; correctIndex: number }) {
+  const { options, ...fields } = question;
+  return {
+    ...fields,
+    taskContext: VOCABULARY_TASK_CONTEXT,
+    targetIndex: 0,
+    distractors: [
+      ...options.slice(0, question.correctIndex),
+      ...options.slice(question.correctIndex + 1),
+    ],
+  };
+}
 
 const execute = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/codex-client', () => ({ executeCodex: execute }));
@@ -32,10 +50,12 @@ describe('section review through the Codex provider', () => {
     };
     execute.mockImplementation(async (system: string, user: string) => {
       if (system.includes('teaching content for')) {
+        const input = JSON.parse(user);
+        const fields = input.items.map((item: { content: unknown }) => item.content);
         expect(JSON.parse(/```json\s*([\s\S]*?)\s*```/.exec(system)![1])).toEqual(
           (system.includes('Teaching review role: critic.')
-            ? TEACHING_CRITIC_JSON_SCHEMA
-            : TEACHING_ADJUDICATOR_JSON_SCHEMA
+            ? buildTeachingCriticJsonSchema(fields)
+            : buildTeachingAdjudicatorJsonSchema(fields, input.criticisms)
           ).schema
         );
         expect(user).toContain(question.explanation);
@@ -44,10 +64,9 @@ describe('section review through the Codex provider', () => {
             items: [
               {
                 index: 0,
-                findings: [],
                 ...(system.includes('Teaching review role: critic.')
-                  ? {}
-                  : { acceptable: true, issues: [], feedback: [], criticDecisions: [] }),
+                  ? { findings: [] }
+                  : { newFindings: [], criticDecisions: [] }),
               },
             ],
           }),
@@ -56,7 +75,7 @@ describe('section review through the Codex provider', () => {
       }
       if (!system.includes('independently evaluate')) {
         return {
-          content: JSON.stringify({ passage: '', questions: [question] }),
+          content: JSON.stringify({ passage: '', questions: [vocabularyWireFixture(question)] }),
           inputTokens: 1,
           outputTokens: 1,
           model: 'fixture-model',
@@ -64,14 +83,13 @@ describe('section review through the Codex provider', () => {
       }
       const schemaBlock = /```json\s*([\s\S]*?)\s*```/.exec(system);
       expect(schemaBlock).not.toBeNull();
-      expect(JSON.parse(schemaBlock![1])).toEqual(SECTION_QUALITY_JSON_SCHEMA.schema);
+      expect(JSON.parse(schemaBlock![1])).toEqual(sectionReviewSchema([question]).schema);
       expect(user).toContain(question.question);
       expect(user).not.toContain('correctIndex');
       expect(user).not.toContain(question.explanation);
       return {
         content: JSON.stringify({
-          passageAcceptable: true,
-          passageFeedback: [],
+          passageFindings: [],
           issues: [],
           questions: [{ index: 0, acceptableOptionIndices: [0], issues: [] }],
         }),
@@ -93,7 +111,12 @@ describe('section review through the Codex provider', () => {
       targetVocab: [{ lemma: 'hola', gloss: 'hello' }],
       seed: 'fixture',
     });
-    expect(result).toEqual([expect.objectContaining(question)]);
+    expect(result).toEqual([
+      expect.objectContaining({
+        ...question,
+        question: `${VOCABULARY_TASK_CONTEXT}\n${question.question}`,
+      }),
+    ]);
     expect(
       execute.mock.calls.some(([system]) => String(system).includes('Required output JSON Schema:'))
     ).toBe(true);
@@ -115,10 +138,9 @@ describe('section review through the Codex provider', () => {
             items: [
               {
                 index: 0,
-                findings: [],
                 ...(system.includes('Teaching review role: critic.')
-                  ? {}
-                  : { acceptable: true, issues: [], feedback: [], criticDecisions: [] }),
+                  ? { findings: [] }
+                  : { newFindings: [], criticDecisions: [] }),
               },
             ],
           }),
@@ -128,8 +150,7 @@ describe('section review through the Codex provider', () => {
       if (system.includes('independently evaluate')) {
         return {
           content: JSON.stringify({
-            passageAcceptable: true,
-            passageFeedback: [],
+            passageFindings: [],
             issues: [],
             questions: [
               {
@@ -157,7 +178,10 @@ describe('section review through the Codex provider', () => {
         rewritten = true;
       }
       return {
-        content: JSON.stringify({ passage: '', questions: [rewritten ? replacement : initial] }),
+        content: JSON.stringify({
+          passage: '',
+          questions: [vocabularyWireFixture(rewritten ? replacement : initial)],
+        }),
         model: 'fixture-model',
       };
     });
@@ -174,7 +198,12 @@ describe('section review through the Codex provider', () => {
       targetVocab: [{ lemma: 'hola', gloss: 'hello' }],
       seed: 'fixture-retry',
     });
-    expect(result).toEqual([expect.objectContaining(replacement)]);
+    expect(result).toEqual([
+      expect.objectContaining({
+        ...replacement,
+        question: `${VOCABULARY_TASK_CONTEXT}\n${replacement.question}`,
+      }),
+    ]);
   });
 
   it('replaces a rejected literal Perfekt completion before returning grammar material', async () => {
@@ -202,10 +231,9 @@ describe('section review through the Codex provider', () => {
           content: JSON.stringify({
             items: Array.from({ length: 5 }, (_, index) => ({
               index,
-              findings: [],
               ...(system.includes('Teaching review role: critic.')
-                ? {}
-                : { acceptable: true, issues: [], feedback: [], criticDecisions: [] }),
+                ? { findings: [] }
+                : { newFindings: [], criticDecisions: [] }),
             })),
           }),
           model: 'fixture-model',
@@ -214,16 +242,16 @@ describe('section review through the Codex provider', () => {
       if (system.includes('independently evaluate')) {
         const input = JSON.parse(user);
         expect(input.questions[0].completedOptions[0]).toBe(
-          rewritten
-            ? 'Lea erzählt von sich und ihrem Bruder. Sie sagt: „Am Samstag haben wir einen kleinen Kuchen für Oma gebacken.“ Welches Hilfsverb passt im Perfekt?'
-            : 'Lea erzählt von sich und ihrem Bruder. Sie sagt: „Am Samstag haben gebacken wir einen kleinen Kuchen für Oma.“ Welche Form passt im Perfekt?'
+          `${GRAMMAR_TASK_CONTEXT}\n` +
+            (rewritten
+              ? 'Lea erzählt von sich und ihrem Bruder. Sie sagt: „Am Samstag haben wir einen kleinen Kuchen für Oma gebacken.“ Welches Hilfsverb passt im Perfekt?'
+              : 'Lea erzählt von sich und ihrem Bruder. Sie sagt: „Am Samstag haben gebacken wir einen kleinen Kuchen für Oma.“ Welche Form passt im Perfekt?')
         );
         expect(user).not.toContain('correctIndex');
         expect(user).not.toContain(initial.explanation);
         return {
           content: JSON.stringify({
-            passageAcceptable: true,
-            passageFeedback: [],
+            passageFindings: [],
             issues: [],
             questions: Array.from({ length: 5 }, (_, index) => ({
               index,
@@ -246,7 +274,10 @@ describe('section review through the Codex provider', () => {
       return {
         content: JSON.stringify({
           passage: '',
-          questions: [rewritten ? replacement : initial, ...otherQuestions],
+          questions: [rewritten ? replacement : initial, ...otherQuestions].map((question) => ({
+            ...question,
+            taskContext: GRAMMAR_TASK_CONTEXT,
+          })),
         }),
         model: 'fixture-model',
       };
@@ -263,23 +294,21 @@ describe('section review through the Codex provider', () => {
       targetVocab: [],
       seed: 'literal-perfekt',
     });
-    expect(result[0]).toMatchObject(replacement);
+    expect(result[0]).toMatchObject(compiledGrammarFixture(replacement));
     expect(result).toHaveLength(5);
     expect(result.some((question) => question.question === initial.question)).toBe(false);
   });
 
   it.each([
     { passageAcceptable: true },
-    { passageAcceptable: false, passageFeedback: [] },
+    { passageFindings: [{ sourcePartIndex: 0, issue: 'incorrect', reason: 'No passage exists.' }] },
     {
-      passageAcceptable: true,
-      passageFeedback: [{ quote: 'Invented text.', reason: 'Incorrect.' }],
+      passageFindings: [{ sourcePartIndex: -1, issue: 'incorrect', reason: 'Incorrect.' }],
     },
     {
-      passageAcceptable: false,
-      passageFeedback: [{ quote: 'Invented text.', reason: 'Incorrect.' }],
+      passageFindings: [{ quote: 'Invented text.', issue: 'incorrect', reason: 'Incorrect.' }],
     },
-    { passageAcceptable: false, passageFeedback: [{ quote: 'hola', reason: '  ' }] },
+    { passageFindings: [{ sourcePartIndex: 0, issue: 'incorrect', reason: '  ' }] },
   ])('does not dispatch a replacement after malformed passage evidence', async (overrides) => {
     const question = {
       question: 'Al llegar, Ana dice _____ a sus amigos.',
@@ -303,7 +332,7 @@ describe('section review through the Codex provider', () => {
       expect(user).not.toContain('Blind review feedback:');
       expect(user).not.toContain('Rejected candidate JSON:');
       return {
-        content: JSON.stringify({ passage: '', questions: [question] }),
+        content: JSON.stringify({ passage: '', questions: [vocabularyWireFixture(question)] }),
         model: 'fixture-model',
       };
     });

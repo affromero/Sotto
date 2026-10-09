@@ -146,10 +146,17 @@ Each paired review retains its existing bounded protocol correction under the sa
 Reference verification, provider transport or search subrequests, and
 later TTS/audio are separate. Parent request budgets remain unchanged. Private
 blind diagnostics use the existing sealed failure envelope with
-explicit `blind_section` and `derived_compatibility_summary` tags. The exact blind
-verdict remains inside the bounded candidate JSON; its outer verdict is a derived
+explicit `blind_section` and `derived_compatibility_summary` tags. The validated blind
+compatibility verdict remains inside the bounded candidate JSON; its outer verdict is a derived
 summary. Oversized transcript/questions are explicitly omitted without losing the
 exact verdict. Neither raw material nor this diagnostic crosses learner APIs.
+The private blind response selects canonical source-part indices with issue codes
+and concrete reasons. Each part is an exact excerpt of at most 240 UTF16 units;
+the full passage remains the review context. The parser derives passage approval,
+quoted feedback and combined issues. Independent section and question issues
+remain required. Empty grammar passages permit no passage findings. Malformed
+responses fail without semantic replacement authority and retain authenticated,
+bounded `blind_section` protocol evidence through the existing private failure store.
 
 Reading vocabulary allows one bounded extraction replacement. Twelve words in
 batches of five require at most two extraction requests and six metadata reviews.
@@ -209,6 +216,14 @@ question structure before review, then uses the same captured provider and
 authority for a separate solve without the proposed key or explanations. Both
 normal and JSON-repaired candidates must pass. Two generation attempts and one
 optional repair bound the work, with at most one review per valid candidate.
+Grammar and vocabulary wire questions require taskContext, compiled before every
+review and persistence. Vocabulary selects each authoritative targetIndex once and
+three distractors; the compiler inserts the exact lemma at correctIndex. Validate
+the bare cloze before adding context. Reading wire and public question shapes stay unchanged.
+For vocabulary, a complete blind verdict without global defects may select only
+rejected target indices for the existing second attempt. Preserve other compiled
+questions exactly, then review the entire merged set again. Malformed repair keeps
+the same selected target binding; incomplete or global verdicts cannot narrow repair.
 Semantic retries include the normalized rejected passage and indexed questions,
 including rejected keys and explanations, as untrusted correction context alongside
 bounded review issue codes. Blind reviewers still receive neither keys nor explanations.
@@ -234,11 +249,15 @@ requests use the same captured provider and consume its existing request budget:
 intro reviews each scalar field, focus entry, tip, example and optional visual as a
 separate address. Fresh intros contain at most ten addresses. Sequential batches
 of at most five items each receive a critic request followed by an adjudicator
-request using the same captured provider and authority. Exact quotations bind
-reported defects to the assigned content. The adjudicator independently checks
+request using the same captured provider and authority. Private findings select
+canonical own-string-leaf source parts of at most 120 UTF16 units, including array
+indices. The server derives exact paths and quotes. The adjudicator independently checks
 every assigned address, evaluates criticisms, dismisses unsupported findings and
 reports defects the critic missed. Only adjudicated verdicts guide repair and
-publication. Malformed or unbound evidence permits one correction of the same role
+publication. Supported decisions reuse the complete critic finding; up to three
+supported and three new findings derive approval, issues and bounded feedback
+without dropping defects. Historical compatibility packets remain readable.
+Malformed or unbound evidence permits one correction of the same role
 response per whole review invocation. A second invalid response is terminal. This protocol proves
 evidence binding, not linguistic truth; semantic judgment remains probabilistic.
 A maximum-size intro normally uses ten requests total: one generation, four review requests
@@ -250,6 +269,10 @@ teaching-quality rejection enters the same bounded replacement path as a
 blind-review rejection.
 The same evidence protocol reviews every indexed writing, speaking, listening,
 question explanation and vocabulary item through the shared teaching entry point.
+Listening reviews one shared passage and up to four separately addressed questions
+in one five-item batch. Scoped packets preserve all passage and question findings;
+repair maps question feedback to original quiz indices and routes passage defects
+to script replacement. Original question items remain the authentication identity.
 `classes/quality/teaching-review-protocol.ts` owns strict role schemas, exact string-leaf
 quotation binding, complete coverage and adjudication consistency. Nonintro calls
 contain at most fifty items, reviewed sequentially in batches of five with complete

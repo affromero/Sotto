@@ -1,5 +1,6 @@
 import { isDeepStrictEqual } from 'node:util';
 import { z } from 'zod';
+import { buildListeningAudit } from './listening-audit/projection';
 import { authenticTeachingFailure, type TeachingQualityRejectionError } from './teaching-quality';
 import {
   teachingAdjudicatorSchema,
@@ -19,6 +20,20 @@ const envelopeSchema = z
         reviewContract: z.literal('teaching_critic_adjudicator'),
         outerVerdict: z.literal('derived_adjudicated_summary'),
         items: z.array(z.unknown()),
+        listeningAudit: z
+          .object({
+            items: z.array(z.unknown()),
+            addresses: z.array(
+              z.union([
+                z.object({ kind: z.literal('passage') }).strict(),
+                z
+                  .object({ kind: z.literal('question'), index: z.number().int().nonnegative() })
+                  .strict(),
+              ])
+            ),
+          })
+          .strict()
+          .optional(),
         reviewPackets: z.array(
           z
             .object({
@@ -48,11 +63,31 @@ export function listeningRepairPlan(
   }
   const envelope = parsed[0];
   if (!isDeepStrictEqual(envelope.items, items)) return null;
-  const findings = envelope.reviewPackets.flatMap((packet) =>
+  if (envelope.listeningAudit) {
+    try {
+      if (!isDeepStrictEqual(envelope.listeningAudit, buildListeningAudit(items))) return null;
+    } catch {
+      return null;
+    }
+  }
+  const rejected = envelope.reviewPackets.flatMap((packet) =>
     packet.adjudicator.items
       .filter((row) => !row.acceptable)
-      .map((row) => ({ index: packet.offset + row.index, findings: row.findings }))
+      .map((row) => ({ ...row, index: packet.offset + row.index }))
   );
+  if (
+    envelope.listeningAudit &&
+    rejected.some((row) => !envelope.listeningAudit!.addresses[row.index])
+  )
+    return null;
+  const mapped = rejected.map((row) => {
+    const address = envelope.listeningAudit?.addresses[row.index];
+    return {
+      ...row,
+      index: address ? (address.kind === 'passage' ? 0 : address.index) : row.index,
+    };
+  });
+  const findings = mapped.map(({ index, findings }) => ({ index, findings }));
   if (!findings.length || findings.some((row) => !row.findings.length)) return null;
   const leaves = findings.flatMap((row) => row.findings.map((finding) => finding.fieldPath[0]));
   if (
@@ -62,6 +97,7 @@ export function listeningRepairPlan(
   return {
     target: leaves.includes('passageText') ? ('script' as const) : ('quiz' as const),
     verdict: { kind: 'teaching', findings } satisfies ListeningTeachingRepair,
+    feedback: mapped.map(({ index, feedback }) => ({ index, feedback })),
     failure,
   };
 }

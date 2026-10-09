@@ -43,12 +43,16 @@ import {
   withClassGeneration,
 } from './learning/classes/class-generation-state';
 import {
-  SECTION_QUALITY_JSON_SCHEMA,
+  sectionReviewSchema,
   sectionReviewInput,
   assessSectionReview,
   SectionQualityError,
   captureBlindSectionFailure,
 } from './classes/section-quality';
+import {
+  captureReviewerProtocolEvidence,
+  retainReviewerProtocolEvidence,
+} from './classes/quality/private-protocol-evidence';
 
 const LISTENING_QUIZ_COUNT = 4;
 const listeningQuizSchema = z
@@ -422,13 +426,14 @@ export async function composeListeningContent(
         ...question,
         passageText: transcript,
       }));
+      const blindSchema = sectionReviewSchema(reviewedQuestions);
       const blindReview = await provider.generateResponse(
         loadAndRender('class/review-section-quiz.md', {
           LEVEL: p.level,
           TARGET: p.targetLang,
           NATIVE: p.nativeLang,
           SKILL: 'LISTENING',
-          REVIEW_SCHEMA: JSON.stringify(SECTION_QUALITY_JSON_SCHEMA.schema),
+          REVIEW_SCHEMA: JSON.stringify(blindSchema.schema),
           LANGUAGE_POLICY: classLanguagePolicy(p),
         }),
         [{ role: 'user', content: sectionReviewInput(reviewedQuestions) }],
@@ -436,7 +441,7 @@ export async function composeListeningContent(
           ...(await capturedLearningAiOptions(ai)),
           temperature: 0,
           maxTokens: 2048,
-          jsonSchema: SECTION_QUALITY_JSON_SCHEMA,
+          jsonSchema: blindSchema,
         }
       );
       logUsage({
@@ -464,6 +469,14 @@ export async function composeListeningContent(
             assessment.feedback
           );
       } catch (error) {
+        const protocolEvidence = captureReviewerProtocolEvidence(error, {
+          kind: 'listening',
+          role: 'blind_section',
+          offset: 0,
+          candidate: JSON.parse(sectionReviewInput(reviewedQuestions)),
+          response: blindReview.content,
+        });
+        if (protocolEvidence) retainReviewerProtocolEvidence(error, [protocolEvidence]);
         if (
           !(error instanceof SectionQualityError) ||
           !error.blindReviewFeedback ||
@@ -527,7 +540,7 @@ export async function composeListeningContent(
           cachedResult = undefined;
         } else {
           cachedResult = result;
-          quizTeachingRepair = { questions, issues: error.issues, feedback: error.feedback };
+          quizTeachingRepair = { questions, issues: error.issues, feedback: repair.feedback };
           learningRepair = undefined;
         }
         continue;

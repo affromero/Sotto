@@ -1,7 +1,13 @@
 import { z } from 'zod';
 import { isDeepStrictEqual } from 'node:util';
-import { SectionQualityError } from '../section-quality';
+import { SectionQualityError, blindReviewProtocolDiagnostic } from '../section-quality';
 import { teachingQualityVerdictSchema, type TeachingFailure } from './teaching-failure';
+import {
+  buildTeachingSourceParts,
+  deriveTeachingFinding,
+  privateTeachingCriticSchema,
+  privateTeachingAdjudicatorSchema,
+} from './teaching-source/protocol';
 
 /** An inconsistent or malformed review cannot guide a semantic replacement. */
 export class ReviewerProtocolError extends SectionQualityError {
@@ -55,6 +61,8 @@ function invalidResponse(
 
 /** Only validation of a completed response can authorize protocol correction. */
 export function reviewerProtocolDiagnostic(error: unknown) {
+  const blind = blindReviewProtocolDiagnostic(error);
+  if (blind) return reviewerProtocolDiagnosticSchema.parse(blind);
   if (!(error instanceof ReviewerProtocolError)) return undefined;
   const diagnostic = responseDiagnostics.get(error);
   return diagnostic ? structuredClone(diagnostic) : undefined;
@@ -93,7 +101,7 @@ export const teachingAdjudicatorSchema = z
     items: z
       .array(
         teachingQualityVerdictSchema.shape.items.element.extend({
-          findings: z.array(teachingFindingSchema).max(3),
+          findings: z.array(teachingFindingSchema).max(6),
           criticDecisions: z
             .array(
               z
@@ -173,6 +181,10 @@ function assertFindingBound(finding: TeachingFinding, fields: unknown): void {
         throw invalidResponse('field_path', 'findings.fieldPath');
     } else finding.fieldPath = relativePath;
   }
+  assertExactFindingBound(finding, fields);
+}
+
+function assertExactFindingBound(finding: TeachingFinding, fields: unknown): void {
   const field = ownField(fields, finding.fieldPath);
   if (!field) throw invalidResponse('field_path', 'findings.fieldPath');
   const { value } = field;
@@ -230,4 +242,63 @@ export function parseTeachingAdjudicator(
     }
   }
   return adjudicator;
+}
+
+/** Parse only the private model contract; historical evidence keeps its existing shape. */
+export function parseTeachingCriticResponse(
+  content: string,
+  fields: readonly unknown[]
+): TeachingCritic {
+  const response = parseReview(content, privateTeachingCriticSchema(fields));
+  assertReviewCoverage(response.items, fields.length);
+  return teachingCriticSchema.parse({
+    items: response.items.map((row) => ({
+      index: row.index,
+      findings: row.findings.map((finding) =>
+        deriveTeachingFinding(finding, buildTeachingSourceParts(fields[row.index]))
+      ),
+    })),
+  });
+}
+
+export function parseTeachingAdjudicatorResponse(
+  content: string,
+  fields: readonly unknown[],
+  critic: TeachingCritic
+): TeachingAdjudicator {
+  const validatedCritic = parseReview(JSON.stringify(critic), teachingCriticSchema);
+  assertReviewCoverage(validatedCritic.items, fields.length);
+  for (const row of validatedCritic.items)
+    for (const finding of row.findings) assertExactFindingBound(finding, fields[row.index]);
+  const response = parseReview(content, privateTeachingAdjudicatorSchema(fields, validatedCritic));
+  assertReviewCoverage(response.items, fields.length);
+  return teachingAdjudicatorSchema.parse({
+    items: response.items.map((row) => {
+      const criticisms = validatedCritic.items.find((item) => item.index === row.index)!.findings;
+      assertReviewCoverage(
+        row.criticDecisions.map((decision) => ({ index: decision.findingIndex })),
+        criticisms.length,
+        'criticDecisions'
+      );
+      const findings = [
+        ...row.criticDecisions
+          .filter((decision) => decision.decision === 'supported')
+          .map((decision) => structuredClone(criticisms[decision.findingIndex]!)),
+        ...row.newFindings.map((finding) =>
+          deriveTeachingFinding(finding, buildTeachingSourceParts(fields[row.index]))
+        ),
+      ];
+      return {
+        index: row.index,
+        acceptable: findings.length === 0,
+        issues: [...new Set(findings.map((finding) => finding.issue))],
+        feedback: findings.map(
+          (finding) =>
+            `${finding.defect} ${finding.correction !== null ? 'Correction' : 'Counterexample'}: ${finding.correction ?? finding.counterexample}`
+        ),
+        findings,
+        criticDecisions: row.criticDecisions,
+      };
+    }),
+  });
 }

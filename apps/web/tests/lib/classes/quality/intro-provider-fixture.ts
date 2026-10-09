@@ -3,6 +3,94 @@ interface FixtureResponse {
   model: string;
 }
 
+type FixturePart = { index: number; fieldPath: string[]; quote: string };
+type FixtureFinding = {
+  fieldPath: string[];
+  quote: string;
+  issue: string;
+  rule: string;
+  defect: string;
+  correction: string | null;
+  counterexample: string | null;
+};
+
+/** Select only an exact supplied leaf at the external model fixture boundary. */
+export function teachingFindingFixture(finding: FixtureFinding, parts: FixturePart[]) {
+  const path = finding.fieldPath[0] === 'content' ? finding.fieldPath.slice(1) : finding.fieldPath;
+  return {
+    sourcePartIndex:
+      parts.find(
+        (part) =>
+          JSON.stringify(part.fieldPath) === JSON.stringify(path) &&
+          finding.quote.trim() &&
+          (part.quote.includes(finding.quote) || finding.quote.includes(part.quote))
+      )?.index ?? -1,
+    issue: finding.issue,
+    rule: finding.rule,
+    defect: finding.defect,
+    remedy: {
+      kind: finding.correction === null ? 'counterexample' : 'correction',
+      text: finding.correction ?? finding.counterexample,
+    },
+  };
+}
+
+function shapeEvidenceFixture(messages: Array<{ content: string }>, response: FixtureResponse) {
+  const parsed = JSON.parse(response.content);
+  if (
+    parsed.items.some(
+      (item: { newFindings?: unknown; findings?: Array<{ sourcePartIndex?: number }> }) =>
+        item.newFindings !== undefined ||
+        item.findings?.some((finding) => finding.sourcePartIndex !== undefined)
+    )
+  )
+    return response;
+  const payload = JSON.parse(messages[0]!.content);
+  return {
+    ...response,
+    content: JSON.stringify({
+      items: parsed.items.map(
+        (item: {
+          index: number;
+          findings: FixtureFinding[];
+          criticDecisions?: Array<{ findingIndex: number; decision: string; reason: string }>;
+        }) => {
+          const supplied = payload.items.find(
+            (entry: { index: number }) => entry.index === item.index
+          );
+          const criticisms =
+            payload.criticisms?.items.find((entry: { index: number }) => entry.index === item.index)
+              ?.findings ?? [];
+          const additions = item.findings.filter(
+            (finding) =>
+              !item.criticDecisions?.some(
+                (decision) =>
+                  decision.decision === 'supported' &&
+                  JSON.stringify(criticisms[decision.findingIndex]?.fieldPath) ===
+                    JSON.stringify(
+                      finding.fieldPath[0] === 'content'
+                        ? finding.fieldPath.slice(1)
+                        : finding.fieldPath
+                    ) &&
+                  criticisms[decision.findingIndex]?.issue === finding.issue &&
+                  criticisms[decision.findingIndex]?.defect === finding.defect
+              )
+          );
+          const findings = additions.map((finding) =>
+            teachingFindingFixture(finding, supplied?.sourceParts ?? [])
+          );
+          if (!item.criticDecisions) return { index: item.index, findings };
+          return {
+            index: item.index,
+            criticDecisions: item.criticDecisions,
+            newFindings: findings,
+          };
+        }
+      ),
+    }),
+  };
+}
+
 export function emptyTeachingCriticFixture(messages: Array<{ content: string }>): FixtureResponse {
   const payload = JSON.parse(messages[0]!.content);
   return {
@@ -13,7 +101,7 @@ export function emptyTeachingCriticFixture(messages: Array<{ content: string }>)
   };
 }
 
-/** Translate only legacy verdicts at the mock model boundary, never modern evidence. */
+/** Translate compatibility fixtures only at the external mock model boundary. */
 export function shapeTeachingProviderFixture(
   system: string,
   messages: Array<{ content: string }>,
@@ -32,7 +120,11 @@ export function shapeTeachingProviderFixture(
           Object.hasOwn(item, 'findings') || Object.hasOwn(item, 'criticDecisions')
       )
     )
-      return response;
+      return parsed.items?.every((item: { findings?: FixtureFinding[] }) =>
+        Array.isArray(item.findings)
+      )
+        ? shapeEvidenceFixture(messages, response)
+        : response;
     if (
       parsed.items.some(
         (item: { acceptable: unknown; issues: unknown; feedback: unknown }) =>
@@ -61,7 +153,7 @@ export function shapeTeachingProviderFixture(
         }
       return { fieldPath, quote: '' };
     };
-    return {
+    const shaped = {
       ...response,
       content: JSON.stringify({
         items: parsed.items.map(
@@ -96,6 +188,7 @@ export function shapeTeachingProviderFixture(
         ),
       }),
     };
+    return shapeEvidenceFixture(messages, shaped);
   } catch {
     return response;
   }
@@ -290,7 +383,11 @@ export function shapeIntroProviderFixture(
       !Array.isArray(parsed.items) ||
       parsed.items.some((item: { findings?: unknown }) => item.findings !== undefined)
     )
-      return response;
+      return parsed.items?.every((item: { findings?: FixtureFinding[] }) =>
+        Array.isArray(item.findings)
+      )
+        ? shapeEvidenceFixture(messages, response)
+        : response;
     if (
       parsed.items.some((item: { acceptable: unknown; issues: unknown; feedback: unknown }) => {
         if (
@@ -360,7 +457,7 @@ export function shapeIntroProviderFixture(
         };
       }
     );
-    return { ...response, content: JSON.stringify({ items }) };
+    return shapeEvidenceFixture(messages, { ...response, content: JSON.stringify({ items }) });
   } catch {
     return response;
   }
