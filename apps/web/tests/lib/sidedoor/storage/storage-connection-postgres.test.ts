@@ -57,7 +57,10 @@ suite('dedicated storage ownership with PostgreSQL', () => {
       expect(await connection.query('SELECT current_database() AS database', [])).toEqual([
         { database: 'sidedoor_test' },
       ]);
-      const lock = await acquire({ ...options(), openConnection: async () => connection });
+      const lock = await acquire({
+        ...options(),
+        openConnection: async () => connection,
+      });
       lock.assertHeld();
     }
   );
@@ -89,7 +92,10 @@ suite('dedicated storage ownership with PostgreSQL', () => {
     const connection = await openConnection();
     const pid = (await connection.query('SELECT pg_backend_pid() AS pid', []))[0]?.pid;
     if (typeof pid !== 'number') throw new Error('Missing test backend PID');
-    const lock = await acquire({ ...options(), openConnection: async () => connection });
+    const lock = await acquire({
+      ...options(),
+      openConnection: async () => connection,
+    });
     const controller = new Client({
       connectionString: databaseUrl,
       connectionTimeoutMillis: 5_000,
@@ -106,12 +112,31 @@ suite('dedicated storage ownership with PostgreSQL', () => {
   });
   it('closes a timed out query session and releases its advisory lock', async () => {
     const connection = await openConnection();
+    const pid = (await connection.query('SELECT pg_backend_pid() AS pid', []))[0]?.pid;
+    if (typeof pid !== 'number') throw new Error('Missing test backend PID');
     const input = { ...options(), openConnection: async () => connection };
     const lock = await acquire(input);
-    await expect(connection.query('SELECT pg_sleep(10)', [])).rejects.toThrow();
-    expect(lock.signal.aborted).toBe(true);
-    await expect(connection.query('SELECT 1', [])).rejects.toThrow();
-    const replacement = await acquire({ ...input, openConnection });
-    replacement.assertHeld();
+    const controller = new Client({
+      connectionString: databaseUrl,
+      connectionTimeoutMillis: 5_000,
+    });
+    try {
+      await controller.connect();
+      await expect(connection.query('SELECT pg_sleep(10)', [])).rejects.toThrow();
+      expect(lock.signal.aborted).toBe(true);
+      await expect(connection.query('SELECT 1', [])).rejects.toThrow();
+      await expect
+        .poll(
+          async () =>
+            (await controller.query('SELECT 1 FROM pg_stat_activity WHERE pid = $1', [pid]))
+              .rowCount,
+          { timeout: 5_000 }
+        )
+        .toBe(0);
+      const replacement = await acquire({ ...input, openConnection });
+      replacement.assertHeld();
+    } finally {
+      await controller.end();
+    }
   }, 15_000);
 });
