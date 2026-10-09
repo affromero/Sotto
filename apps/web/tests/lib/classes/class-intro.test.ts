@@ -23,6 +23,23 @@ const FALLBACK = {
 };
 
 describe('classIntroFromSeed', () => {
+  it('preserves a contextual usage note beside its complete target sentence', async () => {
+    const { classIntroFromSeed } = await loadClassIntro();
+    const stored = {
+      purpose: 'Berichte von einem Ausflug.',
+      about: '„Wir sind mit dem Zug gefahren.“: So berichtest du von einer abgeschlossenen Fahrt.',
+      focus: ['„Wir sind mit dem Zug gefahren.“: Fahren verwendet hier sein.'],
+      examples: [
+        {
+          target: 'Wir sind mit dem Zug gefahren.',
+          meaning: 'So berichtest du von einer abgeschlossenen Fahrt.',
+          note: '„Wir sind mit dem Zug gefahren.“: Fahren verwendet hier sein.',
+        },
+      ],
+      tips: ['Nenne das Verkehrsmittel.'],
+    };
+    expect(classIntroFromSeed({ intro: stored }, { ...FALLBACK, level: 'A2' })).toEqual(stored);
+  });
   it('restores useful own-target notes without counting their display quote as teaching content', async () => {
     const { classIntroFromSeed } = await loadClassIntro();
     const stored = {

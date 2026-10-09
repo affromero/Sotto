@@ -184,6 +184,87 @@ beforeEach(() => {
 });
 
 describe('strict scoped intro wire', () => {
+  it('repairs teaching after a size repair and re-audits the complete merged intro', async () => {
+    const example = { ...wire.examples[1]!, meaning: 'Die Gruppe ging.' };
+    respond(wire, { examples: { 1: example } }, ['examples:1']);
+    const reviewAndRepair = boundary.generate.getMockImplementation()!;
+    let structuralRepairPending = true;
+    boundary.generate.mockImplementation(async (system, messages, options) => {
+      if (options.jsonSchema.name === 'class_intro_generation')
+        return {
+          content: JSON.stringify({ ...wire, purpose: 'Wort '.repeat(205) }),
+          model: 'captured-model',
+        };
+      if (options.jsonSchema.name === 'class_intro_repair' && structuralRepairPending) {
+        structuralRepairPending = false;
+        return {
+          content: JSON.stringify({ ...wire, visuals: undefined }),
+          model: 'captured-model',
+        };
+      }
+      return reviewAndRepair(system, messages, options);
+    });
+    const result = await generateClassIntro(params);
+    expect(result).toEqual({
+      ...compiled,
+      examples: [compiled.examples[0], { ...example, note: compiled.examples[1]!.note }],
+    });
+    const finalContexts = reviewContexts().slice(2);
+    expect(finalContexts).toHaveLength(2);
+    for (const context of finalContexts) expect(context).toEqual(result);
+    expect(
+      boundary.generate.mock.calls
+        .filter(([, , options]) => options.jsonSchema.name === 'class_intro_repair')
+        .map(([, , options]) => Object.keys(options.jsonSchema.schema.properties))
+    ).toEqual([['purpose', 'about', 'focus', 'examples', 'tips'], ['examples']]);
+  });
+
+  it.each(['provider', 'cancelled', 'malformed patch', 'rejected patch'])(
+    'does not retry a %s after structural repair and the semantic patch opportunity',
+    async (failure) => {
+      respond(wire, { examples: { 1: wire.examples[1] } }, ['examples:1']);
+      const reviewAndRepair = boundary.generate.getMockImplementation()!;
+      const terminal = new Error(failure);
+      if (failure === 'cancelled') terminal.name = 'AbortError';
+      let repairedStructure = false;
+      let semanticRequested = false;
+      boundary.generate.mockImplementation(async (system, messages, options) => {
+        const name = options.jsonSchema.name;
+        if (name === 'class_intro_generation')
+          return {
+            content: JSON.stringify({ ...wire, purpose: 'Wort '.repeat(205) }),
+            model: 'captured-model',
+          };
+        if (name === 'class_intro_repair' && !repairedStructure) {
+          repairedStructure = true;
+          return {
+            content: JSON.stringify({ ...wire, visuals: undefined }),
+            model: 'captured-model',
+          };
+        }
+        if ((failure === 'provider' || failure === 'cancelled') && name === 'class_intro_critic')
+          throw terminal;
+        if (name === 'class_intro_repair') {
+          if (semanticRequested) throw new Error('Unexpected additional semantic generation');
+          semanticRequested = true;
+          if (failure === 'malformed patch') return { content: '{}', model: 'captured-model' };
+          if (failure === 'rejected patch')
+            return {
+              content: JSON.stringify({ examples: { 1: wire.examples[1] } }),
+              model: 'captured-model',
+            };
+        }
+        return reviewAndRepair(system, messages, options);
+      });
+      if (failure === 'provider' || failure === 'cancelled') {
+        await expect(generateClassIntro(params)).rejects.toBe(terminal);
+        expect(semanticRequested).toBe(false);
+      } else {
+        await expect(generateClassIntro(params)).rejects.toThrow('educational quality');
+        expect(semanticRequested).toBe(true);
+      }
+    }
+  );
   it.each(['initial', 'structural replacement'])(
     'preserves validated short examples and their original reference indices in an %s',
     async (stage) => {
