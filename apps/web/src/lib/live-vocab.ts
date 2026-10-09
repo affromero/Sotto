@@ -15,7 +15,12 @@ import {
   type VocabItem,
 } from './knowledge-graph';
 import type { CefrLevel } from '@sotto/shared';
-import { buildReadingVocabularyJsonSchema } from './learning/reading/vocabulary-protocol';
+import {
+  buildReadingVocabularyJsonSchema,
+  buildReadingVocabularyWordTable,
+  type ReadingAttributionViolation,
+  type ReadingVocabularyProtocolCode,
+} from './learning/reading/vocabulary-protocol';
 
 export interface ReadingVocabularyQuestion {
   question: string;
@@ -56,10 +61,37 @@ export async function requestVocabularyExtraction(p: {
     issues: readonly string[];
     feedback: ReadonlyArray<{ index: number; feedback: readonly string[] }>;
   };
+  readingProtocolCorrection?: {
+    rawCandidate: string;
+    code: ReadingVocabularyProtocolCode;
+    violations: readonly ReadingAttributionViolation[];
+  };
 }): Promise<string> {
   if (p.readingQuestions) assertReadingQuestionKeys(p.readingQuestions);
   if (p.readingCorrection && !p.readingQuestions)
     throw new Error('Reading vocabulary correction requires keyed reading questions.');
+  if (p.readingProtocolCorrection) {
+    const correction = p.readingProtocolCorrection;
+    if (
+      !p.readingQuestions ||
+      p.readingCorrection ||
+      !['malformed_json', 'invalid_shape', 'source_attribution'].includes(correction.code) ||
+      Buffer.byteLength(JSON.stringify(correction), 'utf8') > 32 * 1024 ||
+      correction.violations.length > 48 ||
+      correction.violations.some(
+        ({ code, wordIndex }) =>
+          !['dup_lemma', 'invalid_source_span', 'dup_question_index', 'out_of_range'].includes(
+            code
+          ) ||
+          !Number.isInteger(wordIndex) ||
+          wordIndex < 0 ||
+          wordIndex >= MAX_ITEMS
+      )
+    )
+      throw new Error(
+        'Reading vocabulary protocol correction exceeds the bounded metadata contract.'
+      );
+  }
   if (
     p.readingCorrection &&
     (p.readingCorrection.words.length < 1 ||
@@ -79,6 +111,9 @@ export async function requestVocabularyExtraction(p: {
     throw new Error('Reading vocabulary correction exceeds the bounded metadata contract.');
   if (p.text.length > MAX_SOURCE_CHARS && p.readingQuestions)
     throw new Error('The reading passage exceeds the vocabulary extraction limit.');
+  const passageWords = p.readingQuestions
+    ? buildReadingVocabularyWordTable(p.text, p.targetLang)
+    : undefined;
   const ai = await resolveCapturedLearningAi(p.userId, p.execution);
   const systemPrompt = loadAndRender(
     p.readingQuestions ? 'live/extract-reading-vocab.md' : 'live/extract-vocab.md',
@@ -98,12 +133,16 @@ export async function requestVocabularyExtraction(p: {
         content: p.readingQuestions
           ? JSON.stringify({
               passageText: p.text,
+              passageWords: passageWords!.map(({ surface }, index) => ({ index, surface })),
               questions: p.readingQuestions.map(({ question, options, correctIndex }) => ({
                 question,
                 options,
                 correctIndex,
               })),
               ...(p.readingCorrection ? { correction: p.readingCorrection } : {}),
+              ...(p.readingProtocolCorrection
+                ? { protocolCorrection: p.readingProtocolCorrection }
+                : {}),
             })
           : fenceUntrustedText(p.label, p.text),
       },
@@ -111,7 +150,12 @@ export async function requestVocabularyExtraction(p: {
     {
       ...(await capturedLearningAiOptions(ai)),
       ...(p.readingQuestions
-        ? { jsonSchema: buildReadingVocabularyJsonSchema(p.readingQuestions.length) }
+        ? {
+            jsonSchema: buildReadingVocabularyJsonSchema(
+              p.readingQuestions.length,
+              passageWords!.length
+            ),
+          }
         : {}),
       maxTokens: p.readingQuestions ? 2048 : 1024,
       temperature: 0.2,

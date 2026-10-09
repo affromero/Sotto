@@ -15,12 +15,10 @@ import {
   readingVocabularyResponseSchema,
   ReadingVocabularyProtocolError,
   type ReadingVocabularyProtocolCode,
+  type ReadingAttributionViolation,
+  buildReadingVocabularyWordTable,
+  type ReadingPassageWord,
 } from './reading/vocabulary-protocol';
-
-type ReadingAttributionViolation = {
-  code: 'dup_lemma' | 'source_form_missing' | 'dup_question_index' | 'out_of_range';
-  wordIndex: number;
-};
 
 function rejectProtocol(
   code: ReadingVocabularyProtocolCode,
@@ -39,10 +37,15 @@ function rejectProtocol(
       ? { questionIds }
       : { questionIdsOmitted: 'size_limit' }),
   });
-  throw new ReadingVocabularyProtocolError(code);
+  throw new ReadingVocabularyProtocolError(code, attributionViolations);
 }
 
-function parseExtraction(content: string, passageText: string, questionIds: readonly string[]) {
+function parseExtraction(
+  content: string,
+  passageText: string,
+  questionIds: readonly string[],
+  passageWords: readonly ReadingPassageWord[]
+) {
   let parsed: unknown;
   try {
     parsed = JSON.parse(content);
@@ -57,8 +60,12 @@ function parseExtraction(content: string, passageText: string, questionIds: read
   for (const [wordIndex, word] of words.entries()) {
     if (lemmas.has(word.lemma)) attributionViolations.push({ code: 'dup_lemma', wordIndex });
     lemmas.add(word.lemma);
-    if (!passageText.includes(word.sourceForm))
-      attributionViolations.push({ code: 'source_form_missing', wordIndex });
+    if (
+      word.sourceSpan.startWordIndex > word.sourceSpan.endWordIndex ||
+      !passageWords[word.sourceSpan.startWordIndex] ||
+      !passageWords[word.sourceSpan.endWordIndex]
+    )
+      attributionViolations.push({ code: 'invalid_source_span', wordIndex });
     if (new Set(word.questionIndices).size !== word.questionIndices.length)
       attributionViolations.push({ code: 'dup_question_index', wordIndex });
     if (word.questionIndices.some((index) => index >= questionIds.length))
@@ -66,7 +73,13 @@ function parseExtraction(content: string, passageText: string, questionIds: read
   }
   if (attributionViolations.length)
     rejectProtocol('source_attribution', passageText, questionIds, attributionViolations);
-  return words;
+  return words.map(({ sourceSpan, ...word }) => ({
+    ...word,
+    sourceForm: passageText.slice(
+      passageWords[sourceSpan.startWordIndex]!.start,
+      passageWords[sourceSpan.endWordIndex]!.end
+    ),
+  }));
 }
 
 export async function extractReadingVocabulary(options: {
@@ -94,6 +107,7 @@ export async function extractReadingVocabulary(options: {
   )
     throw new Error('Reading vocabulary requires one exact passage and unique question IDs.');
   const passageText = [...passages][0]!;
+  const passageWords = buildReadingVocabularyWordTable(passageText, options.targetLang);
   const questionIds = options.questions.map(({ id }) => id);
   const request = {
     ...options,
@@ -102,7 +116,28 @@ export async function extractReadingVocabulary(options: {
     usageCategory: 'reading-vocabulary-extraction',
     readingQuestions: options.questions,
   };
-  let words = parseExtraction(await requestVocabularyExtraction(request), passageText, questionIds);
+  const initialOutput = await requestVocabularyExtraction(request);
+  let replaced = false;
+  let words: ReturnType<typeof parseExtraction>;
+  try {
+    words = parseExtraction(initialOutput, passageText, questionIds, passageWords);
+  } catch (error) {
+    if (!(error instanceof ReadingVocabularyProtocolError)) throw error;
+    replaced = true;
+    words = parseExtraction(
+      await requestVocabularyExtraction({
+        ...request,
+        readingProtocolCorrection: {
+          rawCandidate: initialOutput,
+          code: error.code,
+          violations: error.violations,
+        },
+      }),
+      passageText,
+      questionIds,
+      passageWords
+    );
+  }
   const ai = await resolveCapturedLearningAi(options.userId, options.execution);
   const provider = createAIProvider(ai.provider);
   let reviewOffset = 0;
@@ -131,7 +166,7 @@ export async function extractReadingVocabulary(options: {
   try {
     words = await reviewWords(words);
   } catch (error) {
-    if (!(error instanceof TeachingQualityRejectionError)) throw error;
+    if (!(error instanceof TeachingQualityRejectionError) || replaced) throw error;
     const replacement = parseExtraction(
       await requestVocabularyExtraction({
         ...request,
@@ -145,7 +180,8 @@ export async function extractReadingVocabulary(options: {
         },
       }),
       passageText,
-      questionIds
+      questionIds,
+      passageWords
     );
     if (
       replacement.length !== words.length ||

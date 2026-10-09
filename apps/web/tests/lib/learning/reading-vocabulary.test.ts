@@ -11,7 +11,10 @@ import {
 } from '@/lib/classes/quality/teaching-quality';
 import { teachingFailureSchema } from '@/lib/classes/quality/teaching-failure';
 import type { LearningDatabase } from '@/lib/learning/database';
-import { ReadingVocabularyProtocolError } from '@/lib/learning/reading/vocabulary-protocol';
+import {
+  ReadingVocabularyProtocolError,
+  buildReadingVocabularyWordTable,
+} from '@/lib/learning/reading/vocabulary-protocol';
 import { captureGenerationFailure } from '@/lib/classes/quality/generation-failure';
 
 const generate = vi.hoisted(() => vi.fn());
@@ -46,8 +49,19 @@ const word = {
   sourceForm: 'bestellt',
   questionIndices: [0],
 };
-const response = (content: unknown) => ({
-  content: JSON.stringify(Array.isArray(content) ? { words: content } : content),
+const privateWord = (item: typeof word, passageText = question.passageText) => {
+  const table = buildReadingVocabularyWordTable(passageText, 'de');
+  const { sourceForm, ...metadata } = item;
+  const found = table.findIndex(({ surface }) => surface === sourceForm);
+  const index = found < 0 ? table.length : found;
+  return { ...metadata, sourceSpan: { startWordIndex: index, endWordIndex: index } };
+};
+const response = (content: unknown, passageText = question.passageText) => ({
+  content: JSON.stringify(
+    Array.isArray(content)
+      ? { words: content.map((item) => privateWord(item, passageText)) }
+      : content
+  ),
   model: 'fixture',
 });
 const approved = (indices: number[][] = [[0]]) => ({
@@ -287,7 +301,7 @@ describe('reading vocabulary extraction', () => {
     };
     generate.mockReset();
     generate
-      .mockResolvedValueOnce(response([market, apple, stall]))
+      .mockResolvedValueOnce(response([market, apple, stall], readingQuestion.passageText))
       .mockResolvedValueOnce(response(attributionVerdict))
       .mockResolvedValueOnce(response(meaningRequired()));
 
@@ -372,7 +386,7 @@ describe('reading vocabulary extraction', () => {
     const original = structuredClone(r0);
     generate.mockReset();
     generate
-      .mockResolvedValueOnce(response([station]))
+      .mockResolvedValueOnce(response([station], r0.passageText))
       .mockResolvedValueOnce(response(approved()))
       .mockResolvedValueOnce(
         response({
@@ -439,7 +453,7 @@ describe('reading vocabulary extraction', () => {
     const passageText = words.map((item) => item.sourceForm).join(' ');
     generate.mockReset();
     generate
-      .mockResolvedValueOnce(response(words))
+      .mockResolvedValueOnce(response(words, passageText))
       .mockResolvedValueOnce(response(approved(Array.from({ length: 5 }, () => []))))
       .mockResolvedValueOnce(response(approved(Array.from({ length: 5 }, () => []))))
       .mockResolvedValueOnce(
@@ -450,7 +464,7 @@ describe('reading vocabulary extraction', () => {
           ],
         })
       )
-      .mockResolvedValueOnce(response(words))
+      .mockResolvedValueOnce(response(words, passageText))
       .mockResolvedValueOnce(response(approved(Array.from({ length: 5 }, () => []))))
       .mockResolvedValueOnce(response(approved(Array.from({ length: 5 }, () => []))))
       .mockResolvedValueOnce(response(approved([[], []])));
@@ -710,27 +724,29 @@ describe('reading vocabulary extraction', () => {
     { content: 'private malformed provider body', code: 'malformed_json' },
     { content: JSON.stringify([word]), code: 'invalid_shape' },
     {
-      content: JSON.stringify({ words: [{ ...word, extra: 'private extra field' }] }),
+      content: JSON.stringify({ words: [{ ...privateWord(word), extra: 'private extra field' }] }),
       code: 'invalid_shape',
     },
     { content: JSON.stringify({ words: [] }), code: 'invalid_shape' },
     {
-      content: JSON.stringify({ words: [{ ...word, sourceForm: 'private absent form' }] }),
+      content: JSON.stringify({
+        words: [{ ...privateWord(word), sourceSpan: { startWordIndex: 4, endWordIndex: 4 } }],
+      }),
       code: 'source_attribution',
-      attributionViolations: [{ code: 'source_form_missing', wordIndex: 0 }],
+      attributionViolations: [{ code: 'invalid_source_span', wordIndex: 0 }],
     },
     {
-      content: JSON.stringify({ words: [{ ...word, questionIndices: [1] }] }),
+      content: JSON.stringify({ words: [{ ...privateWord(word), questionIndices: [1] }] }),
       code: 'source_attribution',
       attributionViolations: [{ code: 'out_of_range', wordIndex: 0 }],
     },
     {
-      content: JSON.stringify({ words: [{ ...word, questionIndices: [0, 0] }] }),
+      content: JSON.stringify({ words: [{ ...privateWord(word), questionIndices: [0, 0] }] }),
       code: 'source_attribution',
       attributionViolations: [{ code: 'dup_question_index', wordIndex: 0 }],
     },
     {
-      content: JSON.stringify({ words: [word, word] }),
+      content: JSON.stringify({ words: [privateWord(word), privateWord(word)] }),
       code: 'source_attribution',
       attributionViolations: [{ code: 'dup_lemma', wordIndex: 1 }],
     },
@@ -752,7 +768,7 @@ describe('reading vocabulary extraction', () => {
       expect(failure).toBeInstanceOf(ReadingVocabularyProtocolError);
       expect(failure).toMatchObject({ code });
       expect(captureGenerationFailure(failure)).toEqual({ category: 'generation_failed' });
-      expect(logError.mock.calls).toEqual([
+      const expectedDiagnostic = [
         [
           'Reading vocabulary output protocol rejected',
           {
@@ -766,14 +782,36 @@ describe('reading vocabulary extraction', () => {
             ...(attributionViolations ? { attributionViolations } : {}),
           },
         ],
-      ]);
+      ];
+      expect(logError.mock.calls).toEqual([expectedDiagnostic[0], expectedDiagnostic[0]]);
       expect(JSON.stringify(failure)).not.toContain(content);
       expect(JSON.stringify(logError.mock.calls)).not.toContain('private');
       expect(failure).not.toHaveProperty('cause');
       expect(generate.mock.calls.map((request) => JSON.parse(request[1][0].content))).toEqual([
         {
           passageText: question.passageText,
+          passageWords: [
+            { index: 0, surface: 'Ana' },
+            { index: 1, surface: 'bestellt' },
+            { index: 2, surface: 'einen' },
+            { index: 3, surface: 'Kaffee' },
+          ],
           questions: [{ question: question.question, options: question.options, correctIndex: 0 }],
+        },
+        {
+          passageText: question.passageText,
+          passageWords: [
+            { index: 0, surface: 'Ana' },
+            { index: 1, surface: 'bestellt' },
+            { index: 2, surface: 'einen' },
+            { index: 3, surface: 'Kaffee' },
+          ],
+          questions: [{ question: question.question, options: question.options, correctIndex: 0 }],
+          protocolCorrection: {
+            rawCandidate: content,
+            code,
+            violations: attributionViolations ?? [],
+          },
         },
       ]);
     }

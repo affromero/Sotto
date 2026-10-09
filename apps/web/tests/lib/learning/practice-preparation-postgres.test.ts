@@ -653,7 +653,7 @@ suite('Durable practice preparation against PostgreSQL', () => {
                   lemma: 'Hallo',
                   gloss: 'hello',
                   pos: 'expression',
-                  sourceForm: 'Hallo',
+                  sourceSpan: { startWordIndex: 2, endWordIndex: 2 },
                   questionIndices: [0],
                 },
               ],

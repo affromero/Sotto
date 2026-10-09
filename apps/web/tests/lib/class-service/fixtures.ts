@@ -39,7 +39,7 @@ vi.mock('@/lib/providers/ai', () => ({
                     lemma: 'hola',
                     gloss: 'hello',
                     pos: 'expression',
-                    sourceForm: 'Hola',
+                    sourceSpan: { startWordIndex: 0, endWordIndex: 0 },
                     questionIndices: [],
                   },
                 ],

@@ -157,6 +157,10 @@ describe('createNextClass', () => {
     expect((result as { kind: 'created'; classId: string }).classId).toBe('class-new');
     expect(mockReadingProviderInput).toHaveBeenCalledWith({
       passageText: 'Hola, Ana.',
+      passageWords: [
+        { index: 0, surface: 'Hola' },
+        { index: 1, surface: 'Ana' },
+      ],
       questions: [
         {
           question: 'What greeting is used?',

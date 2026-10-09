@@ -10,7 +10,12 @@ export const readingVocabularyResponseSchema = z
             lemma: z.string().trim().min(1),
             gloss: z.string().trim().min(1),
             pos: z.string().trim().min(1),
-            sourceForm: z.string().min(1),
+            sourceSpan: z
+              .object({
+                startWordIndex: z.number().int().nonnegative(),
+                endWordIndex: z.number().int().nonnegative(),
+              })
+              .strict(),
             questionIndices: z.array(z.number().int().nonnegative()),
           })
           .strict()
@@ -20,10 +25,43 @@ export const readingVocabularyResponseSchema = z
   })
   .strict();
 
-export function buildReadingVocabularyJsonSchema(questionCount: number) {
+export type ReadingPassageWord = { surface: string; start: number; end: number };
+
+/** Private indices retain exact UTF16 offsets into the original passage. */
+export function buildReadingVocabularyWordTable(
+  passageText: string,
+  targetLang: string
+): ReadingPassageWord[] {
+  if (passageText.length > 12000)
+    throw new Error('The reading passage exceeds the vocabulary extraction limit.');
+  if (!targetLang || !Intl.Segmenter.supportedLocalesOf(targetLang).length)
+    throw new Error('Reading vocabulary requires a supported segmentation language.');
+  const segmenter = new Intl.Segmenter(targetLang, { granularity: 'word' });
+  const words = [...segmenter.segment(passageText)]
+    .filter((segment) => segment.isWordLike)
+    .map(({ segment, index }) => ({ surface: segment, start: index, end: index + segment.length }));
+  if (!words.length) throw new Error('Reading vocabulary requires a nonempty passage word table.');
+  return words;
+}
+
+export function buildReadingVocabularyJsonSchema(questionCount: number, sourceWordCount: number) {
   if (!Number.isSafeInteger(questionCount) || questionCount < 1)
     throw new Error('Reading vocabulary requires a positive safe question count.');
+  if (!Number.isSafeInteger(sourceWordCount) || sourceWordCount < 1)
+    throw new Error('Reading vocabulary requires a positive safe source-word count.');
   const word = readingVocabularyResponseSchema.shape.words.element.extend({
+    sourceSpan: readingVocabularyResponseSchema.shape.words.element.shape.sourceSpan.extend({
+      startWordIndex: z
+        .number()
+        .int()
+        .nonnegative()
+        .max(sourceWordCount - 1),
+      endWordIndex: z
+        .number()
+        .int()
+        .nonnegative()
+        .max(sourceWordCount - 1),
+    }),
     questionIndices: z
       .array(
         z
@@ -53,13 +91,23 @@ const protocolMessages = {
 
 export type ReadingVocabularyProtocolCode = keyof typeof protocolMessages;
 
+export type ReadingAttributionViolation = {
+  code: 'dup_lemma' | 'invalid_source_span' | 'dup_question_index' | 'out_of_range';
+  wordIndex: number;
+};
+
 /** Static protocol diagnostics never retain provider output or parser errors. */
 export class ReadingVocabularyProtocolError extends Error {
   readonly code: ReadingVocabularyProtocolCode;
+  readonly violations: readonly ReadingAttributionViolation[];
 
-  constructor(code: ReadingVocabularyProtocolCode) {
+  constructor(
+    code: ReadingVocabularyProtocolCode,
+    violations: readonly ReadingAttributionViolation[] = []
+  ) {
     super(protocolMessages[code]);
     this.name = 'ReadingVocabularyProtocolError';
     this.code = code;
+    this.violations = violations.slice(0, 48);
   }
 }
