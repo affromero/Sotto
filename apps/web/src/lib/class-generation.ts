@@ -10,6 +10,7 @@ import { logger } from './logger';
 import {
   reviewTeachingContent,
   TeachingQualityRejectionError,
+  hasSupportedReadingPassageFailure,
 } from './classes/quality/teaching-quality';
 import { combineTeachingFailures, type TeachingFailure } from './classes/quality/teaching-failure';
 import { classLanguagePolicy } from './classes/class-language-policy';
@@ -18,6 +19,7 @@ import {
   sectionReviewInput,
   sectionReviewSchema,
   SectionQualityError,
+  captureBlindSectionFailure,
   type SectionReviewFeedback,
 } from './classes/section-quality';
 import type { SkillType } from '@sotto/shared';
@@ -26,6 +28,14 @@ import {
   mergeVocabularyRepair,
   type VocabularyRepairSelection,
 } from './classes/quality/vocabulary-repair/selection';
+import {
+  VocabularyDistractorRejectionError,
+  captureVocabularyDistractorRepair,
+  vocabularyDistractorRepairSchema,
+  vocabularyDistractorRepairPrompt,
+  applyVocabularyDistractorRepair,
+  type VocabularyDistractorRepair,
+} from './classes/quality/vocabulary-repair/distractors';
 import {
   captureReviewerProtocolEvidence,
   retainReviewerProtocolEvidence,
@@ -370,7 +380,7 @@ function normalizeQuestions(
         );
       const options = (q.distractors as string[]).map((option) => option.trim());
       options.splice(q.correctIndex, 0, vocabularyLemmas[q.targetIndex]);
-      return { ...q, options };
+      return { ...q, question: q.question.replace(/_____[ \t]+([.,])/, '_____$1'), options };
     });
   }
   const readingPassage = useSourcePassage
@@ -395,7 +405,6 @@ function normalizeQuestions(
         Array.isArray(q.options) &&
         q.options.length === 4 &&
         q.options.every((option) => typeof option === 'string' && option.trim().length > 0) &&
-        new Set(q.options.map((option: string) => option.trim().toLowerCase())).size === 4 &&
         typeof q.correctIndex === 'number' &&
         Number.isInteger(q.correctIndex) &&
         q.correctIndex >= 0 &&
@@ -403,6 +412,16 @@ function normalizeQuestions(
     )
   )
     throw new Error('response contained no usable questions: invalid question structure or count');
+  const duplicateChoices = raw.filter(
+    (q) => new Set((q.options as string[]).map((option) => option.trim().toLowerCase())).size !== 4
+  );
+  if (duplicateChoices.length) {
+    if (vocabularyLemmas.length)
+      throw new VocabularyDistractorRejectionError(
+        duplicateChoices.map((question) => question.targetIndex as number)
+      );
+    throw new Error('response contained no usable questions: invalid question structure or count');
+  }
   return raw.map((q) => ({
     question: requireTaskContext
       ? `${(q.taskContext as string).trim()}\n${(q.question as string).trim()}`
@@ -459,6 +478,8 @@ function assessVocabularyCoverage(
 }
 
 export async function generateSectionQuestions(p: SectionGenParams): Promise<GeneratedQuestion[]> {
+  if (p.skill !== 'GRAMMAR' && p.skill !== 'READING') throw new SectionQualityError();
+  const sectionSkill = p.skill;
   const count = p.vocabularyReview ? p.targetVocab.length : QUESTIONS_PER_SECTION;
   if (count < 1 || count > QUESTIONS_PER_SECTION) {
     throw new Error('Vocabulary review requires between one and five target words.');
@@ -474,6 +495,7 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
   const allVocabularyTargets = vocabularyLemmas.map((_, index) => index);
   let activeVocabularyTargets = allVocabularyTargets;
   let vocabularyRepair: VocabularyRepairSelection | undefined;
+  let distractorRepair: VocabularyDistractorRepair<RawGeneratedQuestion> | undefined;
   const ai = await resolveCapturedLearningAi(p.userId, p.execution);
 
   // Sourced READING classes: base the MCQs on the leveled passage. The
@@ -484,41 +506,60 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
     ? `Source passage (base READING questions on it): ${p.sourceContent}`
     : '';
 
-  const generationSettings = () => ({
-    generationSchema: sectionQuizSchema(requireTaskContext, activeVocabularyTargets),
-    requestCount: p.vocabularyReview ? activeVocabularyTargets.length : count,
-    systemPrompt:
-      loadAndRender('class/generate-section-quiz.md', {
-        COUNT: String(p.vocabularyReview ? activeVocabularyTargets.length : count),
-        SKILL: skill,
-        LEVEL: p.level,
-        NATIVE: p.nativeLang,
-        TARGET: p.targetLang,
-        LANGUAGE_POLICY: classLanguagePolicy({
-          level: p.level,
-          nativeLang: p.nativeLang,
-          targetLang: p.targetLang,
-        }),
-        OBJECTIVE: p.objective,
-        GRAMMAR_POINTS: p.grammarPoints.join(', '),
-        VOCAB: p.targetVocab
-          .map((v, index) => `${p.vocabularyReview ? `[${index}] ` : ''}${v.lemma} (${v.gloss})`)
-          .filter((_, index) => !p.vocabularyReview || activeVocabularyTargets.includes(index))
-          .join('; '),
-        SEED: p.seed,
-        NOTES: formatNotesForPrompt(p.note ?? ''),
-        SOURCE: sourceBlock,
-        TASK_CONTEXT_FIELD: requireTaskContext
-          ? '"taskContext": "…(explicit task scope or disambiguating situation)",'
-          : '',
-        CHOICES_FIELDS: p.vocabularyReview
-          ? `"targetIndex": ${activeVocabularyTargets[0]},\n      "distractors": ["…", "…", "…"],`
-          : '"options": ["…", "…", "…", "…"],',
-      }) +
-      (vocabularyRepair
-        ? `\nGenerate only the requested original target indices ${JSON.stringify(activeVocabularyTargets)}. Other questions are preserved by the application and must not be returned. The complete merged set will be independently reviewed again.`
-        : ''),
-  });
+  const generationSettings = () =>
+    distractorRepair
+      ? {
+          generationSchema: vocabularyDistractorRepairSchema(distractorRepair.targetIndices),
+          requestCount: count,
+          systemPrompt: vocabularyDistractorRepairPrompt(
+            distractorRepair,
+            vocabularyLemmas,
+            classLanguagePolicy({
+              level: p.level,
+              nativeLang: p.nativeLang,
+              targetLang: p.targetLang,
+            })
+          ),
+        }
+      : {
+          generationSchema: sectionQuizSchema(requireTaskContext, activeVocabularyTargets),
+          requestCount: p.vocabularyReview ? activeVocabularyTargets.length : count,
+          systemPrompt:
+            loadAndRender('class/generate-section-quiz.md', {
+              COUNT: String(p.vocabularyReview ? activeVocabularyTargets.length : count),
+              SKILL: skill,
+              LEVEL: p.level,
+              NATIVE: p.nativeLang,
+              TARGET: p.targetLang,
+              LANGUAGE_POLICY: classLanguagePolicy({
+                level: p.level,
+                nativeLang: p.nativeLang,
+                targetLang: p.targetLang,
+              }),
+              OBJECTIVE: p.objective,
+              GRAMMAR_POINTS: p.grammarPoints.join(', '),
+              VOCAB: p.targetVocab
+                .map(
+                  (v, index) => `${p.vocabularyReview ? `[${index}] ` : ''}${v.lemma} (${v.gloss})`
+                )
+                .filter(
+                  (_, index) => !p.vocabularyReview || activeVocabularyTargets.includes(index)
+                )
+                .join('; '),
+              SEED: p.seed,
+              NOTES: formatNotesForPrompt(p.note ?? ''),
+              SOURCE: sourceBlock,
+              TASK_CONTEXT_FIELD: requireTaskContext
+                ? '"taskContext": "…(explicit task scope or disambiguating situation)",'
+                : '',
+              CHOICES_FIELDS: p.vocabularyReview
+                ? `"targetIndex": ${activeVocabularyTargets[0]},\n      "distractors": ["…", "…", "…"],`
+                : '"options": ["…", "…", "…", "…"],',
+            }) +
+            (vocabularyRepair
+              ? `\nGenerate only the requested original target indices ${JSON.stringify(activeVocabularyTargets)}. Other questions are preserved by the application and must not be returned. The complete merged set will be independently reviewed again.`
+              : ''),
+        };
 
   const provider = createAIProvider(ai.provider);
   const reviewPrompt = (questions: GeneratedQuestion[]) =>
@@ -569,7 +610,12 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
     });
     let assessment: ReturnType<typeof assessSectionReview>;
     try {
-      assessment = assessSectionReview(response.content, questions, useSourcePassage);
+      assessment = assessSectionReview(
+        response.content,
+        questions,
+        useSourcePassage,
+        p.skill === 'READING' ? 'reading' : undefined
+      );
     } catch (error) {
       const protocolEvidence = captureReviewerProtocolEvidence(error, {
         kind: p.vocabularyReview ? 'vocabulary' : p.skill === 'READING' ? 'reading' : 'grammar',
@@ -581,8 +627,13 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
       if (protocolEvidence) retainReviewerProtocolEvidence(error, [protocolEvidence]);
       throw error;
     }
-    sectionFeedback = assessment.feedback;
-    const issues = assessment.issues;
+    sectionFeedback = assessment.readingPassageReview ? undefined : assessment.feedback;
+    const issues = assessment.questionIssues ?? assessment.issues;
+    if (p.skill === 'READING' && assessment.feedback && issues.length)
+      teachingFailure = combineTeachingFailures(
+        teachingFailure,
+        captureBlindSectionFailure(questions, assessment.feedback, 'explanations')
+      );
     if (issues.length === 0) {
       try {
         await reviewTeachingContent({
@@ -593,13 +644,17 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
           nativeLang: p.nativeLang,
           targetLang: p.targetLang,
           kind: 'explanations',
+          sectionSkill,
           items: questions,
+          readingPassageReview: assessment.readingPassageReview,
         });
       } catch (error) {
         if (error instanceof TeachingQualityRejectionError) {
           teachingRejection = error;
           terminalTeachingRejection = error;
           teachingFailure = combineTeachingFailures(teachingFailure, error.teachingFailure);
+          if (useSourcePassage && hasSupportedReadingPassageFailure(error))
+            throw new TeachingQualityRejectionError(error.issues, error.feedback, teachingFailure);
           return ['teaching_quality'];
         }
         throw error;
@@ -612,6 +667,45 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
   let qualityFailed = false;
   let rejectedCandidate: string | undefined;
 
+  const compileCandidate = (content: string, requestCount: number, mayCaptureRepair = false) => {
+    const parsed: ParsedGeneratedQuestions = distractorRepair
+      ? { questions: applyVocabularyDistractorRepair(distractorRepair, content) }
+      : parseGeneratedQuestions(content);
+    let questions: GeneratedQuestion[];
+    try {
+      questions = normalizeQuestions(
+        parsed.questions,
+        requestCount,
+        useSourcePassage,
+        p.sourceContent,
+        p.skill === 'READING' ? parsed.passage : undefined,
+        requireTaskContext,
+        vocabularyLemmas,
+        distractorRepair ? allVocabularyTargets : activeVocabularyTargets
+      );
+    } catch (error) {
+      if (
+        mayCaptureRepair &&
+        !vocabularyRepair &&
+        !distractorRepair &&
+        error instanceof VocabularyDistractorRejectionError
+      )
+        distractorRepair = captureVocabularyDistractorRepair(parsed.questions, error);
+      throw error;
+    }
+    if (p.skill === 'READING' && !questions[0].passageText?.trim())
+      throw new Error('reading response omitted the required passage');
+    const targetOrder = p.vocabularyReview
+      ? parsed.questions.map((question) => question.targetIndex as number)
+      : [];
+    return {
+      questions: vocabularyRepair
+        ? mergeVocabularyRepair(vocabularyRepair, questions, targetOrder)
+        : questions,
+      targetOrder: vocabularyRepair?.targetOrder ?? targetOrder,
+    };
+  };
+
   for (let attempt = 1; attempt <= MAX_GENERATION_ATTEMPTS; attempt += 1) {
     const { systemPrompt, generationSchema, requestCount } = generationSettings();
     const response = await provider.generateResponse(
@@ -619,17 +713,19 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
       [
         {
           role: 'user',
-          content: buildUserPrompt(
-            skill,
-            requestCount,
-            attempt,
-            lastError,
-            rejectedCandidate,
-            useSourcePassage,
-            teachingRejection?.feedback,
-            sectionFeedback,
-            vocabularyFeedback
-          ),
+          content: distractorRepair
+            ? 'Return only the required distractor arrays for the fixed original questions.'
+            : buildUserPrompt(
+                skill,
+                requestCount,
+                attempt,
+                lastError,
+                rejectedCandidate,
+                useSourcePassage,
+                teachingRejection?.feedback,
+                sectionFeedback,
+                vocabularyFeedback
+              ),
         },
       ],
       {
@@ -653,29 +749,13 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
     let candidate: GeneratedQuestion[] | undefined;
     let candidateTargetOrder: number[] = [];
     try {
-      const parsed = parseGeneratedQuestions(response.content);
-      const questions = normalizeQuestions(
-        parsed.questions,
+      const compiled = compileCandidate(
+        response.content,
         requestCount,
-        useSourcePassage,
-        p.sourceContent,
-        p.skill === 'READING' ? parsed.passage : undefined,
-        requireTaskContext,
-        vocabularyLemmas,
-        activeVocabularyTargets
+        attempt < MAX_GENERATION_ATTEMPTS
       );
-      if (p.skill === 'READING' && !questions[0].passageText?.trim()) {
-        lastError = 'reading response omitted the required passage';
-        lastMalformedContent = response.content;
-        continue;
-      }
-      const targetOrder = p.vocabularyReview
-        ? parsed.questions.map((q) => q.targetIndex as number)
-        : [];
-      candidate = vocabularyRepair
-        ? mergeVocabularyRepair(vocabularyRepair, questions, targetOrder)
-        : questions;
-      candidateTargetOrder = vocabularyRepair?.targetOrder ?? targetOrder;
+      candidate = compiled.questions;
+      candidateTargetOrder = compiled.targetOrder;
     } catch (err) {
       lastError = err instanceof Error ? err.message : String(err);
       lastMalformedContent = response.content;
@@ -733,12 +813,14 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
       [
         {
           role: 'user',
-          content: buildRepairPrompt(
-            lastMalformedContent,
-            lastError,
-            requestCount,
-            !!p.vocabularyReview
-          ),
+          content: distractorRepair
+            ? `Repair the malformed response into ONLY the same indexed distractor patch schema. Original question fields remain fixed. Parser error: ${lastError}\nMalformed response:\n${lastMalformedContent}`
+            : buildRepairPrompt(
+                lastMalformedContent,
+                lastError,
+                requestCount,
+                !!p.vocabularyReview
+              ),
         },
       ],
       {
@@ -761,28 +843,7 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
     terminalTeachingRejection = undefined;
     let candidate: GeneratedQuestion[] | undefined;
     try {
-      const parsed = parseGeneratedQuestions(repairResponse.content);
-      const questions = normalizeQuestions(
-        parsed.questions,
-        requestCount,
-        useSourcePassage,
-        p.sourceContent,
-        p.skill === 'READING' ? parsed.passage : undefined,
-        requireTaskContext,
-        vocabularyLemmas,
-        activeVocabularyTargets
-      );
-      if (p.skill === 'READING' && !questions[0].passageText?.trim()) {
-        lastError = 'repaired reading response omitted the required passage';
-        throw new Error(lastError);
-      }
-      candidate = vocabularyRepair
-        ? mergeVocabularyRepair(
-            vocabularyRepair,
-            questions,
-            parsed.questions.map((q) => q.targetIndex as number)
-          )
-        : questions;
+      candidate = compileCandidate(repairResponse.content, requestCount).questions;
     } catch (err) {
       lastError = err instanceof Error ? err.message : String(err);
     }
@@ -806,7 +867,7 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
         teachingFailure
       );
     }
-    throw new SectionQualityError();
+    throw new SectionQualityError(undefined, teachingFailure, sectionFeedback);
   }
   throw new Error(
     lastError.includes('no usable questions')

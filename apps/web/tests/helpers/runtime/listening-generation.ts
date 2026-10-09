@@ -164,7 +164,8 @@ vi.mock('@/lib/prisma', () => {
   };
 });
 
-vi.mock('@/lib/script-generator', () => ({
+vi.mock('@/lib/script-generator', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/script-generator')>()),
   generateScript: (...args: unknown[]) => mockGenerateScript(...args),
 }));
 

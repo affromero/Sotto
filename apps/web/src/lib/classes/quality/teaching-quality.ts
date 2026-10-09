@@ -1,11 +1,17 @@
 import { z } from 'zod';
-import { buildListeningAudit } from './listening-audit/projection';
+import { buildListeningAudit, type NormalizedListeningTurn } from './listening-audit/projection';
+import { teachingReviewCandidate } from './teaching-source/request-candidate';
 import { isDeepStrictEqual } from 'node:util';
 import { capturedLearningAiOptions, type CapturedLearningAi } from '../../learning-ai';
 import type { AIOptions, AIProvider } from '../../providers/ai';
 import { loadAndRender } from '../../prompt-loader';
 import { logUsage } from '../../usage-logger';
-import { SectionQualityError } from '../section-quality';
+import {
+  SectionQualityError,
+  authenticReadingPassageReview,
+  authenticListeningPassageReview,
+  type SectionReviewFeedback,
+} from '../section-quality';
 import { logger } from '../../logger';
 import {
   classIntroExampleMeaningPolicy,
@@ -22,7 +28,6 @@ import {
   MAX_TEACHING_REVIEW_ITEMS,
   type TeachingFailure,
 } from './teaching-failure';
-
 import {
   ReviewerProtocolError,
   parseTeachingCriticResponse,
@@ -38,17 +43,16 @@ import {
   captureReviewerProtocolEvidence,
   retainReviewerProtocolEvidence,
 } from './private-protocol-evidence';
-
 import {
   buildTeachingCriticJsonSchema,
   buildTeachingAdjudicatorJsonSchema,
   buildTeachingSourceParts,
+  resolveTeachingCriticAssignment,
 } from './teaching-source/protocol';
 export {
   buildTeachingCriticJsonSchema,
   buildTeachingAdjudicatorJsonSchema,
 } from './teaching-source/protocol';
-
 /** A complete, protocol-valid review that rejects the learner-visible content. */
 export class TeachingQualityRejectionError extends SectionQualityError {
   readonly issues: readonly string[];
@@ -120,6 +124,11 @@ type PriorIntroReview = {
 };
 
 const priorIntroReviews = new WeakMap<TeachingQualityRejectionError, PriorIntroReview>();
+const supportedReadingPassageFailures = new WeakSet<TeachingQualityRejectionError>();
+
+export function hasSupportedReadingPassageFailure(error: TeachingQualityRejectionError) {
+  return supportedReadingPassageFailures.has(error);
+}
 const issuedTeachingFailures = new WeakMap<
   TeachingQualityRejectionError,
   {
@@ -128,6 +137,7 @@ const issuedTeachingFailures = new WeakMap<
     failure: string;
     issues: string;
     feedback: string;
+    listeningCandidate?: readonly unknown[];
   }
 >();
 
@@ -148,6 +158,17 @@ export function authenticTeachingFailure(
   )
     return undefined;
   return teachingFailureSchema.parse(JSON.parse(issued.failure));
+}
+
+/** Live repair authority is independent of the persisted diagnostic byte limit. */
+export function authenticListeningTeachingReview(
+  rejection: TeachingQualityRejectionError,
+  items: readonly unknown[]
+) {
+  const failure = authenticTeachingFailure(rejection, 'listening', items);
+  const candidate = issuedTeachingFailures.get(rejection)?.listeningCandidate;
+  if (!failure || !candidate) return undefined;
+  return { failure, candidate: structuredClone(candidate) };
 }
 
 export function authenticIntroTeachingFailure(
@@ -204,23 +225,6 @@ export function getIntroRepairPlan(rejection: TeachingQualityRejectionError): {
   };
 }
 
-function teachingReviewCandidate(
-  options: Pick<
-    Parameters<typeof requestTeachingReview>[0],
-    'items' | 'sourceParts' | 'introContext' | 'criticisms'
-  >
-) {
-  return {
-    ...(options.introContext ? { introContext: options.introContext } : {}),
-    items: options.items.map((content, index) => ({
-      index,
-      content,
-      ...(options.sourceParts ? { sourceParts: options.sourceParts[index] } : {}),
-    })),
-    ...(options.criticisms ? { criticisms: options.criticisms } : {}),
-  };
-}
-
 /** Shared provider boundary for canonical teaching audits. */
 export async function requestTeachingReview(options: {
   ai: CapturedLearningAi;
@@ -231,12 +235,29 @@ export async function requestTeachingReview(options: {
   items: readonly unknown[];
   introContext?: Record<string, unknown>;
   criticisms?: IntroCritic;
+  readingPassageReview?: SectionReviewFeedback;
+  listeningPassageReview?: SectionReviewFeedback;
+  listeningTurns?: readonly NormalizedListeningTurn[];
+  criticAssignment?: readonly number[];
+  listeningSource?: string;
   sourceParts?: ReturnType<typeof buildTeachingSourceParts>[];
   maxTokens?: number;
   jsonSchema: NonNullable<AIOptions['jsonSchema']>;
   protocolCorrection?: NonNullable<ReturnType<typeof captureReviewerProtocolEvidence>>;
 }): Promise<string> {
   if (options.items.length < 1 || options.items.length > 5) throw new SectionQualityError();
+  if (options.criticAssignment)
+    resolveTeachingCriticAssignment(
+      options.items,
+      false,
+      options.listeningTurns,
+      options.criticAssignment
+    );
+  if (
+    (options.listeningSource !== undefined || options.listeningTurns !== undefined) &&
+    options.variables.KIND !== 'listening'
+  )
+    throw new ReviewerProtocolError();
   if (options.introContext && options.prompt !== 'class/review-class-intro.md')
     throw new ReviewerProtocolError();
   if (
@@ -257,7 +278,11 @@ export async function requestTeachingReview(options: {
         options.variables.INTRO_REVIEW_ROLE === 'adjudicator' &&
         options.jsonSchema.name === 'class_intro_adjudicator') ||
       (!options.introContext &&
-        options.prompt === 'class/review-teaching-content.md' &&
+        [
+          'class/review-teaching-content.md',
+          'class/review-reading-teaching-content.md',
+          'class/review-listening-teaching-content.md',
+        ].includes(options.prompt) &&
         options.variables.TEACHING_REVIEW_ROLE === 'adjudicator' &&
         options.jsonSchema.name === 'class_teaching_adjudicator')
     )
@@ -326,16 +351,55 @@ export async function reviewTeachingContent(options: {
   targetLang: string;
   lessonContext?: { title: string; objective: string; grammarPoints: readonly string[] };
   previousIntroRejection?: TeachingQualityRejectionError;
+  readingPassageReview?: SectionReviewFeedback;
+  listeningPassageReview?: SectionReviewFeedback;
+  listeningSource?: string;
+  listeningTurns?: readonly NormalizedListeningTurn[];
+  sectionSkill?: 'GRAMMAR' | 'READING';
   kind: 'intro' | 'explanations' | 'writing' | 'listening' | 'speaking' | 'vocabulary';
   items: readonly unknown[];
 }): Promise<void> {
+  if (
+    options.kind === 'explanations' &&
+    !['GRAMMAR', 'READING'].includes(options.sectionSkill ?? '')
+  )
+    throw new ReviewerProtocolError();
+  const reading = options.kind === 'explanations' && options.sectionSkill === 'READING';
+  if (
+    ((options.listeningSource !== undefined || options.listeningTurns !== undefined) &&
+      options.kind !== 'listening') ||
+    (options.kind === 'listening' && !options.listeningTurns)
+  )
+    throw new ReviewerProtocolError();
+  if (
+    options.listeningPassageReview &&
+    (options.kind !== 'listening' ||
+      !authenticListeningPassageReview(options.listeningPassageReview, options.items))
+  )
+    throw new ReviewerProtocolError();
+  const passageReview = options.readingPassageReview ?? options.listeningPassageReview;
+  if (options.readingPassageReview) {
+    if (!reading || !authenticReadingPassageReview(options.readingPassageReview, options.items))
+      throw new ReviewerProtocolError();
+    const passages = options.items.map((item) =>
+      item && typeof item === 'object' && 'passageText' in item ? item.passageText : undefined
+    );
+    if (
+      typeof passages[0] !== 'string' ||
+      !passages[0].trim() ||
+      passages.some((passage) => passage !== passages[0])
+    )
+      throw new ReviewerProtocolError();
+  }
   if (options.previousIntroRejection && options.kind !== 'intro')
     throw new ReviewerProtocolError(authenticIntroTeachingFailure(options.previousIntroRejection));
   const introAudit = options.kind === 'intro' ? buildIntroAuditItems(options.items) : undefined;
   const introItems = introAudit?.items;
   if (introItems && introItems.length > 10) throw new ReviewerProtocolError();
   const listeningAudit =
-    options.kind === 'listening' ? buildListeningAudit(options.items) : undefined;
+    options.kind === 'listening'
+      ? buildListeningAudit(options.items, options.listeningTurns)
+      : undefined;
   const allReviewedItems = introItems ?? listeningAudit?.items ?? options.items;
   if (
     allReviewedItems.length < 1 ||
@@ -360,6 +424,18 @@ export async function reviewTeachingContent(options: {
       jsonSchema: structuredClone(request.jsonSchema),
       ...(request.introContext ? { introContext: structuredClone(request.introContext) } : {}),
       ...(request.criticisms ? { criticisms: structuredClone(request.criticisms) } : {}),
+      ...(request.readingPassageReview
+        ? { readingPassageReview: structuredClone(request.readingPassageReview) }
+        : {}),
+      ...(request.listeningPassageReview
+        ? { listeningPassageReview: structuredClone(request.listeningPassageReview) }
+        : {}),
+      ...(request.listeningTurns
+        ? { listeningTurns: structuredClone(request.listeningTurns) }
+        : {}),
+      ...(request.criticAssignment
+        ? { criticAssignment: structuredClone(request.criticAssignment) }
+        : {}),
       sourceParts: (request.introContext
         ? (request.items as readonly IntroAuditItem[]).map((item) => item.fields)
         : request.items
@@ -484,15 +560,35 @@ export async function reviewTeachingContent(options: {
       aggregate.sort((left, right) => left.index - right.index);
       parsed = introTeachingQualityVerdictSchema.parse({ items: aggregate });
     } else {
+      const teachingPrompt = reading
+        ? 'class/review-reading-teaching-content.md'
+        : options.kind === 'listening'
+          ? 'class/review-listening-teaching-content.md'
+          : 'class/review-teaching-content.md';
       const aggregate: z.infer<typeof teachingQualityAggregateVerdictSchema>['items'] = [];
       for (let offset = 0; offset < reviewedItems.length; offset += 5) {
         const batch = reviewedItems.slice(offset, offset + 5);
-        const criticSchema = buildTeachingCriticJsonSchema(batch);
+        const readingPassageReview = offset === 0 ? options.readingPassageReview : undefined;
+        const listeningPassageReview = offset === 0 ? options.listeningPassageReview : undefined;
+        const passageConcernCount = offset === 0 ? (passageReview?.passageFeedback.length ?? 0) : 0;
+        const criticAssignment = listeningAudit ? [0] : undefined;
+        const criticSchema = buildTeachingCriticJsonSchema(
+          batch,
+          false,
+          reading,
+          listeningAudit?.turns,
+          criticAssignment,
+          options.targetLang
+        );
         const critic = await requestRole(
           {
             ...options,
-            items: batch,
-            prompt: 'class/review-teaching-content.md',
+            items: listeningAudit ? batch.slice(0, 1) : batch,
+            prompt: listeningAudit ? 'class/review-listening-passage.md' : teachingPrompt,
+            readingPassageReview,
+            listeningPassageReview: listeningAudit ? undefined : listeningPassageReview,
+            listeningTurns: listeningAudit?.turns,
+            criticAssignment,
             jsonSchema: criticSchema,
             variables: {
               ...reviewVariables,
@@ -501,17 +597,38 @@ export async function reviewTeachingContent(options: {
             },
             maxTokens: 4096,
           },
-          (content, fixed) => parseTeachingCriticResponse(content, fixed.items),
+          (content, fixed) =>
+            parseTeachingCriticResponse(
+              content,
+              fixed.items,
+              reading,
+              fixed.listeningTurns,
+              fixed.criticAssignment,
+              fixed.variables.TARGET
+            ),
           'critic',
           offset
         );
-        const adjudicatorSchema = buildTeachingAdjudicatorJsonSchema(batch, critic);
+        const adjudicatorSchema = buildTeachingAdjudicatorJsonSchema(
+          batch,
+          critic,
+          false,
+          passageConcernCount,
+          reading,
+          listeningAudit?.turns,
+          criticAssignment,
+          options.targetLang
+        );
         const adjudicator = await requestRole(
           {
             ...options,
             items: batch,
             criticisms: critic,
-            prompt: 'class/review-teaching-content.md',
+            prompt: teachingPrompt,
+            readingPassageReview,
+            listeningPassageReview,
+            listeningTurns: listeningAudit?.turns,
+            criticAssignment,
             jsonSchema: adjudicatorSchema,
             variables: {
               ...reviewVariables,
@@ -521,11 +638,21 @@ export async function reviewTeachingContent(options: {
             maxTokens: 4096,
           },
           (content, fixed) =>
-            parseTeachingAdjudicatorResponse(content, fixed.items, fixed.criticisms!),
+            parseTeachingAdjudicatorResponse(
+              content,
+              fixed.items,
+              fixed.criticisms!,
+              (fixed.readingPassageReview ?? fixed.listeningPassageReview)?.passageFeedback
+                .length ?? 0,
+              reading,
+              fixed.listeningTurns,
+              fixed.criticAssignment,
+              fixed.variables.TARGET
+            ),
           'adjudicator',
           offset
         );
-        genericPackets.push({ offset, critic, adjudicator });
+        genericPackets.push({ offset, criticAssignment, critic, adjudicator });
         aggregate.push(
           ...adjudicator.items.map(({ index, acceptable, issues, feedback }) => ({
             index: offset + index,
@@ -536,26 +663,38 @@ export async function reviewTeachingContent(options: {
         );
       }
       aggregate.sort((left, right) => left.index - right.index);
+      if (
+        passageReview &&
+        genericPackets.filter((packet) => packet.adjudicator.passageConcernDecisions !== undefined)
+          .length !== 1
+      )
+        throw new ReviewerProtocolError();
       parsed = teachingQualityAggregateVerdictSchema.parse({ items: aggregate });
     }
     if (parsed.items.some((item) => !item.acceptable || item.issues.length > 0)) {
       const issues = [...new Set(parsed.items.flatMap((item) => item.issues))];
       logger.warn('Teaching quality review rejected content', { kind: options.kind, issues });
-      const failure = captureTeachingFailure(
-        options.kind,
-        introAudit
-          ? introAuditEvidence(introAudit)
-          : [
-              {
-                reviewContract: 'teaching_critic_adjudicator',
-                outerVerdict: 'derived_adjudicated_summary',
-                items: listeningAudit ? options.items : reviewedItems,
-                ...(listeningAudit ? { listeningAudit } : {}),
-                reviewPackets: genericPackets,
-              },
-            ],
-        parsed
-      );
+      const candidate = introAudit
+        ? introAuditEvidence(introAudit)
+        : [
+            {
+              reviewContract: 'teaching_critic_adjudicator',
+              outerVerdict: 'derived_adjudicated_summary',
+              items: listeningAudit ? options.items : reviewedItems,
+              ...(listeningAudit ? { listeningAudit } : {}),
+              ...(options.readingPassageReview
+                ? { readingPassageReview: options.readingPassageReview }
+                : {}),
+              ...(options.listeningPassageReview
+                ? { listeningPassageReview: options.listeningPassageReview }
+                : {}),
+              ...(options.listeningSource !== undefined
+                ? { listeningSource: options.listeningSource }
+                : {}),
+              reviewPackets: genericPackets,
+            },
+          ];
+      const failure = captureTeachingFailure(options.kind, candidate, parsed);
       const rejection = new TeachingQualityRejectionError(
         issues,
         options.kind === 'intro'
@@ -569,6 +708,15 @@ export async function reviewTeachingContent(options: {
               .map(({ index, feedback }) => ({ index, feedback })),
         failure
       );
+      if (
+        reading &&
+        genericPackets.some((packet) =>
+          packet.adjudicator.passageConcernDecisions?.some(
+            (decision) => decision.decision === 'supported'
+          )
+        )
+      )
+        supportedReadingPassageFailures.add(rejection);
       if (!introAudit)
         issuedTeachingFailures.set(rejection, {
           kind: options.kind,
@@ -576,6 +724,9 @@ export async function reviewTeachingContent(options: {
           failure: JSON.stringify(failure),
           issues: JSON.stringify(rejection.issues),
           feedback: JSON.stringify(rejection.feedback),
+          ...(options.kind === 'listening'
+            ? { listeningCandidate: structuredClone(candidate) }
+            : {}),
         });
       if (introAudit && !options.previousIntroRejection) {
         const storedItems = JSON.parse(

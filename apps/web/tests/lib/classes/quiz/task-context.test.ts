@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { blockedProviderExecution } from '../../../helpers/runtime/provider-execution';
 import type { SectionGenParams } from '@/lib/class-generation';
+import { withReadingSupportFixture } from '../quality/teaching/reading-support-fixture';
 
 const boundary = vi.hoisted(() => ({ generate: vi.fn() }));
 vi.mock('@/lib/providers/ai', () => ({
@@ -88,7 +89,10 @@ function configure(
           ),
         };
       }
-      return { content: JSON.stringify(output), model: 'fixture-model' };
+      return withReadingSupportFixture(messages, options, {
+        content: JSON.stringify(output),
+        model: 'fixture-model',
+      });
     }
   );
 }
@@ -190,6 +194,8 @@ describe('compiled grammar and vocabulary task context', () => {
       )) {
         expect(JSON.stringify(request.schema)).toContain('taskContext');
         expect(request.system).toContain('"taskContext":');
+        if (!vocabulary)
+          expect(request.system).toContain('identify its lemma in the learner-visible taskContext');
       }
     }
   );

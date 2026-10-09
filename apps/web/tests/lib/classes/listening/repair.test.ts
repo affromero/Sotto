@@ -25,7 +25,10 @@ import { TeachingQualityRejectionError } from '@/lib/classes/quality/teaching-qu
 import { captureGenerationFailure } from '@/lib/classes/quality/generation-failure';
 import { learningScriptHash } from '@/lib/learning/script-hash';
 import { listeningRepairPlan } from '@/lib/classes/quality/listening-repair';
-import { configureSpokenTeachingRejection } from './teaching-repair-fixture';
+import {
+  configureSpokenTeachingRejection,
+  singleTurnScriptResponseFixture,
+} from './teaching-repair-fixture';
 import { approved, firstText, finalText, rejected, finalRejected } from './blind-review-fixture';
 import { causalBlindRejection } from './blind-review-fixture';
 const causalCandidateQuestions = [
@@ -160,7 +163,7 @@ describe('bounded canonical listening correction', () => {
       if (options.maxTokens === 12288) {
         const text = scriptIndex++ === 0 ? firstText : finalText;
         return {
-          content: JSON.stringify({ ...SAMPLE_SCRIPT_RESULT, turns: [{ speaker: 'HOST', text }] }),
+          content: singleTurnScriptResponseFixture(text, options.jsonSchema?.name),
           model: 'm',
           inputTokens: 5,
           outputTokens: 10,
@@ -203,10 +206,7 @@ describe('bounded canonical listening correction', () => {
     mockGenerateResponse.mockImplementation(async (...args) => ({
       content:
         args[2].maxTokens === 12288
-          ? JSON.stringify({
-              ...SAMPLE_SCRIPT_RESULT,
-              turns: [{ speaker: 'HOST', text: firstText }],
-            })
+          ? singleTurnScriptResponseFixture(firstText, args[2].jsonSchema?.name)
           : SAMPLE_QUESTIONS_JSON,
       model: 'm',
     }));
@@ -251,15 +251,15 @@ describe('bounded canonical listening correction', () => {
     ).toBeNull();
   });
 
-  it('stops when bounded diagnostics omit the rejected candidate instead of guessing its repair target', async () => {
+  it('repairs an omitted diagnostic candidate but still rejects an unchanged replacement', async () => {
     rejectSpokenDefect();
     mockGenerateResponse.mockImplementation(async (...args) => ({
       content:
         args[2].maxTokens === 12288
-          ? JSON.stringify({
-              ...SAMPLE_SCRIPT_RESULT,
-              turns: [{ speaker: 'HOST', text: firstText + ' Hallo.'.repeat(1500) }],
-            })
+          ? singleTurnScriptResponseFixture(
+              firstText + ' Hallo.'.repeat(1500),
+              args[2].jsonSchema?.name
+            )
           : SAMPLE_QUESTIONS_JSON,
       model: 'm',
     }));
@@ -269,7 +269,7 @@ describe('bounded canonical listening correction', () => {
       candidate: null,
       omitted: 'size_limit',
     });
-    expect(scriptRequests()).toHaveLength(1);
+    expect(scriptRequests()).toHaveLength(2);
     noLearningPublication();
   });
 

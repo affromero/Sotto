@@ -8,9 +8,10 @@ import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/
 import { createAIProvider } from './providers/ai';
 import { loadAndRender } from './prompt-loader';
 import { formatNotesForPrompt } from './course-notes';
-import { generateScript } from './script-generator';
+import { formatSourceBlock, generateScript } from './script-generator';
+import { scriptOutputProtocolFailure } from './learning/script/output-protocol';
 import { createSegmentsAndQueueAudio } from './segment-creator';
-import { cleanTextForTts } from './tts-text-cleaner';
+import { normalizeListeningTurns } from './classes/quality/listening-audit/projection';
 import { persistGeneratedReferences } from './references';
 import {
   getConfiguredTtsProviderId,
@@ -46,6 +47,7 @@ import {
   sectionReviewSchema,
   sectionReviewInput,
   assessSectionReview,
+  type SectionReviewFeedback,
   SectionQualityError,
   captureBlindSectionFailure,
 } from './classes/section-quality';
@@ -181,6 +183,11 @@ export function minimumVerifiedReferences(total: number): number {
 export async function composeListeningContent(
   p: ListeningContentParams
 ): Promise<ListeningContent> {
+  const sourceContent = p.sourceContent;
+  const sourceMetadata = structuredClone(p.sourceMetadata);
+  const listeningSource = sourceContent
+    ? formatSourceBlock(sourceContent, sourceMetadata)
+    : undefined;
   // Step 1: resolve the learning AI provider (BYOK or local agent)
   const ai = await resolveCapturedLearningAi(p.userId, p.execution);
   const userSpeechPrefs = await prisma.user.findUnique({
@@ -255,30 +262,51 @@ export async function composeListeningContent(
       p.execution.signal?.throwIfAborted();
       // Step 3: generate the script unless a teaching-only replacement reuses it.
       const reusedScript = cachedResult !== undefined;
-      const result =
-        cachedResult ??
-        (await generateScript({
-          learningRepair,
-          ...(await capturedLearningAiOptions(ai)),
-          topic: p.objective,
-          depth: 'standard',
-          audienceLevel: p.level,
-          focusAreas: [],
-          tone: 'casual',
-          durationTarget: 4,
-          provider: ai.provider,
-          model: ai.model,
-          apiKeyOverride: ai.apiKey,
-          targetLanguage: p.targetLang,
-          languageMode: isImmersionLevel(p.level) ? 'full_immersion' : 'conversational_mix',
-          forLearning: true,
-          mustIncludeVocabulary: p.mustIncludeVocab,
-          sourceContent: p.sourceContent,
-          sourceMetadata: p.sourceMetadata,
-          // Web search enriches a topic that has no extracted text. Provider
-          // selection stays explicit in resolveCapturedLearningAi.
-          webSearchEnabled: !p.sourceContent,
-        }));
+      let result: Awaited<ReturnType<typeof generateScript>>;
+      try {
+        result =
+          cachedResult ??
+          (await generateScript({
+            learningRepair,
+            ...(await capturedLearningAiOptions(ai)),
+            topic: p.objective,
+            depth: 'standard',
+            audienceLevel: p.level,
+            focusAreas: [],
+            tone: 'casual',
+            durationTarget: 4,
+            provider: ai.provider,
+            model: ai.model,
+            apiKeyOverride: ai.apiKey,
+            targetLanguage: p.targetLang,
+            languageMode: isImmersionLevel(p.level) ? 'full_immersion' : 'conversational_mix',
+            forLearning: true,
+            mustIncludeVocabulary: p.mustIncludeVocab,
+            sourceContent,
+            sourceMetadata,
+            // Web search enriches a topic that has no extracted text. Provider
+            // selection stays explicit in resolveCapturedLearningAi.
+            webSearchEnabled: !sourceContent,
+          }));
+      } catch (error) {
+        const rejected = scriptOutputProtocolFailure(error);
+        if (!rejected) throw error;
+        failures.push(
+          captureStructureAttempt(
+            'listening',
+            attempt === 0 ? 1 : 2,
+            rejected.candidate,
+            rejected.issues
+          )
+        );
+        if (attempt === 1 || rejected.candidate === null) throw error;
+        learningRepair = {
+          kind: 'script_protocol',
+          candidate: rejected.candidate,
+          issues: rejected.issues,
+        };
+        continue;
+      }
       cachedResult = undefined;
 
       // Step 6: log usage
@@ -295,9 +323,8 @@ export async function composeListeningContent(
       }
 
       // Step 8: build transcript for quiz generation
-      const transcript = result.turns
-        .map((turn) => `${turn.speaker}: ${cleanTextForTts(turn.text)}`)
-        .join('\n');
+      const listeningTurns = normalizeListeningTurns(result.turns);
+      const transcript = listeningTurns.map((turn) => `${turn.speaker}: ${turn.text}`).join('\n');
       if (rejectedTeachingScript?.transcript === transcript) throw rejectedTeachingScript.error;
 
       // Step 9: generate comprehension questions
@@ -453,6 +480,7 @@ export async function composeListeningContent(
         userId: p.userId,
         episodeId,
       });
+      let listeningPassageReview: SectionReviewFeedback | undefined;
       try {
         const assessment = assessSectionReview(
           blindReview.content,
@@ -460,7 +488,8 @@ export async function composeListeningContent(
           true,
           'listening'
         );
-        if (assessment.issues.length)
+        listeningPassageReview = assessment.listeningPassageReview;
+        if ((assessment.questionIssues ?? assessment.issues).length)
           throw new SectionQualityError(
             'Listening questions are not supported by the exact audio script.',
             assessment.feedback
@@ -513,11 +542,19 @@ export async function composeListeningContent(
           targetLang: p.targetLang,
           kind: 'listening',
           items: reviewedQuestions,
+          listeningPassageReview,
+          listeningSource,
+          listeningTurns,
         });
       } catch (error) {
         if (!(error instanceof TeachingQualityRejectionError)) throw error;
         if (!error.teachingFailure || error.feedback.length === 0) throw error;
-        const repair = listeningRepairPlan(error, reviewedQuestions);
+        const repair = listeningRepairPlan(
+          error,
+          reviewedQuestions,
+          listeningSource,
+          listeningTurns
+        );
         if (!repair) throw error;
         const evidence = combineTeachingFailures(priorFailure, repair.failure);
         failures.push(captureTeachingAttempt(attempt === 0 ? 1 : 2, repair.failure));
@@ -535,6 +572,7 @@ export async function composeListeningContent(
             },
             questions,
             verdict: repair.verdict,
+            turnRepair: repair.turnRepair,
           };
           rejectedTeachingScript = { transcript, error };
           cachedResult = undefined;

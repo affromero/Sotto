@@ -24,8 +24,8 @@ vi.mock('@/lib/learning-ai', () => ({
 const mockGenerateResponse = vi.fn();
 const mockReviewResponse = vi.fn();
 const mockTeachingResponse = vi.fn();
-const mockTeachingCriticResponse = vi.fn((_system: string, messages: Array<{ content: string }>) =>
-  emptyTeachingCriticFixture(messages)
+const mockTeachingCriticResponse = vi.fn((messages: Array<{ content: string }>, options: unknown) =>
+  emptyTeachingCriticFixture(messages, options)
 );
 vi.mock('@/lib/providers/ai', () => ({
   createAIProvider: () => ({
@@ -35,7 +35,7 @@ vi.mock('@/lib/providers/ai', () => ({
       options: unknown
     ) => {
       const name = (options as { jsonSchema: { name: string } }).jsonSchema.name;
-      if (name === 'class_teaching_critic') return mockTeachingCriticResponse(system, messages);
+      if (name === 'class_teaching_critic') return mockTeachingCriticResponse(messages, options);
       if (name === 'class_teaching_adjudicator')
         return shapeTeachingProviderFixture(
           system,
@@ -164,31 +164,40 @@ describe('contextual vocabulary coverage', () => {
     targetVocab: [{ lemma: 'gemacht', gloss: 'done; made' }],
   };
 
-  it('trims response boundaries while preserving the exact target spelling and internal spaces', async () => {
-    mockGenerateResponse.mockResolvedValue(
-      response([
-        {
-          ...made,
-          question: '  Sie hat _____ fotografiert.  ',
-          options: [' die Straße ', 'den Bahnhof', 'das Rathaus', 'den Fluss'],
-          explanation: '  Der Satz beschreibt ein Foto von der Straße.  ',
-          passageRef: '  ',
-        },
-      ])
-    );
-    await expect(
-      generateSectionQuestions({
-        ...params,
-        targetVocab: [{ lemma: 'die Straße', gloss: 'the street' }],
-      })
-    ).resolves.toEqual([
+  it('compiles gap punctuation before every review while preserving exact targets and context spacing', async () => {
+    const context = 'Gemeint ist eine Straße : Welche Straße ?';
+    const candidate = {
+      ...made,
+      question: '  Auf dem Foto sieht man _____ \t.  ',
+      taskContext: `  ${context}  `,
+      options: [' die Straße ', 'den Bahnhof', 'das Rathaus', 'den Fluss'],
+      explanation: '  Der Satz beschreibt ein Foto von der Straße.  ',
+      passageRef: '  ',
+    };
+    mockGenerateResponse.mockResolvedValue(response([candidate]));
+    const questions = await generateSectionQuestions({
+      ...params,
+      targetVocab: [{ lemma: 'die Straße', gloss: 'the street' }],
+    });
+    expect(questions).toEqual([
       expect.objectContaining({
-        question: `${VOCABULARY_TASK_CONTEXT}\nSie hat _____ fotografiert.`,
+        question: `${context}\nAuf dem Foto sieht man _____.`,
         options: ['die Straße', 'den Bahnhof', 'das Rathaus', 'den Fluss'],
         explanation: 'Der Satz beschreibt ein Foto von der Straße.',
         passageRef: '',
       }),
     ]);
+    const requests = [
+      mockReviewResponse.mock.calls[0][1],
+      mockTeachingCriticResponse.mock.calls[0][0],
+      mockTeachingResponse.mock.calls[0][1],
+    ];
+    for (const messages of requests) {
+      const input = JSON.parse(messages[0].content);
+      const item = input.questions?.[0] ?? input.items[0];
+      expect(item.content?.question ?? item.question).toBe(questions[0].question);
+      expect(item.completedOptions[0]).toBe(`${context}\nAuf dem Foto sieht man die Straße.`);
+    }
   });
 
   it.each([
@@ -198,7 +207,7 @@ describe('contextual vocabulary coverage', () => {
       invalid: { ...made, targetIndex: 0.5 },
     },
     { name: 'absent cloze', invalid: { ...made, question: 'done; made' } },
-    { name: 'multiple clozes', invalid: { ...made, question: 'Ich habe _____ und _____.' } },
+    { name: 'multiple clozes', invalid: { ...made, question: 'Ich habe _____ . und _____ .' } },
     { name: 'invalid gap', invalid: { ...made, question: 'Ich habe die Hausaufgaben ______.' } },
     { name: 'no meaningful context', invalid: { ...made, question: '_____' } },
   ])('replaces a $name inside the existing bounded generation path', async ({ invalid }) => {
@@ -725,21 +734,6 @@ describe('generateSectionQuestions', () => {
     });
     mockGenerateResponse.mockResolvedValueOnce({ content: SAMPLE });
     await expect(generateSectionQuestions(BASE)).rejects.toBeInstanceOf(SectionQualityError);
-    expect(mockGenerateResponse.mock.calls).toHaveLength(1);
-  });
-
-  it('reviews the immutable published source and fails immediately if it is defective', async () => {
-    mockReviewResponse.mockResolvedValue(
-      verdict({
-        passageFindings: [
-          { sourcePartIndex: 0, issue: 'incorrect', reason: 'The supplied source is incorrect.' },
-        ],
-      })
-    );
-    await expect(generateSectionQuestions({ ...BASE, sourceContent: PASSAGE })).rejects.toThrow(
-      /supplied reading passage/
-    );
-    expect(JSON.parse(mockReviewResponse.mock.calls[0][1][0].content).passage).toBe(PASSAGE);
     expect(mockGenerateResponse.mock.calls).toHaveLength(1);
   });
 

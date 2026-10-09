@@ -1,0 +1,304 @@
+{
+  "turns": [
+    {
+      "speaker": "HOST",
+      "text": "Was hast du [V5:gestern] gemacht? Ich hoffe, nicht wieder einen ganzen Tag mit einer Liste verbracht. Meine Liste hat mich am Ende sogar gefragt, ob ich noch lebe. [laughs]",
+      "direction": "playful"
+    },
+    {
+      "speaker": "EXPERT",
+      "text": "Nein, ich bin rausgegangen. Ich habe eine Freundin am [V11:Bahnhof] getroffen. Dann sind wir zusammen in ein kleines Café gegangen. Der Tag hat ganz ruhig angefangen. Aber dann ist etwas Komisches passiert.",
+      "direction": "curious"
+    },
+    {
+      "speaker": "HOST",
+      "text": "Warte, was ist passiert? Hast du deinen Zug verpasst? Oder hat deine Freundin plötzlich ein sehr ernstes Gespräch über ihre Kaffeetasse angefangen?",
+      "direction": "curious"
+    },
+    {
+      "speaker": "EXPERT",
+      "text": "Fast. Erst haben wir Kaffee bestellt. Dann habe ich auf die Karte geschaut. Da habe ich [V3:gesehen], dass das Café auch Kuchen hatte. Ich habe ein Stück genommen. Meine Freundin hat nur Tee bestellt.",
+      "direction": "playful"
+    },
+    {
+      "speaker": "HOST",
+      "text": "Das klingt normal. Wo ist das Problem? War der Kuchen geheim? Hat er sich unter dem Tisch versteckt?",
+      "direction": "skeptical"
+    },
+    {
+      "speaker": "EXPERT",
+      "text": "Der Kuchen war sehr groß. Ich habe gesagt: „Ich esse nur ein kleines Stück.“ Dann habe ich alles gegessen. Meine Freundin hat mich angesehen und gelacht. Ich habe auch gelacht, aber erst ein bisschen später.",
+      "direction": "playful"
+    },
+    {
+      "speaker": "HOST",
+      "text": "Aha! Eine echte Geschichte im Perfekt. Ich habe deinen ersten Satz gehört: „Ich bin rausgegangen.“ Und dann: „Ich habe Kuchen gegessen.“ Wir erzählen solche vergangenen Ereignisse oft mit dem Perfekt. [1,2,3]",
+      "direction": "thoughtful"
+    },
+    {
+      "speaker": "EXPERT",
+      "text": "Genau. Das Perfekt hat zwei Teile: ein Hilfsverb und ein Partizip. In „ich habe gegessen“ ist „habe“ das finite Hilfsverb. „Gegessen“ ist das Partizip II. Es ist nicht der Infinitiv. [1,3,4]",
+      "direction": "confident"
+    },
+    {
+      "speaker": "HOST",
+      "text": "Und wann nehmen wir „sein“? Bei deiner Bewegung: „Ich bin rausgegangen.“ Dann steht „bin“ vorne, und „rausgegangen“ kommt ans Ende. Habe ich das richtig?",
+      "direction": "curious"
+    },
+    {
+      "speaker": "EXPERT",
+      "text": "Ja. Bei vielen Verben für eine Ortsveränderung nehmen wir „sein“. Zum Beispiel: „Ich bin nach Hause gegangen.“ Bei vielen anderen Verben nehmen wir „haben“: „Ich habe einen Film gesehen.“ [2,4]",
+      "direction": "warm"
+    },
+    {
+      "speaker": "HOST",
+      "text": "Also kann ich sagen: „Ich habe meine Tasche gemacht“? [laughs] Nein, das klingt falsch. Ich habe meine Tasche gepackt. Aber ich habe die Hausaufgabe [V1:gemacht].",
+      "direction": "playful"
+    },
+    {
+      "speaker": "EXPERT",
+      "text": "Genau, und „gemacht“ ist das Partizip II von „machen“. Das Verb „machen“ steht im Infinitiv. Im Satz „Ich habe die Hausaufgabe gemacht“ ist „habe“ finit. Das passt zusammen. [1,4]",
+      "direction": "thoughtful"
+    },
+    {
+      "speaker": "HOST",
+      "text": "Und die Wortstellung? Im Hauptsatz steht das finite Verb an zweiter Stelle: „Gestern habe ich Kuchen gegessen.“ „Gestern“ ist vorne, dann kommt „habe“. Das Partizip steht am Ende. [2,5]",
+      "direction": "confident"
+    },
+    {
+      "speaker": "EXPERT",
+      "text": "Richtig. Bei einer Ja-Nein-Frage steht das finite Verb oft vorne: „Hast du Kuchen gegessen?“ Bei einer Frage mit Fragewort bleibt es an zweiter Stelle: „Was hast du gegessen?“ [2,5]",
+      "direction": "thoughtful"
+    },
+    {
+      "speaker": "HOST",
+      "text": "Gut! Jetzt meine Geschichte. Ich habe am Wochenende eine Freundin [V4:besucht]. Wir wollten zusammen einen Film [V12:sehen]. Das Verb „sehen“ ist der Infinitiv. Im Perfekt sage ich: „Wir haben einen Film gesehen.“",
+      "direction": "warm"
+    },
+    {
+      "speaker": "EXPERT",
+      "text": "Und wie war der Film? Hat er dir gefallen? Bitte sag nicht, dass du wieder nach zehn Minuten eingeschlafen bist.",
+      "direction": "playful"
+    },
+    {
+      "speaker": "HOST",
+      "text": "Nein! Wir haben den ganzen Film gesehen. Danach haben wir noch lange gesprochen. Meine Freundin hat eine [V6:die Reise] geplant. Sie fährt bald ans Meer. Ich habe sofort gefragt, ob sie einen Platz für mich hat.",
+      "direction": "excited"
+    },
+    {
+      "speaker": "EXPERT",
+      "text": "Schön! Das Wort [V8:Reise] passt gut. Und das Verb „[V10:besuchen]“ steht im Infinitiv. Du kannst sagen: „Ich habe meine Freundin besucht.“ Das klingt ganz natürlich. [2,3]",
+      "direction": "warm"
+    },
+    {
+      "speaker": "HOST",
+      "text": "Dann habe ich einen kleinen Plan gemacht: erst den Film, dann die Reise. [V7:plötzlich] habe ich gemerkt, dass ich den nächsten Morgen frei haben muss. Sonst schlafe ich im Zug.",
+      "direction": "playful"
+    },
+    {
+      "speaker": "EXPERT",
+      "text": "[V9:Plötzlich] ist aus einem normalen Abend ein Reiseplan geworden. Und du kannst davon erzählen: „Ich habe einen Film gesehen. Ich habe meine Freundin besucht. Dann bin ich nach Hause gegangen.“ Drei fertige Ereignisse, ganz einfach.",
+      "direction": "confident"
+    },
+    {
+      "speaker": "HOST",
+      "text": "Und wenn ich morgen frage: „Was hast du gestern gemacht?“, kannst du vom Café erzählen. Nur bitte sag nicht, du hast den Kuchen geteilt. Wir wissen jetzt, was wirklich passiert ist.",
+      "direction": "playful"
+    }
+  ],
+  "soundCues": [
+    {
+      "type": "intro",
+      "prompt": "warm upbeat episode intro jingle with soft chimes",
+      "durationSeconds": 3,
+      "insertAfterTurn": -1
+    },
+    {
+      "type": "comedic_hit",
+      "prompt": "light comic plink after the cake joke",
+      "durationSeconds": 1,
+      "insertAfterTurn": 5
+    },
+    {
+      "type": "transition",
+      "prompt": "subtle whoosh into the grammar explanation",
+      "durationSeconds": 1,
+      "insertAfterTurn": 6
+    },
+    {
+      "type": "music_sting",
+      "prompt": "short playful musical sting as the travel plan appears",
+      "durationSeconds": 1,
+      "insertAfterTurn": 17
+    },
+    {
+      "type": "outro",
+      "prompt": "gentle melodic episode outro with fade",
+      "durationSeconds": 4,
+      "insertAfterTurn": 20
+    }
+  ],
+  "references": [
+    {
+      "number": 1,
+      "title": "Duden – Grundwissen Grammatik",
+      "authors": ["Dudenredaktion"],
+      "year": 2024,
+      "url": "https://shop.duden.de/media/4e/12/33/1719879372/Leseprobe_9783411732746_Duden_%E2%80%93_Grundwissen_Grammatik.pdf",
+      "type": "BOOK",
+      "publisher": "Dudenverlag",
+      "doi": null
+    },
+    {
+      "number": 2,
+      "title": "Deutsche Grammatik",
+      "authors": ["Goethe-Institut"],
+      "year": null,
+      "url": "https://www.goethe.de/ins/de/de/prf/grm.html",
+      "type": "WEB",
+      "publisher": "Goethe-Institut",
+      "doi": null
+    },
+    {
+      "number": 3,
+      "title": "Formenbestand des deutschen Tempussystems",
+      "authors": ["Leibniz-Institut für Deutsche Sprache"],
+      "year": null,
+      "url": "https://grammis.ids-mannheim.de/systematische-grammatik/232",
+      "type": "WEB",
+      "publisher": "grammis",
+      "doi": null
+    },
+    {
+      "number": 4,
+      "title": "Lern- und Übungsgrammatik Deutsch als Fremdsprache",
+      "authors": ["Melanie Kunkel", "Uwe Durst"],
+      "year": 2023,
+      "url": "https://shop.duden.de/Lern-und-UEbungsgrammatik-Deutsch-als-Fremdsprache/9783411755202",
+      "type": "BOOK",
+      "publisher": "Dudenverlag",
+      "doi": null
+    },
+    {
+      "number": 5,
+      "title": "Duden – Die Grammatik",
+      "authors": ["Dudenredaktion"],
+      "year": null,
+      "url": "https://www.duden.de/presse/DAS-Standardwerk-der-deutschen-Grammatik-jetzt-neuer-Auflage",
+      "type": "BOOK",
+      "publisher": "Dudenverlag",
+      "doi": null
+    }
+  ],
+  "vocabulary": [
+    {
+      "number": 1,
+      "word": "gemacht",
+      "translation": "done; made",
+      "partOfSpeech": "verb",
+      "pronunciation": "geh-MAKHT",
+      "exampleSentence": "Ich habe die Hausaufgabe gemacht. (I did the homework.)",
+      "difficulty": "beginner"
+    },
+    {
+      "number": 2,
+      "word": "gegangen",
+      "translation": "gone; walked",
+      "partOfSpeech": "verb",
+      "pronunciation": "geh-GANG-en",
+      "exampleSentence": "Ich bin nach Hause gegangen. (I went home.)",
+      "difficulty": "beginner"
+    },
+    {
+      "number": 3,
+      "word": "gesehen",
+      "translation": "seen",
+      "partOfSpeech": "verb",
+      "pronunciation": "geh-ZAY-en",
+      "exampleSentence": "Wir haben einen Film gesehen. (We watched a film.)",
+      "difficulty": "beginner"
+    },
+    {
+      "number": 4,
+      "word": "besucht",
+      "translation": "visited",
+      "partOfSpeech": "verb",
+      "pronunciation": "beh-ZOOKHT",
+      "exampleSentence": "Ich habe meine Freundin besucht. (I visited my friend.)",
+      "difficulty": "beginner"
+    },
+    {
+      "number": 5,
+      "word": "gestern",
+      "translation": "yesterday",
+      "partOfSpeech": "adverb",
+      "pronunciation": "GES-tern",
+      "exampleSentence": "Was hast du gestern gemacht? (What did you do yesterday?)",
+      "difficulty": "beginner"
+    },
+    {
+      "number": 6,
+      "word": "die Reise",
+      "translation": "the trip; the journey",
+      "partOfSpeech": "noun",
+      "pronunciation": "dee RYE-zeh",
+      "exampleSentence": "Die Reise ans Meer war schön. (The trip to the sea was lovely.)",
+      "difficulty": "beginner"
+    },
+    {
+      "number": 7,
+      "word": "plötzlich",
+      "translation": "suddenly",
+      "partOfSpeech": "adverb",
+      "pronunciation": "PLUETS-likh",
+      "exampleSentence": "Plötzlich hat es geregnet. (Suddenly, it rained.)",
+      "difficulty": "beginner"
+    },
+    {
+      "number": 8,
+      "word": "Reise",
+      "translation": "trip; journey",
+      "partOfSpeech": "noun",
+      "pronunciation": "RYE-zeh",
+      "exampleSentence": "Die Reise beginnt morgen. (The trip begins tomorrow.)",
+      "difficulty": "beginner"
+    },
+    {
+      "number": 9,
+      "word": "Plötzlich",
+      "translation": "Suddenly",
+      "partOfSpeech": "adverb",
+      "pronunciation": "PLUETS-likh",
+      "exampleSentence": "Plötzlich klingelte das Telefon. (Suddenly, the phone rang.)",
+      "difficulty": "beginner"
+    },
+    {
+      "number": 10,
+      "word": "besuchen",
+      "translation": "to visit",
+      "partOfSpeech": "verb",
+      "pronunciation": "beh-ZOO-khen",
+      "exampleSentence": "Ich möchte meine Freundin besuchen. (I want to visit my friend.)",
+      "difficulty": "beginner"
+    },
+    {
+      "number": 11,
+      "word": "Bahnhof",
+      "translation": "train station",
+      "partOfSpeech": "noun",
+      "pronunciation": "BAHN-hohf",
+      "exampleSentence": "Wir treffen uns am Bahnhof. (We are meeting at the train station.)",
+      "difficulty": "beginner"
+    },
+    {
+      "number": 12,
+      "word": "sehen",
+      "translation": "to see",
+      "partOfSpeech": "verb",
+      "pronunciation": "ZAY-en",
+      "exampleSentence": "Wir wollen einen Film sehen. (We want to watch a film.)",
+      "difficulty": "beginner"
+    }
+  ],
+  "places": []
+}

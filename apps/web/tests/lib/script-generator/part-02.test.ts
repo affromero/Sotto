@@ -12,6 +12,11 @@ vi.mock('@/lib/providers/ai', () => ({
 
 // ---- Import under test ----
 import { generateScript as generateScriptImpl, parseScriptResponse } from '@/lib/script-generator';
+import { cleanTextForTts } from '@/lib/tts-text-cleaner';
+import {
+  ScriptOutputProtocolError,
+  scriptOutputProtocolFailure,
+} from '@/lib/learning/script/output-protocol';
 
 describe('vocabulary marker identity', () => {
   const parse = (
@@ -53,6 +58,21 @@ describe('vocabulary marker identity', () => {
       { number: 7, word: 'die Reise', translation: 'the trip' },
     ]);
     expect(result.turns[0].text).toBe('Die [V7:Reise] war kurz.');
+    expect(cleanTextForTts(result.turns[0].text)).toBe('Die Reise war kurz.');
+  });
+
+  it('retains dictionary targets while binding an article-free surface to its unique exact entry', () => {
+    const result = parse('Meine [V7:Reise] war kurz. Das Wort [V7:die Reise] nennt den Ausflug.', [
+      { number: 7, word: 'die Reise', translation: 'the trip' },
+      { number: 8, word: 'Reise', translation: 'trip' },
+    ]);
+    expect(result.turns[0].text).toBe(
+      'Meine [V8:Reise] war kurz. Das Wort [V7:die Reise] nennt den Ausflug.'
+    );
+    expect(cleanTextForTts(result.turns[0].text)).toBe(
+      'Meine Reise war kurz. Das Wort die Reise nennt den Ausflug.'
+    );
+    expect(result.vocabulary.map((entry) => entry.word)).toEqual(['die Reise', 'Reise']);
   });
 
   it('preserves an already correct number when another entry has the same word', () => {
@@ -65,12 +85,21 @@ describe('vocabulary marker identity', () => {
   });
 
   it('rejects an ambiguous remapping instead of selecting a translation', () => {
-    expect(() =>
+    let error: unknown;
+    try {
       parse('[V6:besucht]', [
         ...entries,
         { number: 8, word: 'besucht', translation: 'visited someone' },
-      ])
-    ).toThrow(/ambiguous entry identity/);
+      ]);
+    } catch (caught) {
+      error = caught;
+    }
+    expect(error).toBeInstanceOf(ScriptOutputProtocolError);
+    expect(scriptOutputProtocolFailure(error)).toMatchObject({
+      candidate: expect.stringContaining('[V6:besucht]'),
+      issues: [{ code: 'script_vocabulary_ambiguous_identity' }],
+    });
+    expect(JSON.stringify(error)).not.toContain('besucht');
   });
 
   it('rejects duplicate entry numbers and unknown marker identities', () => {
@@ -100,6 +129,41 @@ function generateScript(
 describe('generateScript', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it.each([
+    ['default', []],
+    [
+      'explicit',
+      [{ type: 'intro', prompt: 'A gentle intro.', durationSeconds: 3, insertAfterTurn: -1 }],
+    ],
+    [
+      'zero optional values',
+      [
+        {
+          type: 'outro',
+          prompt: 'A gentle outro.',
+          durationSeconds: 4,
+          insertAfterTurn: 0,
+          volume: 0,
+          fadeOutMs: 0,
+        },
+      ],
+    ],
+  ])('preserves %s sound cues across canonical JSON round trips', (_, soundCues) => {
+    const response = {
+      content: JSON.stringify({
+        turns: [{ speaker: 'HOST', text: 'Lea hat Tee gemacht.' }],
+        soundCues,
+        references: [],
+      }),
+      model: 'm',
+      inputTokens: 1,
+      outputTokens: 1,
+    };
+    const first = parseScriptResponse(response);
+    const second = parseScriptResponse({ ...response, content: JSON.stringify(first) });
+    expect(second.soundCues).toStrictEqual(first.soundCues);
   });
 
   it('rejects correction outside learning and oversized UTF8 context before contacting the provider', async () => {
@@ -146,6 +210,17 @@ describe('generateScript', () => {
     await expect(generateScript({ ...params, forLearning: true })).rejects.toThrow(
       'bounded context'
     );
+    await expect(
+      generateScript({
+        ...params,
+        forLearning: true,
+        learningRepair: {
+          kind: 'script_protocol',
+          candidate: 'ä'.repeat(16385),
+          issues: [{ code: 'script_vocabulary_missing_identity' }],
+        },
+      })
+    ).rejects.toThrow('bounded context');
     expect(mockGenerateResponse).not.toHaveBeenCalled();
   });
 

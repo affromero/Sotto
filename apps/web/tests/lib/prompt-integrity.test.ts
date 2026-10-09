@@ -64,6 +64,9 @@ const EXPECTED_FILES = [
   'class/generate-section-quiz.md',
   'class/review-section-quiz.md',
   'class/review-teaching-content.md',
+  'class/review-reading-teaching-content.md',
+  'class/review-listening-passage.md',
+  'class/review-listening-teaching-content.md',
   'class/review-reading-vocabulary.md',
   'class/review-reading-vocabulary-counterfactual.md',
   'class/level-source.md',
@@ -79,6 +82,7 @@ const EXPECTED_FILES = [
   'interaction/qa-assistant.md',
   'interaction/incorporate-segment.md',
   'generation/script-generator.md',
+  'generation/repair-learning-script.md',
   'generation/monologue-guidelines.md',
   'generation/dialogue-guidelines.md',
   'generation/eli5-section.md',
@@ -109,6 +113,11 @@ const EXPECTED_FILES = [
 // If a .md file gains or loses a placeholder, these tests will catch it.
 
 const VARIABLE_CONTRACTS: Record<string, string[]> = {
+  'generation/repair-learning-script.md': [
+    'AUDIENCE_LEVEL',
+    'CONTENT_SAFETY',
+    'LANGUAGE_INSTRUCTION',
+  ],
   'class/review-class-intro.md': [
     'EXAMPLE_MEANING_POLICY',
     'GRAMMAR_POINTS',
@@ -132,6 +141,23 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
   ],
   'class/review-teaching-content.md': [
     'KIND',
+    'LANGUAGE_POLICY',
+    'LEVEL',
+    'NATIVE',
+    'REVIEW_SCHEMA',
+    'TARGET',
+    'TEACHING_REVIEW_ROLE',
+  ],
+  'class/review-reading-teaching-content.md': [
+    'LANGUAGE_POLICY',
+    'LEVEL',
+    'NATIVE',
+    'REVIEW_SCHEMA',
+    'TARGET',
+    'TEACHING_REVIEW_ROLE',
+  ],
+  'class/review-listening-passage.md': ['LANGUAGE_POLICY', 'LEVEL', 'REVIEW_SCHEMA', 'TARGET'],
+  'class/review-listening-teaching-content.md': [
     'LANGUAGE_POLICY',
     'LEVEL',
     'NATIVE',
@@ -527,6 +553,7 @@ describe('verification templates', () => {
   it.each([
     'class/review-section-quiz.md',
     'class/review-teaching-content.md',
+    'class/review-listening-teaching-content.md',
     'shared/voice-realism-learning.md',
   ])('%s scopes grammar claims to the actual target-language clause and constituents', (file) => {
     const content = readFileSync(join(PROMPTS_DIR, file), 'utf-8');

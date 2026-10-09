@@ -4,7 +4,15 @@ import { teachingFailureSchema } from './teaching-failure';
 const MAX_CANDIDATE_BYTES = 32 * 1024;
 const structureIssueSchema = z
   .object({
-    code: z.enum(['invalid_json', 'invalid_container', 'wrong_count', 'invalid_item']),
+    code: z.enum([
+      'invalid_json',
+      'invalid_container',
+      'wrong_count',
+      'invalid_item',
+      'script_vocabulary_duplicate_number',
+      'script_vocabulary_ambiguous_identity',
+      'script_vocabulary_missing_identity',
+    ]),
     index: z.number().int().min(0).max(4).optional(),
   })
   .strict();
@@ -72,11 +80,11 @@ export function generationAttemptFailures(error: unknown): GenerationAttemptFail
 export function captureStructureAttempt(
   kind: 'speaking' | 'writing' | 'listening',
   attempt: 1 | 2,
-  candidate: string,
+  candidate: string | null,
   issues: readonly GenerationStructureIssue[]
 ): GenerationAttemptFailure {
   const bounded =
-    Buffer.byteLength(candidate, 'utf8') <= MAX_CANDIDATE_BYTES
+    candidate !== null && Buffer.byteLength(candidate, 'utf8') <= MAX_CANDIDATE_BYTES
       ? { candidate, issues: [...issues] }
       : { candidate: null, omitted: 'size_limit' as const, issues: [...issues] };
   return structureAttemptSchema.parse({ attempt, type: 'structure', kind, ...bounded });

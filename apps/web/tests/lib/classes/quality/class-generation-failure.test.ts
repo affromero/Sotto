@@ -33,7 +33,7 @@ vi.mock('@/lib/providers/ai', () => ({
       options: unknown
     ) => {
       const name = (options as { jsonSchema: { name: string } }).jsonSchema.name;
-      if (name === 'class_teaching_critic') return emptyTeachingCriticFixture(messages);
+      if (name === 'class_teaching_critic') return emptyTeachingCriticFixture(messages, options);
       if (name === 'class_teaching_adjudicator')
         return shapeTeachingProviderFixture(
           system,

@@ -123,6 +123,26 @@ describe('intro teaching gate', () => {
       'HOST and EXPERT at turn prefixes are nonspoken speaker identifiers'
     );
     expect(JSON.parse(messages[0].content).items[0].content).toEqual(content);
+    for (const [roleSystem] of boundary.generate.mock.calls) {
+      expect(roleSystem).toContain(
+        'Evaluate wording in its full conversational context, including ordinary ellipsis and figurative usage'
+      );
+      expect(roleSystem).toContain(
+        'A smoother alternative or a literal reading contradicted by the surrounding dialogue does not establish a defect'
+      );
+      expect(roleSystem).toContain(
+        'Comprehensibility does not excuse genuine grammatical or collocational errors'
+      );
+      expect(roleSystem).toContain(
+        'For a supported wording criticism, use reason to identify the violated constraint or unresolved reading'
+      );
+      expect(roleSystem).toContain(
+        'compare their complete meanings, including event time and completion, modality, agency, negation and scope'
+      );
+      expect(roleSystem).toContain(
+        'Distinguish an explicitly requested transformation from an explanation claiming that two meanings are the same'
+      );
+    }
   });
 
   it.each([true, false])(
@@ -202,6 +222,7 @@ describe('intro teaching gate', () => {
         ai: await boundary.resolve(),
         provider: createAIProvider('fixture'),
         kind: 'explanations',
+        sectionSkill: 'GRAMMAR',
         items: [content],
       });
       if (acceptable) await expect(review).resolves.toBeUndefined();
@@ -222,6 +243,14 @@ describe('intro teaching gate', () => {
         ]);
       }
       const [system, messages] = boundary.generate.mock.calls[0]!;
+      expect(system).toContain('using every option before consulting the proposed key');
+      expect(system).toContain('a conventional verb-second sentence type');
+      expect(system).toContain(
+        'Reject claims that extend verb-second order to verb-final subordinate clauses'
+      );
+      expect(system).toContain(
+        'the proposed key and explanation cannot supply a missing public constraint'
+      );
       expect(system).toContain('For explanation items involving grammar tasks');
       expect(system).toContain('Do not require a quoted subject to match');
       expect(system).toContain('Reject unquoted transformations that change the stated actor');

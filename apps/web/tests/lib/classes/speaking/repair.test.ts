@@ -198,11 +198,11 @@ describe('canonical speaking correction before reference audio', () => {
     expect(runtime.events).toEqual(['generation', 'critic', 'review', 'tts', 'tts', 'tts', 'tts']);
   });
 
-  it('keeps faithful German meanings in the initial immersion set before reference audio', async () => {
+  it('permits faithful usage notes and reused wording in the rendered immersion request', async () => {
     const faithful = [
       {
         targetPhrase: 'Was hast du gestern gemacht?',
-        translation: 'Was hast du am Tag vor heute gemacht?',
+        translation: 'Die sprechende Person fragt, was du gestern gemacht hast.',
       },
       {
         targetPhrase: 'Ich bin gestern ins Café gegangen.',
@@ -228,6 +228,15 @@ describe('canonical speaking correction before reference audio', () => {
       'every learner-visible field must be in the target language (de)'
     );
     expect(runtime.requests[0].system).toContain('Do not replace its meaning with instructions');
+    expect(runtime.requests[0].system).toContain(
+      'use a short target-language paraphrase or usage note'
+    );
+    expect(runtime.requests[0].system).toContain(
+      'Reuse natural core wording when useful; do not force synonyms or lexical differences.'
+    );
+    expect(runtime.requests[0].system).toContain(
+      'Preserve the actor, grammatical person, tense, actions, participants, and every stated fact'
+    );
     expect(
       runtime.requests.filter(
         (request) =>

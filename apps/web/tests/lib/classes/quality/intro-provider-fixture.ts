@@ -1,3 +1,6 @@
+import { withReadingSupportFixture } from './teaching/reading-support-fixture';
+import { withListeningWitnessFixture } from '../listening/witness-fixture';
+
 interface FixtureResponse {
   content: string;
   model: string;
@@ -49,12 +52,22 @@ function shapeEvidenceFixture(messages: Array<{ content: string }>, response: Fi
   return {
     ...response,
     content: JSON.stringify({
+      ...parsed,
       items: parsed.items.map(
         (item: {
           index: number;
           findings: FixtureFinding[];
+          passageWitness?: unknown;
+          answerSupport?: unknown;
           criticDecisions?: Array<{ findingIndex: number; decision: string; reason: string }>;
         }) => {
+          if (
+            item.findings.length === 0 &&
+            (Object.hasOwn(item, 'passageWitness') ||
+              Object.hasOwn(item, 'answerSupport') ||
+              !Object.hasOwn(item, 'criticDecisions'))
+          )
+            return item;
           const supplied = payload.items.find(
             (entry: { index: number }) => entry.index === item.index
           );
@@ -79,9 +92,15 @@ function shapeEvidenceFixture(messages: Array<{ content: string }>, response: Fi
           const findings = additions.map((finding) =>
             teachingFindingFixture(finding, supplied?.sourceParts ?? [])
           );
-          if (!item.criticDecisions) return { index: item.index, findings };
+          const witnesses = Object.fromEntries(
+            ['answerSupport', 'passageWitness']
+              .filter((key) => Object.hasOwn(item, key))
+              .map((key) => [key, item[key as 'answerSupport' | 'passageWitness']])
+          );
+          if (!item.criticDecisions) return { index: item.index, ...witnesses, findings };
           return {
             index: item.index,
+            ...witnesses,
             criticDecisions: item.criticDecisions,
             newFindings: findings,
           };
@@ -91,18 +110,38 @@ function shapeEvidenceFixture(messages: Array<{ content: string }>, response: Fi
   };
 }
 
-export function emptyTeachingCriticFixture(messages: Array<{ content: string }>): FixtureResponse {
+export function emptyTeachingCriticFixture(
+  messages: Array<{ content: string }>,
+  options?: unknown
+): FixtureResponse {
   const payload = JSON.parse(messages[0]!.content);
-  return {
+  return withReadingSupportFixture(messages, options, {
     content: JSON.stringify({
       items: payload.items.map(({ index }: { index: number }) => ({ index, findings: [] })),
     }),
     model: 'm',
-  };
+  });
 }
 
 /** Translate compatibility fixtures only at the external mock model boundary. */
 export function shapeTeachingProviderFixture(
+  system: string,
+  messages: Array<{ content: string }>,
+  options: unknown,
+  response: FixtureResponse
+): FixtureResponse {
+  return withListeningWitnessFixture(
+    messages,
+    options,
+    withReadingSupportFixture(
+      messages,
+      options,
+      shapeTeachingCompatibilityFixture(system, messages, options, response)
+    )
+  );
+}
+
+function shapeTeachingCompatibilityFixture(
   system: string,
   messages: Array<{ content: string }>,
   options: unknown,
@@ -156,36 +195,49 @@ export function shapeTeachingProviderFixture(
     const shaped = {
       ...response,
       content: JSON.stringify({
-        items: parsed.items.map(
-          (item: { index: number; acceptable: boolean; issues: string[]; feedback: string[] }) => {
-            const content = payload.items.find(
-              (entry: { index: number }) => entry.index === item.index
-            )?.content;
-            const findings = item.acceptable
-              ? []
-              : [...new Set(item.issues)].slice(0, 3).map((issue) => ({
-                  issue,
-                  ...leaf(content),
-                  rule: 'fixture teaching contract',
-                  defect: item.feedback[0]?.slice(0, 120) ?? '',
-                  correction: 'Use accurate supported teaching.',
-                  counterexample: null,
-                }));
-            if (name === 'class_teaching_critic') return { index: item.index, findings };
-            const criticisms = payload.criticisms.items.find(
-              (entry: { index: number }) => entry.index === item.index
-            ).findings;
-            return {
-              ...item,
-              findings,
-              criticDecisions: criticisms.map((_: unknown, findingIndex: number) => ({
-                findingIndex,
-                decision: item.acceptable ? 'dismissed' : 'supported',
-                reason: 'Fixture adjudication of the cited field.',
-              })),
-            };
-          }
-        ),
+        items: parsed.items
+          .filter(
+            (item: { index: number }) =>
+              name !== 'class_teaching_critic' ||
+              !Array.isArray(payload.criticAssignment) ||
+              payload.criticAssignment.includes(item.index)
+          )
+          .map(
+            (item: {
+              index: number;
+              acceptable: boolean;
+              issues: string[];
+              feedback: string[];
+            }) => {
+              const content = payload.items.find(
+                (entry: { index: number }) => entry.index === item.index
+              )?.content;
+              const findings = item.acceptable
+                ? []
+                : [...new Set(item.issues)].slice(0, 3).map((issue) => ({
+                    issue,
+                    ...leaf(content),
+                    rule: 'fixture teaching contract',
+                    defect: item.feedback[0]?.slice(0, 120) ?? '',
+                    correction: 'Use accurate supported teaching.',
+                    counterexample: null,
+                  }));
+              if (name === 'class_teaching_critic') return { index: item.index, findings };
+              const criticisms =
+                payload.criticisms.items.find(
+                  (entry: { index: number }) => entry.index === item.index
+                )?.findings ?? [];
+              return {
+                ...item,
+                findings,
+                criticDecisions: criticisms.map((_: unknown, findingIndex: number) => ({
+                  findingIndex,
+                  decision: item.acceptable ? 'dismissed' : 'supported',
+                  reason: 'Fixture adjudication of the cited field.',
+                })),
+              };
+            }
+          ),
       }),
     };
     return shapeEvidenceFixture(messages, shaped);
