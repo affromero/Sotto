@@ -922,10 +922,8 @@ export async function generateClassIntro(p: ClassIntroParams): Promise<ClassIntr
 
   const structuralDiagnostics: IntroStructuralDiagnostic[] = [];
   let intro = parseIntro(response.content, 'initial', structuralDiagnostics);
-  let repaired = false;
   if (!intro || intro.examples.length === 0) {
     intro = await repairIntro(response.content, undefined, undefined, structuralDiagnostics);
-    repaired = true;
   }
   try {
     await reviewTeachingContent({
@@ -944,7 +942,7 @@ export async function generateClassIntro(p: ClassIntroParams): Promise<ClassIntr
       items: [intro],
     });
   } catch (error) {
-    if (!(error instanceof TeachingQualityRejectionError) || repaired) throw error;
+    if (!(error instanceof TeachingQualityRejectionError)) throw error;
     const initialFailure = authenticIntroTeachingFailure(error);
     try {
       intro = await repairIntro(JSON.stringify(intro), intro, error);

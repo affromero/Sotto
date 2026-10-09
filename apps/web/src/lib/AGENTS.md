@@ -261,7 +261,11 @@ Malformed or unbound evidence permits one correction of the same role
 response per whole review invocation. A second invalid response is terminal. This protocol proves
 evidence binding, not linguistic truth; semantic judgment remains probabilistic.
 A maximum-size intro normally uses ten requests total: one generation, four review requests
-before and after one bounded repair, plus the repair request. Writing uses at most
+before and after one bounded semantic repair, plus the repair request. An invalid initial
+intro permits one structural repair before review without consuming the semantic repair.
+The combined structural and semantic path uses at most eleven normal requests, or thirteen
+with the existing single protocol correction in each review invocation. Parent request
+limits remain unchanged. A failed semantic replacement is terminal. Writing uses at most
 six calls when a structurally valid set needs one bounded quality replacement
 and a second review. Section generation uses at most nine, including two
 candidates, optional JSON repair, blind reviews and paired teaching reviews. A

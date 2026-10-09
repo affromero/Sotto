@@ -278,7 +278,12 @@ describe('intro teaching gate', () => {
       items: [{ index: 0, content, sourceParts: expect.any(Array) }],
     });
   });
-  it.each(['initial', 'structural repair', 'semantic replacement'])(
+  it.each([
+    'initial',
+    'structural repair',
+    'semantic replacement',
+    'structural then semantic repair',
+  ])(
     'reviews the exact immersion usage note after %s without requiring a different meaning',
     async (path) => {
       const usageIntro = {
@@ -313,7 +318,13 @@ describe('intro teaching gate', () => {
           ? [usageIntro, approved]
           : path === 'structural repair'
             ? ['invalid fixture JSON', usageIntro, approved]
-            : [drifted, driftVerdict, { examples: { 0: usageIntro.examples[0] } }, approved];
+            : [
+                ...(path === 'structural then semantic repair' ? ['invalid fixture JSON'] : []),
+                drifted,
+                driftVerdict,
+                { examples: { 0: usageIntro.examples[0] } },
+                approved,
+              ];
       queueResponses(responses);
 
       const result = await generateClassIntro(params);
@@ -738,13 +749,8 @@ describe('intro teaching gate', () => {
     }
   });
 
-  it('does not add another replacement after structural repair fails teaching review', async () => {
-    boundary.generate
-      .mockReset()
-      .mockResolvedValueOnce({ content: '{', model: 'captured-model' })
-      .mockResolvedValueOnce({ content: JSON.stringify(intro), model: 'captured-model' })
-      .mockResolvedValueOnce({ content: JSON.stringify(rejected), model: 'captured-model' })
-      .mockResolvedValueOnce({ content: JSON.stringify(rejected), model: 'captured-model' });
+  it('retains both rejections when semantic repair after structural repair still fails', async () => {
+    queueResponses(['{', intro, rejected, { examples: { 0: intro.examples[0] } }, rejected]);
 
     const error = await generateClassIntro(params).catch((failure: unknown) => failure);
     expect(error).toBeInstanceOf(TeachingQualityRejectionError);
@@ -764,7 +770,10 @@ describe('intro teaching gate', () => {
       [3, true],
       [4, false],
     ]);
-    expect(boundary.generate).toHaveBeenCalledTimes(4);
+    expect(error.teachingFailure?.reviews).toHaveLength(2);
+    expect(error.teachingFailure?.reviews[1]?.verdict.items.some((item) => !item.acceptable)).toBe(
+      true
+    );
   });
 
   it('propagates quality replacement provider failure without another call', async () => {
