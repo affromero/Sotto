@@ -28,8 +28,7 @@ const questions: GeneratedQuestion[] = [
 ];
 
 const verdict = {
-  passageAcceptable: true,
-  passageFeedback: [],
+  passageFindings: [],
   issues: [],
   questions: [
     { index: 1, acceptableOptionIndices: [0], issues: [] },
@@ -43,10 +42,8 @@ const passageQuestions = questions.map((question) => ({
 }));
 const rejected = {
   ...verdict,
-  passageAcceptable: false,
-  issues: ['unnatural'],
-  passageFeedback: [
-    { quote: 'Private exact script.', reason: 'The supplied wording is unnatural.' },
+  passageFindings: [
+    { sourcePartIndex: 0, issue: 'unnatural', reason: 'The supplied wording is unnatural.' },
   ],
 };
 
@@ -142,9 +139,7 @@ describe('section review correction feedback', () => {
       questions: [verdict.questions[0], { ...verdict.questions[1], index: 4 }],
     }),
   ])('withholds unvalidated or incomplete review data from correction', (content) => {
-    expect(assessSectionReview(content, questions, false)).toEqual({
-      issues: ['invalid_review'],
-    });
+    expect(() => assessSectionReview(content, questions, false)).toThrow(SectionQualityError);
   });
 
   it('identifies an unacceptable generated passage for replacement', () => {
@@ -186,7 +181,14 @@ describe('section review correction feedback', () => {
     expect(record).toEqual({
       reviewType: 'blind_section',
       verdictType: 'derived_compatibility_summary',
-      blindVerdict: exact,
+      blindVerdict: {
+        passageAcceptable: false,
+        passageFeedback: [
+          { quote: 'Private exact script.', reason: 'The supplied wording is unnatural.' },
+        ],
+        issues: ['unnatural'],
+        questions: exact.questions,
+      },
       transcript: 'Private exact script.',
       questions,
     });
@@ -198,12 +200,18 @@ describe('section review correction feedback', () => {
   });
 
   it('retains the complete exact verdict when oversized script material is explicitly omitted', () => {
+    const compatibility = {
+      passageAcceptable: true,
+      passageFeedback: [],
+      issues: [],
+      questions: verdict.questions,
+    };
     const evidence = captureBlindSectionFailure(
       questions.map((question) => ({ ...question, passageText: 'ä'.repeat(32768) })),
-      verdict as Parameters<typeof captureBlindSectionFailure>[1]
+      compatibility as Parameters<typeof captureBlindSectionFailure>[1]
     );
     const record = JSON.parse(evidence.reviews[0].candidate!);
-    expect(record.blindVerdict).toEqual(verdict);
+    expect(record.blindVerdict).toEqual(compatibility);
     expect(record.transcript).toBeNull();
     expect(record.questions).toBeNull();
     expect(record.omitted).toBe('size_limit');
@@ -221,25 +229,37 @@ describe('section review correction feedback', () => {
       questions: [{ ...verdict.questions[0], acceptableOptionIndices: [4] }, verdict.questions[1]],
     },
   ])('does not attach malformed blind verdicts as correction evidence', (invalid) => {
-    expect(assessSectionReview(JSON.stringify(invalid), questions, true, 'listening')).toEqual({
-      issues: ['invalid_review'],
-    });
+    expect(() =>
+      assessSectionReview(JSON.stringify(invalid), questions, true, 'listening')
+    ).toThrow(SectionQualityError);
   });
 
   it.each([
-    ['missing feedback', undefined],
-    ['empty feedback', []],
-    ['whitespace quote', [{ quote: ' \t', reason: 'Incorrect grammar.' }]],
-    ['whitespace reason', [{ quote: 'Private', reason: ' \t' }]],
-    ['oversized quote', [{ quote: 'x'.repeat(241), reason: 'Incorrect grammar.' }]],
-    ['oversized reason', [{ quote: 'Private', reason: 'x'.repeat(301) }]],
-    ['invented quote', [{ quote: 'An invented sentence.', reason: 'Incorrect grammar.' }]],
-    ['changed quote case', [{ quote: 'private exact script.', reason: 'Incorrect grammar.' }]],
-    ['too many records', Array(4).fill({ quote: 'Private', reason: 'Incorrect grammar.' })],
+    ['missing findings', undefined],
+    ['unknown part', [{ sourcePartIndex: 1, issue: 'incorrect', reason: 'Incorrect grammar.' }]],
+    ['negative part', [{ sourcePartIndex: -1, issue: 'incorrect', reason: 'Incorrect grammar.' }]],
+    ['whitespace reason', [{ sourcePartIndex: 0, issue: 'incorrect', reason: ' \t' }]],
+    ['oversized reason', [{ sourcePartIndex: 0, issue: 'incorrect', reason: 'x'.repeat(301) }]],
+    [
+      'invented quote',
+      [
+        {
+          sourcePartIndex: 0,
+          issue: 'incorrect',
+          quote: 'An invented sentence.',
+          reason: 'Incorrect grammar.',
+        },
+      ],
+    ],
+    ['missing issue', [{ sourcePartIndex: 0, reason: 'Incorrect grammar.' }]],
+    [
+      'too many records',
+      Array(4).fill({ sourcePartIndex: 0, issue: 'incorrect', reason: 'Incorrect grammar.' }),
+    ],
   ])(
     'withholds %s from immutable rejection and private correction evidence',
-    (name, passageFeedback) => {
-      const content = JSON.stringify({ ...rejected, passageFeedback });
+    (name, passageFindings) => {
+      const content = JSON.stringify({ ...rejected, passageFindings });
       expect(() => assessSectionReview(content, passageQuestions, true, 'listening'), name).toThrow(
         SectionQualityError
       );
@@ -254,7 +274,7 @@ describe('section review correction feedback', () => {
 
   it.each([
     { ...rejected, passageAcceptable: true },
-    { ...rejected, issues: [] },
+    { ...rejected, passageFeedback: [] },
   ])('validates the complete protocol before rejecting immutable passage text', (invalid) => {
     expect(() =>
       assessSectionReview(JSON.stringify(invalid), passageQuestions, true, 'listening')
@@ -264,17 +284,16 @@ describe('section review correction feedback', () => {
   it('preserves exact whitespace and Unicode in private feedback without normalizing invented excerpts', () => {
     const passage = 'HOST:  Grüße, wir sind gegangen.  EXPERT: Ja.';
     const material = questions.map((question) => ({ ...question, passageText: passage }));
-    const feedback = [
-      { quote: '  Grüße, wir sind gegangen.  ', reason: 'A specific attributed issue.' },
-    ];
-    const review = { ...rejected, passageFeedback: feedback };
-    expect(
-      assessSectionReview(JSON.stringify(review), material, false).feedback?.passageFeedback
-    ).toEqual(feedback);
-    const evidence = captureBlindSectionFailure(
-      material,
-      review as Parameters<typeof captureBlindSectionFailure>[1]
-    );
+    const review = {
+      ...rejected,
+      passageFindings: [
+        { sourcePartIndex: 0, issue: 'unnatural', reason: 'A specific attributed issue.' },
+      ],
+    };
+    const feedback = [{ quote: passage, reason: 'A specific attributed issue.' }];
+    const compatibility = assessSectionReview(JSON.stringify(review), material, false).feedback!;
+    expect(compatibility.passageFeedback).toEqual(feedback);
+    const evidence = captureBlindSectionFailure(material, compatibility);
     expect(JSON.parse(evidence.reviews[0].candidate!).blindVerdict.passageFeedback).toEqual(
       feedback
     );
@@ -302,8 +321,8 @@ describe('section review correction feedback', () => {
 
   it('withholds incomplete question identities before attaching passage rejection evidence', () => {
     const invalid = { ...rejected, questions: [verdict.questions[0], verdict.questions[0]] };
-    expect(
+    expect(() =>
       assessSectionReview(JSON.stringify(invalid), passageQuestions, true, 'listening')
-    ).toEqual({ issues: ['invalid_review'] });
+    ).toThrow(SectionQualityError);
   });
 });

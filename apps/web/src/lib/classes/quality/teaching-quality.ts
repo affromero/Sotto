@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { buildListeningAudit } from './listening-audit/projection';
 import { isDeepStrictEqual } from 'node:util';
 import { capturedLearningAiOptions, type CapturedLearningAi } from '../../learning-ai';
 import type { AIOptions, AIProvider } from '../../providers/ai';
@@ -24,10 +25,8 @@ import {
 
 import {
   ReviewerProtocolError,
-  teachingCriticSchema,
-  teachingAdjudicatorSchema,
-  parseTeachingCritic,
-  parseTeachingAdjudicator,
+  parseTeachingCriticResponse,
+  parseTeachingAdjudicatorResponse,
   type TeachingCritic as IntroCritic,
   type TeachingFinding as IntroFinding,
   type TeachingAdjudicator as IntroAdjudicator,
@@ -40,22 +39,15 @@ import {
   retainReviewerProtocolEvidence,
 } from './private-protocol-evidence';
 
-const INTRO_CRITIC_JSON_SCHEMA = {
-  name: 'class_intro_critic',
-  schema: z.toJSONSchema(teachingCriticSchema, { target: 'draft-7' }),
-};
-const INTRO_ADJUDICATOR_JSON_SCHEMA = {
-  name: 'class_intro_adjudicator',
-  schema: z.toJSONSchema(teachingAdjudicatorSchema, { target: 'draft-7' }),
-};
-export const TEACHING_CRITIC_JSON_SCHEMA = {
-  name: 'class_teaching_critic',
-  schema: INTRO_CRITIC_JSON_SCHEMA.schema,
-};
-export const TEACHING_ADJUDICATOR_JSON_SCHEMA = {
-  name: 'class_teaching_adjudicator',
-  schema: INTRO_ADJUDICATOR_JSON_SCHEMA.schema,
-};
+import {
+  buildTeachingCriticJsonSchema,
+  buildTeachingAdjudicatorJsonSchema,
+  buildTeachingSourceParts,
+} from './teaching-source/protocol';
+export {
+  buildTeachingCriticJsonSchema,
+  buildTeachingAdjudicatorJsonSchema,
+} from './teaching-source/protocol';
 
 /** A complete, protocol-valid review that rejects the learner-visible content. */
 export class TeachingQualityRejectionError extends SectionQualityError {
@@ -212,6 +204,23 @@ export function getIntroRepairPlan(rejection: TeachingQualityRejectionError): {
   };
 }
 
+function teachingReviewCandidate(
+  options: Pick<
+    Parameters<typeof requestTeachingReview>[0],
+    'items' | 'sourceParts' | 'introContext' | 'criticisms'
+  >
+) {
+  return {
+    ...(options.introContext ? { introContext: options.introContext } : {}),
+    items: options.items.map((content, index) => ({
+      index,
+      content,
+      ...(options.sourceParts ? { sourceParts: options.sourceParts[index] } : {}),
+    })),
+    ...(options.criticisms ? { criticisms: options.criticisms } : {}),
+  };
+}
+
 /** Shared provider boundary for canonical teaching audits. */
 export async function requestTeachingReview(options: {
   ai: CapturedLearningAi;
@@ -222,6 +231,7 @@ export async function requestTeachingReview(options: {
   items: readonly unknown[];
   introContext?: Record<string, unknown>;
   criticisms?: IntroCritic;
+  sourceParts?: ReturnType<typeof buildTeachingSourceParts>[];
   maxTokens?: number;
   jsonSchema: NonNullable<AIOptions['jsonSchema']>;
   protocolCorrection?: NonNullable<ReturnType<typeof captureReviewerProtocolEvidence>>;
@@ -245,11 +255,11 @@ export async function requestTeachingReview(options: {
       (options.introContext &&
         options.prompt === 'class/review-class-intro.md' &&
         options.variables.INTRO_REVIEW_ROLE === 'adjudicator' &&
-        options.jsonSchema.name === INTRO_ADJUDICATOR_JSON_SCHEMA.name) ||
+        options.jsonSchema.name === 'class_intro_adjudicator') ||
       (!options.introContext &&
         options.prompt === 'class/review-teaching-content.md' &&
         options.variables.TEACHING_REVIEW_ROLE === 'adjudicator' &&
-        options.jsonSchema.name === TEACHING_ADJUDICATOR_JSON_SCHEMA.name)
+        options.jsonSchema.name === 'class_teaching_adjudicator')
     )
   )
     throw new ReviewerProtocolError();
@@ -262,9 +272,7 @@ export async function requestTeachingReview(options: {
       {
         role: 'user',
         content: JSON.stringify({
-          ...(options.introContext ? { introContext: options.introContext } : {}),
-          items: options.items.map((content, index) => ({ index, content })),
-          ...(options.criticisms ? { criticisms: options.criticisms } : {}),
+          ...teachingReviewCandidate(options),
           ...(options.protocolCorrection
             ? { priorProtocolOutput: options.protocolCorrection }
             : {}),
@@ -290,7 +298,7 @@ export async function requestTeachingReview(options: {
 }
 
 function parseIntroCritic(content: string, items: readonly IntroAuditItem[]): IntroCritic {
-  return parseTeachingCritic(
+  return parseTeachingCriticResponse(
     content,
     items.map(({ fields }) => fields)
   );
@@ -301,7 +309,7 @@ function parseIntroAdjudicator(
   items: readonly IntroAuditItem[],
   critic: IntroCritic
 ): IntroAdjudicator {
-  return parseTeachingAdjudicator(
+  return parseTeachingAdjudicatorResponse(
     content,
     items.map(({ fields }) => fields),
     critic
@@ -326,7 +334,9 @@ export async function reviewTeachingContent(options: {
   const introAudit = options.kind === 'intro' ? buildIntroAuditItems(options.items) : undefined;
   const introItems = introAudit?.items;
   if (introItems && introItems.length > 10) throw new ReviewerProtocolError();
-  const allReviewedItems = introItems ?? options.items;
+  const listeningAudit =
+    options.kind === 'listening' ? buildListeningAudit(options.items) : undefined;
+  const allReviewedItems = introItems ?? listeningAudit?.items ?? options.items;
   if (
     allReviewedItems.length < 1 ||
     (!introItems && allReviewedItems.length > MAX_TEACHING_REVIEW_ITEMS)
@@ -350,12 +360,12 @@ export async function reviewTeachingContent(options: {
       jsonSchema: structuredClone(request.jsonSchema),
       ...(request.introContext ? { introContext: structuredClone(request.introContext) } : {}),
       ...(request.criticisms ? { criticisms: structuredClone(request.criticisms) } : {}),
+      sourceParts: (request.introContext
+        ? (request.items as readonly IntroAuditItem[]).map((item) => item.fields)
+        : request.items
+      ).map(buildTeachingSourceParts),
     };
-    const candidate = {
-      ...(fixed.introContext ? { introContext: fixed.introContext } : {}),
-      items: fixed.items.map((content, index) => ({ index, content })),
-      ...(fixed.criticisms ? { criticisms: fixed.criticisms } : {}),
-    };
+    const candidate = teachingReviewCandidate(fixed);
     for (;;) {
       // Provider admission, cancellation and cleanup errors are never protocol corrections.
       const content = await requestTeachingReview(fixed);
@@ -416,17 +426,19 @@ export async function reviewTeachingContent(options: {
       introAudit.reviewPackets = reviewPackets;
       for (let offset = 0; offset < reviewedItems.length; offset += 5) {
         const batch = introAudit.items.slice(offset, offset + 5);
+        const fields = batch.map((item) => item.fields);
+        const criticSchema = buildTeachingCriticJsonSchema(fields, true);
         const critic = await requestRole(
           {
             ...options,
             items: batch,
             introContext: introAudit.introContext,
             prompt: 'class/review-class-intro.md',
-            jsonSchema: INTRO_CRITIC_JSON_SCHEMA,
+            jsonSchema: criticSchema,
             variables: {
               ...reviewVariables,
               INTRO_REVIEW_ROLE: 'critic',
-              REVIEW_SCHEMA: JSON.stringify(INTRO_CRITIC_JSON_SCHEMA.schema),
+              REVIEW_SCHEMA: JSON.stringify(criticSchema.schema),
             },
             maxTokens: 4096,
           },
@@ -434,6 +446,7 @@ export async function reviewTeachingContent(options: {
           'critic',
           offset
         );
+        const adjudicatorSchema = buildTeachingAdjudicatorJsonSchema(fields, critic, true);
         const adjudicator = await requestRole(
           {
             ...options,
@@ -441,11 +454,11 @@ export async function reviewTeachingContent(options: {
             introContext: introAudit.introContext,
             criticisms: critic,
             prompt: 'class/review-class-intro.md',
-            jsonSchema: INTRO_ADJUDICATOR_JSON_SCHEMA,
+            jsonSchema: adjudicatorSchema,
             variables: {
               ...reviewVariables,
               INTRO_REVIEW_ROLE: 'adjudicator',
-              REVIEW_SCHEMA: JSON.stringify(INTRO_ADJUDICATOR_JSON_SCHEMA.schema),
+              REVIEW_SCHEMA: JSON.stringify(adjudicatorSchema.schema),
             },
             maxTokens: 4096,
           },
@@ -474,38 +487,41 @@ export async function reviewTeachingContent(options: {
       const aggregate: z.infer<typeof teachingQualityAggregateVerdictSchema>['items'] = [];
       for (let offset = 0; offset < reviewedItems.length; offset += 5) {
         const batch = reviewedItems.slice(offset, offset + 5);
+        const criticSchema = buildTeachingCriticJsonSchema(batch);
         const critic = await requestRole(
           {
             ...options,
             items: batch,
             prompt: 'class/review-teaching-content.md',
-            jsonSchema: TEACHING_CRITIC_JSON_SCHEMA,
+            jsonSchema: criticSchema,
             variables: {
               ...reviewVariables,
               TEACHING_REVIEW_ROLE: 'critic',
-              REVIEW_SCHEMA: JSON.stringify(TEACHING_CRITIC_JSON_SCHEMA.schema),
+              REVIEW_SCHEMA: JSON.stringify(criticSchema.schema),
             },
             maxTokens: 4096,
           },
-          (content, fixed) => parseTeachingCritic(content, fixed.items),
+          (content, fixed) => parseTeachingCriticResponse(content, fixed.items),
           'critic',
           offset
         );
+        const adjudicatorSchema = buildTeachingAdjudicatorJsonSchema(batch, critic);
         const adjudicator = await requestRole(
           {
             ...options,
             items: batch,
             criticisms: critic,
             prompt: 'class/review-teaching-content.md',
-            jsonSchema: TEACHING_ADJUDICATOR_JSON_SCHEMA,
+            jsonSchema: adjudicatorSchema,
             variables: {
               ...reviewVariables,
               TEACHING_REVIEW_ROLE: 'adjudicator',
-              REVIEW_SCHEMA: JSON.stringify(TEACHING_ADJUDICATOR_JSON_SCHEMA.schema),
+              REVIEW_SCHEMA: JSON.stringify(adjudicatorSchema.schema),
             },
             maxTokens: 4096,
           },
-          (content, fixed) => parseTeachingAdjudicator(content, fixed.items, fixed.criticisms!),
+          (content, fixed) =>
+            parseTeachingAdjudicatorResponse(content, fixed.items, fixed.criticisms!),
           'adjudicator',
           offset
         );
@@ -533,7 +549,8 @@ export async function reviewTeachingContent(options: {
               {
                 reviewContract: 'teaching_critic_adjudicator',
                 outerVerdict: 'derived_adjudicated_summary',
-                items: reviewedItems,
+                items: listeningAudit ? options.items : reviewedItems,
+                ...(listeningAudit ? { listeningAudit } : {}),
                 reviewPackets: genericPackets,
               },
             ],
@@ -555,7 +572,7 @@ export async function reviewTeachingContent(options: {
       if (!introAudit)
         issuedTeachingFailures.set(rejection, {
           kind: options.kind,
-          items: JSON.stringify(reviewedItems),
+          items: JSON.stringify(listeningAudit ? options.items : reviewedItems),
           failure: JSON.stringify(failure),
           issues: JSON.stringify(rejection.issues),
           feedback: JSON.stringify(rejection.feedback),

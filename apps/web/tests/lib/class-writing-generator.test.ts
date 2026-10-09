@@ -146,7 +146,7 @@ beforeEach(() => {
 });
 
 describe('composeWritingPrompts', () => {
-  it.each(['unbound quote', 'unmatched criticism', 'mismatched issue'])(
+  it.each(['unknown source part', 'unmatched criticism', 'extra verdict field'])(
     'refuses a modern adjudicator response with %s before replacement or persistence',
     async (defect) => {
       mockTeachingResponse.mockResolvedValue({
@@ -154,23 +154,19 @@ describe('composeWritingPrompts', () => {
         content: JSON.stringify({
           items: SAMPLE_PROMPTS.map((_, index) => ({
             index,
-            acceptable: index !== 0,
-            issues: index === 0 ? ['unsupported'] : [],
-            feedback: index === 0 ? ['The source supplies no additional event.'] : [],
-            findings:
+            ...(index === 0 && defect === 'extra verdict field' ? { acceptable: false } : {}),
+            newFindings:
               index === 0
                 ? [
                     {
-                      issue: defect === 'mismatched issue' ? 'incorrect' : 'unsupported',
-                      fieldPath: ['sourceText'],
-                      quote:
-                        defect === 'unbound quote'
-                          ? 'Unpublished invented event.'
-                          : 'Dinner invitation',
+                      issue: 'unsupported',
+                      sourcePartIndex: defect === 'unknown source part' ? 9999 : 0,
                       rule: 'Preserve supplied facts.',
                       defect: 'The task adds an unsupported event.',
-                      correction: 'Use only the supplied invitation facts.',
-                      counterexample: null,
+                      remedy: {
+                        kind: 'correction',
+                        text: 'Use only the supplied invitation facts.',
+                      },
                     },
                   ]
                 : [],
@@ -485,8 +481,24 @@ describe('composeWritingPrompts', () => {
       )
     );
     expect(error.teachingFailure?.reviews.map((review) => review.verdict)).toEqual([
-      verdict,
-      verdict,
+      {
+        ...verdict,
+        items: verdict.items.map((item) => ({
+          ...item,
+          feedback: item.feedback.map(
+            (text) => `${text} Correction: Use accurate supported teaching.`
+          ),
+        })),
+      },
+      {
+        ...verdict,
+        items: verdict.items.map((item) => ({
+          ...item,
+          feedback: item.feedback.map(
+            (text) => `${text} Correction: Use accurate supported teaching.`
+          ),
+        })),
+      },
     ]);
     expect(JSON.stringify(error)).not.toContain(replacement[0].guidance);
     expect(JSON.stringify(error)).not.toContain(verdict.items[0].feedback[0]);
@@ -550,7 +562,25 @@ describe('composeWritingPrompts', () => {
 
     expect(error).toBeInstanceOf(Error);
     expect(generationAttemptFailures(error)).toMatchObject([
-      { attempt: 1, type: 'teaching', failure: { reviews: [{ verdict: rejectedVerdict }] } },
+      {
+        attempt: 1,
+        type: 'teaching',
+        failure: {
+          reviews: [
+            {
+              verdict: {
+                ...rejectedVerdict,
+                items: rejectedVerdict.items.map((item) => ({
+                  ...item,
+                  feedback: item.feedback.map(
+                    (text) => `${text} Correction: Use accurate supported teaching.`
+                  ),
+                })),
+              },
+            },
+          ],
+        },
+      },
       {
         attempt: 2,
         type: 'structure',

@@ -29,8 +29,17 @@ const payloadSchema = z
 
 const evidenceSchema = reviewerProtocolDiagnosticSchema
   .extend({
-    kind: z.enum(['intro', 'explanations', 'writing', 'listening', 'speaking', 'vocabulary']),
-    role: z.enum(['critic', 'adjudicator']),
+    kind: z.enum([
+      'intro',
+      'explanations',
+      'writing',
+      'listening',
+      'speaking',
+      'vocabulary',
+      'grammar',
+      'reading',
+    ]),
+    role: z.enum(['critic', 'adjudicator', 'blind_section']),
     offset: z.number().int().min(0).max(49),
     payload: payloadSchema,
   })

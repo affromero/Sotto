@@ -16,7 +16,7 @@ import {
   TeachingQualityRejectionError,
   reviewTeachingContent,
   requestTeachingReview,
-  TEACHING_ADJUDICATOR_JSON_SCHEMA,
+  buildTeachingAdjudicatorJsonSchema,
 } from '@/lib/classes/quality/teaching-quality';
 import { captureGenerationFailure } from '@/lib/classes/quality/generation-failure';
 
@@ -145,7 +145,9 @@ describe('intro audit addresses', () => {
         variables: {},
         items: [{ explanation: 'Reviewed explanation.' }],
         introContext: candidate,
-        jsonSchema: TEACHING_ADJUDICATOR_JSON_SCHEMA,
+        jsonSchema: buildTeachingAdjudicatorJsonSchema([{ explanation: 'Reviewed explanation.' }], {
+          items: [{ index: 0, findings: [] }],
+        }),
       })
     ).rejects.toBeInstanceOf(ReviewerProtocolError);
     expect(boundary.generate).not.toHaveBeenCalled();
@@ -248,7 +250,7 @@ describe('intro audit addresses', () => {
       index: 9,
       acceptable: false,
       issues: ['unnatural'],
-      feedback: ['The visual is unsupported.'],
+      feedback: ['The visual is unsupported. Correction: Use accurate supported teaching.'],
     });
   });
 
@@ -332,16 +334,33 @@ describe('intro audit addresses', () => {
       {
         index: 0,
         feedback: [
-          'focus: focus[0]: focus entry has an unsupported rule.',
-          'examples: examples[0]: example meaning adds an event.',
+          'focus: focus[0]: focus entry has an unsupported rule. Correction: Use accurate supported teaching.',
+          'examples: examples[0]: example meaning adds an event. Correction: Use accurate supported teaching.',
         ],
       },
     ]);
     expect(failure.teachingFailure?.reviews[0]?.verdict).toEqual({
       items: [
-        ...rawVerdict.items.slice(0, 3),
-        { ...rawVerdict.items[3], index: 3 },
-        { ...rawVerdict.items[4], index: 4 },
+        ...rawVerdict.items.slice(0, 3).map((item) => ({
+          ...item,
+          feedback: item.feedback.map(
+            (text) => `${text} Correction: Use accurate supported teaching.`
+          ),
+        })),
+        {
+          ...rawVerdict.items[3],
+          index: 3,
+          feedback: rawVerdict.items[3]!.feedback.map(
+            (text) => `${text} Correction: Use accurate supported teaching.`
+          ),
+        },
+        {
+          ...rawVerdict.items[4],
+          index: 4,
+          feedback: rawVerdict.items[4]!.feedback.map(
+            (text) => `${text} Correction: Use accurate supported teaching.`
+          ),
+        },
         { index: 5, acceptable: true, issues: [], feedback: [] },
       ],
     });
@@ -456,8 +475,8 @@ describe('intro audit addresses', () => {
     expect(reviewedBatch(4)).toHaveLength(5);
     expect(reviewedBatch(6)).toHaveLength(5);
     expect(finalFailure.feedback[0]?.feedback).toEqual([
-      'examples: examples[2]: Defect at examples[2].',
-      'visuals: visuals: Defect at visuals[].',
+      'examples: examples[2]: Defect at examples[2]. Correction: Use accurate supported teaching.',
+      'visuals: visuals: Defect at visuals[]. Correction: Use accurate supported teaching.',
     ]);
     expect(firstFailure.teachingFailure?.reviews).toHaveLength(1);
     expect(finalFailure.teachingFailure?.reviews).toHaveLength(1);

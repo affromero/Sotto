@@ -40,6 +40,7 @@ import {
 import type { ListeningContentParams } from '@/lib/class-listening-generator';
 import { authorizedLearnerExecution } from '../helpers/runtime/provider-execution';
 import { captureGenerationFailure } from '@/lib/classes/quality/generation-failure';
+import { SectionQualityError } from '@/lib/classes/section-quality';
 
 describe('Listening audio admission', () => {
   it('rejects obsolete class audio inside admission while preserving the saved episode', async () => {
@@ -117,7 +118,16 @@ describe('generateClassListening', () => {
   it('rejects malformed blind review before publishing listening questions', async () => {
     setupHappyPath();
     mockBlindResponse.mockResolvedValue({ content: '{"questions":[]}', model: 'm' });
-    await expect(generateClassListening(PARAMS)).rejects.toThrow(/passage feedback/);
+    const error = await generateClassListening(PARAMS).catch((failure: unknown) => failure);
+    expect(error).toBeInstanceOf(SectionQualityError);
+    const failure = captureGenerationFailure(error);
+    expect(failure.teachingFailure).toBeUndefined();
+    expect(failure.protocolEvidence).toMatchObject([
+      { kind: 'listening', role: 'blind_section', reason: 'schema', pathCodes: ['response'] },
+    ]);
+    expect(JSON.parse(failure.protocolEvidence![0].payload.json!).response).toBe(
+      '{"questions":[]}'
+    );
     expect(mockClassSectionCreate).not.toHaveBeenCalled();
     expect(mockEpisodeUpdate).toHaveBeenCalledWith({
       where: { id: 'episode-1' },
@@ -252,7 +262,7 @@ describe('generateClassListening', () => {
         teachingInput.items.map(
           (item: { content: { passageText: string } }) => item.content.passageText
         )
-      ).toEqual(Array(4).fill(blindInput.passage));
+      ).toEqual([blindInput.passage, undefined, undefined, undefined, undefined]);
       expect(mockScriptCreate.mock.calls[0][0].data.turns).toEqual(turns);
       expect(mockCreateSegmentsAndQueueAudio.mock.calls[0][1]).toEqual(turns);
     });

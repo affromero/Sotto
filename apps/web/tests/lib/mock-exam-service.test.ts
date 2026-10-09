@@ -229,8 +229,7 @@ suite('persisted mock exams', () => {
         );
       } else if (body.response_format?.json_schema?.name === 'class_section_quality') {
         content = {
-          passageAcceptable: true,
-          passageFeedback: [],
+          passageFindings: [],
           issues: [],
           questions: Array.from({ length: 5 }, (_, index) => ({
             index,
@@ -307,6 +306,9 @@ suite('persisted mock exams', () => {
             'Welches Getränk nennt der Text?',
             'Was trinkt Anna am Morgen?',
           ].map((question) => ({
+            ...(prompt.includes('Generate 5 grammar')
+              ? { taskContext: 'Ergänze die Frage zum angegebenen Text.' }
+              : {}),
             question,
             options: ['Kaffee', 'Tee', 'Wasser', 'Saft'],
             correctIndex: 0,

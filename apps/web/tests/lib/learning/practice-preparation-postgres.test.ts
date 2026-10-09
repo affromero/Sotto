@@ -28,8 +28,8 @@ import { learningPreparationProviderRequest } from '@/lib/learning/preparation/p
 import { processPracticePreparation } from '@/workers/practice/practice-preparation.worker';
 import { readLearningFailure } from '@/lib/classes/quality/teaching-failure-store';
 import {
-  TEACHING_CRITIC_JSON_SCHEMA,
-  TEACHING_ADJUDICATOR_JSON_SCHEMA,
+  buildTeachingCriticJsonSchema,
+  buildTeachingAdjudicatorJsonSchema,
 } from '@/lib/classes/quality/teaching-quality';
 import { resumePractice } from '@/lib/practice/resume';
 import { practicePreparingSchema } from '@sotto/shared';
@@ -675,7 +675,10 @@ suite('Durable practice preparation against PostgreSQL', () => {
           } else if (schemaName === 'class_teaching_critic') {
             expect(payload.response_format).toMatchObject({
               type: 'json_schema',
-              json_schema: { ...TEACHING_CRITIC_JSON_SCHEMA, strict: true },
+              json_schema: {
+                ...buildTeachingCriticJsonSchema(reviewed.items!.map((item) => item.content)),
+                strict: true,
+              },
             });
             content = {
               items: reviewed.items!.map(({ index }) => ({ index, findings: [] })),
@@ -683,7 +686,13 @@ suite('Durable practice preparation against PostgreSQL', () => {
           } else if (schemaName === 'class_teaching_adjudicator') {
             expect(payload.response_format).toMatchObject({
               type: 'json_schema',
-              json_schema: { ...TEACHING_ADJUDICATOR_JSON_SCHEMA, strict: true },
+              json_schema: {
+                ...buildTeachingAdjudicatorJsonSchema(
+                  reviewed.items!.map((item) => item.content),
+                  { items: reviewed.items!.map(({ index }) => ({ index, findings: [] })) }
+                ),
+                strict: true,
+              },
             });
             expect(reviewed.criticisms).toEqual({
               items: reviewed.items!.map(({ index }) => ({ index, findings: [] })),
@@ -691,10 +700,7 @@ suite('Durable practice preparation against PostgreSQL', () => {
             content = {
               items: reviewed.items!.map(({ index }) => ({
                 index,
-                acceptable: true,
-                issues: [],
-                feedback: [],
-                findings: [],
+                newFindings: [],
                 criticDecisions: [],
               })),
             };
@@ -721,8 +727,7 @@ suite('Durable practice preparation against PostgreSQL', () => {
             };
           else if (reviewed.questions)
             content = {
-              passageAcceptable: true,
-              passageFeedback: [],
+              passageFindings: [],
               issues: [],
               questions: reviewed.questions.map(({ index }) => ({
                 index,
@@ -791,6 +796,9 @@ suite('Durable practice preparation against PostgreSQL', () => {
             content = {
               passage: user.includes('reading') ? passage : '',
               questions: Array.from({ length: 5 }, (_, index) => ({
+                ...(user.includes('reading')
+                  ? {}
+                  : { taskContext: 'Ergänze das Verb im Präsens.' }),
                 question: user.includes('reading')
                   ? 'Welche Begrüßung sagt Mia? ' + index
                   : 'Mia ____ in Berlin. ' + index,
