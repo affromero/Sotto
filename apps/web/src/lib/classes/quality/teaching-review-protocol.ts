@@ -20,6 +20,15 @@ import {
 } from './listening-audit/passage-witness';
 import type { NormalizedListeningTurn } from './listening-audit/projection';
 import {
+  listeningNarrativeExtractionEvidenceSchema,
+  listeningNarrativeWitnessEvidenceSchema,
+  parseListeningNarrativeExtraction,
+  parseListeningNarrativeExtractionResponse,
+  parseListeningNarrativeWitness,
+  parseListeningNarrativeWitnessResponse,
+  listeningNarrativeFailure,
+} from './listening-audit/narrative-witness';
+import {
   buildTeachingSourceParts,
   deriveTeachingFinding,
   privateTeachingCriticSchema,
@@ -144,6 +153,7 @@ export const teachingCriticSchema = z
             findings: z.array(teachingFindingSchema).max(3),
             answerSupport: readingAnswerSupportEvidenceSchema.optional(),
             passageWitness: listeningPassageExtractionEvidenceSchema.optional(),
+            narrativeWitness: listeningNarrativeExtractionEvidenceSchema.optional(),
           })
           .strict()
       )
@@ -161,6 +171,7 @@ export const teachingAdjudicatorSchema = z
           findings: z.array(teachingFindingSchema).max(6),
           answerSupport: readingAnswerSupportEvidenceSchema.optional(),
           passageWitness: listeningPassageWitnessEvidenceSchema.optional(),
+          narrativeWitness: listeningNarrativeWitnessEvidenceSchema.optional(),
           criticDecisions: z
             .array(
               z
@@ -408,6 +419,13 @@ export function parseTeachingCritic(
     if (row.answerSupport) validatedAnswerSupport(row.answerSupport, fields[row.index]);
     if (row.passageWitness)
       validatedPassageExtraction(row.passageWitness, fields[row.index], row.index, listeningTurns);
+    if (row.narrativeWitness)
+      validatedNarrativeExtraction(
+        row.narrativeWitness,
+        fields[row.index],
+        row.index,
+        listeningTurns
+      );
     for (const finding of row.findings) assertFindingBound(finding, fields[row.index]);
   }
   return critic;
@@ -421,9 +439,17 @@ export function parseTeachingAdjudicator(
   criticAssignment?: readonly number[]
 ): TeachingAdjudicator {
   assertCriticCoverage(critic.items, fields, false, listeningTurns, criticAssignment);
-  for (const row of critic.items)
+  for (const row of critic.items) {
     if (row.passageWitness)
       validatedPassageExtraction(row.passageWitness, fields[row.index], row.index, listeningTurns);
+    if (row.narrativeWitness)
+      validatedNarrativeExtraction(
+        row.narrativeWitness,
+        fields[row.index],
+        row.index,
+        listeningTurns
+      );
+  }
   const adjudicator = parseReview(content, teachingAdjudicatorSchema);
   assertReviewCoverage(adjudicator.items, fields.length);
   for (const row of adjudicator.items) {
@@ -451,11 +477,23 @@ export function parseTeachingAdjudicator(
           )
         )
       : undefined;
+    const narrativeFailure = row.narrativeWitness
+      ? listeningNarrativeFailure(
+          validatedNarrativeWitness(
+            row.narrativeWitness,
+            fields[row.index],
+            row.index,
+            listeningTurns,
+            critic.items.find((item) => item.index === row.index)?.narrativeWitness
+          )
+        )
+      : undefined;
     const findingIssues = [
       ...new Set([
         ...row.findings.map(({ issue }) => issue),
         ...(supportFailure ? ['unsupported'] : []),
         ...(passageFailure ? [passageFailure.issue] : []),
+        ...(narrativeFailure ? [narrativeFailure.issue] : []),
       ]),
     ].sort();
     if (
@@ -463,10 +501,11 @@ export function parseTeachingAdjudicator(
         (row.findings.length > 0 ||
           supportFailure ||
           passageFailure ||
+          narrativeFailure ||
           row.issues.length > 0 ||
           row.feedback.length > 0)) ||
       (!row.acceptable &&
-        ((!row.findings.length && !supportFailure && !passageFailure) ||
+        ((!row.findings.length && !supportFailure && !passageFailure && !narrativeFailure) ||
           row.issues.length === 0 ||
           row.feedback.length === 0)) ||
       !isDeepStrictEqual([...new Set(row.issues)].sort(), findingIssues)
@@ -507,6 +546,67 @@ function validatedPassageExtraction(
   if (index !== 0 || !listeningTurns) throw invalidResponse('supported_evidence', 'adjudicator');
   try {
     return parseListeningPassageExtraction(value, fields, listeningTurns);
+  } catch {
+    throw invalidResponse('supported_evidence', 'adjudicator');
+  }
+}
+
+function validatedNarrativeExtraction(
+  value: unknown,
+  fields: unknown,
+  index: number,
+  turns?: readonly NormalizedListeningTurn[]
+) {
+  if (index !== 0 || !turns) throw invalidResponse('supported_evidence', 'adjudicator');
+  try {
+    return parseListeningNarrativeExtraction(value, fields, turns);
+  } catch {
+    throw invalidResponse('supported_evidence', 'adjudicator');
+  }
+}
+
+function validatedNarrativeWitness(
+  value: unknown,
+  fields: unknown,
+  index: number,
+  turns: readonly NormalizedListeningTurn[] | undefined,
+  extraction: TeachingCritic['items'][number]['narrativeWitness']
+) {
+  if (index !== 0 || !turns || !extraction)
+    throw invalidResponse('supported_evidence', 'adjudicator');
+  try {
+    return parseListeningNarrativeWitness(value, fields, turns, extraction);
+  } catch {
+    throw invalidResponse('supported_evidence', 'adjudicator');
+  }
+}
+
+function validatedNarrativeExtractionResponse(
+  value: unknown,
+  fields: unknown,
+  index: number,
+  turns: readonly NormalizedListeningTurn[] | undefined,
+  binding: TeachingCritic['items'][number]['passageWitness']
+) {
+  if (index !== 0 || !turns || !binding) throw invalidResponse('supported_evidence', 'adjudicator');
+  try {
+    return parseListeningNarrativeExtractionResponse(value, fields, turns, binding);
+  } catch {
+    throw invalidResponse('supported_evidence', 'adjudicator');
+  }
+}
+
+function validatedNarrativeWitnessResponse(
+  value: unknown,
+  fields: unknown,
+  index: number,
+  turns: readonly NormalizedListeningTurn[] | undefined,
+  extraction: TeachingCritic['items'][number]['narrativeWitness']
+) {
+  if (index !== 0 || !turns || !extraction)
+    throw invalidResponse('supported_evidence', 'adjudicator');
+  try {
+    return parseListeningNarrativeWitnessResponse(value, fields, turns, extraction);
   } catch {
     throw invalidResponse('supported_evidence', 'adjudicator');
   }
@@ -592,26 +692,39 @@ export function parseTeachingCriticResponse(
   );
   assertCriticCoverage(response.items, fields, reading, listeningTurns, criticAssignment);
   return teachingCriticSchema.parse({
-    items: response.items.map((row) => ({
-      index: row.index,
-      ...(reading
-        ? { answerSupport: validatedAnswerSupport(row.answerSupport, fields[row.index]) }
-        : {}),
-      ...(listeningTurns && row.index === 0
-        ? {
-            passageWitness: validatedPassageExtractionResponse(
+    items: response.items.map((row) => {
+      const passageWitness =
+        listeningTurns && row.index === 0
+          ? validatedPassageExtractionResponse(
               row.passageWitness,
               fields[row.index],
               row.index,
               listeningTurns,
               listeningTargetLang
-            ),
-          }
-        : {}),
-      findings: row.findings.map((finding) =>
-        deriveTeachingFinding(finding, buildTeachingSourceParts(fields[row.index]))
-      ),
-    })),
+            )
+          : undefined;
+      return {
+        index: row.index,
+        ...(reading
+          ? { answerSupport: validatedAnswerSupport(row.answerSupport, fields[row.index]) }
+          : {}),
+        ...(passageWitness
+          ? {
+              passageWitness,
+              narrativeWitness: validatedNarrativeExtractionResponse(
+                row.narrativeWitness,
+                fields[row.index],
+                row.index,
+                listeningTurns,
+                passageWitness
+              ),
+            }
+          : {}),
+        findings: row.findings.map((finding) =>
+          deriveTeachingFinding(finding, buildTeachingSourceParts(fields[row.index]))
+        ),
+      };
+    }),
   });
 }
 
@@ -631,6 +744,13 @@ export function parseTeachingAdjudicatorResponse(
     if (reading) validatedAnswerSupport(row.answerSupport, fields[row.index]);
     if (row.passageWitness)
       validatedPassageExtraction(row.passageWitness, fields[row.index], row.index, listeningTurns);
+    if (listeningTurns && row.index === 0)
+      validatedNarrativeExtraction(
+        row.narrativeWitness,
+        fields[row.index],
+        row.index,
+        listeningTurns
+      );
     for (const finding of row.findings) teachingFindingSource(finding, fields[row.index]);
   }
   const response = parseReview(
@@ -689,16 +809,32 @@ export function parseTeachingAdjudicatorResponse(
       const passageFailure = passageWitness
         ? listeningPassageWitnessFailure(passageWitness)
         : undefined;
+      const narrativeWitness =
+        listeningTurns && row.index === 0
+          ? validatedNarrativeWitnessResponse(
+              row.narrativeWitness,
+              fields[row.index],
+              row.index,
+              listeningTurns,
+              validatedCritic.items.find((item) => item.index === row.index)?.narrativeWitness
+            )
+          : undefined;
+      const narrativeFailure = narrativeWitness
+        ? listeningNarrativeFailure(narrativeWitness)
+        : undefined;
       return {
         index: row.index,
         ...(answerSupport ? { answerSupport } : {}),
         ...(passageWitness ? { passageWitness } : {}),
-        acceptable: findings.length === 0 && !supportFailure && !passageFailure,
+        ...(narrativeWitness ? { narrativeWitness } : {}),
+        acceptable:
+          findings.length === 0 && !supportFailure && !passageFailure && !narrativeFailure,
         issues: [
           ...new Set([
             ...findings.map((finding) => finding.issue),
             ...(supportFailure ? ['unsupported' as const] : []),
             ...(passageFailure ? [passageFailure.issue] : []),
+            ...(narrativeFailure ? [narrativeFailure.issue] : []),
           ]),
         ],
         feedback: [
@@ -708,6 +844,7 @@ export function parseTeachingAdjudicatorResponse(
           ),
           ...(supportFailure ? [supportFailure] : []),
           ...(passageFailure ? [passageFailure.feedback] : []),
+          ...(narrativeFailure ? [narrativeFailure.feedback] : []),
         ],
         findings,
         criticDecisions: row.criticDecisions,

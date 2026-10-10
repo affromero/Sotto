@@ -213,13 +213,12 @@ describe('grammar speaker attribution at the provider boundary', () => {
             }),
           };
         }
-        expect(stage).toBe('keyed');
         expect(options.jsonSchema.name).toBe('class_teaching_adjudicator');
         expect(system).toContain('For explanation items involving grammar tasks');
         expect(JSON.parse(messages[0].content).items[1].content).toEqual(
           compiledGrammarFixture(unassigned[1]!)
         );
-        return { content: JSON.stringify(verdict(true)) };
+        return { content: JSON.stringify(verdict(stage === 'keyed')) };
       });
       const failure = await generateSectionQuestions(params).catch((error: unknown) => error);
       expect(failure).toBeInstanceOf(SectionQualityError);

@@ -238,7 +238,17 @@ describe('fixed-context vocabulary distractor repair', () => {
         })),
     ];
     await expect(generateSectionQuestions(params)).rejects.toBeInstanceOf(SectionQualityError);
-    expect(requests.filter(({ name }) => name === 'class_teaching_critic')).toEqual([]);
+    expect(
+      requests.filter(({ name }) => name === 'class_teaching_critic').at(-1)!.input
+    ).toMatchObject({
+      items: expect.arrayContaining([
+        expect.objectContaining({
+          content: expect.objectContaining({
+            question: `${initial[0].taskContext}\nFür den Pfannkuchenteig habe ich Mehl, Eier und Milch in einer Schüssel _____.`,
+          }),
+        }),
+      ]),
+    });
     expect(
       requests.filter(({ name }) => name === 'class_section_quality').at(-1)!.input
     ).toMatchObject({

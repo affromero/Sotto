@@ -16,6 +16,7 @@ import {
 } from '@/lib/classes/quality/teaching-quality';
 import { ReviewerProtocolError } from '@/lib/classes/quality/teaching-review-protocol';
 import { listeningRepairPlan as boundListeningRepairPlan } from '@/lib/classes/quality/listening-repair';
+import { buildListeningAudit } from '@/lib/classes/quality/listening-audit/projection';
 import {
   applyTeachingScriptRepair,
   teachingScriptRepairContract,
@@ -26,6 +27,8 @@ import {
   normalizedListeningExtractionFixture,
   listeningWitnessFixture,
   withListeningWitnessFixture,
+  listeningNarrativeExtractionFixture,
+  listeningNarrativeWitnessFixture,
 } from '../../listening/witness-fixture';
 
 const passage = 'HOST: Wohin ist Lea gefahren?\nEXPERT: Lea ist nach Bonn gefahren.';
@@ -327,6 +330,7 @@ describe('listening passage concern adjudication', () => {
               ...listeningExtractionFixture(turns),
               pairs: origin === 'proposed' ? [proposed] : [],
             };
+            parsed.items[0].narrativeWitness = listeningNarrativeExtractionFixture(turns);
             return { ...response, content: JSON.stringify(parsed) };
           }
           const input = JSON.parse(messages[0].content as string);
@@ -365,6 +369,7 @@ describe('listening passage concern adjudication', () => {
                   additionalPairs: [],
                 }
               : witness;
+          parsed.items[0].narrativeWitness = listeningNarrativeWitnessFixture(turns);
           return { ...response, content: JSON.stringify(parsed) };
         }
       );
@@ -567,13 +572,83 @@ describe('listening passage concern adjudication', () => {
     for (const input of seen) expect(input).not.toHaveProperty('listeningSource');
   });
 
-  it('repairs an oversized rejected candidate while keeping persisted diagnostics capped and live authority isolated', async () => {
+  it.each([undefined, 'Source material:\nLea remained in Köln.'])(
+    'retains compact listening diagnostics and isolated full repair authority for an oversized envelope (source %s)',
+    async (source) => {
+      defect = 'passage';
+      const items = questions().map((item) => ({
+        ...item,
+        passageText: item.passageText + ' Lea erzählt von ihrer Reise.'.repeat(300),
+      }));
+      const error = await review(items, observation(items).listeningPassageReview, source).catch(
+        (failure: unknown) => failure
+      );
+      if (!(error instanceof TeachingQualityRejectionError)) throw error;
+      const diagnostic = error.teachingFailure!.reviews[0];
+      const compact = JSON.parse(diagnostic.candidate!);
+      expect(compact).toEqual([
+        {
+          reviewContract: 'listening_candidate_diagnostic',
+          listeningAudit: buildListeningAudit(items, listeningTurnsFixture(items[0].passageText)),
+          ...(source !== undefined ? { listeningSource: source } : {}),
+        },
+      ]);
+      expect(diagnostic).not.toHaveProperty('omitted');
+      expect(Buffer.byteLength(diagnostic.candidate!, 'utf8')).toBeLessThanOrEqual(32 * 1024);
+      expect(compact[0].listeningAudit.items[0]).toEqual({ passageText: items[0].passageText });
+      expect(compact[0].listeningAudit.items.slice(1)).toEqual(
+        items.map((item) => ({
+          question: item.question,
+          options: item.options,
+          correctIndex: item.correctIndex,
+          explanation: item.explanation,
+        }))
+      );
+      expect(listeningRepairPlan(error, items, source)).toMatchObject({
+        target: 'script',
+        verdict: { findings: [{ index: 0, findings: [{ fieldPath: ['passageText'] }] }] },
+      });
+      const returned = authenticListeningTeachingReview(error, items)!;
+      expect(Buffer.byteLength(JSON.stringify(returned.candidate), 'utf8')).toBeGreaterThan(
+        32 * 1024
+      );
+      expect(returned.candidate).toMatchObject([
+        {
+          reviewContract: 'teaching_critic_adjudicator',
+          reviewPackets: [
+            {
+              critic: { items: expect.any(Array) },
+              adjudicator: { items: expect.any(Array) },
+            },
+          ],
+        },
+      ]);
+      expect(returned.failure.reviews[0].verdict).toEqual(diagnostic.verdict);
+      Object.assign(returned.candidate[0] as object, { listeningSource: 'Changed source' });
+      expect(listeningRepairPlan(error, items, source)?.target).toBe('script');
+      expect(listeningRepairPlan(error, items, `${source ?? ''} changed`)).toBeNull();
+      const changed = structuredClone(items);
+      changed[0].question += ' changed';
+      expect(listeningRepairPlan(error, changed, source)).toBeNull();
+      const copied = new TeachingQualityRejectionError(
+        error.issues,
+        error.feedback,
+        error.teachingFailure
+      );
+      expect(listeningRepairPlan(copied, items, source)).toBeNull();
+      const originalCandidate = diagnostic.candidate;
+      diagnostic.candidate += ' ';
+      expect(listeningRepairPlan(error, items, source)).toBeNull();
+      diagnostic.candidate = originalCandidate;
+      error.teachingFailure!.reviews[0].verdict.items[0].feedback.push('Mutated verdict');
+      expect(listeningRepairPlan(error, items, source)).toBeNull();
+    }
+  );
+
+  it('omits a compact listening diagnostic that still exceeds the byte cap without losing live repair authority', async () => {
     defect = 'passage';
-    const items = questions().map((item) => ({
-      ...item,
-      passageText: item.passageText + ' Lea erzählt von ihrer Reise.'.repeat(300),
-    }));
-    const source = 'Source material:\nLea remained in Köln.';
+    const items = questions();
+    const source = 'Source material:\n' + 'Lea remained in Köln. '.repeat(1700);
     const error = await review(items, observation(items).listeningPassageReview, source).catch(
       (failure: unknown) => failure
     );
@@ -582,25 +657,14 @@ describe('listening passage concern adjudication', () => {
       candidate: null,
       omitted: 'size_limit',
     });
-    expect(listeningRepairPlan(error, items, source)).toMatchObject({
-      target: 'script',
-      verdict: { findings: [{ index: 0, findings: [{ fieldPath: ['passageText'] }] }] },
+    expect(error.teachingFailure!.reviews[0].verdict.items[0]).toMatchObject({
+      index: 0,
+      acceptable: false,
+      issues: ['incorrect'],
     });
     const returned = authenticListeningTeachingReview(error, items)!;
-    Object.assign(returned.candidate[0] as object, { listeningSource: 'Changed source' });
+    expect(returned.candidate).toMatchObject([{ listeningSource: source }]);
     expect(listeningRepairPlan(error, items, source)?.target).toBe('script');
-    expect(listeningRepairPlan(error, items, source + ' changed')).toBeNull();
-    const changed = structuredClone(items);
-    changed[0].question += ' changed';
-    expect(listeningRepairPlan(error, changed, source)).toBeNull();
-    const copied = new TeachingQualityRejectionError(
-      error.issues,
-      error.feedback,
-      error.teachingFailure
-    );
-    expect(listeningRepairPlan(copied, items, source)).toBeNull();
-    error.teachingFailure!.reviews[0].verdict.items[0].feedback.push('Mutated verdict');
-    expect(listeningRepairPlan(error, items, source)).toBeNull();
   });
 
   it('rejects listening source context on another teaching kind before dispatch', async () => {

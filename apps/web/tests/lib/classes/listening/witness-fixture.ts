@@ -41,6 +41,51 @@ export function listeningWitnessFixture() {
   return { pairDecisions: [], additionalPairs: [] };
 }
 
+/** Explicit independent-turn declarations, not inferred narrative semantics. */
+export function listeningNarrativeExtractionFixture(
+  turns: readonly Pick<NormalizedListeningTurn, 'turnIndex'>[]
+) {
+  return {
+    turns: Object.fromEntries(
+      turns.map(({ turnIndex }) => [
+        String(turnIndex),
+        { links: [] as Array<{ earlierUnitIndex: number; currentUnitIndex: number }> },
+      ])
+    ),
+  };
+}
+
+type NarrativeAssessmentFixture = {
+  status:
+    | 'consistent'
+    | 'explicit_change'
+    | 'different_group'
+    | 'not_a_reference'
+    | 'contradicted'
+    | 'uncertain';
+  reason: string;
+  remedy: { kind: 'correction' | 'counterexample'; text: string } | null;
+};
+
+export function listeningNarrativeWitnessFixture(
+  turns: readonly Pick<NormalizedListeningTurn, 'turnIndex'>[]
+) {
+  return {
+    turns: Object.fromEntries(
+      turns.map(({ turnIndex }) => [
+        String(turnIndex),
+        {
+          reason: 'This synthetic fixture declares no narrative reference.',
+          linkDecisions: {} as Record<string, NarrativeAssessmentFixture>,
+          additionalLinks: [] as Array<
+            NarrativeAssessmentFixture & { earlierUnitIndex: number; currentUnitIndex: number }
+          >,
+        },
+      ])
+    ),
+  };
+}
+
 export function normalizedListeningExtractionFixture(
   turns: readonly NormalizedListeningTurn[],
   targetLang = 'de'
@@ -82,6 +127,11 @@ export function withListeningWitnessFixture<T extends { content: string }>(
       (row: { index: number }) => row.index === 0
     )?.passagePairs;
     if (!critic && (!Array.isArray(proposed) || proposed.length !== 0)) return response;
+    const narrativeProposals = payload.criticisms?.items.find(
+      (row: { index: number }) => row.index === 0
+    )?.narrativeTurns;
+    if (!critic && narrativeProposals?.some((turn: { links: unknown[] }) => turn.links.length))
+      return response;
     const declaration = critic
       ? {
           unitAccounts: Object.fromEntries(
@@ -93,13 +143,27 @@ export function withListeningWitnessFixture<T extends { content: string }>(
           pairs: [],
         }
       : listeningWitnessFixture();
+    const turns =
+      payload.listeningTurns ??
+      [
+        ...new Set<number>(
+          payload.listeningUnits.units.map((unit: { turnIndex: number }) => unit.turnIndex)
+        ),
+      ].map((turnIndex) => ({ turnIndex }));
+    const narrative = critic
+      ? listeningNarrativeExtractionFixture(turns)
+      : listeningNarrativeWitnessFixture(turns);
     return {
       ...response,
       content: JSON.stringify({
         ...parsed,
         items: parsed.items.map((row: Record<string, unknown>) =>
-          row.index === 0 && !Object.hasOwn(row, 'passageWitness')
-            ? { ...row, passageWitness: declaration }
+          row.index === 0
+            ? {
+                ...row,
+                ...(!Object.hasOwn(row, 'passageWitness') ? { passageWitness: declaration } : {}),
+                ...(!Object.hasOwn(row, 'narrativeWitness') ? { narrativeWitness: narrative } : {}),
+              }
             : row
         ),
       }),

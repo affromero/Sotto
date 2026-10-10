@@ -581,6 +581,7 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
   let teachingFailure: TeachingFailure | undefined;
   let sectionFeedback: SectionReviewFeedback | undefined;
   let vocabularyFeedback: VocabularyCoverageFeedback | undefined;
+  const blindApprovedQuestionIndices = new Set<number>();
   const review = async (
     questions: GeneratedQuestion[],
     duplicateChoices = false
@@ -589,6 +590,7 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
     terminalTeachingRejection = undefined;
     sectionFeedback = undefined;
     vocabularyFeedback = undefined;
+    blindApprovedQuestionIndices.clear();
     const coverage: ReturnType<typeof assessVocabularyCoverage> = p.vocabularyReview
       ? assessVocabularyCoverage(questions, vocabularyLemmas)
       : { issues: [] };
@@ -633,12 +635,27 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
     }
     sectionFeedback = assessment.readingPassageReview ? undefined : assessment.feedback;
     const issues = assessment.questionIssues ?? assessment.issues;
+    if (assessment.issues.length === 0) {
+      for (const [index] of questions.entries()) blindApprovedQuestionIndices.add(index);
+    } else if (
+      sectionFeedback?.passageAcceptable &&
+      !sectionFeedback.passageFeedback.length &&
+      !sectionFeedback.issues.length
+    ) {
+      for (const row of sectionFeedback.questions)
+        if (
+          !row.issues.length &&
+          row.acceptableOptionIndices.length === 1 &&
+          row.acceptableOptionIndices[0] === questions[row.index].correctIndex
+        )
+          blindApprovedQuestionIndices.add(row.index);
+    }
     if (p.skill === 'READING' && assessment.feedback && issues.length)
       teachingFailure = combineTeachingFailures(
         teachingFailure,
         captureBlindSectionFailure(questions, assessment.feedback, 'explanations')
       );
-    if (issues.length === 0 && !duplicateChoices) {
+    if ((issues.length === 0 || sectionSkill === 'GRAMMAR') && !duplicateChoices) {
       try {
         await reviewTeachingContent({
           ai,
@@ -659,7 +676,7 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
           teachingFailure = combineTeachingFailures(teachingFailure, error.teachingFailure);
           if (useSourcePassage && hasSupportedReadingPassageFailure(error))
             throw new TeachingQualityRejectionError(error.issues, error.feedback, teachingFailure);
-          return ['teaching_quality'];
+          return [...new Set([...issues, 'teaching_quality'])];
         }
         throw error;
       }
@@ -784,7 +801,11 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
         )
           throw teachingRejection;
         for (const item of verdict.items)
-          if (item.acceptable && item.issues.length === 0)
+          if (
+            item.acceptable &&
+            item.issues.length === 0 &&
+            blindApprovedQuestionIndices.has(item.index)
+          )
             retainedApprovedQuestions.set(
               p.vocabularyReview ? candidateTargetOrder[item.index] : item.index,
               structuredClone(candidate[item.index])

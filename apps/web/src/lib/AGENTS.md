@@ -177,8 +177,11 @@ also remains in protocol correction and private failure evidence; repair require
 an exact match to the original source context. Findings still address spoken passage
 fields, and unsourced listening keeps its existing review inputs.
 Live listening repair uses the authenticated canonical review envelope retained
-with its issued rejection. The persisted diagnostic still omits candidates above
-32 KiB; that omission does not remove the existing bounded repair opportunity.
+with its issued rejection. When the full persisted envelope exceeds 32 KiB,
+listening diagnostics retain the deduplicated passage audit, questions, turn table
+and optional original source under the same cap. A compact diagnostic that still
+exceeds the cap remains explicitly omitted. Neither projection changes the full
+live review envelope or the existing bounded repair opportunity.
 Returned live evidence is cloned and passes the same strict source, candidate and
 projection checks before the existing finding-to-repair mapping.
 A malformed quiz preserves the exact script and
@@ -319,7 +322,14 @@ and cancellation propagate without retrying under another provider. This is a
 probabilistic check, not a guarantee of pedagogical correctness.
 `classes/quality/teaching-quality.ts` adds fail-closed reviews of the exact normalized
 intro (including repaired content and visuals), writing tasks, or question
-explanations after a successful blind solve. The keyed teaching audit remains a
+explanations. Reading explanations require a successful blind solve as described
+above. Structurally valid, coverage-complete grammar and vocabulary candidates with
+distinct choices collect both the blind solve and paired teaching audit before the
+existing bounded repair, even when the blind solve rejects a question. Repair receives
+both sets of feedback. Preserve whole questions only when complete indexed blind
+feedback identifies their unique proposed key without row or global defects and the
+authenticated teaching verdict also approves them. Replacements still pass complete
+structural validation and both full-set reviews. The keyed teaching audit remains a
 separate request so keys and explanations never reach the blind solver. Writing
 review distinguishes intentional correction sources from instructions requiring
 incorrect output. Provider, cancellation, and review failures propagate. These
@@ -450,7 +460,21 @@ under the unchanged size limit and retains initial reviews through terminal prov
 protocol and cancellation failures without replacing those errors or replaying work.
 
 `script-generator.ts` aligns vocabulary marker numbers before producing markdown.
-It remaps only a unique exact word identity already in the generated vocabulary,
+`learning/script/authoring-context.ts` scopes default conversational roles and objective
+framing to learning scripts, and contextual vocabulary practice to learning immersion.
+Custom speakers and other language modes retain their existing instructions.
+Learning authoring keeps early-level information sparse within the existing duration
+budget. The shared listening review policy uses the actual pause, replay and question
+support, and requires a concrete remaining comprehension barrier for level findings.
+Listening review requires a separate narrative continuity witness for every canonical
+turn, alongside its teaching-relation witness. The independent judge assesses source-bound
+references, group membership and event state, including turns with no proposed links.
+The judge wire supplies link assessments; compilation derives retained turn continuity
+with negative assessments taking precedence. Model-authored continuity is rejected.
+Contradicted or unresolved narrative links block publication and preserve both operands
+for the existing bounded repair. Changes of state and participant groups require support
+in the actual dialogue. The witness adds no model calls or generation attempts.
+Script vocabulary alignment remaps only a unique exact word identity already in the generated vocabulary,
 preserves correct numbered identities and legitimate surface variations, and rejects
 duplicate numbers, ambiguous remapping, or missing identities. It never rewrites
 spoken text or infers a translation. `learning/script/output-protocol.ts` authenticates

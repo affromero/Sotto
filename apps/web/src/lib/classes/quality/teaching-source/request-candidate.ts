@@ -34,39 +34,54 @@ export function teachingReviewCandidate(options: Parameters<typeof requestTeachi
     ...(options.criticisms
       ? {
           criticisms: {
-            items: options.criticisms.items.map(({ index, findings, passageWitness }) => ({
-              index,
-              findings,
-              ...(options.introContext
-                ? {
-                    findingSources: findings.map((finding, findingIndex) => ({
-                      findingIndex,
-                      sourceText: teachingFindingSource(
-                        finding,
-                        (options.items[index] as { fields: unknown } | undefined)?.fields
-                      ),
-                    })),
-                  }
-                : {}),
-              ...(passageWitness
-                ? {
-                    passagePairs: passageWitness.pairs.map((pair) => {
-                      const premiseUnit = listeningUnits?.units[pair.premiseUnitIndex];
-                      const exampleUnit = listeningUnits?.units[pair.exampleUnitIndex];
-                      if (!premiseUnit || !exampleUnit)
-                        throw new Error('Listening teaching operands require bound source units.');
-                      return {
-                        pairIndex: pair.pairIndex,
-                        premiseUnitIndex: pair.premiseUnitIndex,
-                        exampleUnitIndex: pair.exampleUnitIndex,
-                        premiseUnit,
-                        exampleUnit,
-                        relation: pair.relation,
-                      };
-                    }),
-                  }
-                : {}),
-            })),
+            items: options.criticisms.items.map(
+              ({ index, findings, passageWitness, narrativeWitness }) => ({
+                index,
+                findings,
+                ...(narrativeWitness
+                  ? {
+                      narrativeTurns: narrativeWitness.turns.map((turn) => ({
+                        ...structuredClone(turn),
+                        links: turn.links.map((link, linkIndex) => ({
+                          ...structuredClone(link),
+                          linkIndex,
+                        })),
+                      })),
+                    }
+                  : {}),
+                ...(options.introContext
+                  ? {
+                      findingSources: findings.map((finding, findingIndex) => ({
+                        findingIndex,
+                        sourceText: teachingFindingSource(
+                          finding,
+                          (options.items[index] as { fields: unknown } | undefined)?.fields
+                        ),
+                      })),
+                    }
+                  : {}),
+                ...(passageWitness
+                  ? {
+                      passagePairs: passageWitness.pairs.map((pair) => {
+                        const premiseUnit = listeningUnits?.units[pair.premiseUnitIndex];
+                        const exampleUnit = listeningUnits?.units[pair.exampleUnitIndex];
+                        if (!premiseUnit || !exampleUnit)
+                          throw new Error(
+                            'Listening teaching operands require bound source units.'
+                          );
+                        return {
+                          pairIndex: pair.pairIndex,
+                          premiseUnitIndex: pair.premiseUnitIndex,
+                          exampleUnitIndex: pair.exampleUnitIndex,
+                          premiseUnit,
+                          exampleUnit,
+                          relation: pair.relation,
+                        };
+                      }),
+                    }
+                  : {}),
+              })
+            ),
           },
         }
       : {}),

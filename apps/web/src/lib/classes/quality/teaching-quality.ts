@@ -648,7 +648,21 @@ export async function reviewTeachingContent(options: {
               reviewPackets: genericPackets,
             },
           ];
-      const failure = captureTeachingFailure(options.kind, candidate, parsed);
+      let failure = captureTeachingFailure(options.kind, candidate, parsed);
+      if (options.kind === 'listening' && listeningAudit && failure.reviews[0].candidate === null)
+        failure = captureTeachingFailure(
+          options.kind,
+          [
+            {
+              reviewContract: 'listening_candidate_diagnostic',
+              listeningAudit,
+              ...(options.listeningSource !== undefined
+                ? { listeningSource: options.listeningSource }
+                : {}),
+            },
+          ],
+          parsed
+        );
       const rejection = new TeachingQualityRejectionError(
         issues,
         options.kind === 'intro'
