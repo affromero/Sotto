@@ -127,6 +127,8 @@ export function listeningRepairPlan(
       );
       if (passageFindings.length) {
         if (!turns) return null;
+        if (passageFindings.some((finding) => finding.issue === 'level'))
+          for (const turn of turns) turnIndices.add(turn.turnIndex);
         for (const index of listeningSourcePartTurnIndices(
           envelope.listeningAudit!.items[0],
           turns,
