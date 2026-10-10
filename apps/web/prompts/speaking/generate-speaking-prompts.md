@@ -17,7 +17,7 @@ Generate exactly {{COUNT}} short target phrases the learner should say aloud. Ea
 - Be brief enough for a single spoken utterance (1–2 sentences or a short phrase at A1/A2; up to 2–3 sentences at B1+)
 - Vary in structure so the learner practices different sentence patterns
 
-For each phrase, `translation` must express its faithful meaning under the language policy above. Preserve the actor, grammatical person, tense, actions, participants, and every stated fact, including time, place, negation, and descriptive details. At immersion levels, use a target-language paraphrase. A usage note must explain what the exact utterance communicates. Do not replace its meaning with instructions telling the learner what to say, a suggested reply, or a broader topic description.
+For each phrase, interpret `translation` using the shared speaking field policy above. Preserve that policy during generation and repair; the explanation's grammatical framing and the practiced utterance have distinct roles.
 
 ## Output
 

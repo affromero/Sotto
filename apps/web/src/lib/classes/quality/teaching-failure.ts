@@ -7,7 +7,7 @@ const teachingQualityVerdictItemSchema = z
     issues: z
       .array(z.enum(['incorrect', 'unnatural', 'unsupported', 'infeasible', 'level', 'uncertain']))
       .max(6),
-    feedback: z.array(z.string().trim().min(1).max(300)).max(6),
+    feedback: z.array(z.string().trim().min(1).max(300)).max(7),
   })
   .strict();
 

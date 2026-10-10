@@ -4,7 +4,11 @@
  * generated for curriculum classes, sourced from {{SOURCE}} for sourced classes.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { emptyTeachingCriticFixture, shapeTeachingProviderFixture } from './intro-provider-fixture';
+import {
+  emptyTeachingCriticFixture,
+  novelFindingCorroborationFixture,
+  shapeTeachingProviderFixture,
+} from './intro-provider-fixture';
 
 const mockResolveLearningAi = vi.fn();
 vi.mock('@/lib/learning-ai', () => ({
@@ -32,8 +36,10 @@ vi.mock('@/lib/providers/ai', () => ({
       messages: Array<{ content: string }>,
       options: unknown
     ) => {
+      const corroboration = novelFindingCorroborationFixture(messages, options);
+      if (corroboration) return corroboration;
       const name = (options as { jsonSchema: { name: string } }).jsonSchema.name;
-      if (name === 'class_teaching_critic') return emptyTeachingCriticFixture(messages);
+      if (name === 'class_teaching_critic') return emptyTeachingCriticFixture(messages, options);
       if (name === 'class_teaching_adjudicator')
         return shapeTeachingProviderFixture(
           system,
@@ -78,7 +84,12 @@ const BASE: SectionGenParams = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockResolveLearningAi.mockResolvedValue({ provider: 'anthropic', model: 'm', apiKey: 'k' });
+  mockResolveLearningAi.mockResolvedValue({
+    provider: 'anthropic',
+    model: 'm',
+    apiKey: 'k',
+    execution: BASE.execution,
+  });
   mockTeachingResponse.mockImplementation(async (_system, messages) => ({
     content: JSON.stringify({
       items: JSON.parse(messages[0].content).items.map((item: { index: number }) => ({
@@ -144,11 +155,6 @@ describe('terminal section generation failures', () => {
     expect(mockGenerateResponse).toHaveBeenCalledTimes(3);
     expect(mockReviewResponse).toHaveBeenCalledTimes(2);
     expect(mockTeachingResponse).toHaveBeenCalledTimes(2);
-    expect(
-      mockGenerateResponse.mock.calls.length +
-        mockReviewResponse.mock.calls.length +
-        mockTeachingResponse.mock.calls.length
-    ).toBe(7);
   });
 
   it.each(['malformed', 'blind'])(

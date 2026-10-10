@@ -64,6 +64,10 @@ const EXPECTED_FILES = [
   'class/generate-section-quiz.md',
   'class/review-section-quiz.md',
   'class/review-teaching-content.md',
+  'class/review-teaching-novel-findings.md',
+  'class/review-reading-teaching-content.md',
+  'class/review-listening-passage.md',
+  'class/review-listening-teaching-content.md',
   'class/review-reading-vocabulary.md',
   'class/review-reading-vocabulary-counterfactual.md',
   'class/level-source.md',
@@ -79,6 +83,8 @@ const EXPECTED_FILES = [
   'interaction/qa-assistant.md',
   'interaction/incorporate-segment.md',
   'generation/script-generator.md',
+  'generation/learning-script-generator.md',
+  'generation/repair-learning-script.md',
   'generation/monologue-guidelines.md',
   'generation/dialogue-guidelines.md',
   'generation/eli5-section.md',
@@ -109,6 +115,42 @@ const EXPECTED_FILES = [
 // If a .md file gains or loses a placeholder, these tests will catch it.
 
 const VARIABLE_CONTRACTS: Record<string, string[]> = {
+  'generation/learning-script-generator.md': [
+    'AUDIENCE',
+    'AUDIENCE_LEVEL',
+    'BIAS_GUIDANCE',
+    'CONTENT_SAFETY',
+    'DEPTH',
+    'DURATION_TARGET',
+    'FOCUS_AREAS',
+    'HOST_SPEAKER',
+    'LANGUAGE_INSTRUCTION',
+    'SPEAKER_COUNT',
+    'SPEAKER_SECTION',
+    'TONE',
+    'VOCABULARY_INSTRUCTION',
+    'VOICE_REALISM',
+    'WORD_COUNT_IDEAL',
+    'WORD_COUNT_MAX',
+    'WORD_COUNT_MIN',
+  ],
+  'generation/repair-learning-script.md': [
+    'AUDIENCE_LEVEL',
+    'CONTENT_SAFETY',
+    'LANGUAGE_INSTRUCTION',
+  ],
+  'class/review-teaching-novel-findings.md': [
+    'EXAMPLE_MEANING_POLICY',
+    'GRAMMAR_POINTS',
+    'GRAMMAR_RULE_POLICY',
+    'KIND',
+    'LANGUAGE_POLICY',
+    'LEVEL',
+    'OBJECTIVE',
+    'REVIEW_SCHEMA',
+    'TARGET',
+    'TITLE',
+  ],
   'class/review-class-intro.md': [
     'EXAMPLE_MEANING_POLICY',
     'GRAMMAR_POINTS',
@@ -132,6 +174,23 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
   ],
   'class/review-teaching-content.md': [
     'KIND',
+    'LANGUAGE_POLICY',
+    'LEVEL',
+    'NATIVE',
+    'REVIEW_SCHEMA',
+    'TARGET',
+    'TEACHING_REVIEW_ROLE',
+  ],
+  'class/review-reading-teaching-content.md': [
+    'LANGUAGE_POLICY',
+    'LEVEL',
+    'NATIVE',
+    'REVIEW_SCHEMA',
+    'TARGET',
+    'TEACHING_REVIEW_ROLE',
+  ],
+  'class/review-listening-passage.md': ['LANGUAGE_POLICY', 'LEVEL', 'REVIEW_SCHEMA', 'TARGET'],
+  'class/review-listening-teaching-content.md': [
     'LANGUAGE_POLICY',
     'LEVEL',
     'NATIVE',
@@ -342,6 +401,7 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
     'VOCAB',
   ].sort(),
   'class/generate-class-intro.md': [
+    'INTRO_EXAMPLE',
     'EXAMPLE_MEANING_POLICY',
     'GRAMMAR_POINTS',
     'GRAMMAR_RULE_POLICY',
@@ -487,8 +547,6 @@ describe('generation templates', () => {
     expect(schema.properties.passageFindings.items.properties.reason.maxLength).toBe(300);
     expect(schema.properties).not.toHaveProperty('passageAcceptable');
     expect(schema.properties.passageFindings.items.properties).not.toHaveProperty('quote');
-    expect(prompt).toContain('learner sentence starters');
-    expect(prompt).toContain('reject incorrect complete positive examples');
     expect(prompt).toContain('sourcePartIndex');
   });
   it('script-generator.md references JSON output format', () => {
@@ -527,6 +585,7 @@ describe('verification templates', () => {
   it.each([
     'class/review-section-quiz.md',
     'class/review-teaching-content.md',
+    'class/review-listening-teaching-content.md',
     'shared/voice-realism-learning.md',
   ])('%s scopes grammar claims to the actual target-language clause and constituents', (file) => {
     const content = readFileSync(join(PROMPTS_DIR, file), 'utf-8');

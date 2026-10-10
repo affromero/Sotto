@@ -209,7 +209,11 @@ suite('persisted mock exams', () => {
         .join('\n');
       let content: unknown;
       if (schemaName === 'class_teaching_critic') {
-        content = JSON.parse(emptyTeachingCriticFixture([{ content: prompt }]).content);
+        content = JSON.parse(
+          emptyTeachingCriticFixture([{ content: prompt }], {
+            jsonSchema: body.response_format?.json_schema,
+          }).content
+        );
       } else if (schemaName === 'class_teaching_adjudicator') {
         content = {
           items: JSON.parse(prompt).items.map((item: { index: number }) => ({
@@ -223,7 +227,7 @@ suite('persisted mock exams', () => {
           shapeTeachingProviderFixture(
             body.messages.find((message) => message.role === 'system')!.content,
             [{ content: prompt }],
-            { jsonSchema: { name: schemaName } },
+            { jsonSchema: body.response_format?.json_schema },
             { content: JSON.stringify(content), model: 'exam-fixture' }
           ).content
         );
@@ -255,21 +259,30 @@ suite('persisted mock exams', () => {
             {
               task: 'Schreibe eine Einladung mit diesen Angaben.',
               taskType: 'guided_reply',
+              starterText: null,
               sourceText: 'Kaffee mit Anna, Samstag um 15 Uhr im Café am Markt.',
+              modelAnswer: 'Anna, komm am Samstag um 15 Uhr zum Kaffee ins Café am Markt.',
+              correctionReason: null,
               guidance: 'Verwende alle Angaben.',
               ideas: null,
             },
             {
               task: 'Setze den Satz ins Perfekt.',
               taskType: 'transformation',
+              starterText: null,
               sourceText: 'Anna trinkt einen Kaffee.',
+              modelAnswer: 'Anna hat einen Kaffee getrunken.',
+              correctionReason: null,
               guidance: null,
               ideas: null,
             },
             {
               task: 'Korrigiere den Satz.',
               taskType: 'correction',
+              starterText: null,
               sourceText: 'Anna trinken einen Kaffee.',
+              modelAnswer: 'Anna trinkt einen Kaffee.',
+              correctionReason: 'The singular subject Anna requires trinkt.',
               guidance: null,
               ideas: null,
             },

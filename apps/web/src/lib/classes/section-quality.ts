@@ -9,7 +9,7 @@ import {
 } from './quality/blind-review/protocol';
 
 const issueCode = blindReviewIssueSchema;
-const verdictSchema = z
+export const sectionReviewFeedbackSchema = z
   .object({
     passageAcceptable: z.boolean(),
     passageFeedback: z
@@ -26,6 +26,7 @@ const verdictSchema = z
     questions: blindReviewQuestionsSchema,
   })
   .strict();
+const verdictSchema = sectionReviewFeedbackSchema;
 
 export function sectionReviewSchema(questions: GeneratedQuestion[]) {
   const parts = buildBlindReviewSourceParts(questions[0]?.passageText ?? '');
@@ -55,6 +56,27 @@ export type SectionReviewFeedback = z.infer<typeof verdictSchema>;
 export interface SectionReviewAssessment {
   issues: string[];
   feedback?: SectionReviewFeedback;
+  questionIssues?: string[];
+  readingPassageReview?: SectionReviewFeedback;
+  listeningPassageReview?: SectionReviewFeedback;
+}
+
+const issuedReadingPassageReviews = new WeakMap<SectionReviewFeedback, string>();
+const issuedListeningPassageReviews = new WeakMap<SectionReviewFeedback, string>();
+
+export function authenticListeningPassageReview(
+  feedback: SectionReviewFeedback,
+  questions: readonly unknown[]
+): boolean {
+  return issuedListeningPassageReviews.get(feedback) === JSON.stringify({ questions, feedback });
+}
+
+/** Only an unchanged, candidate-bound blind observation may enter adjudication. */
+export function authenticReadingPassageReview(
+  feedback: SectionReviewFeedback,
+  questions: readonly unknown[]
+): boolean {
+  return issuedReadingPassageReviews.get(feedback) === JSON.stringify({ questions, feedback });
 }
 
 export class SectionQualityError extends Error {
@@ -113,7 +135,8 @@ function completeReview(verdict: SectionReviewFeedback, questions: GeneratedQues
 /** Compatibility envelope only. The exact blind verdict is retained separately from its summary. */
 export function captureBlindSectionFailure(
   questions: GeneratedQuestion[],
-  feedback: SectionReviewFeedback
+  feedback: SectionReviewFeedback,
+  kind: 'listening' | 'explanations' = 'listening'
 ): TeachingFailure {
   const blindVerdict = verdictSchema.parse(feedback);
   if (!completeReview(blindVerdict, questions))
@@ -161,7 +184,25 @@ export function captureBlindSectionFailure(
       };
     }),
   };
-  return teachingFailureSchema.parse({ kind: 'listening', reviews: [{ candidate, verdict }] });
+  return teachingFailureSchema.parse({ kind, reviews: [{ candidate, verdict }] });
+}
+
+/** Render one literal gap without interpreting an option or changing the fixed words. */
+export function literalQuestionCompletions(value: unknown): string[] | undefined {
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    !('question' in value) ||
+    typeof value.question !== 'string' ||
+    !('options' in value) ||
+    !Array.isArray(value.options) ||
+    value.options.length !== 4 ||
+    !value.options.every((option) => typeof option === 'string') ||
+    value.question.match(/_{2,}/g)?.length !== 1
+  )
+    return undefined;
+  const question = value.question;
+  return value.options.map((option) => question.replace(/_{2,}/, () => option));
 }
 
 /** The reviewer solves the published questions without seeing the proposed answer key. */
@@ -175,18 +216,12 @@ export function sectionReviewInput(questions: GeneratedQuestion[]): string {
       })
     ),
     questions: questions.map((question, index) => {
-      const gaps = question.question.match(/_{2,}/g);
+      const completedOptions = literalQuestionCompletions(question);
       return {
         index,
         question: question.question,
         options: question.options,
-        ...(gaps?.length === 1
-          ? {
-              completedOptions: question.options.map((option) =>
-                question.question.replace(/_{2,}/, () => option)
-              ),
-            }
-          : {}),
+        ...(completedOptions ? { completedOptions } : {}),
       };
     }),
   });
@@ -196,7 +231,7 @@ export function assessSectionReview(
   content: string,
   questions: GeneratedQuestion[],
   immutablePassage: boolean,
-  diagnosticKind?: 'listening'
+  diagnosticKind?: 'listening' | 'reading'
 ): SectionReviewAssessment {
   let raw: unknown;
   try {
@@ -222,21 +257,36 @@ export function assessSectionReview(
     questions: privateVerdict.questions,
   };
   if (!completeReview(verdict, questions)) return invalidBlindReview('coverage');
-  if (!verdict.passageAcceptable && immutablePassage) {
+  if (!verdict.passageAcceptable && immutablePassage && !diagnosticKind) {
     throw new SectionQualityError(
-      'The supplied reading passage failed its language quality check.',
-      diagnosticKind === 'listening' ? captureBlindSectionFailure(questions, verdict) : undefined,
-      diagnosticKind === 'listening' ? verdict : undefined
+      'The supplied reading passage failed its language quality check.'
     );
   }
   const issues = new Set<string>(verdict.issues);
+  const questionIssues = new Set<string>(privateVerdict.issues);
   if (!verdict.passageAcceptable) issues.add('unnatural_passage');
   for (const result of verdict.questions) {
-    for (const issue of result.issues) issues.add(issue);
-    if (result.acceptableOptionIndices.length !== 1) issues.add('ambiguous');
+    for (const issue of result.issues) questionIssues.add(issue);
+    if (result.acceptableOptionIndices.length !== 1) questionIssues.add('ambiguous');
     else if (result.acceptableOptionIndices[0] !== questions[result.index].correctIndex) {
-      issues.add('incorrect_key');
+      questionIssues.add('incorrect_key');
     }
+  }
+  for (const issue of questionIssues) issues.add(issue);
+  if (diagnosticKind && !verdict.passageAcceptable) {
+    if (!questionIssues.size)
+      (diagnosticKind === 'reading'
+        ? issuedReadingPassageReviews
+        : issuedListeningPassageReviews
+      ).set(verdict, JSON.stringify({ questions, feedback: verdict }));
+    return {
+      issues: [...issues],
+      feedback: verdict,
+      questionIssues: [...questionIssues],
+      ...(diagnosticKind === 'reading'
+        ? { readingPassageReview: questionIssues.size ? undefined : verdict }
+        : { listeningPassageReview: questionIssues.size ? undefined : verdict }),
+    };
   }
   return { issues: [...issues], feedback: issues.size ? verdict : undefined };
 }

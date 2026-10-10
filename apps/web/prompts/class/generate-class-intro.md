@@ -24,7 +24,7 @@ Rules:
 - Follow the language policy exactly.
 - Use natural, everyday wording at the learner's level in every field, including purpose, about, focus and tips. Describe what the learner will do in ordinary language; avoid unnatural literal translations or abstract descriptions of activities.
 - Make purpose one short sentence naming a concrete action the learner can perform, grounded in the class objective and written in the language required by the language policy. Avoid vague claims about why the class matters, abstract activity labels, and literal translations of abstract objective categories.
-- Aim for about 80 raw words across purpose, focus and tip text and every example's target, meaning and note. The application copies one selected target and meaning into about and adds exact example quotes before measuring the 180-word prose limit. Use one or two short examples and only useful short focus points and tips; select examples that teach the objective instead of filling every possible entry.
+- Aim for about 80 raw words across purpose, focus and tip text and every authored example field. The application derives immersion meanings, renders about according to the supplied example-meaning policy and adds exact example quotes before measuring the 180-word prose limit. Use one or two short examples and only useful short focus points and tips; select examples that teach the objective instead of filling every possible entry.
 - The brief has at most ten review addresses: purpose and about count as two, each focus point, tip and complete example counts as one, and the entire optional visuals object counts as one. Keep this limit even when adding a useful visual.
 - Do not invent exam claims, official certification claims, or unsupported cultural facts.
 - Make tips specific to the grammar/vocabulary, not generic study advice.
@@ -34,9 +34,9 @@ Rules:
 - Use plain, everyday wording at the learner's level for meanings. Distinguish going on foot from travelling by vehicle. Do not force lexical variety or replace ordinary actions with abstract noun phrases.
 - State the scope of every grammar rule. A verb-position rule for a main clause must explicitly say that it applies to main clauses. Do not present a common pattern as a universal rule.
 - Ground each grammar rule in the exact verbs and forms shown in the examples. Do not infer a categorical rule from a broad label such as movement or activity.
-- About is a reference only: {"exampleIndex":0}. Select one useful example whose message introduces the class objective. The application renders about as `„<exact selected target>“: <exact selected meaning>`. Return no about text or independent interpretation; its message must come entirely from that example's meaning.
+- About is a reference only: {"exampleIndex":0}. Select one useful example whose message introduces the class objective. For fresh immersion examples, the application renders about as the exact selected target once; for A1, it renders `„<exact selected target>“: <exact selected meaning>`. Return no about text or independent interpretation.
 - Each focus point and tip must be a scoped atom with text and a zero-based exampleIndex into the returned examples. Text describes only that selected complete example. The application renders it as `„<exact selected target>“: <text>` before review and publication. Do not place a universal claim inside an example observation. Do not add the quote yourself. Every example must remain useful; an unusable example or missing index rejects the whole candidate.
-- Each example note describes only its paired target. The application adds the paired target quote before review. Meanings retain their exact supplied wording and must preserve the example's action and relationships.
+- Each example note describes only its paired target. The application adds the paired target quote before review. A1 meanings retain their exact supplied wording and must preserve the example's action and relationships. Fresh immersion meanings are derived from the exact target by the application.
 - {{GRAMMAR_RULE_POLICY}}
 - Meanings, notes and tips must use grammatical explanatory prose. When mentioning a word, infinitive phrase or other citation form, clearly quote that expression and make the surrounding sentence grammatical. A quoted example may be a fragment; explanatory prose must not treat an unquoted fragment as a grammatically integrated phrase.
 - Visuals must be pedagogical, not decorative: timelines, contrast maps, memory callouts, and helpful external links only when directly useful.
@@ -52,7 +52,7 @@ Return ONLY JSON with this shape. Every field is required; use visuals:null when
 "about": { "exampleIndex": 0 },
 "focus": [{ "text": "a useful short observation", "exampleIndex": 0 }],
 "examples": [
-{ "target": "<{{TARGET}} example>", "meaning": "<meaning or usage note that follows the example meaning policy>", "note": "<short teaching note that follows the language policy>" }
+{{INTRO_EXAMPLE}}
 ],
 "tips": [{ "text": "a practical observation of the selected example", "exampleIndex": 0 }],
 "visuals": null

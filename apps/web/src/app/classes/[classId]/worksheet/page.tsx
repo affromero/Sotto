@@ -218,7 +218,7 @@ function IntroBlock({ intro }: { intro: NonNullable<ClassDocument['intro']> }) {
           {intro.examples.map((example, index) => (
             <article className={styles.exampleCard} key={`${example.target}-${index}`}>
               <h3>{example.target}</h3>
-              <p>{example.meaning}</p>
+              {example.meaning !== example.target && <p>{example.meaning}</p>}
               <small>{example.note}</small>
             </article>
           ))}

@@ -1,7 +1,16 @@
 import {
   mockBlindResponse,
   mockTeachingResponse,
+  SAMPLE_SCRIPT_RESULT,
 } from '../../../helpers/runtime/listening-generation';
+
+export function singleTurnScriptResponseFixture(text: string, schemaName?: string) {
+  return JSON.stringify(
+    schemaName === 'learning_script_turn_repair'
+      ? { turnTexts: { '1': text } }
+      : { ...SAMPLE_SCRIPT_RESULT, turns: [{ speaker: 'HOST', text }] }
+  );
+}
 
 export function configureSpokenTeachingRejection(
   approved: unknown,

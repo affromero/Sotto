@@ -86,6 +86,12 @@ describe('generateScript', () => {
           /clause type: declarative main clause, subordinate clause, or question/
         );
         expect(providerInstruction).toMatch(/every explanation and rule matches its example/);
+        expect(providerInstruction).toContain(
+          'Choose the intended event or situation before writing a teaching example'
+        );
+        expect(providerInstruction).toContain(
+          'preserve event time, modality, agency, negation and scope'
+        );
         expect(providerInstruction).toMatch(/every spoken clause.*after adding vocabulary markers/);
         expect(providerInstruction).toMatch(
           /Wrap an existing word or phrase in its grammatical position/
@@ -141,32 +147,54 @@ describe('generateScript', () => {
           durationTarget: 4,
           targetLanguage,
           forLearning,
+          languageMode: 'full_immersion',
         });
 
-        expect(providerInstruction.includes('## Grammar explanations')).toBe(expectsGuidance);
         expect(providerInstruction.includes('Frame spoken word mentions explicitly')).toBe(
           expectsGuidance
         );
+        expect(providerInstruction.includes('Choose the intended event or situation')).toBe(
+          expectsGuidance
+        );
+        expect(
+          providerInstruction.includes(
+            'Wrap vocabulary appropriate to the requested CEFR level and supplied review targets'
+          )
+        ).toBe(forLearning);
+        expect(providerInstruction.includes('Wrap 5-8 advanced or nuanced vocabulary items')).toBe(
+          !forLearning
+        );
+        expect(
+          providerInstruction.includes("Track each event's actor, affected object and time")
+        ).toBe(expectsGuidance);
         expect(providerInstruction).not.toContain('German Perfekt uses a finite auxiliary');
         expect(providerInstruction).not.toContain('beim Verb „gehen“');
         expect(providerInstruction).not.toContain('die passende Form für das Wort „ich“');
         if (!forLearning) {
           expect(providerInstruction).toContain(VOICE_REALISM_INSTRUCTIONS);
           expect(providerInstruction).not.toContain('Voice Realism for Language Learning');
+          expect(providerInstruction).toContain('Hard Minimum Reference Count');
+          expect(providerInstruction).toContain('cliffhanger');
+        } else {
+          expect(providerInstruction).not.toMatch(/Hard Minimum Reference Count|cliffhanger/);
+          expect(providerInstruction).not.toContain('pop culture references');
         }
       }
     );
 
-    it('preserves the captured transport, endpoint and cancellation for listening generation', async () => {
+    it('preserves source, solo speaker, vocabulary and captured transport for learning generation', async () => {
       const controller = new AbortController();
       const dispatched: string[] = [];
+      const source = 'Lucía viajó a Madrid ayer.';
+      const spoken = 'Lucía [V1:viajó] a Madrid ayer.';
       const fetch = async (input: RequestInfo | URL) => {
         dispatched.push(String(input));
         return new Response(
           JSON.stringify({
-            turns: [{ speaker: 'HOST', text: 'Hola' }],
+            turns: [{ speaker: 'NARRATOR', text: spoken }],
             soundCues: [],
             references: [],
+            vocabulary: [{ number: 1, word: 'viajó', translation: 'traveled' }],
           })
         );
       };
@@ -188,11 +216,31 @@ describe('generateScript', () => {
         focusAreas: [],
         tone: 'casual',
         durationTarget: 1,
+        forLearning: true,
+        targetLanguage: 'es',
+        languageMode: 'full_immersion',
+        speakers: [{ name: 'NARRATOR', description: 'A calm narrator.' }],
+        sourceContent: source,
+        mustIncludeVocabulary: [{ word: 'viajó', translation: 'traveled' }],
+        webSearchEnabled: false,
         fetch,
         signal: controller.signal,
         endpoint: 'https://provider.invalid/v1',
       });
-      expect(result.turns[0].text).toBe('Hola');
+      const [system, messages, options] = mockGenerateResponse.mock.calls[0];
+      expect(messages[0].content).toContain(source);
+      expect(system).toContain('NARRATOR: A calm narrator.');
+      expect(system).toContain('A1');
+      expect(system).toContain('Tone: casual. Depth: standard.');
+      expect(system).toContain('- viajó — traveled');
+      expect(system).not.toMatch(/Hard Minimum Reference Count|cliffhanger|pop culture references/);
+      expect(options).toMatchObject({
+        model: AI_RUNTIME.model,
+        maxTokens: 12288,
+        useWebSearch: false,
+      });
+      expect(result.turns).toEqual([{ speaker: 'NARRATOR', text: spoken }]);
+      expect(result.vocabulary[0]).toMatchObject({ number: 1, word: 'viajó' });
       expect(dispatched).toEqual(['https://provider.invalid/v1']);
     });
 
@@ -471,6 +519,101 @@ describe('generateScript', () => {
   });
 
   describe('language learning instructions', () => {
+    it.each([false, true, 'inflected'] as const)(
+      'keeps lexical targets distinct from contextual speech during repair=%s',
+      async (repair) => {
+        const spoken = 'Wir haben eine schöne [V6:Reise] [V7:gemacht].';
+        const vocabulary =
+          repair === 'inflected'
+            ? [
+                { number: 6, word: 'die Reise', translation: 'the trip' },
+                { number: 7, word: 'machen', translation: 'to do' },
+              ]
+            : [
+                { number: 1, word: 'die Reise', translation: 'the trip' },
+                { number: 2, word: 'Reise', translation: 'trip' },
+              ];
+        mockGenerateResponse.mockResolvedValue({
+          content: JSON.stringify({
+            turns: [
+              {
+                speaker: 'HOST',
+                text:
+                  repair === 'inflected'
+                    ? spoken
+                    : 'Meine [V1:Reise] war kurz. Das Wort [V1:die Reise] nennt den Ausflug.',
+              },
+            ],
+            references: [],
+            soundCues: [],
+            vocabulary,
+          }),
+          model: AI_RUNTIME.model,
+          inputTokens: 1,
+          outputTokens: 1,
+        });
+        const result = await generateScript({
+          topic: 'Travel in the Perfekt',
+          depth: 'standard',
+          audienceLevel: 'A2',
+          focusAreas: [],
+          tone: 'casual',
+          durationTarget: 4,
+          targetLanguage: 'de',
+          languageMode: 'full_immersion',
+          forLearning: true,
+          mustIncludeVocabulary: vocabulary.map(({ word, translation }) => ({
+            word,
+            translation,
+          })),
+          ...(repair === true
+            ? {
+                learningRepair: {
+                  kind: 'script_protocol' as const,
+                  candidate: 'Prior synthetic marker identity failure.',
+                  issues: [{ code: 'script_vocabulary_missing_identity' as const }],
+                },
+              }
+            : {}),
+        });
+        const [system, messages, options] = mockGenerateResponse.mock.calls[0];
+        expect(system).not.toMatch(
+          /Hard Minimum Reference Count|cliffhanger|pop culture references/
+        );
+        expect(system).toContain(
+          'lexical review targets, not mandatory verbatim sentence fragments'
+        );
+        expect(system).toContain(
+          'When presented as expressing the same meaning, its label, example and explanation must preserve event time, modality, agency, negation and scope'
+        );
+        expect(system).toContain(
+          'Distinguish wanting to perform an action from wanting to describe an action already completed'
+        );
+        expect(system).toContain("Track each event's actor, affected object and time across turns");
+        expect(system).toContain(
+          'resolve pronouns to compatible referents and verify that later outcomes remain consistent with preceding events'
+        );
+        expect(system).toContain(
+          'Wrap vocabulary appropriate to the requested CEFR level and supplied review targets'
+        );
+        expect(system).not.toContain('Wrap 5-8 advanced or nuanced vocabulary items');
+        expect(system).toContain('- die Reise — the trip');
+        if (repair !== 'inflected') expect(system).toContain('- Reise — trip');
+        expect(system).not.toContain('MUST naturally incorporate AND wrap each');
+        expect(options).toMatchObject({
+          model: AI_RUNTIME.model,
+          maxTokens: 12288,
+        });
+        if (repair === true) expect(messages[0].content).toContain('script_protocol');
+        expect(result.vocabulary).toMatchObject(vocabulary);
+        expect(result.turns[0].text).toBe(
+          repair === 'inflected'
+            ? spoken
+            : 'Meine [V2:Reise] war kurz. Das Wort [V1:die Reise] nennt den Ausflug.'
+        );
+      }
+    );
+
     it('injects the target-language and vocabulary instructions into the system prompt for a learning episode', async () => {
       mockGenerateResponse.mockResolvedValue({
         content: JSON.stringify({

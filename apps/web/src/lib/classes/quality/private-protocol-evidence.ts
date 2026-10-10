@@ -39,7 +39,7 @@ const evidenceSchema = reviewerProtocolDiagnosticSchema
       'grammar',
       'reading',
     ]),
-    role: z.enum(['critic', 'adjudicator', 'blind_section']),
+    role: z.enum(['critic', 'adjudicator', 'corroborator', 'blind_section']),
     offset: z.number().int().min(0).max(49),
     payload: payloadSchema,
   })
@@ -70,7 +70,15 @@ export function captureReviewerProtocolEvidence(
 ): ProtocolEvidence | undefined {
   const diagnostic = reviewerProtocolDiagnostic(error);
   if (!diagnostic) return undefined;
-  const json = JSON.stringify({ candidate: context.candidate, response: context.response });
+  const candidateJson = JSON.stringify({ candidate: context.candidate });
+  const combined = JSON.stringify({ candidate: context.candidate, response: context.response });
+  const json =
+    Buffer.byteLength(combined, 'utf8') <= MAX_PROTOCOL_BYTES
+      ? combined
+      : JSON.stringify({
+          candidateSha256: createHash('sha256').update(candidateJson).digest('hex'),
+          response: context.response,
+        });
   const byteCount = Buffer.byteLength(json, 'utf8');
   const evidence = evidenceSchema.parse({
     ...diagnostic,

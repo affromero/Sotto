@@ -20,6 +20,36 @@ const verdict = teachingQualityVerdictSchema.parse({
 });
 
 describe('private teaching failure evidence', () => {
+  it('retains six ordinary findings and the separate reading answer-support rejection', () => {
+    const feedback = [
+      'First supported critic defect.',
+      'Second supported critic defect.',
+      'Third supported critic defect.',
+      'First new judge defect.',
+      'Second new judge defect.',
+      'Third new judge defect.',
+      'Reading answer support failed: the requested time is unstated.',
+    ];
+    const evidence = captureTeachingFailure(
+      'explanations',
+      [{ question: 'What happened during the wait?' }],
+      {
+        items: [{ index: 0, acceptable: false, issues: ['unsupported'], feedback }],
+      }
+    );
+    expect(evidence.reviews[0].verdict.items[0].feedback).toEqual(feedback);
+    expect(
+      teachingQualityVerdictSchema.safeParse({
+        items: [
+          {
+            ...evidence.reviews[0].verdict.items[0],
+            feedback: [...feedback, 'Unbounded extra feedback.'],
+          },
+        ],
+      }).success
+    ).toBe(false);
+  });
+
   it('preserves actual review evidence privately without changing a provider error or its category', () => {
     const error = new Error('Private provider failure');
     const failure = captureTeachingFailure(

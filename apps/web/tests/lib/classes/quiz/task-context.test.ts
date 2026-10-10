@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { blockedProviderExecution } from '../../../helpers/runtime/provider-execution';
 import type { SectionGenParams } from '@/lib/class-generation';
+import { withReadingSupportFixture } from '../quality/teaching/reading-support-fixture';
 
 const boundary = vi.hoisted(() => ({ generate: vi.fn() }));
 vi.mock('@/lib/providers/ai', () => ({
@@ -12,6 +13,7 @@ vi.mock('@/lib/learning-ai', () => ({
 }));
 vi.mock('@/lib/usage-logger', () => ({ logUsage: vi.fn() }));
 import { generateSectionQuestions } from '@/lib/class-generation';
+import { SectionQualityError } from '@/lib/classes/section-quality';
 
 const context = 'Ergänze die Lücke im Perfekt.';
 const sentence = 'Gestern _____ ich zu Hause geblieben.';
@@ -44,7 +46,10 @@ function configure(
       options: { jsonSchema: { name: string; schema: unknown } }
     ) => {
       const name = options.jsonSchema.name;
-      const input = name === 'class_section_questions' ? {} : JSON.parse(messages[0].content);
+      const input =
+        name === 'class_section_questions' || name === 'class_vocabulary_distractors'
+          ? {}
+          : JSON.parse(messages[0].content);
       requests.push({ name, system, input, schema: options.jsonSchema.schema });
       let output: unknown;
       if (name === 'class_section_questions') {
@@ -67,6 +72,8 @@ function configure(
             })
           ),
         };
+      } else if (name === 'class_vocabulary_distractors') {
+        output = { distractors: { '0': patch.distractors } };
       } else if (name === 'class_section_quality') {
         const items = input.questions as unknown[];
         output = {
@@ -88,7 +95,10 @@ function configure(
           ),
         };
       }
-      return { content: JSON.stringify(output), model: 'fixture-model' };
+      return withReadingSupportFixture(messages, options, {
+        content: JSON.stringify(output),
+        model: 'fixture-model',
+      });
     }
   );
 }
@@ -123,8 +133,6 @@ describe('compiled grammar and vocabulary task context', () => {
     { targetIndex: -1 },
     { targetIndex: 1 },
     { targetIndex: 0.5 },
-    { distractors: ['bin', 'habe', 'hatte'] },
-    { distractors: ['war', 'war', 'hatte'] },
     { options: ['bin', 'war', 'habe', 'hatte'] },
   ])('rejects invalid private indexed vocabulary choices: %j', async (patch) => {
     const params = {
@@ -136,6 +144,29 @@ describe('compiled grammar and vocabulary task context', () => {
     await expect(generateSectionQuestions(params)).rejects.toThrow();
     expect(requests.every((request) => request.name === 'class_section_questions')).toBe(true);
   });
+  it.each([
+    { distractors: ['bin', 'habe', 'hatte'], options: ['bin', 'bin', 'habe', 'hatte'] },
+    { distractors: ['war', 'war', 'hatte'], options: ['bin', 'war', 'war', 'hatte'] },
+  ])(
+    'rejects duplicate choices despite blind approval and repeated patches: %j',
+    async (choice) => {
+      const params = {
+        ...base,
+        vocabularyReview: true,
+        targetVocab: [{ lemma: 'bin', gloss: 'am' }],
+      };
+      configure(params, context, false, { distractors: choice.distractors });
+      await expect(generateSectionQuestions(params)).rejects.toBeInstanceOf(SectionQualityError);
+      const blind = requests.find((request) => request.name === 'class_section_quality')!;
+      expect(blind.input).toMatchObject({
+        questions: [{ question: `${context}\n${sentence}`, options: choice.options }],
+      });
+      expect(
+        requests.find((request) => request.name === 'class_vocabulary_distractors')!.schema
+      ).toMatchObject({ properties: { distractors: { required: ['0'] } } });
+      expect(requests.filter((request) => request.name.startsWith('class_teaching_'))).toEqual([]);
+    }
+  );
   it('requires every authoritative target exactly once', async () => {
     const params = {
       ...base,
@@ -190,6 +221,8 @@ describe('compiled grammar and vocabulary task context', () => {
       )) {
         expect(JSON.stringify(request.schema)).toContain('taskContext');
         expect(request.system).toContain('"taskContext":');
+        if (!vocabulary)
+          expect(request.system).toContain('identify its lemma in the learner-visible taskContext');
       }
     }
   );

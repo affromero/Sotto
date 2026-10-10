@@ -51,8 +51,20 @@ not a separate provider-key availability heuristic.
 
 Practice content reuses `generateSectionQuestions` for contextual vocabulary and
 focused expressions. Preserve exact word attribution for SRS, and carry reading
-`passageText` through both start and resume projections. Writing generation
-requires supplied source text and a constrained exercise type. Listening checks
+`passageText` through both start and resume projections.
+Duplicate vocabulary choices always block publication. Otherwise valid duplicate
+candidates receive the existing blind review before the bounded replacement.
+When repeated equivalent choices are the only defects, repair indexed distractor
+arrays and preserve all other raw fields. Mixed structural and semantic defects
+use indexed whole-question repair for their combined target indices, preserving
+blind-approved questions exactly. Run complete compilation, blind review and both
+teaching reviews on the replacement.
+Blind and teaching explanation reviews share literal single-gap option completions.
+The derived teaching projection preserves the original content and source addresses.
+Vocabulary compilation removes spaces or tabs between the validated gap and an
+immediate period or comma before review and publication. Source passages stay exact.
+Writing generation requires supplied source text and a constrained exercise type.
+Listening checks
 the explicitly configured TTS provider before script generation; missing
 credentials are errors, never a reason to choose another provider. Classes and
 FULL practice require grammar, reading, and writing. Listening requires configured
@@ -126,11 +138,54 @@ in sealed snapshots owned by the existing preparation job and cleanup policy.
 Learner responses receive static failure reasons after ownership and erasure checks.
 
 Listening permits one replacement for a malformed quiz or a complete, schema-valid
-blind or teaching rejection. A malformed quiz preserves the exact script and
+blind or teaching rejection. Passage-only blind allegations are bound to the exact
+original question candidate and adjudicated by the existing paired teaching review.
+Global issues, question defects and wrong or ambiguous keys remain hard blind failures.
+Both teaching roles review the complete shared passage. The listening critic is
+explicitly assigned only passage item 0. It records a private literal account of
+each server-defined sentence unit and separately extracts the stated premise and
+offered example for every teaching relation, without approval judgments. The private
+wire ledger requires every known unit index as an object key, with that unit's exact
+account length bound and no unknown keys. Compilation restores the canonical unit
+order in the retained account array. Trusted indexed length diagnostics may guide
+the existing bounded protocol correction; accounts are never truncated or relaxed.
+The adjudicator receives the original passage, exact units and untrusted proposed
+pairs. It independently re-extracts both operands before assessing each pair,
+corrects inaccurate interpretations and discovers missing relations. Every proposed
+pair requires one disposition. Incorrect source bindings require explicit linked
+replacements; dismissal cannot silently remove a real teaching relation.
+The critic's full literal ledger stays private. Both roles retain their exact
+source-bound evidence, and all final negative assessments block publication.
+The application derives indices and source references; provider responses supplying
+those omitted fields are rejected. Sentence segmentation uses the captured target
+language, and stored spans validate without resegmenting historical evidence.
+`teaching-source/request-candidate.ts` constructs the same source and operand projection
+for normal requests and authenticated protocol correction.
+The adjudicator also reviews every question;
+the separate blind solver still checks every question. Unassigned questions have
+empty critic decisions, never fabricated approval rows. Dismissal
+of a blind allegation does not waive another defect. Supported concerns reference
+retained exact passage findings, and private repair evidence preserves the concerns.
+Sourced listening snapshots its source content and metadata before dispatch. Both
+script attempts and teaching reviewers receive the same canonical formatted source
+context. Both review roles check source fidelity, including unsupported negative
+facts, while allowing explicitly hypothetical practice examples. Source context
+also remains in protocol correction and private failure evidence; repair requires
+an exact match to the original source context. Findings still address spoken passage
+fields, and unsourced listening keeps its existing review inputs.
+Live listening repair uses the authenticated canonical review envelope retained
+with its issued rejection. The persisted diagnostic still omits candidates above
+32 KiB; that omission does not remove the existing bounded repair opportunity.
+Returned live evidence is cloned and passes the same strict source, candidate and
+projection checks before the existing finding-to-repair mapping.
+A malformed quiz preserves the exact script and
 regenerates only its four questions using bounded original output and static
 server validation codes. A blind rejection replaces the complete script and quiz
 through `generateScript` with bounded untrusted correction context. An authenticated
-teaching rejection targeting the spoken transcript also replaces the script and quiz.
+teaching rejection repairs only raw turn texts bound by its exact source chunks or
+negative witness operands. Other turns, speakers, directions and script metadata
+are preserved through the canonical parser before the complete merged script and
+new quiz are reviewed. Unanchored teaching repair fails closed.
 An unchanged rejected transcript remains rejected. Findings confined to quiz fields
 preserve the script and regenerate its quiz with indexed teaching feedback.
 Both blind and teaching checks run again on the replacement. Mixed rejection or a
@@ -143,6 +198,11 @@ readiness, and audio waits for the learning association. A source teaching repai
 uses at most ten application AI requests: two scripts, two quizzes, two blind reviews,
 and two paired teaching reviews. A quiz-only teaching repair uses nine requests.
 Each paired review retains its existing bounded protocol correction under the same parent budget.
+An authenticated vocabulary-marker identity failure from the canonical script parser
+also consumes one of these same two generation attempts. Its exact original output,
+when within 32 KiB, supplies untrusted structural correction context with static
+validation codes. Oversized output and unissued lookalike errors remain terminal.
+The replacement must pass every normal parsing, review and publication gate.
 Reference verification, provider transport or search subrequests, and
 later TTS/audio are separate. Parent request budgets remain unchanged. Private
 blind diagnostics use the existing sealed failure envelope with
@@ -193,8 +253,12 @@ and its derived metadata-only outer verdict inside the unchanged sealed envelope
 Speaking permits one complete four-phrase replacement after structural validation
 or the canonical teaching review rejects the first set. Writing shares its existing
 single replacement between structural validation and teaching rejection of three
-complete tasks. A structural replacement receives bounded original output and
-static validation codes as untrusted data. The replacement uses the same captured provider,
+complete tasks. One private worked answer and correction evidence reach both reviewers. Optional openings are exact proper grapheme-boundary prefixes of that answer; only openings are published. Completion starters bind the same answer. Canonical correction deltas retain whole word and punctuation segments, reject unchanged answers, and remain private.
+Writing semantic repair receives the original validated authoring tasks, before
+source text, starters and display ellipses are compiled into learner material.
+Accepted compiled tasks remain exact, and the complete replacement still passes
+structural validation and both teaching reviews.
+A structural replacement receives bounded output and static codes as untrusted data. The replacement uses the same captured provider,
 model, objective, vocabulary, language policy, and execution authority. Candidate
 and indexed feedback are untrusted correction data. Both generation and review
 must succeed before reference TTS or writing persistence. Provider errors,
@@ -212,8 +276,9 @@ ledger is private error metadata and never enters ordinary error serialization.
 
 `classes/section-quality.ts` validates independent review verdicts for grammar,
 reading, and contextual vocabulary. `class-generation.ts` rejects malformed
-question structure before review, then uses the same captured provider and
-authority for a separate solve without the proposed key or explanations. Both
+question structure before review, except for otherwise valid vocabulary duplicate
+choices retained as blocking compiler diagnostics. It uses the same captured
+provider and authority for a separate solve without the proposed key or explanations. Both
 normal and JSON-repaired candidates must pass. Two generation attempts and one
 optional repair bound the work, with at most one review per valid candidate.
 Grammar and vocabulary wire questions require taskContext, compiled before every
@@ -227,14 +292,20 @@ the same selected target binding; incomplete or global verdicts cannot narrow re
 Semantic retries include the normalized rejected passage and indexed questions,
 including rejected keys and explanations, as untrusted correction context alongside
 bounded review issue codes. Blind reviewers still receive neither keys nor explanations.
-For a single contiguous gap, blind review also receives every option inserted
-literally into the question. Review exact word order without relocating fragments;
-this supplies context and still requires semantic judgment.
-Rewrite generated content for meaning and evidence; supplied source passages remain
-immutable. Parser repair remains separate from semantic revision.
+For a single contiguous gap, blind review receives every option inserted literally into the question; review exact word order without relocating fragments.
+Reading passage-only concerns proceed to the existing paired teaching review when
+the blind solve has no independent global, question or answer failures. Authenticate
+the exact candidate and blind verdict; send only indexed passage concerns to each
+role and protocol correction. Retain prior approvals privately; adjudicated concerns never reuse the blind repair packet.
+The first batch adjudicates each concern once with retained passage findings or a reason
+for dismissal. Explanation reviews require the actual section skill. Every reading
+question requires each role's own bound option, six-constraint and explanation support
+checks, even without passage concerns. Judges receive critic findings without critic support checks, which remain private. A negative final support check rejects directly
+alongside ordinary findings; empty findings alone cannot approve reading questions.
+Missing, stale or unbound evidence fails closed under the existing correction limit.
+Rewrite generated content; supplied passages remain immutable. Parser repair stays separate from semantic revision.
 Vocabulary coverage retries receive bounded missing/duplicate target feedback,
-indexed unexpected keyed answers, and invalid cloze indices. Preserve exact spelling
-and case for SRS attribution; change sentence placement rather than the target form.
+indexed unexpected keyed answers, and invalid cloze indices. Preserve exact spelling and case for SRS attribution; change placement rather than the target form.
 These coverage failures precede both independent reviews, which still gate replacements.
 These review requests consume the existing preparation budget. Provider errors
 and cancellation propagate without retrying under another provider. This is a
@@ -267,8 +338,10 @@ The combined structural and semantic path uses at most eleven normal requests, o
 with the existing single protocol correction in each review invocation. Parent request
 limits remain unchanged. A failed semantic replacement is terminal. Writing uses at most
 six calls when a structurally valid set needs one bounded quality replacement
-and a second review. Section generation uses at most nine, including two
-candidates, optional JSON repair, blind reviews and paired teaching reviews. A
+and a second review. Five-question section generation normally uses at most nine,
+including two candidates, optional JSON repair, blind reviews and paired teaching
+reviews. The existing single protocol correction per teaching invocation can raise
+that total to eleven, within the unchanged parent budget. A
 teaching-quality rejection enters the same bounded replacement path as a
 blind-review rejection.
 The same evidence protocol reviews every indexed writing, speaking, listening,
@@ -316,16 +389,19 @@ null becomes absent public visuals. A visual object requires timeline and contra
 Historical optional visual fields and their defaults remain unchanged.
 The generation wire schema omits the unsupported URL `format: uri` annotation
 through the Zod converter override; runtime URL validation still uses `z.string().url()`.
-About is a strict `{exampleIndex}` reference with no text. Its compiler always
-concatenates the selected exact target quote and exact meaning, preserving every
-meaning byte after the prefix even if the meaning already includes a quote.
-This removes independently authored overview claims; it does not prove the meaning true.
+Fresh schemas live in `classes/intro/protocol.ts` and use the trusted lesson level.
+Immersion wire examples contain only target and note; an authored meaning is rejected.
+The compiler derives meaning from the exact target before usefulness, prose limits,
+visual binding and review. A1 retains authored meanings and historical restoration is unchanged.
+About is a strict `{exampleIndex}` reference with no text. Fresh immersion renders
+the selected exact target once; A1 concatenates its target quote and exact meaning.
+This removes independently authored overview claims; target and note still receive full review.
 Focus points and tips are `{text, exampleIndex}` observations with zero-based
 references to complete examples. Structural repair uses the same wire shape
 without visuals under `class_intro_repair`. The compiler adds the selected exact
 target quote to every focus or tip observation and each example's own note before either
-review role and before measuring the prose limit. Meanings remain unchanged.
-Fresh candidates reject every unusable raw example before compilation. Fresh
+review role and before measuring the prose limit. A1 meanings remain unchanged.
+Fresh candidates reject every unusable materialized example before prose compilation. Fresh
 validated example arrays are never filtered after quote framing or semantic merging,
 so their indices and accepted entries remain intact. Historical restoration retains
 the example filter. Usefulness checks remove only the exact own-target note prefix
@@ -370,7 +446,9 @@ protocol and cancellation failures without replacing those errors or replaying w
 It remaps only a unique exact word identity already in the generated vocabulary,
 preserves correct numbered identities and legitimate surface variations, and rejects
 duplicate numbers, ambiguous remapping, or missing identities. It never rewrites
-spoken text, infers a translation, or adds provider calls.
+spoken text or infers a translation. `learning/script/output-protocol.ts` authenticates
+the three marker-identity failure kinds and retains bounded original output for the
+existing listening replacement path; the parser itself adds no provider calls.
 
 `classes/regeneration/pristine.ts` supports guarded durable class regeneration.
 The class GET with `pristineSnapshot=1` returns an opaque content hash. Class POST

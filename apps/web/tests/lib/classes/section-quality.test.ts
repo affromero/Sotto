@@ -4,6 +4,8 @@ import {
   SectionQualityError,
   captureBlindSectionFailure,
   sectionReviewInput,
+  authenticReadingPassageReview,
+  literalQuestionCompletions,
 } from '@/lib/classes/section-quality';
 import {
   captureGenerationFailure,
@@ -47,7 +49,52 @@ const rejected = {
   ],
 };
 
+it('separates passage observations from hard answer and global failures without granting review authority', () => {
+  const hard = assessSectionReview(JSON.stringify(rejected), passageQuestions, true, 'reading');
+  expect(hard.questionIssues).toEqual(['ambiguous']);
+  expect(hard.readingPassageReview).toBeUndefined();
+  const packet = {
+    ...rejected,
+    questions: questions.map((_, index) => ({
+      index,
+      acceptableOptionIndices: [0],
+      issues: [],
+    })),
+  };
+  const passageOnly = assessSectionReview(
+    JSON.stringify(packet),
+    passageQuestions,
+    true,
+    'reading'
+  );
+  expect(passageOnly.questionIssues).toEqual([]);
+  expect(authenticReadingPassageReview(passageOnly.readingPassageReview!, passageQuestions)).toBe(
+    true
+  );
+  const global = assessSectionReview(
+    JSON.stringify({ ...packet, issues: ['incorrect'] }),
+    passageQuestions,
+    false,
+    'reading'
+  );
+  expect(global.questionIssues).toEqual(['incorrect']);
+  expect(global.readingPassageReview).toBeUndefined();
+});
+
 describe('section review correction feedback', () => {
+  it.each([
+    null,
+    'A sentence _____.',
+    {},
+    { question: 42, options: ['A', 'B', 'C', 'D'] },
+    { question: 'A sentence _____.', options: ['A', 'B', 'C'] },
+    { question: 'A sentence _____.', options: ['A', 'B', 'C', 42] },
+    { question: 'A complete sentence.', options: ['A', 'B', 'C', 'D'] },
+    { question: 'Two _____ and _____.', options: ['A', 'B', 'C', 'D'] },
+  ])('omits derived completions for unsupported input %j', (value) => {
+    expect(literalQuestionCompletions(value)).toBeUndefined();
+  });
+
   it('shows every literal gap completion without exposing the proposed key or explanation', () => {
     const question = {
       question: 'Am Samstag _____ wir einen kleinen Kuchen für Oma.',
@@ -166,12 +213,12 @@ describe('section review correction feedback', () => {
       ...question,
       passageText: 'Private exact script.',
     }));
-    let error: unknown;
-    try {
-      assessSectionReview(JSON.stringify(exact), material, true, 'listening');
-    } catch (failure) {
-      error = failure;
-    }
+    const assessed = assessSectionReview(JSON.stringify(exact), material, true, 'listening');
+    const error = new SectionQualityError(
+      'The candidate failed its quality check.',
+      captureBlindSectionFailure(material, assessed.feedback!),
+      assessed.feedback
+    );
     expect(error).toBeInstanceOf(SectionQualityError);
     expect(JSON.stringify(error)).not.toContain('Private');
     const captured = captureGenerationFailure(error);

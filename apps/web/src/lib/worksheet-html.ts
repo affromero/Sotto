@@ -639,7 +639,7 @@ function renderIntro(intro: ClassDocumentIntro): string {
     .map(
       (example) => `<article class="example">
         <span class="example-target">${escapeHtml(example.target)}</span>
-        <p>${escapeHtml(example.meaning)}</p>
+        ${example.meaning !== example.target ? `<p>${escapeHtml(example.meaning)}</p>` : ''}
         <small class="example-note">${escapeHtml(example.note)}</small>
       </article>`
     )

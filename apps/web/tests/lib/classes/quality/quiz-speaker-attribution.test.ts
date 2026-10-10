@@ -4,7 +4,11 @@ import {
   sectionProviderFixture,
   compiledGrammarFixture,
 } from '../../../helpers/runtime/section-generation';
-import { emptyTeachingCriticFixture, shapeTeachingProviderFixture } from './intro-provider-fixture';
+import {
+  emptyTeachingCriticFixture,
+  novelFindingCorroborationFixture,
+  shapeTeachingProviderFixture,
+} from './intro-provider-fixture';
 
 const boundary = vi.hoisted(() => ({ generate: vi.fn(), resolve: vi.fn() }));
 vi.mock('@/lib/providers/ai', () => ({
@@ -14,8 +18,10 @@ vi.mock('@/lib/providers/ai', () => ({
       messages: Array<{ content: string }>,
       options: unknown
     ) => {
+      const corroboration = novelFindingCorroborationFixture(messages, options);
+      if (corroboration) return corroboration;
       if ((options as { jsonSchema: { name: string } }).jsonSchema.name === 'class_teaching_critic')
-        return emptyTeachingCriticFixture(messages);
+        return emptyTeachingCriticFixture(messages, options);
       return shapeTeachingProviderFixture(
         system,
         messages,
@@ -121,6 +127,7 @@ beforeEach(() => {
   boundary.resolve.mockResolvedValue({
     provider: 'fixture',
     model: 'captured-model',
+    execution: params.execution,
     signal: new AbortController().signal,
   });
 });

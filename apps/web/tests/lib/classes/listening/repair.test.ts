@@ -25,52 +25,21 @@ import { TeachingQualityRejectionError } from '@/lib/classes/quality/teaching-qu
 import { captureGenerationFailure } from '@/lib/classes/quality/generation-failure';
 import { learningScriptHash } from '@/lib/learning/script-hash';
 import { listeningRepairPlan } from '@/lib/classes/quality/listening-repair';
-import { configureSpokenTeachingRejection } from './teaching-repair-fixture';
+import {
+  configureSpokenTeachingRejection,
+  singleTurnScriptResponseFixture,
+} from './teaching-repair-fixture';
 import { approved, firstText, finalText, rejected, finalRejected } from './blind-review-fixture';
 import { causalBlindRejection } from './blind-review-fixture';
-const causalCandidateQuestions = [
-  {
-    question: 'What did Ana find quickly?',
-    options: ['The station', 'A restaurant', 'Her hotel', 'The museum'],
-    correctIndex: 0,
-    explanation: 'The transcript says Ana found the station quickly.',
-  },
-  ...JSON.parse(SAMPLE_QUESTIONS_JSON).questions.slice(1),
-];
-const unsupportedCausalQuestions = [
-  {
-    question: 'Why did Ana find the station quickly?',
-    options: [
-      'The people were friendly',
-      'It was raining',
-      'She knew the driver',
-      'The station was closed',
-    ],
-    correctIndex: 0,
-    explanation: 'The people were friendly, so Ana found the station quickly.',
-  },
-  ...causalCandidateQuestions.slice(1),
-];
-const causalTranscript = [
-  { speaker: 'HOST', text: 'Ana was new in town.' },
-  { speaker: 'EXPERT', text: 'The people were friendly. Ana found the station quickly.' },
-];
-function teachingVerdict(items: Array<{ index: number }>, rejectedIndex?: number) {
-  return {
-    items: items.map(({ index }) =>
-      index === rejectedIndex
-        ? {
-            index,
-            acceptable: false,
-            issues: ['unsupported'],
-            feedback: [
-              'The transcript does not say that friendliness caused Ana to find the station.',
-            ],
-          }
-        : { index, acceptable: true, issues: [], feedback: [] }
-    ),
-  };
-}
+import {
+  causalCandidateQuestions,
+  unsupportedCausalQuestions,
+  causalTranscript,
+  teachingVerdict,
+  listeningQuizJson,
+  useQuizResponseSequence,
+  malformedQuizResponses,
+} from './repair/fixtures';
 
 function scriptRequests() {
   return mockGenerateResponse.mock.calls.filter((call) => call[2].maxTokens === 12288);
@@ -84,20 +53,6 @@ function noLearningPublication() {
   expect(mockCreateSegmentsAndQueueAudio).not.toHaveBeenCalled();
   expect(mockClassSectionCreate).not.toHaveBeenCalled();
   expect(mockLessonQuestionCreateMany).not.toHaveBeenCalled();
-}
-function listeningQuizJson(questions: unknown) {
-  return JSON.stringify({ questions });
-}
-function useQuizResponseSequence(contents: readonly string[]) {
-  const original = mockGenerateResponse.getMockImplementation();
-  if (!original) throw new Error('Listening provider fixture is not configured.');
-  let quizIndex = 0;
-  mockGenerateResponse.mockImplementation(async (...args) => {
-    if (args[2].maxTokens === 4096 && quizIndex < contents.length) {
-      return { content: contents[quizIndex++]!, model: 'm' };
-    }
-    return original(...args);
-  });
 }
 
 function quizRequests() {
@@ -128,21 +83,6 @@ function expectListeningQuizSchemaOnEveryRequest() {
   expect(schemas[1]).toEqual(schemas[0]);
 }
 
-const malformedQuizResponses = [
-  ['malformed JSON', '{'],
-  ['wrong count', listeningQuizJson(JSON.parse(SAMPLE_QUESTIONS_JSON).questions.slice(0, 3))],
-  ['wrong container', JSON.stringify(JSON.parse(SAMPLE_QUESTIONS_JSON).questions)],
-  [
-    'invalid item',
-    listeningQuizJson(
-      JSON.parse(SAMPLE_QUESTIONS_JSON).questions.map(
-        (question: Record<string, unknown>, index: number) =>
-          index === 0 ? { ...question, options: ['only one option'] } : question
-      )
-    ),
-  ],
-];
-
 describe('bounded canonical listening correction', () => {
   beforeEach(async () => {
     vi.resetAllMocks();
@@ -160,7 +100,7 @@ describe('bounded canonical listening correction', () => {
       if (options.maxTokens === 12288) {
         const text = scriptIndex++ === 0 ? firstText : finalText;
         return {
-          content: JSON.stringify({ ...SAMPLE_SCRIPT_RESULT, turns: [{ speaker: 'HOST', text }] }),
+          content: singleTurnScriptResponseFixture(text, options.jsonSchema?.name),
           model: 'm',
           inputTokens: 5,
           outputTokens: 10,
@@ -175,10 +115,28 @@ describe('bounded canonical listening correction', () => {
   }
 
   it.each([false, true])(
-    'repairs spoken teaching defects with a new script and fully reviewed quiz (mixed=%s)',
+    'retains approved questions for passage-only repairs and regenerates mixed defects (mixed=%s)',
     async (mixed) => {
       rejectSpokenDefect(mixed);
+      const originalQuestions = JSON.parse(SAMPLE_QUESTIONS_JSON).questions;
+      const replacementQuestions = originalQuestions.map((question: Record<string, unknown>) => ({
+        ...question,
+        question: `After correction: ${question.question}`,
+      }));
+      useQuizResponseSequence([
+        listeningQuizJson(originalQuestions),
+        listeningQuizJson(replacementQuestions),
+      ]);
       await generateClassListening(PARAMS);
+      const expectedQuestions = mixed ? replacementQuestions : originalQuestions;
+      expect(mockLessonQuestionCreateMany.mock.calls[0][0].data).toEqual(
+        expectedQuestions.map((question: Record<string, unknown>, index: number) => ({
+          ...question,
+          sectionId: 'section-1',
+          skill: 'LISTENING',
+          order: index + 1,
+        }))
+      );
       expect(mockScriptCreate.mock.calls[0][0].data.turns).toEqual([
         { speaker: 'HOST', text: finalText },
       ]);
@@ -192,21 +150,60 @@ describe('bounded canonical listening correction', () => {
       expect(
         mockBlindResponse.mock.calls.map((call) => JSON.parse(call[1][0].content).passage)
       ).toEqual([`HOST: ${firstText}`, `HOST: ${finalText}`]);
+      const finalReview = JSON.parse(mockTeachingResponse.mock.calls.at(-1)![1][0].content);
+      expect(finalReview.items[0].content.passageText).toBe(`HOST: ${finalText}`);
+      expect(finalReview.items.slice(1).map((item: { content: unknown }) => item.content)).toEqual(
+        expectedQuestions
+      );
       expect(mockCreateSegmentsAndQueueAudio.mock.calls[0][1]).toEqual([
         { speaker: 'HOST', text: finalText },
       ]);
     }
   );
 
+  it('rejects retained questions when a localized repair changes their supporting fact', async () => {
+    const original = `${firstText} Ana ist nach Bonn gegangen.`;
+    const corrected = `${finalText} Ana ist nach Berlin gegangen.`;
+    configureSpokenTeachingRejection(approved, original, corrected);
+    const questions = [
+      {
+        question: 'Wohin ist Ana gegangen?',
+        options: ['Nach Bonn.', 'Nach Berlin.', 'Nach Hamburg.', 'Nach Köln.'],
+        correctIndex: 0,
+        explanation: 'Ana ist nach Bonn gegangen.',
+      },
+      ...JSON.parse(SAMPLE_QUESTIONS_JSON).questions.slice(1),
+    ];
+    mockGenerateResponse.mockImplementation(async (...args) => ({
+      model: 'm',
+      content:
+        args[2].maxTokens === 12288
+          ? singleTurnScriptResponseFixture(
+              args[2].jsonSchema?.name === 'learning_script_turn_repair' ? corrected : original,
+              args[2].jsonSchema?.name
+            )
+          : listeningQuizJson(questions),
+    }));
+    mockBlindResponse
+      .mockResolvedValueOnce({ content: JSON.stringify(approved), model: 'm' })
+      .mockResolvedValueOnce({
+        content: JSON.stringify(causalBlindRejection),
+        model: 'm',
+      });
+    await expect(generateClassListening(PARAMS)).rejects.toBeInstanceOf(SectionQualityError);
+    const finalBlind = JSON.parse(mockBlindResponse.mock.calls.at(-1)![1][0].content);
+    expect(finalBlind.passage).toBe(`HOST: ${corrected}`);
+    expect(finalBlind.questions[0].question).toBe('Wohin ist Ana gegangen?');
+    expect(finalBlind.questions[0].options).toEqual(questions[0].options);
+    noLearningPublication();
+  });
+
   it('keeps the original rejection when script repair returns identical spoken content', async () => {
     rejectSpokenDefect();
     mockGenerateResponse.mockImplementation(async (...args) => ({
       content:
         args[2].maxTokens === 12288
-          ? JSON.stringify({
-              ...SAMPLE_SCRIPT_RESULT,
-              turns: [{ speaker: 'HOST', text: firstText }],
-            })
+          ? singleTurnScriptResponseFixture(firstText, args[2].jsonSchema?.name)
           : SAMPLE_QUESTIONS_JSON,
       model: 'm',
     }));
@@ -251,15 +248,15 @@ describe('bounded canonical listening correction', () => {
     ).toBeNull();
   });
 
-  it('stops when bounded diagnostics omit the rejected candidate instead of guessing its repair target', async () => {
+  it('repairs an omitted diagnostic candidate but still rejects an unchanged replacement', async () => {
     rejectSpokenDefect();
     mockGenerateResponse.mockImplementation(async (...args) => ({
       content:
         args[2].maxTokens === 12288
-          ? JSON.stringify({
-              ...SAMPLE_SCRIPT_RESULT,
-              turns: [{ speaker: 'HOST', text: firstText + ' Hallo.'.repeat(1500) }],
-            })
+          ? singleTurnScriptResponseFixture(
+              firstText + ' Hallo.'.repeat(1500),
+              args[2].jsonSchema?.name
+            )
           : SAMPLE_QUESTIONS_JSON,
       model: 'm',
     }));
@@ -269,7 +266,7 @@ describe('bounded canonical listening correction', () => {
       candidate: null,
       omitted: 'size_limit',
     });
-    expect(scriptRequests()).toHaveLength(1);
+    expect(scriptRequests()).toHaveLength(2);
     noLearningPublication();
   });
 

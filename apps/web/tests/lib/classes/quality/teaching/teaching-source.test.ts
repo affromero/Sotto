@@ -19,6 +19,25 @@ const finding = (sourcePartIndex: number) => ({
 });
 
 describe('canonical teaching source parts', () => {
+  it('requires reading answer evidence only for explicitly selected reading audits', () => {
+    const fields = [
+      {
+        question: 'Where did Lea go?',
+        options: ['Bonn', 'Rome', 'Paris', 'Berlin'],
+        correctIndex: 0,
+        explanation: 'The passage names Bonn.',
+        passageText: 'Lea went to Bonn.',
+      },
+    ];
+    const noWitness = JSON.stringify({ items: [{ index: 0, findings: [] }] });
+    expect(() => parseTeachingCriticResponse(noWitness, fields, true)).toThrow(
+      ReviewerProtocolError
+    );
+    expect(parseTeachingCriticResponse(noWitness, fields)).toEqual({
+      items: [{ index: 0, findings: [] }],
+    });
+  });
+
   it('binds array elements exactly instead of accepting an array parent as quoted evidence', () => {
     const fields = [
       {

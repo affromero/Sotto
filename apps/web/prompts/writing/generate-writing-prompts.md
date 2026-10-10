@@ -25,9 +25,15 @@ Generate exactly {{COUNT}} short, scaffolded writing tasks the learner should re
 - Follow the language policy for task instructions and guidance.
 - Vary in type so the learner practices different registers and structures
 - Include enough cues that the learner knows what to say before they start.
-- Come with 2-3 "ideas": very short example openings written in {{TARGET}}, one clause each, that a stuck learner could adapt. Make them deliberately plain and different from each other, so they suggest a direction rather than hand over the answer. They are content suggestions, never the full expected response.
+- Come with 2-3 "ideas": very short beginnings copied exactly from your single complete `modelAnswer`, so a stuck learner can continue it. Use progressively longer prefixes rather than independently authoring alternative answers. Keep each hint short enough to leave useful work for the learner. For completion, choose a short starter compatible with the hints.
 
 ## Output
+
+Privately solve every task before returning it. Supply one complete `modelAnswer` in the target language that obeys the assigned actor, ALL supplied facts, tense, length and instructions. This answer is authoring evidence for independent review and is never displayed to the learner. Write this answer FIRST, then COPY short exact proper prefixes from its start into the optional `ideas` string array. Do not author separate alternative answers or rewrite the beginnings. After outer whitespace is trimmed, every character and punctuation mark in an idea must match the start of `modelAnswer` exactly. Each prefix must end before the answer ends, without cutting a Unicode character or combining sequence. Omit ellipses from ideas; the application adds the display ellipsis.
+
+For a correction, supply `correctionReason` explaining the actual grammatical error repaired by your answer. The source must contain a genuine error, and the answer must make a meaningful correction. A stylistic paraphrase or a change to supplied facts is insufficient. For every other task type, set `correctionReason` to null.
+
+For a completion task, supply a short `starterText` in {{TARGET}} that the learner must continue exactly. Supply the needed facts in `sourceText`, without independently repeating the starter as an unfinished note or message. The application displays the fixed starter with the source. The `modelAnswer` must begin with the exact starter and continue beyond it, preserving its punctuation and all required facts. Ideas copied from that same answer must remain compatible with the starter. A completion continues this fixed beginning; use another task type for transformations or replies that may freely rephrase the beginning. Omit ellipses from `starterText`. For every other task type, set `starterText` to null.
 
 Return ONLY a JSON object with a `prompts` property containing exactly {{COUNT}} tasks. Each task must include every property shown below. Set `guidance` and `ideas` to `null` when absent. Do not add properties, markdown fences, a preamble, or trailing commentary.
 
@@ -38,11 +44,16 @@ Return ONLY a JSON object with a `prompts` property containing exactly {{COUNT}}
       "taskType": "transformation | correction | completion | guided_reply",
       "task": "the writing task / prompt the learner responds to",
       "sourceText": "required original sentence(s), clauses, or complete facts needed for the answer, following the language policy",
+      "starterText": "short fixed beginning for completion, or null for other task types",
       "guidance": "optional one-line hint on what to include",
-      "ideas": ["short opening in the target language", "a different one", "a third"]
+      "modelAnswer": "one complete feasible answer in the target language",
+      "correctionReason": "the grammatical error repaired, or null for other task types",
+      "ideas": ["short exact prefix copied from modelAnswer"]
     }
   ]
 }
 ```
+
+`task` contains instructions only. Put the original sentences, incoming message and response facts in `sourceText`, without repeating them inside `task`. The application displays `sourceText` once with the instructions and adds any completion starter separately.
 
 `sourceText` is required and displayed with the task. Return actual text to work on, never a description of what the learner should invent. For correction tasks it contains the sentence with the error; for transformations it contains the original sentence; for replies it contains both the incoming message and all response facts.

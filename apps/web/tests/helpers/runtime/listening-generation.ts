@@ -3,6 +3,7 @@ import type { ClassListeningParams } from '@/lib/class-listening-generator';
 import { authorizedLearnerExecution } from './provider-execution';
 import {
   emptyTeachingCriticFixture,
+  novelFindingCorroborationFixture,
   shapeTeachingProviderFixture,
 } from '../../lib/classes/quality/intro-provider-fixture';
 
@@ -96,6 +97,8 @@ const { mockCreateAIProvider, mockGenerateResponse } = vi.hoisted(() => {
           messages: Array<{ content: string }>,
           options: unknown
         ) => {
+          const corroboration = novelFindingCorroborationFixture(messages, options);
+          if (corroboration) return corroboration;
           const name = (options as { jsonSchema?: { name: string } })?.jsonSchema?.name;
           if (name === 'class_teaching_critic')
             return shapeTeachingProviderFixture(
@@ -164,7 +167,8 @@ vi.mock('@/lib/prisma', () => {
   };
 });
 
-vi.mock('@/lib/script-generator', () => ({
+vi.mock('@/lib/script-generator', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/script-generator')>()),
   generateScript: (...args: unknown[]) => mockGenerateScript(...args),
 }));
 

@@ -134,7 +134,7 @@ export function ClassHub({
                       >
                         <summary>
                           <b>{example.target}</b>
-                          <span>{example.meaning}</span>
+                          {example.meaning !== example.target && <span>{example.meaning}</span>}
                         </summary>
                         <small>{example.note}</small>
                       </details>

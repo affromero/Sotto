@@ -47,6 +47,8 @@ import {
   type SharedTestInstance,
   type SharedTestIdentity,
 } from '../../helpers/setup/shared-instance';
+import { requiresReadingSupport } from '../classes/quality/teaching/reading-support-fixture';
+import { practiceProviderFixture } from './practice/provider-fixture';
 
 const boundary = vi.hoisted(() => ({ database: null as PrismaClient | null }));
 vi.mock('@/lib/prisma', async () => {
@@ -622,12 +624,14 @@ suite('Durable practice preparation against PostgreSQL', () => {
           requests.push(body);
           const payload = JSON.parse(body) as {
             messages: { role: string; content: string }[];
-            response_format?: { json_schema?: { name?: string } };
+            response_format?: { json_schema?: { name?: string; schema?: unknown } };
           };
           const schemaName = payload.response_format?.json_schema?.name;
           const system =
             payload.messages.find((message) => message.role === 'system')?.content ?? '';
           const user = payload.messages.at(-1)?.content ?? '';
+          const schemaOptions = { jsonSchema: payload.response_format?.json_schema };
+          const reading = requiresReadingSupport(schemaOptions);
           let content: unknown;
           let reviewed: {
             items?: {
@@ -639,7 +643,7 @@ suite('Durable practice preparation against PostgreSQL', () => {
               };
             }[];
             questions?: { index: number }[];
-            criticisms?: { items: { index: number; findings: unknown[] }[] };
+            criticisms?: Parameters<typeof buildTeachingAdjudicatorJsonSchema>[1];
           } = {};
           try {
             reviewed = JSON.parse(user);
@@ -676,7 +680,11 @@ suite('Durable practice preparation against PostgreSQL', () => {
             expect(payload.response_format).toMatchObject({
               type: 'json_schema',
               json_schema: {
-                ...buildTeachingCriticJsonSchema(reviewed.items!.map((item) => item.content)),
+                ...buildTeachingCriticJsonSchema(
+                  reviewed.items!.map((item) => item.content),
+                  false,
+                  reading
+                ),
                 strict: true,
               },
             });
@@ -689,7 +697,10 @@ suite('Durable practice preparation against PostgreSQL', () => {
               json_schema: {
                 ...buildTeachingAdjudicatorJsonSchema(
                   reviewed.items!.map((item) => item.content),
-                  { items: reviewed.items!.map(({ index }) => ({ index, findings: [] })) }
+                  reviewed.criticisms!,
+                  false,
+                  0,
+                  reading
                 ),
                 strict: true,
               },
@@ -752,18 +763,27 @@ suite('Durable practice preparation against PostgreSQL', () => {
               prompts: [
                 {
                   taskType: 'transformation',
+                  starterText: null,
                   sourceText: 'Ich wohne in Berlin. Change Ich to Mia.',
                   task: 'Rewrite the supplied sentence about Mia.',
+                  modelAnswer: 'Mia wohnt in Berlin.',
+                  correctionReason: null,
                 },
                 {
                   taskType: 'correction',
+                  starterText: null,
                   sourceText: 'Mia wohnen in Berlin.',
                   task: 'Correct the verb in the supplied sentence.',
+                  modelAnswer: 'Mia wohnt in Berlin.',
+                  correctionReason: 'The singular subject Mia requires wohnt.',
                 },
                 {
                   taskType: 'completion',
-                  sourceText: 'Mia sagt ____. Complete with Hallo.',
+                  sourceText: 'Complete with the greeting Hallo.',
+                  starterText: 'Mia sagt',
                   task: 'Complete the supplied greeting.',
+                  modelAnswer: 'Mia sagt Hallo.',
+                  correctionReason: null,
                 },
               ].map((prompt) => ({ ...prompt, guidance: null, ideas: null })),
             };
@@ -814,22 +834,7 @@ suite('Durable practice preparation against PostgreSQL', () => {
             };
           else throw new Error('Unexpected generation request: ' + system.slice(0, 100));
           response.writeHead(200, { 'Content-Type': 'application/json' });
-          response.end(
-            JSON.stringify({
-              id: 'full-fixture',
-              object: 'chat.completion',
-              created: 1,
-              model: 'full-fixture',
-              choices: [
-                {
-                  index: 0,
-                  message: { role: 'assistant', content: JSON.stringify(content) },
-                  finish_reason: 'stop',
-                },
-              ],
-              usage: { prompt_tokens: 5, completion_tokens: 10, total_tokens: 15 },
-            })
-          );
+          response.end(JSON.stringify(practiceProviderFixture(content, user, schemaOptions)));
         } catch (failure) {
           failures.push(String(failure));
           response.writeHead(500, { 'Content-Type': 'application/json' });

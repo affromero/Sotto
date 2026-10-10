@@ -38,6 +38,31 @@ function makeDoc(overrides: Partial<ClassDocument> = {}): ClassDocument {
 }
 
 describe('renderWorksheetHtml', () => {
+  it.each([true, false])(
+    'prints one copy of an identical meaning and preserves distinct meanings (%s)',
+    (identical) => {
+      const target = 'Ich habe gestern einen Film gesehen.';
+      const meaning = identical ? target : 'I watched a film yesterday.';
+      const html = renderWorksheetHtml(
+        makeDoc({
+          intro: {
+            purpose: 'Erzähle von gestern.',
+            about: target,
+            focus: ['Das Perfekt beschreibt Vergangenes.'],
+            examples: [{ target, meaning, note: 'Sehen verwendet hier haben.' }],
+            tips: ['Nenne den Tag.'],
+          },
+        })
+      );
+      const document = new DOMParser().parseFromString(html, 'text/html');
+      const example = document.querySelector('article.example');
+      expect(example?.querySelector('.example-target')?.textContent).toBe(target);
+      expect(example?.querySelector('p')?.textContent ?? null).toBe(identical ? null : meaning);
+      expect(example?.querySelector('.example-note')?.textContent).toBe(
+        'Sehen verwendet hier haben.'
+      );
+    }
+  );
   it('contains the document title', () => {
     const html = renderWorksheetHtml(makeDoc());
     expect(html).toContain('German Basics');
