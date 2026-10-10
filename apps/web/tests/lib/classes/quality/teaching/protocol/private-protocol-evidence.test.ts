@@ -25,14 +25,17 @@ import {
   TeachingQualityRejectionError,
 } from '@/lib/classes/quality/teaching-quality';
 import { buildTeachingAdjudicatorJsonSchema } from '@/lib/classes/quality/teaching-source/protocol';
-import { supportedMeaningDifferenceRule } from '@/lib/classes/quality/listening-audit/passage-witness';
+import {
+  supportedMeaningDifferenceRule,
+  listeningUnitAccountLimitRule,
+} from '@/lib/classes/quality/listening-audit/passage-witness';
 
 function fixture() {
   const turns = [
     {
       turnIndex: 1,
       speaker: 'HOST',
-      text: 'Wenn ich Lea besuchen will, sage ich: „Ich habe Lea besucht.“',
+      text: 'Wenn ich Lea besuchen will, sage ich: „Ich habe gestern Lea besucht.“',
     },
     { turnIndex: 2, speaker: 'EXPERT', text: '„Besucht“ ist das Partizip II.' },
   ];
@@ -57,10 +60,10 @@ function fixture() {
         index: 0,
         findings: [],
         passageWitness: {
-          unitAccounts: [
-            'The speaker intends to visit Lea but says they have visited her.',
-            'Besucht is the past participle.',
-          ],
+          unitAccounts: {
+            '0': 'The speaker intends to visit Lea but says they have visited her.',
+            '1': 'Besucht is the past participle.',
+          },
           pairs: [pair],
         },
       },
@@ -121,6 +124,75 @@ function fixture() {
 }
 
 describe('bounded private protocol correction evidence', () => {
+  it('corrects an oversized indexed account with its trusted local limit and preserves the negative gate', async () => {
+    const source = fixture();
+    const oversized = structuredClone(source.criticWire);
+    oversized.items[0].passageWitness.unitAccounts['1'] = 'x'.repeat(163);
+    const invalidResponse = JSON.stringify(oversized);
+    const responses = [
+      invalidResponse,
+      JSON.stringify(source.criticWire),
+      source.response('contradicted'),
+    ];
+    const requests: { system: string; messages: ChatMessage[]; options?: AIOptions }[] = [];
+    const provider: AIProvider = {
+      async generateResponse(system, messages, options) {
+        requests.push({ system, messages, options });
+        const content = responses.shift();
+        if (content === undefined) throw new Error('Unexpected provider request.');
+        return { content, model: 'captured-luna', inputTokens: 0, outputTokens: 0 };
+      },
+      async *streamResponse() {
+        throw new Error('Unexpected stream.');
+      },
+    };
+    await expect(
+      reviewTeachingContent({
+        ai: {
+          provider: 'fixture',
+          model: 'captured-luna',
+          execution: blockedProviderExecution('fixture'),
+        },
+        userId: 'fixture',
+        level: 'A2',
+        nativeLang: 'en',
+        targetLang: 'de',
+        provider,
+        kind: 'listening',
+        listeningTurns: source.turns,
+        items: [{ passageText: source.passageText, ...source.question }],
+      })
+    ).rejects.toBeInstanceOf(TeachingQualityRejectionError);
+    const initial = requests.find(
+      (request) =>
+        request.options?.jsonSchema?.name === 'class_teaching_critic' &&
+        !JSON.parse(request.messages[0].content as string).priorProtocolOutput
+    )!;
+    const correction = requests.find(
+      (request) => JSON.parse(request.messages[0].content as string).priorProtocolOutput
+    )!;
+    const { priorProtocolOutput, ...candidate } = JSON.parse(
+      correction.messages[0].content as string
+    );
+    expect(candidate).toEqual(JSON.parse(initial.messages[0].content as string));
+    expect(correction.options).toEqual(initial.options);
+    expect(priorProtocolOutput).toMatchObject({
+      role: 'critic',
+      schemaIssues: [
+        {
+          path: ['items', 0, 'passageWitness', 'unitAccounts', 1],
+          rule: listeningUnitAccountLimitRule,
+          maxChars: 120,
+        },
+      ],
+      payload: { omitted: null },
+    });
+    expect(JSON.parse(priorProtocolOutput.payload.json)).toEqual({
+      candidate,
+      response: invalidResponse,
+    });
+  });
+
   it.each([32768, 32769])(
     'retains or omits an exact UTF8 %s-byte compact response payload',
     (bytes) => {
@@ -210,6 +282,22 @@ describe('bounded private protocol correction evidence', () => {
     const { priorProtocolOutput, ...correctedCandidate } = correction.candidate;
     expect(correctedCandidate).toEqual(initial.candidate);
     expect(correctedCandidate.listeningSource).toBe(listeningSource);
+    const pair = correctedCandidate.criticisms.items[0].passagePairs[0];
+    expect(pair).toEqual({
+      pairIndex: 0,
+      premiseUnitIndex: 0,
+      exampleUnitIndex: 0,
+      premiseUnit: correctedCandidate.listeningUnits.units[0],
+      exampleUnit: correctedCandidate.listeningUnits.units[0],
+      relation: source.criticWire.items[0].passageWitness.pairs[0].relation,
+    });
+    expect(pair.exampleUnit).toMatchObject({
+      unitIndex: 0,
+      turnIndex: 1,
+      speaker: 'HOST',
+      text: source.turns[0].text,
+      sourcePartIndices: [0],
+    });
     expect(correction.request.options).toEqual(initial.request.options);
     expect(priorProtocolOutput).toMatchObject({
       role: 'adjudicator',

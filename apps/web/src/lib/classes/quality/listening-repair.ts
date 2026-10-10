@@ -18,6 +18,7 @@ import {
 import {
   teachingAdjudicatorSchema,
   teachingCriticSchema,
+  teachingNovelFindingProofSchema,
   type TeachingFinding,
 } from './teaching-review-protocol';
 
@@ -57,6 +58,7 @@ const envelopeSchema = z
               criticAssignment: z.tuple([z.literal(0)]).optional(),
               critic: teachingCriticSchema,
               adjudicator: teachingAdjudicatorSchema,
+              novelFindingCorroboration: teachingNovelFindingProofSchema.optional(),
             })
             .strict()
         ),

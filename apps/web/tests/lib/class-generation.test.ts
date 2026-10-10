@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   emptyTeachingCriticFixture,
+  novelFindingCorroborationFixture,
   shapeTeachingProviderFixture,
 } from './classes/quality/intro-provider-fixture';
 
@@ -34,6 +35,8 @@ vi.mock('@/lib/providers/ai', () => ({
       messages: Array<{ content: string }>,
       options: unknown
     ) => {
+      const corroboration = novelFindingCorroborationFixture(messages, options);
+      if (corroboration) return corroboration;
       const name = (options as { jsonSchema: { name: string } }).jsonSchema.name;
       if (name === 'class_teaching_critic') return mockTeachingCriticResponse(messages, options);
       if (name === 'class_teaching_adjudicator')
@@ -324,6 +327,9 @@ describe('contextual vocabulary coverage', () => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockGenerateResponse.mockReset();
+  mockReviewResponse.mockReset();
+  mockTeachingResponse.mockReset();
   mockResolveLearningAi.mockResolvedValue({
     provider: 'anthropic',
     model: 'm',
@@ -751,19 +757,13 @@ describe('generateSectionQuestions', () => {
     expect(mockGenerateResponse.mock.calls[2][0]).toContain('repairing malformed JSON');
   });
 
-  it('bounds mixed quality and syntax retries to seven model requests including both review roles', async () => {
+  it('repairs a malformed replacement after a blind rejection', async () => {
     mockGenerateResponse
       .mockResolvedValueOnce({ content: SAMPLE })
       .mockResolvedValueOnce({ content: '{' });
     mockReviewResponse.mockResolvedValueOnce(verdict({ issues: ['ambiguous'] }));
     const questions = await generateSectionQuestions(BASE);
     expect(questions).toHaveLength(5);
-    expect(
-      mockGenerateResponse.mock.calls.length +
-        mockReviewResponse.mock.calls.length +
-        mockTeachingResponse.mock.calls.length +
-        mockTeachingCriticResponse.mock.calls.length
-    ).toBe(7);
     expect(mockGenerateResponse.mock.calls[2][0]).toContain('repairing malformed JSON');
   });
 

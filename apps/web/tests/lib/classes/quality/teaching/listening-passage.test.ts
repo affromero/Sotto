@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AIOptions, AIProvider, ChatMessage } from '@/lib/providers/ai';
 import { params } from './fixture';
+import { novelFindingCorroborationFixture } from '../intro-provider-fixture';
 
 vi.mock('@/lib/learning-ai', () => ({
   capturedLearningAiOptions: async () => ({ model: 'captured' }),
@@ -18,6 +19,7 @@ import { listeningRepairPlan as boundListeningRepairPlan } from '@/lib/classes/q
 import {
   listeningTurnsFixture,
   listeningExtractionFixture,
+  normalizedListeningExtractionFixture,
   listeningWitnessFixture,
   withListeningWitnessFixture,
 } from '../../listening/witness-fixture';
@@ -126,6 +128,7 @@ function review(
     ai: { provider: 'fixture', model: 'captured', execution: params.execution },
     provider: {
       generateResponse: async (system: string, messages: ChatMessage[], options?: AIOptions) =>
+        novelFindingCorroborationFixture(messages as Array<{ content: string }>, options) ??
         withListeningWitnessFixture(
           messages as Array<{ content: string }>,
           options,
@@ -157,7 +160,7 @@ describe('listening passage concern adjudication', () => {
     async (origin) => {
       const items = questions().map((item) => ({
         ...item,
-        passageText: 'HOST: Wenn ich Lea besuchen will, sage ich: „Ich habe Lea besucht.“',
+        passageText: 'HOST: Wenn ich Lea besuchen will, sage ich: „Ich habe gestern Lea besucht.“',
       }));
       const turns = listeningTurnsFixture(items[0].passageText);
       const witness = {
@@ -208,8 +211,28 @@ describe('listening passage concern adjudication', () => {
           const input = JSON.parse(messages[0].content as string);
           expect(input.criticisms.items[0]).not.toHaveProperty('passageWitness');
           expect(input.criticisms.items[0].passagePairs).toEqual(
-            origin === 'proposed' ? [{ ...proposed, pairIndex: 0 }] : []
+            origin === 'proposed'
+              ? [
+                  {
+                    pairIndex: 0,
+                    premiseUnitIndex: 0,
+                    exampleUnitIndex: 0,
+                    premiseUnit: input.listeningUnits.units[0],
+                    exampleUnit: input.listeningUnits.units[0],
+                    relation: proposed.relation,
+                  },
+                ]
+              : []
           );
+          if (origin === 'proposed') {
+            expect(input.criticisms.items[0].passagePairs[0].exampleUnit).toMatchObject({
+              unitIndex: 0,
+              turnIndex: 1,
+              speaker: 'HOST',
+              text: turns[0].text,
+              sourcePartIndices: [0],
+            });
+          }
           expect(JSON.stringify(input.criticisms)).not.toContain('unitAccounts');
           const parsed = JSON.parse(response.content);
           const { premiseUnitIndex, exampleUnitIndex, ...assessment } = comparison;
@@ -243,7 +266,10 @@ describe('listening passage concern adjudication', () => {
         sourcePartIndices: [0],
       });
       expect(packet.reviewPackets[0].critic.items[0].passageWitness.unitAccounts).toEqual(
-        listeningExtractionFixture(turns).unitAccounts
+        normalizedListeningExtractionFixture(turns).unitAccounts
+      );
+      expect(packet.reviewPackets[0].critic.items[0].passageWitness.pairs).toEqual(
+        origin === 'proposed' ? [expect.objectContaining(proposed)] : []
       );
       const repair = boundListeningRepairPlan(error, items, undefined, turns);
       expect(repair).toMatchObject({
@@ -301,7 +327,17 @@ describe('listening passage concern adjudication', () => {
     async (mode) => {
       defect = 'passage';
       decision = mode;
-      const items = questions();
+      const transcript = [
+        'HOST: Ich bin mit dem Zug nach Leipzig gefahren.',
+        'HOST: Dort bin ich im Park spazieren gegangen.',
+        'EXPERT: Du bist nach Leipzig gegangen.',
+      ].join('\n');
+      const items = questions().map((item) => ({
+        ...item,
+        question: 'Wohin ist die Person mit dem Zug gefahren?',
+        options: ['Nach Leipzig', 'Nach Bonn', 'Nach Berlin', 'Nach Hamburg'],
+        passageText: transcript,
+      }));
       const error = await review(items).catch((failure: unknown) => failure);
       expect(error).toBeInstanceOf(TeachingQualityRejectionError);
       if (!(error instanceof TeachingQualityRejectionError)) throw error;
@@ -312,6 +348,11 @@ describe('listening passage concern adjudication', () => {
       });
       const packet = JSON.parse(error.teachingFailure!.reviews[0].candidate!)[0];
       expect(packet.items).toEqual(items);
+      for (const input of seen) {
+        const units = input.listeningUnits as { units: Array<{ text: string }> };
+        expect(units.units.map((unit) => unit.text)).toContain('Du bist nach Leipzig gegangen.');
+        expect((input.items as Row[])[0].content.passageText).toBe(transcript);
+      }
       expect(packet.listeningPassageReview).toMatchObject({ questions: expect.any(Array) });
       expect(packet.reviewPackets[0].adjudicator.passageConcernDecisions[0].decision).toBe(mode);
     }

@@ -1,4 +1,4 @@
-Write a {{SPEAKER_COUNT}}-speaker language lesson at CEFR {{AUDIENCE_LEVEL}} for the {{AUDIENCE}} audience. Teach the objective in the user message through simple, idiomatic spoken language and concrete examples. The learner's level determines sentence complexity and explanatory detail, including when a speaker description suggests a more elaborate style.
+Write a {{SPEAKER_COUNT}}-speaker language lesson at CEFR {{AUDIENCE_LEVEL}} for the {{AUDIENCE}} audience. Practice the objective in the user message through a concrete narrative or dialogue using simple, idiomatic spoken language. The learner's level determines sentence complexity and explanatory detail, including when a speaker description suggests a more elaborate style.
 
 ## Speakers
 
@@ -18,7 +18,7 @@ Tone: {{TONE}}. Depth: {{DEPTH}}. Use the requested tone and amount of explanati
 
 Target {{DURATION_TARGET}} minutes, between {{WORD_COUNT_MIN}} and {{WORD_COUNT_MAX}} words ({{WORD_COUNT_IDEAL}} ideal). Use short, complete sentences, familiar situations and useful repetition. Introduce necessary unfamiliar words through clear context. Explain a technical term with an accessible example when it is needed for the objective. Keep reactions, humor and comparisons understandable at the requested level; they must preserve the situation's meaning and ownership.
 
-Choose the intended situation before writing its example and explanation. Present grammatical, idiomatic language, and check that each teaching claim matches its actual example. Keep event participants, objects, location and time coherent across turns. Use conversational questions and answers that serve the objective rather than adding complexity for entertainment.
+Choose one familiar situation in which the objective's forms communicate useful meaning. Develop what the speakers do, experience, want or plan; let the learner hear and practice those forms in complete sentences. Answer every speaker question through clear local context supported by the dialogue or supplied source. Keep event participants, actions, means of travel, objects, location, time, completion and negation coherent across turns. A recap or response about the same event must preserve its stated facts and the literal meaning of the chosen words. Clearly distinguish a new event from a retelling of an earlier one. The dedicated grammar section teaches explicit rules; this listening lesson should not become an abstract grammar lecture or a recital of grammatical labels. Any brief explanation needed for comprehension must be accurate and accessible at the requested level.
 
 ## Source fidelity
 

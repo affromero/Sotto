@@ -545,7 +545,9 @@ This is a LANGUAGE LEARNING audio lesson. Generate the learner-facing script in 
     modeInstructions[mode ?? 'conversational_mix'] ?? modeInstructions.conversational_mix;
 
   const teachingCorrectness = opts?.forLearning
-    ? `\n\n## Grammar explanations
+    ? `\n\n## Private author accuracy checks
+
+Use these checks while composing and revising the script. They are not a spoken lesson outline or a request to explain grammar rules aloud.
 
 - Distinguish infinitives or base forms, participles, and finite verb forms. Use the correct grammatical term for the form in the actual example.
 - Frame spoken word mentions explicitly as words, verbs or example forms. Keep the surrounding sentence grammatical and idiomatic; quotation marks alone do not make a bare citation fit after a preposition.
@@ -573,7 +575,7 @@ In addition to references, you MUST include a "vocabulary" array in your JSON ou
 
 Rules:
 - Each [V{N}:word] marker in the script MUST have a corresponding vocabulary entry
-- "word" is the ${langName} word/phrase
+- "word" identifies the ${langName} dictionary entry or lexical phrase. Keep required review targets unchanged here; a marker contains the actual grammatical surface used in its sentence, which may omit a dictionary article or use an inflected form of that entry.
 - "translation" is the English translation
 - "pronunciation" is a phonetic guide using English approximation (e.g., "SHPREE-chen")
 - "partOfSpeech" is noun/verb/adjective/adverb/phrase/expression
@@ -582,7 +584,7 @@ Rules:
 
   const requiredItems = opts?.mustIncludeVocabulary?.length
     ? `\n\n## REQUIRED review items (from the learner's spaced-repetition queue)
-These are lexical review targets, not mandatory verbatim sentence fragments. Write complete natural sentences before adding markers. Keep each target as a vocabulary entry; the text inside a marker is the actual grammatical surface already present in the sentence. If that surface exactly matches another entry's word, use that entry's number. Introduce the original target separately in a natural context or explicit spoken word mention where its form fits. Never splice a dictionary article or base form into an incompatible surrounding phrase. Prioritize these targets for anticipation and recall:
+These are lexical review targets, not mandatory verbatim sentence fragments. Write complete natural sentences before adding markers. Keep each target unchanged as a vocabulary entry; its numbered marker contains the actual grammatical surface already present in the sentence. A noun's dictionary article need not appear inside the marker, and a verb may appear in its inflected form. Never splice a dictionary article or base form into an incompatible surrounding phrase or add a spoken dictionary citation merely to repeat the entry verbatim. Prioritize these targets for anticipation and recall:
 ${opts.mustIncludeVocabulary.map((v) => `- ${v.word} — ${v.translation}`).join('\n')}`
     : '';
 

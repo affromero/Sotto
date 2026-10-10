@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   emptyTeachingCriticFixture,
+  novelFindingCorroborationFixture,
   shapeTeachingProviderFixture,
 } from './classes/quality/intro-provider-fixture';
 
@@ -43,6 +44,8 @@ vi.mock('@/lib/providers/ai', () => ({
       messages: Array<{ content: string }>,
       options: unknown
     ) => {
+      const corroboration = novelFindingCorroborationFixture(messages, options);
+      if (corroboration) return corroboration;
       const name = (options as { jsonSchema?: { name: string } }).jsonSchema?.name;
       if (name === 'class_teaching_critic') return emptyTeachingCriticFixture(messages);
       if (name === 'class_teaching_adjudicator')
@@ -472,7 +475,7 @@ describe('composeWritingPrompts', () => {
     expect(mockGenerateResponse.mock.calls).toHaveLength(2);
   });
 
-  it('replaces a rejected writing set once and requires the replacement to pass review', async () => {
+  it('repairs rejected writing tasks and rereviews unchanged approved tasks with their private proof', async () => {
     const replacement = writingResponse([
       {
         taskType: 'completion',
@@ -483,7 +486,12 @@ describe('composeWritingPrompts', () => {
         task: 'Complete the supplied sentence with the correct form of tener.',
         guidance: 'Use the near future.',
       },
-      ...SAMPLE_PROMPTS.slice(1),
+      {
+        ...SAMPLE_PROMPTS[1],
+        modelAnswer: 'Ayer yo iré al cine.',
+        correctionReason: 'Use the future for yesterday.',
+      },
+      { ...SAMPLE_PROMPTS[2], guidance: 'Use the past tense for tomorrow.' },
     ]);
     mockGenerateResponse
       .mockResolvedValueOnce({ content: SAMPLE, inputTokens: 10, outputTokens: 20, model: 'm' })
@@ -530,6 +538,10 @@ describe('composeWritingPrompts', () => {
     });
     expect(mockGenerateResponse).toHaveBeenCalledTimes(2);
     expect(mockTeachingResponse).toHaveBeenCalledTimes(2);
+    const initialReview = JSON.parse(mockTeachingResponse.mock.calls[0][1][0].content).items;
+    const replacementReview = JSON.parse(mockTeachingResponse.mock.calls[1][1][0].content).items;
+    expect(replacementReview.slice(1)).toEqual(initialReview.slice(1));
+    expect(prompts.slice(1).map((item) => item.guidance)).toEqual([null, null]);
     expect(JSON.parse(mockTeachingResponse.mock.calls[1][1][0].content).items[0].content).toEqual({
       ...prompts[0],
       taskType: 'completion',
@@ -539,6 +551,8 @@ describe('composeWritingPrompts', () => {
       correctionDelta: null,
     });
     const repair = mockGenerateResponse.mock.calls[1][1][0].content as string;
+    const authoringItems = JSON.parse(repair.split('Rejected tasks:\n')[1]);
+    expect(authoringItems).toEqual(SAMPLE_PROMPTS);
     expect(repair).toContain('supply every fact the learner needs');
     expect(repair).toContain('Review issue codes: ["unnatural"]');
     expect(repair).toContain('The guidance requires an incorrect collocation.');

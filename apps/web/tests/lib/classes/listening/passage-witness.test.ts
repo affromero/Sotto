@@ -30,7 +30,9 @@ function fixture(
     relation: 'claimed_equivalence' as const,
   };
   const extractionWire = {
-    unitAccounts: table.units.map((unit) => unit.text.trim()),
+    unitAccounts: Object.fromEntries(
+      table.units.map((unit) => [String(unit.unitIndex), unit.text.trim()])
+    ),
     pairs: [pair],
   };
   const extraction = parseListeningPassageExtractionResponse(extractionWire, fields, turns, 'en');
@@ -112,11 +114,67 @@ function grammaticalFormFixture() {
   return { ...source, extraction, assessment, parse };
 }
 
+function denseTeachingFixture(splitExpert: boolean) {
+  const expertSentences = [
+    'Ja.',
+    'Du benutzt „bin gefahren“ für die Fahrt.',
+    'Bei „besucht“ und „gekocht“ benutzt du „haben“.',
+    'Wenn du von einem Erlebnis erzählst, kannst du zuerst die Zeit nennen: „Am Samstag bin ich nach Hamburg gefahren.“',
+    'Dann erzählst du, was du dort gemacht hast.',
+  ];
+  const turns = [
+    {
+      turnIndex: 1,
+      speaker: 'HOST',
+      text: 'Dann übe ich noch ein Beispiel: „Letzten Monat bin ich nach Hamburg gefahren. Ich habe meine Tante besucht. Wir haben zusammen gekocht.“ Sind das gute Sätze?',
+    },
+    ...(splitExpert ? expertSentences : [expertSentences.join(' ')]).map((text, position) => ({
+      turnIndex: position + 2,
+      speaker: 'EXPERT',
+      text,
+    })),
+  ];
+  const fields = {
+    passageText: turns.map((turn) => `${turn.speaker}: ${turn.text}`).join('\n'),
+  };
+  const table = buildListeningSourceUnits(fields, turns, 'de');
+  const pairInputs = [
+    [4, 0, 'The expert confirms the first sentence is good.', 'The host went to Hamburg.'],
+    [4, 1, 'The expert confirms the second sentence is good.', 'The host visited their aunt.'],
+    [4, 2, 'The expert confirms the third sentence is good.', 'The host cooked with their aunt.'],
+    [5, 0, 'Use “bin gefahren” for the journey.', 'The host went to Hamburg.'],
+    [6, 1, 'Use “haben” with “besucht”.', 'The host visited their aunt.'],
+    [6, 2, 'Use “haben” with “gekocht”.', 'The host cooked with their aunt.'],
+    [7, 7, 'The time can come first in an experience.', '“Am Samstag” comes first.'],
+  ] as const;
+  const pairs = pairInputs.map(
+    ([premiseUnitIndex, exampleUnitIndex, premiseMeaning, exampleMeaning]) => ({
+      premiseUnitIndex,
+      exampleUnitIndex,
+      premiseMeaning,
+      exampleMeaning,
+      relation: 'grammatical_form' as const,
+    })
+  );
+  return {
+    turns,
+    fields,
+    wire: {
+      unitAccounts: Object.fromEntries(
+        table.units.map((unit) => [String(unit.unitIndex), unit.text.trim()])
+      ),
+      pairs,
+    },
+  };
+}
+
 describe('source-bound two-stage listening evidence', () => {
   it('retains full literal accounts and independently assessed meanings for the same source unit', () => {
     const source = fixture();
     const witness = source.parse();
-    expect(source.extraction.unitAccounts).toEqual(source.extractionWire.unitAccounts);
+    expect(source.extraction.unitAccounts).toEqual(
+      source.table.units.map((unit) => source.extractionWire.unitAccounts[String(unit.unitIndex)])
+    );
     expect(source.extraction.pairs[0]).toMatchObject({
       pairIndex: 0,
       premiseTurnIndex: 1,
@@ -156,8 +214,9 @@ describe('source-bound two-stage listening evidence', () => {
     (change) => {
       const source = fixture();
       const wire = structuredClone(source.extractionWire);
-      if (change === 'missing') wire.unitAccounts.pop();
-      if (change === 'extra') wire.unitAccounts.push('Extra account.');
+      if (change === 'missing') delete wire.unitAccounts['0'];
+      if (change === 'extra')
+        wire.unitAccounts[String(source.table.units.length)] = 'Extra account.';
       if (change === 'empty') wire.unitAccounts[0] = ' ';
       if (change === 'too long')
         wire.unitAccounts[2] = 'x'.repeat(source.table.units[2].meaningMaxChars + 1);
@@ -185,7 +244,82 @@ describe('source-bound two-stage listening evidence', () => {
     }
   );
 
-  it('rejects foreign units and enforces six relations across all units of one original turn', () => {
+  it('binds indexed accounts to their original units regardless of declaration order', () => {
+    const source = fixture();
+    const wire = {
+      ...source.extractionWire,
+      unitAccounts: Object.fromEntries(
+        Object.entries(source.extractionWire.unitAccounts).reverse()
+      ),
+    };
+    expect(
+      parseListeningPassageExtractionResponse(wire, source.fields, source.turns, 'en')
+    ).toEqual(source.extraction);
+    expect(() =>
+      parseListeningPassageExtractionResponse(
+        { ...wire, unitAccounts: source.extraction.unitAccounts },
+        source.fields,
+        source.turns,
+        'en'
+      )
+    ).toThrow();
+    expect(parseListeningPassageExtraction(source.extraction, source.fields, source.turns)).toEqual(
+      source.extraction
+    );
+  });
+
+  it('enforces each indexed account limit in both the provider schema and canonical parser', () => {
+    const turns = Array.from({ length: 89 }, (_, unitIndex) => ({
+      turnIndex: unitIndex + 1,
+      speaker: unitIndex % 2 ? 'EXPERT' : 'HOST',
+      text:
+        unitIndex === 88
+          ? 'Goodbye.'
+          : `On day ${unitIndex + 1}, we walked through the old town and visited the museum before returning home.`,
+    }));
+    const fields = { passageText: turns.map((turn) => `${turn.speaker}: ${turn.text}`).join('\n') };
+    const table = buildListeningSourceUnits(fields, turns, 'en');
+    const schema = listeningPassageExtractionResponseSchema(fields, turns, 'en');
+    const nativeSchema = z.fromJSONSchema(z.toJSONSchema(schema));
+    const last = table.units.at(-1)!;
+    expect(last.unitIndex).toBe(88);
+    expect(last.meaningMaxChars).toBe(120);
+    expect(table.units[0].meaningMaxChars).toBeGreaterThan(last.meaningMaxChars);
+    const valid = {
+      unitAccounts: Object.fromEntries(
+        table.units.map((unit) => [
+          String(unit.unitIndex),
+          unit.unitIndex === last.unitIndex
+            ? 'x'.repeat(last.meaningMaxChars)
+            : `Complete account for day ${unit.unitIndex + 1}.`,
+        ])
+      ),
+      pairs: [],
+    };
+    expect(nativeSchema.safeParse(valid).success).toBe(true);
+    expect(
+      parseListeningPassageExtractionResponse(valid, fields, turns, 'en').unitAccounts.at(-1)
+    ).toBe(valid.unitAccounts[String(last.unitIndex)]);
+    for (const length of [121, 163, 255]) {
+      const oversized = structuredClone(valid);
+      oversized.unitAccounts[String(last.unitIndex)] = 'x'.repeat(length);
+      expect(nativeSchema.safeParse(oversized).success).toBe(false);
+      expect(() =>
+        parseListeningPassageExtractionResponse(oversized, fields, turns, 'en')
+      ).toThrow();
+    }
+    for (const change of ['missing', 'unknown'] as const) {
+      const incomplete = structuredClone(valid);
+      if (change === 'missing') delete incomplete.unitAccounts[String(last.unitIndex)];
+      else incomplete.unitAccounts['89'] = 'An unbound account.';
+      expect(nativeSchema.safeParse(incomplete).success).toBe(false);
+      expect(() =>
+        parseListeningPassageExtractionResponse(incomplete, fields, turns, 'en')
+      ).toThrow();
+    }
+  });
+
+  it('rejects foreign units and preserves the aggregate relation budget', () => {
     const source = fixture();
     expect(() =>
       parseListeningPassageExtractionResponse(
@@ -197,12 +331,93 @@ describe('source-bound two-stage listening evidence', () => {
     ).toThrow();
     expect(() =>
       parseListeningPassageExtractionResponse(
-        { ...source.extractionWire, pairs: Array.from({ length: 7 }, () => ({ ...source.pair })) },
+        { ...source.extractionWire, pairs: Array.from({ length: 19 }, () => ({ ...source.pair })) },
         source.fields,
         source.turns,
         'en'
       )
     ).toThrow();
+    expect(() =>
+      source.parse({
+        ...source.judgeWire,
+        additionalPairs: Array.from({ length: 18 }, () => ({
+          premiseUnitIndex: 0,
+          exampleUnitIndex: 0,
+          ...source.assessment,
+        })),
+      })
+    ).toThrow();
+  });
+
+  it('retains seven distinct teaching relations whether the explanation is one turn or several', () => {
+    const extractions = [false, true].map((splitExpert) => {
+      const source = denseTeachingFixture(splitExpert);
+      const extraction = parseListeningPassageExtractionResponse(
+        source.wire,
+        source.fields,
+        source.turns,
+        'de'
+      );
+      expect(extraction.pairs).toHaveLength(7);
+      const assessments = source.wire.pairs.map((pair) => ({
+        premiseMeaning: pair.premiseMeaning,
+        exampleMeaning: pair.exampleMeaning,
+        relation: pair.relation,
+        checks: {
+          actor: 'not_applicable',
+          event: 'not_applicable',
+          time: 'not_applicable',
+          modality: 'not_applicable',
+          negation: 'not_applicable',
+        },
+        status: 'supported',
+        reason: 'The cited example illustrates the stated grammatical form.',
+        remedy: null,
+      }));
+      const witness = parseListeningPassageWitnessResponse(
+        {
+          pairDecisions: assessments.map((assessment, pairIndex) => ({
+            pairIndex,
+            decision: 'compared',
+            ...assessment,
+          })),
+          additionalPairs: [],
+        },
+        source.fields,
+        source.turns,
+        extraction,
+        'de'
+      );
+      expect(witness.proposedPairs).toEqual(extraction.pairs);
+      expect(witness.pairDecisions).toHaveLength(7);
+      const emptyExtraction = parseListeningPassageExtractionResponse(
+        { ...source.wire, pairs: [] },
+        source.fields,
+        source.turns,
+        'de'
+      );
+      const discovered = parseListeningPassageWitnessResponse(
+        {
+          pairDecisions: [],
+          additionalPairs: source.wire.pairs.map((pair, pairIndex) => ({
+            ...pair,
+            ...assessments[pairIndex],
+          })),
+        },
+        source.fields,
+        source.turns,
+        emptyExtraction,
+        'de'
+      );
+      expect(discovered.additionalPairs).toHaveLength(7);
+      return extraction;
+    });
+    expect(new Set(extractions[0].pairs.map((pair) => pair.premiseTurnIndex))).toEqual(
+      new Set([2])
+    );
+    expect(extractions[1].pairs.map((pair) => pair.premiseMeaning)).toEqual(
+      extractions[0].pairs.map((pair) => pair.premiseMeaning)
+    );
   });
 
   it.each(['missing', 'duplicate', 'foreign', 'rewritten unit', 'derived index'] as const)(
@@ -740,7 +955,7 @@ describe('source-bound two-stage listening evidence', () => {
     const table = buildListeningSourceUnits(fields, turns, 'en');
     const extraction = parseListeningPassageExtractionResponse(
       {
-        unitAccounts: ['A long complete source account.'],
+        unitAccounts: { '0': 'A long complete source account.' },
         pairs: [{ ...fixture().pair, premiseUnitIndex: 0, exampleUnitIndex: 0 }],
       },
       fields,

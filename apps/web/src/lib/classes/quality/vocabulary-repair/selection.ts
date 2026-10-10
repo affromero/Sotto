@@ -11,7 +11,8 @@ export interface VocabularyRepairSelection {
 export function selectVocabularyRepair(
   questions: GeneratedQuestion[],
   targetOrder: number[],
-  feedback: SectionReviewFeedback | undefined
+  feedback: SectionReviewFeedback | undefined,
+  structuralTargets: readonly number[] = []
 ): VocabularyRepairSelection | undefined {
   if (
     !feedback ||
@@ -23,6 +24,7 @@ export function selectVocabularyRepair(
     targetOrder.some(
       (index) => !Number.isInteger(index) || index < 0 || index >= questions.length
     ) ||
+    structuralTargets.some((index) => !targetOrder.includes(index)) ||
     feedback.questions.length !== questions.length ||
     new Set(feedback.questions.map((row) => row.index)).size !== questions.length ||
     feedback.questions.some(
@@ -33,6 +35,7 @@ export function selectVocabularyRepair(
   const rejectedTargets = feedback.questions
     .filter(
       (row) =>
+        structuralTargets.includes(targetOrder[row.index]) ||
         row.issues.length ||
         row.acceptableOptionIndices.length !== 1 ||
         row.acceptableOptionIndices[0] !== questions[row.index].correctIndex

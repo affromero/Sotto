@@ -13,15 +13,13 @@ import {
 } from './source-units';
 
 export { buildListeningSourceUnits } from './source-units';
-export type {
-  ListeningSourceBinding,
-  ListeningSourceTable,
-  ListeningSourceUnit,
-} from './source-units';
+export type { ListeningSourceTable } from './source-units';
 
-const maximumRelationsPerTurn = 6;
+const relationBudgetPerTurn = 6;
 export const supportedMeaningDifferenceRule =
   'An illustration or claimed_equivalence with a different meaning check cannot have supported or explicitly_repaired status.';
+export const listeningUnitAccountLimitRule =
+  'Each listening unit account must fit its supplied meaningMaxChars.';
 const index = z.number().int().nonnegative();
 const turnIndex = z.number().int().positive();
 const meaning = z.string().trim().min(1).max(120);
@@ -147,9 +145,7 @@ function checkPairs(
   context: z.RefinementCtx,
   path: PropertyKey[]
 ) {
-  const counts = new Map<number, number>();
-  const maximum =
-    new Set(binding.units.map((unit) => unit.turnIndex)).size * maximumRelationsPerTurn;
+  const maximum = new Set(binding.units.map((unit) => unit.turnIndex)).size * relationBudgetPerTurn;
   if (pairs.length > maximum) invalid(context, path);
   pairs.forEach((pair, position) => {
     const premise = binding.units[pair.premiseUnitIndex];
@@ -161,9 +157,6 @@ function checkPairs(
       pair.exampleTurnIndex !== example.turnIndex
     )
       invalid(context, [...path, position]);
-    const count = (counts.get(pair.premiseTurnIndex) ?? 0) + 1;
-    counts.set(pair.premiseTurnIndex, count);
-    if (count > maximumRelationsPerTurn) invalid(context, [...path, position]);
     if (
       pair.sourcePartIndices.some(
         (part, index) => index > 0 && part <= pair.sourcePartIndices[index - 1]
@@ -296,7 +289,7 @@ export function parseListeningPassageExtraction(
   return listeningPassageExtractionSchema(fields, turns).parse(value);
 }
 
-export function listeningPassageWitnessSchema(
+function listeningPassageWitnessSchema(
   fields: unknown,
   turns: readonly NormalizedListeningTurn[],
   extraction?: ListeningPassageExtraction
@@ -331,7 +324,7 @@ export function parseListeningPassageWitness(
   return listeningPassageWitnessSchema(fields, turns, extraction).parse(value);
 }
 
-type ExtractionResponse = { unitAccounts: string[]; pairs: Pair[] };
+type ExtractionResponse = { unitAccounts: Record<string, string>; pairs: Pair[] };
 const comparedResponseSchema = z.object(comparedShape).strict();
 const additionalResponseSchema = z
   .object({ premiseUnitIndex: index, exampleUnitIndex: index, ...assessmentShape })
@@ -348,7 +341,7 @@ function compileExtraction(
   return {
     version: 2,
     ...retainListeningSourceBinding(table),
-    unitAccounts: value.unitAccounts,
+    unitAccounts: table.units.map((unit) => value.unitAccounts[String(unit.unitIndex)]),
     pairs: value.pairs.map((pair, pairIndex) => ({
       ...pair,
       pairIndex,
@@ -406,17 +399,18 @@ export function listeningPassageExtractionResponseSchema(
   return z
     .object({
       unitAccounts: z
-        .array(
-          z
-            .string()
-            .trim()
-            .min(1)
-            .max(Math.max(...table.units.map((unit) => unit.meaningMaxChars)))
+        .object(
+          Object.fromEntries(
+            table.units.map((unit) => [
+              String(unit.unitIndex),
+              z.string().trim().min(1).max(unit.meaningMaxChars),
+            ])
+          )
         )
-        .length(table.units.length),
+        .strict(),
       pairs: z
         .array(pairSchema.extend({ premiseUnitIndex: unitIndex, exampleUnitIndex: unitIndex }))
-        .max(turns.length * maximumRelationsPerTurn),
+        .max(turns.length * relationBudgetPerTurn),
     })
     .strict()
     .superRefine((value, refinement) => {
@@ -462,7 +456,7 @@ export function listeningPassageWitnessResponseSchema(
 ) {
   const { original, table } = judgeSourceTable(fields, turns, extraction, targetLang);
   const unitIndex = z.literal(table.units.map((unit) => unit.unitIndex));
-  const limit = turns.length * maximumRelationsPerTurn;
+  const limit = turns.length * relationBudgetPerTurn;
   const pairIndex = z.literal(
     original.pairs.length ? original.pairs.map((pair) => pair.pairIndex) : [0]
   );

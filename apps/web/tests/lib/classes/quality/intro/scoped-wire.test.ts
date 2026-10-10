@@ -1,11 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { novelFindingCorroborationFixture } from '../intro-provider-fixture';
 import { blockedProviderExecution } from '../../../../helpers/runtime/provider-execution';
 import { teachingFindingFixture } from '../intro-provider-fixture';
 
 const boundary = vi.hoisted(() => ({ generate: vi.fn(), resolve: vi.fn() }));
 vi.unmock('@/lib/classes/class-intro');
 vi.mock('@/lib/providers/ai', () => ({
-  createAIProvider: () => ({ generateResponse: boundary.generate }),
+  createAIProvider: () => ({
+    generateResponse: async (
+      system: string,
+      messages: Array<{ content: string }>,
+      options: unknown
+    ) =>
+      novelFindingCorroborationFixture(messages, options) ??
+      boundary.generate(system, messages, options),
+  }),
 }));
 vi.mock('@/lib/learning-ai', () => ({
   resolveCapturedLearningAi: boundary.resolve,
@@ -20,7 +29,7 @@ import { classIntroFromSeed, generateClassIntro } from '@/lib/classes/class-intr
 const params = {
   userId: 'fixture',
   execution: blockedProviderExecution('fixture'),
-  level: 'A2',
+  level: 'A1',
   nativeLang: 'en',
   targetLang: 'de',
   title: 'Gestern',
@@ -36,15 +45,15 @@ const wire = {
     { text: 'Gehen verwendet sein.', exampleIndex: 1 },
   ],
   examples: [
-    { target: 'Ich habe gekocht.', meaning: 'Ich kochte.', note: 'Kochen verwendet haben.' },
-    { target: 'Wir sind gegangen.', meaning: 'Wir gingen.', note: 'Gehen verwendet sein.' },
+    { target: 'Ich habe gekocht.', meaning: 'I cooked.', note: 'Kochen verwendet haben.' },
+    { target: 'Wir sind gegangen.', meaning: 'We went.', note: 'Gehen verwendet sein.' },
   ],
   tips: [{ text: 'Lerne das Hilfsverb.', exampleIndex: 1 }],
   visuals: null,
 };
 const compiled = {
   purpose: wire.purpose,
-  about: '„Wir sind gegangen.“: Wir gingen.',
+  about: '„Wir sind gegangen.“: We went.',
   focus: [
     '„Ich habe gekocht.“: Kochen verwendet haben.',
     '„Wir sind gegangen.“: Gehen verwendet sein.',
@@ -57,7 +66,7 @@ const compiled = {
 };
 const shortExample = {
   target: 'Guten Morgen',
-  meaning: '„Guten Morgen“ sagt man früh am Tag.',
+  meaning: 'You say good morning early in the day.',
   note: 'Sagt man früh am Tag.',
 };
 const shortCompiledExample = { ...shortExample, note: '„Guten Morgen“: Sagt man früh am Tag.' };
@@ -183,9 +192,9 @@ beforeEach(() => {
   });
 });
 
-describe('strict scoped intro wire', () => {
+describe('strict scoped A1 intro wire', () => {
   it('repairs teaching after a size repair and re-audits the complete merged intro', async () => {
-    const example = { ...wire.examples[1]!, meaning: 'Die Gruppe ging.' };
+    const example = { ...wire.examples[1]!, meaning: 'The group went.' };
     respond(wire, { examples: { 1: example } }, ['examples:1']);
     const reviewAndRepair = boundary.generate.getMockImplementation()!;
     let structuralRepairPending = true;
@@ -277,7 +286,7 @@ describe('strict scoped intro wire', () => {
         'Guten Morgen',
         'Wir sind gegangen.',
       ]);
-      expect(result.about).toBe('„Wir sind gegangen.“: Wir gingen.');
+      expect(result.about).toBe('„Wir sind gegangen.“: We went.');
       for (const context of reviewContexts()) expect(context).toEqual(shortExampleIntro);
       const persisted = JSON.parse(JSON.stringify({ intro: result }));
       expect(classIntroFromSeed(persisted, params)).toEqual(result);
@@ -297,7 +306,7 @@ describe('strict scoped intro wire', () => {
   it('preserves an accepted short example and stable later indices when its sibling changes', async () => {
     const example = {
       target: 'Wir sind gestern gefahren.',
-      meaning: 'Wir fuhren gestern.',
+      meaning: 'We travelled yesterday.',
       note: 'Fahren verwendet hier sein.',
     };
     respond(shortExampleWire, { examples: { 1: example } }, ['examples:1']);
@@ -434,7 +443,7 @@ describe('strict scoped intro wire', () => {
   it('copies only the selected journey meaning without inventing when the whole outing ended', async () => {
     const example = {
       target: 'Gestern bin ich zu Fuß zum Markt gegangen.',
-      meaning: 'Ich ging gestern zu Fuß zum Markt.',
+      meaning: 'I walked to the market yesterday.',
       note: 'Gehen verwendet hier sein.',
     };
     const input = {
@@ -447,14 +456,14 @@ describe('strict scoped intro wire', () => {
     respond(input);
     const result = await generateClassIntro(params);
     expect(result.about).toBe(
-      '„Gestern bin ich zu Fuß zum Markt gegangen.“: Ich ging gestern zu Fuß zum Markt.'
+      '„Gestern bin ich zu Fuß zum Markt gegangen.“: I walked to the market yesterday.'
     );
     expect(result.examples[0]!.meaning).toBe(example.meaning);
     for (const context of reviewContexts()) expect(context.about).toBe(result.about);
   });
 
   it('retains the selected meaning exactly even when it already begins with the target quote', async () => {
-    const meaning = '„Wir sind gegangen.“: Die Gruppe ging.';
+    const meaning = '„Wir sind gegangen.“: The group went.';
     respond({ ...wire, examples: [wire.examples[0], { ...wire.examples[1], meaning }] });
     const result = await generateClassIntro(params);
     expect(result.about).toBe(`„Wir sind gegangen.“: ${meaning}`);
@@ -510,7 +519,7 @@ describe('strict scoped intro wire', () => {
   it('compiles rejected observations after all example replacements while preserving accepted bytes', async () => {
     const example = {
       target: 'Wir sind gestern gefahren.',
-      meaning: 'Wir fuhren gestern.',
+      meaning: 'We travelled yesterday.',
       note: 'Fahren verwendet hier sein.',
     };
     const patch = {
@@ -523,7 +532,7 @@ describe('strict scoped intro wire', () => {
     const result = await generateClassIntro(params);
     expect(result).toEqual({
       ...compiled,
-      about: '„Wir sind gestern gefahren.“: Wir fuhren gestern.',
+      about: '„Wir sind gestern gefahren.“: We travelled yesterday.',
       focus: ['„Wir sind gestern gefahren.“: Das Partizip lautet gefahren.', compiled.focus[1]],
       tips: ['„Wir sind gestern gefahren.“: Lerne fahren mit sein.'],
       examples: [
@@ -539,7 +548,7 @@ describe('strict scoped intro wire', () => {
   it.each([false, true])(
     'changes the overview only when it was rejected alongside its paired meaning: %s',
     async (rejectAbout) => {
-      const example = { ...compiled.examples[1]!, meaning: 'Die Gruppe ging.' };
+      const example = { ...compiled.examples[1]!, meaning: 'The group went.' };
       const patch = {
         ...(rejectAbout ? { about: { exampleIndex: 1 } } : {}),
         examples: { 1: example },
@@ -548,7 +557,7 @@ describe('strict scoped intro wire', () => {
       const result = await generateClassIntro(params);
       expect(result).toEqual({
         ...compiled,
-        about: rejectAbout ? '„Wir sind gegangen.“: Die Gruppe ging.' : compiled.about,
+        about: rejectAbout ? '„Wir sind gegangen.“: The group went.' : compiled.about,
         examples: [compiled.examples[0], example],
       });
       for (const context of reviewContexts().slice(2)) expect(context).toEqual(result);
@@ -564,7 +573,7 @@ describe('strict scoped intro wire', () => {
         patch.about = { exampleIndex: 1, text: 'Der Ausflug war gestern zu Ende.' };
       if (kind === 'out of bounds') patch.about = { exampleIndex: 2 };
       if (kind === 'unreviewed example')
-        patch.examples = { 1: { ...wire.examples[1], meaning: 'Die Gruppe kam gestern an.' } };
+        patch.examples = { 1: { ...wire.examples[1], meaning: 'The group arrived yesterday.' } };
       respond(wire, patch, ['about']);
       await expect(generateClassIntro(params)).rejects.toThrow('educational quality');
       const repair = boundary.generate.mock.calls.at(-1)!;

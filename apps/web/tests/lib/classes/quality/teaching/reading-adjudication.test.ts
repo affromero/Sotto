@@ -2,10 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AIOptions, AIProvider, ChatMessage } from '@/lib/providers/ai';
 import type { GeneratedQuestion } from '@/lib/class-generation';
 import { blockedProviderExecution } from '../../../../helpers/runtime/provider-execution';
+import { novelFindingCorroborationFixture } from '../intro-provider-fixture';
 
 const boundary = vi.hoisted(() => ({ respond: vi.fn() }));
 vi.mock('@/lib/providers/ai', () => ({
-  createAIProvider: () => ({ generateResponse: boundary.respond }),
+  createAIProvider: () => ({ generateResponse: fixtureGenerateResponse }),
 }));
 vi.mock('@/lib/learning-ai', () => ({
   resolveCapturedLearningAi: async () => ({
@@ -32,6 +33,14 @@ import {
 import { buildTeachingSourceParts } from '@/lib/classes/quality/teaching-source/protocol';
 import { captureGenerationFailure } from '@/lib/classes/quality/generation-failure';
 import { captureTeachingFailure } from '@/lib/classes/quality/teaching-failure';
+
+async function fixtureGenerateResponse(...args: Parameters<AIProvider['generateResponse']>) {
+  const [, messages, options] = args;
+  return (
+    novelFindingCorroborationFixture(messages as Array<{ content: string }>, options) ??
+    boundary.respond(...args)
+  );
+}
 
 const passage =
   'Am Samstag hat Lea ihre Freundin besucht. Gestern sind die beiden nach Bonn gefahren.';
@@ -215,7 +224,7 @@ describe('reading passage adjudication', () => {
       await expect(
         reviewTeachingContent({
           ai: { provider: 'fixture', model: 'captured', execution: base.execution },
-          provider: { generateResponse: boundary.respond } as unknown as AIProvider,
+          provider: { generateResponse: fixtureGenerateResponse } as unknown as AIProvider,
           userId: 'reader',
           level: 'A2',
           nativeLang: 'en',
@@ -327,7 +336,7 @@ describe('reading passage adjudication', () => {
       );
       const failure = await reviewTeachingContent({
         ai: { provider: 'fixture', model: 'captured', execution: base.execution },
-        provider: { generateResponse: boundary.respond } as unknown as AIProvider,
+        provider: { generateResponse: fixtureGenerateResponse } as unknown as AIProvider,
         userId: 'reader',
         level: 'A2',
         nativeLang: 'en',
@@ -407,7 +416,7 @@ describe('reading passage adjudication', () => {
       );
       const failure = await reviewTeachingContent({
         ai: { provider: 'fixture', model: 'captured', execution: base.execution },
-        provider: { generateResponse: boundary.respond } as unknown as AIProvider,
+        provider: { generateResponse: fixtureGenerateResponse } as unknown as AIProvider,
         userId: 'reader',
         level: 'A2',
         nativeLang: 'en',
@@ -506,7 +515,7 @@ describe('reading passage adjudication', () => {
     const assessment = assessSectionReview(blind(items), items, false, 'reading');
     const options = {
       ai: { provider: 'fixture', model: 'captured', execution: base.execution },
-      provider: { generateResponse: boundary.respond } as unknown as AIProvider,
+      provider: { generateResponse: fixtureGenerateResponse } as unknown as AIProvider,
       userId: 'reader',
       level: 'A2',
       nativeLang: 'en',

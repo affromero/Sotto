@@ -253,7 +253,7 @@ describe('canonical repair source boundaries', () => {
     const fields = { passageText: turns.map((turn) => `${turn.speaker}: ${turn.text}`).join('\n') };
     const extraction = parseListeningPassageExtractionResponse(
       {
-        unitAccounts: turns.map((turn) => turn.text),
+        unitAccounts: Object.fromEntries(turns.map((turn, index) => [String(index), turn.text])),
         pairs: [
           {
             premiseUnitIndex: 0,

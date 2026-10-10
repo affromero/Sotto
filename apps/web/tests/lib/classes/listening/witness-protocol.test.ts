@@ -49,12 +49,12 @@ function fixture(negative = true) {
     relation: 'claimed_equivalence' as const,
   };
   const extraction = {
-    unitAccounts: [
-      negative
+    unitAccounts: {
+      '0': negative
         ? 'If I want to visit someone, I say: I have visited my friend.'
         : 'For a completed visit, I say: I have visited my friend.',
-      'Besucht is the past participle.',
-    ],
+      '1': 'Besucht is the past participle.',
+    },
     pairs: [pair],
   };
   const compared = {
@@ -184,7 +184,7 @@ describe('bound listening extraction and adjudication protocol', () => {
       assessed = judge(source, proposed);
     expect(proposed.items[0].passageWitness).toMatchObject({
       locale: 'de',
-      unitAccounts: source.extraction.unitAccounts,
+      unitAccounts: Object.values(source.extraction.unitAccounts),
       pairs: [{ pairIndex: 0, ...source.extraction.pairs[0] }],
     });
     expect(assessed.items[0].passageWitness).toMatchObject({
@@ -477,12 +477,12 @@ describe('bound listening extraction and adjudication protocol', () => {
     const proposed = critic(
       source,
       withExtraction(source, {
-        unitAccounts: [
-          'Then I try it: Suddenly I looked for my key yesterday.',
-          'After that I found it in my pocket.',
-          'Is that correct?',
-          'Yes, very good.',
-        ],
+        unitAccounts: {
+          '0': 'Then I try it: Suddenly I looked for my key yesterday.',
+          '1': 'After that I found it in my pocket.',
+          '2': 'Is that correct?',
+          '3': 'Yes, very good.',
+        },
         pairs: meanings.map((premiseMeaning, premiseUnitIndex) => ({
           premiseUnitIndex,
           exampleUnitIndex: 3,
@@ -547,10 +547,10 @@ describe('bound listening extraction and adjudication protocol', () => {
       source,
       withExtraction(source, {
         ...source.extraction,
-        unitAccounts: [
-          source.extraction.unitAccounts[0],
-          'Besucht is claimed to be the infinitive of besuchen.',
-        ],
+        unitAccounts: {
+          '0': source.extraction.unitAccounts[0],
+          '1': 'Besucht is claimed to be the infinitive of besuchen.',
+        },
       })
     );
     const assessed = judge(
@@ -827,7 +827,7 @@ describe('bound listening extraction and adjudication protocol', () => {
         source,
         withExtraction(source, {
           ...source.extraction,
-          unitAccounts: source.extraction.unitAccounts.slice(1),
+          unitAccounts: { '1': source.extraction.unitAccounts[1] },
         })
       );
     } catch (failure) {

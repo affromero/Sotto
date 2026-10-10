@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { blockedProviderExecution } from '../../../helpers/runtime/provider-execution';
-import { scopedIntroFixture, shapeIntroProviderFixture } from './intro-provider-fixture';
+import {
+  novelFindingCorroborationFixture,
+  scopedIntroFixture,
+  shapeIntroProviderFixture,
+} from './intro-provider-fixture';
 
 const boundary = vi.hoisted(() => ({ generate: vi.fn(), resolve: vi.fn() }));
 vi.unmock('@/lib/classes/class-intro');
@@ -15,7 +19,8 @@ vi.mock('@/lib/providers/ai', () => ({
         system,
         messages,
         options,
-        await boundary.generate(system, messages, options)
+        novelFindingCorroborationFixture(messages, options) ??
+          (await boundary.generate(system, messages, options))
       ),
   }),
 }));
@@ -41,7 +46,7 @@ import {
 const params = {
   userId: 'fixture',
   execution: blockedProviderExecution('fixture'),
-  level: 'A2',
+  level: 'A1',
   nativeLang: 'en',
   targetLang: 'de',
   title: 'Travel',
@@ -64,7 +69,7 @@ type ReviewIssue = { issues: string[]; feedback: string[] };
 
 const candidate: IntroFixture = {
   purpose: 'Erzähle klar von vergangenen Erlebnissen.',
-  about: '„Ich habe gestern meine Freundin besucht.“: Gestern besuchte ich meine Freundin.',
+  about: '„Ich habe gestern meine Freundin besucht.“: Yesterday I visited my friend.',
   focus: [
     '„Ich habe gestern meine Freundin besucht.“: Wähle das passende Hilfsverb.',
     '„Ich habe gestern meine Freundin besucht.“: Beachte die Wortstellung.',
@@ -72,17 +77,17 @@ const candidate: IntroFixture = {
   examples: [
     {
       target: 'Ich habe gestern meine Freundin besucht.',
-      meaning: 'Gestern besuchte ich meine Freundin.',
+      meaning: 'Yesterday I visited my friend.',
       note: '„Ich habe gestern meine Freundin besucht.“: „Besuchen“ verwendet „haben“.',
     },
     {
       target: 'Wir sind zu Fuß zum Markt gegangen.',
-      meaning: 'Wir gingen zu Fuß zum Markt.',
+      meaning: 'We walked to the market.',
       note: '„Wir sind zu Fuß zum Markt gegangen.“: „Gehen“ verwendet „sein“.',
     },
     {
       target: 'Auf der Reise habe ich schöne Orte gesehen.',
-      meaning: 'Auf der Reise sah ich schöne Orte.',
+      meaning: 'I saw beautiful places on the trip.',
       note: '„Auf der Reise habe ich schöne Orte gesehen.“: „Sehen“ verwendet „haben“.',
     },
   ],
@@ -96,12 +101,12 @@ const candidate: IntroFixture = {
 function introWithWordCount(count: number, token = 'größer'): IntroFixture {
   return {
     purpose: 'Erzähle von gestern. ' + Array.from({ length: count - 31 }, () => token).join(' '),
-    about: '„Ich bin gegangen.“: Ich ging.',
+    about: '„Ich bin gegangen.“: I went.',
     focus: ['„Ich bin gegangen.“: Perfekt mit sein'],
     examples: [
       {
         target: 'Ich bin gegangen.',
-        meaning: 'Ich ging.',
+        meaning: 'I went.',
         note: '„Ich bin gegangen.“: Gehen verwendet sein.',
       },
     ],
@@ -120,6 +125,12 @@ function introAddresses(value: IntroFixture): IntroAddress[] {
 }
 function addressKey(address: IntroAddress): string {
   return 'index' in address ? `${address.field}:${address.index}` : address.field;
+}
+function parsedReviews(reviews: Array<{ candidate: string | null; verdict: unknown }> | undefined) {
+  return reviews?.map(({ candidate: retained, ...review }) => ({
+    ...review,
+    candidate: retained === null ? null : JSON.parse(retained),
+  }));
 }
 function auditItems(value: IntroFixture, rejected: Record<string, ReviewIssue> = {}) {
   return [
@@ -209,7 +220,7 @@ beforeEach(() => {
   });
 });
 
-describe('field-local intro repair', () => {
+describe('field-local A1 intro repair', () => {
   it('derives the overview from the selected example meaning before either review role', async () => {
     const raw = {
       ...scopedIntroFixture(candidate),
@@ -218,7 +229,7 @@ describe('field-local intro repair', () => {
     };
     const framed = {
       ...candidate,
-      about: '„Wir sind zu Fuß zum Markt gegangen.“: Wir gingen zu Fuß zum Markt.',
+      about: '„Wir sind zu Fuß zum Markt gegangen.“: We walked to the market.',
     };
     boundary.generate.mockResolvedValueOnce({ content: JSON.stringify(raw) });
     queueReview(framed);
@@ -236,7 +247,7 @@ describe('field-local intro repair', () => {
     async (rejectAbout) => {
       const correctedExample = {
         target: 'Ich habe gestern einen Film gesehen.',
-        meaning: 'Gestern sah ich einen Film.',
+        meaning: 'Yesterday I watched a film.',
         note: '„Ich habe gestern einen Film gesehen.“: „Sehen“ steht hier mit „haben“.',
       };
       const rejected: Record<string, ReviewIssue> = {
@@ -479,7 +490,7 @@ describe('field-local intro repair', () => {
         index === 1
           ? {
               ...example,
-              meaning: 'Die sprechende Gruppe erzählt, dass sie zu Fuß zum Markt gegangen ist.',
+              meaning: 'The speaking group says that it walked to the market.',
             }
           : example
       ),
@@ -526,8 +537,8 @@ describe('field-local intro repair', () => {
       tips: Record<string, string>;
     } = {
       examples: {
-        '1': { ...candidate.examples[1], meaning: 'Wir gingen zu Fuß zum Markt.' },
-        '2': { ...candidate.examples[2], meaning: 'Auf der Reise sah ich schöne Orte.' },
+        '1': { ...candidate.examples[1], meaning: 'We walked to the market.' },
+        '2': { ...candidate.examples[2], meaning: 'I saw beautiful places on the trip.' },
       },
       tips: {
         '0': '„Ich habe gestern meine Freundin besucht.“: Lerne „besuchen“ mit „haben“.',
@@ -585,7 +596,7 @@ describe('field-local intro repair', () => {
     const repaired: IntroFixture = {
       ...original,
       examples: original.examples.map((example, index) =>
-        index === 1 ? { ...example, meaning: 'Wir gingen zu Fuß zum Markt.' } : example
+        index === 1 ? { ...example, meaning: 'We walked to the market.' } : example
       ),
     };
     delete repaired.visuals;
@@ -619,7 +630,7 @@ describe('field-local intro repair', () => {
     const repaired = {
       ...candidate,
       examples: candidate.examples.map((example, index) =>
-        index === 1 ? { ...example, meaning: 'Wir gingen zum Markt.' } : example
+        index === 1 ? { ...example, meaning: 'We went to the market.' } : example
       ),
     };
     const finalRejected = {
@@ -638,13 +649,13 @@ describe('field-local intro repair', () => {
     const error = await generateClassIntro(params).catch((caught: unknown) => caught);
     expect(error).toBeInstanceOf(TeachingQualityRejectionError);
     if (!(error instanceof TeachingQualityRejectionError)) throw error;
-    expect(error.teachingFailure?.reviews).toEqual([
+    expect(parsedReviews(error.teachingFailure?.reviews)).toMatchObject([
       {
-        candidate: JSON.stringify(auditItems(candidate, firstRejected)),
+        candidate: auditItems(candidate, firstRejected),
         verdict: fullVerdict(candidate, firstRejected),
       },
       {
-        candidate: JSON.stringify(auditItems(repaired, finalRejected)),
+        candidate: auditItems(repaired, finalRejected),
         verdict: fullVerdict(repaired, finalRejected),
       },
     ]);
@@ -705,7 +716,7 @@ describe('field-local intro repair', () => {
     const repaired = {
       ...original,
       examples: original.examples.map((example, index) =>
-        index === 1 ? { ...example, meaning: 'Die Gruppe ist zu Fuß zum Markt gegangen.' } : example
+        index === 1 ? { ...example, meaning: 'The group walked to the market.' } : example
       ),
     };
     const finalRejected = {
@@ -725,12 +736,7 @@ describe('field-local intro repair', () => {
     const error = await generateClassIntro(params).catch((caught: unknown) => caught);
     expect(error).toBeInstanceOf(TeachingQualityRejectionError);
     if (!(error instanceof TeachingQualityRejectionError)) throw error;
-    expect(
-      error.teachingFailure?.reviews.map(({ candidate: retained, ...review }) => ({
-        ...review,
-        candidate: retained === null ? null : JSON.parse(retained),
-      }))
-    ).toEqual([
+    expect(parsedReviews(error.teachingFailure?.reviews)).toMatchObject([
       {
         candidate: auditItems(original, firstRejected),
         verdict: fullVerdict(original, firstRejected),
@@ -778,8 +784,8 @@ describe('field-local intro repair', () => {
     const error = await generateClassIntro(params).catch((caught: unknown) => caught);
     const failure = captureGenerationFailure(error);
     expect(failure.category).toBe('section_quality');
-    expect(failure.teachingFailure?.reviews[0]).toEqual({
-      candidate: JSON.stringify(auditItems(candidate, rejected)),
+    expect(parsedReviews(failure.teachingFailure?.reviews)?.[0]).toMatchObject({
+      candidate: auditItems(candidate, rejected),
       verdict: fullVerdict(candidate, rejected),
     });
     expect(
@@ -796,10 +802,10 @@ describe('field-local intro repair', () => {
     async (outcome) => {
       const repairedMeaning =
         outcome === 'unsupported group shift'
-          ? 'Du erzählst, dass ihr zu Fuß zum Markt gegangen seid.'
+          ? 'You say that you all walked to the market.'
           : outcome === 'faithful collective'
-            ? 'Die sprechende Gruppe erzählt, dass sie zu Fuß zum Markt gegangen ist.'
-            : 'Die sprechende Person und ihre Gruppe sind zu Fuß zum Markt gegangen.';
+            ? 'The speaking group says that it walked to the market.'
+            : 'The speaker and their group walked to the market.';
       const repaired = {
         ...candidate,
         examples: candidate.examples.map((example, index) =>
@@ -863,9 +869,12 @@ describe('field-local intro repair', () => {
     boundary.generate.mockRejectedValueOnce(originalError);
     const error = await generateClassIntro(params).catch((caught: unknown) => caught);
     expect(error).toBe(originalError);
-    expect(captureGenerationFailure(error).teachingFailure?.reviews[0].candidate).toBe(
-      JSON.stringify(auditItems(candidate, rejected))
-    );
+    expect(
+      parsedReviews(captureGenerationFailure(error).teachingFailure?.reviews)?.[0]
+    ).toMatchObject({
+      candidate: auditItems(candidate, rejected),
+      verdict: fullVerdict(candidate, rejected),
+    });
   });
 
   it('preserves the purpose and re-reviews after selecting another overview example', async () => {
@@ -873,7 +882,7 @@ describe('field-local intro repair', () => {
     const patch = { about: { exampleIndex: 1 } };
     const repaired = {
       ...candidate,
-      about: '„Wir sind zu Fuß zum Markt gegangen.“: Wir gingen zu Fuß zum Markt.',
+      about: '„Wir sind zu Fuß zum Markt gegangen.“: We walked to the market.',
     };
     boundary.generate.mockResolvedValueOnce({
       content: JSON.stringify(candidate),
@@ -912,7 +921,7 @@ describe('field-local intro repair', () => {
       const repaired = {
         ...candidate,
         examples: candidate.examples.map((example, index) =>
-          index === 1 ? { ...example, meaning: 'Wir gingen zum Markt.' } : example
+          index === 1 ? { ...example, meaning: 'We went to the market.' } : example
         ),
       };
       boundary.generate.mockResolvedValueOnce({
@@ -946,9 +955,9 @@ describe('field-local intro repair', () => {
           ? 'review_protocol'
           : 'generation_failed'
       );
-      expect(evidence.teachingFailure?.reviews).toEqual([
+      expect(parsedReviews(evidence.teachingFailure?.reviews)).toMatchObject([
         {
-          candidate: JSON.stringify(auditItems(candidate, rejected)),
+          candidate: auditItems(candidate, rejected),
           verdict: fullVerdict(candidate, rejected),
         },
       ]);

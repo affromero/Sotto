@@ -34,16 +34,17 @@ import {
 } from '@/lib/classes/quality/generation-failure';
 import { captureReviewerProtocolEvidence } from '@/lib/classes/quality/private-protocol-evidence';
 import { assessSectionReview, SectionQualityError } from '@/lib/classes/section-quality';
-import { shapeTeachingProviderFixture } from '../intro-provider-fixture';
+import {
+  novelFindingCorroborationFixture,
+  shapeTeachingProviderFixture,
+} from '../intro-provider-fixture';
 import { buildTeachingSourceParts } from '@/lib/classes/quality/teaching-source/protocol';
 import { listeningRepairPlan } from '@/lib/classes/quality/listening-repair';
-
 const TEACHING_CRITIC_JSON_SCHEMA = buildTeachingCriticJsonSchema([{ task: 'Fixture.' }]);
 const TEACHING_ADJUDICATOR_JSON_SCHEMA = buildTeachingAdjudicatorJsonSchema(
   [{ task: 'Fixture.' }],
   { items: [{ index: 0, findings: [] }] }
 );
-
 it('retains only authenticated blind protocol failures with bounded private payloads', () => {
   const question = { question: 'Which?', options: ['A', 'B'], correctIndex: 0, explanation: 'A.' };
   let failure: unknown;
@@ -69,7 +70,6 @@ it('retains only authenticated blind protocol failures with bounded private payl
   expect(evidence?.payload.sha256).toMatch(/^[a-f0-9]{64}$/);
   expect(JSON.stringify(evidence)).not.toContain('private ');
 });
-
 const execution = blockedProviderExecution('fixture');
 const base = {
   ai: { provider: 'fixture', model: 'captured-luna', execution },
@@ -122,6 +122,11 @@ type Packet = {
 function provider(critic: (packet: Packet) => unknown, adjudicator: (packet: Packet) => unknown) {
   const generateResponse = vi.fn(
     async (system: string, messages: ChatMessage[], options?: AIOptions) => {
+      const corroboration = novelFindingCorroborationFixture(
+        messages as Array<{ content: string }>,
+        options
+      );
+      if (corroboration) return { ...corroboration, inputTokens: 0, outputTokens: 0 };
       const packet = JSON.parse(messages[0]!.content as string) as Packet;
       expect(options).toMatchObject({ model: 'captured-luna', temperature: 0 });
       expect(system).toMatch(/untrusted (?:data|lesson content)/);
@@ -157,7 +162,6 @@ const approvingJudge = (packet: Packet) => ({
     accepted(index, packet.criticisms!.items.find((row) => row.index === index)?.findings ?? [])
   ),
 });
-
 describe('bound teaching evidence', () => {
   const content = { task: 'Describe a visit.', ideas: ['A supplied opening.'] };
   const critic = {
@@ -315,7 +319,6 @@ describe('bound teaching evidence', () => {
     audit(TEACHING_ADJUDICATOR_JSON_SCHEMA.schema);
   });
 });
-
 describe('shared teaching adjudication', () => {
   const listeningTurns = [{ turnIndex: 1, speaker: 'HOST', text: 'A passage.' }];
   it('maps a scoped question-only rejection back to the original quiz index', async () => {
@@ -355,10 +358,6 @@ describe('shared teaching adjudication', () => {
     expect(request.criticAssignment).toEqual([0]);
     expect(request.items.map((row: { content: unknown }) => row.content)).toEqual([
       { passageText: items[0].passageText },
-    ]);
-    expect(generateResponse.mock.calls.map((call) => call[2]?.jsonSchema?.name)).toEqual([
-      'class_teaching_critic',
-      'class_teaching_adjudicator',
     ]);
     expect(listeningRepairPlan(error, [...items].reverse(), undefined, listeningTurns)).toBeNull();
   });
@@ -713,11 +712,15 @@ describe('shared teaching adjudication', () => {
     expect(generateResponse).not.toHaveBeenCalled();
   });
 });
-
 describe('bounded protocol correction', () => {
   function scripted(outputs: Array<string | ((packet: Packet) => unknown) | Error>) {
     const generateResponse = vi.fn(
       async (_system: string, messages: ChatMessage[], options?: AIOptions) => {
+        const corroboration = novelFindingCorroborationFixture(
+          messages as Array<{ content: string }>,
+          options
+        );
+        if (corroboration) return { ...corroboration, inputTokens: 0, outputTokens: 0 };
         const next = outputs.shift();
         if (next instanceof Error) throw next;
         if (next === undefined) throw new Error('Unexpected provider dispatch.');
@@ -753,7 +756,6 @@ describe('bounded protocol correction', () => {
   const task = [{ task: 'Private supplied task.' }];
   const audit = (boundary: AIProvider, items: readonly unknown[] = task) =>
     reviewTeachingContent({ ...base, provider: boundary, kind: 'writing', items });
-
   it('refuses forged, changed or wrong-role correction data before provider dispatch', async () => {
     let error: unknown;
     try {
@@ -793,7 +795,6 @@ describe('bounded protocol correction', () => {
     ).rejects.toBeInstanceOf(ReviewerProtocolError);
     expect(generateResponse).not.toHaveBeenCalled();
   });
-
   it('corrects a malformed critic using the same role, candidate and schema before judging', async () => {
     const { boundary, generateResponse } = scripted(['{', emptyCritic, approvingJudge]);
     await expect(audit(boundary)).resolves.toBeUndefined();

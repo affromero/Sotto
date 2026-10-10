@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { blockedProviderExecution } from '../../../helpers/runtime/provider-execution';
-import { shapeIntroProviderFixture } from './intro-provider-fixture';
+import {
+  novelFindingCorroborationFixture,
+  shapeIntroProviderFixture,
+} from './intro-provider-fixture';
 
 const boundary = vi.hoisted(() => ({ generate: vi.fn() }));
 vi.mock('@/lib/learning-ai', () => ({
@@ -44,7 +47,8 @@ const provider = {
       system,
       messages,
       options,
-      await boundary.generate(system, messages, options)
+      novelFindingCorroborationFixture(messages, options) ??
+        (await boundary.generate(system, messages, options))
     ),
 };
 const options = {

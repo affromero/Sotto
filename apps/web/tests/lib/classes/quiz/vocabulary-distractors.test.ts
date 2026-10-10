@@ -155,7 +155,9 @@ beforeEach(() => {
             acceptableOptionIndices:
               rejected && index === 0
                 ? []
-                : [question.options.indexOf(lemmas[initial[index].targetIndex])],
+                : question.options.flatMap((option, optionIndex) =>
+                    option === lemmas[initial[index].targetIndex] ? [optionIndex] : []
+                  ),
             issues: rejected && index === 0 ? ['unnatural'] : [],
           })),
         };
@@ -202,7 +204,7 @@ describe('fixed-context vocabulary distractor repair', () => {
     });
     expect(patchRequest.system).toContain(JSON.stringify(original));
     expect(patchRequest.system).not.toContain('DIFFERENT set of items');
-    const blind = requests.find(({ name }) => name === 'class_section_quality')!.input;
+    const blind = requests.filter(({ name }) => name === 'class_section_quality').at(-1)!.input;
     expect(blind).toMatchObject({
       questions: result.map(({ question, options }, index) => ({ index, question, options })),
     });
@@ -218,18 +220,28 @@ describe('fixed-context vocabulary distractor repair', () => {
     expect(requests.filter(({ name }) => name === 'class_section_questions')).toHaveLength(1);
   });
 
-  it('rejects a retained collocation defect after the final full-set review without reopening its sentence', async () => {
+  it('rejects a collocation defect that survives the combined structural and semantic repair', async () => {
     initial[0].question =
       'Für den Pfannkuchenteig habe ich Mehl, Eier und Milch in einer Schüssel _____ .';
     initial[0].taskContext = 'Mehl, Eier und Milch kommen in eine Schüssel und werden verrührt.';
     rejectRetained = true;
+    authorResponses = [
+      initial,
+      initial
+        .filter((row) => row.targetIndex !== 2)
+        .map((row) => ({
+          ...row,
+          distractors:
+            replacement.distractors[
+              String(row.targetIndex) as keyof typeof replacement.distractors
+            ] ?? row.distractors,
+        })),
+    ];
     await expect(generateSectionQuestions(params)).rejects.toBeInstanceOf(SectionQualityError);
-    expect(requests.map(({ name }) => name)).toEqual([
-      'class_section_questions',
-      'class_vocabulary_distractors',
-      'class_section_quality',
-    ]);
-    expect(requests[2].input).toMatchObject({
+    expect(requests.filter(({ name }) => name === 'class_teaching_critic')).toEqual([]);
+    expect(
+      requests.filter(({ name }) => name === 'class_section_quality').at(-1)!.input
+    ).toMatchObject({
       questions: [
         expect.objectContaining({
           question: `${initial[0].taskContext}\nFür den Pfannkuchenteig habe ich Mehl, Eier und Milch in einer Schüssel _____.`,
@@ -296,12 +308,8 @@ describe('fixed-context vocabulary distractor repair', () => {
       { ...replacement, correctIndex: 3 },
       { ...replacement, questions: [] },
     ];
-    await expect(generateSectionQuestions(params)).rejects.toThrow(/malformed output/i);
-    expect(requests.map(({ name }) => name)).toEqual([
-      'class_section_questions',
-      'class_vocabulary_distractors',
-      'class_vocabulary_distractors',
-    ]);
+    await expect(generateSectionQuestions(params)).rejects.toBeInstanceOf(SectionQualityError);
+    expect(requests.filter(({ name }) => name.startsWith('class_teaching_'))).toEqual([]);
   });
 
   it.each(['missing task context', 'duplicate target identity', 'oversized snapshot'])(

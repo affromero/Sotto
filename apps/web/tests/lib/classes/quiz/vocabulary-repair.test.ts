@@ -152,6 +152,20 @@ describe('bounded selective vocabulary repair', () => {
     };
     const selected = selectVocabularyRepair(questions, [4, 3, 2, 1, 0], feedback)!;
     expect(selected.rejectedTargets).toEqual([4]);
+    const combined = selectVocabularyRepair(questions, [4, 3, 2, 1, 0], feedback, [2])!;
+    expect(combined.rejectedTargets).toEqual([4, 2]);
+    const structuralReplacement = { ...questions[2], question: 'Distinct choices' };
+    const semanticReplacement = { ...questions[0], question: 'Unambiguous context' };
+    expect(
+      mergeVocabularyRepair(combined, [structuralReplacement, semanticReplacement], [2, 4])
+    ).toEqual([
+      semanticReplacement,
+      questions[1],
+      structuralReplacement,
+      questions[3],
+      questions[4],
+    ]);
+    expect(selectVocabularyRepair(questions, [4, 3, 2, 1, 0], feedback, [5])).toBeUndefined();
     const replaced = { ...questions[0], question: 'Repaired' };
     expect(mergeVocabularyRepair(selected, [replaced], [4])).toEqual([
       replaced,

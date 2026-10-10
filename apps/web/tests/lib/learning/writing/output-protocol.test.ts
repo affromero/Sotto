@@ -15,6 +15,30 @@ describe('writing authoring proofs and scaffolds', () => {
     ).toEqual(['Paul hat …', 'Paul hat gestern …']);
   });
 
+  it.each([' …', '...'])(
+    'normalizes a terminal display marker and preserves canonical round trips: %s',
+    (marker) => {
+      const answer = 'Paul hat gestern seine Tante besucht.';
+      const ideas = parseWritingIdeas([`Paul hat${marker}`, `Paul hat gestern${marker}`], answer);
+      expect(ideas).toEqual(['Paul hat …', 'Paul hat gestern …']);
+      expect(parseWritingIdeas(ideas, answer)).toEqual(ideas);
+    }
+  );
+
+  it.each([' …', '...'])('preserves combining graphemes before a marker: %s', (marker) => {
+    const answer = 'Cafe\u0301 ist offen.';
+    expect(parseWritingIdeas([`Cafe\u0301${marker}`], answer)).toEqual(['Cafe\u0301 …']);
+    expect(() => parseWritingIdeas([`Cafe${marker}`], answer)).toThrow();
+  });
+
+  it.each(['…', '...'])('preserves an ellipsis belonging to the answer: %s', (marker) => {
+    const answer = `Warte${marker} ich komme.`;
+    const ideas = parseWritingIdeas([`Warte${marker}`], answer);
+    expect(ideas).toEqual([`Warte${marker} …`]);
+    expect(parseWritingIdeas(ideas, answer)).toEqual(ideas);
+    expect(() => parseWritingIdeas([`Warte${marker}`], `Warte${marker}`)).toThrow();
+  });
+
   it.each([null, undefined, []].map((ideas) => ({ ideas })))(
     'keeps optional scaffolds absent',
     ({ ideas }) => {
@@ -24,11 +48,23 @@ describe('writing authoring proofs and scaffolds', () => {
 
   it.each(
     [
-      ['Paul hat gestern …'],
-      ['Paul hat gestern...'],
       [''],
+      ['…'],
+      ['...'],
       ['Gestern ist Paul'],
+      ['Gestern ist Paul …'],
+      ['paul hat …'],
+      ['Paul hat... gestern'],
+      ['Paul hat gestern.'],
+      ['Paul hat gestern..'],
+      ['Paul hat gestern....'],
+      ['Paul hat gestern⋯'],
       ['Paul hat gestern seine Tante besucht.'],
+      ['Paul hat gestern seine Tante besucht'],
+      ['Paul hat gestern seine Tante besucht …'],
+      ['Paul hat gestern seine Tante besuch'],
+      ['Paul hat gestern seine Tante besucht. …'],
+      ['Paul hat gestern seine Tante besucht....'],
       [{ opening: 'Paul hat', answer: 'Paul hat gestern seine Tante besucht.' }],
       Array.from({ length: 4 }, () => 'Paul hat'),
     ].map((ideas) => ({ ideas }))
@@ -83,6 +119,8 @@ describe('fixed writing starters', () => {
     ['Hallo...', 'Hallo... Tim.'],
     ['Hallo Tim, gestern', 'Hallo Tim, ich war gestern im Kino.'],
     ['Hallo Tim, gestern', 'Hallo Tim, gestern'],
+    ['Hallo Tim, gestern war ich im Kino', 'Hallo Tim, gestern war ich im Kino.'],
+    ['Hallo Tim, gestern war ich im Kin', 'Hallo Tim, gestern war ich im Kino.'],
     ['Cafe', 'Cafe\u0301 ist offen.'],
     ['\ud83d', '😀 ist hier.'],
     ['Cafe\u0301', 'Café ist offen.'],
@@ -112,13 +150,20 @@ const correction = (source: string, answer: string) =>
 
 describe('writing authoring proof', () => {
   it.each([
-    ['Er ist gekocht.', 'Er hat gekocht.', 'is', 'ha'],
+    ['Er ist gekocht.', 'Er hat gekocht.', 'ist', 'hat'],
+    ['Tom ist gestern einen Film gesehen.', 'Tom hat gestern einen Film gesehen.', 'ist', 'hat'],
     ['Sie gestern gekocht.', 'Sie hat gestern gekocht.', '', 'hat '],
     ['Sie hat hat gekocht.', 'Sie hat gekocht.', 'hat ', ''],
     ['😀 Er ist hier.', '😀 Er war hier.', 'ist', 'war'],
-    ['Cafe\u0301 ist offen.', 'Café war offen.', 'e\u0301 ist', 'é war'],
+    ['Cafe\u0301 ist offen.', 'Café war offen.', 'Cafe\u0301 ist', 'Café war'],
+    ['Er besucht Mia.', 'Er besuchte Mia.', 'besucht', 'besuchte'],
+    ['Das Café ist offen.', 'Die Cafés sind offen.', 'Das Café ist', 'Die Cafés sind'],
+    ['Tom ist  gestern hier.', 'Tom war gestern hier.', 'ist  ', 'war '],
+    ['😀 Café ist offen.', '😀 Café war offen.', 'ist', 'war'],
+    ['她去了学校。', '她去了公园。', '学校', '公园'],
+    ['Er kommt, sie geht.', 'Er kommt; sie geht.', ',', ';'],
   ])(
-    'preserves complete Unicode text around an actual proposed edit: %s',
+    'preserves exact word and punctuation spans around an actual proposed edit: %s',
     (source, answer, original, replacement) => {
       expect(correction(source, answer)).toEqual({
         modelAnswer: answer,
@@ -141,8 +186,8 @@ describe('writing authoring proof', () => {
 
   it('retains a proposed paraphrase for independent grammatical review without claiming it is a real correction', () => {
     expect(correction('Er hat gekocht.', 'Er hat Essen zubereitet.').correctionDelta).toEqual({
-      original: 'gekoch',
-      replacement: 'Essen zubereite',
+      original: 'gekocht',
+      replacement: 'Essen zubereitet',
       reason: 'Proposed grammatical correction.',
     });
   });

@@ -29,7 +29,9 @@ export function listeningExtractionFixture(
   const fields = { passageText: turns.map((turn) => `${turn.speaker}: ${turn.text}`).join('\n') };
   const table = buildListeningSourceUnits(fields, turns, targetLang);
   return {
-    unitAccounts: table.units.map((unit) => `Synthetic source account: ${unit.text}`),
+    unitAccounts: Object.fromEntries(
+      table.units.map((unit) => [String(unit.unitIndex), `Synthetic source account: ${unit.text}`])
+    ),
     pairs: [],
   };
 }
@@ -82,8 +84,11 @@ export function withListeningWitnessFixture<T extends { content: string }>(
     if (!critic && (!Array.isArray(proposed) || proposed.length !== 0)) return response;
     const declaration = critic
       ? {
-          unitAccounts: payload.listeningUnits.units.map(
-            (unit: { text: string }) => `Synthetic source account: ${unit.text}`
+          unitAccounts: Object.fromEntries(
+            payload.listeningUnits.units.map((unit: { unitIndex: number; text: string }) => [
+              String(unit.unitIndex),
+              `Synthetic source account: ${unit.text}`,
+            ])
           ),
           pairs: [],
         }

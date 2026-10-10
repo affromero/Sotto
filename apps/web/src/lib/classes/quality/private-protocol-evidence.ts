@@ -39,7 +39,7 @@ const evidenceSchema = reviewerProtocolDiagnosticSchema
       'grammar',
       'reading',
     ]),
-    role: z.enum(['critic', 'adjudicator', 'blind_section']),
+    role: z.enum(['critic', 'adjudicator', 'corroborator', 'blind_section']),
     offset: z.number().int().min(0).max(49),
     payload: payloadSchema,
   })

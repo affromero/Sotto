@@ -52,9 +52,13 @@ not a separate provider-key availability heuristic.
 Practice content reuses `generateSectionQuestions` for contextual vocabulary and
 focused expressions. Preserve exact word attribution for SRS, and carry reading
 `passageText` through both start and resume projections.
-Vocabulary rows whose only structural defect is duplicate choices use the existing
-replacement attempt to repair indexed distractor arrays. Preserve all other raw
-fields and run complete compilation, blind review and both teaching reviews again.
+Duplicate vocabulary choices always block publication. Otherwise valid duplicate
+candidates receive the existing blind review before the bounded replacement.
+When repeated equivalent choices are the only defects, repair indexed distractor
+arrays and preserve all other raw fields. Mixed structural and semantic defects
+use indexed whole-question repair for their combined target indices, preserving
+blind-approved questions exactly. Run complete compilation, blind review and both
+teaching reviews on the replacement.
 Blind and teaching explanation reviews share literal single-gap option completions.
 The derived teaching projection preserves the original content and source addresses.
 Vocabulary compilation removes spaces or tabs between the validated gap and an
@@ -140,7 +144,11 @@ Global issues, question defects and wrong or ambiguous keys remain hard blind fa
 Both teaching roles review the complete shared passage. The listening critic is
 explicitly assigned only passage item 0. It records a private literal account of
 each server-defined sentence unit and separately extracts the stated premise and
-offered example for every teaching relation, without approval judgments.
+offered example for every teaching relation, without approval judgments. The private
+wire ledger requires every known unit index as an object key, with that unit's exact
+account length bound and no unknown keys. Compilation restores the canonical unit
+order in the retained account array. Trusted indexed length diagnostics may guide
+the existing bounded protocol correction; accounts are never truncated or relaxed.
 The adjudicator receives the original passage, exact units and untrusted proposed
 pairs. It independently re-extracts both operands before assessing each pair,
 corrects inaccurate interpretations and discovers missing relations. Every proposed
@@ -245,7 +253,11 @@ and its derived metadata-only outer verdict inside the unchanged sealed envelope
 Speaking permits one complete four-phrase replacement after structural validation
 or the canonical teaching review rejects the first set. Writing shares its existing
 single replacement between structural validation and teaching rejection of three
-complete tasks. One private worked answer and correction evidence reach both reviewers. Optional openings are exact proper grapheme-boundary prefixes of that answer; only openings are published. Completion starters bind the same answer. Canonical correction deltas reject unchanged answers and remain private.
+complete tasks. One private worked answer and correction evidence reach both reviewers. Optional openings are exact proper grapheme-boundary prefixes of that answer; only openings are published. Completion starters bind the same answer. Canonical correction deltas retain whole word and punctuation segments, reject unchanged answers, and remain private.
+Writing semantic repair receives the original validated authoring tasks, before
+source text, starters and display ellipses are compiled into learner material.
+Accepted compiled tasks remain exact, and the complete replacement still passes
+structural validation and both teaching reviews.
 A structural replacement receives bounded output and static codes as untrusted data. The replacement uses the same captured provider,
 model, objective, vocabulary, language policy, and execution authority. Candidate
 and indexed feedback are untrusted correction data. Both generation and review
@@ -264,8 +276,9 @@ ledger is private error metadata and never enters ordinary error serialization.
 
 `classes/section-quality.ts` validates independent review verdicts for grammar,
 reading, and contextual vocabulary. `class-generation.ts` rejects malformed
-question structure before review, then uses the same captured provider and
-authority for a separate solve without the proposed key or explanations. Both
+question structure before review, except for otherwise valid vocabulary duplicate
+choices retained as blocking compiler diagnostics. It uses the same captured
+provider and authority for a separate solve without the proposed key or explanations. Both
 normal and JSON-repaired candidates must pass. Two generation attempts and one
 optional repair bound the work, with at most one review per valid candidate.
 Grammar and vocabulary wire questions require taskContext, compiled before every
@@ -376,16 +389,19 @@ null becomes absent public visuals. A visual object requires timeline and contra
 Historical optional visual fields and their defaults remain unchanged.
 The generation wire schema omits the unsupported URL `format: uri` annotation
 through the Zod converter override; runtime URL validation still uses `z.string().url()`.
-About is a strict `{exampleIndex}` reference with no text. Its compiler always
-concatenates the selected exact target quote and exact meaning, preserving every
-meaning byte after the prefix even if the meaning already includes a quote.
-This removes independently authored overview claims; it does not prove the meaning true.
+Fresh schemas live in `classes/intro/protocol.ts` and use the trusted lesson level.
+Immersion wire examples contain only target and note; an authored meaning is rejected.
+The compiler derives meaning from the exact target before usefulness, prose limits,
+visual binding and review. A1 retains authored meanings and historical restoration is unchanged.
+About is a strict `{exampleIndex}` reference with no text. Fresh immersion renders
+the selected exact target once; A1 concatenates its target quote and exact meaning.
+This removes independently authored overview claims; target and note still receive full review.
 Focus points and tips are `{text, exampleIndex}` observations with zero-based
 references to complete examples. Structural repair uses the same wire shape
 without visuals under `class_intro_repair`. The compiler adds the selected exact
 target quote to every focus or tip observation and each example's own note before either
-review role and before measuring the prose limit. Meanings remain unchanged.
-Fresh candidates reject every unusable raw example before compilation. Fresh
+review role and before measuring the prose limit. A1 meanings remain unchanged.
+Fresh candidates reject every unusable materialized example before prose compilation. Fresh
 validated example arrays are never filtered after quote framing or semantic merging,
 so their indices and accepted entries remain intact. Historical restoration retains
 the example filter. Usefulness checks remove only the exact own-target note prefix

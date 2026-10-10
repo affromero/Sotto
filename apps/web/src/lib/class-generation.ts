@@ -8,6 +8,7 @@ import { formatNotesForPrompt } from './course-notes';
 import { logUsage } from './usage-logger';
 import { logger } from './logger';
 import {
+  authenticTeachingFailure,
   reviewTeachingContent,
   TeachingQualityRejectionError,
   hasSupportedReadingPassageFailure,
@@ -341,7 +342,7 @@ function normalizeQuestions(
   requireTaskContext = false,
   vocabularyLemmas: readonly string[] = [],
   vocabularyTargets: readonly number[] = vocabularyLemmas.map((_, index) => index)
-): GeneratedQuestion[] {
+): { questions: GeneratedQuestion[]; duplicateTargets: number[] } {
   if (vocabularyLemmas.length) {
     if (
       raw.length !== vocabularyTargets.length ||
@@ -415,23 +416,22 @@ function normalizeQuestions(
   const duplicateChoices = raw.filter(
     (q) => new Set((q.options as string[]).map((option) => option.trim().toLowerCase())).size !== 4
   );
-  if (duplicateChoices.length) {
-    if (vocabularyLemmas.length)
-      throw new VocabularyDistractorRejectionError(
-        duplicateChoices.map((question) => question.targetIndex as number)
-      );
+  if (duplicateChoices.length && !vocabularyLemmas.length) {
     throw new Error('response contained no usable questions: invalid question structure or count');
   }
-  return raw.map((q) => ({
-    question: requireTaskContext
-      ? `${(q.taskContext as string).trim()}\n${(q.question as string).trim()}`
-      : (q.question as string).trim(),
-    options: (q.options as string[]).map((option) => option.trim()),
-    correctIndex: q.correctIndex as number,
-    explanation: typeof q.explanation === 'string' ? q.explanation.trim() : '',
-    passageRef: typeof q.passageRef === 'string' ? q.passageRef.trim() : undefined,
-    passageText: readingPassage,
-  }));
+  return {
+    duplicateTargets: duplicateChoices.map((question) => question.targetIndex as number),
+    questions: raw.map((q) => ({
+      question: requireTaskContext
+        ? `${(q.taskContext as string).trim()}\n${(q.question as string).trim()}`
+        : (q.question as string).trim(),
+      options: (q.options as string[]).map((option) => option.trim()),
+      correctIndex: q.correctIndex as number,
+      explanation: typeof q.explanation === 'string' ? q.explanation.trim() : '',
+      passageRef: typeof q.passageRef === 'string' ? q.passageRef.trim() : undefined,
+      passageText: readingPassage,
+    })),
+  };
 }
 
 interface VocabularyCoverageFeedback {
@@ -496,6 +496,7 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
   let activeVocabularyTargets = allVocabularyTargets;
   let vocabularyRepair: VocabularyRepairSelection | undefined;
   let distractorRepair: VocabularyDistractorRepair<RawGeneratedQuestion> | undefined;
+  const retainedApprovedQuestions = new Map<number, GeneratedQuestion>();
   const ai = await resolveCapturedLearningAi(p.userId, p.execution);
 
   // Sourced READING classes: base the MCQs on the leveled passage. The
@@ -580,7 +581,10 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
   let teachingFailure: TeachingFailure | undefined;
   let sectionFeedback: SectionReviewFeedback | undefined;
   let vocabularyFeedback: VocabularyCoverageFeedback | undefined;
-  const review = async (questions: GeneratedQuestion[]): Promise<string[]> => {
+  const review = async (
+    questions: GeneratedQuestion[],
+    duplicateChoices = false
+  ): Promise<string[]> => {
     teachingRejection = undefined;
     terminalTeachingRejection = undefined;
     sectionFeedback = undefined;
@@ -634,7 +638,7 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
         teachingFailure,
         captureBlindSectionFailure(questions, assessment.feedback, 'explanations')
       );
-    if (issues.length === 0) {
+    if (issues.length === 0 && !duplicateChoices) {
       try {
         await reviewTeachingContent({
           ai,
@@ -671,38 +675,40 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
     const parsed: ParsedGeneratedQuestions = distractorRepair
       ? { questions: applyVocabularyDistractorRepair(distractorRepair, content) }
       : parseGeneratedQuestions(content);
-    let questions: GeneratedQuestion[];
-    try {
-      questions = normalizeQuestions(
-        parsed.questions,
-        requestCount,
-        useSourcePassage,
-        p.sourceContent,
-        p.skill === 'READING' ? parsed.passage : undefined,
-        requireTaskContext,
-        vocabularyLemmas,
-        distractorRepair ? allVocabularyTargets : activeVocabularyTargets
-      );
-    } catch (error) {
-      if (
-        mayCaptureRepair &&
-        !vocabularyRepair &&
-        !distractorRepair &&
-        error instanceof VocabularyDistractorRejectionError
-      )
-        distractorRepair = captureVocabularyDistractorRepair(parsed.questions, error);
-      throw error;
+    const normalized = normalizeQuestions(
+      parsed.questions,
+      requestCount,
+      useSourcePassage,
+      p.sourceContent,
+      p.skill === 'READING' ? parsed.passage : undefined,
+      requireTaskContext,
+      vocabularyLemmas,
+      distractorRepair ? allVocabularyTargets : activeVocabularyTargets
+    );
+    if (normalized.duplicateTargets.length) {
+      const error = new VocabularyDistractorRejectionError(normalized.duplicateTargets);
+      if (!mayCaptureRepair || vocabularyRepair || distractorRepair) throw error;
+      distractorRepair = captureVocabularyDistractorRepair(parsed.questions, error);
+      if (!distractorRepair) throw error;
     }
+    const questions = normalized.questions;
     if (p.skill === 'READING' && !questions[0].passageText?.trim())
       throw new Error('reading response omitted the required passage');
     const targetOrder = p.vocabularyReview
       ? parsed.questions.map((question) => question.targetIndex as number)
       : [];
+    const composed = vocabularyRepair
+      ? mergeVocabularyRepair(vocabularyRepair, questions, targetOrder)
+      : questions;
+    const composedTargetOrder = vocabularyRepair?.targetOrder ?? targetOrder;
     return {
-      questions: vocabularyRepair
-        ? mergeVocabularyRepair(vocabularyRepair, questions, targetOrder)
-        : questions,
-      targetOrder: vocabularyRepair?.targetOrder ?? targetOrder,
+      questions: composed.map(
+        (question, index) =>
+          retainedApprovedQuestions.get(p.vocabularyReview ? composedTargetOrder[index] : index) ??
+          question
+      ),
+      targetOrder: composedTargetOrder,
+      duplicateTargets: normalized.duplicateTargets,
     };
   };
 
@@ -748,6 +754,7 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
     terminalTeachingRejection = undefined;
     let candidate: GeneratedQuestion[] | undefined;
     let candidateTargetOrder: number[] = [];
+    let duplicateTargets: number[] = [];
     try {
       const compiled = compileCandidate(
         response.content,
@@ -756,16 +763,35 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
       );
       candidate = compiled.questions;
       candidateTargetOrder = compiled.targetOrder;
+      duplicateTargets = compiled.duplicateTargets;
     } catch (err) {
       lastError = err instanceof Error ? err.message : String(err);
       lastMalformedContent = response.content;
     }
 
     if (candidate) {
-      const issues = await review(candidate);
-      if (issues.length === 0) return candidate;
+      const issues = await review(candidate, duplicateTargets.length > 0);
+      if (issues.length === 0 && !duplicateTargets.length) return candidate;
+      if (sectionSkill === 'GRAMMAR' && teachingRejection && attempt < MAX_GENERATION_ATTEMPTS) {
+        const failure = authenticTeachingFailure(teachingRejection, 'explanations', candidate);
+        const verdict = failure?.reviews.length === 1 ? failure.reviews[0].verdict : undefined;
+        if (
+          !verdict ||
+          verdict.items.length !== candidate.length ||
+          new Set(verdict.items.map((item) => item.index)).size !== candidate.length ||
+          verdict.items.some((item) => item.index < 0 || item.index >= candidate.length) ||
+          verdict.items.every((item) => item.acceptable && item.issues.length === 0)
+        )
+          throw teachingRejection;
+        for (const item of verdict.items)
+          if (item.acceptable && item.issues.length === 0)
+            retainedApprovedQuestions.set(
+              p.vocabularyReview ? candidateTargetOrder[item.index] : item.index,
+              structuredClone(candidate[item.index])
+            );
+      }
       qualityFailed = true;
-      lastError = `educational quality: ${issues.join(', ')}`;
+      lastError = `educational quality: ${[...issues, ...(duplicateTargets.length ? ['duplicate_choices'] : [])].join(', ')}`;
       rejectedCandidate = JSON.stringify({
         passage: candidate[0]?.passageText ?? '',
         questions: candidate.map((question, index) => ({
@@ -780,9 +806,40 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
       });
       lastMalformedContent = '';
       if (p.vocabularyReview && attempt < MAX_GENERATION_ATTEMPTS) {
-        vocabularyRepair = teachingRejection
-          ? undefined
-          : selectVocabularyRepair(candidate, candidateTargetOrder, sectionFeedback);
+        const duplicatesOnly =
+          !issues.length ||
+          (sectionFeedback &&
+            sectionFeedback.passageAcceptable &&
+            !sectionFeedback.passageFeedback.length &&
+            !sectionFeedback.issues.length &&
+            sectionFeedback.questions.every((row) => {
+              const question = candidate[row.index];
+              if (!duplicateTargets.includes(candidateTargetOrder[row.index]))
+                return (
+                  !row.issues.length &&
+                  row.acceptableOptionIndices.length === 1 &&
+                  row.acceptableOptionIndices[0] === question.correctIndex
+                );
+              return (
+                row.issues.every((issue) => issue === 'ambiguous') &&
+                row.acceptableOptionIndices.length > 0 &&
+                row.acceptableOptionIndices.every(
+                  (index) =>
+                    question.options[index].trim().toLowerCase() ===
+                    question.options[question.correctIndex].trim().toLowerCase()
+                )
+              );
+            }));
+        if (!duplicatesOnly) distractorRepair = undefined;
+        vocabularyRepair =
+          teachingRejection || distractorRepair
+            ? undefined
+            : selectVocabularyRepair(
+                candidate,
+                candidateTargetOrder,
+                sectionFeedback,
+                duplicateTargets
+              );
         activeVocabularyTargets = vocabularyRepair?.rejectedTargets ?? allVocabularyTargets;
       }
     }

@@ -12,7 +12,7 @@ export const listeningSourceBindingShape = {
 const bindingSchema = z.object(listeningSourceBindingShape).strict();
 export type ListeningSourceBinding = z.infer<typeof bindingSchema>;
 
-export interface ListeningSourceUnit {
+interface ListeningSourceUnit {
   unitIndex: number;
   turnIndex: number;
   speaker: string;

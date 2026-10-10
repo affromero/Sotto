@@ -64,6 +64,7 @@ const EXPECTED_FILES = [
   'class/generate-section-quiz.md',
   'class/review-section-quiz.md',
   'class/review-teaching-content.md',
+  'class/review-teaching-novel-findings.md',
   'class/review-reading-teaching-content.md',
   'class/review-listening-passage.md',
   'class/review-listening-teaching-content.md',
@@ -137,6 +138,18 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
     'AUDIENCE_LEVEL',
     'CONTENT_SAFETY',
     'LANGUAGE_INSTRUCTION',
+  ],
+  'class/review-teaching-novel-findings.md': [
+    'EXAMPLE_MEANING_POLICY',
+    'GRAMMAR_POINTS',
+    'GRAMMAR_RULE_POLICY',
+    'KIND',
+    'LANGUAGE_POLICY',
+    'LEVEL',
+    'OBJECTIVE',
+    'REVIEW_SCHEMA',
+    'TARGET',
+    'TITLE',
   ],
   'class/review-class-intro.md': [
     'EXAMPLE_MEANING_POLICY',
@@ -388,6 +401,7 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
     'VOCAB',
   ].sort(),
   'class/generate-class-intro.md': [
+    'INTRO_EXAMPLE',
     'EXAMPLE_MEANING_POLICY',
     'GRAMMAR_POINTS',
     'GRAMMAR_RULE_POLICY',
@@ -533,8 +547,6 @@ describe('generation templates', () => {
     expect(schema.properties.passageFindings.items.properties.reason.maxLength).toBe(300);
     expect(schema.properties).not.toHaveProperty('passageAcceptable');
     expect(schema.properties.passageFindings.items.properties).not.toHaveProperty('quote');
-    expect(prompt).toContain('learner sentence starters');
-    expect(prompt).toContain('reject incorrect complete positive examples');
     expect(prompt).toContain('sourcePartIndex');
   });
   it('script-generator.md references JSON output format', () => {

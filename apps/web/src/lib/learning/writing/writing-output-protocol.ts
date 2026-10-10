@@ -18,7 +18,7 @@ export const writingIdeasSchema = z
       .trim()
       .min(1)
       .describe(
-        'Copy a short exact proper prefix from modelAnswer after solving the complete task; punctuation must match exactly; no ellipsis. Use progressively longer prefixes for additional hints.'
+        'Copy a short exact proper prefix from modelAnswer after solving the complete task; leave at least one whole word for the learner to write, not only punctuation or the end of a word; punctuation must match exactly; no ellipsis. Use progressively longer prefixes for additional hints.'
       )
   )
   .max(3)
@@ -30,17 +30,25 @@ export const writingStarterSchema = z
   .min(1)
   .nullable()
   .describe(
-    'For completion only, the short fixed beginning the learner must continue exactly; sourceText supplies facts without a separately authored copy of this starter. Null for other task types. No ellipsis.'
+    'For completion only, the short fixed beginning the learner must continue exactly, leaving at least one whole word to write; sourceText supplies facts without a separately authored copy of this starter. Null for other task types. No ellipsis.'
   );
 
 function requireProperPrefix(prefix: string, answer: string) {
   const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
   if (
+    prefix.length === 0 ||
     !answer.startsWith(prefix) ||
     answer.length <= prefix.length ||
     !Array.from(segmenter.segment(answer)).some((part) => part.index === prefix.length)
   )
     throw new Error('Writing beginning must be a complete grapheme prefix of its answer.');
+  const words = new Intl.Segmenter(undefined, { granularity: 'word' });
+  if (
+    !Array.from(words.segment(answer)).some(
+      (part) => part.isWordLike && part.index >= prefix.length
+    )
+  )
+    throw new Error('Writing beginning must leave at least one whole word for the learner.');
 }
 
 export function parseWritingStarter(
@@ -61,10 +69,13 @@ export function parseWritingStarter(
 
 export function parseWritingIdeas(value: unknown, modelAnswer: string): string[] {
   const openings = writingIdeasSchema.parse(value ?? null) ?? [];
-  if (openings.some((opening) => /(?:…|\.{3})$/u.test(opening)))
-    throw new Error('Writing openings must omit the display ellipsis.');
-  for (const opening of openings) requireProperPrefix(opening, modelAnswer);
-  return openings.map((opening) => `${opening} …`);
+  return openings.map((opening) => {
+    const prefix = modelAnswer.startsWith(opening)
+      ? opening
+      : opening.replace(/(?:…|(?<!\.)\.{3})$/u, '').trimEnd();
+    requireProperPrefix(prefix, modelAnswer);
+    return `${prefix} …`;
+  });
 }
 
 export interface WritingCorrectionDelta {
@@ -73,7 +84,7 @@ export interface WritingCorrectionDelta {
   reason: string;
 }
 
-/** Derive the author's proposed edit without asking the model to count offsets. */
+/** Derive exact word and punctuation edits without asking the model to count offsets. */
 export function parseWritingAuthoringProof(
   item: unknown,
   taskType: string,
@@ -90,7 +101,7 @@ export function parseWritingAuthoringProof(
   if (comparable(source) === comparable(proof.modelAnswer))
     throw new Error('Writing correction must propose a meaningful edit.');
 
-  const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+  const segmenter = new Intl.Segmenter(undefined, { granularity: 'word' });
   const sourceParts = Array.from(segmenter.segment(source), (part) => part.segment);
   const answerParts = Array.from(segmenter.segment(proof.modelAnswer), (part) => part.segment);
   let start = 0;

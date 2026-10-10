@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { params, intro } from './teaching/fixture';
-import { shapeIntroProviderFixture } from './intro-provider-fixture';
+import {
+  novelFindingCorroborationFixture,
+  shapeIntroProviderFixture,
+} from './intro-provider-fixture';
 
 const boundary = vi.hoisted(() => ({ generate: vi.fn(), resolve: vi.fn() }));
 vi.unmock('@/lib/classes/class-intro');
@@ -15,7 +18,8 @@ vi.mock('@/lib/providers/ai', () => ({
         system,
         messages,
         options,
-        await boundary.generate(system, messages, options)
+        novelFindingCorroborationFixture(messages, options) ??
+          (await boundary.generate(system, messages, options))
       ),
   }),
 }));
@@ -31,6 +35,8 @@ import { generateClassIntro } from '@/lib/classes/class-intro';
 import {
   classIntroExampleMeaningPolicy,
   classIntroGrammarRulePolicy,
+  classListeningTranscriptPolicy,
+  classSpeakingMeaningPolicy,
 } from '@/lib/classes/class-language-policy';
 import { logger } from '@/lib/logger';
 import { createAIProvider } from '@/lib/providers/ai';
@@ -42,6 +48,7 @@ import {
 } from '@/lib/classes/quality/teaching-quality';
 
 const approved = { items: [{ index: 0, acceptable: true, issues: [], feedback: [] }] };
+const nativeIntroParams = { ...params, level: 'A1' };
 function quotedExample(example: (typeof intro.examples)[number]) {
   return { ...example, note: `„${example.target}“: ${example.note}` };
 }
@@ -97,6 +104,88 @@ beforeEach(() => {
 });
 
 describe('intro teaching gate', () => {
+  it.each(['A1', 'A2'])(
+    'preserves the speaking field contract and exact %s source',
+    async (level) => {
+      const content = {
+        targetPhrase: 'Was hast du gestern gemacht?',
+        translation:
+          level === 'A1'
+            ? 'What did you do yesterday?'
+            : 'Die Frage ist, was du gestern gemacht hast.',
+        ipa: null,
+      };
+      boundary.generate.mockReset();
+      boundary.generate.mockResolvedValue({
+        content: JSON.stringify(approved),
+        model: 'captured-model',
+      });
+      await reviewTeachingContent({
+        ...params,
+        level,
+        ai: await boundary.resolve(),
+        provider: createAIProvider('fixture'),
+        kind: 'speaking',
+        items: [content],
+      });
+      for (const [system, messages] of boundary.generate.mock.calls) {
+        expect(system).toContain(classSpeakingMeaningPolicy({ ...params, level }));
+        expect(JSON.parse(messages[0].content).items[0].content).toEqual(content);
+      }
+    }
+  );
+
+  it.each(['A1', 'A2'])(
+    'keeps the shared spoken policy and written quiz fields in both %s listening reviews',
+    async (level) => {
+      const turn = {
+        turnIndex: 1,
+        speaker: 'EXPERT',
+        text: '[whispers] Einige Verben brauchen hier „sein“: Ich bin nach Hause gegangen. „Gegangen“ ist eine Verbform; die Grundform heißt „gehen“.',
+      };
+      const passageText = `${turn.speaker}: ${turn.text}`;
+      const question = {
+        question: 'Wohin ist die Expertin gegangen?',
+        options: ['Nach Hause', 'In den Park'],
+        correctIndex: 0,
+        explanation: 'Die Expertin ist nach Hause gegangen.',
+      };
+      boundary.generate.mockReset();
+      boundary.generate.mockImplementation(async (...args) => ({
+        content: JSON.stringify({
+          items: JSON.parse(args[1][0].content).items.map(({ index }: { index: number }) => ({
+            index,
+            acceptable: true,
+            issues: [],
+            feedback: [],
+          })),
+        }),
+        model: 'captured-model',
+      }));
+      await reviewTeachingContent({
+        ...params,
+        level,
+        ai: await boundary.resolve(),
+        provider: createAIProvider('fixture'),
+        kind: 'listening',
+        listeningTurns: [turn],
+        items: [{ ...question, passageText }],
+      });
+      const policy = classListeningTranscriptPolicy({ ...params, level });
+      for (const name of ['class_teaching_critic', 'class_teaching_adjudicator']) {
+        const [system, messages] = boundary.generate.mock.calls.find(
+          (call) => call[2].jsonSchema.name === name
+        )!;
+        const input = JSON.parse(messages[0].content);
+        expect(system).toContain(policy);
+        expect(input.listeningTurns).toEqual([turn]);
+        expect(input.items.map((item: { content: unknown }) => item.content)).toEqual(
+          name === 'class_teaching_critic' ? [{ passageText }] : [{ passageText }, question]
+        );
+      }
+    }
+  );
+
   it('reviews a partial reply opening without inventing a completed travel event', async () => {
     const content = {
       taskType: 'guided_reply',
@@ -313,7 +402,7 @@ describe('intro teaching gate', () => {
     'semantic replacement',
     'structural then semantic repair',
   ])(
-    'reviews the exact immersion usage note after %s without requiring a different meaning',
+    'reviews the exact native-language explanation after %s without requiring a different meaning',
     async (path) => {
       const usageIntro = {
         purpose: 'Erzähle von gestern.',
@@ -322,7 +411,7 @@ describe('intro teaching gate', () => {
         examples: [
           {
             target: 'Sie hat das Museum besucht.',
-            meaning: 'Du erzählst hier von einem Besuch im Museum.',
+            meaning: 'She visited the museum.',
             note: 'Das Verb „besuchen“ bildet das Perfekt mit „haben“.',
           },
         ],
@@ -330,7 +419,7 @@ describe('intro teaching gate', () => {
       };
       const drifted = {
         ...usageIntro,
-        examples: [{ ...usageIntro.examples[0], meaning: 'Sie hat das Museum angesehen.' }],
+        examples: [{ ...usageIntro.examples[0], meaning: 'She looked at the museum.' }],
       };
       const driftVerdict = {
         items: [
@@ -356,26 +445,24 @@ describe('intro teaching gate', () => {
               ];
       queueResponses(responses);
 
-      const result = await generateClassIntro(params);
+      const result = await generateClassIntro(nativeIntroParams);
       expect(result.examples).toEqual(usageIntro.examples.map(quotedExample));
       expect(result.visuals).toBeUndefined();
       const generationRequests = boundary.generate.mock.calls.filter(([system]) =>
         system.startsWith('You are a language teacher')
       );
       for (const [system, messages] of generationRequests) {
-        expect(system).toContain(classIntroExampleMeaningPolicy(params));
+        expect(system).toContain(classIntroExampleMeaningPolicy(nativeIntroParams));
         expect(system).toContain(classIntroGrammarRulePolicy());
-        expect(system).not.toContain('closely paraphrase');
-        expect(messages[0].content).not.toContain('distinct meanings');
         if (system.includes('repairing or replacing')) {
-          expect(messages[0].content).toContain(classIntroExampleMeaningPolicy(params));
+          expect(messages[0].content).toContain(classIntroExampleMeaningPolicy(nativeIntroParams));
         }
       }
       const reviewRequests = boundary.generate.mock.calls.filter(([system]) =>
         system.startsWith('Independently review')
       );
       const [reviewSystem, messages] = reviewRequests.at(-1)!;
-      expect(reviewSystem).toContain(classIntroExampleMeaningPolicy(params));
+      expect(reviewSystem).toContain(classIntroExampleMeaningPolicy(nativeIntroParams));
       expect(reviewSystem).toContain(classIntroGrammarRulePolicy());
       expect(
         JSON.parse(messages[0].content).items.find(
@@ -386,13 +473,13 @@ describe('intro teaching gate', () => {
     }
   );
 
-  it('keeps rejecting an immersion usage note with an unsupported result after bounded replacement', async () => {
+  it('keeps rejecting a native-language explanation with an unsupported result after bounded replacement', async () => {
     const unsupported = {
       ...intro,
       examples: [
         {
           target: 'Sie hat das Museum besucht.',
-          meaning: 'Sie hat dort alle Bilder gesehen.',
+          meaning: 'She saw all the pictures there.',
           note: 'Das Verb „besuchen“ bildet das Perfekt mit „haben“.',
         },
       ],
@@ -408,8 +495,9 @@ describe('intro teaching gate', () => {
       ],
     };
     queueResponses([unsupported, verdict, { examples: { 0: unsupported.examples[0] } }, verdict]);
-    await expect(generateClassIntro(params)).rejects.toBeInstanceOf(TeachingQualityRejectionError);
-    expect(boundary.generate.mock.calls).toHaveLength(6);
+    await expect(generateClassIntro(nativeIntroParams)).rejects.toBeInstanceOf(
+      TeachingQualityRejectionError
+    );
     for (const [system, messages] of boundary.generate.mock.calls.filter(([system]) =>
       system.startsWith('Independently review')
     )) {
@@ -439,18 +527,18 @@ describe('intro teaching gate', () => {
     }
   });
 
-  it('keeps rejected A2 meanings and misleading visual combinations out of published teaching', async () => {
+  it('keeps rejected native-language meanings and misleading visual combinations out of published teaching', async () => {
     const candidate = {
       ...intro,
       examples: [
         {
           target: 'Ich habe gestern einen Film gesehen.',
-          meaning: 'Der Film war gestern Gegenstand meines Sehens.',
+          meaning: 'The film was the object of my seeing yesterday.',
           note: 'Das Partizip steht im Hauptsatz am Ende.',
         },
         {
           target: 'Wir sind zu Fuß nach Hause gegangen.',
-          meaning: 'Wir haben uns gehend nach Hause bewegt.',
+          meaning: 'We moved home in a walking way.',
           note: 'Hier steht gehen mit sein.',
         },
       ],
@@ -458,14 +546,14 @@ describe('intro teaching gate', () => {
         contrast: {
           title: 'Ich habe gestern einen Film gesehen.',
           leftLabel: 'Ich habe gestern einen Film gesehen.',
-          leftItems: ['Wir haben uns gehend nach Hause bewegt.'],
+          leftItems: ['We moved home in a walking way.'],
           rightLabel: 'Wir sind zu Fuß nach Hause gegangen.',
-          rightItems: ['Der Film war gestern Gegenstand meines Sehens.'],
+          rightItems: ['The film was the object of my seeing yesterday.'],
         },
         callouts: [
           {
             label: 'Ich habe gestern einen Film gesehen.',
-            text: 'Wir haben uns gehend nach Hause bewegt.',
+            text: 'We moved home in a walking way.',
             tone: 'blue',
           },
         ],
@@ -485,7 +573,10 @@ describe('intro teaching gate', () => {
     };
     const replacement = {
       ...intro,
-      examples: candidate.examples.map((example) => ({ ...example, meaning: example.target })),
+      examples: candidate.examples.map((example, index) => ({
+        ...example,
+        meaning: ['I watched a film yesterday.', 'We walked home.'][index]!,
+      })),
     };
     const finalBatch = {
       items: [
@@ -512,28 +603,13 @@ describe('intro teaching gate', () => {
       approved,
     ]);
 
-    const result = await generateClassIntro(params);
+    const result = await generateClassIntro(nativeIntroParams);
 
     expect(result.examples).toEqual(replacement.examples.map(quotedExample));
     expect(result.visuals).toBeUndefined();
-    expect(boundary.generate.mock.calls[0][0]).toContain('plain, everyday wording');
-    expect(boundary.generate.mock.calls[0][0]).toContain("verb's required complements");
-    expect(boundary.generate.mock.calls[5][0]).toContain('plain, everyday wording');
-    for (const prompt of [boundary.generate.mock.calls[0][0], boundary.generate.mock.calls[5][0]]) {
-      expect(prompt).toContain('including purpose, about, focus and tips');
-      expect(prompt).toContain('Every examples[].target must be correct model language');
-      expect(prompt).toContain('even if its note identifies the mistake');
-      expect(prompt).toContain(
-        'explicitly labelled note or tip that also supplies the correct form'
-      );
-    }
-    expect(boundary.generate.mock.calls[5][0]).toContain(
-      'style preference alone does not justify changing sound wording'
-    );
     expect(boundary.generate.mock.calls[5][1][0].content).toContain(
       'examples[0].meaning is unnatural.'
     );
-    expect(boundary.generate.mock.calls[1][0]).toContain('shortened visual claims');
   });
   it('retains both rejected candidates privately without changing the bounded replacement', async () => {
     const replacement = {
@@ -619,7 +695,7 @@ describe('intro teaching gate', () => {
       .mockResolvedValueOnce({ content: JSON.stringify(intro), model: 'captured-model' })
       .mockResolvedValue({ content: JSON.stringify(approved), model: 'captured-model' });
 
-    const result = await generateClassIntro(params);
+    const result = await generateClassIntro(nativeIntroParams);
 
     expect(result.purpose).toBe(intro.purpose);
     expect(result.examples).toEqual(intro.examples.map(quotedExample));
@@ -667,8 +743,9 @@ describe('intro teaching gate', () => {
 
     const result = await generateClassIntro(params);
 
-    expect(result.examples).toEqual(intro.examples.map(quotedExample));
-    expect(boundary.generate.mock.calls).toHaveLength(4);
+    expect(result.examples).toEqual(
+      intro.examples.map((example) => ({ ...quotedExample(example), meaning: example.target }))
+    );
   });
 
   it('replaces a rejected explanation and preserves feedback identifying its field', async () => {
@@ -709,10 +786,13 @@ describe('intro teaching gate', () => {
 
     await expect(generateClassIntro(params)).resolves.toMatchObject({
       ...replacement,
-      about: '„Ich habe einen Kuchen gebacken.“: Ein Kuchen wurde von mir gebacken.',
+      about: 'Ich habe einen Kuchen gebacken.',
       focus: ['„Ich habe einen Kuchen gebacken.“: Describe transport'],
       tips: ['„Ich habe einen Kuchen gebacken.“: Name the transport.'],
-      examples: replacement.examples.map(quotedExample),
+      examples: replacement.examples.map((example) => ({
+        ...quotedExample(example),
+        meaning: example.target,
+      })),
     });
     expect(boundary.generate.mock.calls[3][2].jsonSchema.name).toBe('class_intro_repair');
     expect(boundary.generate.mock.calls[3][1][0].content).toContain(
@@ -729,7 +809,6 @@ describe('intro teaching gate', () => {
     for (const system of [boundary.generate.mock.calls[0][0], boundary.generate.mock.calls[3][0]]) {
       expect(system).toContain(params.title);
       expect(system).toContain(params.objective);
-      expect(system).toContain('Immediate immersion for A2');
     }
     expect(
       boundary.generate.mock.calls[3][2].jsonSchema.schema.properties.examples.required

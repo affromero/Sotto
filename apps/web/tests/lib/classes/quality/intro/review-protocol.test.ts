@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { blockedProviderExecution } from '../../../../helpers/runtime/provider-execution';
-import { shapeIntroProviderFixture, teachingFindingFixture } from '../intro-provider-fixture';
+import {
+  novelFindingCorroborationFixture,
+  shapeIntroProviderFixture,
+  teachingFindingFixture,
+} from '../intro-provider-fixture';
 
 const boundary = vi.hoisted(() => ({ generate: vi.fn(), resolve: vi.fn() }));
 vi.unmock('@/lib/classes/class-intro');
@@ -15,7 +19,8 @@ vi.mock('@/lib/providers/ai', () => ({
         system,
         messages,
         options,
-        await boundary.generate(system, messages, options)
+        novelFindingCorroborationFixture(messages, options) ??
+          (await boundary.generate(system, messages, options))
       ),
   }),
 }));
@@ -363,7 +368,10 @@ describe('evidence-bound intro review', () => {
           ...intro.examples[0]!,
           note: '„Ich habe gestern meine Freundin besucht.“: „Habe“ steht an dritter Stelle, „besucht“ am Satzende.',
         },
-        intro.examples[1]!,
+        {
+          ...intro.examples[1]!,
+          note: '„Wir sind zu Fuß zum Bahnhof gegangen.“: „Gehen“ verwendet „haben“.',
+        },
       ],
     };
     const noteFinding: Finding = {
@@ -375,15 +383,24 @@ describe('evidence-bound intro review', () => {
       correction: '„Habe“ steht an zweiter Stelle, „besucht“ am Satzende.',
       counterexample: null,
     };
-    const repaired = { ...intro.examples[1]!, meaning: arrivalFinding.correction! };
+    const auxiliaryFinding: Finding = {
+      issue: 'incorrect',
+      fieldPath: ['example', 'note'],
+      quote: '„Gehen“ verwendet „haben“',
+      rule: 'Use the correct auxiliary for the displayed intransitive gehen example.',
+      defect: 'The displayed gehen example requires sein, not haben.',
+      correction: '„Gehen“ verwendet „sein“.',
+      counterexample: null,
+    };
+    const repaired = { ...intro.examples[1]!, meaning: intro.examples[1]!.target };
     let repairedPhase = false;
     boundary.generate.mockImplementation(async (_system, messages, options) => {
       const schema = options.jsonSchema?.name;
       if (schema === 'class_intro_generation') return response(candidate);
       if (schema === 'class_intro_repair') {
-        expect(messages[0].content).toContain(arrivalFinding.quote);
+        expect(messages[0].content).toContain(auxiliaryFinding.quote);
         repairedPhase = true;
-        return response({ examples: { 1: repaired } });
+        return response({ examples: { 1: { target: repaired.target, note: repaired.note } } });
       }
       const payload: Payload = JSON.parse(messages[0].content);
       return response(
@@ -395,7 +412,7 @@ describe('evidence-bound intro review', () => {
                   ? [noteFinding]
                   : [];
               return item.content.address.field === 'examples' && item.content.address.index === 1
-                ? [arrivalFinding]
+                ? [auxiliaryFinding]
                 : [];
             })
       );
@@ -408,10 +425,11 @@ describe('evidence-bound intro review', () => {
     );
     expect(candidates).toHaveLength(2);
     for (const candidate of candidates) expect(candidate.addresses).toHaveLength(9);
-    expect(candidates[1].introContext.about).toBe(
-      `„${intro.examples[0]!.target}“: ${intro.examples[0]!.meaning}`
-    );
-    expect(candidates[1].introContext.examples[0]).toEqual(candidate.examples[0]);
+    expect(candidates[1].introContext.about).toBe(intro.examples[0]!.target);
+    expect(candidates[1].introContext.examples[0]).toEqual({
+      ...candidate.examples[0],
+      meaning: candidate.examples[0]!.target,
+    });
     expect(candidates[1].introContext.examples[1]).toEqual(repaired);
     expect(
       failure.teachingFailure!.reviews[1]!.verdict.items.filter(({ acceptable }) => !acceptable)

@@ -4,17 +4,19 @@ import type { requestTeachingReview } from '../teaching-quality';
 
 /** Keep source evidence and proposed operands visible without exposing approval labels. */
 export function teachingReviewCandidate(options: Parameters<typeof requestTeachingReview>[0]) {
+  const listeningUnits = options.listeningTurns
+    ? buildListeningSourceUnits(options.items[0], options.listeningTurns, options.variables.TARGET)
+    : undefined;
   return {
     ...(options.introContext ? { introContext: options.introContext } : {}),
+    ...(options.novelFindingProposals
+      ? { novelFindingProposals: options.novelFindingProposals }
+      : {}),
     ...(options.listeningSource !== undefined ? { listeningSource: options.listeningSource } : {}),
     ...(options.listeningTurns
       ? {
           listeningTurns: options.listeningTurns,
-          listeningUnits: buildListeningSourceUnits(
-            options.items[0],
-            options.listeningTurns,
-            options.variables.TARGET
-          ),
+          listeningUnits,
         }
       : {}),
     ...(options.criticAssignment ? { criticAssignment: options.criticAssignment } : {}),
@@ -36,14 +38,20 @@ export function teachingReviewCandidate(options: Parameters<typeof requestTeachi
               findings,
               ...(passageWitness
                 ? {
-                    passagePairs: passageWitness.pairs.map((pair) => ({
-                      pairIndex: pair.pairIndex,
-                      premiseUnitIndex: pair.premiseUnitIndex,
-                      exampleUnitIndex: pair.exampleUnitIndex,
-                      premiseMeaning: pair.premiseMeaning,
-                      exampleMeaning: pair.exampleMeaning,
-                      relation: pair.relation,
-                    })),
+                    passagePairs: passageWitness.pairs.map((pair) => {
+                      const premiseUnit = listeningUnits?.units[pair.premiseUnitIndex];
+                      const exampleUnit = listeningUnits?.units[pair.exampleUnitIndex];
+                      if (!premiseUnit || !exampleUnit)
+                        throw new Error('Listening teaching operands require bound source units.');
+                      return {
+                        pairIndex: pair.pairIndex,
+                        premiseUnitIndex: pair.premiseUnitIndex,
+                        exampleUnitIndex: pair.exampleUnitIndex,
+                        premiseUnit,
+                        exampleUnit,
+                        relation: pair.relation,
+                      };
+                    }),
                   }
                 : {}),
             })),

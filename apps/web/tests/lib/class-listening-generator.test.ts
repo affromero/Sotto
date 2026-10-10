@@ -16,7 +16,9 @@ import {
   mockPersistGeneratedReferences,
   mockVerifyEpisodeReferences,
   mockBlindResponse,
+  mockTeachingCriticResponse,
   mockTeachingResponse,
+  mockLoadAndRender,
   mockGenerateResponse,
   mockLogUsage,
   mockGetConfiguredTtsProviderId,
@@ -41,6 +43,7 @@ import type { ListeningContentParams } from '@/lib/class-listening-generator';
 import { authorizedLearnerExecution } from '../helpers/runtime/provider-execution';
 import { captureGenerationFailure } from '@/lib/classes/quality/generation-failure';
 import { SectionQualityError } from '@/lib/classes/section-quality';
+import { classListeningTranscriptPolicy } from '@/lib/classes/class-language-policy';
 
 describe('Listening audio admission', () => {
   it('rejects obsolete class audio inside admission while preserving the saved episode', async () => {
@@ -248,16 +251,29 @@ describe('generateClassListening', () => {
       );
     });
 
-    it('reviews spoken words while keeping annotated turns intact for persistence and audio', async () => {
+    it('shares spoken review policy while preserving annotated turns for persistence and audio', async () => {
       setupHappyPath();
-      const turns = [{ speaker: 'HOST', text: '[V1:hola], bienvenidos. [1] [SFX: intro]' }];
+      const { loadAndRender } =
+        await vi.importActual<typeof import('@/lib/prompt-loader')>('@/lib/prompt-loader');
+      mockLoadAndRender.mockImplementation(loadAndRender);
+      const turns = [
+        {
+          speaker: 'HOST',
+          text: '[V1:hola], estos verbos usan «haber» en el pretérito perfecto. Aquí «hablado» es una forma de «hablar», no el infinitivo. [1] [SFX: intro]',
+        },
+      ];
       mockGenerateScript.mockResolvedValue({ ...SAMPLE_SCRIPT_RESULT, turns });
 
       await generateClassListening(PARAMS);
 
       const blindInput = JSON.parse(mockBlindResponse.mock.calls[0][1][0].content);
       const teachingInput = JSON.parse(mockTeachingResponse.mock.calls[0][1][0].content);
-      expect(blindInput.passage).toBe('HOST: hola, bienvenidos.');
+      const policy = classListeningTranscriptPolicy(PARAMS);
+      for (const reviewer of [mockBlindResponse, mockTeachingCriticResponse, mockTeachingResponse])
+        expect(reviewer.mock.calls[0][0]).toContain(policy);
+      expect(blindInput.passage).toBe(
+        'HOST: hola, estos verbos usan «haber» en el pretérito perfecto. Aquí «hablado» es una forma de «hablar», no el infinitivo.'
+      );
       expect(
         teachingInput.items.map(
           (item: { content: { passageText: string } }) => item.content.passageText

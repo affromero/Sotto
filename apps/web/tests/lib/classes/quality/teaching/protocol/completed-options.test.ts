@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { blockedProviderExecution } from '../../../../../helpers/runtime/provider-execution';
+import { novelFindingCorroborationFixture } from '../../intro-provider-fixture';
 import type { AIProvider } from '@/lib/providers/ai';
 vi.mock('@/lib/learning-ai', () => ({
   capturedLearningAiOptions: async (ai: { model: string }) => ({ model: ai.model }),
@@ -46,6 +47,11 @@ function provider(options: { malformedCritic?: boolean; reject?: boolean } = {})
   const packets: Packet[] = [];
   const generateResponse = vi.fn(async (...args: Parameters<AIProvider['generateResponse']>) => {
     const [, messages, ai] = args;
+    const corroboration = novelFindingCorroborationFixture(
+      messages as Array<{ content: string }>,
+      ai
+    );
+    if (corroboration) return { ...corroboration, inputTokens: 0, outputTokens: 0 };
     const packet = JSON.parse(messages[0].content as string) as Packet;
     packets.push(packet);
     if (options.malformedCritic && packets.length === 1)

@@ -6,6 +6,45 @@ interface FixtureResponse {
   model: string;
 }
 
+/** Existing rejection fixtures explicitly retain their discovered defects at the model boundary. */
+export function novelFindingCorroborationFixture(
+  messages: Array<{ content: string }>,
+  options: unknown
+): FixtureResponse | undefined {
+  const request = options as { model?: string; jsonSchema?: { name?: string } };
+  if (request.jsonSchema?.name !== 'class_teaching_novel_finding_corroboration') return undefined;
+  const payload = JSON.parse(messages[0].content) as {
+    novelFindingProposals: Array<{
+      itemIndex: number;
+      findingIndex: number;
+      passageConcerns?: Array<{ concernIndex: number }>;
+    }>;
+  };
+  const concerns = payload.novelFindingProposals.flatMap(
+    (proposal) => proposal.passageConcerns ?? []
+  );
+  return {
+    model: request.model ?? 'm',
+    content: JSON.stringify({
+      decisions: payload.novelFindingProposals.map(({ itemIndex, findingIndex }) => ({
+        itemIndex,
+        findingIndex,
+        decision: 'supported',
+        reason: 'The fixture declares this source-bound teaching defect supported.',
+      })),
+      ...(concerns.length
+        ? {
+            passageConcernDecisions: concerns.map(({ concernIndex }) => ({
+              concernIndex,
+              decision: 'supported',
+              reason: 'The fixture independently retains this original source-bound concern.',
+            })),
+          }
+        : {}),
+    }),
+  };
+}
+
 type FixturePart = { index: number; fieldPath: string[]; quote: string };
 type FixtureFinding = {
   fieldPath: string[];
@@ -399,6 +438,47 @@ function shapeLegacyIntroFixture(
   }
 }
 
+function introExampleWireFixture(value: Record<string, unknown>, options: unknown) {
+  const properties = (
+    options as {
+      jsonSchema?: {
+        schema?: {
+          properties?: {
+            examples?: {
+              items?: { properties?: Record<string, unknown> };
+              properties?: Record<string, { properties?: Record<string, unknown> }>;
+            };
+          };
+        };
+      };
+    }
+  ).jsonSchema?.schema?.properties?.examples;
+  const example = (item: unknown, schema: { properties?: Record<string, unknown> } | undefined) => {
+    if (
+      !item ||
+      typeof item !== 'object' ||
+      Array.isArray(item) ||
+      !schema?.properties ||
+      Object.hasOwn(schema.properties, 'meaning')
+    )
+      return item;
+    return Object.fromEntries(Object.entries(item).filter(([key]) => key !== 'meaning'));
+  };
+  if (Array.isArray(value.examples))
+    return { ...value, examples: value.examples.map((item) => example(item, properties?.items)) };
+  if (value.examples && typeof value.examples === 'object')
+    return {
+      ...value,
+      examples: Object.fromEntries(
+        Object.entries(value.examples).map(([index, item]) => [
+          index,
+          example(item, properties?.properties?.[index]),
+        ])
+      ),
+    };
+  return value;
+}
+
 export function shapeIntroProviderFixture(
   system: string,
   messages: Array<{ content: string }>,
@@ -416,10 +496,13 @@ export function shapeIntroProviderFixture(
       return {
         ...legacy,
         content: JSON.stringify(
-          scopedIntroFixture(
-            schemaName === 'class_intro_generation'
-              ? generationVisualFixture(parsed as Record<string, unknown>)
-              : (parsed as Record<string, unknown>)
+          introExampleWireFixture(
+            scopedIntroFixture(
+              schemaName === 'class_intro_generation'
+                ? generationVisualFixture(parsed as Record<string, unknown>)
+                : (parsed as Record<string, unknown>)
+            ),
+            options
           )
         ),
       };

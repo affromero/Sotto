@@ -16,6 +16,7 @@ import {
   parseListeningPassageWitnessResponse,
   listeningPassageWitnessFailure,
   supportedMeaningDifferenceRule,
+  listeningUnitAccountLimitRule,
 } from './listening-audit/passage-witness';
 import type { NormalizedListeningTurn } from './listening-audit/projection';
 import {
@@ -38,7 +39,7 @@ export class ReviewerProtocolError extends SectionQualityError {
   }
 }
 
-const schemaIssueSchema = z
+const meaningDifferenceSchemaIssue = z
   .object({
     path: z
       .array(
@@ -52,6 +53,20 @@ const schemaIssueSchema = z
     rule: z.literal(supportedMeaningDifferenceRule),
   })
   .strict();
+const unitAccountLimitSchemaIssue = z
+  .object({
+    path: z.tuple([
+      z.literal('items'),
+      z.number().int().nonnegative(),
+      z.literal('passageWitness'),
+      z.literal('unitAccounts'),
+      z.number().int().nonnegative(),
+    ]),
+    rule: z.literal(listeningUnitAccountLimitRule),
+    maxChars: z.number().int().positive(),
+  })
+  .strict();
+const schemaIssueSchema = z.union([meaningDifferenceSchemaIssue, unitAccountLimitSchemaIssue]);
 
 export const reviewerProtocolDiagnosticSchema = z
   .object({
@@ -167,11 +182,63 @@ export const teachingAdjudicatorSchema = z
 export type TeachingFinding = z.infer<typeof teachingFindingSchema>;
 export type TeachingCritic = z.infer<typeof teachingCriticSchema>;
 export type TeachingAdjudicator = z.infer<typeof teachingAdjudicatorSchema>;
+export type TeachingNovelFindingProposal = {
+  itemIndex: number;
+  findingIndex: number;
+  finding: TeachingFinding;
+  passageConcerns?: Array<{ concernIndex: number; quote: string; reason: string }>;
+};
+const teachingNovelFindingCorroborationSchema = z
+  .object({
+    decisions: z
+      .array(
+        z
+          .object({
+            itemIndex: z.number().int().min(0).max(4),
+            findingIndex: z.number().int().min(0).max(5),
+            decision: z.enum(['supported', 'dismissed', 'uncertain']),
+            reason: z.string().trim().min(1).max(240),
+          })
+          .strict()
+      )
+      .min(1)
+      .max(15),
+    passageConcernDecisions: z
+      .array(
+        z
+          .object({
+            concernIndex: z.number().int().min(0).max(2),
+            decision: z.enum(['supported', 'dismissed', 'uncertain']),
+            reason: z.string().trim().min(1).max(120),
+          })
+          .strict()
+      )
+      .max(3)
+      .optional(),
+  })
+  .strict();
+export function teachingNovelFindingCorroborationResponseSchema(
+  proposals: readonly TeachingNovelFindingProposal[]
+) {
+  return proposals.some((proposal) => proposal.passageConcerns?.length)
+    ? teachingNovelFindingCorroborationSchema.required({ passageConcernDecisions: true })
+    : teachingNovelFindingCorroborationSchema.omit({ passageConcernDecisions: true });
+}
+export type TeachingNovelFindingCorroboration = z.infer<
+  typeof teachingNovelFindingCorroborationSchema
+>;
+export const teachingNovelFindingProofSchema = z
+  .object({
+    candidateSha256: z.string().regex(/^[a-f0-9]{64}$/),
+    receiptIndex: z.number().int().min(0).max(63),
+  })
+  .strict();
 export type TeachingReviewPacket = {
   offset: number;
   criticAssignment?: readonly number[];
   critic: TeachingCritic;
   adjudicator: TeachingAdjudicator;
+  novelFindingCorroboration?: z.infer<typeof teachingNovelFindingProofSchema>;
 };
 
 function parseReview<T>(content: string, schema: z.ZodType<T>): T {
@@ -191,8 +258,26 @@ function parseReview<T>(content: string, schema: z.ZodType<T>): T {
           issue.errors.forEach(collect);
           continue;
         }
-        if (issue.code !== 'custom' || issue.message !== supportedMeaningDifferenceRule) continue;
-        const detail = schemaIssueSchema.safeParse({ path: issue.path, rule: issue.message });
+        let candidate: unknown;
+        if (issue.code === 'custom' && issue.message === supportedMeaningDifferenceRule) {
+          candidate = { path: issue.path, rule: supportedMeaningDifferenceRule };
+        } else if (
+          issue.code === 'too_big' &&
+          issue.origin === 'string' &&
+          issue.path.length === 5 &&
+          issue.path[0] === 'items' &&
+          issue.path[2] === 'passageWitness' &&
+          issue.path[3] === 'unitAccounts' &&
+          typeof issue.path[4] === 'string' &&
+          /^(0|[1-9][0-9]*)$/.test(issue.path[4])
+        ) {
+          candidate = {
+            path: [...issue.path.slice(0, 4), Number(issue.path[4])],
+            rule: listeningUnitAccountLimitRule,
+            maxChars: issue.maximum,
+          };
+        } else continue;
+        const detail = schemaIssueSchema.safeParse(candidate);
         if (
           detail.success &&
           !schemaIssues.some((existing) => isDeepStrictEqual(existing, detail.data))
@@ -206,6 +291,35 @@ function parseReview<T>(content: string, schema: z.ZodType<T>): T {
   return parsed.data;
 }
 
+/** Only complete, uniquely indexed decisions can corroborate original novel findings. */
+export function parseTeachingNovelFindingCorroborationResponse(
+  content: string,
+  proposals: readonly TeachingNovelFindingProposal[]
+): TeachingNovelFindingCorroboration {
+  const response: TeachingNovelFindingCorroboration = parseReview(
+    content,
+    teachingNovelFindingCorroborationResponseSchema(proposals)
+  );
+  assertReviewCoverage(
+    response.decisions.map((decision) => ({
+      index: proposals.findIndex(
+        (proposal) =>
+          proposal.itemIndex === decision.itemIndex &&
+          proposal.findingIndex === decision.findingIndex
+      ),
+    })),
+    proposals.length
+  );
+  const concerns = proposals.flatMap((proposal) => proposal.passageConcerns ?? []);
+  assertReviewCoverage(
+    (response.passageConcernDecisions ?? []).map((decision) => ({
+      index: concerns.findIndex((concern) => concern.concernIndex === decision.concernIndex),
+    })),
+    concerns.length
+  );
+  return response;
+}
+
 function assertReviewCoverage(
   items: readonly { index: number }[],
   expected: number,
@@ -214,7 +328,7 @@ function assertReviewCoverage(
   if (
     items.length !== expected ||
     new Set(items.map(({ index }) => index)).size !== expected ||
-    items.some(({ index }) => index >= expected)
+    items.some(({ index }) => index < 0 || index >= expected)
   )
     throw invalidResponse('coverage', path);
 }

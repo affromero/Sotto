@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { params } from './fixture';
-import { shapeTeachingProviderFixture } from '../intro-provider-fixture';
+import {
+  novelFindingCorroborationFixture,
+  shapeTeachingProviderFixture,
+} from '../intro-provider-fixture';
 import { listeningTurnsFixture } from '../../listening/witness-fixture';
 
 const boundary = vi.hoisted(() => ({ generate: vi.fn(), resolve: vi.fn() }));
@@ -15,7 +18,8 @@ vi.mock('@/lib/providers/ai', () => ({
         system,
         messages,
         options,
-        await boundary.generate(system, messages, options)
+        novelFindingCorroborationFixture(messages, options) ??
+          (await boundary.generate(system, messages, options))
       ),
   }),
 }));

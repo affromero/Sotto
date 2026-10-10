@@ -150,7 +150,6 @@ describe('generateScript', () => {
           languageMode: 'full_immersion',
         });
 
-        expect(providerInstruction.includes('## Grammar explanations')).toBe(expectsGuidance);
         expect(providerInstruction.includes('Frame spoken word mentions explicitly')).toBe(
           expectsGuidance
         );
@@ -520,23 +519,34 @@ describe('generateScript', () => {
   });
 
   describe('language learning instructions', () => {
-    it.each([false, true])(
+    it.each([false, true, 'inflected'] as const)(
       'keeps lexical targets distinct from contextual speech during repair=%s',
       async (repair) => {
+        const spoken = 'Wir haben eine schöne [V6:Reise] [V7:gemacht].';
+        const vocabulary =
+          repair === 'inflected'
+            ? [
+                { number: 6, word: 'die Reise', translation: 'the trip' },
+                { number: 7, word: 'machen', translation: 'to do' },
+              ]
+            : [
+                { number: 1, word: 'die Reise', translation: 'the trip' },
+                { number: 2, word: 'Reise', translation: 'trip' },
+              ];
         mockGenerateResponse.mockResolvedValue({
           content: JSON.stringify({
             turns: [
               {
                 speaker: 'HOST',
-                text: 'Meine [V1:Reise] war kurz. Das Wort [V1:die Reise] nennt den Ausflug.',
+                text:
+                  repair === 'inflected'
+                    ? spoken
+                    : 'Meine [V1:Reise] war kurz. Das Wort [V1:die Reise] nennt den Ausflug.',
               },
             ],
             references: [],
             soundCues: [],
-            vocabulary: [
-              { number: 1, word: 'die Reise', translation: 'the trip' },
-              { number: 2, word: 'Reise', translation: 'trip' },
-            ],
+            vocabulary,
           }),
           model: AI_RUNTIME.model,
           inputTokens: 1,
@@ -552,11 +562,11 @@ describe('generateScript', () => {
           targetLanguage: 'de',
           languageMode: 'full_immersion',
           forLearning: true,
-          mustIncludeVocabulary: [
-            { word: 'die Reise', translation: 'the trip' },
-            { word: 'Reise', translation: 'trip' },
-          ],
-          ...(repair
+          mustIncludeVocabulary: vocabulary.map(({ word, translation }) => ({
+            word,
+            translation,
+          })),
+          ...(repair === true
             ? {
                 learningRepair: {
                   kind: 'script_protocol' as const,
@@ -573,8 +583,6 @@ describe('generateScript', () => {
         expect(system).toContain(
           'lexical review targets, not mandatory verbatim sentence fragments'
         );
-        expect(system).toContain('actual grammatical surface already present in the sentence');
-        expect(system).toContain("If that surface exactly matches another entry's word");
         expect(system).toContain(
           'When presented as expressing the same meaning, its label, example and explanation must preserve event time, modality, agency, negation and scope'
         );
@@ -590,12 +598,18 @@ describe('generateScript', () => {
         );
         expect(system).not.toContain('Wrap 5-8 advanced or nuanced vocabulary items');
         expect(system).toContain('- die Reise — the trip');
-        expect(system).toContain('- Reise — trip');
+        if (repair !== 'inflected') expect(system).toContain('- Reise — trip');
         expect(system).not.toContain('MUST naturally incorporate AND wrap each');
-        expect(options).toMatchObject({ model: AI_RUNTIME.model, maxTokens: 12288 });
-        if (repair) expect(messages[0].content).toContain('script_protocol');
+        expect(options).toMatchObject({
+          model: AI_RUNTIME.model,
+          maxTokens: 12288,
+        });
+        if (repair === true) expect(messages[0].content).toContain('script_protocol');
+        expect(result.vocabulary).toMatchObject(vocabulary);
         expect(result.turns[0].text).toBe(
-          'Meine [V2:Reise] war kurz. Das Wort [V1:die Reise] nennt den Ausflug.'
+          repair === 'inflected'
+            ? spoken
+            : 'Meine [V2:Reise] war kurz. Das Wort [V1:die Reise] nennt den Ausflug.'
         );
       }
     );

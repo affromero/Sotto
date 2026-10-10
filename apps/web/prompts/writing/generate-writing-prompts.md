@@ -54,4 +54,6 @@ Return ONLY a JSON object with a `prompts` property containing exactly {{COUNT}}
 }
 ```
 
+`task` contains instructions only. Put the original sentences, incoming message and response facts in `sourceText`, without repeating them inside `task`. The application displays `sourceText` once with the instructions and adds any completion starter separately.
+
 `sourceText` is required and displayed with the task. Return actual text to work on, never a description of what the learner should invent. For correction tasks it contains the sentence with the error; for transformations it contains the original sentence; for replies it contains both the incoming message and all response facts.
