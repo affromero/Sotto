@@ -381,10 +381,11 @@ function assertFindingBound(finding: TeachingFinding, fields: unknown): void {
         throw invalidResponse('field_path', 'findings.fieldPath');
     } else finding.fieldPath = relativePath;
   }
-  assertExactFindingBound(finding, fields);
+  teachingFindingSource(finding, fields);
 }
 
-function assertExactFindingBound(finding: TeachingFinding, fields: unknown): void {
+/** Resolve the complete own string leaf after checking the exact evidence binding. */
+export function teachingFindingSource(finding: TeachingFinding, fields: unknown): string {
   const field = ownField(fields, finding.fieldPath);
   if (!field) throw invalidResponse('field_path', 'findings.fieldPath');
   const { value } = field;
@@ -392,6 +393,7 @@ function assertExactFindingBound(finding: TeachingFinding, fields: unknown): voi
     throw invalidResponse('quote_binding', 'findings.quote');
   if (finding.correction === null && finding.counterexample === null)
     throw invalidResponse('missing_remedy', 'findings.remedy');
+  return value;
 }
 
 export function parseTeachingCritic(
@@ -629,7 +631,7 @@ export function parseTeachingAdjudicatorResponse(
     if (reading) validatedAnswerSupport(row.answerSupport, fields[row.index]);
     if (row.passageWitness)
       validatedPassageExtraction(row.passageWitness, fields[row.index], row.index, listeningTurns);
-    for (const finding of row.findings) assertExactFindingBound(finding, fields[row.index]);
+    for (const finding of row.findings) teachingFindingSource(finding, fields[row.index]);
   }
   const response = parseReview(
     content,

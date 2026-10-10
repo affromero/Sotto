@@ -404,6 +404,63 @@ describe('strict scoped A1 intro wire', () => {
     await expect(generateClassIntro(params)).resolves.toEqual(compiled);
   });
 
+  it('repairs an observation prefixed by a different complete example before reviewing it', async () => {
+    const conflicting = '„Wir sind gegangen.“: Kochen verwendet haben.';
+    respond({ ...wire, focus: [{ text: conflicting, exampleIndex: 0 }, wire.focus[1]] }, wire);
+    await expect(generateClassIntro(params)).resolves.toEqual(compiled);
+    const repair = boundary.generate.mock.calls.find(
+      ([, , options]) => options.jsonSchema.name === 'class_intro_repair'
+    );
+    expect(repair?.[1][0].content).toContain(conflicting);
+    for (const context of reviewContexts()) expect(context).toEqual(compiled);
+  });
+
+  it.each([
+    { label: 'a quoted form', text: '„haben“ steht hier vor dem Partizip.' },
+    {
+      label: 'a later example reference',
+      text: 'Vergleiche „Wir sind gegangen.“ mit diesem Satz.',
+    },
+  ])('preserves $label inside an observation of its selected example', async ({ text }) => {
+    respond({ ...wire, focus: [{ text, exampleIndex: 0 }, wire.focus[1]] });
+    const result = await generateClassIntro(params);
+    expect(result).toEqual({
+      ...compiled,
+      focus: [`„Ich habe gekocht.“: ${text}`, compiled.focus[1]],
+    });
+    for (const context of reviewContexts()) expect(context).toEqual(result);
+  });
+
+  it('keeps an observation bound to an identical target at another index', async () => {
+    const examples = [wire.examples[0]!, { ...wire.examples[0]! }];
+    respond({
+      ...wire,
+      examples,
+      focus: [{ text: compiled.focus[0], exampleIndex: 1 }],
+      tips: [{ text: wire.tips[0]!.text, exampleIndex: 0 }],
+    });
+    const result = await generateClassIntro(params);
+    expect(result.focus).toEqual([compiled.focus[0]]);
+    expect(result.examples.map(({ target }) => target)).toEqual([
+      'Ich habe gekocht.',
+      'Ich habe gekocht.',
+    ]);
+    for (const context of reviewContexts()) expect(context).toEqual(result);
+  });
+
+  it('rejects a semantic patch prefixed by another example without changing accepted fields', async () => {
+    const patch = {
+      focus: { 0: { text: '„Wir sind gegangen.“: Kochen verwendet haben.', exampleIndex: 0 } },
+    };
+    respond(wire, patch, ['focus:0']);
+    await expect(generateClassIntro(params)).rejects.toThrow('educational quality');
+    for (const context of reviewContexts()) expect(context).toEqual(compiled);
+    const repair = boundary.generate.mock.calls.find(
+      ([, , options]) => options.jsonSchema.name === 'class_intro_repair'
+    );
+    expect(Object.keys(repair?.[2].jsonSchema.schema.properties ?? {})).toEqual(['focus']);
+  });
+
   it.each(['about', 'focus', 'tips'] as const)(
     'rejects fresh legacy strings in %s without semantic review',
     async (field) => {
@@ -524,7 +581,9 @@ describe('strict scoped A1 intro wire', () => {
     };
     const patch = {
       about: { exampleIndex: 1 },
-      focus: { 0: { text: 'Das Partizip lautet gefahren.', exampleIndex: 1 } },
+      focus: {
+        0: { text: '„Wir sind gestern gefahren.“: Das Partizip lautet gefahren.', exampleIndex: 1 },
+      },
       tips: { 0: { text: 'Lerne fahren mit sein.', exampleIndex: 1 } },
       examples: { 1: example },
     };

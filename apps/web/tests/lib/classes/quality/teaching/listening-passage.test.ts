@@ -17,6 +17,10 @@ import {
 import { ReviewerProtocolError } from '@/lib/classes/quality/teaching-review-protocol';
 import { listeningRepairPlan as boundListeningRepairPlan } from '@/lib/classes/quality/listening-repair';
 import {
+  applyTeachingScriptRepair,
+  teachingScriptRepairContract,
+} from '@/lib/learning/script/teaching-repair';
+import {
   listeningTurnsFixture,
   listeningExtractionFixture,
   normalizedListeningExtractionFixture,
@@ -155,6 +159,123 @@ function listeningRepairPlan(
 }
 
 describe('listening passage concern adjudication', () => {
+  it.each(['passage-level', 'passage-local', 'question-level'] as const)(
+    'keeps authenticated repair scope appropriate to the rejected field (%s)',
+    async (scenario) => {
+      const turns = [
+        {
+          turnIndex: 1,
+          speaker: 'HOST',
+          text: 'Heute erzählen wir von unserem Ausflug und den vielen Erlebnissen. '
+            .repeat(8)
+            .trim(),
+        },
+        { turnIndex: 2, speaker: 'EXPERT', text: 'Gestern bin ich mit dem Zug gefahren.' },
+        { turnIndex: 3, speaker: 'HOST', text: 'Was hast du danach gemacht?' },
+      ];
+      const items = questions()
+        .slice(0, 1)
+        .map((item) => ({
+          ...item,
+          passageText: turns.map((turn) => `${turn.speaker}: ${turn.text}`).join('\n'),
+        }));
+      const targetIndex = scenario === 'question-level' ? 1 : 0;
+      respond.mockImplementation(async (_system, messages: ChatMessage[], options: AIOptions) => {
+        const packet = JSON.parse(messages[0].content as string) as { items: Row[] };
+        const critic = options.jsonSchema?.name === 'class_teaching_critic';
+        return {
+          model: 'captured',
+          content: JSON.stringify({
+            items: packet.items.map((row) =>
+              critic
+                ? { index: row.index, findings: [] }
+                : {
+                    index: row.index,
+                    criticDecisions: [],
+                    newFindings:
+                      row.index === targetIndex
+                        ? [
+                            {
+                              sourcePartIndex: row.sourceParts.find(
+                                (part) =>
+                                  part.fieldPath[0] ===
+                                  (scenario === 'question-level' ? 'question' : 'passageText')
+                              )!.index,
+                              issue: scenario === 'passage-local' ? 'incorrect' : 'level',
+                              rule: 'Match the supplied learner and content.',
+                              defect:
+                                scenario === 'passage-level'
+                                  ? 'Reduce the passage event load.'
+                                  : 'Correct this field.',
+                              remedy: {
+                                kind: 'correction',
+                                text: 'Use a simpler correct expression.',
+                              },
+                            },
+                          ]
+                        : [],
+                  }
+            ),
+          }),
+        };
+      });
+      const failure = await reviewTeachingContent({
+        ...params,
+        kind: 'listening',
+        items,
+        ai: { provider: 'fixture', model: 'captured', execution: params.execution },
+        provider: {
+          generateResponse: async (system: string, messages: ChatMessage[], options?: AIOptions) =>
+            novelFindingCorroborationFixture(messages as Array<{ content: string }>, options) ??
+            withListeningWitnessFixture(
+              messages as Array<{ content: string }>,
+              options,
+              await respond(system, messages, options)
+            ),
+        } as AIProvider,
+        listeningTurns: turns,
+      }).catch((error: unknown) => error);
+      expect(failure).toBeInstanceOf(TeachingQualityRejectionError);
+      if (!(failure instanceof TeachingQualityRejectionError)) throw failure;
+      const repair = boundListeningRepairPlan(failure, items, undefined, turns);
+      expect(
+        boundListeningRepairPlan(
+          new TeachingQualityRejectionError(['level'], []),
+          items,
+          undefined,
+          turns
+        )
+      ).toBeNull();
+      if (scenario === 'question-level') {
+        expect(repair?.target).toBe('quiz');
+        expect(repair?.turnRepair).toBeUndefined();
+        return;
+      }
+      const scope = repair?.turnRepair;
+      expect(scope?.turnIndices).toEqual(scenario === 'passage-level' ? [1, 2, 3] : [1]);
+      if (!scope) throw new Error('Missing authenticated passage repair scope.');
+      const candidate = {
+        turns: turns.map(({ speaker, text }) => ({ speaker, text, direction: 'calm' })),
+        references: [{ url: 'https://example.com/source', title: 'Preserved source' }],
+      };
+      const contract = teachingScriptRepairContract(candidate, scope);
+      const turnTexts = Object.fromEntries(
+        scope.turnIndices.map((index) => [String(index), `Text ${index}.`])
+      );
+      const repaired = applyTeachingScriptRepair(
+        JSON.stringify({ turnTexts }),
+        contract.schema,
+        candidate
+      );
+      expect(repaired.references).toEqual(candidate.references);
+      expect(repaired.turns.map(({ speaker, direction }) => ({ speaker, direction }))).toEqual(
+        candidate.turns.map(({ speaker, direction }) => ({ speaker, direction }))
+      );
+      expect(repaired.turns[2]!.text).toBe(
+        scenario === 'passage-level' ? 'Text 3.' : turns[2]!.text
+      );
+    }
+  );
   it.each(['proposed', 'discovered'] as const)(
     'rejects and repairs a %s negative relation with no ordinary findings',
     async (origin) => {

@@ -1,5 +1,6 @@
 import { buildListeningSourceUnits } from '../listening-audit/passage-witness';
 import { literalQuestionCompletions } from '../../section-quality';
+import { teachingFindingSource } from '../teaching-review-protocol';
 import type { requestTeachingReview } from '../teaching-quality';
 
 /** Keep source evidence and proposed operands visible without exposing approval labels. */
@@ -36,6 +37,17 @@ export function teachingReviewCandidate(options: Parameters<typeof requestTeachi
             items: options.criticisms.items.map(({ index, findings, passageWitness }) => ({
               index,
               findings,
+              ...(options.introContext
+                ? {
+                    findingSources: findings.map((finding, findingIndex) => ({
+                      findingIndex,
+                      sourceText: teachingFindingSource(
+                        finding,
+                        (options.items[index] as { fields: unknown } | undefined)?.fields
+                      ),
+                    })),
+                  }
+                : {}),
               ...(passageWitness
                 ? {
                     passagePairs: passageWitness.pairs.map((pair) => {

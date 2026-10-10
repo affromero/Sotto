@@ -96,7 +96,12 @@ describe('bounded reading vocabulary protocol repair', () => {
       });
       expect(repair).not.toHaveProperty('correction');
       const review = JSON.parse(generate.mock.calls[2]![1][0].content);
-      expect(review.items[0].content).toMatchObject({ ...word, passageText: question.passageText });
+      const { sourceForm, ...metadata } = word;
+      expect(review.items[0].content).toMatchObject({
+        ...metadata,
+        sourceQuote: sourceForm,
+        passageText: question.passageText,
+      });
       expect(JSON.stringify(logError.mock.calls)).not.toContain(raw);
     }
   );
@@ -235,7 +240,7 @@ describe('bounded reading vocabulary protocol repair', () => {
       });
       expect(result.words[0]?.sourceForm).toBe(expected);
       expect(result.words[0]).not.toHaveProperty('sourceSpan');
-      expect(JSON.parse(generate.mock.calls[1]![1][0].content).items[0].content.sourceForm).toBe(
+      expect(JSON.parse(generate.mock.calls[1]![1][0].content).items[0].content.sourceQuote).toBe(
         expected
       );
     }

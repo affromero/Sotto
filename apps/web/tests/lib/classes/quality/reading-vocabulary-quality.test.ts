@@ -92,13 +92,83 @@ beforeEach(() => {
 });
 
 describe('independent reading vocabulary admission', () => {
+  it.each([
+    {
+      lemma: 'Foto',
+      gloss: 'photo; here, an old photo',
+      pos: 'noun',
+      sourceForm: 'alte Fotos',
+      passageText: 'Im Museum haben wir alte Fotos gesehen.',
+    },
+    {
+      lemma: 'anrufen',
+      gloss: 'to call by telephone',
+      pos: 'verb',
+      sourceForm: 'rufe meine Tante an',
+      passageText: 'Ich rufe meine Tante an.',
+    },
+  ])(
+    'reviews the complete quotation for $lemma without changing stored word identity',
+    async (word) => {
+      const request = {
+        ...options(),
+        items: [{ ...word, questionIndices: [], assessedQuestions: [] }],
+      };
+      const original = structuredClone(request.items);
+      boundary.generate.mockResolvedValue({
+        content: JSON.stringify({ items: [{ index: 0, metadata, associations: [] }] }),
+      });
+      expect(await reviewReadingVocabularyContent(request)).toEqual([[]]);
+      expect(request.items).toEqual(original);
+      const { sourceForm, ...fields } = original[0]!;
+      expect(JSON.parse(boundary.generate.mock.calls[0]![1][0].content)).toEqual({
+        items: [{ index: 0, content: { ...fields, sourceQuote: sourceForm } }],
+      });
+    }
+  );
+
+  it('retains rejected lexical metadata and its original source quotation in private evidence', async () => {
+    const word = {
+      lemma: 'Foto',
+      gloss: 'apple',
+      pos: 'noun',
+      sourceForm: 'alte Fotos',
+      passageText: 'Im Museum haben wir alte Fotos gesehen.',
+      questionIndices: [],
+      assessedQuestions: [],
+    };
+    const rejected = {
+      acceptable: false,
+      issues: ['incorrect'],
+      feedback: ['Foto means photo, not apple.'],
+    };
+    boundary.generate.mockResolvedValue({
+      content: JSON.stringify({ items: [{ index: 0, metadata: rejected, associations: [] }] }),
+    });
+    const failure = await reviewReadingVocabularyContent({ ...options(), items: [word] }).catch(
+      (error: unknown) => error
+    );
+    expect(failure).toBeInstanceOf(TeachingQualityRejectionError);
+    if (!(failure instanceof TeachingQualityRejectionError)) throw failure;
+    expect(failure.issues).toEqual(['incorrect']);
+    const evidence = teachingFailureSchema.parse(failure.teachingFailure);
+    expect(JSON.parse(evidence.reviews[0]!.candidate!)[0]).toMatchObject({
+      ...word,
+      actualReview: { index: 0, metadata: rejected, associations: [] },
+    });
+    expect(JSON.parse(evidence.reviews[0]!.candidate!)[0]).not.toHaveProperty('sourceQuote');
+  });
+
   it('retains only explicitly supported links, preserving proposed input and captured request settings', async () => {
     const request = options();
     const original = structuredClone(request.items);
     expect(await reviewReadingVocabularyContent(request)).toEqual([[1]]);
     expect(request.items).toEqual(original);
     const [system, messages, settings] = boundary.generate.mock.calls[0]!;
-    expect(JSON.parse(messages[0].content)).toEqual({ items: [{ index: 0, content: item }] });
+    const { sourceForm, ...reviewedItem } = item;
+    expect(JSON.parse(messages[0].content)).toEqual({
+      items: [{ index: 0, content: { ...reviewedItem, sourceQuote: sourceForm } }],
+    });
     expect(settings).toMatchObject({
       model: 'captured',
       temperature: 0,

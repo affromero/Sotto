@@ -101,7 +101,10 @@ schema between reading requests and parsing. Initial and replacement responses
 use a structured `words` object. Private source spans use inclusive word indices from the canonical
 `Intl.Segmenter` table for the target language. Both request and parser use the
 same original UTF16 offsets; the parser derives public `sourceForm` strings from
-the exact contiguous passage slice. Empty tables, unsupported languages and
+the exact contiguous passage slice. Metadata review receives these unchanged bytes
+as `sourceQuote`, distinct from the canonical lexical lemma, gloss and part of speech.
+The quotation can contain modifiers or intervening words in a separated construction;
+the reviewed lexical unit must be represented inside it. Empty tables, unsupported languages and
 invalid indices fail closed. Questions and options cannot supply source quotes.
 A first parse rejection may consume the same single replacement as teaching rejection. Its distinct protocol correction carries
 at most 32KiB of untrusted output and static indexed violations. Invalid original
@@ -186,6 +189,10 @@ teaching rejection repairs only raw turn texts bound by its exact source chunks 
 negative witness operands. Other turns, speakers, directions and script metadata
 are preserved through the canonical parser before the complete merged script and
 new quiz are reviewed. Unanchored teaching repair fails closed.
+An authenticated passage-level difficulty finding authorizes text repair in every
+existing turn so the writer can reduce the passage's information load. Speakers,
+directions, turn count and script metadata remain protected by the same compiler.
+Other passage findings keep their source-bound local turn scope.
 An unchanged rejected transcript remains rejected. Findings confined to quiz fields
 preserve the script and regenerate its quiz with indexed teaching feedback.
 Both blind and teaching checks run again on the replacement. Mixed rejection or a

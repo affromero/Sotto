@@ -81,6 +81,7 @@ export async function reviewReadingVocabularyContent(options: {
   };
   const content = await requestTeachingReview({
     ...options,
+    items: options.items.map(({ sourceForm, ...item }) => ({ ...item, sourceQuote: sourceForm })),
     prompt: 'class/review-reading-vocabulary.md',
     jsonSchema,
     variables: {

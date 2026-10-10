@@ -67,6 +67,7 @@ function queueResponses(responses: readonly unknown[]) {
 async function reviewedIntro(callIndex: number) {
   const [system, messages, options] = boundary.generate.mock.calls[callIndex]!;
   const { introContext, items, criticisms } = JSON.parse(messages[0].content);
+  for (const item of criticisms.items) delete item.findingSources;
   const addresses = items.map(({ content }: { content: { address: unknown } }) => content.address);
   const response = await boundary.generate.mock.results[callIndex]!.value;
   const adjudicator = parseTeachingAdjudicatorResponse(

@@ -35,6 +35,7 @@ vi.mock('@/lib/usage-logger', () => ({ logUsage: vi.fn() }));
 
 import { generateClassIntro } from '@/lib/classes/class-intro';
 import { createAIProvider } from '@/lib/providers/ai';
+import { teachingFindingSource } from '@/lib/classes/quality/teaching-review-protocol';
 import {
   getIntroRepairPlan,
   ReviewerProtocolError,
@@ -96,7 +97,13 @@ type AuditItem = {
 type Payload = {
   introContext: typeof intro;
   items: AuditItem[];
-  criticisms?: { items: Array<{ index: number; findings: Finding[] }> };
+  criticisms?: {
+    items: Array<{
+      index: number;
+      findings: Finding[];
+      findingSources: Array<{ findingIndex: number; sourceText: string }>;
+    }>;
+  };
 };
 const scopeCriticism: Finding = {
   issue: 'incorrect',
@@ -181,6 +188,106 @@ beforeEach(() => {
 });
 
 describe('evidence-bound intro review', () => {
+  it.each([
+    { fields: {}, path: ['example', 'note'] },
+    { fields: { example: { note: 3 } }, path: ['example', 'note'] },
+    { fields: { example: { note: 'Other text.' } }, path: ['example', 'note'] },
+    {
+      fields: { example: Object.create({ note: 'The supplied note.' }) },
+      path: ['example', 'note'],
+    },
+    { fields: { notes: ['The supplied note.'] }, path: ['notes', '01'] },
+  ])('rejects missing or foreign full-field evidence %#', ({ fields, path }) => {
+    expect(() =>
+      teachingFindingSource(
+        { ...scopeCriticism, fieldPath: path, quote: 'The supplied note.' },
+        fields
+      )
+    ).toThrow(ReviewerProtocolError);
+  });
+
+  it.each(['dismissed', 'supported'] as const)(
+    'supplies the complete note beside an anchored criticism and preserves its %s verdict',
+    async (decision) => {
+      const note =
+        decision === 'dismissed'
+          ? '„Ich habe gestern eine Ausstellung besucht.“: „Habe“ ist das Hilfsverb; „besucht“ ist das Partizip. Beide Verben passen hier zu „besuchen“.'
+          : '„Ich habe gestern eine Ausstellung besucht.“: „Habe“ ist das Hilfsverb; „besucht“ ist das Partizip. Beide Formen gehören zum Vollverb „besuchen“.';
+      const candidate = {
+        ...intro,
+        examples: [
+          {
+            target: 'Ich habe gestern eine Ausstellung besucht.',
+            meaning: 'Ich habe gestern eine Ausstellung besucht.',
+            note,
+          },
+          intro.examples[1]!,
+        ],
+      };
+      const criticism: Finding = {
+        issue: 'incorrect',
+        fieldPath: ['example', 'note'],
+        quote: '„besuchen“.',
+        rule: 'Distinguish the auxiliary from forms of the lexical verb.',
+        defect: 'The note assigns the auxiliary to the lexical verb.',
+        correction: '„Habe“ ist eine Form von „haben“, „besucht“ eine Form von „besuchen“.',
+        counterexample: null,
+      };
+      let adjudicatorPayload: Payload | undefined;
+      boundary.generate.mockImplementation(async (_system, messages, options) => {
+        const payload: Payload = JSON.parse(messages[0].content);
+        if (options.jsonSchema.name === 'class_intro_critic')
+          return response(
+            critic(payload, (item) =>
+              item.content.address.field === 'examples' && item.content.address.index === 0
+                ? [criticism]
+                : []
+            )
+          );
+        if (payload.criticisms!.items.some((item) => item.findings.length))
+          adjudicatorPayload = payload;
+        const verdict = judge(payload);
+        for (const item of verdict.items)
+          for (const entry of item.criticDecisions) {
+            entry.decision = decision;
+            entry.reason =
+              decision === 'dismissed'
+                ? 'The complete note already identifies both different grammatical roles.'
+                : 'The final sentence falsely assigns habe to the lexical verb besuchen.';
+          }
+        return response(verdict);
+      });
+      const outcome = reviewTeachingContent({
+        ...params,
+        ai: await boundary.resolve(),
+        provider: createAIProvider('fixture'),
+        kind: 'intro',
+        items: [candidate],
+      });
+      const failure = await outcome.catch((error: unknown) => error);
+      const projected = adjudicatorPayload!.criticisms!.items.find((item) => item.findings.length)!;
+      expect(projected.findingSources).toEqual([{ findingIndex: 0, sourceText: note }]);
+      expect(projected.findings[0]!.quote).not.toContain('Hilfsverb');
+      expect(projected.findingSources[0]!.sourceText).toContain('Hilfsverb');
+      expect(projected.findingSources[0]!.sourceText).toContain('Partizip');
+      expect(projected.findings[0]!.fieldPath).toEqual(criticism.fieldPath);
+      expect(adjudicatorPayload!.introContext).toEqual(candidate);
+      if (decision === 'dismissed') {
+        expect(failure).toBeUndefined();
+        return;
+      }
+      expect(failure).toBeInstanceOf(TeachingQualityRejectionError);
+      if (!(failure instanceof TeachingQualityRejectionError)) throw failure;
+      const evidence = JSON.parse(failure.teachingFailure!.reviews[0]!.candidate!)[0];
+      const packet = evidence.reviewPackets.find((entry: { offset: number }) => entry.offset === 5);
+      expect(
+        packet.critic.items.find((item: { findings: Finding[] }) => item.findings.length)
+      ).toEqual({ index: projected.index, findings: projected.findings });
+      expect(packet.adjudicator.items[projected.index].acceptable).toBe(false);
+      expect(packet.adjudicator.items[projected.index].findings).toEqual(projected.findings);
+    }
+  );
+
   it('dismisses the actual missing-scope criticism when the claim already supplies scope', async () => {
     boundary.generate.mockImplementation(async (_system, messages, options) => {
       const payload: Payload = JSON.parse(messages[0].content);

@@ -187,7 +187,14 @@ function compileScopedAtom(
   examples: readonly ClassIntroExample[]
 ): string | null {
   const example = examples[atom.exampleIndex];
-  return example ? frameInstruction(atom.text, example.target) : null;
+  if (!example) return null;
+  if (
+    examples.some(
+      ({ target }) => target !== example.target && atom.text.startsWith(`„${target}“: `)
+    )
+  )
+    return null;
+  return frameInstruction(atom.text, example.target);
 }
 
 function compileAboutReference(
@@ -738,11 +745,11 @@ export async function generateClassIntro(p: ClassIntroParams): Promise<ClassIntr
     INTRO_SCHEMA: JSON.stringify(protocol.generationResponseFormat.schema),
     INTRO_EXAMPLE: JSON.stringify(
       immersion
-        ? { target: `<${p.targetLang} example>`, note: '<short teaching note>' }
+        ? { target: `<${p.targetLang} example>`, note: '<one concrete form or use observation>' }
         : {
             target: `<${p.targetLang} example>`,
             meaning: '<faithful meaning under the A1 policy>',
-            note: '<short teaching note>',
+            note: '<one concrete form or use observation>',
           }
     ),
     LANGUAGE_POLICY: classLanguagePolicy({

@@ -481,7 +481,7 @@ describe('reading vocabulary extraction', () => {
         .slice(5)
         .map((call) =>
           JSON.parse(call[1][0].content).items.map(
-            (item: { content: { sourceForm: string } }) => item.content.sourceForm
+            (item: { content: { sourceQuote: string } }) => item.content.sourceQuote
           )
         )
     ).toEqual(
