@@ -105,7 +105,7 @@ export async function startProvider() {
             input.items[0].index !== 0 ||
             input.items[0].content.lemma !== 'Hallo' ||
             input.items[0].content.gloss !== 'hello' ||
-            input.items[0].content.sourceForm !== 'Hallo' ||
+            input.items[0].content.sourceQuote !== 'Hallo' ||
             input.items[0].content.passageText !== 'Anna sagt Hallo zu ihrem Freund.'
           ) {
             throw new Error('Unexpected vocabulary review fixture');
