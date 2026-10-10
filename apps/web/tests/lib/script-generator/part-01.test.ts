@@ -176,6 +176,7 @@ describe('generateScript', () => {
           expect(providerInstruction).toContain('Hard Minimum Reference Count');
           expect(providerInstruction).toContain('cliffhanger');
         } else {
+          expect(providerInstruction).toContain('An ordinary conversation partner');
           expect(providerInstruction).not.toMatch(/Hard Minimum Reference Count|cliffhanger/);
           expect(providerInstruction).not.toContain('pop culture references');
         }

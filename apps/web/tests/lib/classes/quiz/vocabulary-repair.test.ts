@@ -44,7 +44,7 @@ describe('bounded selective vocabulary repair', () => {
     async ({ malformed, finalReject }) => {
       const generationTargets: number[][] = [];
       const blindInputs: Array<Array<{ question: string; options: string[] }>> = [];
-      const keyedInputs: unknown[][] = [];
+      const keyedInputs: Array<Array<{ content: GeneratedQuestion }>> = [];
       boundary.generate.mockReset();
       boundary.generate.mockImplementation(
         async (
@@ -124,13 +124,21 @@ describe('bounded selective vocabulary repair', () => {
       expect(blindInputs.map((items) => items.length)).toEqual([5, 5]);
       expect(blindInputs[1].slice(0, 4)).toEqual(blindInputs[0].slice(0, 4));
       expect(blindInputs[1][4].question).toContain('the revised meaningful sentence 4');
+      for (const [items, blind] of [
+        [keyedInputs[0], blindInputs[0]],
+        [keyedInputs.at(-1)!, blindInputs[1]],
+      ] as const)
+        expect(items.map(({ content: { question, options } }) => ({ question, options }))).toEqual(
+          blind.map(({ question, options }) => ({ question, options }))
+        );
       if (finalReject) {
         expect(result).toBeUndefined();
-        expect(keyedInputs).toEqual([]);
         return;
       }
       expect(result?.[4].options[0]).toBe('gestern');
-      expect(keyedInputs.map((items) => items.length)).toEqual([5, 5]);
+      expect(keyedInputs.at(-1)!.map(({ content }) => content)).toEqual(
+        JSON.parse(JSON.stringify(result))
+      );
     }
   );
   it('selects original target identities and refuses incomplete or global review authority', () => {

@@ -12,6 +12,7 @@ import { LANGUAGE_DISPLAY } from '@sotto/shared';
 import type { SectionReviewFeedback } from './classes/section-quality';
 import type { GeneratedQuestion } from './class-generation';
 import type { ListeningTeachingRepair } from './classes/quality/listening-repair';
+import * as authoringContext from './learning/script/authoring-context';
 import {
   alignScriptVocabularyMarkers,
   type ScriptOutputProtocolFailure,
@@ -584,7 +585,7 @@ Rules:
 
   const requiredItems = opts?.mustIncludeVocabulary?.length
     ? `\n\n## REQUIRED review items (from the learner's spaced-repetition queue)
-These are lexical review targets, not mandatory verbatim sentence fragments. Write complete natural sentences before adding markers. Keep each target unchanged as a vocabulary entry; its numbered marker contains the actual grammatical surface already present in the sentence. A noun's dictionary article need not appear inside the marker, and a verb may appear in its inflected form. Never splice a dictionary article or base form into an incompatible surrounding phrase or add a spoken dictionary citation merely to repeat the entry verbatim. Prioritize these targets for anticipation and recall:
+These are lexical review targets, not mandatory verbatim sentence fragments. Write complete natural sentences before adding markers. Keep each target unchanged as a vocabulary entry; its numbered marker contains the actual grammatical surface already present in the sentence. A noun's dictionary article need not appear inside the marker, and a verb may appear in its inflected form. Never splice a dictionary article or base form into an incompatible surrounding phrase or add a spoken dictionary citation merely to repeat the entry verbatim. ${authoringContext.scriptReviewTargetInstruction(mode, opts.forLearning)}:
 ${opts.mustIncludeVocabulary.map((v) => `- ${v.word} — ${v.translation}`).join('\n')}`
     : '';
 
@@ -647,13 +648,11 @@ export async function generateScript(params: {
   const speakers = params.speakers ?? [
     {
       name: 'HOST',
-      description:
-        'Warm, curious, asks great questions, guides the conversation. Represents the listener. Reacts naturally — laughs, expresses surprise, interjects with short reactions.',
+      description: authoringContext.scriptSpeakerDescription('HOST', params.forLearning),
     },
     {
       name: 'EXPERT',
-      description:
-        'Knowledgeable, vivid storyteller, uses analogies, examples, and occasionally humor. Explains complex topics in ways that create "aha" moments.',
+      description: authoringContext.scriptSpeakerDescription('EXPERT', params.forLearning),
     },
   ];
   const speakerCount = speakers.length;
@@ -720,8 +719,8 @@ export async function generateScript(params: {
       });
 
   let userMessage = params.sourceContent
-    ? `Topic: ${params.topic}\nDepth: ${params.depth}\n\n${formatSourceBlock(params.sourceContent, params.sourceMetadata)}`
-    : `Topic: ${params.topic}\nDepth: ${params.depth}`;
+    ? `${authoringContext.scriptObjectiveInstruction(params.topic, params.forLearning)}\nDepth: ${params.depth}\n\n${formatSourceBlock(params.sourceContent, params.sourceMetadata)}`
+    : `${authoringContext.scriptObjectiveInstruction(params.topic, params.forLearning)}\nDepth: ${params.depth}`;
 
   let turnContract: ReturnType<typeof teachingScriptRepairContract> | undefined;
   if (params.learningRepair) {

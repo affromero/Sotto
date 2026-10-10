@@ -16,6 +16,7 @@ import {
   listeningExtractionFixture,
   normalizedListeningExtractionFixture,
   withListeningWitnessFixture,
+  listeningNarrativeExtractionFixture,
 } from './witness-fixture';
 
 const turns = normalizeListeningTurns([{ speaker: 'HOST', text: 'Lea fährt nach Bonn.' }]);
@@ -71,7 +72,12 @@ describe('declared listening provider fixtures', () => {
       model: 'fixture',
       content: JSON.stringify({
         items: [
-          { index: 0, findings: [], passageWitness: normalizedListeningExtractionFixture(turns) },
+          {
+            index: 0,
+            findings: [],
+            passageWitness: normalizedListeningExtractionFixture(turns),
+            narrativeWitness: listeningNarrativeExtractionFixture(turns),
+          },
         ],
       }),
     };
@@ -92,6 +98,7 @@ describe('declared listening provider fixtures', () => {
             index: 0,
             findings: [],
             passageWitness: listeningExtractionFixture(turns),
+            narrativeWitness: listeningNarrativeExtractionFixture(turns),
             unexpected: true,
           },
         ],
@@ -246,7 +253,14 @@ describe('declared listening provider fixtures', () => {
   it('declares an empty judge witness only for an explicitly empty extracted pair set', () => {
     const critic = parseTeachingCriticResponse(
       JSON.stringify({
-        items: [{ index: 0, findings: [], passageWitness: listeningExtractionFixture(turns) }],
+        items: [
+          {
+            index: 0,
+            findings: [],
+            passageWitness: listeningExtractionFixture(turns),
+            narrativeWitness: listeningNarrativeExtractionFixture(turns),
+          },
+        ],
       }),
       fields,
       false,
@@ -302,6 +316,7 @@ describe('declared listening provider fixtures', () => {
         {
           index: 0,
           findings: [],
+          narrativeWitness: listeningNarrativeExtractionFixture(turns),
           passageWitness: {
             ...listeningExtractionFixture(turns),
             pairs: [

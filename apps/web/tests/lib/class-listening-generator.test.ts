@@ -251,7 +251,7 @@ describe('generateClassListening', () => {
       );
     });
 
-    it('shares spoken review policy while preserving annotated turns for persistence and audio', async () => {
+    it('shares the supported listening task while preserving annotated turns for persistence and audio', async () => {
       setupHappyPath();
       const { loadAndRender } =
         await vi.importActual<typeof import('@/lib/prompt-loader')>('@/lib/prompt-loader');
@@ -269,8 +269,22 @@ describe('generateClassListening', () => {
       const blindInput = JSON.parse(mockBlindResponse.mock.calls[0][1][0].content);
       const teachingInput = JSON.parse(mockTeachingResponse.mock.calls[0][1][0].content);
       const policy = classListeningTranscriptPolicy(PARAMS);
-      for (const reviewer of [mockBlindResponse, mockTeachingCriticResponse, mockTeachingResponse])
+      for (const reviewer of [
+        mockBlindResponse,
+        mockTeachingCriticResponse,
+        mockTeachingResponse,
+      ]) {
         expect(reviewer.mock.calls[0][0]).toContain(policy);
+        expect(reviewer.mock.calls[0][0]).toContain('learners can pause and replay the audio');
+        expect(reviewer.mock.calls[0][0]).toContain(
+          'multiple-choice questions are visible before answering'
+        );
+        expect(reviewer.mock.calls[0][0]).toContain('Do not assume a learner-visible transcript');
+        expect(reviewer.mock.calls[0][0]).toContain(
+          'actual audio delivery requires separate verification'
+        );
+        expect(reviewer.mock.calls[0][0]).toContain('Cite the actual wording or dependency');
+      }
       expect(blindInput.passage).toBe(
         'HOST: hola, estos verbos usan «haber» en el pretérito perfecto. Aquí «hablado» es una forma de «hablar», no el infinitivo.'
       );

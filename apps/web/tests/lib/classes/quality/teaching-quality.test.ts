@@ -137,7 +137,7 @@ describe('intro teaching gate', () => {
   );
 
   it.each(['A1', 'A2'])(
-    'keeps the shared spoken policy and written quiz fields in both %s listening reviews',
+    'keeps task-relative difficulty and written quiz fields in both %s listening reviews',
     async (level) => {
       const turn = {
         turnIndex: 1,
@@ -179,6 +179,7 @@ describe('intro teaching gate', () => {
         )!;
         const input = JSON.parse(messages[0].content);
         expect(system).toContain(policy);
+        expect(system).toContain('A passage-only review must not invent a recall task');
         expect(input.listeningTurns).toEqual([turn]);
         expect(input.items.map((item: { content: unknown }) => item.content)).toEqual(
           name === 'class_teaching_critic' ? [{ passageText }] : [{ passageText }, question]

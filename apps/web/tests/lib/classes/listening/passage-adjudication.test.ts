@@ -131,7 +131,7 @@ describe('canonical listening passage adjudication orchestration', () => {
   });
 
   it.each([false, true])(
-    'keeps oversized rejected replacements terminal without publication (unchanged script: %s)',
+    'retains compact rejected evidence without publication (unchanged script: %s)',
     async (unchanged) => {
       supported = true;
       alwaysReject = true;
@@ -140,12 +140,48 @@ describe('canonical listening passage adjudication orchestration', () => {
         (error: unknown) => error
       );
       if (!(failure instanceof TeachingQualityRejectionError)) throw failure;
-      expect(
-        failure.teachingFailure!.reviews.every(
-          (review) => review.candidate === null && review.omitted === 'size_limit'
-        )
-      ).toBe(true);
       expect(failure.teachingFailure!.reviews).toHaveLength(unchanged ? 1 : 2);
+      for (const [index, review] of failure.teachingFailure!.reviews.entries()) {
+        const text =
+          (index === 0 ? original : replacement) + ' Lea erzählt von ihrer Reise.'.repeat(300);
+        expect(review).not.toHaveProperty('omitted');
+        expect(JSON.parse(review.candidate!)).toEqual([
+          {
+            reviewContract: 'listening_candidate_diagnostic',
+            listeningAudit: {
+              turns: [{ turnIndex: 1, speaker: 'HOST', text }],
+              addresses: [
+                { kind: 'passage' },
+                { kind: 'question', index: 0 },
+                { kind: 'question', index: 1 },
+                { kind: 'question', index: 2 },
+                { kind: 'question', index: 3 },
+              ],
+              items: [
+                { passageText: `HOST: ${text}` },
+                ...JSON.parse(SAMPLE_QUESTIONS_JSON).questions,
+              ],
+            },
+            listeningSource: formatSourceBlock(source),
+          },
+        ]);
+        expect(review.verdict).toEqual({
+          items: [
+            {
+              index: 0,
+              acceptable: false,
+              issues: ['unsupported'],
+              feedback: [`The destination differs from the source. Correction: ${replacement}`],
+            },
+            ...[1, 2, 3, 4].map((questionIndex) => ({
+              index: questionIndex,
+              acceptable: true,
+              issues: [],
+              feedback: [],
+            })),
+          ],
+        });
+      }
       expect(scripts).toEqual([original, replacement]);
       expect(mockScriptCreate).not.toHaveBeenCalled();
       expect(mockClassSectionCreate).not.toHaveBeenCalled();

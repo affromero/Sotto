@@ -29,6 +29,10 @@ import {
   supportedMeaningDifferenceRule,
   listeningUnitAccountLimitRule,
 } from '@/lib/classes/quality/listening-audit/passage-witness';
+import {
+  listeningNarrativeExtractionFixture,
+  listeningNarrativeWitnessFixture,
+} from '../../../listening/witness-fixture';
 
 function fixture() {
   const turns = [
@@ -59,6 +63,7 @@ function fixture() {
       {
         index: 0,
         findings: [],
+        narrativeWitness: listeningNarrativeExtractionFixture(turns),
         passageWitness: {
           unitAccounts: {
             '0': 'The speaker intends to visit Lea but says they have visited her.',
@@ -76,6 +81,7 @@ function fixture() {
           index: 0,
           criticDecisions: [],
           newFindings: [],
+          narrativeWitness: listeningNarrativeWitnessFixture(turns),
           passageWitness: {
             pairDecisions: [
               {

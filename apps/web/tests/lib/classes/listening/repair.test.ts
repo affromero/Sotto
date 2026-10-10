@@ -248,7 +248,7 @@ describe('bounded canonical listening correction', () => {
     ).toBeNull();
   });
 
-  it('repairs an omitted diagnostic candidate but still rejects an unchanged replacement', async () => {
+  it('retains compact diagnostics but still rejects an unchanged replacement', async () => {
     rejectSpokenDefect();
     mockGenerateResponse.mockImplementation(async (...args) => ({
       content:
@@ -262,10 +262,12 @@ describe('bounded canonical listening correction', () => {
     }));
     const error = await generateClassListening(PARAMS).catch((value) => value);
     expect(error).toBeInstanceOf(TeachingQualityRejectionError);
-    expect(error.teachingFailure.reviews[0]).toMatchObject({
-      candidate: null,
-      omitted: 'size_limit',
-    });
+    const diagnostic = error.teachingFailure.reviews[0];
+    expect(diagnostic).not.toHaveProperty('omitted');
+    expect(JSON.parse(diagnostic.candidate)[0].listeningAudit.items).toEqual([
+      { passageText: `HOST: ${firstText + ' Hallo.'.repeat(1500)}` },
+      ...JSON.parse(SAMPLE_QUESTIONS_JSON).questions,
+    ]);
     expect(scriptRequests()).toHaveLength(2);
     noLearningPublication();
   });

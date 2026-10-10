@@ -12,6 +12,10 @@ import {
 } from './listening-audit/passage-witness';
 import { listeningSourcePartTurnIndices } from './listening-audit/source-units';
 import {
+  listeningNarrativeRepairFindings,
+  listeningNarrativeRepairTurnIndices,
+} from './listening-audit/narrative-witness';
+import {
   authenticListeningTeachingReview,
   type TeachingQualityRejectionError,
 } from './teaching-quality';
@@ -136,7 +140,7 @@ export function listeningRepairPlan(
         ))
           turnIndices.add(index);
       }
-      if (row.passageWitness && !turns) return null;
+      if ((row.passageWitness || row.narrativeWitness) && !turns) return null;
       const witnessFindings = row.passageWitness
         ? listeningPassageWitnessRepairFindings(
             row.passageWitness,
@@ -151,7 +155,24 @@ export function listeningRepairPlan(
           turns!
         ))
           turnIndices.add(index);
-      findings.push({ index: row.index, findings: [...row.findings, ...witnessFindings] });
+      const narrativeFindings = row.narrativeWitness
+        ? listeningNarrativeRepairFindings(
+            row.narrativeWitness,
+            envelope.listeningAudit!.items[0],
+            turns!
+          )
+        : [];
+      if (row.narrativeWitness)
+        for (const index of listeningNarrativeRepairTurnIndices(
+          row.narrativeWitness,
+          envelope.listeningAudit!.items[0],
+          turns!
+        ))
+          turnIndices.add(index);
+      findings.push({
+        index: row.index,
+        findings: [...row.findings, ...witnessFindings, ...narrativeFindings],
+      });
     }
   } catch {
     return null;

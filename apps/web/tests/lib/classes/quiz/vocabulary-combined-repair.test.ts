@@ -240,10 +240,14 @@ describe('combined vocabulary structural and meaning repair', () => {
     async (defect) => {
       finalDefect = defect;
       await expect(generateSectionQuestions(params)).rejects.toBeInstanceOf(SectionQualityError);
-      expect(requests.filter(({ name }) => name.startsWith('class_teaching_'))).toEqual([]);
       const final = requests.filter(({ name }) => name === 'class_section_quality').at(-1)!
         .input as { questions: BlindQuestion[] };
       expect(final.questions[defect === 'seen_done' ? 0 : 3].options).toContain('gesehen');
+      const teaching = requests.filter(({ name }) => name === 'class_teaching_adjudicator').at(-1)!
+        .input as { items: TeachingItem[] };
+      expect(
+        teaching.items.map(({ content: { question, options } }) => ({ question, options }))
+      ).toEqual(final.questions.map(({ question, options }) => ({ question, options })));
     }
   );
 

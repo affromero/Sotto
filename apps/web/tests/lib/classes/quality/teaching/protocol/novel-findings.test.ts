@@ -21,10 +21,15 @@ import {
   listeningExtractionFixture,
   listeningTurnsFixture,
   listeningWitnessFixture,
+  listeningNarrativeExtractionFixture,
+  listeningNarrativeWitnessFixture,
 } from '../../../listening/witness-fixture';
 import { intro } from '../fixture';
 import { loadAndRender } from '@/lib/prompt-loader';
-import { classIntroGrammarRulePolicy } from '@/lib/classes/class-language-policy';
+import {
+  classIntroGrammarRulePolicy,
+  classListeningTranscriptPolicy,
+} from '@/lib/classes/class-language-policy';
 
 const binding = vi.hoisted(() => ({ database: null as PrismaClient | null }));
 vi.mock('@/lib/prisma', async () => {
@@ -242,6 +247,14 @@ suite('independent corroboration of novel teaching findings', () => {
           return {
             index: row.index,
             ...(support ? { answerSupport: support } : {}),
+            ...(row.index === 0 && payload.listeningTurns
+              ? {
+                  narrativeWitness:
+                    schema === 'class_teaching_critic'
+                      ? listeningNarrativeExtractionFixture(payload.listeningTurns)
+                      : listeningNarrativeWitnessFixture(payload.listeningTurns),
+                }
+              : {}),
             ...(schema === 'class_teaching_critic' && row.index === 0 && payload.listeningTurns
               ? { passageWitness: listeningExtractionFixture(payload.listeningTurns) }
               : schema === 'class_teaching_adjudicator' && row.index === 0 && payload.listeningTurns
@@ -458,6 +471,14 @@ suite('independent corroboration of novel teaching findings', () => {
       const packet = JSON.parse(error.teachingFailure!.reviews[0].candidate!)[0].reviewPackets[0];
       expect(packet.adjudicator.items[0].acceptable).toBe(false);
       expect(packet.adjudicator.items[0].findings).toEqual([]);
+      if (negative === 'listening') {
+        const policy = classListeningTranscriptPolicy({
+          level: 'A2',
+          nativeLang: 'en',
+          targetLang: 'de',
+        });
+        for (const request of requests) expect(request.system).toContain(policy);
+      }
       const proof = teachingNovelFindingReceipts(ai)[packet.novelFindingCorroboration.receiptIndex];
       expect(
         packet.adjudicator.items[0][negative === 'reading' ? 'answerSupport' : 'passageWitness']

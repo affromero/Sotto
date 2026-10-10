@@ -18,6 +18,10 @@ import {
   listeningPassageWitnessRepairFindings,
   supportedMeaningDifferenceRule,
 } from '@/lib/classes/quality/listening-audit/passage-witness';
+import {
+  listeningNarrativeExtractionFixture,
+  listeningNarrativeWitnessFixture,
+} from './witness-fixture';
 
 function fixture(negative = true) {
   const turns = [
@@ -75,8 +79,19 @@ function fixture(negative = true) {
     remedy: negative ? { kind: 'correction', text: 'Ich möchte meine Freundin besuchen.' } : null,
   };
   const judgment = { pairDecisions: [compared], additionalPairs: [] };
-  const passageCritic = { index: 0, findings: [], passageWitness: extraction };
-  const passageJudge = { index: 0, criticDecisions: [], newFindings: [], passageWitness: judgment };
+  const passageCritic = {
+    index: 0,
+    findings: [],
+    passageWitness: extraction,
+    narrativeWitness: listeningNarrativeExtractionFixture(turns),
+  };
+  const passageJudge = {
+    index: 0,
+    criticDecisions: [],
+    newFindings: [],
+    passageWitness: judgment,
+    narrativeWitness: listeningNarrativeWitnessFixture(turns),
+  };
   const questionCritic = { index: 1, findings: [] };
   const questionJudge = { index: 1, criticDecisions: [], newFindings: [] };
   return {

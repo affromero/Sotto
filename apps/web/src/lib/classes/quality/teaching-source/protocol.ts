@@ -9,6 +9,14 @@ import {
   listeningPassageWitnessResponseSchema,
 } from '../listening-audit/passage-witness';
 import { buildListeningAudit, type NormalizedListeningTurn } from '../listening-audit/projection';
+import {
+  buildListeningSourceUnits,
+  retainListeningSourceBinding,
+} from '../listening-audit/source-units';
+import {
+  listeningNarrativeExtractionResponseSchema,
+  listeningNarrativeWitnessResponseSchema,
+} from '../listening-audit/narrative-witness';
 
 export type TeachingSourcePart = { index: number; fieldPath: string[]; quote: string };
 
@@ -133,6 +141,17 @@ export function privateTeachingCriticSchema(
                   ...(reading ? { answerSupport: readingAnswerSupportSchema(fields[index]) } : {}),
                   ...(listeningTurns && index === 0
                     ? {
+                        narrativeWitness: listeningNarrativeExtractionResponseSchema(
+                          fields[index],
+                          listeningTurns,
+                          retainListeningSourceBinding(
+                            buildListeningSourceUnits(
+                              fields[index],
+                              listeningTurns,
+                              listeningTargetLang!
+                            )
+                          )
+                        ),
                         passageWitness: listeningPassageExtractionResponseSchema(
                           fields[index],
                           listeningTurns,
@@ -203,6 +222,11 @@ export function privateTeachingAdjudicatorSchema(
                   ...(reading ? { answerSupport: readingAnswerSupportSchema(field) } : {}),
                   ...(listeningTurns && index === 0
                     ? {
+                        narrativeWitness: listeningNarrativeWitnessResponseSchema(
+                          field,
+                          listeningTurns,
+                          critic.items.find((item) => item.index === 0)!.narrativeWitness!
+                        ),
                         passageWitness: listeningPassageWitnessResponseSchema(
                           field,
                           listeningTurns,
