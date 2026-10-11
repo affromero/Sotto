@@ -10,6 +10,7 @@ import { getAiProviderIdsWithPricing } from './providers/ai-registry';
 import { knownTokenSum } from 'thesidedoor-core/ai/usage';
 import { metricEventSchema } from 'thesidedoor-core/observability';
 import { randomUUID } from 'node:crypto';
+import { formatAgentModelId, parseAgentModelId } from './agent-models/id';
 
 const AI_SERVICES: Set<string> = new Set(getAiProviderIdsWithPricing());
 
@@ -44,6 +45,25 @@ export async function logUsage(params: {
   }
 
   try {
+    const agentSelection =
+      params.model && (params.service === 'codex' || params.service === 'claude-code')
+        ? parseAgentModelId(params.model, params.service)
+        : null;
+    if (params.model && (params.service === 'codex' || params.service === 'claude-code')) {
+      if (!agentSelection || agentSelection.provider !== params.service)
+        throw new Error('Usage model must match its CLI provider');
+      const canonical = formatAgentModelId(
+        agentSelection.provider,
+        agentSelection.model,
+        agentSelection.effort
+      );
+      if (
+        params.model !== canonical &&
+        (!agentSelection.model || params.model !== canonical.slice(params.service.length + 1))
+      )
+        throw new Error('Usage model must be a canonical CLI selection');
+    }
+    const metricModel = agentSelection ? (agentSelection.model ?? params.service) : params.model;
     const metric = metricEventSchema.parse({
       version: 1,
       id: randomUUID(),
@@ -52,7 +72,7 @@ export async function logUsage(params: {
       operation: params.category,
       outcome: 'success',
       provider: params.service,
-      ...(params.model ? { model: params.model } : {}),
+      ...(metricModel ? { model: metricModel } : {}),
       ...(params.userId ? { consumerId: params.userId } : {}),
       durationMs: params.durationMs ?? null,
       inputTokens: params.inputTokens ?? null,
@@ -74,6 +94,7 @@ export async function logUsage(params: {
           userId: params.userId ?? null,
           metadata: {
             ...(params.metadata ?? {}),
+            ...(agentSelection ? { agentModelSelection: { ...agentSelection } } : {}),
             sidedoorMetric: metric,
           } as Prisma.InputJsonValue,
         },
