@@ -8,6 +8,7 @@ import signal
 import shutil
 import socket
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -204,7 +205,8 @@ class OverlapMemoryTests(unittest.TestCase):
             PROCESSES.require_overlap_memory('MemTotal: 1000 kB\nMemAvailable: 500 kB\n', 0)
 
 
-@unittest.skipUnless(shutil.which('node'), 'Node is required for the executable contract')
+@unittest.skipUnless(sys.platform == 'linux' and shutil.which('node'),
+                     'Linux procfd traversal and Node are required for the executable contract')
 class RollingContractTests(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory(prefix='sotto-rolling-contract-')
@@ -277,6 +279,61 @@ class RollingContractTests(unittest.TestCase):
         result = self.contract()
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(result.stdout, '')
+
+    def test_replaced_authority_path_reads_the_original_open_file(self):
+        before = self.digest()
+        target = self.root / 'apps/web/src/lib/sidedoor/authority.ts'
+        outside = self.root / 'outside-authority.ts'
+        outside.write_text('malicious authority outside the executable contract\n')
+        self.source = '''(() => {
+  const boundary = require('node:fs');
+  const originalRead = boundary.readFileSync;
+  const target = %s;
+  boundary.readFileSync = function (input, ...options) {
+    const actual = typeof input === 'number'
+      ? boundary.readlinkSync('/proc/self/fd/' + input) : String(input);
+    if (actual === target && !boundary.lstatSync(target).isSymbolicLink()) {
+      boundary.unlinkSync(target);
+      boundary.symlinkSync(%s, target);
+    }
+    return originalRead.call(this, input, ...options);
+  };
+})();
+''' % (json.dumps(str(target)), json.dumps(str(outside))) + self.source
+        self.assertEqual(self.digest(), before)
+        self.assertTrue(target.is_symlink())
+        self.assertEqual(target.resolve(), outside)
+        self.assertEqual(target.read_text(), outside.read_text())
+
+    def test_replaced_authority_directory_enumerates_the_original_open_directory(self):
+        before = self.digest()
+        target = self.root / 'apps/web/src/lib/sidedoor'
+        retained = self.root / 'original-authority-directory'
+        outside = self.root / 'outside-authority-directory'
+        outside.mkdir()
+        (outside / 'authority.ts').write_text('malicious replacement authority\n')
+        self.source = '''(() => {
+  const boundary = require('node:fs');
+  const originalRead = boundary.readdirSync;
+  const target = %s;
+  boundary.readdirSync = function (input, ...options) {
+    const actual = typeof input === 'number'
+      ? boundary.readlinkSync('/proc/self/fd/' + input)
+      : String(input).startsWith('/proc/self/fd/')
+        ? boundary.readlinkSync(String(input)) : String(input);
+    if (actual === target && !boundary.lstatSync(target).isSymbolicLink()) {
+      boundary.renameSync(target, %s);
+      boundary.symlinkSync(%s, target);
+    }
+    return originalRead.call(this, input, ...options);
+  };
+})();
+''' % (json.dumps(str(target)), json.dumps(str(retained)), json.dumps(str(outside))) + self.source
+        self.assertEqual(self.digest(), before)
+        self.assertTrue(target.is_symlink())
+        self.assertEqual(target.resolve(), outside)
+        self.assertEqual((retained / 'authority.ts').read_text(),
+                         'fixture payload apps/web/src/lib/sidedoor/authority.ts\n')
 
 
 @unittest.skipUnless((ROOT / 'node_modules/next/dist/bin/next').is_file(), 'Installed Next is required')
