@@ -23,6 +23,9 @@
       ]
     },
     "packages/mcp": {},
+    "vendor/braces": {
+      "entry": ["index.js", "lib/*.js"]
+    },
     "packages/shared": {
       "entry": ["scripts/**/*.ts!"]
     }

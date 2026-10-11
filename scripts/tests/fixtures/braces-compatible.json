@@ -1,0 +1,1289 @@
+{
+  "upstream": "braces@3.0.3",
+  "cases": [
+    { "method": "main", "input": "x/{a,b}/y", "options": {}, "expected": ["x/(a|b)/y"] },
+    {
+      "method": "main",
+      "input": "x/{a,b}/y",
+      "options": { "expand": true },
+      "expected": ["x/a/y", "x/b/y"]
+    },
+    {
+      "method": "main",
+      "input": "x/{a,b}/y",
+      "options": { "expand": true, "nodupes": true },
+      "expected": ["x/a/y", "x/b/y"]
+    },
+    {
+      "method": "main",
+      "input": "x/{a,b}/y",
+      "options": { "expand": true, "noempty": true },
+      "expected": ["x/a/y", "x/b/y"]
+    },
+    {
+      "method": "main",
+      "input": "x/{a,b}/y",
+      "options": { "escapeInvalid": true },
+      "expected": ["x/(a|b)/y"]
+    },
+    { "method": "compile", "input": "x/{a,b}/y", "options": {}, "expected": "x/(a|b)/y" },
+    { "method": "expand", "input": "x/{a,b}/y", "options": {}, "expected": ["x/a/y", "x/b/y"] },
+    { "method": "stringify", "input": "x/{a,b}/y", "options": {}, "expected": "x/{a,b}/y" },
+    { "method": "main", "input": "{1..10..2}", "options": {}, "expected": ["(1|3|5|7|9)"] },
+    {
+      "method": "main",
+      "input": "{1..10..2}",
+      "options": { "expand": true },
+      "expected": ["1", "3", "5", "7", "9"]
+    },
+    {
+      "method": "main",
+      "input": "{1..10..2}",
+      "options": { "expand": true, "nodupes": true },
+      "expected": ["1", "3", "5", "7", "9"]
+    },
+    {
+      "method": "main",
+      "input": "{1..10..2}",
+      "options": { "expand": true, "noempty": true },
+      "expected": ["1", "3", "5", "7", "9"]
+    },
+    {
+      "method": "main",
+      "input": "{1..10..2}",
+      "options": { "escapeInvalid": true },
+      "expected": ["(1|3|5|7|9)"]
+    },
+    { "method": "compile", "input": "{1..10..2}", "options": {}, "expected": "(1|3|5|7|9)" },
+    {
+      "method": "expand",
+      "input": "{1..10..2}",
+      "options": {},
+      "expected": ["1", "3", "5", "7", "9"]
+    },
+    { "method": "stringify", "input": "{1..10..2}", "options": {}, "expected": "{1..10..2}" },
+    { "method": "main", "input": "{10..1..2}", "options": {}, "expected": ["(2|4|6|8|10)"] },
+    {
+      "method": "main",
+      "input": "{10..1..2}",
+      "options": { "expand": true },
+      "expected": ["10", "8", "6", "4", "2"]
+    },
+    {
+      "method": "main",
+      "input": "{10..1..2}",
+      "options": { "expand": true, "nodupes": true },
+      "expected": ["10", "8", "6", "4", "2"]
+    },
+    {
+      "method": "main",
+      "input": "{10..1..2}",
+      "options": { "expand": true, "noempty": true },
+      "expected": ["10", "8", "6", "4", "2"]
+    },
+    {
+      "method": "main",
+      "input": "{10..1..2}",
+      "options": { "escapeInvalid": true },
+      "expected": ["(2|4|6|8|10)"]
+    },
+    { "method": "compile", "input": "{10..1..2}", "options": {}, "expected": "(2|4|6|8|10)" },
+    {
+      "method": "expand",
+      "input": "{10..1..2}",
+      "options": {},
+      "expected": ["10", "8", "6", "4", "2"]
+    },
+    { "method": "stringify", "input": "{10..1..2}", "options": {}, "expected": "{10..1..2}" },
+    { "method": "main", "input": "a{b,{c,d}}", "options": {}, "expected": ["a(b|(c|d))"] },
+    {
+      "method": "main",
+      "input": "a{b,{c,d}}",
+      "options": { "expand": true },
+      "expected": ["ab", "ac", "ad"]
+    },
+    {
+      "method": "main",
+      "input": "a{b,{c,d}}",
+      "options": { "expand": true, "nodupes": true },
+      "expected": ["ab", "ac", "ad"]
+    },
+    {
+      "method": "main",
+      "input": "a{b,{c,d}}",
+      "options": { "expand": true, "noempty": true },
+      "expected": ["ab", "ac", "ad"]
+    },
+    {
+      "method": "main",
+      "input": "a{b,{c,d}}",
+      "options": { "escapeInvalid": true },
+      "expected": ["a(b|(c|d))"]
+    },
+    { "method": "compile", "input": "a{b,{c,d}}", "options": {}, "expected": "a(b|(c|d))" },
+    { "method": "expand", "input": "a{b,{c,d}}", "options": {}, "expected": ["ab", "ac", "ad"] },
+    { "method": "stringify", "input": "a{b,{c,d}}", "options": {}, "expected": "a{b,{c,d}}" },
+    { "method": "main", "input": "foo", "options": {}, "expected": ["foo"] },
+    { "method": "main", "input": "foo", "options": { "expand": true }, "expected": ["foo"] },
+    {
+      "method": "main",
+      "input": "foo",
+      "options": { "expand": true, "nodupes": true },
+      "expected": ["foo"]
+    },
+    {
+      "method": "main",
+      "input": "foo",
+      "options": { "expand": true, "noempty": true },
+      "expected": ["foo"]
+    },
+    { "method": "main", "input": "foo", "options": { "escapeInvalid": true }, "expected": ["foo"] },
+    { "method": "compile", "input": "foo", "options": {}, "expected": "foo" },
+    { "method": "expand", "input": "foo", "options": {}, "expected": ["foo"] },
+    { "method": "stringify", "input": "foo", "options": {}, "expected": "foo" },
+    { "method": "main", "input": "{}", "options": {}, "expected": ["{}"] },
+    { "method": "main", "input": "{}", "options": { "expand": true }, "expected": ["{}"] },
+    {
+      "method": "main",
+      "input": "{}",
+      "options": { "expand": true, "nodupes": true },
+      "expected": ["{}"]
+    },
+    {
+      "method": "main",
+      "input": "{}",
+      "options": { "expand": true, "noempty": true },
+      "expected": ["{}"]
+    },
+    { "method": "main", "input": "{}", "options": { "escapeInvalid": true }, "expected": ["{}"] },
+    { "method": "compile", "input": "{}", "options": {}, "expected": "{}" },
+    { "method": "expand", "input": "{}", "options": {}, "expected": ["{}"] },
+    { "method": "stringify", "input": "{}", "options": {}, "expected": "{}" },
+    { "method": "main", "input": "{a,}", "options": {}, "expected": ["(a|)"] },
+    { "method": "main", "input": "{a,}", "options": { "expand": true }, "expected": ["a", ""] },
+    {
+      "method": "main",
+      "input": "{a,}",
+      "options": { "expand": true, "nodupes": true },
+      "expected": ["a", ""]
+    },
+    {
+      "method": "main",
+      "input": "{a,}",
+      "options": { "expand": true, "noempty": true },
+      "expected": ["a"]
+    },
+    {
+      "method": "main",
+      "input": "{a,}",
+      "options": { "escapeInvalid": true },
+      "expected": ["(a|)"]
+    },
+    { "method": "compile", "input": "{a,}", "options": {}, "expected": "(a|)" },
+    { "method": "expand", "input": "{a,}", "options": {}, "expected": ["a", ""] },
+    { "method": "stringify", "input": "{a,}", "options": {}, "expected": "{a,}" },
+    { "method": "main", "input": "{a,b", "options": {}, "expected": ["{a,b"] },
+    { "method": "main", "input": "{a,b", "options": { "expand": true }, "expected": ["{a,b"] },
+    {
+      "method": "main",
+      "input": "{a,b",
+      "options": { "expand": true, "nodupes": true },
+      "expected": ["{a,b"]
+    },
+    {
+      "method": "main",
+      "input": "{a,b",
+      "options": { "expand": true, "noempty": true },
+      "expected": ["{a,b"]
+    },
+    {
+      "method": "main",
+      "input": "{a,b",
+      "options": { "escapeInvalid": true },
+      "expected": ["\\{a,b"]
+    },
+    { "method": "compile", "input": "{a,b", "options": {}, "expected": "{a,b" },
+    { "method": "expand", "input": "{a,b", "options": {}, "expected": ["{a,b"] },
+    { "method": "stringify", "input": "{a,b", "options": {}, "expected": "{a,b" },
+    { "method": "main", "input": "a\\{b,c}", "options": {}, "expected": ["a{b,c}"] },
+    {
+      "method": "main",
+      "input": "a\\{b,c}",
+      "options": { "expand": true },
+      "expected": ["a{b,c}"]
+    },
+    {
+      "method": "main",
+      "input": "a\\{b,c}",
+      "options": { "expand": true, "nodupes": true },
+      "expected": ["a{b,c}"]
+    },
+    {
+      "method": "main",
+      "input": "a\\{b,c}",
+      "options": { "expand": true, "noempty": true },
+      "expected": ["a{b,c}"]
+    },
+    {
+      "method": "main",
+      "input": "a\\{b,c}",
+      "options": { "escapeInvalid": true },
+      "expected": ["a{b,c}"]
+    },
+    { "method": "compile", "input": "a\\{b,c}", "options": {}, "expected": "a{b,c}" },
+    { "method": "expand", "input": "a\\{b,c}", "options": {}, "expected": ["a{b,c}"] },
+    { "method": "stringify", "input": "a\\{b,c}", "options": {}, "expected": "a{b,c}" },
+    { "method": "main", "input": "(a|b)/{c,d}", "options": {}, "expected": ["(a|b)/(c|d)"] },
+    {
+      "method": "main",
+      "input": "(a|b)/{c,d}",
+      "options": { "expand": true },
+      "expected": ["(a|b)/c", "(a|b)/d"]
+    },
+    {
+      "method": "main",
+      "input": "(a|b)/{c,d}",
+      "options": { "expand": true, "nodupes": true },
+      "expected": ["(a|b)/c", "(a|b)/d"]
+    },
+    {
+      "method": "main",
+      "input": "(a|b)/{c,d}",
+      "options": { "expand": true, "noempty": true },
+      "expected": ["(a|b)/c", "(a|b)/d"]
+    },
+    {
+      "method": "main",
+      "input": "(a|b)/{c,d}",
+      "options": { "escapeInvalid": true },
+      "expected": ["(a|b)/(c|d)"]
+    },
+    { "method": "compile", "input": "(a|b)/{c,d}", "options": {}, "expected": "(a|b)/(c|d)" },
+    {
+      "method": "expand",
+      "input": "(a|b)/{c,d}",
+      "options": {},
+      "expected": ["(a|b)/c", "(a|b)/d"]
+    },
+    { "method": "stringify", "input": "(a|b)/{c,d}", "options": {}, "expected": "(a|b)/{c,d}" },
+    { "method": "main", "input": "${foo}", "options": {}, "expected": ["${foo}"] },
+    { "method": "main", "input": "${foo}", "options": { "expand": true }, "expected": ["${foo}"] },
+    {
+      "method": "main",
+      "input": "${foo}",
+      "options": { "expand": true, "nodupes": true },
+      "expected": ["${foo}"]
+    },
+    {
+      "method": "main",
+      "input": "${foo}",
+      "options": { "expand": true, "noempty": true },
+      "expected": ["${foo}"]
+    },
+    {
+      "method": "main",
+      "input": "${foo}",
+      "options": { "escapeInvalid": true },
+      "expected": ["$\\{foo\\}"]
+    },
+    { "method": "compile", "input": "${foo}", "options": {}, "expected": "${foo}" },
+    { "method": "expand", "input": "${foo}", "options": {}, "expected": ["${foo}"] },
+    { "method": "stringify", "input": "${foo}", "options": {}, "expected": "${foo}" },
+    { "method": "main", "input": "{a,a,b}", "options": {}, "expected": ["(a|a|b)"] },
+    {
+      "method": "main",
+      "input": "{a,a,b}",
+      "options": { "expand": true },
+      "expected": ["a", "a", "b"]
+    },
+    {
+      "method": "main",
+      "input": "{a,a,b}",
+      "options": { "expand": true, "nodupes": true },
+      "expected": ["a", "b"]
+    },
+    {
+      "method": "main",
+      "input": "{a,a,b}",
+      "options": { "expand": true, "noempty": true },
+      "expected": ["a", "a", "b"]
+    },
+    {
+      "method": "main",
+      "input": "{a,a,b}",
+      "options": { "escapeInvalid": true },
+      "expected": ["(a|a|b)"]
+    },
+    { "method": "compile", "input": "{a,a,b}", "options": {}, "expected": "(a|a|b)" },
+    { "method": "expand", "input": "{a,a,b}", "options": {}, "expected": ["a", "a", "b"] },
+    { "method": "stringify", "input": "{a,a,b}", "options": {}, "expected": "{a,a,b}" },
+    {
+      "method": "parse",
+      "input": "",
+      "options": {},
+      "expected": {
+        "type": "root",
+        "input": "",
+        "nodes": [
+          { "type": "bos", "parent": { "$ref": "$" }, "prev": { "$ref": "$" } },
+          { "type": "eos", "parent": { "$ref": "$" }, "prev": { "$ref": "$.nodes.0" } }
+        ]
+      }
+    },
+    { "method": "create", "input": "", "options": {}, "expected": [""] },
+    {
+      "method": "parse",
+      "input": "",
+      "options": { "escapeInvalid": true },
+      "expected": {
+        "type": "root",
+        "input": "",
+        "nodes": [
+          { "type": "bos", "parent": { "$ref": "$" }, "prev": { "$ref": "$" } },
+          { "type": "eos", "parent": { "$ref": "$" }, "prev": { "$ref": "$.nodes.0" } }
+        ]
+      }
+    },
+    { "method": "create", "input": "", "options": { "escapeInvalid": true }, "expected": [""] },
+    {
+      "method": "parse",
+      "input": "x",
+      "options": {},
+      "expected": {
+        "type": "root",
+        "input": "x",
+        "nodes": [
+          { "type": "bos", "parent": { "$ref": "$" }, "prev": { "$ref": "$" } },
+          {
+            "type": "text",
+            "value": "x",
+            "parent": { "$ref": "$" },
+            "prev": { "$ref": "$.nodes.0" }
+          },
+          { "type": "eos", "parent": { "$ref": "$" }, "prev": { "$ref": "$.nodes.1" } }
+        ]
+      }
+    },
+    { "method": "create", "input": "x", "options": {}, "expected": ["x"] },
+    {
+      "method": "parse",
+      "input": "x",
+      "options": { "escapeInvalid": true },
+      "expected": {
+        "type": "root",
+        "input": "x",
+        "nodes": [
+          { "type": "bos", "parent": { "$ref": "$" }, "prev": { "$ref": "$" } },
+          {
+            "type": "text",
+            "value": "x",
+            "parent": { "$ref": "$" },
+            "prev": { "$ref": "$.nodes.0" }
+          },
+          { "type": "eos", "parent": { "$ref": "$" }, "prev": { "$ref": "$.nodes.1" } }
+        ]
+      }
+    },
+    { "method": "create", "input": "x", "options": { "escapeInvalid": true }, "expected": ["x"] },
+    {
+      "method": "parse",
+      "input": "foo",
+      "options": {},
+      "expected": {
+        "type": "root",
+        "input": "foo",
+        "nodes": [
+          { "type": "bos", "parent": { "$ref": "$" }, "prev": { "$ref": "$" } },
+          {
+            "type": "text",
+            "value": "foo",
+            "parent": { "$ref": "$" },
+            "prev": { "$ref": "$.nodes.0" }
+          },
+          { "type": "eos", "parent": { "$ref": "$" }, "prev": { "$ref": "$.nodes.1" } }
+        ]
+      }
+    },
+    { "method": "create", "input": "foo", "options": {}, "expected": "foo" },
+    {
+      "method": "parse",
+      "input": "foo",
+      "options": { "escapeInvalid": true },
+      "expected": {
+        "type": "root",
+        "input": "foo",
+        "nodes": [
+          { "type": "bos", "parent": { "$ref": "$" }, "prev": { "$ref": "$" } },
+          {
+            "type": "text",
+            "value": "foo",
+            "parent": { "$ref": "$" },
+            "prev": { "$ref": "$.nodes.0" }
+          },
+          { "type": "eos", "parent": { "$ref": "$" }, "prev": { "$ref": "$.nodes.1" } }
+        ]
+      }
+    },
+    { "method": "create", "input": "foo", "options": { "escapeInvalid": true }, "expected": "foo" },
+    {
+      "method": "parse",
+      "input": "a/{b,c}/d",
+      "options": {},
+      "expected": {
+        "type": "root",
+        "input": "a/{b,c}/d",
+        "nodes": [
+          { "type": "bos", "parent": { "$ref": "$" }, "prev": { "$ref": "$" } },
+          {
+            "type": "text",
+            "value": "a/",
+            "parent": { "$ref": "$" },
+            "prev": { "$ref": "$.nodes.0" }
+          },
+          {
+            "type": "brace",
+            "open": true,
+            "close": true,
+            "dollar": false,
+            "depth": 1,
+            "commas": 1,
+            "ranges": 0,
+            "nodes": [
+              {
+                "type": "open",
+                "value": "{",
+                "parent": { "$ref": "$.nodes.2" },
+                "prev": { "$ref": "$.nodes.2" }
+              },
+              {
+                "type": "text",
+                "value": "b",
+                "parent": { "$ref": "$.nodes.2" },
+                "prev": { "$ref": "$.nodes.2.nodes.0" }
+              },
+              {
+                "type": "comma",
+                "value": ",",
+                "parent": { "$ref": "$.nodes.2" },
+                "prev": { "$ref": "$.nodes.2.nodes.1" }
+              },
+              {
+                "type": "text",
+                "value": "c",
+                "parent": { "$ref": "$.nodes.2" },
+                "prev": { "$ref": "$.nodes.2.nodes.2" }
+              },
+              {
+                "type": "close",
+                "value": "}",
+                "parent": { "$ref": "$.nodes.2" },
+                "prev": { "$ref": "$.nodes.2.nodes.3" }
+              }
+            ],
+            "parent": { "$ref": "$" },
+            "prev": { "$ref": "$.nodes.1" }
+          },
+          {
+            "type": "text",
+            "value": "/d",
+            "parent": { "$ref": "$" },
+            "prev": { "$ref": "$.nodes.2.nodes.4" }
+          },
+          { "type": "eos", "parent": { "$ref": "$" }, "prev": { "$ref": "$.nodes.3" } }
+        ]
+      }
+    },
+    { "method": "create", "input": "a/{b,c}/d", "options": {}, "expected": "a/(b|c)/d" },
+    {
+      "method": "parse",
+      "input": "a/{b,c}/d",
+      "options": { "escapeInvalid": true },
+      "expected": {
+        "type": "root",
+        "input": "a/{b,c}/d",
+        "nodes": [
+          { "type": "bos", "parent": { "$ref": "$" }, "prev": { "$ref": "$" } },
+          {
+            "type": "text",
+            "value": "a/",
+            "parent": { "$ref": "$" },
+            "prev": { "$ref": "$.nodes.0" }
+          },
+          {
+            "type": "brace",
+            "open": true,
+            "close": true,
+            "dollar": false,
+            "depth": 1,
+            "commas": 1,
+            "ranges": 0,
+            "nodes": [
+              {
+                "type": "open",
+                "value": "{",
+                "parent": { "$ref": "$.nodes.2" },
+                "prev": { "$ref": "$.nodes.2" }
+              },
+              {
+                "type": "text",
+                "value": "b",
+                "parent": { "$ref": "$.nodes.2" },
+                "prev": { "$ref": "$.nodes.2.nodes.0" }
+              },
+              {
+                "type": "comma",
+                "value": ",",
+                "parent": { "$ref": "$.nodes.2" },
+                "prev": { "$ref": "$.nodes.2.nodes.1" }
+              },
+              {
+                "type": "text",
+                "value": "c",
+                "parent": { "$ref": "$.nodes.2" },
+                "prev": { "$ref": "$.nodes.2.nodes.2" }
+              },
+              {
+                "type": "close",
+                "value": "}",
+                "parent": { "$ref": "$.nodes.2" },
+                "prev": { "$ref": "$.nodes.2.nodes.3" }
+              }
+            ],
+            "parent": { "$ref": "$" },
+            "prev": { "$ref": "$.nodes.1" }
+          },
+          {
+            "type": "text",
+            "value": "/d",
+            "parent": { "$ref": "$" },
+            "prev": { "$ref": "$.nodes.2.nodes.4" }
+          },
+          { "type": "eos", "parent": { "$ref": "$" }, "prev": { "$ref": "$.nodes.3" } }
+        ]
+      }
+    },
+    {
+      "method": "create",
+      "input": "a/{b,c}/d",
+      "options": { "escapeInvalid": true },
+      "expected": "a/(b|c)/d"
+    },
+    {
+      "method": "parse",
+      "input": "{4..1}",
+      "options": {},
+      "expected": {
+        "type": "root",
+        "input": "{4..1}",
+        "nodes": [
+          { "type": "bos", "parent": { "$ref": "$" }, "prev": { "$ref": "$" } },
+          {
+            "type": "brace",
+            "open": true,
+            "close": true,
+            "dollar": false,
+            "depth": 1,
+            "commas": 0,
+            "ranges": 1,
+            "nodes": [
+              {
+                "type": "open",
+                "value": "{",
+                "parent": { "$ref": "$.nodes.1" },
+                "prev": { "$ref": "$.nodes.1" }
+              },
+              {
+                "type": "text",
+                "value": "4",
+                "parent": { "$ref": "$.nodes.1" },
+                "prev": { "$ref": "$.nodes.1.nodes.0" }
+              },
+              {
+                "type": "range",
+                "value": "..",
+                "parent": { "$ref": "$.nodes.1" },
+                "prev": { "$ref": "$.nodes.1.nodes.1" }
+              },
+              {
+                "type": "text",
+                "value": "1",
+                "parent": { "$ref": "$.nodes.1" },
+                "prev": { "$ref": "$.nodes.1.nodes.2" }
+              },
+              {
+                "type": "close",
+                "value": "}",
+                "parent": { "$ref": "$.nodes.1" },
+                "prev": { "$ref": "$.nodes.1.nodes.3" }
+              }
+            ],
+            "parent": { "$ref": "$" },
+            "prev": { "$ref": "$.nodes.0" },
+            "range": [],
+            "args": []
+          },
+          { "type": "eos", "parent": { "$ref": "$" }, "prev": { "$ref": "$.nodes.1.nodes.4" } }
+        ]
+      }
+    },
+    { "method": "create", "input": "{4..1}", "options": {}, "expected": "([1-4])" },
+    {
+      "method": "parse",
+      "input": "{4..1}",
+      "options": { "escapeInvalid": true },
+      "expected": {
+        "type": "root",
+        "input": "{4..1}",
+        "nodes": [
+          { "type": "bos", "parent": { "$ref": "$" }, "prev": { "$ref": "$" } },
+          {
+            "type": "brace",
+            "open": true,
+            "close": true,
+            "dollar": false,
+            "depth": 1,
+            "commas": 0,
+            "ranges": 1,
+            "nodes": [
+              {
+                "type": "open",
+                "value": "{",
+                "parent": { "$ref": "$.nodes.1" },
+                "prev": { "$ref": "$.nodes.1" }
+              },
+              {
+                "type": "text",
+                "value": "4",
+                "parent": { "$ref": "$.nodes.1" },
+                "prev": { "$ref": "$.nodes.1.nodes.0" }
+              },
+              {
+                "type": "range",
+                "value": "..",
+                "parent": { "$ref": "$.nodes.1" },
+                "prev": { "$ref": "$.nodes.1.nodes.1" }
+              },
+              {
+                "type": "text",
+                "value": "1",
+                "parent": { "$ref": "$.nodes.1" },
+                "prev": { "$ref": "$.nodes.1.nodes.2" }
+              },
+              {
+                "type": "close",
+                "value": "}",
+                "parent": { "$ref": "$.nodes.1" },
+                "prev": { "$ref": "$.nodes.1.nodes.3" }
+              }
+            ],
+            "parent": { "$ref": "$" },
+            "prev": { "$ref": "$.nodes.0" },
+            "range": [],
+            "args": []
+          },
+          { "type": "eos", "parent": { "$ref": "$" }, "prev": { "$ref": "$.nodes.1.nodes.4" } }
+        ]
+      }
+    },
+    {
+      "method": "create",
+      "input": "{4..1}",
+      "options": { "escapeInvalid": true },
+      "expected": "([1-4])"
+    },
+    {
+      "method": "parse",
+      "input": "a{b,{c,d}}",
+      "options": {},
+      "expected": {
+        "type": "root",
+        "input": "a{b,{c,d}}",
+        "nodes": [
+          { "type": "bos", "parent": { "$ref": "$" }, "prev": { "$ref": "$" } },
+          {
+            "type": "text",
+            "value": "a",
+            "parent": { "$ref": "$" },
+            "prev": { "$ref": "$.nodes.0" }
+          },
+          {
+            "type": "brace",
+            "open": true,
+            "close": true,
+            "dollar": false,
+            "depth": 1,
+            "commas": 1,
+            "ranges": 0,
+            "nodes": [
+              {
+                "type": "open",
+                "value": "{",
+                "parent": { "$ref": "$.nodes.2" },
+                "prev": { "$ref": "$.nodes.2" }
+              },
+              {
+                "type": "text",
+                "value": "b",
+                "parent": { "$ref": "$.nodes.2" },
+                "prev": { "$ref": "$.nodes.2.nodes.0" }
+              },
+              {
+                "type": "comma",
+                "value": ",",
+                "parent": { "$ref": "$.nodes.2" },
+                "prev": { "$ref": "$.nodes.2.nodes.1" }
+              },
+              {
+                "type": "brace",
+                "open": true,
+                "close": true,
+                "dollar": false,
+                "depth": 2,
+                "commas": 1,
+                "ranges": 0,
+                "nodes": [
+                  {
+                    "type": "open",
+                    "value": "{",
+                    "parent": { "$ref": "$.nodes.2.nodes.3" },
+                    "prev": { "$ref": "$.nodes.2.nodes.3" }
+                  },
+                  {
+                    "type": "text",
+                    "value": "c",
+                    "parent": { "$ref": "$.nodes.2.nodes.3" },
+                    "prev": { "$ref": "$.nodes.2.nodes.3.nodes.0" }
+                  },
+                  {
+                    "type": "comma",
+                    "value": ",",
+                    "parent": { "$ref": "$.nodes.2.nodes.3" },
+                    "prev": { "$ref": "$.nodes.2.nodes.3.nodes.1" }
+                  },
+                  {
+                    "type": "text",
+                    "value": "d",
+                    "parent": { "$ref": "$.nodes.2.nodes.3" },
+                    "prev": { "$ref": "$.nodes.2.nodes.3.nodes.2" }
+                  },
+                  {
+                    "type": "close",
+                    "value": "}",
+                    "parent": { "$ref": "$.nodes.2.nodes.3" },
+                    "prev": { "$ref": "$.nodes.2.nodes.3.nodes.3" }
+                  }
+                ],
+                "parent": { "$ref": "$.nodes.2" },
+                "prev": { "$ref": "$.nodes.2.nodes.2" }
+              },
+              {
+                "type": "close",
+                "value": "}",
+                "parent": { "$ref": "$.nodes.2" },
+                "prev": { "$ref": "$.nodes.2.nodes.3.nodes.4" }
+              }
+            ],
+            "parent": { "$ref": "$" },
+            "prev": { "$ref": "$.nodes.1" }
+          },
+          { "type": "eos", "parent": { "$ref": "$" }, "prev": { "$ref": "$.nodes.2.nodes.4" } }
+        ]
+      }
+    },
+    { "method": "create", "input": "a{b,{c,d}}", "options": {}, "expected": "a(b|(c|d))" },
+    {
+      "method": "parse",
+      "input": "a{b,{c,d}}",
+      "options": { "escapeInvalid": true },
+      "expected": {
+        "type": "root",
+        "input": "a{b,{c,d}}",
+        "nodes": [
+          { "type": "bos", "parent": { "$ref": "$" }, "prev": { "$ref": "$" } },
+          {
+            "type": "text",
+            "value": "a",
+            "parent": { "$ref": "$" },
+            "prev": { "$ref": "$.nodes.0" }
+          },
+          {
+            "type": "brace",
+            "open": true,
+            "close": true,
+            "dollar": false,
+            "depth": 1,
+            "commas": 1,
+            "ranges": 0,
+            "nodes": [
+              {
+                "type": "open",
+                "value": "{",
+                "parent": { "$ref": "$.nodes.2" },
+                "prev": { "$ref": "$.nodes.2" }
+              },
+              {
+                "type": "text",
+                "value": "b",
+                "parent": { "$ref": "$.nodes.2" },
+                "prev": { "$ref": "$.nodes.2.nodes.0" }
+              },
+              {
+                "type": "comma",
+                "value": ",",
+                "parent": { "$ref": "$.nodes.2" },
+                "prev": { "$ref": "$.nodes.2.nodes.1" }
+              },
+              {
+                "type": "brace",
+                "open": true,
+                "close": true,
+                "dollar": false,
+                "depth": 2,
+                "commas": 1,
+                "ranges": 0,
+                "nodes": [
+                  {
+                    "type": "open",
+                    "value": "{",
+                    "parent": { "$ref": "$.nodes.2.nodes.3" },
+                    "prev": { "$ref": "$.nodes.2.nodes.3" }
+                  },
+                  {
+                    "type": "text",
+                    "value": "c",
+                    "parent": { "$ref": "$.nodes.2.nodes.3" },
+                    "prev": { "$ref": "$.nodes.2.nodes.3.nodes.0" }
+                  },
+                  {
+                    "type": "comma",
+                    "value": ",",
+                    "parent": { "$ref": "$.nodes.2.nodes.3" },
+                    "prev": { "$ref": "$.nodes.2.nodes.3.nodes.1" }
+                  },
+                  {
+                    "type": "text",
+                    "value": "d",
+                    "parent": { "$ref": "$.nodes.2.nodes.3" },
+                    "prev": { "$ref": "$.nodes.2.nodes.3.nodes.2" }
+                  },
+                  {
+                    "type": "close",
+                    "value": "}",
+                    "parent": { "$ref": "$.nodes.2.nodes.3" },
+                    "prev": { "$ref": "$.nodes.2.nodes.3.nodes.3" }
+                  }
+                ],
+                "parent": { "$ref": "$.nodes.2" },
+                "prev": { "$ref": "$.nodes.2.nodes.2" }
+              },
+              {
+                "type": "close",
+                "value": "}",
+                "parent": { "$ref": "$.nodes.2" },
+                "prev": { "$ref": "$.nodes.2.nodes.3.nodes.4" }
+              }
+            ],
+            "parent": { "$ref": "$" },
+            "prev": { "$ref": "$.nodes.1" }
+          },
+          { "type": "eos", "parent": { "$ref": "$" }, "prev": { "$ref": "$.nodes.2.nodes.4" } }
+        ]
+      }
+    },
+    {
+      "method": "create",
+      "input": "a{b,{c,d}}",
+      "options": { "escapeInvalid": true },
+      "expected": "a(b|(c|d))"
+    },
+    {
+      "method": "parse",
+      "input": "${foo}",
+      "options": {},
+      "expected": {
+        "type": "root",
+        "input": "${foo}",
+        "nodes": [
+          { "type": "bos", "parent": { "$ref": "$" }, "prev": { "$ref": "$" } },
+          {
+            "type": "text",
+            "value": "$",
+            "parent": { "$ref": "$" },
+            "prev": { "$ref": "$.nodes.0" }
+          },
+          {
+            "type": "brace",
+            "open": true,
+            "close": true,
+            "dollar": true,
+            "depth": 1,
+            "commas": 0,
+            "ranges": 0,
+            "nodes": [
+              {
+                "type": "open",
+                "value": "{",
+                "parent": { "$ref": "$.nodes.2" },
+                "prev": { "$ref": "$.nodes.2" }
+              },
+              {
+                "type": "text",
+                "value": "foo",
+                "parent": { "$ref": "$.nodes.2" },
+                "prev": { "$ref": "$.nodes.2.nodes.0" }
+              },
+              {
+                "type": "close",
+                "value": "}",
+                "parent": { "$ref": "$.nodes.2" },
+                "prev": { "$ref": "$.nodes.2.nodes.1" }
+              }
+            ],
+            "parent": { "$ref": "$" },
+            "prev": { "$ref": "$.nodes.1" }
+          },
+          { "type": "eos", "parent": { "$ref": "$" }, "prev": { "$ref": "$.nodes.2.nodes.2" } }
+        ]
+      }
+    },
+    { "method": "create", "input": "${foo}", "options": {}, "expected": "${foo}" },
+    {
+      "method": "parse",
+      "input": "${foo}",
+      "options": { "escapeInvalid": true },
+      "expected": {
+        "type": "root",
+        "input": "${foo}",
+        "nodes": [
+          { "type": "bos", "parent": { "$ref": "$" }, "prev": { "$ref": "$" } },
+          {
+            "type": "text",
+            "value": "$",
+            "parent": { "$ref": "$" },
+            "prev": { "$ref": "$.nodes.0" }
+          },
+          {
+            "type": "brace",
+            "open": true,
+            "close": true,
+            "dollar": true,
+            "depth": 1,
+            "commas": 0,
+            "ranges": 0,
+            "nodes": [
+              {
+                "type": "open",
+                "value": "{",
+                "parent": { "$ref": "$.nodes.2" },
+                "prev": { "$ref": "$.nodes.2" }
+              },
+              {
+                "type": "text",
+                "value": "foo",
+                "parent": { "$ref": "$.nodes.2" },
+                "prev": { "$ref": "$.nodes.2.nodes.0" }
+              },
+              {
+                "type": "close",
+                "value": "}",
+                "parent": { "$ref": "$.nodes.2" },
+                "prev": { "$ref": "$.nodes.2.nodes.1" }
+              }
+            ],
+            "parent": { "$ref": "$" },
+            "prev": { "$ref": "$.nodes.1" }
+          },
+          { "type": "eos", "parent": { "$ref": "$" }, "prev": { "$ref": "$.nodes.2.nodes.2" } }
+        ]
+      }
+    },
+    {
+      "method": "create",
+      "input": "${foo}",
+      "options": { "escapeInvalid": true },
+      "expected": "$\\{foo\\}"
+    },
+    {
+      "method": "parse",
+      "input": "(a|b)/{c,d}",
+      "options": {},
+      "expected": {
+        "type": "root",
+        "input": "(a|b)/{c,d}",
+        "nodes": [
+          { "type": "bos", "parent": { "$ref": "$" }, "prev": { "$ref": "$" } },
+          {
+            "type": "paren",
+            "nodes": [
+              {
+                "type": "text",
+                "value": "(a|b)/",
+                "parent": { "$ref": "$.nodes.1" },
+                "prev": { "$ref": "$.nodes.1" }
+              }
+            ],
+            "parent": { "$ref": "$" },
+            "prev": { "$ref": "$.nodes.0" }
+          },
+          {
+            "type": "brace",
+            "open": true,
+            "close": true,
+            "dollar": false,
+            "depth": 1,
+            "commas": 1,
+            "ranges": 0,
+            "nodes": [
+              {
+                "type": "open",
+                "value": "{",
+                "parent": { "$ref": "$.nodes.2" },
+                "prev": { "$ref": "$.nodes.2" }
+              },
+              {
+                "type": "text",
+                "value": "c",
+                "parent": { "$ref": "$.nodes.2" },
+                "prev": { "$ref": "$.nodes.2.nodes.0" }
+              },
+              {
+                "type": "comma",
+                "value": ",",
+                "parent": { "$ref": "$.nodes.2" },
+                "prev": { "$ref": "$.nodes.2.nodes.1" }
+              },
+              {
+                "type": "text",
+                "value": "d",
+                "parent": { "$ref": "$.nodes.2" },
+                "prev": { "$ref": "$.nodes.2.nodes.2" }
+              },
+              {
+                "type": "close",
+                "value": "}",
+                "parent": { "$ref": "$.nodes.2" },
+                "prev": { "$ref": "$.nodes.2.nodes.3" }
+              }
+            ],
+            "parent": { "$ref": "$" },
+            "prev": { "$ref": "$.nodes.1.nodes.0" }
+          },
+          { "type": "eos", "parent": { "$ref": "$" }, "prev": { "$ref": "$.nodes.2.nodes.4" } }
+        ]
+      }
+    },
+    { "method": "create", "input": "(a|b)/{c,d}", "options": {}, "expected": "(a|b)/(c|d)" },
+    {
+      "method": "parse",
+      "input": "(a|b)/{c,d}",
+      "options": { "escapeInvalid": true },
+      "expected": {
+        "type": "root",
+        "input": "(a|b)/{c,d}",
+        "nodes": [
+          { "type": "bos", "parent": { "$ref": "$" }, "prev": { "$ref": "$" } },
+          {
+            "type": "paren",
+            "nodes": [
+              {
+                "type": "text",
+                "value": "(a|b)/",
+                "parent": { "$ref": "$.nodes.1" },
+                "prev": { "$ref": "$.nodes.1" }
+              }
+            ],
+            "parent": { "$ref": "$" },
+            "prev": { "$ref": "$.nodes.0" }
+          },
+          {
+            "type": "brace",
+            "open": true,
+            "close": true,
+            "dollar": false,
+            "depth": 1,
+            "commas": 1,
+            "ranges": 0,
+            "nodes": [
+              {
+                "type": "open",
+                "value": "{",
+                "parent": { "$ref": "$.nodes.2" },
+                "prev": { "$ref": "$.nodes.2" }
+              },
+              {
+                "type": "text",
+                "value": "c",
+                "parent": { "$ref": "$.nodes.2" },
+                "prev": { "$ref": "$.nodes.2.nodes.0" }
+              },
+              {
+                "type": "comma",
+                "value": ",",
+                "parent": { "$ref": "$.nodes.2" },
+                "prev": { "$ref": "$.nodes.2.nodes.1" }
+              },
+              {
+                "type": "text",
+                "value": "d",
+                "parent": { "$ref": "$.nodes.2" },
+                "prev": { "$ref": "$.nodes.2.nodes.2" }
+              },
+              {
+                "type": "close",
+                "value": "}",
+                "parent": { "$ref": "$.nodes.2" },
+                "prev": { "$ref": "$.nodes.2.nodes.3" }
+              }
+            ],
+            "parent": { "$ref": "$" },
+            "prev": { "$ref": "$.nodes.1.nodes.0" }
+          },
+          { "type": "eos", "parent": { "$ref": "$" }, "prev": { "$ref": "$.nodes.2.nodes.4" } }
+        ]
+      }
+    },
+    {
+      "method": "create",
+      "input": "(a|b)/{c,d}",
+      "options": { "escapeInvalid": true },
+      "expected": "(a|b)/(c|d)"
+    },
+    {
+      "method": "parse",
+      "input": "{a,b",
+      "options": {},
+      "expected": {
+        "type": "root",
+        "input": "{a,b",
+        "nodes": [
+          { "type": "bos", "parent": { "$ref": "$" }, "prev": { "$ref": "$" } },
+          {
+            "type": "text",
+            "value": "{",
+            "parent": {
+              "type": "brace",
+              "open": true,
+              "close": false,
+              "dollar": false,
+              "depth": 1,
+              "commas": 1,
+              "ranges": 0,
+              "nodes": [
+                { "$ref": "$.nodes.1" },
+                {
+                  "type": "text",
+                  "value": "a",
+                  "parent": { "$ref": "$.nodes.1.parent" },
+                  "prev": { "$ref": "$.nodes.1" },
+                  "invalid": true
+                },
+                {
+                  "type": "text",
+                  "value": ",",
+                  "parent": { "$ref": "$.nodes.1.parent" },
+                  "prev": { "$ref": "$.nodes.1.parent.nodes.1" },
+                  "invalid": true
+                },
+                {
+                  "type": "text",
+                  "value": "b",
+                  "parent": { "$ref": "$.nodes.1.parent" },
+                  "prev": { "$ref": "$.nodes.1.parent.nodes.2" },
+                  "invalid": true
+                }
+              ],
+              "parent": { "$ref": "$" },
+              "prev": { "$ref": "$.nodes.0" }
+            },
+            "prev": { "$ref": "$.nodes.1.parent" },
+            "isOpen": true,
+            "invalid": true
+          },
+          { "$ref": "$.nodes.1.parent.nodes.1" },
+          { "$ref": "$.nodes.1.parent.nodes.2" },
+          { "$ref": "$.nodes.1.parent.nodes.3" },
+          {
+            "type": "eos",
+            "parent": { "$ref": "$" },
+            "prev": { "$ref": "$.nodes.1.parent.nodes.3" }
+          }
+        ]
+      }
+    },
+    { "method": "create", "input": "{a,b", "options": {}, "expected": "{a,b" },
+    {
+      "method": "parse",
+      "input": "{a,b",
+      "options": { "escapeInvalid": true },
+      "expected": {
+        "type": "root",
+        "input": "{a,b",
+        "nodes": [
+          { "type": "bos", "parent": { "$ref": "$" }, "prev": { "$ref": "$" } },
+          {
+            "type": "text",
+            "value": "{",
+            "parent": {
+              "type": "brace",
+              "open": true,
+              "close": false,
+              "dollar": false,
+              "depth": 1,
+              "commas": 1,
+              "ranges": 0,
+              "nodes": [
+                { "$ref": "$.nodes.1" },
+                {
+                  "type": "text",
+                  "value": "a",
+                  "parent": { "$ref": "$.nodes.1.parent" },
+                  "prev": { "$ref": "$.nodes.1" },
+                  "invalid": true
+                },
+                {
+                  "type": "text",
+                  "value": ",",
+                  "parent": { "$ref": "$.nodes.1.parent" },
+                  "prev": { "$ref": "$.nodes.1.parent.nodes.1" },
+                  "invalid": true
+                },
+                {
+                  "type": "text",
+                  "value": "b",
+                  "parent": { "$ref": "$.nodes.1.parent" },
+                  "prev": { "$ref": "$.nodes.1.parent.nodes.2" },
+                  "invalid": true
+                }
+              ],
+              "parent": { "$ref": "$" },
+              "prev": { "$ref": "$.nodes.0" }
+            },
+            "prev": { "$ref": "$.nodes.1.parent" },
+            "isOpen": true,
+            "invalid": true
+          },
+          { "$ref": "$.nodes.1.parent.nodes.1" },
+          { "$ref": "$.nodes.1.parent.nodes.2" },
+          { "$ref": "$.nodes.1.parent.nodes.3" },
+          {
+            "type": "eos",
+            "parent": { "$ref": "$" },
+            "prev": { "$ref": "$.nodes.1.parent.nodes.3" }
+          }
+        ]
+      }
+    },
+    {
+      "method": "create",
+      "input": "{a,b",
+      "options": { "escapeInvalid": true },
+      "expected": "\\{a,b"
+    },
+    {
+      "method": "main",
+      "input": ["x/{a,b}", "{1..3}"],
+      "options": {},
+      "expected": ["x/(a|b)", "([1-3])"]
+    }
+  ]
+}

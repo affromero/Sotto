@@ -1,5 +1,15 @@
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { resolve } from 'node:path';
+import {
+  existsSync,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+  mkdtempSync,
+  mkdirSync,
+  rmSync,
+} from 'node:fs';
+import { resolve, dirname, join } from 'node:path';
+import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
 import { describe, expect, it } from 'vitest';
 
 const webRoot = existsSync(resolve(process.cwd(), 'src'))
@@ -14,6 +24,43 @@ function readSource(relativePath: string): string {
 void readdirSync;
 
 describe('open-source language-learning OSS surfaces', () => {
+  it('uses guarded brace expansion through the declared Next ESLint dependency chain', () => {
+    const require = createRequire(import.meta.url);
+    const eslintRequire = createRequire(require.resolve('eslint-config-next'));
+    const pluginRequire = createRequire(eslintRequire.resolve('@next/eslint-plugin-next'));
+    const globRequire = createRequire(pluginRequire.resolve('fast-glob'));
+    const matchRequire = createRequire(globRequire.resolve('micromatch'));
+    expect(realpathSync(dirname(matchRequire.resolve('braces/package.json')))).toBe(
+      realpathSync(resolve(repoRoot, 'vendor/braces'))
+    );
+    const distribution = matchRequire('braces');
+    expect(distribution.expand('lesson/{reading,listening}')).toEqual([
+      'lesson/reading',
+      'lesson/listening',
+    ]);
+    expect(() => distribution.parse('{'.repeat(4000) + 'lesson' + '}'.repeat(4000))).toThrow(
+      RangeError
+    );
+    expect(globRequire('micromatch')(['x/a/y', 'x/b/y', 'x/c/y'], 'x/{a,b}/y')).toEqual([
+      'x/a/y',
+      'x/b/y',
+    ]);
+    const directory = mkdtempSync(join(tmpdir(), 'sotto-braces-test-'));
+    try {
+      mkdirSync(join(directory, 'a'));
+      mkdirSync(join(directory, 'b'));
+      expect(
+        pluginRequire('fast-glob')
+          .globSync('{a,b}', {
+            cwd: directory,
+            onlyDirectories: true,
+          })
+          .sort()
+      ).toEqual(['a', 'b']);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
   const primarySurfaceFiles = [
     'src/components/layout/Sidebar.tsx',
     'src/components/layout/MobileNav.tsx',
