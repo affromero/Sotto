@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@/generated/prisma/client';
 import { beforeAll, afterAll, describe, expect, it, vi } from 'vitest';
+import { metricEventSchema } from 'thesidedoor-core/observability';
 
 const boundary = vi.hoisted(() => ({ database: null as PrismaClient | null }));
 vi.mock('@/lib/prisma', () => ({
@@ -146,6 +147,60 @@ suite('usage persistence in PostgreSQL', () => {
     ).toMatchObject({ inputTokens: 100, outputTokens: 50, totalCost: null });
   });
 
+  it.each([
+    ['codex', 'gpt-6-luna#effort=high', 'gpt-6-luna', 'high'],
+    ['codex', 'codex:gpt-6-luna#effort=high', 'gpt-6-luna', 'high'],
+    ['claude-code', 'claude-sonnet-4-6#effort=max', 'claude-sonnet-4-6', 'max'],
+    ['claude-code', 'claude-code:claude-sonnet-4-6#effort=high', 'claude-sonnet-4-6', 'high'],
+    ['codex', 'gpt-6-luna', 'gpt-6-luna', null],
+    ['claude-code', 'claude-code:claude-sonnet-4-6', 'claude-sonnet-4-6', null],
+    ['codex', 'codex', null, null],
+    ['codex', 'codex#effort=high', null, 'high'],
+  ] as const)(
+    'persists %s selection %s with a valid metric and unknown cost',
+    async (service, model, base, effort) => {
+      const category = `selection-${randomUUID()}`;
+      await logUsage({
+        service,
+        model,
+        category,
+        inputTokens: 100,
+        outputTokens: 50,
+        metadata: { agentModelSelection: { provider: 'spoofed' } },
+      });
+      const row = await database.apiUsageLog.findFirst({ where: { category } });
+      expect(row).toMatchObject({
+        service,
+        modelId: model,
+        inputTokens: 100,
+        outputTokens: 50,
+        totalCost: null,
+      });
+      const metadata = row!.metadata as Record<string, unknown>;
+      expect(metricEventSchema.parse(metadata.sidedoorMetric)).toMatchObject({
+        provider: service,
+        model: base ?? service,
+        estimatedCost: null,
+      });
+      expect(metadata.agentModelSelection).toEqual({ provider: service, model: base, effort });
+    }
+  );
+
+  it.each([
+    ['codex', 'gpt-6-luna#effort=unknown'],
+    ['codex', 'gpt-6-luna#unknown=high'],
+    ['codex', 'gpt-6-luna#effort=high&effort=low'],
+    ['codex', 'gpt-6-luna#effort=high#extra'],
+    ['codex', 'gpt-6-luna#effort=high&extra=yes'],
+    ['codex', 'claude-code:claude-sonnet-4-6#effort=high'],
+    ['claude-code', 'codex:gpt-6-luna'],
+    ['openai', 'gpt-6-luna#effort=high'],
+  ])('does not persist an invalid %s model selection %s', async (service, model) => {
+    const category = `invalid-selection-${randomUUID()}`;
+    await logUsage({ service, model, category });
+    expect(await database.apiUsageLog.count({ where: { category } })).toBe(0);
+  });
+
   it('retains explicit costs and computes known API token estimates', async () => {
     await logUsage({
       service: 'openai',
@@ -161,6 +216,15 @@ suite('usage persistence in PostgreSQL', () => {
     expect((await database.apiUsageLog.findFirst({ where: { category: 'free' } }))?.totalCost).toBe(
       0
     );
+    const known = await database.apiUsageLog.findFirst({ where: { category: 'known' } });
+    const metadata = known!.metadata as Record<string, unknown>;
+    expect(known!.modelId).toBe('gpt-5-nano');
+    expect(metricEventSchema.parse(metadata.sidedoorMetric)).toMatchObject({
+      provider: 'openai',
+      model: 'gpt-5-nano',
+      estimatedCost: known!.totalCost,
+    });
+    expect(metadata).not.toHaveProperty('agentModelSelection');
   });
 
   it('rejects invalid measurements before persistence', async () => {
