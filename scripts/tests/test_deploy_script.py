@@ -1,21 +1,110 @@
 """Run the deployment controller against disposable filesystem and CLI boundaries."""
 
+import fcntl
 import json
+import logging
 import os
 from pathlib import Path
+from contextlib import contextmanager
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import shutil
 import signal
 import subprocess
 import sys
 import tempfile
+import threading
+import time
 import unittest
+from urllib.error import HTTPError, URLError
+from urllib.request import urlopen
 
 
 SHA = 'a' * 40
 OLD = 'sha256:' + 'b' * 64
 NEW = 'sha256:' + 'c' * 64
+OLD_WEB = '1' * 64
+CANDIDATE_WEB = '2' * 64
+SERVICES = ('workers-heavy', 'workers-pipeline', 'workers-light')
+OLD_WORKERS = {service: str(index + 3) * 64 for index, service in enumerate(SERVICES)}
+NEW_WORKERS = {service: str(index + 6) * 64 for index, service in enumerate(SERVICES)}
+
+
+@contextmanager
+def serving_fixture(root):
+    """Exercise real HTTP availability while Docker boundaries change state."""
+    observations = []
+    phase_observations = {}
+    stopped = threading.Event()
+
+    class Backend(BaseHTTPRequestHandler):
+        def do_GET(self):
+            state = json.loads((root / 'state.json').read_text())
+            available = state['old_web'] if self.server.role == 'old' else state['web']
+            self.send_response(200 if available else 503)
+            self.end_headers()
+            self.wfile.write(json.dumps({'version': ('d' * 40) if self.server.role == 'old' else SHA}).encode())
+
+        def log_message(self, format, *args):
+            logging.getLogger(__name__).debug(format, *args)
+
+    class Proxy(BaseHTTPRequestHandler):
+        def do_GET(self):
+            try:
+                route = json.loads((root / 'state.json').read_text())['active_route']
+                target = candidate if route == 'candidate' else old
+                with urlopen(f'http://127.0.0.1:{target.server_port}/api/v1/health', timeout=1) as response:
+                    body = response.read()
+                    self.send_response(response.status)
+                    self.end_headers()
+                    self.wfile.write(body)
+            except (OSError, HTTPError, URLError) as error:
+                self.send_response(503)
+                self.end_headers()
+                self.wfile.write(str(error).encode())
+
+        def log_message(self, format, *args):
+            logging.getLogger(__name__).debug(format, *args)
+
+    old = ThreadingHTTPServer(('127.0.0.1', 0), Backend)
+    old.role = 'old'
+    candidate = ThreadingHTTPServer(('127.0.0.1', 0), Backend)
+    candidate.role = 'candidate'
+    proxy = ThreadingHTTPServer(('127.0.0.1', 0), Proxy)
+    servers = (old, candidate, proxy)
+    threads = [threading.Thread(target=server.serve_forever, kwargs={'poll_interval': 0.01}) for server in servers]
+    for thread in threads:
+        thread.start()
+
+    def poll():
+        while not stopped.is_set():
+            try:
+                with urlopen(f'http://127.0.0.1:{proxy.server_port}/api/v1/health', timeout=1) as response:
+                    observation = (response.status, json.load(response)['version'])
+                    observations.append(observation)
+                    phase = json.loads((root / 'state.json').read_text()).get('phase')
+                    if phase:
+                        phase_observations.setdefault(phase, []).append(observation)
+            except (OSError, ValueError, HTTPError, URLError) as error:
+                observations.append((503, str(error)))
+            stopped.wait(0.01)
+
+    monitor = threading.Thread(target=poll)
+    monitor.start()
+    try:
+        yield {'TEST_PROXY_PORT': str(proxy.server_port), 'TEST_CANDIDATE_PORT': str(candidate.server_port),
+               'TEST_OLD_PORT': str(old.server_port)}, observations, phase_observations
+    finally:
+        stopped.set()
+        monitor.join(timeout=2)
+        for server in servers:
+            server.shutdown()
+            server.server_close()
+        for thread in threads:
+            thread.join(timeout=2)
+
+
 BOUNDARY = r'''
-import hashlib, json, os, pathlib, re, shutil, sys
+import fcntl, hashlib, json, os, pathlib, re, shutil, sys, time, urllib.request, urllib.error
 name = pathlib.Path(sys.argv[0]).name
 args = sys.argv[1:]
 root = pathlib.Path(os.environ['TEST_ROOT'])
@@ -25,13 +114,32 @@ mode = os.environ['TEST_FAILURE']
 with (root / 'calls.jsonl').open('a') as stream:
     stream.write(json.dumps([name, *args]) + '\n')
 def finish(value='', code=0):
-    state_path.write_text(json.dumps(state))
+    pending = state_path.with_suffix('.next')
+    pending.write_text(json.dumps(state))
+    pending.replace(state_path)
     if value: print(value)
     sys.exit(code)
+def delayed(phase):
+    state['phase'] = phase
+    pending = state_path.with_suffix('.next')
+    pending.write_text(json.dumps(state))
+    pending.replace(state_path)
+    time.sleep(0.12)
 old = 'sha256:' + 'b' * 64
 new = 'sha256:' + 'c' * 64
 sha = 'a' * 40
-if name in ('sleep', 'flock'): finish()
+old_web = '1' * 64
+candidate_web = '2' * 64
+services = ('workers-heavy', 'workers-pipeline', 'workers-light')
+old_workers = {service: str(index + 3) * 64 for index, service in enumerate(services)}
+new_workers = {service: str(index + 6) * 64 for index, service in enumerate(services)}
+def image_for(identifier):
+    return new if identifier == candidate_web or identifier in new_workers.values() else old
+if name == 'sleep': finish()
+if name == 'flock':
+    try: fcntl.flock(int(args[-1]), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError: finish(code=1)
+    finish()
 if name == 'git': finish(sha if args[0] == 'rev-parse' else '')
 if name == 'sha256sum':
     finish(hashlib.sha256(pathlib.Path(args[0]).read_bytes()).hexdigest() + '  ' + args[0])
@@ -40,8 +148,19 @@ if name == 'capacity':
     fail = (mode == 'pre-capacity' and state['capacity'] == 1) or (mode == 'post-capacity' and state['capacity'] == 2) or (mode == 'final-capacity' and state['capacity'] == 5)
     finish(code=1 if fail else 0)
 if name == 'sudo':
-    if args[0] == 'install': shutil.copyfile(args[-2], args[-1])
+    if args[0] == 'install':
+        shutil.copyfile(args[-2], args[-1])
+        if pathlib.Path(args[-2]).name == 'caddy.current':
+            state['normalized_old_config'] = pathlib.Path(args[-1]).read_text()
     elif args[:2] == ['rm', '-f']: pathlib.Path(args[-1]).unlink(missing_ok=True)
+    elif args[:2] == ['caddy', 'reload']:
+        config = (root / 'caddy.conf').read_text()
+        first_port = int(re.search(r'reverse_proxy\s+localhost:(\d+)', config).group(1))
+        route = 'candidate' if first_port == state['candidate_port'] else 'old'
+        if mode == 'caddy-rollback' and state['active_route'] == 'candidate' and route == 'old':
+            delayed('rollback-route-failed')
+            finish(code=1)
+        state['active_route'] = route
     finish()
 if name == 'curl':
     url = args[-1]
@@ -49,49 +168,120 @@ if name == 'curl':
     public = url.startswith('https://')
     if public:
         state['public_health'].append(state['web'])
-        text = (root / 'caddy.conf').read_text()
-        candidate = 'localhost:3010' in text and 'localhost:3000' not in text
-    else: candidate = ':3010/' in url
-    version = sha if candidate else 'd' * 40
-    finish('200' if '%{http_code}' in args else json.dumps({'version': version}, separators=(',', ':')))
+        candidate = state['active_route'] == 'candidate'
+    else: candidate = ':' + str(state['candidate_port']) + '/' in url
+    port = os.environ['TEST_PROXY_PORT'] if public else os.environ['TEST_CANDIDATE_PORT' if candidate else 'TEST_OLD_PORT']
+    if candidate and mode == 'candidate': finish(code=22)
+    if public and candidate and mode == 'caddy-rollback': finish(code=22)
+    try:
+        with urllib.request.urlopen('http://127.0.0.1:' + port + '/api/v1/health', timeout=2) as response:
+            body = json.dumps(json.load(response), separators=(',', ':'))
+            finish(str(response.status) if '%{http_code}' in args else body)
+    except urllib.error.HTTPError: finish(code=22)
 if name != 'docker': finish(code=2)
 if args[0] == 'version': finish('linux/amd64')
 if args[:2] == ['image', 'inspect']:
     if '--format' not in args: finish(code=0 if state['pulled'] else 1)
     fmt = args[args.index('--format') + 1]
+    if fmt == '{{json .Config}}':
+        finish(json.dumps({'Cmd': ['node', 'server.js'], 'Entrypoint': ['docker-entrypoint.sh'],
+                           'Env': ['NEXT_MANUAL_SIG_HANDLE=1'] if mode == 'manual-signal-image' else []}))
     if 'Config.User' in fmt: finish('1001' if mode == 'runtime-owner' else '1000')
     finish(sha if 'revision' in fmt else ('linux/amd64' if 'Architecture' in fmt else new))
 if args[0] == 'pull': state['pulled'] = True; finish()
 if args[0] == 'ps':
     service = next((arg.split('=', 2)[-1] for arg in args if 'compose.service=' in arg), None)
     project = next((arg.split('=', 2)[-1] for arg in args if 'compose.project=' in arg), '')
-    if service: finish('old-web' if service == 'web' and project.endswith('-blue') else (service if service != 'web' else ''))
-    finish('old-web' if project.endswith('-blue') else ('workers-heavy' if project == 'sotto-test' else ''))
+    if service:
+        finish((old_web if project.endswith('-' + state['old_slot']) else (candidate_web if state['web'] else ''))
+               if service == 'web' else state['worker_ids'].get(service, service))
+    finish(old_web if project.endswith('-' + state['old_slot']) else (state['worker_ids']['workers-heavy'] if project in ('sotto-test', 'sotto') else ''))
 if args[0] == 'inspect':
+    if '--format' not in args and '-f' not in args:
+        finish(json.dumps([{'Id': identifier, 'State': {'Running': state['running'].get(identifier, True),
+            'ExitCode': 143 if identifier in (old_web, candidate_web) and not state['running'].get(identifier, True) else 0,
+            'OOMKilled': False, 'Error': ''}, 'Image': image_for(identifier),
+            'RestartCount': 0} for identifier in args[1:]]))
     fmt = args[args.index('--format') + 1] if '--format' in args else args[args.index('-f') + 1]
     identifier = args[-1]
-    if fmt == '{{.Image}}': finish(old)
-    if fmt == '{{.State.Running}}': finish('true')
+    if fmt == '{{json .Config}}':
+        finish(json.dumps({'Cmd': ['node', 'server.js'], 'Entrypoint': ['docker-entrypoint.sh'],
+                           'Env': ['NEXT_MANUAL_SIG_HANDLE=1'] if mode == 'manual-signal-runtime' else []}))
+    if fmt == '{{.Image}}': finish(image_for(identifier))
+    if fmt == '{{.State.Running}}': finish('true' if state['running'].get(identifier, True) else 'false')
+    if 'ExitCode' in fmt:
+        if fmt == '{{.State.ExitCode}}': finish('0')
+        finish('false false 0')
     if 'RestartCount' in fmt:
-        image = state['workers']
-        if 'revision' in fmt: finish('false false 0 ' + sha if mode == 'workers' else 'true false 0 ' + sha)
-        if image == old: state['verified_workers'].append(identifier)
+        image = image_for(identifier)
+        if 'revision' in fmt:
+            revision = 'e' * 40 if mode == 'workers' and image == new else sha
+            finish('true false 0 ' + revision)
+        if identifier in old_workers.values():
+            state['verified_workers'].append(next(service for service, value in old_workers.items() if value == identifier))
         finish('true false 0 ' + image)
     finish()
 if args[0] == 'run':
+    if '/proc/meminfo' in args[-1]:
+        available = 1024 if mode == 'overlap-memory' else 6291456
+        finish('MemTotal: 8388608 kB\nMemAvailable: ' + str(available) + ' kB')
+    if mode == 'contract' and 'schema.prisma' not in args[-1]:
+        finish(('d' if old in args else 'e') * 64)
     if mode.startswith('schema-'): finish(('d' if old in args else 'e') * 64)
     finish('same')
 if args[0] == 'exec':
     script = args[-1]
-    if 'pg_database_size' in script: finish('1024', code=1 if mode in ('backup', 'schema-reviewed') else 0)
+    if 'SOTTO_DEPLOY_QUEUE=' in script:
+        request = json.load(sys.stdin)
+        command = request['command']
+        snapshot = {'schemaVersion': 1, 'connectionIdentity': 'f' * 64,
+                    'queues': [{'name': key, 'paused': value} for key, value in sorted(state['queue_flags'].items())]}
+        if command == 'established':
+            finish('SOTTO_DEPLOY_QUEUE=' + json.dumps({'schemaVersion': 1, 'connectionIdentity': 'f' * 64,
+                                                     'established': True, 'appliedMigrations': 3}))
+        if command == 'pause':
+            state['queue_flags'] = dict.fromkeys(state['queue_flags'], True)
+            snapshot['queues'] = [{'name': key, 'paused': True} for key in sorted(state['queue_flags'])]
+        if command == 'restore':
+            state['queue_flags'] = {queue['name']: queue['paused'] for queue in request['manifest']['queues']}
+            snapshot['queues'] = request['manifest']['queues']
+        if command == 'drained':
+            if state['journal_pending']: finish(code=1)
+            active = state['active']
+            snapshot.update({'drained': active == 0, 'activeJobs': active,
+                'executions': {'inspected': active, 'settled': 0, 'synchronousActive': 0, 'workerActive': active}})
+            state['active'] = 0
+            delayed('drain')
+        finish('SOTTO_DEPLOY_QUEUE=' + json.dumps(snapshot))
+    if 'pg_database_size' in script:
+        delayed('backup')
+        finish('1024', code=1 if mode in ('backup', 'schema-reviewed') else 0)
     if 'pg_dump' in script: finish('verified fixture dump')
     finish()
+if args[0] == 'top':
+    processes = 'PID PPID COMMAND\n100 1 node --max-old-space-size=1024 --import tsx src/workers/index.ts\n101 100 /app/node_modules/@esbuild/linux-x64/bin/esbuild --service=0.25.0 --ping'
+    if mode == 'extra-process': processes += '\n102 100 codex exec fixture'
+    finish(processes)
+if args[0] == 'stop':
+    identifiers = [arg for arg in args[1:] if arg in state['running']]
+    for identifier in identifiers:
+        if identifier in (*old_workers.values(), *new_workers.values()) and (state['active'] or state['journal_pending'] or not all(state['queue_flags'].values())):
+            state['unsafe_stops'].append(identifier)
+            finish(code=1)
+        if '--time' not in args or args[args.index('--time') + 1] != '-1':
+            state['unsafe_stops'].append(identifier)
+            finish(code=1)
+        state['running'][identifier] = False
+        state['stopped'].append(identifier)
+        if identifier == old_web: state['old_web'] = None
+    finish('\n'.join(identifiers))
 if args[0] in ('volume', 'tag'): finish()
 if args[0] != 'compose': finish(code=2)
 project = args[args.index('-p') + 1] if '-p' in args else ''
 overrides = [args[index + 1] for index, value in enumerate(args[:-1]) if value == '-f' and args[index + 1].endswith('.json')]
 config = json.loads(pathlib.Path(overrides[-1]).read_text()) if overrides else {}
-if 'ps' in args: finish(args[-1])
+if 'ps' in args:
+    finish((old_web if project.endswith('-' + state['old_slot']) else candidate_web) if args[-1] == 'web' else state['worker_ids'].get(args[-1], args[-1]))
 if 'exec' in args:
     command = args[args.index('exec') + 1:]
     if command[:2] == ['-T', 'postgres'] and 'pg_isready' in command:
@@ -104,34 +294,62 @@ if 'exec' in args:
     if command[:2] == ['-T', 'redis']: finish('PONG')
     finish()
 if 'up' in args:
-    if project.endswith('-green'):
+    if project.endswith('-' + state['new_slot']):
         state['web'] = new
-        state['premature_route'] = 'localhost:3010' in (root / 'caddy.conf').read_text()
-    if project.endswith('-blue'):
+        state['running'][candidate_web] = True
+        state['premature_route'] = state['active_route'] == 'candidate'
+        delayed('warmup')
+    if project.endswith('-' + state['old_slot']):
         state['old_web'] = old
+        state['running'][old_web] = True
         state['old_web_recreated'] = True
-    if 'workers-heavy' in config.get('services', {}) and ('--force-recreate' in args or 'workers-heavy' in args):
-        image = config['services']['workers-heavy']['image']
+    selected = [service for service in services if service in args]
+    if 'workers-heavy' in config.get('services', {}) and selected:
+        image = config['services'][selected[0]]['image']
+        if not all(state['queue_flags'].values()):
+            state['unsafe_starts'].extend(selected)
+            finish(code=1)
         state['workers'] = old if image == old else new
-if 'down' in args and project.endswith('-green'): state['web'] = None
+        state['worker_generation'] = 'old' if image == old else 'new'
+        for service in selected:
+            identifier = (old_workers if image == old else new_workers)[service]
+            state['worker_ids'][service] = identifier
+            state['running'][identifier] = True
+if 'down' in args:
+    identifier = candidate_web if project.endswith('-' + state['new_slot']) else old_web
+    if state['running'].get(identifier, False):
+        state['unsafe_stops'].append(identifier + ':compose-down-running')
+        finish(code=1)
+    if project.endswith('-' + state['new_slot']): state['web'] = None
 finish()
 '''
 
 
 class DeploymentFailureTests(unittest.TestCase):
-    def run_deployment(self, failure, stack='sotto-test', reviewed_schema=False, expect_rollback=True):
+    def run_deployment(self, failure, stack='sotto-test', reviewed_schema=False, success=False,
+                       expect_rollback=True, prepaused=False, retained_candidate=False, rollback_blocked=False,
+                       old_slot='blue'):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             source = Path(__file__).parents[2]
-            (root / 'scripts/deploy').mkdir(parents=True)
-            for name in ('deploy.sh', 'deploy/production-retention.py', 'deploy/database-command.py', 'smoke-prod.sh'):
+            shutil.copytree(source / 'scripts/deploy', root / 'scripts/deploy')
+            for name in ('deploy.sh', 'smoke-prod.sh'):
                 shutil.copyfile(source / 'scripts' / name, root / 'scripts' / name)
             shutil.copyfile(source / 'Caddyfile', root / 'Caddyfile')
             slot_file = root / f'.{stack}-deploy-slot'
-            slot_file.write_text('blue\n')
+            new_slot = 'green' if old_slot == 'blue' else 'blue'
+            slot_file.write_text(old_slot + '\n')
             original_caddy = 'reverse_proxy localhost:3000 localhost:3010\n'
             (root / 'caddy.conf').write_text(original_caddy)
-            state = {'capacity': 0, 'pulled': False, 'web': None, 'old_web': OLD, 'workers': OLD, 'public_health': [], 'verified_workers': [], 'premature_route': False}
+            state = {'capacity': 0, 'pulled': False, 'web': None, 'old_web': OLD,
+                     'workers': OLD, 'public_health': [], 'verified_workers': [],
+                     'premature_route': False, 'active_route': 'old', 'old_slot': old_slot, 'new_slot': new_slot,
+                     'candidate_port': 3010 if new_slot == 'green' else 3000, 'running': {OLD_WEB: True,
+                     **dict.fromkeys(OLD_WORKERS.values(), True)},
+                     'worker_ids': OLD_WORKERS.copy(),
+                     'queue_flags': {'audio-generation': prepaused, 'speaking-grading': False},
+                     'active': 1, 'journal_pending': failure == 'unknown-cleanup', 'unsafe_stops': [],
+                     'unsafe_starts': [], 'stopped': [], 'worker_generation': 'old'}
             (root / 'state.json').write_text(json.dumps(state))
             bin_path = root / 'bin'
             bin_path.mkdir()
@@ -156,34 +374,69 @@ class DeploymentFailureTests(unittest.TestCase):
                 values['SOTTO_REVIEWED_PREVIOUS_SCHEMA_HASH'] = 'd' * 64
                 values['SOTTO_REVIEWED_CANDIDATE_SCHEMA_HASH'] = 'e' * 64
             (root / '.env.production').write_text(''.join(key + '=' + value + '\n' for key, value in values.items()))
-            result = subprocess.run(['bash', str(root / 'scripts/deploy.sh')], env=environment,
-                                    text=True, capture_output=True, timeout=30)
-            self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+            with serving_fixture(root) as (ports, observations, phase_observations):
+                environment.update(ports)
+                command = ['bash', str(root / 'scripts/deploy.sh')]
+                if retained_candidate:
+                    unresolved = root / '.local/state/sotto-deploy/unresolved.json'
+                    stdout = root / 'controller.stdout'
+                    stderr = root / 'controller.stderr'
+                    with stdout.open('w') as output, stderr.open('w') as errors:
+                        process = subprocess.Popen(command, env=environment, stdout=output,
+                                                   stderr=errors, start_new_session=True)
+                        try:
+                            deadline = time.monotonic() + 30
+                            while not unresolved.exists() and process.poll() is None and time.monotonic() < deadline:
+                                time.sleep(0.02)
+                            self.assertTrue(unresolved.exists(), stdout.read_text() + stderr.read_text())
+                            self.assertIsNone(process.poll(), stdout.read_text() + stderr.read_text())
+                            with (root / 'deploy.lock').open('a') as lock:
+                                with self.assertRaises(BlockingIOError):
+                                    fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                            time.sleep(0.15)
+                            self.assertIsNone(process.poll(), stdout.read_text() + stderr.read_text())
+                        finally:
+                            if process.poll() is None:
+                                os.killpg(process.pid, signal.SIGKILL)
+                            process.wait(timeout=5)
+                    result = subprocess.CompletedProcess(command, process.returncode,
+                                                         stdout.read_text(), stderr.read_text())
+                else:
+                    result = subprocess.run(command, env=environment, text=True,
+                                            capture_output=True, timeout=30)
+            if success:
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            else:
+                self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
             after = json.loads((root / 'state.json').read_text())
+            after['observations'] = observations
+            after['phase_observations'] = phase_observations
+            after['calls'] = [json.loads(line) for line in (root / 'calls.jsonl').read_text().splitlines()]
             if expect_rollback:
                 self.assertEqual(after['old_web'], OLD, result.stdout + result.stderr)
-                self.assertEqual(after['workers'], OLD, result.stdout + result.stderr)
-                self.assertIsNone(after['web'], result.stdout + result.stderr)
-                self.assertEqual(slot_file.read_text(), 'blue\n')
-                self.assertEqual((root / 'caddy.conf').read_text(), original_caddy)
+                self.assertEqual(after['workers'], NEW if rollback_blocked else OLD, result.stdout + result.stderr)
+                self.assertEqual(after['web'], NEW if retained_candidate else None, result.stdout + result.stderr)
+                self.assertEqual(slot_file.read_text(), old_slot + '\n')
+                if not retained_candidate:
+                    self.assertEqual((root / 'caddy.conf').read_text(), after.get('normalized_old_config', original_caddy))
             else:
                 self.assertEqual(after['workers'], NEW, result.stdout + result.stderr)
                 self.assertEqual(after['web'], NEW, result.stdout + result.stderr)
-                self.assertEqual(slot_file.read_text(), 'green\n')
+                self.assertEqual(slot_file.read_text(), new_slot + '\n')
             self.assertFalse(after['premature_route'], result.stdout + result.stderr)
+            self.assertTrue(observations, result.stdout + result.stderr)
+            self.assertTrue(all(status == 200 for status, version in observations), observations)
+            self.assertFalse(after['unsafe_stops'], result.stdout + result.stderr)
+            self.assertFalse(after['unsafe_starts'], result.stdout + result.stderr)
             return after, result.stdout + result.stderr
 
-    def test_primary_deployment_stops_when_only_initialization_socket_is_ready(self):
-        state, output = self.run_deployment('postgres-unavailable', stack='sotto')
-        self.assertIn('Postgres not ready', output)
-        self.assertNotIn('Backing up the application database', output)
-        self.assertFalse(state.get('postgres_ready', False), output)
-
-    def test_primary_deployment_reaches_backup_after_database_accepts_tcp(self):
+    def test_established_primary_keeps_shared_infrastructure_running_during_backup(self):
         state, output = self.run_deployment('backup', stack='sotto')
-        self.assertTrue(state.get('postgres_ready', False), output)
         self.assertIn('Backing up the application database', output)
-        self.assertNotIn('Postgres not ready', output)
+        self.assertFalse(any(call[0] == 'docker' and 'compose' in call and
+                             'docker-compose.infra.yml' in call and 'up' in call
+                             for call in state['calls']), output)
+        self.assertEqual({version for status, version in state['observations']}, {'d' * 40})
 
     def test_capacity_rejection_before_import_keeps_current_services(self):
         state, output = self.run_deployment('pre-capacity')
@@ -219,7 +472,7 @@ class DeploymentFailureTests(unittest.TestCase):
         self.assertNotIn('Running database migrations', output)
         self.assertEqual(state['workers'], OLD, output)
 
-    def test_worker_failure_restores_images_routing_slot_and_checks_public_health(self):
+    def test_wrong_worker_revision_restores_images_routing_slot_and_checks_public_health(self):
         state, output = self.run_deployment('workers')
         self.assertIn('workers-heavy did not remain healthy', output)
         self.assertNotIn('restored worker', output)
@@ -227,12 +480,87 @@ class DeploymentFailureTests(unittest.TestCase):
         self.assertIsNone(state['public_health'][-1], output)
         self.assertEqual(set(state['verified_workers']), {'workers-heavy', 'workers-pipeline', 'workers-light'}, output)
 
-    def test_post_finalization_failure_keeps_the_verified_candidate_serving(self):
+    def test_final_metadata_failure_does_not_remove_the_verified_public_service(self):
         state, output = self.run_deployment('final-capacity', expect_rollback=False)
         self.assertEqual(state['capacity'], 5, output)
         self.assertIn('Tags access check OK (status 401)', output)
         self.assertIn('Saved active slot: green', output)
-        self.assertIn('Keeping the verified candidate serving', output)
+        self.assertEqual(state['observations'][-1], (200, SHA))
+
+    def test_code_only_deployment_keeps_http_serving_through_warmup_and_drain(self):
+        state, output = self.run_deployment('none', success=True, expect_rollback=False)
+        self.assertIn((200, 'd' * 40), state['observations'])
+        self.assertIn((200, SHA), state['observations'])
+        for phase in ('backup', 'warmup', 'drain'):
+            self.assertIn((200, 'd' * 40), state['phase_observations'].get(phase, []), output)
+        self.assertTrue(all(not paused for paused in state['queue_flags'].values()), output)
+        self.assertEqual(state['worker_ids'], NEW_WORKERS, output)
+        self.assertTrue(all(state['running'][identifier] for identifier in NEW_WORKERS.values()), output)
+        self.assertTrue(all(not state['running'][identifier] for identifier in OLD_WORKERS.values()), output)
+        self.assertIsNone(state['old_web'], output)
+        self.assertFalse(any('initialize' in call or 'finalize' in call or
+                             'migrate' in call or '--force-recreate' in call
+                             for call in state['calls']), output)
+
+    def test_candidate_failure_keeps_old_http_and_workers_serving(self):
+        state, output = self.run_deployment('candidate')
+        self.assertEqual({version for status, version in state['observations']}, {'d' * 40})
+        self.assertFalse(any(identifier != CANDIDATE_WEB for identifier in state['stopped']), output)
+
+    def test_prepaused_queue_remains_paused_after_successful_worker_replacement(self):
+        state, output = self.run_deployment('none', success=True, expect_rollback=False, prepaused=True)
+        self.assertEqual(state['queue_flags'], {'audio-generation': True, 'speaking-grading': False}, output)
+
+    def test_unknown_worker_cleanup_blocks_replacement_without_stopping_old_workers(self):
+        state, output = self.run_deployment('unknown-cleanup', retained_candidate=True)
+        self.assertFalse(set(state['stopped']) & set(OLD_WORKERS.values()), output)
+        self.assertEqual(state['worker_generation'], 'old', output)
+        self.assertTrue(all(state['queue_flags'].values()), output)
+        self.assertEqual({version for status, version in state['observations']}, {'d' * 40})
+
+    def test_extra_worker_child_blocks_replacement_without_forcing_termination(self):
+        state, output = self.run_deployment('extra-process', retained_candidate=True)
+        self.assertFalse(set(state['stopped']) & set(OLD_WORKERS.values()), output)
+        self.assertEqual(state['worker_generation'], 'old', output)
+        self.assertTrue(all(state['queue_flags'].values()), output)
+        self.assertEqual({version for status, version in state['observations']}, {'d' * 40})
+
+    def test_incompatible_job_contract_never_starts_a_candidate(self):
+        state, output = self.run_deployment('contract')
+        self.assertFalse(any('up' in call and 'web' in call for call in state['calls']), output)
+        self.assertFalse(state['stopped'], output)
+
+    def test_insufficient_overlap_memory_keeps_old_http_and_workers_serving(self):
+        state, output = self.run_deployment('overlap-memory')
+        self.assertIn('Insufficient RAM', output)
+        self.assertFalse(state['stopped'], output)
+        self.assertFalse(any('up' in call and 'web' in call for call in state['calls']), output)
+        self.assertEqual({version for status, version in state['observations']}, {'d' * 40})
+
+    def test_custom_signal_handler_blocks_replacement_before_mutation(self):
+        for failure in ('manual-signal-image', 'manual-signal-runtime'):
+            with self.subTest(configuration=failure):
+                state, output = self.run_deployment(failure)
+                self.assertFalse(state['stopped'], output)
+                self.assertFalse(any('up' in call and 'web' in call for call in state['calls']), output)
+                self.assertEqual({version for status, version in state['observations']}, {'d' * 40})
+
+    def test_failed_routing_rollback_keeps_both_web_slots_and_active_proxy_serving(self):
+        state, output = self.run_deployment('caddy-rollback', retained_candidate=True, rollback_blocked=True)
+        self.assertTrue(state['running'][OLD_WEB], output)
+        self.assertTrue(state['running'][CANDIDATE_WEB], output)
+        self.assertEqual(state['active_route'], 'candidate', output)
+        self.assertTrue(all(state['queue_flags'].values()), output)
+        self.assertIn((200, SHA), state['phase_observations'].get('rollback-route-failed', []), output)
+
+    def test_legacy_dual_upstreams_restore_old_green_without_routing_to_retired_blue(self):
+        state, output = self.run_deployment('workers', old_slot='green')
+        self.assertEqual(state['active_route'], 'old', output)
+        self.assertTrue(state['running'][OLD_WEB], output)
+        self.assertFalse(state['running'][CANDIDATE_WEB], output)
+        self.assertIn('localhost:3010', state['normalized_old_config'], output)
+        self.assertNotIn('localhost:3000', state['normalized_old_config'], output)
+        self.assertEqual({version for status, version in state['observations']}, {'d' * 40})
 
 
 class CliHomeSmokeTests(unittest.TestCase):

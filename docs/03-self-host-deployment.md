@@ -1,6 +1,6 @@
 # Self-Host Deployment Guide
 
-**Date:** 2026-09-10
+**Date:** 2026-10-11
 
 **Summary:** Install Sotto on your computer with Docker, or deploy it to a VPS with explicit settings and private storage.
 
@@ -211,9 +211,13 @@ Set `SOTTO_RELEASE_SHA` to the full committed checkout SHA and provide complete 
 
 Install your reviewed shared-host capacity checker before using this production script. `PRODUCTION_CAPACITY_CHECKER` defaults to `/usr/local/lib/production/production_capacity.py`. Its `before-import` command receives `--image-bytes` and `--transfer-bytes`; `before-switch` checks remaining capacity after imports. A missing checker or rejected allocation stops deployment. Use a policy that reserves at least 10 GiB, rejects disk or inode usage at 85%, and requires 100,000 free inodes. The script holds `/var/lock/production-build.lock` through health verification. Preinstall any required infrastructure/helper images through the same admission process; service commands cannot pull unbudgeted images.
 
-Provide `SOTTO_BACKUP_BYTES` as a measured allowance for the database archive. The checker reserves that allocation alongside absent images; exact digests already present need no import budget. `SOTTO_BACKUP_DIR` defaults to `$HOME/.local/state/sotto-backups/$SOTTO_STACK`. Before migrations, the script checks database size, creates a custom-format `pg_dump`, reads the full archive with `pg_restore` without restoring a database, and retains its checksum. Completed deployments retain the newest ten successful backups and all backups younger than thirty days, including the current and previous deployment. Cleanup removes only older backups with matching success metadata and checksums. Failed, unmarked, malformed, and symlinked backups remain for review.
+Provide `SOTTO_BACKUP_BYTES` as a measured allowance for the database archive. The checker reserves that allocation alongside absent images; exact digests already present need no import budget. `SOTTO_BACKUP_DIR` defaults to `$HOME/.local/state/sotto-backups/$SOTTO_STACK`. Before candidate startup, the script checks database size, creates a custom-format `pg_dump`, reads the full archive with `pg_restore` without restoring a database, and retains its checksum. The current site keeps serving during this transactionally consistent backup. Completed deployments retain the newest ten successful backups and all backups younger than thirty days, including the current and previous deployment. Cleanup removes only older backups with matching success metadata and checksums. Failed, unmarked, malformed, and symlinked backups remain for review.
 
-Existing-stack deployments require identical Prisma schema and migration assets between current and candidate workers. Handle schema changes through a separately reviewed migration procedure. For these code-only releases, a failed candidate restores prior worker images and Caddy routing before retiring the old web slot. Public routing is switched to the verified candidate and checked while the previous slot remains available.
+Existing-stack deployments require identical Prisma schema, migration assets, shared job contracts and Sidedoor runtime assets between current and candidate workers. The runner verifies the applied migration checksums and finalized access state without writing to the database. It preserves shared credentials and running infrastructure. Handle incompatible changes through a separately reviewed migration procedure.
+
+The old site serves pages, APIs and audio throughout backup, candidate startup and worker draining. After candidate health and smoke checks pass, the runner saves each queue's original pause flag, pauses delivery and waits for active jobs and provider cleanup to settle. New asynchronous requests remain durable and wait for delivery to resume. Workers are replaced individually only after their captured process trees are idle. Caddy then routes to the healthy candidate, the runner restores the original queue flags and gracefully retires the old web slot without a forced-kill deadline. Routine compatible releases do not install a full-site maintenance response.
+
+A failed candidate leaves the old slot serving. Failures during replacement restore old routing and verified workers before resuming queues. Unknown provider ownership, unresolved cleanup or an unverified rollback retains the deployment lock and evidence, with queues paused. The durable `$HOME/.local/state/sotto-deploy/unresolved.json` marker also blocks a new attempt after an interrupted controller. Inspect the recorded containers, queue manifest and cleanup state before clearing that marker. Never clear it to bypass unresolved work.
 
 Matching schema-review hashes cannot bypass this restriction. Additive enum changes can still make newly written rows unreadable by older Prisma clients. Before a separate schema-changing rollout, fence HTTP admissions, preserve and pause the affected queues, verify that active jobs and provider executions have settled, and only then stop the old services. Worker shutdown cancels active jobs; it does not safely drain them. The migration procedure must define the point after which recovery keeps admissions fenced and proceeds with compatible code instead of restarting the previous release.
 
@@ -227,12 +231,12 @@ The deploy script:
 2. copies `.env.production` to `.env` for Docker Compose;
 3. admits the measured image budget, pulls verified digests and rechecks capacity;
 4. records rollback image protection and validates Caddy;
-5. starts existing infra images from `docker-compose.infra.yml`;
-6. runs Prisma migrations using the verified worker image;
-7. health-checks the new web slot;
-8. runs `scripts/smoke-prod.sh`;
-9. restarts workers from the prepared `docker-compose.workers.yml` image;
-10. stops the previous app slot and records successful image retention after final capacity verification.
+5. verifies existing infrastructure, access state and migration checksums (first install starts infrastructure and initializes the database);
+6. backs up the database while the current site serves, then checks RAM for overlapping web slots;
+7. starts and health-checks the new web slot, then runs `scripts/smoke-prod.sh`;
+8. preserves queue flags, pauses delivery and drains jobs before replacing idle workers individually;
+9. switches Caddy to the verified candidate and restores queue flags;
+10. gracefully stops the previous web slot and records successful image retention after final capacity verification.
 
 ## 7. Verify
 

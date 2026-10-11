@@ -17,6 +17,12 @@ set -euo pipefail
 # One lock covers admission, image imports, service changes and health checks.
 exec 9>"${PRODUCTION_DEPLOY_LOCK:-/var/lock/production-build.lock}"
 flock -n 9 || { echo "Another production deployment or maintenance operation is active." >&2; exit 1; }
+DEPLOY_STATE_ROOT="$HOME/.local/state/sotto-deploy"
+UNRESOLVED_DEPLOYMENT="$DEPLOY_STATE_ROOT/unresolved.json"
+if [ -e "$UNRESOLVED_DEPLOYMENT" ]; then
+  echo "ERROR: unresolved deployment requires review before another attempt: $UNRESOLVED_DEPLOYMENT" >&2
+  exit 1
+fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -334,19 +340,43 @@ python3 - <<'PREVIOUS_IMAGES'
 import json, os, subprocess
 stack = os.environ["SOTTO_STACK"]
 def previous(project, service):
-    ids = subprocess.check_output(["docker", "ps", "-aq", "--filter", "label=com.docker.compose.project=" + project, "--filter", "label=com.docker.compose.service=" + service], text=True).split()
+    ids = subprocess.check_output(["docker", "ps", "-aq", "--no-trunc", "--filter", "label=com.docker.compose.project=" + project, "--filter", "label=com.docker.compose.service=" + service], text=True).split()
     if len(ids) > 1:
         raise SystemExit("Ambiguous previous service containers")
-    return subprocess.check_output(["docker", "inspect", "--format", "{{.Image}}", ids[0]], text=True).strip() if ids else None
-workers = {name: {"image": image} for name in ("workers-heavy", "workers-pipeline", "workers-light") if (image := previous(stack, name))}
+    return {"container": ids[0], "image": subprocess.check_output(["docker", "inspect", "--format", "{{.Image}}", ids[0]], text=True).strip()} if ids else None
+captured = {name: item for name in ("workers-heavy", "workers-pipeline", "workers-light") if (item := previous(stack, name))}
+workers = {name: {"image": item["image"]} for name, item in captured.items()}
 with open(os.environ["PREVIOUS_WORKER_IMAGES"], "w") as stream:
-    json.dump({"services": workers}, stream)
+    json.dump({"services": workers, "x-captured-containers": {name: item["container"] for name, item in captured.items()}}, stream)
 web = previous(stack + "-" + os.environ["OLD_SLOT"], "web")
 with open(os.environ["PREVIOUS_APP_IMAGES"], "w") as stream:
-    json.dump({"services": {"web": {"image": web}} if web else {}}, stream)
+    json.dump({"services": {"web": {"image": web["image"]}} if web else {}, "x-captured-container": web["container"] if web else None}, stream)
 PREVIOUS_IMAGES
 previous_worker_id=$(python3 -c 'import json,sys; images={item["image"] for item in json.load(open(sys.argv[1]))["services"].values()}; print(next(iter(images)) if len(images)==1 else "")' "$PREVIOUS_WORKER_IMAGES")
 previous_web_id=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["services"].get("web",{}).get("image",""))' "$PREVIOUS_APP_IMAGES")
+# The proven Next shutdown path awaits pending requests before exiting 143.
+if [ -n "${NEXT_MANUAL_SIG_HANDLE:-}" ]; then
+  echo "ERROR: NEXT_MANUAL_SIG_HANDLE disables verified graceful web retirement." >&2
+  exit 1
+fi
+web_configs="$IMAGE_OVERRIDES/web-runtime-configs.jsonl"
+docker image inspect --format '{{json .Config}}' "$SOTTO_WEB_IMAGE_REF" > "$web_configs"
+if [ "$OLD_SLOT" != none ]; then
+  captured_web=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["x-captured-container"])' "$PREVIOUS_APP_IMAGES")
+  docker inspect --format '{{json .Config}}' "$captured_web" >> "$web_configs"
+fi
+python3 - "$web_configs" <<'WEB_SHUTDOWN'
+import json, sys
+for line in open(sys.argv[1]):
+    config = json.loads(line)
+    if config.get('Cmd') != ['node', 'server.js'] or config.get('Entrypoint') not in (None, [], ['docker-entrypoint.sh']):
+        raise SystemExit('Unreviewed web entrypoint; current service remains serving')
+    for entry in config.get('Env') or []:
+        name, _, value = entry.partition('=')
+        if name == 'NEXT_MANUAL_SIG_HANDLE' and value:
+            raise SystemExit('Manual signal override disables verified graceful web retirement')
+WEB_SHUTDOWN
+rm "$web_configs"
 for kind in WEB WORKERS; do
   tag_variable="SOTTO_${kind}_ROLLBACK_TAG"
   tag="${!tag_variable:-}"
@@ -372,12 +402,107 @@ while IFS= read -r previous_image; do
   fi
 done < <(python3 -c 'import json,sys; print("\n".join(sorted({item["image"] for item in json.load(open(sys.argv[1]))["services"].values()})))' "$PREVIOUS_WORKER_IMAGES")
 
+# Schema identity alone does not establish mixed-version job compatibility.
+if [ "$OLD_SLOT" != none ]; then
+  rolling_contract_source=$(<scripts/deploy/checks/rolling-contract.cjs)
+  candidate_contract=$(docker run --rm --pull never --network none --entrypoint node "$SOTTO_WORKERS_IMAGE_REF" -e "$rolling_contract_source")
+  while IFS= read -r previous_image; do
+    [ -z "$previous_image" ] && continue
+    previous_contract=$(docker run --rm --pull never --network none --entrypoint node "$previous_image" -e "$rolling_contract_source")
+    if [ "$previous_contract" != "$candidate_contract" ]; then
+      echo "ERROR: job, authority, storage or shared-runtime contracts differ. Use a separately reviewed compatibility procedure." >&2
+      exit 1
+    fi
+  done < <(python3 -c 'import json,sys; print("\n".join(sorted({item["image"] for item in json.load(open(sys.argv[1]))["services"].values()})))' "$PREVIOUS_WORKER_IMAGES")
+fi
+
+DEPLOY_STATE_DIR="$DEPLOY_STATE_ROOT/$SOTTO_RELEASE_SHA-$RETENTION_ATTEMPT_KEY"
+mkdir -p "$DEPLOY_STATE_DIR"
+chmod 700 "$DEPLOY_STATE_DIR"
+QUEUE_MANIFEST="$DEPLOY_STATE_DIR/queues-original.json"
+QUEUE_HELPER=$(<scripts/deploy/queue-lifecycle.cjs)
+QUEUE_HELPER+=$'\nmodule.exports.main().catch(() => { console.error("Deployment queue lifecycle failed. Preserve the original manifest and inspect existing state."); process.exitCode = 1; });'
+QUEUES_PAUSED=false
+
+queue_control() {
+  local command="$1" container="" ids payload raw report
+  for service in workers-light workers-pipeline workers-heavy; do
+    ids=$(docker ps -q --no-trunc --filter "label=com.docker.compose.project=$SOTTO_STACK" --filter "label=com.docker.compose.service=$service")
+    if [ -n "$ids" ]; then
+      if [ "$(printf '%s\n' "$ids" | wc -l | tr -d ' ')" != 1 ]; then
+        echo "ERROR: ambiguous deployment control worker." >&2
+        return 1
+      fi
+      container="$ids"
+      break
+    fi
+  done
+  if [ -z "$container" ]; then echo "ERROR: no running worker can supervise the queue lifecycle." >&2; return 1; fi
+  payload=$(python3 - "$command" "$QUEUE_MANIFEST" <<'QUEUE_INPUT'
+import json, pathlib, sys
+command, path = sys.argv[1:]
+value = {'command': command}
+if command not in ('snapshot', 'established'):
+    value['manifest'] = json.loads(pathlib.Path(path).read_text())
+print(json.dumps(value))
+QUEUE_INPUT
+  ) || return 1
+  raw=$(mktemp "$DEPLOY_STATE_DIR/queue-$command.log.XXXXXX")
+  printf '%s\n' "$payload" | docker exec -i -w /app/apps/web "$container" node --import tsx -e "$QUEUE_HELPER" > "$raw" || return 1
+  report=$(python3 - "$raw" <<'QUEUE_OUTPUT'
+import json, pathlib, sys
+lines = [line.removeprefix('SOTTO_DEPLOY_QUEUE=') for line in pathlib.Path(sys.argv[1]).read_text().splitlines() if line.startswith('SOTTO_DEPLOY_QUEUE=')]
+assert len(lines) == 1, 'Missing queue lifecycle report'
+print(json.dumps(json.loads(lines[0])))
+QUEUE_OUTPUT
+  ) || return 1
+  if [ "$command" = snapshot ]; then
+    printf '%s\n' "$report" | python3 -c 'import os,sys; path=sys.argv[1]; stream=open(path,"x"); stream.write(sys.stdin.read()); stream.flush(); os.fsync(stream.fileno()); stream.close(); directory=os.open(os.path.dirname(path),os.O_RDONLY); os.fsync(directory); os.close(directory)' "$QUEUE_MANIFEST" || return 1
+  fi
+  printf '%s\n' "$report"
+}
+
+wait_for_worker_drain() {
+  local deadline=$((SECONDS + 1200)) report
+  while true; do
+    report=$(queue_control drained) || return 1
+    if printf '%s\n' "$report" | python3 -c 'import json,sys; sys.exit(0 if json.load(sys.stdin)["drained"] else 1)'; then return 0; fi
+    if [ "$SECONDS" -ge "$deadline" ]; then
+      echo "ERROR: worker drain did not settle. Current web remains serving; no forced termination." >&2
+      return 1
+    fi
+    sleep 2
+  done
+}
+
+hold_unresolved() {
+  python3 - "$UNRESOLVED_DEPLOYMENT" "$DEPLOY_STATE_DIR" "$IMAGE_OVERRIDES" "$SOTTO_STACK" <<'UNRESOLVED'
+import json, os, sys
+path, state, images, stack = sys.argv[1:]
+with open(path, 'x') as stream:
+    json.dump({'stack': stack, 'stateDirectory': state, 'imageOverrides': images}, stream)
+    stream.flush()
+    os.fsync(stream.fileno())
+directory = os.open(os.path.dirname(path), os.O_RDONLY)
+os.fsync(directory)
+os.close(directory)
+UNRESOLVED
+  echo "Unresolved deployment. Keeping current HTTP service and deployment lock; inspect $UNRESOLVED_DEPLOYMENT" >&2
+  while true; do /bin/sleep 30; done
+}
+
+if [ "$OLD_SLOT" != none ]; then
+  echo "=== Verifying established access and database state without conversion ==="
+  queue_control established
+fi
+
 WORKERS_CHANGED=false
 CADDY_CHANGED=false
 WEB_STARTED=false
 OLD_SLOT_STOPPED=false
 DEPLOYMENT_COMPLETE=false
 PLATFORM_FINALIZED=false
+TRAFFIC_COMMITTED=false
 if [ -f "$CADDY_SITE_PATH" ]; then cp "$CADDY_SITE_PATH" "$IMAGE_OVERRIDES/caddy.previous"; fi
 if [ -f "$SLOT_FILE" ]; then cp "$SLOT_FILE" "$IMAGE_OVERRIDES/slot.previous"; fi
 finish_deployment() {
@@ -385,43 +510,69 @@ finish_deployment() {
   trap - EXIT
   set +e
   if [ "$status" -ne 0 ] && [ "$DEPLOYMENT_COMPLETE" != true ]; then
-    if [ "$PLATFORM_FINALIZED" = true ]; then
-      echo "Deployment metadata failed after platform finalization. Keeping the verified candidate serving because the previous release is no longer schema-compatible." >&2
+    if [ "$PLATFORM_FINALIZED" = true ] || [ "$TRAFFIC_COMMITTED" = true ]; then
+      echo "Deployment metadata failed after verified cutover. Keeping the verified candidate serving." >&2
       curl --retry 10 --retry-delay 2 --retry-all-errors -fsS --max-time 10 "${NEXT_PUBLIC_APP_URL%/}/api/v1/health" >/dev/null || echo "ERROR: finalized candidate failed public health verification" >&2
       rm -rf "$IMAGE_OVERRIDES"
       exit "$status"
     fi
     echo "Deployment failed. Restoring the previous services and routing." >&2
+    if [ "$CADDY_CHANGED" = true ]; then
+      if [ -f "$IMAGE_OVERRIDES/caddy.current" ]; then
+        sudo install -m 0644 "$IMAGE_OVERRIDES/caddy.current" "$CADDY_SITE_PATH" || hold_unresolved
+      elif [ -f "$IMAGE_OVERRIDES/caddy.previous" ]; then
+        sudo install -m 0644 "$IMAGE_OVERRIDES/caddy.previous" "$CADDY_SITE_PATH" || hold_unresolved
+      else
+        sudo rm -f "$CADDY_SITE_PATH" || hold_unresolved
+      fi
+      if ! sudo caddy validate --config /etc/caddy/Caddyfile || ! sudo caddy reload --config /etc/caddy/Caddyfile --force; then
+        echo "ERROR: routing rollback is unresolved; preserving both web slots." >&2
+        hold_unresolved
+      fi
+    fi
     if [ "$WORKERS_CHANGED" = true ]; then
+      if [ "$OLD_SLOT" != none ]; then
+        if ! queue_control pause || ! wait_for_worker_drain; then
+          echo "ERROR: rollback cleanup is unresolved. Current HTTP service remains; preserve paused queues, $DEPLOY_STATE_DIR and $IMAGE_OVERRIDES." >&2
+          hold_unresolved
+        fi
+        for service in workers-heavy workers-pipeline workers-light; do
+          candidate=$(docker ps -q --no-trunc --filter "label=com.docker.compose.project=$SOTTO_STACK" --filter "label=com.docker.compose.service=$service")
+          if [ -n "$candidate" ]; then
+            if ! python3 scripts/deploy/stop-workers.py stop "$candidate"; then
+              echo "ERROR: candidate worker cleanup is unresolved. Preserve paused queues and deployment evidence." >&2
+              hold_unresolved
+            fi
+          fi
+          docker compose -f "$COMPOSE_WORKERS" -f "$PREVIOUS_WORKER_IMAGES" -p "$SOTTO_STACK" up -d --no-deps --no-build --pull never "$service" || { echo "ERROR: worker rollback failed" >&2; hold_unresolved; }
+        done
+      fi
       previous_services=$(python3 -c 'import json,sys; print(" ".join(json.load(open(sys.argv[1]))["services"]))' "$PREVIOUS_WORKER_IMAGES")
       if [ -n "$previous_services" ]; then
         # Service names come from the fixed allowlist above.
-        docker compose -f "$COMPOSE_WORKERS" -f "$PREVIOUS_WORKER_IMAGES" -p "$SOTTO_STACK" up -d --no-build --pull never $previous_services || echo "ERROR: worker rollback failed" >&2
         sleep 10
         for service in $previous_services; do
           container=$(docker compose -f "$COMPOSE_WORKERS" -f "$PREVIOUS_WORKER_IMAGES" -p "$SOTTO_STACK" ps -q "$service")
           expected_image=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["services"][sys.argv[2]]["image"])' "$PREVIOUS_WORKER_IMAGES" "$service")
           if [ -z "$container" ] || [ "$(docker inspect --format '{{.State.Running}} {{.State.OOMKilled}} {{.RestartCount}} {{.Image}}' "$container")" != "true false 0 $expected_image" ]; then
             echo "ERROR: restored worker $service failed runtime or image verification" >&2
+            hold_unresolved
           fi
         done
       else
         docker compose -f "$COMPOSE_WORKERS" -f "$WORKER_IMAGES" -p "$SOTTO_STACK" stop workers-heavy workers-pipeline workers-light
       fi
     fi
-    if [ "$CADDY_CHANGED" = true ]; then
-      if [ -f "$IMAGE_OVERRIDES/caddy.previous" ]; then
-        sudo install -m 0644 "$IMAGE_OVERRIDES/caddy.previous" "$CADDY_SITE_PATH"
-      else
-        sudo rm -f "$CADDY_SITE_PATH"
-      fi
-      sudo caddy validate --config /etc/caddy/Caddyfile && sudo caddy reload --config /etc/caddy/Caddyfile --force || echo "ERROR: routing rollback failed" >&2
+    if [ "$QUEUES_PAUSED" = true ]; then
+      queue_control restore || { echo "ERROR: original queue states remain unresolved; preserve deployment evidence." >&2; hold_unresolved; }
     fi
     if [ "$OLD_SLOT_STOPPED" = true ]; then
       if [ "$OLD_SLOT" = blue ]; then export WEB_PORT=$WEB_PORT_BLUE; else export WEB_PORT=$WEB_PORT_GREEN; fi
       docker compose -f "$COMPOSE_APP" -f "$PREVIOUS_APP_IMAGES" -p "${SOTTO_STACK}-${OLD_SLOT}" up -d --no-build --pull never web || echo "ERROR: web rollback failed" >&2
     fi
     if [ "$WEB_STARTED" = true ]; then
+      candidate_web=$(docker compose -f "$COMPOSE_APP" -f "$APP_IMAGES" -p "${SOTTO_STACK}-${NEW_SLOT}" ps -q web)
+      if [ -n "$candidate_web" ]; then python3 scripts/deploy/stop-workers.py stop-web "$candidate_web" || { echo "ERROR: candidate web shutdown unresolved" >&2; hold_unresolved; }; fi
       docker compose -f "$COMPOSE_APP" -f "$APP_IMAGES" -p "${SOTTO_STACK}-${NEW_SLOT}" down --timeout 10 || echo "ERROR: candidate teardown failed" >&2
     fi
     if [ -f "$IMAGE_OVERRIDES/slot.previous" ]; then
@@ -466,7 +617,7 @@ fi
 # Shared across all stacks; only the primary stack manages it. A secondary
 # stack bringing it up would collide on the fixed sotto-prod-* container names.
 
-if [ "$SOTTO_STACK" != "sotto" ]; then
+if [ "$SOTTO_STACK" != "sotto" ] || [ "$OLD_SLOT" != none ]; then
   echo ""
   echo "=== Secondary stack ($SOTTO_STACK): verifying shared infrastructure ==="
   for c in sotto-prod-postgres sotto-prod-redis; do
@@ -538,6 +689,7 @@ docker volume create agent-codex-home >/dev/null
 # starts. The networkless sidecar copies only the two supported auth JSON files
 # into the stack-scoped volume shared by those containers.
 echo ""
+if [ "$OLD_SLOT" = none ]; then
 echo "=== Syncing host CLI credentials ==="
 docker compose -f "$COMPOSE_WORKERS" -f "$WORKER_IMAGES" -p "$SOTTO_STACK" up -d --no-build --pull never credential-sync
 for i in $(seq 1 15); do
@@ -552,6 +704,10 @@ for i in $(seq 1 15); do
   fi
   sleep 1
 done
+
+else
+  echo "Preserving the running credential sidecar and shared CLI authority during overlap."
+fi
 
 export WEB_PORT=$NEW_WEB_PORT
 
@@ -575,6 +731,7 @@ sha256sum "$backup_file" > "$backup_file.sha256"
 python3 "$PRODUCTION_CAPACITY_CHECKER" before-switch
 
 echo ""
+if [ "$OLD_SLOT" = none ]; then
 echo "=== Running database migrations ==="
 docker compose -f "$COMPOSE_WORKERS" -f "$WORKER_IMAGES" -p "$SOTTO_STACK" run --rm --no-deps --pull never \
   -e DATABASE_URL="${DIRECT_DATABASE_URL:-$DATABASE_URL}" \
@@ -582,6 +739,9 @@ docker compose -f "$COMPOSE_WORKERS" -f "$WORKER_IMAGES" -p "$SOTTO_STACK" run -
 docker compose -f "$COMPOSE_APP" -f "$APP_IMAGES" -p "${SOTTO_STACK}-${NEW_SLOT}" run --rm --no-deps --pull never \
   -e DATABASE_URL="${DIRECT_DATABASE_URL:-$DATABASE_URL}" \
   web node dist/access.cjs initialize
+else
+  echo "Established database and access state verified read-only; no conversion or migration during overlap."
+fi
 
 # --- Start new slot ---
 
@@ -598,6 +758,10 @@ fi
 
 echo ""
 echo "=== Starting $NEW_SLOT slot ==="
+if [ "$OLD_SLOT" != none ]; then
+  memory_probe='process.stdout.write(require("node:fs").readFileSync("/proc/meminfo","utf8"));'
+  docker run --rm --pull never --network none --entrypoint node "$SOTTO_WORKERS_IMAGE_REF" -e "$memory_probe" | python3 scripts/deploy/stop-workers.py overlap 1073741824
+fi
 WEB_STARTED=true
 docker compose -f "$COMPOSE_APP" -f "$APP_IMAGES" -p "${SOTTO_STACK}-${NEW_SLOT}" up -d --no-build --pull never web
 
@@ -633,7 +797,7 @@ if [ "$HEALTH_OK" = false ]; then
   docker compose -f "$COMPOSE_APP" -f "$APP_IMAGES" -p "${SOTTO_STACK}-${NEW_SLOT}" logs --tail=50 web
   echo ""
   echo "=== Tearing down failed $NEW_SLOT slot ==="
-  docker compose -f "$COMPOSE_APP" -f "$APP_IMAGES" -p "${SOTTO_STACK}-${NEW_SLOT}" down --timeout 10
+  # The exit handler supervises candidate shutdown without imposing a kill deadline.
   echo "Old slot ($OLD_SLOT) still serving traffic"
   exit 1
 fi
@@ -645,14 +809,28 @@ echo "=== Post-deploy smoke check ==="
 BASE_URL="http://127.0.0.1:${NEW_WEB_PORT}" bash scripts/smoke-prod.sh
 
 # --- Restart workers ---
-# Workers are stateless BullMQ consumers; jobs are durable in Redis.
-# No drain needed. Restart immediately with new code.
+# Pause delivery while the existing web continues admitting durable work.
 
 echo ""
 echo "=== Restarting workers ==="
 echo "Worker presets: heavy=${WORKER_PRESET_HEAVY:-full} pipeline=${WORKER_PRESET_PIPELINE:-full} light=${WORKER_PRESET_LIGHT:-full}"
-WORKERS_CHANGED=true
-docker compose -f "$COMPOSE_WORKERS" -f "$WORKER_IMAGES" -p "$SOTTO_STACK" up -d --force-recreate --no-build --pull never
+if [ "$OLD_SLOT" != none ]; then
+  echo "=== Draining workers while current web remains serving ==="
+  queue_control snapshot
+  QUEUES_PAUSED=true
+  queue_control pause
+  wait_for_worker_drain || hold_unresolved
+  WORKERS_CHANGED=true
+  for service in workers-heavy workers-pipeline workers-light; do
+    wait_for_worker_drain
+    previous_container=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["x-captured-containers"][sys.argv[2]])' "$PREVIOUS_WORKER_IMAGES" "$service")
+    python3 scripts/deploy/stop-workers.py stop "$previous_container"
+    docker compose -f "$COMPOSE_WORKERS" -f "$WORKER_IMAGES" -p "$SOTTO_STACK" up -d --no-deps --no-build --pull never "$service"
+  done
+else
+  WORKERS_CHANGED=true
+  docker compose -f "$COMPOSE_WORKERS" -f "$WORKER_IMAGES" -p "$SOTTO_STACK" up -d --no-build --pull never
+fi
 sleep 10
 for service in workers-heavy workers-pipeline workers-light; do
   container=$(docker compose -f "$COMPOSE_WORKERS" -f "$WORKER_IMAGES" -p "$SOTTO_STACK" ps -q "$service")
@@ -673,19 +851,25 @@ if [ "$(printf '%s' "$public_health" | python3 -c 'import json,sys; print(json.l
 fi
 
 echo ""
+if [ "$OLD_SLOT" = none ]; then
 echo "=== Finalizing Sidedoor conversion ==="
 docker compose -f "$COMPOSE_APP" -f "$APP_IMAGES" -p "${SOTTO_STACK}-${NEW_SLOT}" run --rm --no-deps --pull never \
   -e DATABASE_URL="${DIRECT_DATABASE_URL:-$DATABASE_URL}" \
   web node dist/access.cjs finalize
 PLATFORM_FINALIZED=true
+else
+  queue_control restore
+  QUEUES_PAUSED=false
+fi
 
 echo "$NEW_SLOT" > "$SLOT_FILE.next-$$"
 mv "$SLOT_FILE.next-$$" "$SLOT_FILE"
+TRAFFIC_COMMITTED=true
 echo ""
 echo "=== Saved active slot: $NEW_SLOT ==="
 
 # --- Stop old slot ---
-# Workers are already out of app compose. No job drain needed here.
+# Route new requests first; existing HTTP/provider cleanup may finish afterward.
 
 if [ "$OLD_SLOT" != "none" ]; then
   echo ""
@@ -699,6 +883,8 @@ if [ "$OLD_SLOT" != "none" ]; then
   fi
 
   OLD_SLOT_STOPPED=true
+  previous_web_container=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["x-captured-container"])' "$PREVIOUS_APP_IMAGES")
+  python3 scripts/deploy/stop-workers.py stop-web "$previous_web_container" || hold_unresolved
   docker compose -f "$COMPOSE_APP" -f "$APP_IMAGES" -p "${SOTTO_STACK}-${OLD_SLOT}" down --timeout 10
 fi
 
