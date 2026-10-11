@@ -1,0 +1,261 @@
+'use strict';
+
+const assert = require('node:assert/strict');
+const { createHash } = require('node:crypto');
+const { readdir, readFile } = require('node:fs/promises');
+const { createRequire } = require('node:module');
+const { join } = require('node:path');
+
+const LIMIT = 10000;
+const LEGACY_TABLES = [
+  'UserVisualCueKey',
+  'UserAiKey',
+  'UserTtsKey',
+  'AutoModelConfig',
+  'SiteConfig',
+];
+
+function connectionIdentity(environment, namespace) {
+  const database = new URL(environment.DATABASE_URL);
+  const redis = new URL(environment.REDIS_URL);
+  const endpoint = (url, port) => [url.protocol, url.hostname, url.port || port, url.pathname];
+  return createHash('sha256')
+    .update(
+      JSON.stringify({
+        namespace,
+        database: [...endpoint(database, '5432'), database.searchParams.get('schema')],
+        redis: endpoint(redis, '6379'),
+      })
+    )
+    .digest('hex');
+}
+
+function validateManifest(manifest, names, identity) {
+  assert(manifest && typeof manifest === 'object', 'Original queue manifest required');
+  assert.deepEqual(Object.keys(manifest).sort(), ['connectionIdentity', 'queues', 'schemaVersion']);
+  assert.equal(manifest.schemaVersion, 1);
+  assert.equal(manifest.connectionIdentity, identity, 'Queue connection identity changed');
+  assert(Array.isArray(manifest.queues));
+  assert.deepEqual(manifest.queues.map((queue) => queue.name).sort(), names);
+  for (const queue of manifest.queues) {
+    assert.deepEqual(Object.keys(queue).sort(), ['name', 'paused']);
+    assert.equal(typeof queue.paused, 'boolean');
+  }
+}
+
+async function readOnly(database, operation) {
+  return database.$transaction(
+    async (transaction) => {
+      await transaction.$executeRawUnsafe('SET TRANSACTION READ ONLY');
+      await transaction.$executeRawUnsafe("SET LOCAL statement_timeout='15s'");
+      return operation(transaction);
+    },
+    { isolationLevel: 'RepeatableRead', timeout: 20000, maxWait: 5000 }
+  );
+}
+
+async function inspectExecutions(runtime) {
+  return readOnly(runtime.database, async (transaction) => {
+    const rows = await transaction.$queryRawUnsafe(
+      'SELECT "state" FROM "SidedoorState" WHERE "state"->>\'kind\' = $1 LIMIT 10001',
+      'job_execution'
+    );
+    assert(rows.length <= LIMIT, 'Execution inspection bound exceeded');
+    const journal = runtime.sottoJobExecutions(transaction);
+    const outbox = runtime.sottoJobOutbox(transaction);
+    const summary = { inspected: 0, settled: 0, synchronousActive: 0, workerActive: 0 };
+    for (const { state } of rows) {
+      const record = await journal.read({
+        id: state.id,
+        parentId: state.parentId,
+        fingerprint: state.fingerprint,
+        executorId: state.executorId,
+      });
+      summary.inspected++;
+      if (record.status === 'settled') {
+        summary.settled++;
+        continue;
+      }
+      assert.equal(record.status, 'active', 'Execution cleanup is unresolved');
+      const receipt = await outbox.receipt(record.parentId);
+      assert(
+        receipt && receipt.id === record.parentId && receipt.fingerprint === record.fingerprint,
+        'Execution parent receipt does not match'
+      );
+      assert(
+        ['pending', 'complete'].includes(receipt.status),
+        'Unexpected execution parent status'
+      );
+      const parent = await outbox.read(record.parentId);
+      assert(
+        parent && parent.job.id === record.parentId && parent.fingerprint === record.fingerprint,
+        'Execution parent work does not match'
+      );
+      assert.equal(parent.job.handler, receipt.handler);
+      assert.equal(parent.job.version, receipt.version);
+      assert.equal(parent.complete, receipt.status === 'complete');
+      if (runtime.isSottoSynchronousJob(receipt.handler, receipt.version)) {
+        assert.equal(receipt.handler, 'learning-writing');
+        assert.equal(receipt.version, 1);
+        if (receipt.status === 'pending') summary.synchronousActive++;
+        else summary.workerActive++;
+      } else {
+        runtime.requireSottoJobVersion(receipt.handler, receipt.version);
+        summary.workerActive++;
+      }
+    }
+    return summary;
+  });
+}
+
+async function established(runtime) {
+  const entries = await readdir(runtime.migrationDirectory, { withFileTypes: true });
+  const migrations = new Map();
+  for (const entry of entries
+    .filter((item) => item.isDirectory())
+    .sort((a, b) => a.name.localeCompare(b.name))) {
+    const raw = await readFile(join(runtime.migrationDirectory, entry.name, 'migration.sql'));
+    migrations.set(entry.name, createHash('sha256').update(raw).digest('hex'));
+  }
+  assert(migrations.size > 0, 'Committed migration inventory is missing');
+  return readOnly(runtime.database, async (transaction) => {
+    const state = await runtime.sidedoorStateStore(transaction).read();
+    await runtime.sottoStorageInstance(transaction).read();
+    assert(
+      state.configuration.site !== null && state.configuration.automaticModels !== null,
+      'Canonical configuration is incomplete'
+    );
+    const legacy = await transaction.$queryRawUnsafe(
+      'SELECT table_name FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = ANY($1::text[])',
+      LEGACY_TABLES
+    );
+    assert.equal(legacy.length, 0, 'Platform conversion is not finalized');
+    const applied = await transaction.$queryRawUnsafe(
+      'SELECT migration_name, checksum, finished_at, rolled_back_at FROM "_prisma_migrations"'
+    );
+    assert.equal(applied.length, migrations.size, 'Applied migration inventory differs');
+    const seen = new Set();
+    for (const migration of applied) {
+      assert(
+        migration.finished_at !== null && migration.rolled_back_at === null,
+        'Migration is unfinished or rolled back'
+      );
+      assert(!seen.has(migration.migration_name), 'Duplicate applied migration');
+      seen.add(migration.migration_name);
+      assert.equal(
+        migration.checksum,
+        migrations.get(migration.migration_name),
+        'Applied migration differs from committed bytes'
+      );
+    }
+    return { established: true, appliedMigrations: applied.length };
+  });
+}
+
+/** Dependencies are the actual database, queue and filesystem boundaries in tests. */
+async function run(input, runtime) {
+  assert(input && typeof input === 'object');
+  assert(Object.keys(input).every((key) => ['command', 'manifest'].includes(key)));
+  assert(['snapshot', 'pause', 'drained', 'restore', 'established'].includes(input.command));
+  const identity = connectionIdentity(runtime.environment, runtime.namespace);
+  const base = { schemaVersion: 1, connectionIdentity: identity };
+  if (input.command === 'established') return { ...base, ...(await established(runtime)) };
+  const names = [...runtime.names].sort();
+  assert(names.length > 0 && new Set(names).size === names.length);
+  if (input.manifest !== undefined || ['pause', 'drained', 'restore'].includes(input.command))
+    validateManifest(input.manifest, names, identity);
+  const queues = [];
+  try {
+    for (const name of names) queues.push(runtime.createQueue(name));
+    if (input.command === 'pause') {
+      for (const queue of queues) await queue.pause();
+    }
+    if (input.command === 'restore') {
+      for (const queue of queues) {
+        if (input.manifest.queues.find((item) => item.name === queue.name).paused)
+          await queue.pause();
+        else await queue.resume();
+      }
+    }
+    const snapshot = [];
+    for (const queue of queues) snapshot.push({ name: queue.name, paused: await queue.isPaused() });
+    if (['pause', 'drained'].includes(input.command))
+      assert(
+        snapshot.every((queue) => queue.paused),
+        'Queues must remain paused'
+      );
+    if (input.command === 'restore') {
+      const expected = [...input.manifest.queues].sort((a, b) => a.name.localeCompare(b.name));
+      assert.deepEqual(snapshot, expected, 'Original queue pause states were not restored');
+    }
+    if (input.command !== 'drained') return { ...base, queues: snapshot };
+    const executions = await inspectExecutions(runtime);
+    let activeJobs = 0;
+    for (const queue of queues) {
+      assert(await queue.isPaused(), 'Queue fence changed during inspection');
+      activeJobs += await queue.getActiveCount();
+    }
+    return {
+      ...base,
+      queues: snapshot,
+      activeJobs,
+      executions,
+      drained: activeJobs === 0 && executions.workerActive === 0,
+    };
+  } finally {
+    const closed = await Promise.allSettled(queues.map((queue) => queue.close()));
+    assert(
+      closed.every((result) => result.status === 'fulfilled'),
+      'Queue connection cleanup failed'
+    );
+  }
+}
+
+function productionRuntime() {
+  const load = createRequire('/app/apps/web/package.json');
+  const { Queue } = load('bullmq');
+  const { ALL_QUEUE_NAMES } = load('/app/apps/web/src/lib/queue.ts');
+  const { getSharedQueueRedisClient, closeRedis } = load('/app/apps/web/src/lib/redis.ts');
+  const { prismaUnfiltered } = load('/app/apps/web/src/lib/prisma.ts');
+  const store = load('/app/apps/web/src/lib/sidedoor/access/state/store.ts');
+  return {
+    ...store,
+    ...load('/app/apps/web/src/lib/sidedoor/jobs/core/job-contracts.ts'),
+    ...load('/app/apps/web/src/lib/sidedoor/jobs/core/job-execution-lifetime.ts'),
+    ...load('/app/apps/web/src/lib/sidedoor/jobs/core/job-delivery.ts'),
+    database: prismaUnfiltered,
+    namespace: store.SIDEDOOR_STATE_ID,
+    names: ALL_QUEUE_NAMES,
+    environment: process.env,
+    closeRedis,
+    migrationDirectory: '/app/apps/web/prisma/migrations',
+    createQueue: (name) =>
+      new Queue(name, { connection: getSharedQueueRedisClient(), skipMetasUpdate: true }),
+  };
+}
+
+async function main() {
+  let bytes = 0;
+  const chunks = [];
+  for await (const chunk of process.stdin) {
+    bytes += Buffer.byteLength(chunk);
+    assert(bytes <= 65536, 'Input bound exceeded');
+    chunks.push(Buffer.from(chunk));
+  }
+  const input = JSON.parse(Buffer.concat(chunks).toString());
+  const runtime = productionRuntime();
+  try {
+    console.log('SOTTO_DEPLOY_QUEUE=' + JSON.stringify(await run(input, runtime)));
+  } finally {
+    await Promise.all([runtime.closeRedis(), runtime.database.$disconnect()]);
+  }
+}
+
+module.exports = { run, connectionIdentity, main };
+if (require.main === module)
+  main().catch(() => {
+    console.error(
+      'Deployment queue lifecycle failed. Preserve the original manifest and inspect existing state.'
+    );
+    process.exitCode = 1;
+  });
