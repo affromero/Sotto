@@ -10,6 +10,7 @@ RUN apk add --no-cache g++ libc6-compat make openssl python3
 WORKDIR /app
 
 COPY package.json package-lock.json ./
+COPY vendor/braces ./vendor/braces/
 COPY apps/web/package.json ./apps/web/
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/groundcheck/package.json ./packages/groundcheck/
@@ -26,6 +27,7 @@ RUN apk add --no-cache libc6-compat openssl
 WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/vendor ./vendor/
 COPY packages/shared ./packages/shared/
 COPY packages/groundcheck ./packages/groundcheck/
 COPY packages/learning-model ./packages/learning-model/
@@ -101,6 +103,7 @@ COPY --from=builder /app/apps/web/public ./apps/web/public
 
 # Copy standalone build output
 COPY --from=builder --chown=${RUNTIME_UID}:${RUNTIME_UID} /app/apps/web/.next/standalone ./
+COPY --from=builder --chown=${RUNTIME_UID}:${RUNTIME_UID} /app/vendor ./vendor/
 COPY --from=builder --chown=${RUNTIME_UID}:${RUNTIME_UID} /app/apps/web/.next/static ./apps/web/.next/static
 COPY --from=builder --chown=${RUNTIME_UID}:${RUNTIME_UID} /app/apps/web/dist/access.cjs ./apps/web/dist/access.cjs
 

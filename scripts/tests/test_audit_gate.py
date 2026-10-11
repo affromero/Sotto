@@ -45,9 +45,10 @@ class AuditGateTests(unittest.TestCase):
                 cwd=root, env=environment, capture_output=True, text=True, timeout=15,
             )
 
-    def test_unpatched_development_tooling_is_allowed_before_expiry(self):
+    def test_unpatched_development_tooling_is_rejected_without_an_exception(self):
         result = self.run_gate({'node_modules/braces': {'dev': True}}, ['node_modules/braces'])
-        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('GHSA-vfj7-8cjw-p6xm', result.stderr)
 
     def test_runtime_and_mixed_dependencies_still_fail(self):
         for packages, nodes in [

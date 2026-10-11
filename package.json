@@ -55,6 +55,7 @@
     "@prisma/config": {
       "deepmerge-ts": "8.0.2"
     },
+    "braces": "$braces",
     "esbuild": "$esbuild",
     "postcss": "$postcss",
     "prisma": {
@@ -70,6 +71,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
+    "braces": "file:vendor/braces",
     "esbuild": "0.28.2",
     "eslint": "10.12.0",
     "knip": "6.39.0",

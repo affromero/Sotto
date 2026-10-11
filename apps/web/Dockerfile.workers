@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 COPY package.json package-lock.json ./
+COPY vendor/braces ./vendor/braces/
 COPY apps/web/package.json ./apps/web/
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/groundcheck/package.json ./packages/groundcheck/
@@ -49,6 +50,7 @@ ENV HOME=/home/sotto
 
 # Copy dependencies with Prisma client (root + workspace-specific node_modules)
 COPY --from=deps --chown=${RUNTIME_UID}:${RUNTIME_UID} /app/node_modules ./node_modules
+COPY --from=deps --chown=${RUNTIME_UID}:${RUNTIME_UID} /app/vendor ./vendor/
 COPY --from=deps --chown=${RUNTIME_UID}:${RUNTIME_UID} /app/apps/web/node_modules ./apps/web/node_modules
 
 # Copy workspace structure (workers need full src/ for tsx runtime compilation)
