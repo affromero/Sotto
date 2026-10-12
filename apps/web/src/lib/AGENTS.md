@@ -428,9 +428,13 @@ Semantic patches use a reference for rejected about and atoms for rejected
 focus and tip entries. An about-only rejection never expands repair authority to
 an accepted example; select another useful example or fail the final audit closed.
 All example patches merge first; references then resolve against the complete
-merged array. Only rejected about, observations and example notes are compiled. Accepted
-strings retain their exact bytes and original quote even when an example changes;
-the full final audit checks that retained sentence. Historical restoration never
+merged array. Rejected about, observations and example notes are compiled. Private fresh-generation
+indices retain the original about, focus and tip bindings without changing stored content.
+When a selected example target changes, its linked about is rendered again and only the
+compiler-added prefixes on accepted focus and tips are refreshed. Authored observation
+text and unrelated accepted strings remain exact; duplicate target strings do not
+change index identity. The full final audit checks every retained observation against
+the repaired example. Historical restoration never
 adds framing. Explicit local scope does not prove linguistic correctness.
 Every fresh visual text, including titles and labels, must exactly reuse a compiled
 observation, complete target or paired meaning. URLs remain typed URL fields.
@@ -448,7 +452,8 @@ Structural repair receives measured word-limit and address-limit diagnostics,
 may remove redundant whole entries, and aims for 80 raw words to leave room for
 compiled quotes. Semantic repair preserves every accepted entry even when shortening.
 Intro semantic repair returns a strict patch of the actual rejected addresses.
-Accepted fields and array entries remain exact, accepted visuals are retained, and
+Accepted authored fields and array entries remain exact apart from those derived
+example references; accepted visuals are retained, and
 rejected optional visuals are removed. The initial full audit binds its private
 receipt to the captured execution and trusted lesson context. The replacement audit
 reviews every current address again and never reuses prior approvals. Every address
