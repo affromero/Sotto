@@ -118,7 +118,15 @@ function requireProviderObjectSchemas(value: unknown): void {
   Object.values(schema).forEach(requireProviderObjectSchemas);
 }
 
-function respond(initial: unknown, replacement: unknown = initial, rejected: string[] = []) {
+function respond(
+  initial: unknown,
+  replacement: unknown = initial,
+  rejected: string[] = [],
+  reviewRepaired?: (
+    item: Item,
+    intro: Payload['introContext']
+  ) => { defect: string; correction: string } | undefined
+) {
   let replaced = false;
   boundary.generate.mockImplementation(async (_system, messages, options) => {
     const name = options.jsonSchema.name;
@@ -137,12 +145,17 @@ function respond(initial: unknown, replacement: unknown = initial, rejected: str
     return {
       model: 'captured-model',
       content: JSON.stringify({
-        items: payload.items.map(({ index, content, sourceParts }) => {
+        items: payload.items.map((item) => {
+          const { index, content, sourceParts } = item;
           if (name === 'class_intro_critic') return { index, findings: [] };
           const key =
             content.address.field +
             (content.address.index === undefined ? '' : `:${content.address.index}`);
-          const unacceptable = !replaced && rejected.includes(key);
+          const repairedFinding = replaced
+            ? reviewRepaired?.(item, payload.introContext)
+            : undefined;
+          const unacceptable =
+            (!replaced && rejected.includes(key)) || repairedFinding !== undefined;
           const fieldPath =
             content.address.field === 'examples' ? ['example', 'target'] : [content.address.field];
           const text =
@@ -159,8 +172,8 @@ function respond(initial: unknown, replacement: unknown = initial, rejected: str
                       fieldPath,
                       quote: text.slice(0, 120),
                       rule: 'Describe the selected example accurately.',
-                      defect: 'Correct this observation.',
-                      correction: 'Use the corrected observation.',
+                      defect: repairedFinding?.defect ?? 'Correct this observation.',
+                      correction: repairedFinding?.correction ?? 'Use the corrected observation.',
                       counterexample: null,
                     },
                     sourceParts
@@ -232,7 +245,15 @@ describe('strict scoped A1 intro wire', () => {
         },
       },
     };
-    respond(original, patch, ['examples:2']);
+    respond(original, patch, ['examples:2'], ({ content }, intro) => {
+      if (content.address.field !== 'focus' || content.address.index !== 2) return;
+      const prefix = `„${intro.examples[2]!.target}“: `;
+      if ((content.fields.focus as string).startsWith(prefix)) return;
+      return {
+        defect: 'The focus quotation differs from its repaired example.',
+        correction: 'Quote the current example about mi casa.',
+      };
+    });
     const result = await generateClassIntro({
       ...params,
       level: 'A2',
@@ -297,55 +318,17 @@ describe('strict scoped A1 intro wire', () => {
   });
 
   it('still rejects a retained observation that is invalid for the repaired example', async () => {
-    respond(wire, { examples: { 0: shortExample } }, ['examples:0']);
-    const ordinaryResponse = boundary.generate.getMockImplementation()!;
-    boundary.generate.mockImplementation(async (system, messages, options) => {
-      const name = options.jsonSchema.name;
-      if (name !== 'class_intro_critic' && name !== 'class_intro_adjudicator')
-        return ordinaryResponse(system, messages, options);
-      const payload: Payload = JSON.parse(messages[0].content);
-      if (payload.introContext.examples[0].target !== 'Guten Morgen')
-        return ordinaryResponse(system, messages, options);
+    respond(wire, { examples: { 0: shortExample } }, ['examples:0'], ({ content }, intro) => {
+      if (
+        content.address.field !== 'focus' ||
+        content.address.index !== 0 ||
+        intro.examples[0].target !== 'Guten Morgen' ||
+        !(content.fields.focus as string).includes('Kochen')
+      )
+        return;
       return {
-        model: 'captured-model',
-        content: JSON.stringify({
-          items: payload.items.map(({ index, content, sourceParts }) => {
-            const invalid = content.address.field === 'focus' && content.address.index === 0;
-            return name === 'class_intro_critic'
-              ? {
-                  index,
-                  findings: invalid
-                    ? [
-                        teachingFindingFixture(
-                          {
-                            fieldPath: ['focus'],
-                            quote: content.fields.focus as string,
-                            issue: 'incorrect',
-                            rule: 'The observation must describe the current example.',
-                            defect: 'The greeting contains no form of kochen.',
-                            correction: 'This is a morning greeting.',
-                            counterexample: null,
-                          },
-                          sourceParts
-                        ),
-                      ]
-                    : [],
-                }
-              : {
-                  index,
-                  criticDecisions: invalid
-                    ? [
-                        {
-                          findingIndex: 0,
-                          decision: 'supported',
-                          reason: 'The current example is a greeting, not kochen.',
-                        },
-                      ]
-                    : [],
-                  newFindings: [],
-                };
-          }),
-        }),
+        defect: 'The greeting contains no form of kochen.',
+        correction: 'This is a morning greeting.',
       };
     });
     await expect(generateClassIntro(params)).rejects.toMatchObject({
