@@ -243,7 +243,7 @@ describe('field-local A1 intro repair', () => {
   });
 
   it.each([false, true])(
-    'changes the first example and frames only a rejected overview: %s',
+    'refreshes references to the first repaired example with an overview rejection of %s',
     async (rejectAbout) => {
       const correctedExample = {
         target: 'Ich habe gestern einen Film gesehen.',
@@ -258,9 +258,16 @@ describe('field-local A1 intro repair', () => {
       };
       const repaired = {
         ...candidate,
-        about: rejectAbout
-          ? `„${correctedExample.target}“: ${correctedExample.meaning}`
-          : candidate.about,
+        about: '„Ich habe gestern einen Film gesehen.“: Yesterday I watched a film.',
+        focus: [
+          '„Ich habe gestern einen Film gesehen.“: Wähle das passende Hilfsverb.',
+          '„Ich habe gestern einen Film gesehen.“: Beachte die Wortstellung.',
+        ],
+        tips: [
+          '„Ich habe gestern einen Film gesehen.“: Lerne das Hilfsverb.',
+          '„Ich habe gestern einen Film gesehen.“: Nenne die vergangene Zeit.',
+          '„Ich habe gestern einen Film gesehen.“: Vergleiche vollständige Sätze.',
+        ],
         examples: [correctedExample, ...candidate.examples.slice(1)],
       };
       boundary.generate.mockResolvedValueOnce({ content: JSON.stringify(candidate) });
