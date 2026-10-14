@@ -17,12 +17,13 @@ import {
 } from './providers/cartesia';
 import { ERROR_CACHE_TTL_MS, formatUsageDuration, nowIso } from './utils';
 import { captureSottoProviderAdmission } from '@/lib/sidedoor/credentials/runtime/provider-execution';
+import { getAutoModelConfig, resolveDisabledSystemAiProviders } from '@/lib/auto-model-config';
 
-const PROVIDER_ADAPTERS: UsageProviderAdapter[] = [
-  getClaudeUsageProvider,
-  getCodexUsageProvider,
-  getElevenLabsUsageProvider,
-  getCartesiaUsageProvider,
+const PROVIDER_ADAPTERS: { id: string; adapter: UsageProviderAdapter }[] = [
+  { id: 'claude-code', adapter: getClaudeUsageProvider },
+  { id: 'codex', adapter: getCodexUsageProvider },
+  { id: 'elevenlabs', adapter: getElevenLabsUsageProvider },
+  { id: 'cartesia', adapter: getCartesiaUsageProvider },
 ];
 export type { AgentUsageProvider, AgentUsageStatus, UsageProviderContext } from './types';
 export {
@@ -43,8 +44,12 @@ export async function getAgentUsageStatus(
     : siblings.signal;
   const context: UsageProviderContext = { ...execution, signal };
   const admit = await captureSottoProviderAdmission(context);
+  await admit.validate(signal);
+  const disabledProviders = resolveDisabledSystemAiProviders(await getAutoModelConfig());
   const results = await Promise.allSettled(
-    PROVIDER_ADAPTERS.map(async (adapter) => {
+    PROVIDER_ADAPTERS.filter(
+      ({ id }) => (id !== 'claude-code' && id !== 'codex') || !disabledProviders.has(id)
+    ).map(async ({ adapter }) => {
       try {
         await admit.validate(signal);
         const provider = await adapter(context);

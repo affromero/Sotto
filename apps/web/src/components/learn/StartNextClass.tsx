@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useEffect } from 'react';
 import { useRef } from 'react';
+import type { ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { SottoSpinner } from '@/components/ui/SottoSpinner';
 import styles from './StartNextClass.module.css';
@@ -10,6 +11,7 @@ import styles from './StartNextClass.module.css';
 interface StartNextClassProps {
   courseId: string;
   activeClassId: string | null;
+  children?: ReactNode;
 }
 
 type Phase = 'idle' | 'generating' | 'done';
@@ -27,6 +29,8 @@ interface GenerationProgress {
   operationId?: string;
   operationStatus?: string;
   result?: string | null;
+  availableAt?: string;
+  timeZone?: string;
 }
 
 interface PreparationActivity {
@@ -43,7 +47,7 @@ interface PreparationActivity {
   latest?: number;
 }
 
-export function StartNextClass({ courseId, activeClassId }: StartNextClassProps) {
+export function StartNextClass({ courseId, activeClassId, children }: StartNextClassProps) {
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>('idle');
   const [error, setError] = useState('');
@@ -56,7 +60,29 @@ export function StartNextClass({ courseId, activeClassId }: StartNextClassProps)
   const [acknowledgeUnknownOutcome, setAcknowledgeUnknownOutcome] = useState(false);
   const [isRecovering, setIsRecovering] = useState(false);
   const activeController = useRef<AbortController | null>(null);
+  const inspectionController = useRef<AbortController | null>(null);
+  const [statusUnavailable, setStatusUnavailable] = useState(false);
   const buttonLabel = activeClassId ? 'Resume class' : 'Take a class';
+
+  useEffect(() => {
+    const controller = new AbortController();
+    inspectionController.current = controller;
+    setGeneration(null);
+    setStatusUnavailable(false);
+    void fetch(`/api/v1/courses/${courseId}/generation`, {
+      cache: 'no-store',
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error('Preparation status is unavailable');
+        const progress = (await response.json()) as GenerationProgress;
+        if (!controller.signal.aborted) setGeneration(progress);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setStatusUnavailable(true);
+      });
+    return () => controller.abort();
+  }, [courseId]);
 
   useEffect(() => {
     return () => {
@@ -72,14 +98,15 @@ export function StartNextClass({ courseId, activeClassId }: StartNextClassProps)
     }
   }
 
-  function startPolling(monitoringExisting: boolean, pollNow = true) {
+  function startPolling(monitoringExisting: boolean, pollNow = true, openWhenReady = true) {
+    inspectionController.current?.abort();
     activeController.current?.abort();
     const controller = new AbortController();
     activeController.current = controller;
     setIsMonitoringExisting(monitoringExisting);
     setActivity(null);
     setPhase('generating');
-    if (pollNow) void pollGenerationProgress(controller.signal, monitoringExisting);
+    if (pollNow) void pollGenerationProgress(controller.signal, monitoringExisting, openWhenReady);
     return controller;
   }
 
@@ -186,7 +213,7 @@ export function StartNextClass({ courseId, activeClassId }: StartNextClassProps)
       }
       const body = (await res.json()) as { cancelling?: boolean };
       if (body.cancelling) {
-        startPolling(true);
+        startPolling(true, true, false);
         return;
       }
       setGeneration(null);
@@ -203,6 +230,7 @@ export function StartNextClass({ courseId, activeClassId }: StartNextClassProps)
 
   async function handleSchedule(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    inspectionController.current?.abort();
     setError('');
     const date = new Date(scheduledAt);
     if (!Number.isFinite(date.getTime())) {
@@ -225,13 +253,15 @@ export function StartNextClass({ courseId, activeClassId }: StartNextClassProps)
         setError(typeof body.error === 'string' ? body.error : 'Could not schedule preparation.');
         return;
       }
-      startPolling(true);
+      startPolling(true, true, false);
     } catch {
       setError('Could not reach Sotto to schedule preparation.');
     }
   }
 
   async function handleRecovery() {
+    activeController.current?.abort();
+    activeController.current = null;
     setIsRecovering(true);
     setError('');
     try {
@@ -246,7 +276,7 @@ export function StartNextClass({ courseId, activeClassId }: StartNextClassProps)
         return;
       }
       setAcknowledgeUnknownOutcome(false);
-      startPolling(true);
+      startPolling(true, true, false);
     } catch {
       setError('Could not reach Sotto to recover preparation.');
     } finally {
@@ -259,10 +289,12 @@ export function StartNextClass({ courseId, activeClassId }: StartNextClassProps)
       cache: 'no-store',
       signal,
     });
-    if (!res.ok) return null;
+    if (!res.ok) throw new Error('Could not read class preparation status.');
 
     const progress = (await res.json()) as GenerationProgress;
+    if (signal?.aborted) return null;
     setGeneration(progress);
+    setStatusUnavailable(false);
     if (progress.operationId) {
       try {
         const result = await fetch(`/api/v1/courses/${courseId}/preparation?limit=100`, {
@@ -293,7 +325,11 @@ export function StartNextClass({ courseId, activeClassId }: StartNextClassProps)
     return progress;
   }
 
-  async function pollGenerationProgress(signal: AbortSignal, monitoringExisting: boolean) {
+  async function pollGenerationProgress(
+    signal: AbortSignal,
+    monitoringExisting: boolean,
+    openWhenReady = true
+  ) {
     while (!signal.aborted) {
       try {
         const progress = await fetchGenerationProgress(signal);
@@ -301,7 +337,7 @@ export function StartNextClass({ courseId, activeClassId }: StartNextClassProps)
         if (monitoringExisting && progress?.status === 'IDLE') {
           if (activeController.current) stopPolling(activeController.current);
           setPhase('idle');
-          setError('No preparation is currently scheduled.');
+          setError('');
           return;
         }
         if (progress?.result === 'done') {
@@ -319,11 +355,21 @@ export function StartNextClass({ courseId, activeClassId }: StartNextClassProps)
         if (isClassReadyToOpen(progress)) {
           activeController.current?.abort();
           activeController.current = null;
-          router.push(`/learn/class/${progress.classId}`);
+          if (openWhenReady) router.push(`/learn/class/${progress.classId}`);
+          else {
+            setPhase('idle');
+            router.refresh();
+          }
           return;
         }
       } catch (err) {
         if (isAbortError(err)) return;
+        if (signal.aborted) return;
+        activeController.current?.abort();
+        activeController.current = null;
+        setStatusUnavailable(true);
+        setPhase('idle');
+        return;
       }
 
       await wait(1500, signal);
@@ -383,9 +429,12 @@ export function StartNextClass({ courseId, activeClassId }: StartNextClassProps)
 
   if (phase === 'done') {
     return (
-      <p className={styles.done} role="status">
-        Course complete
-      </p>
+      <div className={styles.root}>
+        <p className={styles.done} role="status">
+          Course complete
+        </p>
+        {children}
+      </div>
     );
   }
 
@@ -404,41 +453,44 @@ export function StartNextClass({ courseId, activeClassId }: StartNextClassProps)
     const canCancel = !generation || generation.status === 'GENERATING';
 
     return (
-      <div
-        className={styles.composing}
-        role="status"
-        aria-live="polite"
-        aria-label="Composing your next class, please wait"
-      >
-        <SottoSpinner
-          size="large"
-          progress={progress}
-          label={title}
-          detail={detail}
-          showPercent
-          orientation="stack"
-          ariaLabel="Composing your next class"
-        />
-        <div className={styles.composingActions}>
-          <span className={styles.composingMeta}>{meta}</span>
-          {canCancel ? (
-            <button
-              type="button"
-              className={styles.cancelButton}
-              onClick={handleCancel}
-              disabled={isCancelling}
-            >
-              {isCancelling ? 'Cancelling...' : 'Cancel generation'}
-            </button>
-          ) : null}
+      <div className={styles.root}>
+        <div
+          className={styles.composing}
+          role="status"
+          aria-live="polite"
+          aria-label="Composing your next class, please wait"
+        >
+          <SottoSpinner
+            size="large"
+            progress={progress}
+            label={title}
+            detail={detail}
+            showPercent
+            orientation="stack"
+            ariaLabel="Composing your next class"
+          />
+          <div className={styles.composingActions}>
+            <span className={styles.composingMeta}>{meta}</span>
+            {canCancel ? (
+              <button
+                type="button"
+                className={styles.cancelButton}
+                onClick={handleCancel}
+                disabled={isCancelling}
+              >
+                {isCancelling ? 'Cancelling...' : 'Cancel generation'}
+              </button>
+            ) : null}
+          </div>
+          {activityView}
+          {recoveryView}
+          {error && (
+            <p className={styles.error} role="alert">
+              {error}
+            </p>
+          )}
         </div>
-        {activityView}
-        {recoveryView}
-        {error && (
-          <p className={styles.error} role="alert">
-            {error}
-          </p>
-        )}
+        {children}
       </div>
     );
   }
@@ -452,17 +504,41 @@ export function StartNextClass({ courseId, activeClassId }: StartNextClassProps)
       )}
       {activityView}
       {recoveryView}
-      <button
-        type="button"
-        className={styles.button}
-        onClick={handleContinue}
-        aria-label={activeClassId ? 'Resume active class' : 'Take a class at this level'}
-      >
-        {buttonLabel}
-      </button>
-      <button type="button" className={styles.cancelButton} onClick={() => startPolling(true)}>
-        Check preparation
-      </button>
+      <div className={styles.actions}>
+        <button
+          type="button"
+          className={styles.button}
+          onClick={handleContinue}
+          aria-label={activeClassId ? 'Resume active class' : 'Take a class at this level'}
+        >
+          {buttonLabel}
+        </button>
+        {(statusUnavailable || (generation && generation.status !== 'IDLE')) && (
+          <button
+            type="button"
+            className={styles.statusButton}
+            onClick={() => startPolling(true, true, false)}
+          >
+            {statusUnavailable ? 'Retry preparation status' : 'View preparation details'}
+          </button>
+        )}
+      </div>
+      <p className={styles.preparationStatus} role="status">
+        {statusUnavailable
+          ? 'Could not read class preparation status.'
+          : generation
+            ? generation.status === 'IDLE'
+              ? 'No class is being prepared.'
+              : generation.operationStatus === 'QUEUED' && generation.availableAt
+                ? `Scheduled for ${new Date(generation.availableAt).toLocaleString(undefined, {
+                    timeZone: generation.timeZone,
+                  })}.`
+                : isClassReadyToOpen(generation)
+                  ? 'Your class is ready.'
+                  : generation.detail
+            : 'Checking class preparation status...'}
+      </p>
+      {children}
       {!activeClassId && (
         <details className={styles.schedule}>
           <summary>Prepare a class later</summary>

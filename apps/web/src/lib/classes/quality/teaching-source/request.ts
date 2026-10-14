@@ -115,7 +115,7 @@ export async function requestTeachingReview(options: {
       jsonSchema: options.jsonSchema,
     }
   );
-  logUsage({
+  await logUsage({
     service: options.ai.provider,
     model: response.model,
     category: 'class-teaching-review',

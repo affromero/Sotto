@@ -3,11 +3,37 @@
 .root {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
-  gap: 6px;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
   min-width: 0;
   max-width: 100%;
   flex-shrink: 1;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.statusButton {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r);
+  background: var(--paper);
+  color: var(--ink);
+  font: 500 13px var(--sans);
+  cursor: pointer;
+}
+
+.preparationStatus {
+  margin: 0;
+  color: var(--ink-mute);
+  font: 13px/1.5 var(--sans);
+  overflow-wrap: anywhere;
 }
 
 .button {
@@ -111,12 +137,12 @@
   font-family: var(--sans);
   font-size: 12px;
   color: var(--bad);
-  text-align: right;
-  max-width: 200px;
+  text-align: left;
+  max-width: 100%;
 }
 
 .schedule {
-  width: min(100%, 360px);
+  width: min(100%, 560px);
   min-width: 0;
   overflow-wrap: anywhere;
   font-size: 13px;
@@ -134,6 +160,17 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.schedule form {
+  gap: 16px;
+  padding: 16px 0;
+  border-top: 1px solid var(--line);
+}
+
+.schedule p {
+  margin: 0;
+  line-height: 1.5;
 }
 
 .schedule input {

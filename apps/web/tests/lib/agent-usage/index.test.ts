@@ -1,4 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { defaultAutoModelConfig, getAutoModelConfig } from '@/lib/auto-model-config';
+import { getClaudeUsageProvider } from '@/lib/agent-usage/providers/claude-code';
+import { getCodexUsageProvider } from '@/lib/agent-usage/providers/codex';
+import { getElevenLabsUsageProvider } from '@/lib/agent-usage/providers/elevenlabs';
+import { getCartesiaUsageProvider } from '@/lib/agent-usage/providers/cartesia';
+import { buildProvider } from '@/lib/agent-usage/utils';
 import {
   formatUsageDuration,
   getAgentUsageStatus,
@@ -8,6 +14,125 @@ import {
   parseElevenLabsSubscriptionPayload,
   resolveCartesiaBillingWindow,
 } from '@/lib/agent-usage';
+
+vi.mock('@/lib/auto-model-config', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/auto-model-config')>()),
+  getAutoModelConfig: vi.fn(),
+}));
+
+vi.mock('@/lib/sidedoor/credentials/runtime/provider-execution', () => ({
+  captureSottoProviderAdmission: async ({ signal }: { signal?: AbortSignal }) => {
+    signal?.throwIfAborted();
+    return { validate: async (requestSignal: AbortSignal) => requestSignal.throwIfAborted() };
+  },
+}));
+
+vi.mock('@/lib/agent-usage/providers/claude-code', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/agent-usage/providers/claude-code')>()),
+  getClaudeUsageProvider: vi.fn(),
+}));
+vi.mock('@/lib/agent-usage/providers/codex', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/agent-usage/providers/codex')>()),
+  getCodexUsageProvider: vi.fn(),
+}));
+vi.mock('@/lib/agent-usage/providers/elevenlabs', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/agent-usage/providers/elevenlabs')>()),
+  getElevenLabsUsageProvider: vi.fn(),
+}));
+vi.mock('@/lib/agent-usage/providers/cartesia', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/agent-usage/providers/cartesia')>()),
+  getCartesiaUsageProvider: vi.fn(),
+}));
+
+describe('configured provider usage', () => {
+  const execution = {
+    userId: 'usage-recipient',
+    authorize: async () => ({ userId: 'usage-recipient' }),
+  };
+
+  beforeEach(() => {
+    vi.mocked(getAutoModelConfig).mockResolvedValue(defaultAutoModelConfig());
+    for (const [id, adapter] of [
+      ['claude-code', getClaudeUsageProvider],
+      ['codex', getCodexUsageProvider],
+      ['elevenlabs', getElevenLabsUsageProvider],
+      ['cartesia', getCartesiaUsageProvider],
+    ] as const) {
+      vi.mocked(adapter).mockResolvedValue(
+        buildProvider({
+          id,
+          category: id === 'claude-code' || id === 'codex' ? 'agent' : 'audio',
+          label: id,
+          shortLabel: id,
+          planLabel: null,
+          status: 'action_required',
+          detail: 'Authentication needs to be refreshed.',
+          windows: [],
+          credits: null,
+          limitReached: false,
+        })
+      );
+    }
+  });
+
+  afterEach(() => vi.resetAllMocks());
+
+  it.each([
+    { disabled: ['claude-code'], expected: ['codex', 'elevenlabs', 'cartesia'] },
+    { disabled: ['codex'], expected: ['claude-code', 'elevenlabs', 'cartesia'] },
+    { disabled: ['claude-code', 'codex'], expected: ['elevenlabs', 'cartesia'] },
+  ])(
+    'omits disabled system providers ($disabled) without probing them',
+    async ({ disabled, expected }) => {
+      vi.mocked(getAutoModelConfig).mockResolvedValue({
+        ...defaultAutoModelConfig(),
+        includedModels: disabled.map((id) => `__disabled-system-ai-provider:${id}`),
+      });
+      if (disabled.includes('claude-code')) {
+        vi.mocked(getClaudeUsageProvider).mockRejectedValue(
+          new Error('Disabled Claude was probed')
+        );
+      }
+      if (disabled.includes('codex')) {
+        vi.mocked(getCodexUsageProvider).mockRejectedValue(new Error('Disabled Codex was probed'));
+      }
+
+      const usage = await getAgentUsageStatus(execution);
+
+      expect(usage.providers.map((provider) => provider.id)).toEqual(expected);
+    }
+  );
+
+  it('keeps authentication warnings for enabled system providers', async () => {
+    const usage = await getAgentUsageStatus(execution);
+
+    expect(usage.providers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'claude-code', status: 'action_required' }),
+        expect.objectContaining({ id: 'codex', status: 'action_required' }),
+      ])
+    );
+  });
+
+  it('applies provider disabling on the next usage refresh', async () => {
+    const enabled = await getAgentUsageStatus(execution);
+    expect(enabled.providers).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: 'claude-code' })])
+    );
+    vi.mocked(getAutoModelConfig).mockResolvedValue({
+      ...defaultAutoModelConfig(),
+      includedModels: ['__disabled-system-ai-provider:claude-code'],
+    });
+
+    const disabled = await getAgentUsageStatus(execution);
+
+    expect(disabled.providers.map((provider) => provider.id)).toEqual([
+      'codex',
+      'elevenlabs',
+      'cartesia',
+    ]);
+  });
+});
 
 describe('agent-usage helpers', () => {
   it('rejects a canceled usage request before inspecting provider accounts', async () => {

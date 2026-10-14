@@ -25,6 +25,54 @@ describe('StartNextClass', () => {
     global.fetch = vi.fn();
   });
 
+  it('shows that no class is scheduled without offering empty preparation details', async () => {
+    vi.mocked(global.fetch).mockResolvedValue(
+      jsonResponse({ status: 'IDLE', detail: 'Waiting to start.' })
+    );
+    render(<StartNextClass courseId="course-1" activeClassId={null} />);
+    expect(await screen.findByText('No class is being prepared.')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'View preparation details' })
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /take a class at this level/i })).toBeInTheDocument();
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('keeps course navigation before the expanded scheduling form', async () => {
+    vi.mocked(global.fetch).mockResolvedValue(jsonResponse({ status: 'IDLE' }));
+    render(
+      <StartNextClass courseId="course-1" activeClassId={null}>
+        <a href="/learn/practice">Practice</a>
+      </StartNextClass>
+    );
+    await screen.findByText('No class is being prepared.');
+    fireEvent.click(screen.getByText('Prepare a class later'));
+    const navigation = screen.getByRole('link', { name: 'Practice' });
+    const scheduler = screen.getByText('Prepare a class later').parentElement!;
+    expect(
+      navigation.compareDocumentPosition(scheduler) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+  });
+
+  it('shows an unavailable status when its read fails', async () => {
+    vi.mocked(global.fetch).mockResolvedValue(jsonResponse({ error: 'Unavailable' }, 503));
+    render(<StartNextClass courseId="course-1" activeClassId={null} />);
+    expect(await screen.findByText('Could not read class preparation status.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Retry preparation status' })).toBeInTheDocument();
+    expect(screen.queryByText('No class is being prepared.')).not.toBeInTheDocument();
+  });
+
+  it('keeps a ready class on the course page when viewing preparation details', async () => {
+    vi.mocked(global.fetch).mockResolvedValue(
+      jsonResponse({ status: 'AVAILABLE', classId: 'class-1', progress: 1, detail: 'Class ready.' })
+    );
+    render(<StartNextClass courseId="course-1" activeClassId="class-1" />);
+    fireEvent.click(await screen.findByRole('button', { name: 'View preparation details' }));
+    expect(await screen.findByRole('button', { name: 'Resume active class' })).toBeInTheDocument();
+    expect(screen.getByText('Your class is ready.')).toBeInTheDocument();
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
   it('shows the saved failure reason without exposing private review content', async () => {
     const reason =
       'The generated lesson did not pass teaching review. You can start a new attempt.';
@@ -48,7 +96,7 @@ describe('StartNextClass', () => {
           })
     );
     render(<StartNextClass courseId="course-1" activeClassId={null} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Check preparation' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'View preparation details' }));
     expect(await screen.findByText('Preparation activity')).toBeInTheDocument();
     expect(await screen.findByText(reason)).toBeInTheDocument();
     expect(screen.queryByText(/private candidate/i)).not.toBeInTheDocument();
@@ -95,7 +143,7 @@ describe('StartNextClass', () => {
       });
     });
     const { unmount } = render(<StartNextClass courseId="course-1" activeClassId={null} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Check preparation' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'View preparation details' }));
     expect(await screen.findByText('Preparing your class.')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Cancel generation' }));
     expect(await screen.findByText('Waiting for active work to settle.')).toBeInTheDocument();
@@ -110,7 +158,7 @@ describe('StartNextClass', () => {
       jsonResponse({ status: 'COMPLETED', result: 'done', progress: 1 })
     );
     render(<StartNextClass courseId="course-1" activeClassId={null} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Check preparation' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'View preparation details' }));
     expect(await screen.findByText('Course complete')).toBeInTheDocument();
     expect(mockPush).not.toHaveBeenCalled();
   });
@@ -129,12 +177,15 @@ describe('StartNextClass', () => {
       });
     });
     render(<StartNextClass courseId="course-1" activeClassId={null} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Check preparation' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'View preparation details' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Preparation was interrupted.');
     const recover = await screen.findByRole('button', { name: 'Check cleanup and recover' });
     expect(recover).toBeDisabled();
     fireEvent.click(screen.getByRole('checkbox', { name: /provider may have charged/i }));
-    fireEvent.click(recover);
-    expect(await screen.findByRole('alert')).toHaveTextContent(/cleanup is not confirmed/i);
+    fireEvent.click(screen.getByRole('button', { name: 'Check cleanup and recover' }));
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent(/cleanup is not confirmed/i)
+    );
     expect(recovery).toEqual({ acknowledgeUnknownOutcome: true });
     expect(mockPush).not.toHaveBeenCalled();
   });
@@ -160,7 +211,7 @@ describe('StartNextClass', () => {
       });
     });
     const { unmount } = render(<StartNextClass courseId="course-1" activeClassId={null} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Check preparation' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'View preparation details' }));
     expect(await screen.findByText(/3 of 32 model requests admitted/i)).toBeInTheDocument();
     expect(screen.getByText(/meta: muse-spark-1.3/)).toBeInTheDocument();
     unmount();

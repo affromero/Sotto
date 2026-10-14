@@ -157,7 +157,9 @@ struct SottoAPIClient {
     }
 
     func listCourses() async throws -> [SottoCourse] {
-        let response: SottoCourseListResponse = try await get("/api/v1/courses")
+        var request = try makeRequest(path: "/api/v1/courses", method: "GET", authorized: true)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        let response: SottoCourseListResponse = try await send(request, acceptedStatuses: [200])
         return response.courses
     }
 
@@ -713,9 +715,9 @@ struct SottoAPIClient {
 
         guard acceptedStatuses.contains(http.statusCode) else {
             if let error = try? JSONDecoder().decode(SottoErrorResponse.self, from: data) {
-                throw SottoAPIError.message(error.error.description)
+                throw SottoAPIError.http(http.statusCode, error.error.description)
             }
-            throw SottoAPIError.message("Sotto returned HTTP \(http.statusCode).")
+            throw SottoAPIError.http(http.statusCode, "Sotto returned HTTP \(http.statusCode).")
         }
 
         do {
@@ -734,9 +736,9 @@ struct SottoAPIClient {
         }
         guard acceptedStatuses.contains(http.statusCode) else {
             if let error = try? JSONDecoder().decode(SottoErrorResponse.self, from: data) {
-                throw SottoAPIError.message(error.error.description)
+                throw SottoAPIError.http(http.statusCode, error.error.description)
             }
-            throw SottoAPIError.message("Sotto returned HTTP \(http.statusCode).")
+            throw SottoAPIError.http(http.statusCode, "Sotto returned HTTP \(http.statusCode).")
         }
     }
 
@@ -934,10 +936,11 @@ private struct ClassGenerationCancelResponse: Decodable {
 
 enum SottoAPIError: LocalizedError {
     case message(String)
+    case http(Int, String)
 
     var errorDescription: String? {
         switch self {
-        case let .message(value):
+        case let .message(value), let .http(_, value):
             value
         }
     }

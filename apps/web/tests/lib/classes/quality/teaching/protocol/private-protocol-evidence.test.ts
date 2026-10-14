@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { setImmediate } from 'node:timers/promises';
 import { describe, expect, it, vi } from 'vitest';
 import { blockedProviderExecution } from '../../../../../helpers/runtime/provider-execution';
 import type { AIProvider, ChatMessage, AIOptions } from '@/lib/providers/ai';
@@ -9,6 +10,7 @@ vi.mock('@/lib/learning-ai', () => ({
   }) => ({ model: ai.model, signal: ai.execution.signal }),
 }));
 vi.mock('@/lib/usage-logger', () => ({ logUsage: vi.fn() }));
+import { logUsage } from '@/lib/usage-logger';
 import {
   parseTeachingCritic,
   parseTeachingCriticResponse,
@@ -33,6 +35,52 @@ import {
   listeningNarrativeExtractionFixture,
   listeningNarrativeWitnessFixture,
 } from '../../../listening/witness-fixture';
+
+it('settles the usage write before returning a completed teaching review', async () => {
+  const started = Promise.withResolvers<void>();
+  const write = Promise.withResolvers<void>();
+  vi.mocked(logUsage).mockImplementationOnce(async () => {
+    started.resolve();
+    await write.promise;
+  });
+  const review = requestTeachingReview({
+    ai: {
+      provider: 'fixture',
+      model: 'captured-luna',
+      execution: blockedProviderExecution('fixture'),
+    },
+    userId: 'fixture',
+    provider: {
+      async generateResponse() {
+        return {
+          content: 'completed review',
+          model: 'captured-luna',
+          inputTokens: 0,
+          outputTokens: 0,
+        };
+      },
+      async *streamResponse() {
+        throw new Error('Unexpected stream.');
+      },
+    } as AIProvider,
+    prompt: 'class/review-teaching-content.md',
+    variables: { KIND: 'writing', TEACHING_REVIEW_ROLE: 'critic', TARGET: 'de' },
+    items: [{ task: 'Schreibe einen Satz.' }],
+    jsonSchema: { name: 'class_teaching_critic', schema: { type: 'object' } },
+  });
+  let completed = false;
+  void review.then(() => {
+    completed = true;
+  });
+  try {
+    await started.promise;
+    await setImmediate();
+    expect(completed).toBe(false);
+  } finally {
+    write.resolve();
+    await expect(review).resolves.toBe('completed review');
+  }
+});
 
 function fixture() {
   const turns = [

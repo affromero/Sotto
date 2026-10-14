@@ -76,6 +76,7 @@ struct CourseListView: View {
                 }
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
+                .refreshable { await model.loadCourses(showLoading: false) }
 
                 Button(role: .destructive) {
                     model.signOut()
@@ -98,9 +99,6 @@ struct CourseListView: View {
             }
         }
         .task {
-            if model.courses.isEmpty {
-                await model.loadCourses()
-            }
             await model.loadAgentUsage()
         }
         .onChange(of: model.courses) { _, courses in

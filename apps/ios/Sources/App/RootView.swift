@@ -3,6 +3,7 @@ import SwiftUI
 struct RootView: View {
     @EnvironmentObject private var model: SottoAppModel
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.scenePhase) private var scenePhase
 
     private var layout: SottoLayoutMode {
         SottoLayoutMode(horizontalSizeClass)
@@ -47,6 +48,25 @@ struct RootView: View {
         }
         .background(SottoTheme.paper)
         .environment(\.sottoLayout, layout)
+        .safeAreaInset(edge: .top) {
+            if let failure = model.courseRefreshError {
+                Text(failure)
+                    .font(.caption)
+                    .foregroundStyle(SottoTheme.muted)
+                    .padding(10)
+                    .frame(maxWidth: .infinity)
+                    .background(SottoTheme.surface)
+                    .accessibilityAddTraits(.updatesFrequently)
+            }
+        }
+        .task(id: CourseRefreshLifecycle(scenePhase: scenePhase, identity: model.courseRefreshIdentity)) {
+            guard scenePhase == .active, model.hasSelectedProfile else { return }
+            while !Task.isCancelled {
+                await model.loadCourses(showLoading: false)
+                do { try await Task.sleep(for: .seconds(15)) }
+                catch { return }
+            }
+        }
         .sheet(isPresented: practiceSheetBinding) {
             if let practiceStart = model.practiceStart {
                 let state = model.learningSessionState(path: "/api/v1/practice/\(practiceStart.sessionId)",
@@ -100,6 +120,11 @@ struct RootView: View {
             }
         }
     }
+}
+
+private struct CourseRefreshLifecycle: Equatable {
+    let scenePhase: ScenePhase
+    let identity: SottoLearnerIdentity?
 }
 
 struct LoadingOverlay: View {

@@ -189,43 +189,46 @@ export default async function LearnPage() {
                     )}
                   </div>
                 </div>
-                <div className={styles.courseActions}>
-                  <StartNextClass courseId={course.id} activeClassId={activeClassId} />
-                  <Link
-                    href="/learn/practice"
-                    className={styles.practiceLink}
-                    aria-label={`Practice a single skill for ${courseTitle}`}
-                  >
-                    Practice
-                  </Link>
-                  <Link
-                    href={`/learn/live?course=${course.id}`}
-                    className={styles.practiceLink}
-                    aria-label={`Live conversation for ${courseTitle}`}
-                  >
-                    Live
-                  </Link>
-                  <Link
-                    href={`/learn/exams?course=${course.id}`}
-                    className={styles.practiceLink}
-                    aria-label={`Practice exam for ${courseTitle}`}
-                  >
-                    Exam
-                  </Link>
-                  <Link
-                    href={placementHref}
-                    className={styles.practiceLink}
-                    aria-label={`${isManualPlacement ? 'Confirm' : 'Retake'} the placement test for ${courseTitle} (your level is never lowered)`}
-                  >
-                    {isManualPlacement ? 'Confirm level' : 'Retake placement'}
-                  </Link>
-                  <Link
-                    href="/settings#course-mgmt-heading"
-                    className={styles.practiceLink}
-                    aria-label={`Manage or remove ${courseTitle}`}
-                  >
-                    Manage
-                  </Link>
+                <div className={styles.sourcedRow}>
+                  <StartNextClass courseId={course.id} activeClassId={activeClassId}>
+                    <div className={styles.courseActions}>
+                      <Link
+                        href="/learn/practice"
+                        className={styles.practiceLink}
+                        aria-label={`Practice a single skill for ${courseTitle}`}
+                      >
+                        Practice
+                      </Link>
+                      <Link
+                        href={`/learn/live?course=${course.id}`}
+                        className={styles.practiceLink}
+                        aria-label={`Live conversation for ${courseTitle}`}
+                      >
+                        Live
+                      </Link>
+                      <Link
+                        href={`/learn/exams?course=${course.id}`}
+                        className={styles.practiceLink}
+                        aria-label={`Practice exam for ${courseTitle}`}
+                      >
+                        Exam
+                      </Link>
+                      <Link
+                        href={placementHref}
+                        className={styles.practiceLink}
+                        aria-label={`${isManualPlacement ? 'Confirm' : 'Retake'} the placement test for ${courseTitle} (your level is never lowered)`}
+                      >
+                        {isManualPlacement ? 'Confirm level' : 'Retake placement'}
+                      </Link>
+                      <Link
+                        href="/settings#course-mgmt-heading"
+                        className={styles.practiceLink}
+                        aria-label={`Manage or remove ${courseTitle}`}
+                      >
+                        Manage
+                      </Link>
+                    </div>
+                  </StartNextClass>
                 </div>
                 <div className={styles.sourcedRow}>
                   <SourcedClassEntry courseId={course.id} activeClassId={activeClassId} />

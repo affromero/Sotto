@@ -22,15 +22,21 @@ final class SottoAppModel: ObservableObject {
     @Published private(set) var classGenerationErrors: [String: String] = [:]
     @Published var errorMessage: String?
     @Published var acceptedAIScope: String?
+    @Published var courseRefreshError: String?
+    var courseRefreshTasks: [SottoLearnerIdentity: SottoCourseRefreshRequest] = [:]
+    var practiceCourses: [String: String] = [:]
+    var practiceOverviewCourseId: String?
 
     private let credentialStore = CredentialStore()
+    private let session: URLSession
     private var work: Task<Void, Never>?
     private var activeClassGenerationCourseId: String?
     private var cancelledClassGenerationCourseIds = Set<String>()
     private var classGenerationTasks: [String: Task<Void, Never>] = [:]
 
-    init() {
-        credentials = try? credentialStore.load()
+    init(credentials: SottoCredentials? = nil, session: URLSession = .shared) {
+        self.session = session
+        self.credentials = credentials ?? (try? credentialStore.load())
     }
 
     var isPaired: Bool {
@@ -189,6 +195,11 @@ final class SottoAppModel: ObservableObject {
     }
 
     private func resetLearnerState() {
+        courseRefreshTasks.values.forEach { $0.task.cancel() }
+        courseRefreshTasks.removeAll()
+        courseRefreshError = nil
+        practiceCourses = [:]
+        practiceOverviewCourseId = nil
         courses = []
         selectedClass = nil
         practiceStart = nil
@@ -210,18 +221,33 @@ final class SottoAppModel: ObservableObject {
         workbook = nil
     }
 
-    func loadCourses() async {
-        guard hasSelectedProfile, let client = makeClient() else { return }
-        isLoading = true
-        errorMessage = nil
-
-        do {
-            courses = try await client.listCourses()
-        } catch {
-            report(error)
+    func applyCourseRefresh(_ refreshed: [SottoCourse]) {
+        let previous = courses
+        courses = refreshed
+        let ids = Set(refreshed.map(\.id))
+        let removedIds = Set(previous.map(\.id)).subtracting(ids)
+        if let selectedClass {
+            let wasKnown = previous.contains { $0.classes.contains { $0.id == selectedClass.id } }
+            let remains = refreshed.contains { $0.classes.contains { $0.id == selectedClass.id } }
+            if removedIds.contains(selectedClass.courseId) || (wasKnown && !remains) { closeClass() }
         }
-
-        isLoading = false
+        for id in removedIds {
+            cancelledClassGenerationCourseIds.insert(id)
+            classGenerationTasks[id]?.cancel()
+            classGenerationTasks[id] = nil
+            classGenerationOperations[id] = nil
+            classGenerationErrors[id] = nil
+            if activeClassGenerationCourseId == id { activeClassGenerationCourseId = nil }
+        }
+        if let sessionId = practiceStart?.sessionId, let courseId = practiceCourses[sessionId], !ids.contains(courseId) {
+            practiceStart = nil
+            practiceResult = nil
+        }
+        if let courseId = practiceOverviewCourseId, !ids.contains(courseId) {
+            practiceOverview = nil
+            practiceOverviewCourseId = nil
+        }
+        practiceCourses = practiceCourses.filter { ids.contains($0.value) }
     }
 
     func loadAgentUsage() async {
@@ -315,17 +341,18 @@ final class SottoAppModel: ObservableObject {
 
         do {
             try await client.startNextClassGeneration(courseId: course.id, source: source)
-            if let classId = try await waitForGeneratedClassAfterRequestFailure(
+            if try await waitForGeneratedClassAfterRequestFailure(
                 client: client,
                 course: course,
                 startedAt: startedAt,
                 originalError: SottoAPIError.message("Class generation did not finish.")
-            ) {
+            ) != nil {
                 guard !isClassGenerationCancelled(course.id) else { return }
-                await finishBackgroundClassGeneration(courseId: course.id, classId: classId, client: client)
+                await finishBackgroundClassGeneration(courseId: course.id, client: client)
                 return
             }
 
+            guard !Task.isCancelled, !isClassGenerationCancelled(course.id), isCurrentLearningClient(client) else { return }
             classGenerationErrors[course.id] = "Class generation did not finish."
             classGenerationOperations[course.id] = nil
         } catch {
@@ -334,14 +361,14 @@ final class SottoAppModel: ObservableObject {
             }
 
             do {
-                if let classId = try await waitForGeneratedClassAfterRequestFailure(
+                if try await waitForGeneratedClassAfterRequestFailure(
                     client: client,
                     course: course,
                     startedAt: startedAt,
                     originalError: error
-                ) {
+                ) != nil {
                     guard !isClassGenerationCancelled(course.id) else { return }
-                    await finishBackgroundClassGeneration(courseId: course.id, classId: classId, client: client)
+                    await finishBackgroundClassGeneration(courseId: course.id, client: client)
                     return
                 }
             } catch {
@@ -350,6 +377,7 @@ final class SottoAppModel: ObservableObject {
                 }
             }
 
+            guard !Task.isCancelled, !isClassGenerationCancelled(course.id), isCurrentLearningClient(client) else { return }
             classGenerationErrors[course.id] = error.localizedDescription
             classGenerationOperations[course.id] = nil
         }
@@ -357,15 +385,18 @@ final class SottoAppModel: ObservableObject {
 
     private func finishBackgroundClassGeneration(
         courseId: String,
-        classId _: String,
         client: SottoAPIClient
     ) async {
         do {
-            courses = try await client.listCourses()
+            let refreshed = try await client.listCourses()
+            guard !Task.isCancelled, !isClassGenerationCancelled(courseId), isCurrentLearningClient(client) else { return }
+            applyCourseRefresh(refreshed)
+            guard !isClassGenerationCancelled(courseId) else { return }
             classGenerationErrors[courseId] = nil
             classGenerationOperations[courseId] = nil
             refreshAgentUsageInBackground()
         } catch {
+            guard !Task.isCancelled, !isClassGenerationCancelled(courseId), isCurrentLearningClient(client) else { return }
             classGenerationErrors[courseId] = error.localizedDescription
             classGenerationOperations[courseId] = nil
         }
@@ -406,10 +437,21 @@ final class SottoAppModel: ObservableObject {
                 )
             }
 
+            guard isCurrentLearningClient(client) else { return }
             selectedClass = classDetail
             classResult = nil
         } catch {
-            report(error)
+            if isCurrentLearningClient(client) {
+                if case SottoAPIError.http(404, _) = error {
+                    if selectedClass?.id == classId { closeClass() }
+                    await loadCourses(showLoading: false)
+                    if isCurrentLearningClient(client) {
+                        errorMessage = courseRefreshError == nil
+                            ? "This class was removed. Your courses have been refreshed."
+                            : "This class was removed, but the course list could not be refreshed. Try again."
+                    }
+                } else { report(error) }
+            }
         }
 
         loadingOperation = nil
@@ -582,7 +624,11 @@ final class SottoAppModel: ObservableObject {
     /// this decorates the practice menu, it does not gate it.
     func loadPracticeOverview(courseId: String) async {
         guard let client = makeClient() else { return }
-        practiceOverview = try? await client.fetchPracticeOverview(courseId: courseId)
+        let overview = try? await client.fetchPracticeOverview(courseId: courseId)
+        guard isCurrentLearningClient(client), courses.contains(where: { $0.id == courseId }) else { return }
+        practiceOverview = overview
+        practiceOverviewCourseId = courseId
+        for practice in overview?.recent ?? [] { practiceCourses[practice.id] = courseId }
     }
 
     /// Discards a session the learner is not going to finish, then refreshes
@@ -824,7 +870,8 @@ final class SottoAppModel: ObservableObject {
         return SottoAPIClient(
             serverURL: credentials.serverURL,
             apiKey: credentials.apiKey,
-            profileId: usesSelectedProfile ? credentials.selectedProfile?.id : nil
+            profileId: usesSelectedProfile ? credentials.selectedProfile?.id : nil,
+            session: session
         )
     }
 
@@ -850,6 +897,7 @@ final class SottoAppModel: ObservableObject {
         while !Task.isCancelled && !isClassGenerationCancelled(course.id) {
             let elapsedSeconds = Int(Date().timeIntervalSince(startedAt))
             let progress = try? await client.fetchClassGenerationProgress(courseId: course.id)
+            guard !Task.isCancelled, !isClassGenerationCancelled(course.id), isCurrentLearningClient(client) else { return nil }
 
             classGenerationOperations[course.id] = classGenerationOperation(
                 progress: progress,
@@ -884,7 +932,7 @@ final class SottoAppModel: ObservableObject {
                 do {
                     let progress = try await client.fetchClassGenerationProgress(courseId: course.id)
                     await MainActor.run {
-                        guard let self else { return }
+                        guard let self, !Task.isCancelled, !self.isClassGenerationCancelled(course.id), self.isCurrentLearningClient(client) else { return }
                         self.classGenerationOperations[course.id] = self.classGenerationOperation(
                             progress: progress,
                             course: course,
@@ -893,7 +941,7 @@ final class SottoAppModel: ObservableObject {
                     }
                 } catch {
                     await MainActor.run {
-                        guard let self else { return }
+                        guard let self, !Task.isCancelled, !self.isClassGenerationCancelled(course.id), self.isCurrentLearningClient(client) else { return }
                         self.classGenerationOperations[course.id] = self.classGenerationOperation(
                             progress: nil,
                             course: course,
@@ -936,50 +984,4 @@ final class SottoAppModel: ObservableObject {
             remainingSeconds: max(0, 240 - elapsedSeconds)
         )
     }
-}
-
-
-private let requiredClassSkills = ["GRAMMAR", "READING", "LISTENING", "SPEAKING", "WRITING"]
-
-private func classPresentationIssues(_ classDetail: SottoClassDetail) -> [String] {
-    var issues: [String] = []
-    let sectionsBySkill = classDetail.sections.reduce(into: [String: SottoClassSection]()) { result, section in
-        result[section.skill.uppercased()] = section
-    }
-
-    for skill in requiredClassSkills where sectionsBySkill[skill] == nil {
-        issues.append("Missing \(classSkillLabel(skill)) section.")
-    }
-
-    if let reading = sectionsBySkill["READING"],
-       !reading.questions.contains(where: { ($0.passageText ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false }) {
-        issues.append("Reading section has no full reading passage.")
-    }
-
-    if let listening = sectionsBySkill["LISTENING"], listening.episode == nil {
-        issues.append("Listening section has no audio episode.")
-    } else if let listening = sectionsBySkill["LISTENING"], let episode = listening.episode, episode.audioUrl == nil {
-        if episode.status == "FAILED" {
-            let detail = episode.failureReason ?? episode.technicalError
-            issues.append("Listening section audio failed\(detail.map { ": \($0)" } ?? ".")")
-        } else {
-            issues.append("Listening section audio is not ready yet.")
-        }
-    }
-
-    if let speaking = sectionsBySkill["SPEAKING"], speaking.prompts.isEmpty {
-        issues.append("Speaking section has no speaking prompts.")
-    }
-
-    if let writing = sectionsBySkill["WRITING"], writing.writingPrompts.isEmpty {
-        issues.append("Writing section has no writing prompts.")
-    }
-
-    return issues
-}
-
-private func isClassPresentationStillRendering(_ classDetail: SottoClassDetail) -> Bool {
-    let listening = classDetail.sections.first { $0.skill.uppercased() == "LISTENING" }
-    guard let episode = listening?.episode, episode.audioUrl == nil else { return false }
-    return episode.status != "READY" && episode.status != "FAILED"
 }

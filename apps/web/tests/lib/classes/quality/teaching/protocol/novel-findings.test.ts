@@ -374,7 +374,29 @@ suite('independent corroboration of novel teaching findings', () => {
   });
 
   it('accepts a candidate without novel findings and retains no corroboration proof', async () => {
+    const priorUsage = await instance.database.apiUsageLog.findMany({ select: { id: true } });
     await expect(review({ targetIndex: 4 })).resolves.toBeUndefined();
+    const usage = await instance.database.apiUsageLog.findMany({
+      where: { id: { notIn: priorUsage.map((row) => row.id) } },
+    });
+    expect(usage).toEqual([
+      expect.objectContaining({
+        userId,
+        service: ai.provider,
+        category: 'class-teaching-review',
+        modelId: ai.model,
+        inputTokens: 0,
+        outputTokens: 0,
+      }),
+      expect.objectContaining({
+        userId,
+        service: ai.provider,
+        category: 'class-teaching-review',
+        modelId: ai.model,
+        inputTokens: 0,
+        outputTokens: 0,
+      }),
+    ]);
     expect(teachingNovelFindingReceipts(ai)).toEqual([]);
     expect(
       requests.find((request) => request.schema === 'class_teaching_novel_finding_corroboration')

@@ -243,6 +243,8 @@ final class QRScannerViewController: UIViewController, AVCaptureMetadataOutputOb
     private let coordinator: QRScannerView.Coordinator
     private let session = AVCaptureSession()
     private var previewLayer: AVCaptureVideoPreviewLayer?
+    private var rotationCoordinator: AVCaptureDevice.RotationCoordinator?
+    private var previewRotationObservation: NSKeyValueObservation?
     private let messageLabel = UILabel()
 
     init(coordinator: QRScannerView.Coordinator) {
@@ -330,7 +332,7 @@ final class QRScannerViewController: UIViewController, AVCaptureMetadataOutputOb
     }
 
     private func configureSession() {
-        guard let device = AVCaptureDevice.default(for: .video) else {
+        guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) else {
             messageLabel.isHidden = false
             return
         }
@@ -361,6 +363,14 @@ final class QRScannerViewController: UIViewController, AVCaptureMetadataOutputOb
         previewLayer.frame = view.bounds
         view.layer.insertSublayer(previewLayer, at: 0)
         self.previewLayer = previewLayer
+        let rotationCoordinator = AVCaptureDevice.RotationCoordinator(device: device, previewLayer: previewLayer)
+        self.rotationCoordinator = rotationCoordinator
+        previewRotationObservation = rotationCoordinator.observe(
+            \.videoRotationAngleForHorizonLevelPreview, options: [.initial, .new]
+        ) { [weak self] _, _ in
+            // AVFoundation delivers preview rotation changes on the main queue.
+            self?.updatePreviewOrientation()
+        }
         updatePreviewOrientation()
         messageLabel.isHidden = true
 
@@ -372,8 +382,7 @@ final class QRScannerViewController: UIViewController, AVCaptureMetadataOutputOb
     private func updatePreviewOrientation() {
         guard
             let connection = previewLayer?.connection,
-            let interfaceOrientation = view.window?.windowScene?.interfaceOrientation,
-            let videoRotationAngle = interfaceOrientation.videoRotationAngle,
+            let videoRotationAngle = rotationCoordinator?.videoRotationAngleForHorizonLevelPreview,
             connection.isVideoRotationAngleSupported(videoRotationAngle)
         else {
             return
@@ -396,24 +405,5 @@ final class QRScannerViewController: UIViewController, AVCaptureMetadataOutputOb
         }
 
         coordinator.handle(value: value)
-    }
-}
-
-private extension UIInterfaceOrientation {
-    var videoRotationAngle: CGFloat? {
-        switch self {
-        case .portrait:
-            90
-        case .portraitUpsideDown:
-            270
-        case .landscapeLeft:
-            0
-        case .landscapeRight:
-            180
-        case .unknown:
-            nil
-        @unknown default:
-            nil
-        }
     }
 }

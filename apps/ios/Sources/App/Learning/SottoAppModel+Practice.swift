@@ -51,7 +51,7 @@ extension SottoAppModel {
 
     func isCurrentLearningClient(_ client: SottoAPIClient) -> Bool {
         guard let current = makeClient() else { return false }
-        return current.serverURL == client.serverURL && current.profileId == client.profileId
+        return SottoLearnerIdentity(current) == SottoLearnerIdentity(client)
     }
 
     func learningSessionState(path: String, attempt: Int, revision: Int) -> NativeLearningSessionState {
@@ -74,8 +74,9 @@ extension SottoAppModel {
         defer { isLoading = false }
         do {
             let response = try await client.startPractice(courseId: courseId, kind: kind, requestId: requestId)
-            guard isCurrentLearningClient(client) else { return }
+            guard isCurrentLearningClient(client), courses.contains(where: { $0.id == courseId }) else { return }
             practiceStart = response
+            practiceCourses[response.sessionId] = courseId
             practiceResult = response.submissionResult
             clearSettledPracticeAdmission(response, client: client)
         } catch { report(error) }
