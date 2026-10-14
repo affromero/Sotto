@@ -20,6 +20,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   if (!authed) return errorResponse('Unauthorized', 401);
 
   const { key } = await params;
+  if (key[0] === 'materials') return errorResponse('Not found', 404);
   const range = request.headers.get('range');
 
   let object: Awaited<ReturnType<typeof readLocalObject>>;

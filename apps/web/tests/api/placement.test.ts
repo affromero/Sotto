@@ -66,6 +66,7 @@ vi.mock('@/lib/placement-notes', () => ({
 
 vi.mock('@/lib/course-notes', () => ({
   getCourseNote: (...args: unknown[]) => mockGetCourseNote(...args),
+  getEditableCourseNote: vi.fn().mockResolvedValue(''),
   mergeCourseNote: (...args: unknown[]) => mockMergeCourseNote(...args),
   setCourseNote: (...args: unknown[]) => mockSetCourseNote(...args),
 }));
@@ -299,7 +300,7 @@ describe('POST /api/v1/placement', () => {
     // Default: this submission did not come from a notes deduction.
     mockGetCachedNotesDeduction.mockResolvedValue(null);
     mockMergeCourseNote.mockReturnValue('merged');
-    mockGetCourseNote.mockResolvedValue('');
+    mockGetCourseNote.mockResolvedValue('merged');
     mockSetCourseNote.mockResolvedValue(undefined);
     mockExtractAndStoreNoteVocab.mockResolvedValue(0);
   });
@@ -486,6 +487,7 @@ describe('POST /api/v1/placement', () => {
       content: 'mis materiales',
     });
     mockMergeCourseNote.mockReturnValue('mis materiales');
+    mockGetCourseNote.mockResolvedValue('mis materiales');
 
     await POST(makePostRequest({ native: 'en', target: 'de', answers }));
 

@@ -27,7 +27,7 @@ struct SottoBrandMark: View {
             let size = min(proxy.size.width, proxy.size.height)
             let ringWidth = max(2, size * 0.069)
             let logoSize = showsProgressRing ? size * 0.655 : size
-            let progressEnd = clampedProgress.map { max(0.08, $0) } ?? 0.34
+            let progressEnd = clampedProgress ?? 0.34
             let shouldPulse = !reduceMotion && size >= 40
 
             ZStack {
@@ -35,7 +35,7 @@ struct SottoBrandMark: View {
                     Circle()
                         .stroke(SottoTheme.primary.opacity(0.16), lineWidth: ringWidth)
 
-                    Circle()
+                    if progressEnd > 0 { Circle()
                         .trim(from: 0, to: progressEnd)
                         .stroke(
                             SottoTheme.primary,
@@ -49,6 +49,7 @@ struct SottoBrandMark: View {
                             value: isAnimating
                         )
                         .animation(reduceMotion ? nil : .easeOut(duration: 0.35), value: clampedProgress)
+                    }
                 }
 
                 ZStack {

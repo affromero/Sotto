@@ -6,7 +6,10 @@ import {
   readClassPreparation,
   cancelClassPreparation,
   preparationProgress,
+  readPreparationActivity,
 } from '@/lib/classes/preparation';
+import { currentClassSections } from '@/lib/learning/classes/current-sections';
+import { readSkillRequirements } from '@/lib/learning/skill-requirements';
 import { sottoRequestExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import { PreparationConflictError } from '@/lib/classes/preparation-state';
 
@@ -48,11 +51,15 @@ function isListeningAudioStillRendering(episode: SectionProgress['episode']): bo
   );
 }
 
-function describeProgress(status: string, sections: SectionProgress[]) {
+function describeProgress(
+  status: string,
+  sections: SectionProgress[],
+  requiredSkills: readonly string[] = EXPECTED_SKILLS
+) {
   const sectionBySkill = new Map(sections.map((section) => [section.skill, section]));
-  const readyCount = EXPECTED_SKILLS.filter(
-    (skill) => sectionBySkill.get(skill)?.status === 'READY'
-  ).length;
+  const ready = (skill: string) =>
+    ['READY', 'PASSED'].includes(sectionBySkill.get(skill)?.status ?? '');
+  const readyCount = requiredSkills.filter(ready).length;
   const listening = sectionBySkill.get('LISTENING');
   const listeningAudioReady =
     listening?.episode === undefined || listening.episode === null || !!listening.episode.audioUrl;
@@ -91,12 +98,12 @@ function describeProgress(status: string, sections: SectionProgress[]) {
   if (!grammar) {
     return {
       stage: 'Preparing class',
-      detail: 'Creating the class shell and loading the lesson plan.',
-      progress: 0.05,
+      detail: 'Writing and reviewing the class introduction before building the exercises.',
+      progress: 0,
       currentStep: 1,
     };
   }
-  if (grammar.status !== 'READY') {
+  if (!ready('GRAMMAR')) {
     return {
       stage: 'Generating grammar questions',
       detail: 'Building the first multiple-choice section.',
@@ -114,7 +121,7 @@ function describeProgress(status: string, sections: SectionProgress[]) {
       currentStep: 2,
     };
   }
-  if (reading.status !== 'READY') {
+  if (!ready('READING')) {
     return {
       stage: 'Generating reading questions',
       detail: 'Writing comprehension questions and answer choices.',
@@ -123,7 +130,7 @@ function describeProgress(status: string, sections: SectionProgress[]) {
     };
   }
 
-  if (!sectionBySkill.has('LISTENING')) {
+  if (requiredSkills.includes('LISTENING') && !ready('LISTENING')) {
     return {
       stage: 'Composing listening practice',
       detail: 'Creating adaptive audio material and comprehension checks.',
@@ -132,16 +139,16 @@ function describeProgress(status: string, sections: SectionProgress[]) {
     };
   }
 
-  if (!sectionBySkill.has('SPEAKING')) {
+  if (requiredSkills.includes('SPEAKING') && !ready('SPEAKING')) {
     return {
       stage: 'Preparing speaking prompts',
-      detail: 'Creating short Apple Pencil and voice practice prompts.',
+      detail: 'Creating speaking prompts and their reference audio.',
       progress: 0.72,
       currentStep: 4,
     };
   }
 
-  if (!sectionBySkill.has('WRITING')) {
+  if (!ready('WRITING')) {
     return {
       stage: 'Preparing writing prompts',
       detail: 'Creating the final written-response practice.',
@@ -153,7 +160,7 @@ function describeProgress(status: string, sections: SectionProgress[]) {
   return {
     stage: 'Finalizing class',
     detail: 'Saving adaptive review targets and unlocking the class.',
-    progress: readyCount >= EXPECTED_SKILLS.length ? 0.96 : 0.9,
+    progress: readyCount >= requiredSkills.length ? 0.96 : 0.9,
     currentStep: TOTAL_STEPS,
   };
 }
@@ -175,6 +182,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           id: true,
           status: true,
           attempt: true,
+          skillRequirements: true,
           createdAt: true,
           updatedAt: true,
           lesson: { select: { title: true } },
@@ -182,8 +190,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
             orderBy: [{ createdAt: 'asc' }],
             select: {
               skill: true,
+              attempt: true,
               status: true,
-              episode: { select: { status: true, audioUrl: true } },
+              updatedAt: true,
+              episode: { select: { status: true, audioUrl: true, updatedAt: true } },
             },
           },
         },
@@ -211,7 +221,54 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ ...preparationProgress(operation), result: 'done', progress: 1 });
   }
   if (!terminalOperationSuperseded && operation && operation.status !== 'COMPLETED') {
-    return NextResponse.json(preparationProgress(operation));
+    const preparation = preparationProgress(operation);
+    if (operation.status !== 'RUNNING') return NextResponse.json(preparation);
+    const activity = await readPreparationActivity(
+      courseId,
+      sottoRequestExecution(request, authed)
+    );
+    if (!activity || activity.operationId !== operation.id)
+      return errorResponse('Preparation changed. Refresh its status.', 409);
+    const matchesClass =
+      cls && cls.id === operation.classId && cls.attempt === (operation.intent?.attempt ?? 1);
+    const sections = matchesClass
+      ? currentClassSections(
+          cls.sections.filter((section) =>
+            operation.intent?.kind === 'REPAIR' && !operation.intent.skills.includes(section.skill)
+              ? true
+              : section.attempt === cls.attempt
+          )
+        )
+      : [];
+    const requiredSkills = EXPECTED_SKILLS.filter(
+      (skill) =>
+        !operation.requirements || operation.requirements.skills[skill].state === 'REQUIRED'
+    );
+    const described = matchesClass
+      ? describeProgress('GENERATING', sections, requiredSkills)
+      : null;
+    return NextResponse.json({
+      ...preparation,
+      ...(described ?? {}),
+      lessonTitle: matchesClass ? cls.lesson.title : null,
+      sections: sections.map((section) => ({
+        skill: section.skill,
+        status: section.status,
+        episode: section.episode,
+      })),
+      updatedAt: new Date(
+        Math.max(
+          Date.parse(activity.updatedAt),
+          ...(matchesClass ? [cls.updatedAt.getTime()] : []),
+          ...sections.flatMap((section) => [
+            section.updatedAt.getTime(),
+            ...(section.episode ? [section.episode.updatedAt.getTime()] : []),
+          ])
+        )
+      ).toISOString(),
+      providerRequestsCompleted: activity.providerRequestsCompleted,
+      providerRequestInFlight: activity.providerRequestInFlight,
+    });
   }
   if (!cls) {
     return NextResponse.json({
@@ -229,12 +286,22 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     });
   }
 
-  const sections = cls.sections.map((section) => ({
+  const activeSections = currentClassSections(
+    cls.sections.filter((section) => cls.status !== 'GENERATING' || section.attempt === cls.attempt)
+  );
+  const sections = activeSections.map((section) => ({
     skill: section.skill,
     status: section.status,
     episode: section.episode,
   }));
-  const described = describeProgress(cls.status, sections);
+  const requirements = readSkillRequirements(cls.skillRequirements);
+  const described = describeProgress(
+    cls.status,
+    sections,
+    EXPECTED_SKILLS.filter(
+      (skill) => !requirements || requirements.skills[skill].state === 'REQUIRED'
+    )
+  );
   const elapsedSeconds = Math.max(0, Math.round((Date.now() - cls.createdAt.getTime()) / 1000));
   const progress = clamp(described.progress, 0, 1);
 
@@ -255,7 +322,15 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     elapsedSeconds,
     remainingSeconds: estimateRemainingSeconds(elapsedSeconds, progress),
     sections,
-    updatedAt: cls.updatedAt.toISOString(),
+    updatedAt: new Date(
+      Math.max(
+        cls.updatedAt.getTime(),
+        ...activeSections.flatMap((section) => [
+          section.updatedAt.getTime(),
+          ...(section.episode ? [section.episode.updatedAt.getTime()] : []),
+        ])
+      )
+    ).toISOString(),
   });
 }
 

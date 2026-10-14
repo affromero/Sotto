@@ -704,7 +704,7 @@ describe('welcome hosted-demo mode', () => {
     expect(screen.getByText('Required')).toBeInTheDocument();
     expect(screen.getByText(/Class notes, a syllabus/i)).toBeInTheDocument();
     expect(screen.queryByText('Optional')).not.toBeInTheDocument();
-    expect(screen.getByText(/Text files are read locally/i)).toBeInTheDocument();
+    expect(screen.getByText(/Original documents are saved separately/i)).toBeInTheDocument();
     expect(screen.queryByText(/Context permissions/i)).not.toBeInTheDocument();
     expect(screen.getByRole('radio', { name: /Web links/i })).toHaveAttribute(
       'aria-checked',
@@ -739,6 +739,19 @@ describe('welcome hosted-demo mode', () => {
           type: 'text/markdown',
         })
     );
+    vi.mocked(global.fetch).mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          materials: files.map((file, index) => ({
+            id: `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`,
+            name: file.name,
+            extractedText: `Italian notes ${index + 1}`,
+          })),
+          failed: 0,
+        }),
+        { status: 201 }
+      )
+    );
     await user.upload(screen.getByLabelText(/Choose context files/i), files);
     await waitFor(() => {
       expect(contextItems.map((item) => item.kind)).toEqual([
@@ -757,6 +770,9 @@ describe('welcome hosted-demo mode', () => {
     rerender(renderStep());
 
     expect(screen.getByText('notes-7.md')).toBeInTheDocument();
+    expect(
+      contextItems.filter((item) => item.kind === 'file').every((item) => !!item.materialId)
+    ).toBe(true);
     expect(screen.queryByText(/Added the first/i)).not.toBeInTheDocument();
   });
 

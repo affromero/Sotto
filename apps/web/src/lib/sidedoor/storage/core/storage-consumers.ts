@@ -2,6 +2,7 @@ import type { Prisma } from '@/generated/prisma/client';
 
 /** Fixed application fields shared by storage inventory and pre-cascade retirement. */
 export const storageConsumerFields = [
+  ['CourseMaterial', 'originalUrl', 'material', 'original', 'material'],
   ['Episode', 'audioUrl', 'episode', 'audio', 'episode'],
   ['Episode', 'pdfUrl', 'episode', 'transcript', 'episode'],
   ['Episode', 'waveformUrl', 'episode', 'waveform', 'episode'],

@@ -500,6 +500,16 @@ export async function readPreparationActivity(
         maxProviderRequests: operation.maxProviderRequests,
         providerRequestsAdmitted:
           operation.maxProviderRequests === null ? null : record.attempts.length,
+        providerRequestsCompleted: record.attempts.filter(
+          (attempt) => attempt.outcome === 'succeeded'
+        ).length,
+        providerRequestInFlight: record.attempts.some((attempt) => attempt.outcome === 'admitted'),
+        updatedAt: new Date(
+          Math.max(
+            operation.updatedAt,
+            ...record.attempts.map((attempt) => attempt.settledAt ?? attempt.admittedAt)
+          )
+        ).toISOString(),
         audioRequiresReview: operation.deferAudio,
         ...(failureReason ? { failureReason } : {}),
         ...(await grant.activity(operation.grant, options)),

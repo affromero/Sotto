@@ -19,6 +19,12 @@ verified official voice pool. Fish defaults to `s2.1-pro-free`; explicit paid
 models require a separate API balance. Unknown models and unsupported languages
 fail before dispatch. A paid credit error must never block the free model.
 
+`course-materials/index.ts` retains original uploaded documents through the canonical
+storage writer and stages owned materials before course attachment. Editable
+course notes stay separate. Generation reads their extracts through `getCourseNote()`.
+Material scopes stay stable during attachment and storage migration; course
+deletion retires their references and revokes their material scopes.
+
 `providers/capacity/tts.ts` admits speech and sound-effect requests from the shared TTS
 factory. Requests with the same captured provider credential and endpoint share
 capacity across profiles, workers, reference audio, previews, and provider tests.

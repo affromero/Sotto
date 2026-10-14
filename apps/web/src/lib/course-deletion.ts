@@ -61,6 +61,10 @@ export async function deleteCourseCompletely(courseId: string): Promise<CourseDe
         select: { createdAt: true },
       });
       const episodeIds = await courseEpisodeIds(database, courseId);
+      const materials = await database.courseMaterial.findMany({
+        where: { courseId },
+        select: { id: true, createdAt: true },
+      });
       const episodes = episodeIds.length
         ? await database.episode.findMany({
             where: { id: { in: episodeIds } },
@@ -74,6 +78,10 @@ export async function deleteCourseCompletely(courseId: string): Promise<CourseDe
         scope: { kind: 'course', id: courseId, episodeIds },
         subjects: [
           { subjectId: 'course:' + courseId, generation: course.createdAt.getTime() },
+          ...materials.map((material) => ({
+            subjectId: `material:${material.id}`,
+            generation: material.createdAt.getTime(),
+          })),
           ...episodes.map((episode) => ({
             subjectId: 'episode:' + episode.id,
             generation: episode.createdAt.getTime(),

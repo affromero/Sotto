@@ -240,6 +240,27 @@ export function StepContext({ contextItems, setContextItems, demoMode, onNext, o
     setUploading(true);
     setFileError(null);
     try {
+      if (!demoMode) {
+        const form = new FormData();
+        files.forEach((file) => form.append('files', file));
+        const response = await fetch('/api/v1/materials', { method: 'POST', body: form });
+        const data = (await response.json()) as {
+          materials?: Array<{ id: string; name: string; extractedText: string }>;
+          failed?: number;
+          error?: string;
+        };
+        if (!response.ok) throw new Error(data.error ?? 'Could not retain those files.');
+        addContextItems(
+          (data.materials ?? []).map((material) => ({
+            kind: 'file',
+            label: material.name,
+            value: material.extractedText,
+            materialId: material.id,
+          }))
+        );
+        if (data.failed) setFileError(`${data.failed} files could not be read.`);
+        return;
+      }
       const results = await Promise.allSettled(files.map(contextItemFromFile));
       const items = results.flatMap((result) =>
         result.status === 'fulfilled' ? [result.value] : []
@@ -251,8 +272,8 @@ export function StepContext({ contextItems, setContextItems, demoMode, onNext, o
           `Added ${items.length} file${items.length === 1 ? '' : 's'}; ${failed} could not be read.`
         );
       }
-    } catch {
-      setFileError('Could not read those files.');
+    } catch (error) {
+      setFileError(error instanceof Error ? error.message : 'Could not read those files.');
     } finally {
       setUploading(false);
       input.value = '';
@@ -363,7 +384,9 @@ export function StepContext({ contextItems, setContextItems, demoMode, onNext, o
             {uploading ? 'Reading files' : 'Upload files'}
           </button>
           <span className={c.contextUploadHint}>
-            Text files are read locally; other files are kept as named references.
+            {demoMode
+              ? 'Demo files stay in this browser.'
+              : 'Original documents are saved separately from editable notes. Maximum 10MB per upload.'}
           </span>
         </div>
 
@@ -372,7 +395,7 @@ export function StepContext({ contextItems, setContextItems, demoMode, onNext, o
           className={c.fileInput}
           type="file"
           multiple
-          accept=".csv,.html,.json,.log,.markdown,.md,.mdx,.rtf,.text,.tsv,.txt,.xml,.yaml,.yml,text/*"
+          accept=".csv,.docx,.epub,.html,.json,.log,.markdown,.md,.mdx,.pdf,.pptx,.rtf,.text,.tsv,.txt,.xlsx,.xml,.yaml,.yml,application/pdf,text/*"
           onChange={handleFileChange}
           aria-label="Choose context files"
         />

@@ -156,6 +156,56 @@ suite('Atomic onboarding with shared authority', () => {
       sttModel: getSttProviderMeta('openai').defaultModel,
     };
   }
+  it('attaches owned staged originals and keeps them outside the editable setup note', async () => {
+    const material = await instance.database.courseMaterial.create({
+      data: {
+        userId: identity.ownerId,
+        name: 'Vocab Deutsch.pdf',
+        mimeType: 'application/pdf',
+        byteSize: 18,
+        originalUrl: '/api/v1/storage/materials/fixture.pdf',
+        extractedText: 'Bahnhof means station.',
+      },
+    });
+    const response = await POST(
+      await request({ ...base, materialIds: [material.id] }, identity.ownerToken)
+    );
+    expect(response.status).toBe(200);
+    const result = await response.json();
+    expect(
+      (await instance.database.courseMaterial.findUniqueOrThrow({ where: { id: material.id } }))
+        .courseId
+    ).toBe(result.courseId);
+    expect(
+      (
+        await instance.database.courseNote.findUniqueOrThrow({
+          where: { courseId: result.courseId },
+        })
+      ).body
+    ).toBe(base.note);
+  });
+  it('rejects setup claiming another learner original before committing its note', async () => {
+    const other = await identity.household('Other learner');
+    const material = await instance.database.courseMaterial.create({
+      data: {
+        userId: other.id,
+        name: 'private.txt',
+        mimeType: 'text/plain',
+        byteSize: 4,
+        originalUrl: '/api/v1/storage/materials/other.txt',
+        extractedText: 'Other notes',
+      },
+    });
+    const response = await POST(
+      await request({ ...base, materialIds: [material.id] }, identity.ownerToken)
+    );
+    expect(response.status).toBe(409);
+    expect(
+      (await instance.database.courseMaterial.findUniqueOrThrow({ where: { id: material.id } }))
+        .courseId
+    ).toBeNull();
+    expect(await instance.database.courseNote.count()).toBe(0);
+  });
   it('authenticates curriculum generation with the saved local key during setup', async () => {
     const endpoint = 'http://localhost:8000/v1';
     await instance.configureInfrastructure({ aiBaseUrl: endpoint });

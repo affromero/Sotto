@@ -9,19 +9,32 @@ describe('learner note text imports', () => {
       new File(['My lesson notes'], 'lesson.txt', { type: 'text/plain' }),
       new File([subtitle], 'lesson.vtt', { type: 'text/vtt' }),
     ]);
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       failed: 0,
       texts: [
         'Uploaded course note: lesson.txt\nMy lesson notes',
         `Uploaded course note: lesson.vtt\n${subtitle}`,
       ],
     });
+    expect(result.uploads.map((upload) => upload.file.name)).toEqual(['lesson.txt', 'lesson.vtt']);
+    expect(await result.uploads[1]!.file.text()).toBe(subtitle);
   });
   it('reports unsupported binary subtitle uploads without pretending to parse them', async () => {
     expect(
       await extractUploadTexts([
         new File(['subtitle'], 'lesson.srt', { type: 'application/octet-stream' }),
       ])
-    ).toEqual({ texts: [], failed: 1 });
+    ).toEqual({ texts: [], uploads: [], failed: 1 });
+  });
+  it('keeps successful filenames aligned with their extracts after an earlier file fails', async () => {
+    const result = await extractUploadTexts([
+      new File(['binary'], 'bad.bin'),
+      new File(['Hallo'], 'good.txt', { type: 'text/plain' }),
+    ]);
+    expect(result.failed).toBe(1);
+    expect(result.uploads).toHaveLength(1);
+    expect(result.uploads[0]!.file.name).toBe('good.txt');
+    expect(result.uploads[0]!.text).toContain('good.txt');
+    expect(result.uploads[0]!.text).toContain('Hallo');
   });
 });

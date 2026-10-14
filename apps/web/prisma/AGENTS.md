@@ -80,6 +80,13 @@ npx prisma studio      # Visual database browser
 
 ## Scope
 
+`CourseMaterial` retains an immutable original document reference, a bounded text
+extract and profile ownership. Its optional course association lets onboarding
+stage files before creating a course. Note edits leave these records untouched.
+Pending uploads have a null original reference and remain discoverable by
+erasure before storage I/O. Publication fills the reference atomically; learner
+APIs expose published documents.
+
 `Episode.transcriptPublication` binds a canonical transcript reference to its source
 fingerprint and producing operation. It belongs to the episode, so requester-job
 erasure does not invalidate an owner-owned transcript. Unattributed URLs retain

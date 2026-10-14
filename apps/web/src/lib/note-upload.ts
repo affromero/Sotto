@@ -25,7 +25,7 @@ const TEXT_EXTENSIONS = new Set([
 const MARKIT_EXTENSIONS = new Set(['.pdf', '.docx', '.pptx', '.xlsx', '.epub']);
 
 /** Narrow a multipart form entry to an uploaded File. */
-export function isUploadFile(value: FormDataEntryValue): value is File {
+export function isUploadFile(value: unknown): value is File {
   return typeof value === 'object' && value !== null && 'arrayBuffer' in value && 'name' in value;
 }
 
@@ -70,8 +70,14 @@ async function extractUploadText(file: File): Promise<string> {
  */
 export async function extractUploadTexts(
   files: File[]
-): Promise<{ texts: string[]; failed: number }> {
-  const results = await Promise.allSettled(files.map(extractUploadText));
-  const texts = results.flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []));
-  return { texts, failed: results.length - texts.length };
+): Promise<{ texts: string[]; uploads: Array<{ file: File; text: string }>; failed: number }> {
+  const results = await Promise.allSettled(
+    files.map(async (file) => ({ file, text: await extractUploadText(file) }))
+  );
+  const uploads = results.flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []));
+  return {
+    texts: uploads.map((upload) => upload.text),
+    uploads,
+    failed: results.length - uploads.length,
+  };
 }

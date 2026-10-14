@@ -36,6 +36,12 @@ suite('storage ownership collection with PostgreSQL', () => {
       for (const match of baseline.matchAll(/CREATE TABLE "[^"]+" \([\s\S]*?\n\);/g))
         await tx.$executeRawUnsafe(match[0]);
     });
+    const materialsMigration = await readFile(
+      'prisma/migrations/20261014140000_course_materials/migration.sql',
+      'utf8'
+    );
+    for (const statement of materialsMigration.split(';').filter((sql) => sql.trim()))
+      await database.$executeRawUnsafe(statement);
     for (const owner of ['first', 'second']) {
       await insert('User', {
         id: owner,

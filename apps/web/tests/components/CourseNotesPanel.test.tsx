@@ -8,6 +8,38 @@ import userEvent from '@testing-library/user-event';
 import { CourseNotesPanel } from '@/components/learn/CourseNotesPanel';
 
 describe('CourseNotesPanel', () => {
+  it('keeps original document links and imported text outside the note editor', async () => {
+    vi.spyOn(global, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            body: 'Travel goals',
+            materials: [
+              {
+                id: 'document-1',
+                name: 'Vocab Deutsch.pdf',
+                extractedText: 'Bahnhof means station.',
+              },
+            ],
+          })
+        )
+      )
+      .mockResolvedValueOnce(new Response(JSON.stringify({ body: '', addedVocabulary: 0 })));
+    const user = userEvent.setup();
+    render(<CourseNotesPanel courseId="c1" />);
+    await user.click(screen.getByRole('button', { name: /course notes/i }));
+    const editor = await screen.findByLabelText(/paste notes/i);
+    await waitFor(() => expect(editor).toHaveValue('Travel goals'));
+    const link = screen.getByRole('link', { name: 'Vocab Deutsch.pdf' });
+    expect(link).toHaveAttribute('href', '/api/v1/materials/document-1/file');
+    await user.click(screen.getByText('View imported text'));
+    expect(screen.getByText('Bahnhof means station.')).toBeVisible();
+    await user.clear(editor);
+    await user.click(screen.getByRole('button', { name: /save notes/i }));
+    await screen.findByText('Saved');
+    expect(screen.getByRole('link', { name: 'Vocab Deutsch.pdf' })).toBeInTheDocument();
+    expect(editor).toHaveValue('');
+  });
   beforeEach(() => {
     vi.restoreAllMocks();
   });
@@ -71,6 +103,10 @@ describe('CourseNotesPanel', () => {
 
     await user.click(screen.getByRole('button', { name: /course notes/i }));
     await screen.findByLabelText(/paste notes from an official course/i);
+    await user.type(
+      screen.getByLabelText(/paste notes from an official course/i),
+      'Unsaved learner draft'
+    );
     await user.upload(screen.getByLabelText(/upload course note files/i), [
       new File(['ciao'], 'official-1.md', { type: 'text/markdown' }),
       new File(['arrivederci'], 'official-2.md', { type: 'text/markdown' }),
@@ -83,5 +119,8 @@ describe('CourseNotesPanel', () => {
     expect(fetchMock.mock.calls[1][1]).toMatchObject({ method: 'POST', credentials: 'include' });
     expect(fetchMock.mock.calls[1][1]?.body).toBeInstanceOf(FormData);
     expect(await screen.findByText(/Imported 2 files .* 4 vocab added/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/paste notes from an official course/i)).toHaveValue(
+      'Unsaved learner draft'
+    );
   });
 });

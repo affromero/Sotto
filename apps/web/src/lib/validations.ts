@@ -460,6 +460,7 @@ export const onboardingSaveSchema = z.object({
     level: cefrLevel.optional(),
   }),
   note: z.string().trim().max(4000).optional(),
+  materialIds: z.array(z.uuid()).max(30).optional(),
   preferred: z
     .object({
       language: z.string().trim().max(40).optional(),
