@@ -14,8 +14,8 @@ import { getEditableCourseNote, mergeCourseNote, setCourseNote } from '../course
 import { sottoTransaction } from '../sidedoor/access/state/transaction';
 import type { SottoProviderExecution } from '../sidedoor/credentials/runtime/provider-execution';
 
-export const MAX_MATERIAL_BYTES = 10 * 1024 * 1024;
-export const MAX_MATERIAL_FILES = 10;
+const MAX_MATERIAL_BYTES = 10 * 1024 * 1024;
+const MAX_MATERIAL_FILES = 10;
 export const materialSelect = {
   id: true,
   name: true,
