@@ -20,6 +20,58 @@ function titleFromId(id: string): string {
   return id.replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+// Fish Official voices verified through /model on October 14, 2026.
+export const FISH_VOICE_POOL: ProviderVoice[] = [
+  {
+    id: '536d3a5e000945adb7038665781a4aca',
+    name: 'Ethan',
+    gender: 'male',
+    character: 'curious clear explainer',
+  },
+  {
+    id: '933563129e564b19a115bedd57b7406a',
+    name: 'Sarah',
+    gender: 'female',
+    character: 'gentle conversationalist',
+  },
+  {
+    id: 'bf322df2096a46f18c579d0baa36f41d',
+    name: 'Adrian',
+    gender: 'male',
+    character: 'steady measured narrator',
+  },
+  {
+    id: 'b347db033a6549378b48d00acb0d06cd',
+    name: 'Selene',
+    gender: 'female',
+    character: 'calm gentle narrator',
+  },
+  {
+    id: '9a9cf47702da476aa4629e2506d4a857',
+    name: 'Hannah',
+    gender: 'female',
+    character: 'friendly confident conversationalist',
+  },
+  {
+    id: '79d0bd3e4e5444b18f7b6d89b5927bf1',
+    name: 'Jordan',
+    gender: 'male',
+    character: 'calm motivational speaker',
+  },
+  {
+    id: 'e3cd384158934cc9a01029cd7d278634',
+    name: 'Laura',
+    gender: 'female',
+    character: 'warm clear narrator',
+  },
+  {
+    id: '3f065d660212478a9c697fa965b4d098',
+    name: 'Carmen',
+    gender: 'female',
+    character: 'clear confident conversationalist',
+  },
+];
+
 // ---------------------------------------------------------------------------
 // Cartesia voices — curated subset of Cartesia's voice library
 // ---------------------------------------------------------------------------
@@ -449,6 +501,7 @@ export const PLAYHT_VOICE_POOL: ProviderVoice[] = [
 import type { TtsProviderId } from './tts-registry';
 
 const PROVIDER_VOICE_POOLS: Partial<Record<TtsProviderId, ProviderVoice[]>> = {
+  fish: FISH_VOICE_POOL,
   cartesia: CARTESIA_VOICE_POOL,
   hume: HUME_VOICE_POOL,
   fal: FAL_VOICE_POOL,

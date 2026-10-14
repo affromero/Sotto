@@ -10,7 +10,7 @@
  */
 import type { WordTiming } from '@sotto/shared';
 import type { TtsProvider } from '@/lib/providers/tts';
-import { getProviderMeta, type TtsProviderId } from '@/lib/providers/tts-registry';
+import { estimateTtsCost, getProviderMeta, type TtsProviderId } from '@/lib/providers/tts-registry';
 import { TtsParentStoppedError } from '@/lib/providers/capacity/tts';
 import { cleanTextForTts, splitTextForTts } from '@/lib/tts-text-cleaner';
 import { concatenateTtsAudio, measureTtsAudio } from '@/lib/audio/tts-media';
@@ -248,7 +248,7 @@ export async function generateTtsAudio(
 
   // 9. Log TTS cost
   const charCount = text.length;
-  const totalCost = (charCount / 1000) * meta.platformCostPerKChar;
+  const totalCost = estimateTtsCost(providerId, provider.getModelId(), text);
 
   await logUsage({
     service,

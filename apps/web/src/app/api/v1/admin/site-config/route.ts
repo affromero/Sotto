@@ -4,6 +4,10 @@ import { getSiteConfig, setSiteConfig } from '@/lib/site-config';
 import { siteConfigUpdateSchema } from '@/lib/validations';
 import { invalidateServerInfra } from '@/lib/server-config';
 import { errorResponse } from '@/lib/api-response';
+import {
+  assertProviderActivated,
+  ProviderActivationPendingError,
+} from '@/lib/providers/shared/runtime-activation';
 
 export async function GET() {
   const adminId = await requireAdmin();
@@ -37,7 +41,13 @@ export async function PATCH(request: NextRequest) {
   if (storageKeys.some((key) => parsed.data[key] !== undefined))
     return errorResponse('Use the verified storage migration action to change storage', 409);
 
-  await setSiteConfig(parsed.data, adminId);
+  try {
+    if (parsed.data.ttsProvider) assertProviderActivated(parsed.data.ttsProvider);
+    await setSiteConfig(parsed.data, adminId);
+  } catch (error) {
+    if (error instanceof ProviderActivationPendingError) return errorResponse(error.message, 409);
+    throw error;
+  }
   invalidateServerInfra();
   const updated = await getSiteConfig();
   return NextResponse.json(updated);

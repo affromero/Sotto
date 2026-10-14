@@ -4,6 +4,7 @@ import { admitDurableJob, contentExtractionQueue, JobType } from './queue';
 import type { ExtractContentPayload } from './queue';
 import { getProviderForModel } from './providers/ai-registry';
 import { generateEpisodeSlug } from './slugify';
+import { assertProviderActivated } from './providers/shared/runtime-activation';
 
 export type PrivateIngestionTransaction = Prisma.TransactionClient;
 
@@ -37,6 +38,7 @@ interface CreatePrivateIngestionEpisodeParams {
 export async function createPrivateIngestionEpisode(
   params: CreatePrivateIngestionEpisodeParams
 ): Promise<{ id: string; status: string; source: EpisodeSource; discoveryId: string }> {
+  assertProviderActivated(params.ttsProvider);
   const episodeId = randomUUID();
   const discoveryId = randomUUID();
   const payload: ExtractContentPayload = {
@@ -49,6 +51,7 @@ export async function createPrivateIngestionEpisode(
     jobId: `${params.jobIdPrefix}-${episodeId}`,
     authorize: params.authorize,
     mutate: async (database, operationId) => {
+      assertProviderActivated(params.ttsProvider);
       await database.episode.create({
         data: {
           id: episodeId,

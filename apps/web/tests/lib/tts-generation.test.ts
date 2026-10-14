@@ -43,16 +43,6 @@ vi.mock('@/lib/duration', () => ({
   estimateDurationFromText: vi.fn((text: string) => text.length / 12.5),
 }));
 
-vi.mock('@/lib/providers/tts-registry', () => ({
-  getProviderMeta: vi.fn().mockReturnValue({
-    id: 'elevenlabs',
-    displayName: 'ElevenLabs',
-    platformCostPerKChar: 0.3,
-    maxSegmentChars: 5000,
-    modelsWithoutTextContext: ['eleven_v3'],
-  }),
-}));
-
 const mockLogUsage = vi.fn();
 const createUsage = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/prisma', () => ({
@@ -138,6 +128,29 @@ describe('generateTtsAudio', () => {
     expect(result!.segmentDuration).toBe(5.0);
     expect(result!.service).toBe('elevenlabs');
     expect(result!.wordTimings).toBeNull();
+  });
+
+  it.each([
+    { model: 's2.1-pro-free', cost: 0 },
+    { model: 'drama-3', cost: 0.00006 },
+  ])('records Fish $model cost using UTF-8 bytes', async ({ model, cost }) => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-14T12:00:00Z'));
+    try {
+      const { logUsage } =
+        await vi.importActual<typeof import('@/lib/usage-logger')>('@/lib/usage-logger');
+      mockLogUsage.mockImplementation(logUsage);
+      const params = defaultParams({ text: '你好', providerId: 'fish' });
+      params.provider = { ...params.provider, providerId: 'fish', getModelId: () => model };
+      expect(await generateTtsAudio(params)).toMatchObject({ service: 'fish' });
+      expect(createUsage.mock.calls[0]?.[0]?.data).toMatchObject({
+        service: 'fish',
+        inputTokens: 2,
+        totalCost: cost,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('preserves a provider rejection even when it has no error value', async () => {

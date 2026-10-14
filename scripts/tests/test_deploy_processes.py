@@ -1,6 +1,7 @@
 """Exercise graceful worker retirement and executable compatibility boundaries."""
 
 import importlib.util
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -22,6 +23,10 @@ ROOT = Path(__file__).resolve().parents[2]
 SPEC = importlib.util.spec_from_file_location('deploy_processes', ROOT / 'scripts/deploy/stop-workers.py')
 PROCESSES = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(PROCESSES)
+REVIEW_SPEC = importlib.util.spec_from_file_location(
+    'compatibility_review', ROOT / 'scripts/deploy/compatibility-review.py')
+REVIEW = importlib.util.module_from_spec(REVIEW_SPEC)
+REVIEW_SPEC.loader.exec_module(REVIEW)
 WORKER = 'a' * 64
 MAIN = 'node --max-old-space-size=1024 --import tsx src/workers/index.ts'
 ESBUILD = '/app/node_modules/@esbuild/linux-x64/bin/esbuild --service=0.25.0 --ping'
@@ -205,6 +210,176 @@ class OverlapMemoryTests(unittest.TestCase):
             PROCESSES.require_overlap_memory('MemTotal: 1000 kB\nMemAvailable: 500 kB\n', 0)
 
 
+class CompatibilityReviewTests(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory(prefix='sotto-review-')
+        self.root = Path(self.directory.name)
+        self.image = 'sha256:' + 'b' * 64
+        self.contracts = (self.image + ' ' + 'd' * 64 + '\n').encode()
+        self.evidence = b'Independent exact-image overlap review evidence.'
+        self.environment = {
+            'SOTTO_STACK': 'sotto-personal',
+            'SOTTO_RELEASE_SHA': 'a' * 40,
+            'SOTTO_WEB_IMAGE_REF': 'fixture/web@sha256:' + 'c' * 64,
+            'SOTTO_WORKERS_IMAGE_REF': 'fixture/workers@sha256:' + 'c' * 64,
+            'PREVIOUS_APP_IMAGES': str(self.root / 'web.json'),
+            'PREVIOUS_WORKER_IMAGES': str(self.root / 'workers.json'),
+        }
+        (self.root / 'web.json').write_text(json.dumps({
+            'services': {'web': {'image': self.image}},
+        }))
+        (self.root / 'workers.json').write_text(json.dumps({
+            'services': {'workers-heavy': {'image': self.image}},
+        }))
+        self.review = {
+            'schemaVersion': 1,
+            'procedure': 'compatible-runtime-overlap',
+            'stack': self.environment['SOTTO_STACK'],
+            'releaseSha': self.environment['SOTTO_RELEASE_SHA'],
+            'candidateWebImage': self.environment['SOTTO_WEB_IMAGE_REF'],
+            'candidateWorkersImage': self.environment['SOTTO_WORKERS_IMAGE_REF'],
+            'previousWebImage': self.image,
+            'previousWorkerContracts': {self.image: 'd' * 64},
+            'candidateContract': 'e' * 64,
+            'reviewer': 'Independent reviewer',
+            'evidenceSha256': hashlib.sha256(self.evidence).hexdigest(),
+        }
+
+    def tearDown(self):
+        self.directory.cleanup()
+
+    def validate(self, review=None, evidence=None):
+        REVIEW.validate(
+            self.review if review is None else review,
+            self.evidence if evidence is None else evidence,
+            'e' * 64, self.contracts, self.environment,
+        )
+
+    def test_review_matches_only_the_exact_images_and_runtime_pair(self):
+        self.validate()
+        for field, value in {
+            'schemaVersion': True,
+            'procedure': 'skip-contract-check',
+            'stack': 'sotto',
+            'releaseSha': 'f' * 40,
+            'candidateWebImage': 'fixture/web:main',
+            'candidateWorkersImage': 'fixture/workers:main',
+            'previousWebImage': 'sha256:' + 'f' * 64,
+            'previousWorkerContracts': {self.image: 'f' * 64},
+            'candidateContract': 'f' * 64,
+            'reviewer': ' ',
+            'evidenceSha256': 'f' * 64,
+        }.items():
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                self.validate({**self.review, field: value})
+        with self.assertRaises(ValueError):
+            self.validate({**self.review, 'approved': True})
+        with self.assertRaises(ValueError):
+            self.validate(evidence=b'Changed evidence')
+
+    def test_extra_previous_worker_cannot_reuse_a_review(self):
+        (self.root / 'workers.json').write_text(json.dumps({
+            'services': {
+                'workers-heavy': {'image': self.image},
+                'workers-light': {'image': 'sha256:' + 'f' * 64},
+            },
+        }))
+        with self.assertRaisesRegex(ValueError, 'inventory changed'):
+            self.validate()
+
+    def test_duplicate_json_fields_and_public_or_symlinked_files_fail(self):
+        with self.assertRaisesRegex(ValueError, 'Duplicate'):
+            REVIEW.mapping(b'{"schemaVersion":1,"schemaVersion":1}')
+        path = self.root / 'review.json'
+        path.write_text(json.dumps(self.review))
+        path.chmod(0o600)
+        self.assertEqual(REVIEW.read_bytes(path, private=True), path.read_bytes())
+        path.chmod(0o640)
+        with self.assertRaisesRegex(ValueError, 'private'):
+            REVIEW.read_bytes(path, private=True)
+        path.chmod(0o600)
+        link = self.root / 'link.json'
+        link.symlink_to(path)
+        with self.assertRaises(OSError):
+            REVIEW.read_bytes(link, private=True)
+
+    def test_cli_preserves_exact_validated_record_and_evidence_bytes(self):
+        raw = json.dumps(self.review, indent=2).encode() + b'\n'
+        for name, content in [
+            ('review.json', raw), ('evidence.txt', self.evidence),
+            ('contracts.txt', self.contracts),
+        ]:
+            path = self.root / name
+            path.write_bytes(content)
+            path.chmod(0o600)
+        result = subprocess.run([
+            sys.executable, str(ROOT / 'scripts/deploy/compatibility-review.py'),
+            'validate',
+            str(self.root / 'review.json'), str(self.root / 'evidence.txt'),
+            'e' * 64, str(self.root / 'contracts.txt'),
+        ], env={**os.environ, **self.environment}, capture_output=True,
+            text=True, check=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        accepted = json.loads(result.stdout)
+        self.assertEqual(accepted['review'].encode(), raw)
+        self.assertEqual(accepted['evidence'].encode(), self.evidence)
+
+    def test_recovery_marker_advances_durably_and_only_its_attempt_can_clear(self):
+        marker = self.root / 'unresolved.json'
+        state = str(self.root / 'attempt-one')
+        REVIEW.record_marker(marker, state, '/private/overrides', 'sotto-personal',
+                             'compatibility-preparation')
+        self.assertEqual(json.loads(marker.read_text())['phase'],
+                         'compatibility-preparation')
+        with self.assertRaises(ValueError):
+            REVIEW.clear_marker(marker, '/different/attempt',
+                                'compatibility-preparation')
+        REVIEW.record_marker(marker, state, '/private/overrides', 'sotto-personal',
+                             'compatibility-cutover')
+        self.assertEqual(json.loads(marker.read_text())['phase'],
+                         'compatibility-cutover')
+        with self.assertRaises(ValueError):
+            REVIEW.clear_marker(marker, state, 'compatibility-preparation')
+        REVIEW.record_marker(marker, state, '/private/overrides', 'sotto-personal',
+                             'unresolved')
+        self.assertEqual(json.loads(marker.read_text())['phase'],
+                         'compatibility-cutover')
+        REVIEW.clear_marker(marker, state, 'compatibility-cutover')
+        self.assertFalse(marker.exists())
+
+    def test_activation_mount_preserves_environment_and_is_read_only(self):
+        for variable, filename, service in [
+            ('APP_IMAGES', 'candidate-web.json', 'web'),
+            ('WORKER_IMAGES', 'candidate-workers.json', 'workers-heavy'),
+        ]:
+            path = self.root / filename
+            path.write_text(json.dumps({'services': {service: {
+                'image': 'fixture@sha256:' + 'c' * 64,
+                'environment': {'KEEP': 'preserved'},
+                'volumes': [{'type': 'volume', 'source': 'data',
+                             'target': '/app/storage'}],
+            }}}))
+            self.environment[variable] = str(path)
+        directory = self.root / 'provider-activation'
+        REVIEW.prepare_activation(directory, self.environment)
+        self.assertFalse(json.loads((directory / 'fish.json').read_text())['fishEnabled'])
+        self.assertEqual(directory.stat().st_mode & 0o777, 0o755)
+        self.assertEqual((directory / 'fish.json').stat().st_mode & 0o777, 0o444)
+        for variable, service in [('APP_IMAGES', 'web'),
+                                  ('WORKER_IMAGES', 'workers-heavy')]:
+            value = json.loads(Path(self.environment[variable]).read_text())
+            selected = value['services'][service]
+            self.assertEqual(selected['environment']['KEEP'], 'preserved')
+            self.assertEqual(selected['volumes'][0]['source'], 'data')
+            self.assertTrue(Path(selected['volumes'][1]['source']).samefile(directory))
+            self.assertTrue(selected['volumes'][1]['read_only'])
+        with self.assertRaises(ValueError):
+            REVIEW.activate_provider(directory, 'f' * 40)
+        self.assertFalse(json.loads((directory / 'fish.json').read_text())['fishEnabled'])
+        REVIEW.activate_provider(directory, 'a' * 40)
+        self.assertTrue(json.loads((directory / 'fish.json').read_text())['fishEnabled'])
+
+
 @unittest.skipUnless(sys.platform == 'linux' and shutil.which('node'),
                      'Linux procfd traversal and Node are required for the executable contract')
 class RollingContractTests(unittest.TestCase):
@@ -271,6 +446,33 @@ class RollingContractTests(unittest.TestCase):
         result = self.contract()
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(result.stdout, '')
+
+    def test_workspace_packages_and_core_local_flock_match_runtime_resolution(self):
+        before = self.digest()
+        for name in ['thesidedoor', 'thesidedoor-core']:
+            target = self.root / 'apps/web/node_modules' / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(self.root / 'node_modules' / name), target)
+        core = 'apps/web/node_modules/thesidedoor-core'
+        target = self.root / core / 'node_modules/thesidedoor-flock'
+        target.parent.mkdir(parents=True)
+        shutil.move(str(self.root / 'node_modules/thesidedoor-flock'), target)
+        workspace = self.digest()
+        self.assertNotEqual(workspace, before)
+        self.write('node_modules/thesidedoor-flock/index.cjs', 'shadowed flock')
+        self.assertEqual(self.digest(), workspace)
+        self.write(core + '/node_modules/thesidedoor-flock/index.cjs',
+                   'changed selected native lock implementation')
+        self.assertNotEqual(self.digest(), workspace)
+
+    def test_symlinked_or_incomplete_workspace_package_cannot_use_root_copy(self):
+        target = self.root / 'apps/web/node_modules/thesidedoor-core'
+        target.parent.mkdir(parents=True)
+        target.symlink_to(self.root / 'node_modules/thesidedoor-core')
+        self.assertNotEqual(self.contract().returncode, 0)
+        target.unlink()
+        target.mkdir()
+        self.assertNotEqual(self.contract().returncode, 0)
 
     def test_symlinked_authority_rejects_the_contract(self):
         target = self.root / 'apps/web/src/lib/sidedoor/authority.ts'

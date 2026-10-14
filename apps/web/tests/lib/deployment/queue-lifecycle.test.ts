@@ -5,7 +5,7 @@ import { createRequire } from 'node:module';
 import { join, resolve } from 'node:path';
 import { Queue, Worker } from 'bullmq';
 import Redis from 'ioredis';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { prepareJob } from 'thesidedoor-core/runtime/outbox';
 import { ALL_QUEUE_NAMES } from '@/lib/queue';
 import { sottoJobOutbox } from '@/lib/sidedoor/jobs/core/job-delivery';
@@ -21,6 +21,12 @@ import {
 } from '@/lib/sidedoor/access/state/store';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 import {
+  captureSottoCredentialOwner,
+  sottoCredentialRows,
+  sottoCredentialStorage,
+} from '@/lib/sidedoor/credentials/runtime/provider-credentials';
+import { captureSottoCredentialProbe } from '@/lib/providers/shared/credential-validation';
+import {
   createSharedTestInstance,
   type SharedTestInstance,
 } from '../../helpers/setup/shared-instance';
@@ -31,6 +37,7 @@ interface Manifest {
   queues: { name: string; paused: boolean }[];
 }
 interface Report extends Manifest {
+  activationReady?: boolean;
   drained?: boolean;
   established?: boolean;
   activeJobs?: number;
@@ -49,6 +56,7 @@ interface Runtime {
   requireSottoJobVersion: typeof requireSottoJobVersion;
   sidedoorStateStore: typeof sidedoorStateStore;
   sottoStorageInstance: typeof sottoStorageInstance;
+  sottoCredentialRows: typeof sottoCredentialRows;
 }
 const { run } = createRequire(import.meta.url)(
   resolve(process.cwd(), '../../scripts/deploy/queue-lifecycle.cjs')
@@ -122,6 +130,7 @@ suite('deployment queue and execution settlement', () => {
       requireSottoJobVersion,
       sidedoorStateStore,
       sottoStorageInstance,
+      sottoCredentialRows,
     };
   });
   afterEach(async () => {
@@ -178,11 +187,89 @@ suite('deployment queue and execution settlement', () => {
     await run({ command: 'pause', manifest: original }, runtime);
     expect((await run({ command: 'drained', manifest: original }, runtime)).drained).toBe(true);
     await queue('pricing-fetch').resume();
+    const observed = await run({ command: 'observe', manifest: original }, runtime);
+    expect(observed.queues.find((entry) => entry.name === 'pricing-fetch')?.paused).toBe(false);
+    expect(original.queues.find((entry) => entry.name === 'pricing-fetch')?.paused).toBe(true);
     await run({ command: 'restore', manifest: original }, runtime);
     expect(await run({ command: 'snapshot' }, runtime)).toEqual(original);
     expect(original.queues.find((entry) => entry.name === 'pricing-fetch')?.paused).toBe(true);
     expect(snapshot.queues.every((entry) => !entry.paused)).toBe(true);
   });
+
+  it('checks empty Fish state without writing credentials or queue metadata', async () => {
+    expect(await run({ command: 'activation-ready' }, runtime)).toMatchObject({
+      activationReady: true,
+    });
+    expect(await connection.keys(`${prefix}:*`)).toEqual([]);
+  });
+
+  it.each(['preference', 'credential', 'queue', 'episode', 'segment', 'voice'])(
+    'rejects existing Fish %s state before enabling overlap',
+    async (kind) => {
+      const identity = await instance.reset();
+      if (['episode', 'segment', 'voice'].includes(kind)) {
+        const episode = await instance.database.episode.create({
+          data: {
+            userId: identity.ownerId,
+            title: 'Existing audio',
+            topic: 'Practice',
+            ...(kind === 'episode' ? { ttsProvider: 'fish' } : {}),
+          },
+        });
+        if (kind === 'segment')
+          await instance.database.segment.create({
+            data: {
+              episodeId: episode.id,
+              order: 0,
+              speaker: 'Host',
+              text: 'Hallo',
+              ttsProvider: 'fish',
+            },
+          });
+        if (kind === 'voice')
+          await instance.database.episodeVoice.create({
+            data: { episodeId: episode.id, speaker: 'Host', provider: 'fish' },
+          });
+      }
+      if (kind === 'preference')
+        await instance.database.user.update({
+          where: { id: identity.ownerId },
+          data: { preferredTtsProvider: 'fish' },
+        });
+      if (kind === 'queue')
+        await queue('audio-generation').add('existing-audio', { selection: { provider: 'fish' } });
+      if (kind === 'credential') {
+        vi.stubEnv('BYOK_ENCRYPTION_KEY', '1'.repeat(64));
+        try {
+          await sottoTransaction(instance.database, async (tx) => {
+            const storage = await sottoCredentialStorage(tx, 'tts', 'fish');
+            const owner = await captureSottoCredentialOwner(tx, identity.ownerId);
+            const values = { apiKey: 'fixture-fish-key' };
+            const probe = captureSottoCredentialProbe('tts', 'fish', values);
+            if (probe.kind === 'unsupported') throw new Error('Fish credentials must be supported');
+            await storage.owned.replace(
+              storage.owned.prepareReplacement(
+                { ...storage.slot, owner },
+                {
+                  expectedHeadRevision: null,
+                  credentialRevision: randomUUID(),
+                  values,
+                  binding: probe.binding,
+                  availability: 'enabled',
+                  label: 'Fish',
+                  metadata: { createdAt: 1, updatedAt: 1, lastUsedAt: null },
+                }
+              )
+            );
+          });
+        } finally {
+          vi.unstubAllEnvs();
+        }
+      }
+      await expect(run({ command: 'activation-ready' }, runtime)).rejects.toThrow('Existing Fish');
+      if (kind === 'queue') expect(await queue('audio-generation').getWaitingCount()).toBe(1);
+    }
+  );
 
   it('rejects foreign or malformed manifests without pausing any queue', async () => {
     const original = await run({ command: 'snapshot' }, runtime);

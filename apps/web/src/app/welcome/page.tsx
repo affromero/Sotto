@@ -52,6 +52,7 @@ async function buildModelMeta(selfHosted: boolean): Promise<ModelMeta> {
       elevenlabs: opt(getProviderMeta('elevenlabs').models),
       openai: opt(getProviderMeta('openai').models),
       cartesia: opt(getProviderMeta('cartesia').models),
+      fish: opt(getProviderMeta('fish').models),
       hume: opt(getProviderMeta('hume').models),
       deepgram: opt(getProviderMeta('deepgram').models),
       rime: opt(getProviderMeta('rime').models),

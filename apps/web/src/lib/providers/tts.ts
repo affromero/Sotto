@@ -1,6 +1,7 @@
 import { type VoiceMatchMetadata } from '../voice-pool';
 import type { TtsProviderId } from './tts-registry';
-import { isValidProviderId } from './tts-registry';
+import { assertTtsModelAvailable, getProviderMeta, isValidProviderId } from './tts-registry';
+import { assertProviderActivated } from './shared/runtime-activation';
 import type { WordTiming } from '@sotto/shared';
 import { getSharedByokKey, hasSharedByokKey } from '../byok';
 import { supportsLanguage, getDefaultModelForLanguage } from '../tts-language-support';
@@ -105,6 +106,11 @@ async function importOpenAI() {
 async function importCartesia() {
   const { CartesiaProvider } = await import('@/lib/providers/tts/cartesia.provider');
   return CartesiaProvider;
+}
+
+async function importFish() {
+  const { FishProvider } = await import('@/lib/providers/tts/fish/fish.provider');
+  return FishProvider;
 }
 
 async function importHume() {
@@ -302,6 +308,14 @@ async function createTtsProviderBare(
       ]);
       return new Cls(selectedKey, transport, model);
     }
+    case 'fish': {
+      if (!apiKey?.trim()) throw new Error('Fish Audio requires an API key');
+      const Cls = await importFish();
+      const transport = await createSottoProviderTransport(execution, [
+        { method: 'POST', url: Cls.speechEndpoint },
+      ]);
+      return new Cls(apiKey, transport, model);
+    }
     case 'hume': {
       if (!apiKey) throw new Error('Hume AI requires an API key');
       const Cls = await importHume();
@@ -452,6 +466,15 @@ export async function resolveTtsProvider(context: {
   ): string | undefined => {
     // Custom sidecars validate their own model names and language capabilities.
     if (providerId === 'local' && model?.trim()) return model.trim();
+    if (providerId === 'fish') {
+      assertProviderActivated(providerId);
+      const meta = getProviderMeta(providerId);
+      const selected = model ?? meta.defaultModel;
+      assertTtsModelAvailable(providerId, selected);
+      if (language && !supportsLanguage(providerId, selected, language))
+        throw new Error(`Fish Audio model "${selected}" does not support language "${language}".`);
+      return selected;
+    }
     if (!language) return model ?? undefined;
     if (model && supportsLanguage(providerId, model, language)) return model;
     const fallback = getDefaultModelForLanguage(providerId, language, model);

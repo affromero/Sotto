@@ -11,6 +11,10 @@ import {
 } from '@/lib/providers/ai-registry';
 import { getProviderIds, type TtsProviderId } from '@/lib/providers/tts-registry';
 import { getSttProviderIds, type SttProviderId } from '@/lib/providers/stt-registry';
+import {
+  assertProviderActivated,
+  ProviderActivationPendingError,
+} from '@/lib/providers/shared/runtime-activation';
 
 const aiProviderEnum = getAiProviderIds() as [AiProviderId, ...AiProviderId[]];
 const ttsProviderEnum = getProviderIds() as [TtsProviderId, ...TtsProviderId[]];
@@ -93,7 +97,15 @@ export async function PATCH(request: NextRequest) {
     }
   }
 
-  await setAutoModelConfig(parsed.data, adminId);
+  try {
+    if (parsed.data.model?.ttsProvider) assertProviderActivated(parsed.data.model.ttsProvider);
+    for (const selection of parsed.data.includedTtsModels ?? [])
+      assertProviderActivated(selection.split(':')[0]);
+    await setAutoModelConfig(parsed.data, adminId);
+  } catch (error) {
+    if (error instanceof ProviderActivationPendingError) return errorResponse(error.message, 409);
+    throw error;
+  }
   const updated = await getAutoModelConfig();
   return NextResponse.json(updated);
 }

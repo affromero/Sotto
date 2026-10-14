@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
 // Define mock functions at module scope for proper typing
@@ -289,6 +289,31 @@ describe('GET /api/v1/episodes', () => {
 });
 
 describe('POST /api/v1/episodes', () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it.each(['explicit', 'configured'])(
+    'rejects %s Fish selection before creating an episode during overlap',
+    async (selection) => {
+      vi.stubEnv('SOTTO_PROVIDER_ACTIVATION_FILE', '/missing-fish-activation.json');
+      mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+      if (selection === 'configured')
+        mockGetAutoModelConfig.mockResolvedValue({
+          model: { ttsProvider: 'fish', ttsModel: 's2.1-pro-free' },
+        });
+      const response = await createEpisode(
+        createPostRequest('/api/v1/episodes', {
+          title: 'Fish lesson',
+          topic: 'German practice',
+          ...(selection === 'explicit' ? { ttsProvider: 'fish', ttsModel: 's2.1-pro-free' } : {}),
+        })
+      );
+      expect(response.status).toBe(409);
+      expect((await response.json()).error).toContain('being enabled');
+      expect(mockEpisodeCreate).not.toHaveBeenCalled();
+      expect(mockEpisodeVoiceCreateMany).not.toHaveBeenCalled();
+    }
+  );
+
   beforeEach(() => {
     vi.clearAllMocks();
     mockUserFindUnique.mockResolvedValue({ preferredAiModel: null });

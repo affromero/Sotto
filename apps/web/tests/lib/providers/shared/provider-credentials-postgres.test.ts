@@ -1,5 +1,8 @@
 // @vitest-environment node
 import { randomUUID, randomBytes } from 'node:crypto';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { useProviderCredentialDatabase } from '../../../helpers/runtime/provider-credentials-postgres';
 import type { CredentialValues } from 'thesidedoor-core/ai';
@@ -27,6 +30,9 @@ import {
   resolveSottoRequestCredential,
   listSottoProfileCredentials,
 } from '@/lib/sidedoor/credentials/runtime/provider-credentials';
+import { validateSottoCredentialSelection } from '@/lib/sidedoor/credentials/config/credential-selection';
+import { setSiteConfig } from '@/lib/site-config';
+import { setAutoModelConfig } from '@/lib/auto-model-config';
 
 const databaseUrl = process.env.SIDEDOOR_TEST_DATABASE_URL;
 let database: PrismaClient;
@@ -44,6 +50,74 @@ suite('Sotto provider ownership with PostgreSQL', () => {
   const { transaction, admission } = fixture;
   beforeAll(() => {
     database = fixture.database;
+  });
+
+  it('defers Fish credential and configuration writes until old HTTP has retired', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'sotto-fish-settings-'));
+    const path = join(directory, 'fish.json');
+    const previousFile = process.env.SOTTO_PROVIDER_ACTIVATION_FILE;
+    const previousRelease = process.env.SOTTO_RELEASE_SHA;
+    vi.stubEnv('SOTTO_PROVIDER_ACTIVATION_FILE', path);
+    vi.stubEnv('SOTTO_RELEASE_SHA', 'a'.repeat(40));
+    const activation = (fishEnabled: boolean) =>
+      writeFile(path, JSON.stringify({ releaseSha: 'a'.repeat(40), fishEnabled }));
+    try {
+      await activation(false);
+      const admitted = await transaction((tx) => admission(tx));
+      const input = {
+        request: admitted.request,
+        identity: admitted.identity,
+        scope: 'tts' as const,
+        provider: 'fish',
+        values: { apiKey: 'fixture-fish-key' },
+        expectedRevision: null,
+        operationId: randomUUID(),
+        allowUnverified: false,
+      };
+      const displayed = await listSottoCredentialSettings(database, {
+        ...input,
+        providers: ['fish'],
+      });
+      await expect(saveSottoCredential(database, input)).rejects.toThrow('being enabled');
+      await expect(setSiteConfig({ ttsProvider: 'fish' }, 'alice')).rejects.toThrow(
+        'being enabled'
+      );
+      await expect(
+        setAutoModelConfig({ model: { ttsProvider: 'fish', ttsModel: 's2.1-pro-free' } }, 'alice')
+      ).rejects.toThrow('being enabled');
+      await expect(
+        setAutoModelConfig({ includedTtsModels: ['fish:drama-3'] }, 'alice')
+      ).rejects.toThrow('being enabled');
+      await expect(
+        transaction((tx) =>
+          validateSottoCredentialSelection(
+            tx,
+            'alice',
+            {
+              context: { instanceId: displayed.context.instanceId, owner: displayed.context.owner },
+              selections: [{ endpoint: 'byok', provider: 'fish', expectedRevision: null }],
+            },
+            { ttsProvider: 'fish' }
+          )
+        )
+      ).rejects.toThrow('being enabled');
+      expect(
+        await listSottoCredentialSettings(database, { ...input, providers: ['fish'] })
+      ).toMatchObject({ keys: [], heads: { fish: null } });
+      await activation(true);
+      vi.stubGlobal('fetch', async () => Response.json({ total: 0, items: [] }));
+      expect(await saveSottoCredential(database, input)).toMatchObject({
+        status: 'saved',
+        revision: input.operationId,
+      });
+      expect(
+        await listSottoCredentialSettings(database, { ...input, providers: ['fish'] })
+      ).toMatchObject({ heads: { fish: input.operationId } });
+    } finally {
+      vi.stubEnv('SOTTO_PROVIDER_ACTIVATION_FILE', previousFile);
+      vi.stubEnv('SOTTO_RELEASE_SHA', previousRelease);
+      await rm(directory, { recursive: true, force: true });
+    }
   });
   it('saves verified credentials through shared storage and retains a removed head for the next edit', async () => {
     const admitted = await transaction((tx) => admission(tx));

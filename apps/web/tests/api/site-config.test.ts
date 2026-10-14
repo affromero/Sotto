@@ -63,6 +63,17 @@ describe('GET /api/v1/admin/site-config', () => {
 });
 
 describe('PATCH /api/v1/admin/site-config', () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it('returns an activation conflict when the owner selects Fish during overlap', async () => {
+    vi.stubEnv('SOTTO_PROVIDER_ACTIVATION_FILE', '/missing-fish-activation.json');
+    mockRequireAdmin.mockResolvedValue('owner-1');
+    const { PATCH } = await getHandlers();
+    const response = await PATCH(patchRequest({ ttsProvider: 'fish' }));
+    expect(response.status).toBe(409);
+    expect((await response.json()).error).toContain('being enabled');
+  });
+
   beforeEach(() => vi.clearAllMocks());
   afterEach(() => vi.clearAllMocks());
 

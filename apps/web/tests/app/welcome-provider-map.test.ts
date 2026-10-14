@@ -20,6 +20,13 @@ import {
   welcomeVoiceCredentialExtras,
 } from '@/app/welcome/providerMap';
 
+it('retains explicit Fish provider and free model during onboarding', () => {
+  const result = resolveTts('fish', 'test-key', '', 's2.1-pro-free');
+  expect(result.keyPost).toEqual({ endpoint: 'byok', provider: 'fish', apiKey: 'test-key' });
+  expect(result.preferredTtsProvider).toBe('fish');
+  expect(result.preferredTtsModel).toBe('s2.1-pro-free');
+});
+
 it('keeps the selected PlayHT account identifier with its own key', () => {
   const extra = welcomeVoiceCredentialExtras('playht', {
     'playht:userId': ' personal-account ',

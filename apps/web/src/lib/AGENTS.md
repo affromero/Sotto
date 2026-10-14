@@ -14,6 +14,11 @@ acknowledges them separately. A missing attached workspace fails closed.
 
 All shared business logic and external service integrations live here.
 
+`providers/tts/fish/fish.provider.ts` uses Fish Audio's captured JSON transport and
+verified official voice pool. Fish defaults to `s2.1-pro-free`; explicit paid
+models require a separate API balance. Unknown models and unsupported languages
+fail before dispatch. A paid credit error must never block the free model.
+
 `providers/capacity/tts.ts` admits speech and sound-effect requests from the shared TTS
 factory. Requests with the same captured provider credential and endpoint share
 capacity across profiles, workers, reference audio, previews, and provider tests.

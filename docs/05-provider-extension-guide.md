@@ -1,8 +1,53 @@
 # Provider Extension Guide
 
-Date: 2026-09-27
+Date: 2026-10-14
 
 > **Summary**: Add local LLM, STT, and TTS models to Sotto with the least possible code. Prefer OpenAI-compatible local servers for LLM and STT, and the Sotto local TTS sidecar contract for TTS. Only write a native provider adapter when a model or vendor cannot fit those simple HTTP shapes.
+
+## Fish Audio
+
+Choose **Fish Audio** in Settings or onboarding and save its API key. Fish
+defaults to **S2.1 Pro Free**, a developer API model available at $0 under
+fair-use limits. Fish currently guarantees that free window through November
+30, 2026; see its [free API announcement](https://fish.audio/blog/s2-1-pro-free-api/).
+Sotto stops free-model calls at the end of that guaranteed window until its
+availability metadata is reverified. It never switches an expired free choice
+to a paid model.
+**Drama 3**, **S2.1 Pro**, and **S2 Pro** are explicit paid
+choices. Website membership credits and API credit are separate balances.
+Cartesia remains available alongside Fish.
+
+Fish documents 83 languages for Drama 3 and S2.1 Pro, including all 30 Sotto
+course languages. Language detection is automatic. The verified official voice
+pool supplies eight distinct voices for teaching and conversation. Bracket
+directions and inline cues are preserved. Language switching within a Drama
+line is experimental and depends on the voice and language pair.
+
+Verified on 2026-10-14: S2.1 Pro and S2 Pro cost $15 per million UTF-8 bytes.
+Drama 3's launch rate is $10 through November 12, 2026, then its published list
+rate is $50. Usage estimates count UTF-8 bytes and expire that promotion.
+See [models](https://docs.fish.audio/developer-guide/models-pricing/models-overview),
+[pricing](https://docs.fish.audio/developer-guide/models-pricing/pricing-and-rate-limits),
+and [Drama 3](https://fish.audio/blog/fish-audio-drama-3/).
+
+Provider keys are saved through Sidedoor's credential flow. An operator's
+`FISH_AUDIO_API_KEY` in Infisical does not register a runtime credential.
+Credential validation lists only the authenticated account's voices and does
+not generate audio. Unknown Fish model IDs fail before a request because Fish's
+API silently serves its paid default for unknown model headers. Paid errors
+surface directly and do not disable the free model or change providers.
+
+To exercise Sotto's authenticated preview route against the live free API,
+provide `FISH_AUDIO_API_KEY`, set `FISH_AUDIO_LIVE_TESTS=1`, and run:
+
+```bash
+npm test --workspace=@sotto/web -- --run tests/api/sidedoor/speech-credentials/part-02.test.ts
+```
+
+This also requires the isolated local `SIDEDOOR_TEST_DATABASE_URL` and Redis
+test services. The live test sends one short German line, uses temporary
+credential storage, and skips unless explicitly enabled. Regular CI sends no
+Fish requests.
 
 ## Meta Muse
 

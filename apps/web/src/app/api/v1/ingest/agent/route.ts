@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
+import { ProviderActivationPendingError } from '@/lib/providers/shared/runtime-activation';
 import { Prisma } from '@/generated/prisma/client';
 import { prisma } from '@/lib/prisma';
 import { authenticateRequest } from '@/lib/api-keys';
@@ -199,6 +200,7 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
+    if (error instanceof ProviderActivationPendingError) return errorResponse(error.message, 409);
     if (input.idempotencyKey && isUniqueConstraintError(error)) {
       const duplicate = await findExistingIngestion(authResult.userId, input.idempotencyKey);
       if (duplicate) {

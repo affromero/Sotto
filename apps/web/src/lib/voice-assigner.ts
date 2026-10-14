@@ -7,6 +7,7 @@ import { selectVoiceSet, resolveVoiceId, type VoiceMatchMetadata } from './voice
 import {
   selectVoiceSetFromPool,
   CARTESIA_VOICE_POOL,
+  FISH_VOICE_POOL,
   HUME_VOICE_POOL,
   FAL_VOICE_POOL,
   MINIMAX_VOICE_POOL,
@@ -113,6 +114,10 @@ function selectDeterministicVoiceIds(
       return entries.map((e) => resolveVoiceId(e, 'openai'));
     }
 
+    case 'fish': {
+      const voices = selectVoiceSetFromPool(FISH_VOICE_POOL, episodeId, speakerCount, metadata);
+      return voices.map((voice) => voice.id);
+    }
     case 'cartesia': {
       const voices = selectVoiceSetFromPool(CARTESIA_VOICE_POOL, episodeId, speakerCount, metadata);
       return voices.map((v) => v.id);

@@ -43,15 +43,99 @@ function validateManifest(manifest, names, identity) {
   }
 }
 
-async function readOnly(database, operation) {
+async function readOnly(database, operation, isolationLevel = 'RepeatableRead') {
   return database.$transaction(
     async (transaction) => {
       await transaction.$executeRawUnsafe('SET TRANSACTION READ ONLY');
       await transaction.$executeRawUnsafe("SET LOCAL statement_timeout='15s'");
       return operation(transaction);
     },
-    { isolationLevel: 'RepeatableRead', timeout: 20000, maxWait: 5000 }
+    { isolationLevel, timeout: 20000, maxWait: 5000 }
   );
+}
+
+function hasFishSelection(value, depth = 0) {
+  assert(depth <= 64, 'Provider selection inspection depth exceeded');
+  if (Array.isArray(value)) return value.some((item) => hasFishSelection(item, depth + 1));
+  if (!value || typeof value !== 'object') return false;
+  for (const [key, child] of Object.entries(value)) {
+    if (
+      ['provider', 'providerId', 'ttsProvider', 'preferredTtsProvider'].includes(key) &&
+      child === 'fish'
+    )
+      return true;
+    if (
+      key === 'includedTtsModels' &&
+      Array.isArray(child) &&
+      child.some((model) => typeof model === 'string' && model.startsWith('fish:'))
+    )
+      return true;
+    if (hasFishSelection(child, depth + 1)) return true;
+  }
+  return false;
+}
+
+async function activationReady(runtime, queues) {
+  const inspectedCredentials = await readOnly(
+    runtime.database,
+    async (transaction) => {
+      const state = await runtime.sidedoorStateStore(transaction).read();
+      assert(
+        !hasFishSelection(state.configuration),
+        'Existing Fish configuration requires separate review'
+      );
+      assert(
+        !(await transaction.user.findFirst({
+          where: { preferredTtsProvider: 'fish' },
+          select: { id: true },
+        })),
+        'Existing Fish preference requires separate review'
+      );
+      const storage = await runtime.sottoCredentialRows(transaction);
+      for (const [model, field] of [
+        ['episode', 'ttsProvider'],
+        ['segment', 'ttsProvider'],
+        ['episodeVoice', 'provider'],
+      ])
+        assert(
+          !(await transaction[model].findFirst({
+            where: { [field]: 'fish' },
+            select: { id: true },
+          })),
+          'Existing Fish audio state requires separate review'
+        );
+      let inspected = 0;
+      for (const inventory of [storage.owned, storage.sharing]) {
+        let cursor = null;
+        do {
+          const page = await inventory.list(cursor, 100);
+          inspected += page.items.length;
+          assert(inspected <= LIMIT, 'Credential inspection bound exceeded');
+          assert(
+            !page.items.some((item) => item.provider === 'fish'),
+            'Existing Fish credentials require separate review'
+          );
+          cursor = page.cursor;
+        } while (cursor !== null);
+      }
+      return inspected;
+    },
+    'Serializable'
+  );
+  let inspectedJobs = 0;
+  for (const queue of queues) {
+    for (let offset = 0; ; offset += 100) {
+      const jobs = await queue.getJobs(undefined, offset, offset + 99);
+      inspectedJobs += jobs.length;
+      assert(inspectedJobs <= LIMIT, 'Job inspection bound exceeded');
+      assert(
+        !jobs.some((job) => hasFishSelection(job.data)),
+        'Existing Fish queued work requires separate review'
+      );
+      if (jobs.length < 100) break;
+    }
+  }
+  return { activationReady: true, inspectedCredentials, inspectedJobs };
 }
 
 async function inspectExecutions(runtime) {
@@ -156,7 +240,17 @@ async function established(runtime) {
 async function run(input, runtime) {
   assert(input && typeof input === 'object');
   assert(Object.keys(input).every((key) => ['command', 'manifest'].includes(key)));
-  assert(['snapshot', 'pause', 'drained', 'restore', 'established'].includes(input.command));
+  assert(
+    [
+      'snapshot',
+      'observe',
+      'pause',
+      'drained',
+      'restore',
+      'established',
+      'activation-ready',
+    ].includes(input.command)
+  );
   const identity = connectionIdentity(runtime.environment, runtime.namespace);
   const base = { schemaVersion: 1, connectionIdentity: identity };
   if (input.command === 'established') return { ...base, ...(await established(runtime)) };
@@ -167,6 +261,8 @@ async function run(input, runtime) {
   const queues = [];
   try {
     for (const name of names) queues.push(runtime.createQueue(name));
+    if (input.command === 'activation-ready')
+      return { ...base, ...(await activationReady(runtime, queues)) };
     if (input.command === 'pause') {
       for (const queue of queues) await queue.pause();
     }
@@ -223,6 +319,7 @@ function productionRuntime() {
     ...load('/app/apps/web/src/lib/sidedoor/jobs/core/job-contracts.ts'),
     ...load('/app/apps/web/src/lib/sidedoor/jobs/core/job-execution-lifetime.ts'),
     ...load('/app/apps/web/src/lib/sidedoor/jobs/core/job-delivery.ts'),
+    ...load('/app/apps/web/src/lib/sidedoor/credentials/runtime/provider-credentials.ts'),
     database: prismaUnfiltered,
     namespace: store.SIDEDOOR_STATE_ID,
     names: ALL_QUEUE_NAMES,

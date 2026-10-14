@@ -89,6 +89,20 @@ describe('AI Providers', () => {
 // TTS Providers (shared credential verification)
 // ---------------------------------------------------------------------------
 describe('TTS Providers', () => {
+  describe('Fish Audio', () => {
+    it.skipIf(!process.env.FISH_AUDIO_API_KEY)(
+      'validates credentials without generating audio',
+      async () => {
+        const result = await validateSottoCredentialProbe(
+          captureSottoCredentialProbe('tts', 'fish', { apiKey: process.env.FISH_AUDIO_API_KEY! })
+        );
+        expect(result).toMatchObject({
+          status: 'valid',
+          readiness: { authentication: 'verified' },
+        });
+      }
+    );
+  });
   describe('ElevenLabs', () => {
     it.skipIf(!process.env.ELEVENLABS_API_KEY)('validates credentials', async () => {
       const result = await validateSottoCredentialProbe(

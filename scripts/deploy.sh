@@ -403,22 +403,47 @@ while IFS= read -r previous_image; do
 done < <(python3 -c 'import json,sys; print("\n".join(sorted({item["image"] for item in json.load(open(sys.argv[1]))["services"].values()})))' "$PREVIOUS_WORKER_IMAGES")
 
 # Schema identity alone does not establish mixed-version job compatibility.
+COMPATIBILITY_REVIEWED=false
 if [ "$OLD_SLOT" != none ]; then
   rolling_contract_source=$(<scripts/deploy/checks/rolling-contract.cjs)
   candidate_contract=$(docker run --rm --pull never --network none --entrypoint node "$SOTTO_WORKERS_IMAGE_REF" -e "$rolling_contract_source")
+  contracts_match=true
+  previous_contracts="$IMAGE_OVERRIDES/previous-contracts.txt"
+  : > "$previous_contracts"
   while IFS= read -r previous_image; do
     [ -z "$previous_image" ] && continue
     previous_contract=$(docker run --rm --pull never --network none --entrypoint node "$previous_image" -e "$rolling_contract_source")
-    if [ "$previous_contract" != "$candidate_contract" ]; then
+    printf '%s %s\n' "$previous_image" "$previous_contract" >> "$previous_contracts"
+    if [ "$previous_contract" != "$candidate_contract" ]; then contracts_match=false; fi
+  done < <(python3 -c 'import json,sys; print("\n".join(sorted({item["image"] for item in json.load(open(sys.argv[1]))["services"].values()})))' "$PREVIOUS_WORKER_IMAGES")
+  if [ "$contracts_match" != true ]; then
+    if [ -z "${SOTTO_COMPATIBILITY_REVIEW_FILE:-}" ] || [ -z "${SOTTO_COMPATIBILITY_EVIDENCE_FILE:-}" ]; then
       echo "ERROR: job, authority, storage or shared-runtime contracts differ. Use a separately reviewed compatibility procedure." >&2
       exit 1
     fi
-  done < <(python3 -c 'import json,sys; print("\n".join(sorted({item["image"] for item in json.load(open(sys.argv[1]))["services"].values()})))' "$PREVIOUS_WORKER_IMAGES")
+    python3 scripts/deploy/compatibility-review.py validate "$SOTTO_COMPATIBILITY_REVIEW_FILE" "$SOTTO_COMPATIBILITY_EVIDENCE_FILE" "$candidate_contract" "$previous_contracts" > "$IMAGE_OVERRIDES/compatibility-review.json"
+    COMPATIBILITY_REVIEWED=true
+  fi
 fi
 
 DEPLOY_STATE_DIR="$DEPLOY_STATE_ROOT/$SOTTO_RELEASE_SHA-$RETENTION_ATTEMPT_KEY"
 mkdir -p "$DEPLOY_STATE_DIR"
 chmod 700 "$DEPLOY_STATE_DIR"
+if [ "$COMPATIBILITY_REVIEWED" = true ]; then
+  python3 - "$IMAGE_OVERRIDES/compatibility-review.json" "$DEPLOY_STATE_DIR/compatibility-review.json" <<'REVIEW_RECORD'
+import os, pathlib, sys
+with open(sys.argv[2], 'xb') as stream:
+    os.fchmod(stream.fileno(), 0o600)
+    stream.write(pathlib.Path(sys.argv[1]).read_bytes())
+    stream.flush()
+    os.fsync(stream.fileno())
+directory = os.open(os.path.dirname(sys.argv[2]), os.O_RDONLY)
+os.fsync(directory)
+os.close(directory)
+REVIEW_RECORD
+  SOTTO_PROVIDER_ACTIVATION_DIR="$DEPLOY_STATE_DIR/provider-activation"
+  python3 scripts/deploy/compatibility-review.py prepare-activation "$SOTTO_PROVIDER_ACTIVATION_DIR"
+fi
 QUEUE_MANIFEST="$DEPLOY_STATE_DIR/queues-original.json"
 QUEUE_HELPER=$(<scripts/deploy/queue-lifecycle.cjs)
 QUEUE_HELPER+=$'\nmodule.exports.main().catch(() => { console.error("Deployment queue lifecycle failed. Preserve the original manifest and inspect existing state."); process.exitCode = 1; });'
@@ -442,7 +467,7 @@ queue_control() {
 import json, pathlib, sys
 command, path = sys.argv[1:]
 value = {'command': command}
-if command not in ('snapshot', 'established'):
+if command not in ('snapshot', 'established', 'activation-ready'):
     value['manifest'] = json.loads(pathlib.Path(path).read_text())
 print(json.dumps(value))
 QUEUE_INPUT
@@ -475,18 +500,12 @@ wait_for_worker_drain() {
   done
 }
 
+record_unresolved() {
+  python3 scripts/deploy/compatibility-review.py marker "$UNRESOLVED_DEPLOYMENT" "$DEPLOY_STATE_DIR" "$IMAGE_OVERRIDES" "$SOTTO_STACK" "$1"
+}
+
 hold_unresolved() {
-  python3 - "$UNRESOLVED_DEPLOYMENT" "$DEPLOY_STATE_DIR" "$IMAGE_OVERRIDES" "$SOTTO_STACK" <<'UNRESOLVED'
-import json, os, sys
-path, state, images, stack = sys.argv[1:]
-with open(path, 'x') as stream:
-    json.dump({'stack': stack, 'stateDirectory': state, 'imageOverrides': images}, stream)
-    stream.flush()
-    os.fsync(stream.fileno())
-directory = os.open(os.path.dirname(path), os.O_RDONLY)
-os.fsync(directory)
-os.close(directory)
-UNRESOLVED
+  record_unresolved unresolved || echo "ERROR: recovery marker identity is unconfirmed; retain the deployment lock." >&2
   echo "Unresolved deployment. Keeping current HTTP service and deployment lock; inspect $UNRESOLVED_DEPLOYMENT" >&2
   while true; do /bin/sleep 30; done
 }
@@ -494,6 +513,11 @@ UNRESOLVED
 if [ "$OLD_SLOT" != none ]; then
   echo "=== Verifying established access and database state without conversion ==="
   queue_control established
+  if [ "$COMPATIBILITY_REVIEWED" = true ]; then
+    activation_report=$(queue_control activation-ready)
+    printf '%s\n' "$activation_report"
+    printf '%s\n' "$activation_report" | python3 -c 'import json,sys; assert json.load(sys.stdin)["activationReady"] is True, "Existing Fish state requires separate review"'
+  fi
 fi
 
 WORKERS_CHANGED=false
@@ -503,12 +527,19 @@ OLD_SLOT_STOPPED=false
 DEPLOYMENT_COMPLETE=false
 PLATFORM_FINALIZED=false
 TRAFFIC_COMMITTED=false
+COMPATIBILITY_CUTOVER=false
 if [ -f "$CADDY_SITE_PATH" ]; then cp "$CADDY_SITE_PATH" "$IMAGE_OVERRIDES/caddy.previous"; fi
 if [ -f "$SLOT_FILE" ]; then cp "$SLOT_FILE" "$IMAGE_OVERRIDES/slot.previous"; fi
 finish_deployment() {
   local status=$?
   trap - EXIT
   set +e
+  if [ "$status" -ne 0 ] && [ "$COMPATIBILITY_CUTOVER" = true ]; then
+    echo "Compatibility cutover is irreversible. Preserving compatible services and recovery evidence." >&2
+    queue_control pause > "$DEPLOY_STATE_DIR/compatibility-repause.json" || echo "ERROR: delivery fencing is unconfirmed; preserve active execution ownership." >&2
+    queue_control observe > "$DEPLOY_STATE_DIR/compatibility-queues-observed.json" || echo "ERROR: observed queue state is unknown." >&2
+    hold_unresolved
+  fi
   if [ "$status" -ne 0 ] && [ "$DEPLOYMENT_COMPLETE" != true ]; then
     if [ "$PLATFORM_FINALIZED" = true ] || [ "$TRAFFIC_COMMITTED" = true ]; then
       echo "Deployment metadata failed after verified cutover. Keeping the verified candidate serving." >&2
@@ -581,7 +612,10 @@ finish_deployment() {
       rm -f "$SLOT_FILE"
     fi
     if [ "$OLD_SLOT" != none ]; then
-      curl --retry 10 --retry-delay 2 --retry-all-errors -fsS --max-time 10 "${NEXT_PUBLIC_APP_URL%/}/api/v1/health" >/dev/null || echo "ERROR: restored public service failed health verification" >&2
+      curl --retry 10 --retry-delay 2 --retry-all-errors -fsS --max-time 10 "${NEXT_PUBLIC_APP_URL%/}/api/v1/health" >/dev/null || { echo "ERROR: restored public service failed health verification" >&2; if [ "$COMPATIBILITY_REVIEWED" = true ]; then hold_unresolved; fi; }
+    fi
+    if [ "$COMPATIBILITY_REVIEWED" = true ] && [ -e "$UNRESOLVED_DEPLOYMENT" ]; then
+      python3 scripts/deploy/compatibility-review.py clear "$UNRESOLVED_DEPLOYMENT" "$DEPLOY_STATE_DIR" compatibility-preparation || hold_unresolved
     fi
   fi
   rm -rf "$IMAGE_OVERRIDES"
@@ -817,6 +851,7 @@ echo "Worker presets: heavy=${WORKER_PRESET_HEAVY:-full} pipeline=${WORKER_PRESE
 if [ "$OLD_SLOT" != none ]; then
   echo "=== Draining workers while current web remains serving ==="
   queue_control snapshot
+  if [ "$COMPATIBILITY_REVIEWED" = true ]; then record_unresolved compatibility-preparation; fi
   QUEUES_PAUSED=true
   queue_control pause
   wait_for_worker_drain || hold_unresolved
@@ -840,6 +875,10 @@ for service in workers-heavy workers-pipeline workers-light; do
   fi
 done
 
+if [ "$COMPATIBILITY_REVIEWED" = true ]; then
+  record_unresolved compatibility-cutover
+  COMPATIBILITY_CUTOVER=true
+fi
 CADDY_CHANGED=true
 sudo install -m 0644 "$TMP_CADDY" "$CADDY_SITE_PATH"
 sudo caddy validate --config /etc/caddy/Caddyfile
@@ -905,6 +944,10 @@ DEPLOYMENT_COMPLETE=true
 python3 scripts/deploy/production-retention.py backups-success
 if [ -n "${SOTTO_WORKERS_ROLLBACK_TAG:-}" ]; then docker tag "$previous_worker_id" "$SOTTO_WORKERS_ROLLBACK_TAG"; fi
 if [ -n "${SOTTO_WEB_ROLLBACK_TAG:-}" ]; then docker tag "$previous_web_id" "$SOTTO_WEB_ROLLBACK_TAG"; fi
+if [ "$COMPATIBILITY_CUTOVER" = true ]; then
+  python3 scripts/deploy/compatibility-review.py activate "$SOTTO_PROVIDER_ACTIVATION_DIR" "$SOTTO_RELEASE_SHA"
+  python3 scripts/deploy/compatibility-review.py clear "$UNRESOLVED_DEPLOYMENT" "$DEPLOY_STATE_DIR" compatibility-cutover
+fi
 echo "Images and build cache retained. Run host maintenance separately with rollback protection."
 
 echo ""

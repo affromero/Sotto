@@ -13,6 +13,7 @@ import {
 import { FileStateStore } from 'thesidedoor-core/storage';
 import { accessHandler, accessOperation } from '@/lib/sidedoor/access/core/http';
 import { sottoDeviceService } from '@/lib/sidedoor/access/state/device-identity';
+import { ProviderActivationPendingError } from '@/lib/providers/shared/runtime-activation';
 
 describe('Sotto shared access HTTP configuration', () => {
   let directory: string;
@@ -142,6 +143,20 @@ describe('Sotto shared access HTTP configuration', () => {
     );
     expect(response.status).toBe(status);
     expect(await response.json()).toMatchObject({ error: code });
+    expect(response.headers.get('cache-control')).toContain('no-store');
+  });
+  it('returns a clear conflict while a new provider is being enabled', async () => {
+    const response = await accessOperation(
+      householdRequest('https://sotto.example'),
+      true,
+      async () => {
+        throw new ProviderActivationPendingError();
+      }
+    );
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      error: expect.stringContaining('being enabled'),
+    });
     expect(response.headers.get('cache-control')).toContain('no-store');
   });
   it('sanitizes unexpected storage failures', async () => {

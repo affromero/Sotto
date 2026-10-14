@@ -10,6 +10,7 @@ import type { TtsProviderId } from './providers/tts-registry';
 import { VOICE_POOL, type VoicePoolEntry } from './voice-pool';
 import {
   CARTESIA_VOICE_POOL,
+  FISH_VOICE_POOL,
   HUME_VOICE_POOL,
   FAL_VOICE_POOL,
   INWORLD_VOICE_POOL,
@@ -225,6 +226,8 @@ export async function getVoiceCatalog(
   request: typeof fetch = fetch
 ): Promise<CatalogVoice[]> {
   switch (providerId) {
+    case 'fish':
+      return providerVoiceToCatalog(FISH_VOICE_POOL);
     case 'elevenlabs': {
       const key = apiKey;
       if (!key) return voicePoolToCatalog(VOICE_POOL, 'elevenlabs');

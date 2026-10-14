@@ -29,6 +29,10 @@ import { randomUUID } from 'crypto';
 import { restartExistingSegmentAudio } from '@/lib/segment-creator';
 import type { Queue } from 'bullmq';
 import type { Prisma } from '@/generated/prisma/client';
+import {
+  assertProviderActivated,
+  ProviderActivationPendingError,
+} from '@/lib/providers/shared/runtime-activation';
 
 type RouteParams = { params: Promise<{ episodeId: string }> };
 
@@ -127,6 +131,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       status: true,
       failedAtStatus: true,
       audioGenerationKey: true,
+      ttsProvider: true,
       discovery: {
         select: { id: true, sourceUrl: true, sourceContent: true, durationTarget: true },
       },
@@ -158,6 +163,25 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       `Requested duration of ${durationTarget} minutes exceeds the maximum of ${MAX_LESSON_DURATION_MINUTES} minutes.`,
       400
     );
+  }
+
+  let bodyProvider: string | undefined;
+  let bodyModel: string | undefined;
+  if (episode.status === 'FAILED') {
+    try {
+      const body = await request.json();
+      bodyProvider = body?.ttsProvider;
+      bodyModel = body?.ttsModel;
+    } catch {
+      // A bare retry uses the persisted provider.
+    }
+  }
+  try {
+    const provider = bodyProvider ?? episode.ttsProvider;
+    if (provider) assertProviderActivated(provider);
+  } catch (error) {
+    if (error instanceof ProviderActivationPendingError) return errorResponse(error.message, 409);
+    throw error;
   }
 
   // For FAILED episodes: smart resume or force restart
@@ -200,17 +224,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     } else {
       // Smart resume: inspect existing data and pick up where we left off
       const resumePoint = await determineResumePoint(episodeId);
-
-      // Parse optional provider override from JSON body (audio failure retry)
-      let bodyProvider: string | undefined;
-      let bodyModel: string | undefined;
-      try {
-        const body = await request.json();
-        bodyProvider = body?.ttsProvider;
-        bodyModel = body?.ttsModel;
-      } catch {
-        // No JSON body — bare retry
-      }
 
       return await routeResume(
         episodeId,

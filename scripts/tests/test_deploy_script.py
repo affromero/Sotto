@@ -1,6 +1,7 @@
 """Run the deployment controller against disposable filesystem and CLI boundaries."""
 
 import fcntl
+import hashlib
 import json
 import logging
 import os
@@ -145,7 +146,7 @@ if name == 'sha256sum':
     finish(hashlib.sha256(pathlib.Path(args[0]).read_bytes()).hexdigest() + '  ' + args[0])
 if name == 'capacity':
     state['capacity'] += 1
-    fail = (mode == 'pre-capacity' and state['capacity'] == 1) or (mode == 'post-capacity' and state['capacity'] == 2) or (mode == 'final-capacity' and state['capacity'] == 5)
+    fail = (mode == 'pre-capacity' and state['capacity'] == 1) or (mode == 'post-capacity' and state['capacity'] == 2) or (mode in ('final-capacity', 'compat-final-capacity') and state['capacity'] == 5)
     finish(code=1 if fail else 0)
 if name == 'sudo':
     if args[0] == 'install':
@@ -161,6 +162,12 @@ if name == 'sudo':
             delayed('rollback-route-failed')
             finish(code=1)
         state['active_route'] = route
+        if mode.startswith('compat-') and route == 'candidate':
+            marker = root / '.local/state/sotto-deploy/unresolved.json'
+            state['cutover_marker_before_reload'] = json.loads(marker.read_text())
+            directory = pathlib.Path(state['cutover_marker_before_reload']['stateDirectory'])
+            state['gate_disabled_before_cutover'] = json.loads((directory / 'provider-activation/fish.json').read_text())['fishEnabled'] is False
+            if mode == 'compat-cutover': finish(code=1)
     finish()
 if name == 'curl':
     url = args[-1]
@@ -215,7 +222,7 @@ if args[0] == 'inspect':
     if 'RestartCount' in fmt:
         image = image_for(identifier)
         if 'revision' in fmt:
-            revision = 'e' * 40 if mode == 'workers' and image == new else sha
+            revision = 'e' * 40 if mode in ('workers', 'compat-before') and image == new else sha
             finish('true false 0 ' + revision)
         if identifier in old_workers.values():
             state['verified_workers'].append(next(service for service, value in old_workers.items() if value == identifier))
@@ -225,7 +232,7 @@ if args[0] == 'run':
     if '/proc/meminfo' in args[-1]:
         available = 1024 if mode == 'overlap-memory' else 6291456
         finish('MemTotal: 8388608 kB\nMemAvailable: ' + str(available) + ' kB')
-    if mode == 'contract' and 'schema.prisma' not in args[-1]:
+    if (mode == 'contract' or mode.startswith('compat-')) and 'schema.prisma' not in args[-1]:
         finish(('d' if old in args else 'e') * 64)
     if mode.startswith('schema-'): finish(('d' if old in args else 'e') * 64)
     finish('same')
@@ -239,10 +246,17 @@ if args[0] == 'exec':
         if command == 'established':
             finish('SOTTO_DEPLOY_QUEUE=' + json.dumps({'schemaVersion': 1, 'connectionIdentity': 'f' * 64,
                                                      'established': True, 'appliedMigrations': 3}))
+        if command == 'activation-ready':
+            if mode == 'compat-existing-fish': finish(code=1)
+            finish('SOTTO_DEPLOY_QUEUE=' + json.dumps({'schemaVersion': 1, 'connectionIdentity': 'f' * 64,
+                                                     'activationReady': True, 'inspectedCredentials': 0, 'inspectedJobs': 0}))
         if command == 'pause':
             state['queue_flags'] = dict.fromkeys(state['queue_flags'], True)
             snapshot['queues'] = [{'name': key, 'paused': True} for key in sorted(state['queue_flags'])]
         if command == 'restore':
+            if mode == 'compat-restore':
+                state['queue_flags']['audio-generation'] = False
+                finish(code=1)
             state['queue_flags'] = {queue['name']: queue['paused'] for queue in request['manifest']['queues']}
             snapshot['queues'] = request['manifest']['queues']
         if command == 'drained':
@@ -328,7 +342,7 @@ finish()
 class DeploymentFailureTests(unittest.TestCase):
     def run_deployment(self, failure, stack='sotto-test', reviewed_schema=False, success=False,
                        expect_rollback=True, prepaused=False, retained_candidate=False, rollback_blocked=False,
-                       old_slot='blue'):
+                       old_slot='blue', reviewed_runtime=False, stale_review=False):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             source = Path(__file__).parents[2]
@@ -373,6 +387,28 @@ class DeploymentFailureTests(unittest.TestCase):
             if reviewed_schema:
                 values['SOTTO_REVIEWED_PREVIOUS_SCHEMA_HASH'] = 'd' * 64
                 values['SOTTO_REVIEWED_CANDIDATE_SCHEMA_HASH'] = 'e' * 64
+            if reviewed_runtime:
+                evidence = b'Independent review of exact fixture images.'
+                evidence_path = root / 'compatibility-evidence.txt'
+                evidence_path.write_bytes(evidence)
+                evidence_path.chmod(0o600)
+                review_path = root / 'compatibility-review.json'
+                review_path.write_text(json.dumps({
+                    'schemaVersion': 1,
+                    'procedure': 'compatible-runtime-overlap',
+                    'stack': stack,
+                    'releaseSha': SHA,
+                    'candidateWebImage': values['SOTTO_WEB_IMAGE_REF'],
+                    'candidateWorkersImage': values['SOTTO_WORKERS_IMAGE_REF'],
+                    'previousWebImage': OLD,
+                    'previousWorkerContracts': {OLD: 'd' * 64},
+                    'candidateContract': ('f' if stale_review else 'e') * 64,
+                    'reviewer': 'Independent fixture reviewer',
+                    'evidenceSha256': hashlib.sha256(evidence).hexdigest(),
+                }))
+                review_path.chmod(0o600)
+                values['SOTTO_COMPATIBILITY_REVIEW_FILE'] = str(review_path)
+                values['SOTTO_COMPATIBILITY_EVIDENCE_FILE'] = str(evidence_path)
             (root / '.env.production').write_text(''.join(key + '=' + value + '\n' for key, value in values.items()))
             with serving_fixture(root) as (ports, observations, phase_observations):
                 environment.update(ports)
@@ -386,7 +422,7 @@ class DeploymentFailureTests(unittest.TestCase):
                                                    stderr=errors, start_new_session=True)
                         try:
                             deadline = time.monotonic() + 30
-                            while not unresolved.exists() and process.poll() is None and time.monotonic() < deadline:
+                            while (not unresolved.exists() or 'Unresolved deployment.' not in stdout.read_text()) and process.poll() is None and time.monotonic() < deadline:
                                 time.sleep(0.02)
                             self.assertTrue(unresolved.exists(), stdout.read_text() + stderr.read_text())
                             self.assertIsNone(process.poll(), stdout.read_text() + stderr.read_text())
@@ -399,6 +435,11 @@ class DeploymentFailureTests(unittest.TestCase):
                             if process.poll() is None:
                                 os.killpg(process.pid, signal.SIGKILL)
                             process.wait(timeout=5)
+                    if reviewed_runtime:
+                        retry = subprocess.run(command, env=environment, text=True,
+                                               capture_output=True, timeout=5)
+                        self.assertNotEqual(retry.returncode, 0)
+                        self.assertIn('unresolved deployment requires review', retry.stderr)
                     result = subprocess.CompletedProcess(command, process.returncode,
                                                          stdout.read_text(), stderr.read_text())
                 else:
@@ -409,6 +450,16 @@ class DeploymentFailureTests(unittest.TestCase):
             else:
                 self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
             after = json.loads((root / 'state.json').read_text())
+            marker = root / '.local/state/sotto-deploy/unresolved.json'
+            after['unresolved_marker'] = json.loads(marker.read_text()) if marker.exists() else None
+            if marker.exists():
+                state_directory = Path(after['unresolved_marker']['stateDirectory'])
+                observed = state_directory / 'compatibility-queues-observed.json'
+                if observed.exists():
+                    after['observed_queues'] = json.loads(observed.read_text())
+            for gate in (root / '.local/state/sotto-deploy').glob('*/provider-activation/fish.json'):
+                after['gate_enabled_after_controller'] = json.loads(gate.read_text())['fishEnabled']
+                self.assertFalse(after['gate_enabled_after_controller'] and after['running'][OLD_WEB], result.stdout + result.stderr)
             after['observations'] = observations
             after['phase_observations'] = phase_observations
             after['calls'] = [json.loads(line) for line in (root / 'calls.jsonl').read_text().splitlines()]
@@ -529,6 +580,70 @@ class DeploymentFailureTests(unittest.TestCase):
         state, output = self.run_deployment('contract')
         self.assertFalse(any('up' in call and 'web' in call for call in state['calls']), output)
         self.assertFalse(state['stopped'], output)
+
+    def test_reviewed_runtime_pair_deploys_and_clears_its_recovery_marker(self):
+        state, output = self.run_deployment(
+            'compat-success', reviewed_runtime=True, success=True,
+            expect_rollback=False, prepaused=True)
+        self.assertEqual(state['queue_flags'], {
+            'audio-generation': True, 'speaking-grading': False}, output)
+        self.assertEqual(state['cutover_marker_before_reload']['phase'],
+                         'compatibility-cutover', output)
+        self.assertIsNone(state['unresolved_marker'], output)
+        self.assertTrue(state['gate_disabled_before_cutover'], output)
+        self.assertTrue(state['gate_enabled_after_controller'], output)
+
+    def test_stale_runtime_review_never_starts_candidate_services(self):
+        state, output = self.run_deployment(
+            'compat-success', reviewed_runtime=True, stale_review=True)
+        self.assertIn('Compatibility review rejected', output)
+        self.assertFalse(state['stopped'], output)
+        self.assertFalse(any('up' in call and 'web' in call
+                             for call in state['calls']), output)
+
+    def test_existing_fish_state_blocks_candidate_start_and_stays_disabled(self):
+        state, output = self.run_deployment('compat-existing-fish', reviewed_runtime=True)
+        self.assertFalse(state['stopped'], output)
+        self.assertFalse(state['gate_enabled_after_controller'], output)
+        self.assertFalse(any('up' in call and 'web' in call for call in state['calls']), output)
+
+    def test_reviewed_upgrade_can_restore_old_workers_before_cutover(self):
+        state, output = self.run_deployment('compat-before', reviewed_runtime=True)
+        self.assertEqual(state['worker_generation'], 'old', output)
+        self.assertIsNone(state['unresolved_marker'], output)
+        self.assertEqual(state['queue_flags'], {
+            'audio-generation': False, 'speaking-grading': False}, output)
+
+    def test_uncertain_compatible_cutover_keeps_new_workers_and_durable_lock(self):
+        state, output = self.run_deployment(
+            'compat-cutover', reviewed_runtime=True, retained_candidate=True,
+            rollback_blocked=True)
+        self.assertEqual(state['active_route'], 'candidate', output)
+        self.assertEqual(state['worker_generation'], 'new', output)
+        self.assertTrue(state['running'][OLD_WEB], output)
+        self.assertTrue(all(state['queue_flags'].values()), output)
+        self.assertEqual(state['unresolved_marker']['phase'],
+                         'compatibility-cutover', output)
+        self.assertFalse(state['gate_enabled_after_controller'], output)
+
+    def test_partial_queue_restore_fences_delivery_without_killing_active_work(self):
+        state, output = self.run_deployment(
+            'compat-restore', reviewed_runtime=True, retained_candidate=True,
+            rollback_blocked=True)
+        self.assertEqual(state['worker_generation'], 'new', output)
+        self.assertTrue(all(state['queue_flags'].values()), output)
+        self.assertTrue(all(queue['paused'] for queue in
+                            state['observed_queues']['queues']), output)
+        self.assertTrue(state['running'][CANDIDATE_WEB], output)
+
+    def test_post_commit_failure_keeps_compatible_candidate_and_evidence(self):
+        state, output = self.run_deployment(
+            'compat-final-capacity', reviewed_runtime=True,
+            retained_candidate=True, expect_rollback=False)
+        self.assertEqual(state['active_route'], 'candidate', output)
+        self.assertEqual(state['worker_generation'], 'new', output)
+        self.assertTrue(state['running'][CANDIDATE_WEB], output)
+        self.assertTrue(all(state['queue_flags'].values()), output)
 
     def test_insufficient_overlap_memory_keeps_old_http_and_workers_serving(self):
         state, output = self.run_deployment('overlap-memory')

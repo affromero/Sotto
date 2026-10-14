@@ -81,6 +81,7 @@ describe('welcome TTS provider language support', () => {
       'hume',
       'openai',
       'cartesia',
+      'fish',
       'deepgram',
       'rime',
       'playht',

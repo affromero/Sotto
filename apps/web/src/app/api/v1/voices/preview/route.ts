@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/api-keys';
 import { voicePreviewSchema } from '@/lib/validations';
 import { checkRateLimit } from '@/lib/redis';
-import { getProviderMeta, type TtsProviderId } from '@/lib/providers/tts-registry';
+import { estimateTtsCost, getProviderMeta, type TtsProviderId } from '@/lib/providers/tts-registry';
 import { logUsage } from '@/lib/usage-logger';
+import { ProviderActivationPendingError } from '@/lib/providers/shared/runtime-activation';
 import {
   captureSottoExecutionCredential,
   admitSottoExecutionCredential,
@@ -76,6 +77,7 @@ export async function POST(request: NextRequest) {
         'rime',
         'hume',
         'cartesia',
+        'fish',
         'elevenlabs',
         'local',
         'kokoro',
@@ -91,6 +93,7 @@ export async function POST(request: NextRequest) {
     }
     audioBuffer = await ttsProvider.generateSpeech({ text, voiceId, signal: request.signal });
   } catch (err) {
+    if (err instanceof ProviderActivationPendingError) return errorResponse(err.message, 409);
     if (isAccessError(err)) return errorResponse(err.code, accessErrorStatus(err));
     if (request.signal.aborted) return errorResponse('Preview cancelled.', 499);
     const msg = err instanceof Error ? err.message : '';
@@ -109,7 +112,7 @@ export async function POST(request: NextRequest) {
     service: providerName,
     category: 'voice_preview',
     inputTokens: text.length,
-    totalCost: (text.length / 1000) * meta.platformCostPerKChar,
+    totalCost: estimateTtsCost(providerName, meta.defaultModel, text),
     userId,
   });
 

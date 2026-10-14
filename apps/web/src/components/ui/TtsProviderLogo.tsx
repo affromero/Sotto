@@ -9,6 +9,7 @@ interface TtsProviderLogoProps {
     | 'elevenlabs'
     | 'openai'
     | 'cartesia'
+    | 'fish'
     | 'hume'
     | 'fal'
     | 'replicate'
@@ -398,6 +399,14 @@ export function TtsProviderLogo({ provider, size = 24, className }: TtsProviderL
           />
         </svg>
       );
+    case 'fish':
+      return (
+        <svg {...props}>
+          <path d="M5 12c3-6 10-6 13 0-3 6-10 6-13 0Z" fill="currentColor" />
+          <path d="m5 12-4-4v8Z" fill="currentColor" />
+          <circle cx="15" cy="11" r="1" fill="var(--color-surface)" />
+        </svg>
+      );
     case 'local':
       return (
         <svg {...props}>
@@ -416,6 +425,7 @@ const PROVIDER_NAMES: Record<string, string> = {
   elevenlabs: 'ElevenLabs',
   openai: 'OpenAI',
   cartesia: 'Cartesia',
+  fish: 'Fish Audio',
   hume: 'Hume AI',
   fal: 'Fal',
   replicate: 'Replicate',

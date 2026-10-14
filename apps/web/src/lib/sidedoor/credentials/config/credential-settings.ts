@@ -17,6 +17,7 @@ import {
 import { requireOriginalSottoAdmission } from '@/lib/sidedoor/access/core/request-identity';
 import type { CredentialScope } from '@/lib/sidedoor/access/state/state';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
+import { assertProviderActivated } from '@/lib/providers/shared/runtime-activation';
 
 export class SottoCredentialRejectedError extends Error {
   constructor(readonly validation: CredentialValidation) {
@@ -97,6 +98,7 @@ export async function saveSottoCredential(
     }
 ) {
   input = captureRequest(input);
+  assertProviderActivated(input.provider);
   const expectedRevision = z.uuid().nullable().parse(input.expectedRevision);
   const operationId = z.uuid().parse(input.operationId);
   const edit = structuredClone({ values: input.values, patch: input.patch });
@@ -192,6 +194,7 @@ export async function saveSottoCredential(
           throw new AccessError('conflict', 'Provider configuration changed during validation');
         const prepared = storage.owned.withValidation(captured.prepared, validation);
         input.request.signal.throwIfAborted();
+        assertProviderActivated(input.provider);
         await storage.owned.replace(prepared);
         input.request.signal.throwIfAborted();
         return saved;
@@ -215,6 +218,7 @@ export async function saveSottoCredential(
         const head = await storage.owned.head(storage.target);
         if (head.revision !== operationId) throw error;
         const prepared = storage.owned.withValidation(captured.prepared, validation);
+        assertProviderActivated(input.provider);
         if ((await storage.owned.replace(prepared)) !== 'replayed')
           throw new OwnedCredentialConflictError();
         input.request.signal.throwIfAborted();

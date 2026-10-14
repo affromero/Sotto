@@ -13,6 +13,7 @@ import {
 import { getAiProviderIds } from '@/lib/providers/ai-registry';
 import { getProviderIds } from '@/lib/providers/tts-registry';
 import { getSttProviderIds } from '@/lib/providers/stt-registry';
+import { assertProviderActivated } from '@/lib/providers/shared/runtime-activation';
 
 interface Preferences {
   aiProvider?: string | null;
@@ -38,6 +39,7 @@ export async function validateSottoCredentialSelection(
     throw new AccessError('conflict', 'The displayed credential owner changed');
   const selected = new Set<string>();
   for (const selection of captured.selections) {
+    assertProviderActivated(selection.provider);
     const endpoint = sottoCredentialEndpoint(selection.endpoint);
     if (!endpoint.providers.includes(selection.provider))
       throw new AccessError('invalid', 'Unsupported credential selection');
@@ -59,6 +61,7 @@ export async function validateSottoCredentialSelection(
       ['stt', preferred?.sttProvider, getSttProviderIds(), ['local']],
     ] as const) {
       if (!provider) continue;
+      assertProviderActivated(provider);
       if (!(registered as readonly string[]).includes(provider))
         throw new AccessError('invalid', 'Unsupported provider selection');
       if ((keyless as readonly string[]).includes(provider)) continue;

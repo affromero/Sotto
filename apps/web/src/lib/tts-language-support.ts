@@ -79,6 +79,14 @@ export function getDefaultModelForLanguage(
   try {
     const meta = getProviderMeta(providerId);
 
+    // Fish's paid and free models share languages. Preserve explicit billing choice.
+    if (providerId === 'fish') {
+      const selected = preferred ?? meta.defaultModel;
+      return meta.models.find((model) => model.id === selected)?.supportedLanguages.has(normalized)
+        ? selected
+        : null;
+    }
+
     // Check preferred model first
     if (preferred) {
       const prefModel = meta.models.find((m) => m.id === preferred);
