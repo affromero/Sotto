@@ -1,5 +1,12 @@
 import { interruptibleStream } from 'thesidedoor-core/runtime/stream';
-import type { AIProvider, AIOptions, AIResponse, ChatMessage, TextContentPart } from './ai';
+import type {
+  AIProvider,
+  AIOptions,
+  AIResponse,
+  ChatMessage,
+  TextContentPart,
+  ImageContentPart,
+} from './ai';
 import { serializeMessages } from '../agent-messages';
 
 /** Extract plain text from ChatMessage content (string or ContentPart[]). */
@@ -11,15 +18,12 @@ function textOf(content: ChatMessage['content']): string {
     .join('\n');
 }
 
-function rejectImages(messages: ChatMessage[]): void {
-  if (
-    messages.some(
-      (message) =>
-        Array.isArray(message.content) && message.content.some((part) => part.type !== 'text')
-    )
-  ) {
-    throw new Error("Codex CLI image input is not supported by Sotto's current transport.");
-  }
+function imagesOf(messages: ChatMessage[]): ImageContentPart[] {
+  return messages.flatMap((message) =>
+    typeof message.content === 'string'
+      ? []
+      : message.content.filter((part): part is ImageContentPart => part.type === 'image_url')
+  );
 }
 
 /**
@@ -33,8 +37,8 @@ export class CodexProvider implements AIProvider {
     messages: ChatMessage[],
     opts?: AIOptions
   ): Promise<AIResponse> {
-    rejectImages(messages);
     const textMessages = messages.map((m) => ({ role: m.role, content: textOf(m.content) }));
+    const images = imagesOf(messages);
     const { executeCodex } = await import('../codex-client');
     const result = await executeCodex(system, serializeMessages(textMessages), {
       signal: opts?.signal,
@@ -42,6 +46,7 @@ export class CodexProvider implements AIProvider {
       model: opts?.model,
       useWebSearch: opts?.useWebSearch,
       jsonSchema: opts?.jsonSchema,
+      ...(images.length ? { images } : {}),
       ...(opts?.isolated ? { isolated: opts.isolated } : {}),
     });
     return result;
@@ -55,8 +60,8 @@ export class CodexProvider implements AIProvider {
     let cleanupError: (error: unknown) => boolean = () => false;
     return interruptibleStream(
       async function* (signal) {
-        rejectImages(messages);
         const textMessages = messages.map((m) => ({ role: m.role, content: textOf(m.content) }));
+        const images = imagesOf(messages);
         const { streamCodex, isCodexCleanupError } = await import('../codex-client');
         cleanupError = isCodexCleanupError;
         yield* streamCodex(system, serializeMessages(textMessages), {
@@ -65,6 +70,7 @@ export class CodexProvider implements AIProvider {
           model: opts?.model,
           useWebSearch: opts?.useWebSearch,
           jsonSchema: opts?.jsonSchema,
+          ...(images.length ? { images } : {}),
           ...(opts?.isolated ? { isolated: opts.isolated } : {}),
         });
       },

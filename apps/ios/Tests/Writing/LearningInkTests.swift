@@ -20,12 +20,15 @@ final class LearningInkTests: XCTestCase {
             PKStrokePoint(location: point, timeOffset: Double(index), size: CGSize(width: 3, height: 3), opacity: 1, force: 1, azimuth: 0, altitude: .pi / 2)
         }
         let stroke = PKStroke(ink: PKInk(.pen, color: .black), path: PKStrokePath(controlPoints: points, creationDate: Date()))
-        try store.save(PKDrawing(strokes: [stroke]), key: "answer")
+        let drawing = PKDrawing(strokes: [stroke])
+        try store.save(drawing, key: "answer")
         let reopened = LearningInkStore(directory: directory)
         XCTAssertEqual(try reopened.load("answer").strokes.count, 1)
+        XCTAssertEqual(LearningInkStore.drawingDigest(drawing), try LearningInkStore.drawingDigest(reopened.load("answer")))
         XCTAssertTrue(try reopened.load("another-answer").strokes.isEmpty)
         try reopened.save(PKDrawing(), key: "answer")
         XCTAssertTrue(try store.load("answer").strokes.isEmpty)
+        XCTAssertNotEqual(LearningInkStore.drawingDigest(drawing), LearningInkStore.drawingDigest(PKDrawing()))
     }
 
     func testCorruptInkSurfacesAnError() throws {

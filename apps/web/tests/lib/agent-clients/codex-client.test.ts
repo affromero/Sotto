@@ -174,6 +174,72 @@ describe('Codex CLI execution', () => {
     },
   };
 
+  it.each([false, true])(
+    'delivers private image attachments with the original prompt and removes them (SSH %s)',
+    async (remote) => {
+      process.env.PATH = directory + ':/usr/bin:/bin';
+      if (remote) {
+        process.env.CODEX_SSH_HOST = 'fixture-host';
+        executable(
+          'const child=require("node:child_process").spawn("/bin/sh",["-c",args.at(-1)],{stdio:["pipe","inherit","inherit"]});child.stdin.end(input);child.on("exit",code=>{process.exitCode=code});',
+          'ssh'
+        );
+      }
+      executable(
+        'const file=args[args.indexOf("--image")+1];const info={file,image:fs.readFileSync(file).toString("base64"),mode:fs.statSync(file).mode&511,input,args};' +
+          'if(output)fs.writeFileSync(output,JSON.stringify(info));else console.log(JSON.stringify({type:"item.completed",item:{id:"answer",type:"agent_message",text:JSON.stringify(info)}}));' +
+          event(done)
+      );
+      const encoded = Buffer.from('private homework fixture').toString('base64');
+      const response = await new CodexProvider().generateResponse(
+        'Read the marks',
+        [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: 'Interpret the marked option.' },
+              { type: 'image_url', url: 'data:image/png;base64,' + encoded },
+            ],
+          },
+        ],
+        { jsonSchema }
+      );
+      const delivered = JSON.parse(response.content);
+      expectApplicationRequest(delivered, 'Read the marks', 'Interpret the marked option.');
+      expect(delivered.image).toBe(encoded);
+      expect(delivered.mode).toBe(0o600);
+      expect(delivered.args.slice(-2)).toEqual(['--', '-']);
+      expect(delivered.args.join(' ')).not.toContain(encoded);
+      expect(existsSync(delivered.file)).toBe(false);
+    }
+  );
+
+  it('removes attached images after a measured CLI failure', async () => {
+    const receipt = join(directory, 'attachment-receipt');
+    executable(
+      `fs.writeFileSync(${JSON.stringify(receipt)},args[args.indexOf("--image")+1]);` +
+        event(done) +
+        'process.exitCode=1;'
+    );
+    await expect(
+      executeCodex('Read', 'Marks', {
+        images: [{ type: 'image_url', url: 'data:image/png;base64,aW5r' }],
+      })
+    ).rejects.toThrow();
+    expect(existsSync(readFileSync(receipt, 'utf8'))).toBe(false);
+  });
+
+  it('refuses external images before starting the CLI', async () => {
+    const spawned = join(directory, 'unexpected-spawn');
+    executable(`fs.writeFileSync(${JSON.stringify(spawned)},'started');`);
+    await expect(
+      executeCodex('Read', 'Marks', {
+        images: [{ type: 'image_url', url: 'https://example.com/private.png' }],
+      })
+    ).rejects.toThrow('inline PNG or JPEG');
+    expect(existsSync(spawned)).toBe(false);
+  });
+
   function schemaExecutable() {
     executable(
       'const file=args[args.indexOf("--output-schema")+1];' +

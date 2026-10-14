@@ -5,6 +5,17 @@ import Combine
 
 final class CourseRefreshTests: XCTestCase {
     @MainActor
+    func testPencilWorkbookOpensTheInteractiveClassWithoutRequiringAPDF() async {
+        let model = model()
+        await model.openWorkbook(for: "class-1", pencil: true)
+        XCTAssertEqual(model.selectedClass?.id, "class-1")
+        XCTAssertTrue(model.pencilWorkbook)
+        XCTAssertNil(model.workbook)
+        model.closeClass()
+        XCTAssertFalse(model.pencilWorkbook)
+    }
+
+    @MainActor
     func testRefreshRemovesDeletedCourseAndItsOpenLearningSessions() async throws {
         let model = model()
         await model.loadCourses(showLoading: false)

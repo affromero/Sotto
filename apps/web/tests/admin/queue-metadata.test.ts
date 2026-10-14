@@ -3,6 +3,12 @@ import { ALL_QUEUE_NAMES } from '@/lib/queue';
 import { QUEUE_METADATA, PIPELINE_STAGE_ORDER } from '@/app/(admin)/admin/queues/queue-metadata';
 
 describe('queue-metadata', () => {
+  it('identifies image interpretation as review before submission', () => {
+    expect(QUEUE_METADATA['pencil-homework'].stage).toBe('Content Pipeline');
+    expect(QUEUE_METADATA['pencil-homework'].description).toMatch(
+      /review before class submission/i
+    );
+  });
   it('places saved practice preparation in the content pipeline', () => {
     expect(QUEUE_METADATA['practice-preparation']).toMatchObject({ stage: 'Content Pipeline' });
   });

@@ -189,6 +189,7 @@ const QUEUE_DEFINITIONS: Record<string, QueueDefinition> = {
   'episode-status': { attempts: 3, skipEvents: true },
   'speaking-grading': { attempts: 3 },
   'worksheet-pdf': { attempts: 2, skipEvents: true },
+  'pencil-homework': { attempts: 1, skipEvents: true },
 };
 
 const queueInstances = new Map<string, Queue>();
@@ -489,6 +490,7 @@ export const waveformGenerationQueue = createQueueReference('waveform-generation
 export const episodeStatusQueue = createQueueReference('episode-status');
 export const speakingGradingQueue = createQueueReference('speaking-grading');
 export const worksheetPdfQueue = createQueueReference('worksheet-pdf');
+export const pencilHomeworkQueue = createQueueReference('pencil-homework');
 
 /** All queue names — single source of truth for admin and health endpoints */
 export const ALL_QUEUE_NAMES = Object.freeze(Object.keys(QUEUE_DEFINITIONS));

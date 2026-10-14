@@ -383,14 +383,19 @@ describe('POST /api/v1/classes/[classId]/submit', () => {
     expect(res.status).toBe(401);
   });
 
-  it('returns 400 when answers array is empty', async () => {
+  it('finishes a class whose graded work does not include multiple-choice answers', async () => {
+    const result = {
+      ...SUBMIT_RESULT,
+      sections: [{ id: 'writing', skill: 'WRITING', score: 1, passed: true }],
+    };
+    mockSubmitClass.mockResolvedValue(result);
     const res = await POSTSubmit(
       makeRequest('http://localhost/api/v1/classes/class-1/submit', 'POST', { answers: [] }),
       classParams('class-1')
     );
 
-    expect(res.status).toBe(400);
-    expect(mockSubmitClass).not.toHaveBeenCalled();
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual(result);
   });
 
   it('returns 400 when answers field is missing', async () => {

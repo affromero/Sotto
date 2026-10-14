@@ -4,6 +4,28 @@ import XCTest
 @testable import Sotto
 
 final class APITransportPrivacyTests: XCTestCase {
+    func testPencilReviewSendsTheImageToThePairedServerAndKeepsItsRetryIdentity() async throws {
+        let id = UUID()
+        let server = try LocalHTTPServer { _ in .init(status: 202, headers: [:], body: "{\"status\":\"PENDING\",\"operationId\":\"\(id.uuidString)\"}") }
+        try await server.start()
+        defer { server.stop() }
+        let client = SottoAPIClient(serverURL: server.url, apiKey: "pencil-secret", profileId: "learner", session: URLSession(configuration: .ephemeral))
+        let answer = SottoPencilRequest(requestId: id, attempt: 3, taskKind: "QUESTION", taskId: "q1", image: "data:image/png;base64,aW5r")
+        let first = try await client.requestPencilInterpretation(classId: "class-1", answer: answer)
+        let retry = try await client.requestPencilInterpretation(classId: "class-1", answer: answer)
+        XCTAssertEqual(first.operationId, retry.operationId)
+        for request in server.requests {
+            XCTAssertTrue(request.hasPrefix("POST /api/v1/classes/class-1/pencil "))
+            XCTAssertTrue(request.lowercased().contains("authorization: bearer pencil-secret"))
+            XCTAssertTrue(request.lowercased().contains("x-sotto-profile-id: learner"))
+            let body = try XCTUnwrap(request.components(separatedBy: "\r\n\r\n").last?.data(using: .utf8))
+            let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+            XCTAssertEqual(json["image"] as? String, answer.image)
+            XCTAssertEqual(json["requestId"] as? String, id.uuidString)
+            XCTAssertEqual(json["attempt"] as? Int, 3)
+        }
+    }
+
     func testSameOriginMediaRedirectRetainsBearerWithoutCookies() async throws {
         let server = try LocalHTTPServer { request in
             if request.hasPrefix("GET /audio-final ") {

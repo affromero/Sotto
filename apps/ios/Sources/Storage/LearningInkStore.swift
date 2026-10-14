@@ -30,6 +30,56 @@ struct LearningInkStore {
         SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }
 
+    static func drawingDigest(_ drawing: PKDrawing) -> String {
+        var bytes = Data("pencil-strokes-v1".utf8)
+        func appendInteger(_ value: UInt32) {
+            var encoded = value.littleEndian
+            withUnsafeBytes(of: &encoded) { bytes.append(contentsOf: $0) }
+        }
+        func appendNumber(_ value: CGFloat) { appendInteger(Float(value).bitPattern) }
+        appendInteger(UInt32(drawing.strokes.count))
+        for stroke in drawing.strokes {
+            let name = Data(stroke.ink.inkType.rawValue.utf8)
+            appendInteger(UInt32(name.count))
+            bytes.append(name)
+            appendInteger(stroke.randomSeed)
+            let color = stroke.ink.color.resolvedColor(with: UITraitCollection(userInterfaceStyle: .light))
+            var red: CGFloat = 0
+            var green: CGFloat = 0
+            var blue: CGFloat = 0
+            var alpha: CGFloat = 0
+            if color.getRed(&red, green: &green, blue: &blue, alpha: &alpha) {
+                for component in [red, green, blue, alpha] { appendNumber(component) }
+            } else {
+                for component in color.cgColor.components ?? [] { appendNumber(component) }
+            }
+            let transform = stroke.transform
+            for value in [transform.a, transform.b, transform.c, transform.d, transform.tx, transform.ty] { appendNumber(value) }
+            appendInteger(UInt32(stroke.path.count))
+            for point in stroke.path {
+                for value in [point.location.x, point.location.y, point.size.width, point.size.height,
+                              point.opacity, point.force, point.azimuth, point.altitude, CGFloat(point.timeOffset)] { appendNumber(value) }
+            }
+            appendInteger(stroke.mask == nil ? 0 : 1)
+            stroke.mask?.cgPath.applyWithBlock { element in
+                appendInteger(UInt32(bitPattern: element.pointee.type.rawValue))
+                let count: Int
+                switch element.pointee.type {
+                case .moveToPoint, .addLineToPoint: count = 1
+                case .addQuadCurveToPoint: count = 2
+                case .addCurveToPoint: count = 3
+                case .closeSubpath: count = 0
+                @unknown default: count = 0
+                }
+                for index in 0..<count {
+                    appendNumber(element.pointee.points[index].x)
+                    appendNumber(element.pointee.points[index].y)
+                }
+            }
+        }
+        return digest(bytes)
+    }
+
     func load(_ key: String) throws -> PKDrawing {
         let url = fileURL(key)
         guard FileManager.default.fileExists(atPath: url.path) else { return PKDrawing() }

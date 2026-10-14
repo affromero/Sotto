@@ -51,6 +51,14 @@ describe('agent invocation', () => {
     expect(shellQuote("it's")).toBe("'it'\\''s'");
   });
 
+  it('rejects arbitrary remote attachment paths', () => {
+    expect(() =>
+      buildAgentInvocation('codex', ['exec', '-'], 'fixture-host', {
+        remoteImageInputs: { names: ['../../private.png'], cleanupToken: randomUUID() },
+      })
+    ).toThrow('Invalid remote Codex image input names');
+  });
+
   it.each([
     { name: 'array', json: '[]' },
     { name: 'null', json: 'null' },
@@ -80,6 +88,7 @@ describe('agent invocation', () => {
       const token = randomUUID();
       const invocation = buildAgentInvocation('codex', ['exec', '-'], 'fixture-host', {
         remoteOutputSchema: { json: '{"type":"object"}', cleanupToken: token },
+        remoteImageInputs: { names: ['image-0.png'], cleanupToken: token },
       });
       const child = spawn('/bin/sh', ['-c', invocation.args.at(-1)!], {
         env: { ...process.env, PATH: directory + ':/usr/bin:/bin', TMPDIR: directory },
@@ -102,7 +111,7 @@ describe('agent invocation', () => {
             if (!state) reject(new Error('Remote child exited before readiness'));
           });
         });
-        child.stdin.end('Private prompt');
+        child.stdin.end(Buffer.from('private image').toString('base64') + '\nPrivate prompt');
         state = await ready;
         expect(existsSync(state.file)).toBe(true);
         child.kill(signal);

@@ -99,4 +99,8 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
       'Renders class worksheet to a print-optimized PDF via Playwright and uploads to storage',
     stage: 'Content Pipeline',
   },
+  'pencil-homework': {
+    description: 'Interprets exercise images and learner ink for review before class submission',
+    stage: 'Content Pipeline',
+  },
 };

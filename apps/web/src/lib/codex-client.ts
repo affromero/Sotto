@@ -15,6 +15,8 @@ import { getCodexSshHost, isCodexAvailable } from './agent-availability';
 import { buildAgentInvocation, minimalAgentEnvironment } from './agent-invocation';
 import { formatAgentModelId, parseAgentModelId, type AgentEffortLevel } from './agent-models/id';
 import { installCurrentProviderCredentialSnapshot } from './agent-credentials';
+import { decodeCodexImages } from './providers/agents/codex-images';
+import type { ImageContentPart } from './providers/ai';
 
 /**
  * Run the selected Codex CLI with the existing read-only execution policy.
@@ -36,6 +38,7 @@ interface CodexResponse extends TokenUsage {
 }
 
 interface CodexOptions {
+  images?: ImageContentPart[];
   jsonSchema?: { name: string; schema: Record<string, unknown> };
   isolated?: import('./agents/isolated/isolated-agent').IsolatedClaudeExecution;
   signal?: AbortSignal;
@@ -258,28 +261,34 @@ async function* runCodex(
   host?: string,
   output?: string
 ): AsyncGenerator<string> {
-  if (!opts.jsonSchema) {
+  if (!opts.jsonSchema && !opts.images?.length) {
     yield* runCodexProcess(systemPrompt, prompt, opts, selection, host, output);
     return;
   }
   opts.signal?.throwIfAborted();
   if (opts.isolated)
     throw new Error('Isolated Codex execution is not supported by the reviewed broker protocol');
-  const schema = opts.jsonSchema.schema;
-  if (!schema || typeof schema !== 'object' || Array.isArray(schema))
+  const schema = opts.jsonSchema?.schema;
+  if (opts.jsonSchema && (!schema || typeof schema !== 'object' || Array.isArray(schema)))
     throw new Error('Codex output schema must be a JSON object');
-  const json = JSON.stringify(schema);
-  if (Buffer.byteLength(json) > 1_048_576)
+  const json = schema ? JSON.stringify(schema) : undefined;
+  if (json && Buffer.byteLength(json) > 1_048_576)
     throw new Error('Codex output schema exceeds its size limit');
   let directory: string | undefined;
   let schemaPath: string | undefined;
   let primary: { error: unknown } | undefined;
   let usage: TokenUsage = { inputTokens: null, outputTokens: null };
+  const images = decodeCodexImages(opts.images ?? []);
+  const cleanupToken = randomUUID();
   try {
     if (!host) {
       directory = await mkdtemp(join(tmpdir(), 'sotto-codex-schema-'));
-      schemaPath = join(directory, 'schema.json');
-      await writeFile(schemaPath, json, { mode: 0o600, flag: 'wx' });
+      if (json) {
+        schemaPath = join(directory, 'schema.json');
+        await writeFile(schemaPath, json, { mode: 0o600, flag: 'wx' });
+      }
+      for (const image of images)
+        await writeFile(join(directory, image.name), image.bytes, { mode: 0o600, flag: 'wx' });
     }
     yield* runCodexProcess(
       systemPrompt,
@@ -295,7 +304,9 @@ async function* runCodex(
       host,
       output,
       schemaPath,
-      host ? { json, cleanupToken: randomUUID() } : undefined
+      host && json ? { json, cleanupToken } : undefined,
+      images.map((image) => (directory ? join(directory, image.name) : image.name)),
+      host && images.length ? { images, cleanupToken } : undefined
     );
   } catch (error) {
     primary = { error };
@@ -313,15 +324,27 @@ async function* runCodexProcess(
   host?: string,
   output?: string,
   schemaPath?: string,
-  remoteOutputSchema?: { json: string; cleanupToken: string }
+  remoteOutputSchema?: { json: string; cleanupToken: string },
+  imagePaths: string[] = [],
+  remoteImages?: { images: ReturnType<typeof decodeCodexImages>; cleanupToken: string }
 ): AsyncGenerator<string> {
   opts.signal?.throwIfAborted();
   if (opts.isolated)
     throw new Error('Isolated Codex execution is not supported by the reviewed broker protocol');
   const { args } = codexArgs(opts, output, selection, schemaPath);
+  if (!host && imagePaths.length)
+    args.splice(args.length - 1, 1, ...imagePaths.flatMap((path) => ['--image', path]), '--', '-');
   const invocation = buildAgentInvocation('codex', args, host, {
     remoteEnvKeys: CODEX_ENV_KEYS,
     ...(remoteOutputSchema ? { remoteOutputSchema } : {}),
+    ...(remoteImages
+      ? {
+          remoteImageInputs: {
+            names: remoteImages.images.map((image) => image.name),
+            cleanupToken: remoteImages.cleanupToken,
+          },
+        }
+      : {}),
   });
   const environment = codexEnvironment();
   const decoder = new CodexOutputDecoder(Number.MAX_SAFE_INTEGER);
@@ -348,9 +371,11 @@ async function* runCodexProcess(
       }
     }
   }
-  const cleanupProof = remoteOutputSchema
-    ? 'SOTTO_CODEX_SCHEMA_CLEANED ' + remoteOutputSchema.cleanupToken
-    : null;
+  const cleanupProof =
+    remoteOutputSchema || remoteImages
+      ? 'SOTTO_CODEX_SCHEMA_CLEANED ' +
+        (remoteOutputSchema?.cleanupToken ?? remoteImages!.cleanupToken)
+      : null;
   const cleanupConfirmed = () => !cleanupProof || stderr.split('\n').includes(cleanupProof);
   const diagnostic = () =>
     failure ||
@@ -374,7 +399,10 @@ async function* runCodexProcess(
       environment,
       signal: opts.signal,
       timeoutMs: opts.timeoutMs || 600000,
-      input: JSON.stringify({ applicationInstructions: systemPrompt, input: prompt }),
+      input:
+        (remoteImages
+          ? remoteImages.images.map((image) => image.bytes.toString('base64') + '\n').join('')
+          : '') + JSON.stringify({ applicationInstructions: systemPrompt, input: prompt }),
       maxOutputBytes: Number.MAX_SAFE_INTEGER,
     })) {
       if (chunk.channel === 'stderr') {

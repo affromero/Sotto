@@ -85,17 +85,25 @@ describe('CLI agent providers', () => {
     });
   });
 
-  it('rejects Codex images instead of dropping non-text content', async () => {
+  it('preserves images and exercise text at the Codex process boundary', async () => {
     const { CodexProvider } = await import('@/lib/providers/codex');
-    await expect(
-      new CodexProvider().generateResponse('', [
-        {
-          role: 'user',
-          content: [{ type: 'image_url', url: 'data:image/png;base64,aGVsbG8=' }],
-        },
-      ])
-    ).rejects.toThrow('image input is not supported');
-    expect(executeCodex).not.toHaveBeenCalled();
+    const image = { type: 'image_url' as const, url: 'data:image/png;base64,aGVsbG8=' };
+    executeCodex.mockImplementationOnce(
+      async (system: string, prompt: string, options: { images: unknown }) => ({
+        content: JSON.stringify({ system, prompt, images: options.images }),
+        inputTokens: 20,
+        outputTokens: 7,
+        model: 'codex:captured#effort=high',
+      })
+    );
+    const result = await new CodexProvider().generateResponse('Read the marks', [
+      { role: 'user', content: [image, { type: 'text', text: 'Interpret this exercise' }] },
+    ]);
+    expect(JSON.parse(result.content)).toEqual({
+      system: 'Read the marks',
+      prompt: 'Interpret this exercise',
+      images: [image],
+    });
   });
 
   it('preserves Claude image parts for the base64 stdin transport', async () => {

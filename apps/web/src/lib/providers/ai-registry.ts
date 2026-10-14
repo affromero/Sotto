@@ -135,7 +135,7 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
     defaultModel: 'codex',
     getApiKeyUrl: aiCredentialForm('codex').getApiKeyUrl,
     models: modelPresets('codex'),
-    capabilities: { web: true, vision: false },
+    capabilities: { web: true, vision: true },
     auth: {
       fields: aiCredentialForm('codex').fields,
     },

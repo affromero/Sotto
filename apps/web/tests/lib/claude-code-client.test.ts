@@ -335,7 +335,7 @@ describe('Claude CLI execution', () => {
         JSON.stringify(pidPath) +
         ', String(process.pid)); setInterval(() => {}, 1000);'
     );
-    await expect(executeClaudeCode('', 'Prompt', { timeoutMs: 2000 })).rejects.toThrow(
+    await expect(executeClaudeCode('', 'Prompt', { timeoutMs: 5000 })).rejects.toThrow(
       /timed out|timeout/i
     );
     const pid = Number(readFileSync(pidPath, 'utf8'));

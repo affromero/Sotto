@@ -1,6 +1,6 @@
 # User Flows - Sotto
 
-**Date:** 2026-06-27
+**Date:** 2026-10-14
 
 **Summary:** End-to-end learner and operator flows for starting a self-hosted Sotto instance, creating a course, taking classes, using iPad workbooks, connecting devices, and maintaining the private learning stack.
 
@@ -283,9 +283,22 @@ Failure states:
 
 ## 6. iPad Workbook Flow
 
-The iPad workbook is for slow study, handwriting, annotation, and handoff back to the web class. It is not the grading surface.
+The native iPad workbook integrates Pencil homework with the class. The browser worksheet provides a printable PDF with links back to browser exercises.
 
-### Open the workbook
+### Native class homework
+
+1. Select a course in the iPad app and tap `Workbook`, or open a class and tap `Workbook` in its toolbar.
+2. Write on the exercise paper. Circle choices, annotate the source sentence, or cross out and insert words to construct your answer.
+3. Tap `Read my marks`. This sends an image of the printed exercise and your ink to your server and its selected AI provider.
+4. Check the interpretation, including any unclear marks. Edit the text or selected choice, then tap `Use reviewed answer`.
+5. Use the listening player and speaking recorder in the same workbook.
+6. Tap `Submit` at the bottom or in the toolbar. The existing class graders return feedback and determine completion.
+
+Ink is saved locally, scoped to the server, learner, class attempt, and exercise content. Reviewed answers use the existing class progress store. New ink needs review before submission, including after reopening the class in its normal view. The native class workbook works without a generated PDF. `PDF notes` opens the separate annotation and export surface when a PDF is available.
+
+Interpretation runs through the `pencil-homework` queue. Results stay private to the learner and current class exercise. An uncertain provider outcome is retained and blocks automatic replay. The configured provider must support images; Sotto surfaces an error if it cannot process them.
+
+### Open the browser worksheet
 
 From an active class:
 

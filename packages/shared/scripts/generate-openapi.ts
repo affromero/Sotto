@@ -9,6 +9,10 @@ import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
 import {
+  pencilHomeworkRequestSchema,
+  pencilHomeworkResponseSchema,
+} from '../src/contracts/pencil-homework';
+import {
   classRegenerationRequestSchema,
   classRegenerationAcceptedSchema,
   practicePreparingSchema,
@@ -125,6 +129,8 @@ const startPracticeVariants: Record<string, string> = {
 // pointers instead of being inlined — this keeps the document DRY and gives the
 // Rust codegen clean, named types. Order is irrelevant; refs resolve by id.
 const namedSchemas: Record<string, z.ZodType> = {
+  PencilHomeworkRequest: pencilHomeworkRequestSchema,
+  PencilHomeworkResponse: pencilHomeworkResponseSchema,
   ClassRegenerationRequest: classRegenerationRequestSchema,
   ClassRegenerationAccepted: classRegenerationAcceptedSchema,
   StartPracticePreparing: practicePreparingSchema,

@@ -1,0 +1,15 @@
+import type { ImageContentPart } from '../ai';
+
+export function decodeCodexImages(images: readonly ImageContentPart[]) {
+  if (images.length > 5) throw new Error('Codex accepts at most five images per request.');
+  let total = 0;
+  return images.map((image, index) => {
+    const match = /^data:image\/(png|jpeg);base64,([A-Za-z0-9+/]+={0,2})$/.exec(image.url);
+    if (!match) throw new Error('Codex images must be inline PNG or JPEG data URLs.');
+    const bytes = Buffer.from(match[2]!, 'base64');
+    total += bytes.length;
+    if (!bytes.length || total > 2_000_000 || bytes.toString('base64') !== match[2])
+      throw new Error('Codex image input is malformed or exceeds 2 MB.');
+    return { name: `image-${index}.${match[1]}`, bytes };
+  });
+}

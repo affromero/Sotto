@@ -479,7 +479,7 @@ private struct CourseDetailPane: View {
 
     private func openWorkbook() {
         model.run {
-            await model.openWorkbook(for: course)
+            await model.openWorkbook(for: course, pencil: layout.supportsHandwriting)
         }
     }
 
