@@ -1,9 +1,6 @@
 name: Release surfaces
 
-# Both jobs below run on macOS runners, which bill at ten times the Linux rate,
-# and each only builds one app directory. Without these filters every unrelated
-# push — a tsconfig line, a dependabot config — paid for a desktop build and an
-# iOS simulator test run.
+# Select each native surface separately. Manual runs validate both.
 on:
   workflow_dispatch:
   pull_request:
@@ -15,6 +12,8 @@ on:
       - '.github/workflows/release-surfaces-ci.yml'
       - '.github/workflows/desktop-release.yml'
       - 'scripts/ci/test-desktop-appimage.sh'
+      - 'scripts/ci/native-scope.mjs'
+      - 'apps/web/public/brand/sotto-mark.svg'
   push:
     branches: [main]
     paths:
@@ -23,6 +22,8 @@ on:
       - '.github/workflows/release-surfaces-ci.yml'
       - '.github/workflows/desktop-release.yml'
       - 'scripts/ci/test-desktop-appimage.sh'
+      - 'scripts/ci/native-scope.mjs'
+      - 'apps/web/public/brand/sotto-mark.svg'
 
 concurrency:
   group: release-surfaces-${{ github.ref }}
@@ -32,7 +33,31 @@ permissions:
   contents: read
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      desktop: ${{ steps.scope.outputs.desktop }}
+      ios: ${{ steps.scope.outputs.ios }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          fetch-depth: 0
+      - name: Select changed native surfaces
+        id: scope
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          if [ "$EVENT" = workflow_dispatch ]; then
+            node scripts/ci/native-scope.mjs --all >> "$GITHUB_OUTPUT"
+          else
+            node scripts/ci/native-scope.mjs --event "$EVENT" --base "$BASE" --head "$HEAD" >> "$GITHUB_OUTPUT"
+          fi
+
   desktop:
+    needs: changes
+    if: needs.changes.outputs.desktop == 'true'
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
@@ -54,6 +79,8 @@ jobs:
         working-directory: apps/desktop/src-tauri
 
   desktop-linux:
+    needs: changes
+    if: needs.changes.outputs.desktop == 'true'
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
@@ -80,6 +107,8 @@ jobs:
           done
 
   ios:
+    needs: changes
+    if: needs.changes.outputs.ios == 'true'
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6

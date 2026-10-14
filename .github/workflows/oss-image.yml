@@ -1,16 +1,14 @@
-# Public images must pass the installer path anonymously before moving latest.
+# Public images consume the exact successful production source gate.
 name: Publish OSS image
 
 on:
-  push:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
     branches: [main]
-    paths-ignore:
-      - '**/*.md'
-      - 'docs/**'
-      - '.github/dependabot.yml'
   workflow_dispatch:
 
-# Serialize promotion across refs and never interrupt a running release.
+# Preserve serialized public promotion and never interrupt a running release.
 concurrency:
   group: oss-image
   cancel-in-progress: false
@@ -18,59 +16,91 @@ concurrency:
 env:
   DOCKER_BUILD_RECORD_UPLOAD: false
   DOCKER_BUILD_SUMMARY: false
+  RELEASE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   source:
-    if: github.repository == 'affromero/Sotto' && github.ref == 'refs/heads/main'
+    if: >-
+      github.repository == 'affromero/Sotto' &&
+      ((github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+       (github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_branch == 'main' &&
+        github.event.workflow_run.head_repository.full_name == github.repository))
     runs-on: ubuntu-latest
-    env:
-      NEXT_PUBLIC_APP_URL: http://localhost:3000
-      SIDEDOOR_TEST_DATABASE_URL: postgresql://postgres:sidedoor-test-only@127.0.0.1:5432/sidedoor_test
-      SIDEDOOR_TEST_REDIS_URL: redis://127.0.0.1:6379/15
-    services:
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 12
-      postgres:
-        image: pgvector/pgvector:pg17
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: sidedoor-test-only
-          POSTGRES_DB: sidedoor_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres -d sidedoor_test"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 12
+    outputs:
+      runtime: ${{ steps.validation.outputs.runtime }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          submodules: recursive
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
-        with:
-          node-version: 24
-          cache: npm
-      - name: Install media tools
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg libchromaprint-tools
-      - name: Verify source
+      - name: Find successful source validation for this exact main commit
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN_ID: ${{ github.event.workflow_run.id }}
         run: |
-          npm ci
-          go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
-          npm run ci
+          set -euo pipefail
+          mkdir -p delivery
+          if [ -n "$SOURCE_RUN_ID" ]; then
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID" > delivery/source-run.json
+          else
+            gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?branch=main&head_sha=$RELEASE_SHA&status=success&per_page=100" > delivery/source-runs.json
+          fi
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          single = Path('delivery/source-run.json')
+          runs = [json.loads(single.read_text())] if single.exists() else json.loads(
+              Path('delivery/source-runs.json').read_text())['workflow_runs']
+          valid = [run for run in runs if (
+              run.get('head_sha') == os.environ['RELEASE_SHA'] and
+              run.get('head_branch') == 'main' and
+              run.get('head_repository', {}).get('full_name') == os.environ['GITHUB_REPOSITORY'] and
+              run.get('conclusion') == 'success' and
+              run.get('status') == 'completed' and
+              run.get('path') == '.github/workflows/ci.yml'
+          )]
+          if not valid:
+              raise SystemExit('No successful production source gate exists for this exact main commit')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f"run_id={valid[0]['id']}\n")
+          PY
+      - name: Download source validation from the verified run
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.gate.outputs.run_id }}
+          name: source-validation-${{ env.RELEASE_SHA }}
+          path: delivery/verified
+      - name: Validate release revision and runtime scope
+        id: validation
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          record = json.loads(Path('delivery/verified/source-validation.json').read_text())
+          if (
+              record.get('sha') != os.environ['RELEASE_SHA'] or
+              type(record.get('runtime_changed')) is not bool or
+              type(record.get('source_validated')) is not bool or
+              (record['runtime_changed'] and not record['source_validated'])
+          ):
+              raise SystemExit('Source validation artifact does not match this release')
+          manual = os.environ.get('GITHUB_EVENT_NAME') == 'workflow_dispatch'
+          if manual and not record['source_validated']:
+              raise SystemExit('Dispatch ci.yml on main to validate this commit before rebuilding images')
+          runtime = manual or record['runtime_changed']
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f"runtime={str(runtime).lower()}\n")
+          PY
 
   build:
     needs: source
+    if: needs.source.outputs.runtime == 'true'
     permissions:
       contents: read
       packages: write
@@ -84,10 +114,11 @@ jobs:
             runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
     env:
-      CANDIDATE_TAG: ${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.arch }}
+      CANDIDATE_TAG: ${{ github.event.workflow_run.head_sha || github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.arch }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
+          ref: ${{ env.RELEASE_SHA }}
           submodules: recursive
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069
       - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
@@ -121,7 +152,7 @@ jobs:
           platforms: linux/${{ matrix.arch }}
           load: true
           build-args: |
-            COMMIT_SHA=${{ github.sha }}
+            COMMIT_SHA=${{ env.RELEASE_SHA }}
             NEXT_PUBLIC_APP_URL=http://localhost:3000
           tags: ghcr.io/affromero/sotto-web:${{ env.CANDIDATE_TAG }}
           cache-from: type=gha,scope=sotto-web-${{ matrix.arch }}
@@ -156,10 +187,11 @@ jobs:
             runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
     env:
-      CANDIDATE_TAG: ${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.arch }}
+      CANDIDATE_TAG: ${{ github.event.workflow_run.head_sha || github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.arch }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
+          ref: ${{ env.RELEASE_SHA }}
           submodules: recursive
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
@@ -182,7 +214,7 @@ jobs:
           platforms: linux/${{ matrix.arch }}
           load: true
           build-args: |
-            COMMIT_SHA=${{ github.sha }}
+            COMMIT_SHA=${{ env.RELEASE_SHA }}
             WORKER_BASE_IMAGE=${{ steps.worker_base.outputs.reference }}
           tags: ghcr.io/affromero/sotto-workers:${{ env.CANDIDATE_TAG }}
           cache-from: type=gha,scope=sotto-workers-${{ matrix.arch }}
@@ -215,6 +247,8 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ env.RELEASE_SHA }}
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           pattern: oss-digests-*-${{ matrix.arch }}
@@ -226,7 +260,7 @@ jobs:
           export DOCKER_CONFIG
           DOCKER_CONFIG=$(mktemp -d)
           trap 'rm -rf "$DOCKER_CONFIG"' EXIT
-          bash scripts/ci/smoke-selfhost.sh "$(cat digests/web.txt)" "$(cat digests/workers.txt)" "$GITHUB_SHA"
+          bash scripts/ci/smoke-selfhost.sh "$(cat digests/web.txt)" "$(cat digests/workers.txt)" "$RELEASE_SHA"
 
   publish-release:
     needs: verify-public
@@ -251,8 +285,8 @@ jobs:
           for component in workers web; do
             image="ghcr.io/affromero/sotto-$component"
             docker buildx imagetools create \
-              --tag "$image:${GITHUB_SHA::8}" \
-              --tag "$image:$GITHUB_SHA" \
+              --tag "$image:${RELEASE_SHA::8}" \
+              --tag "$image:$RELEASE_SHA" \
               "$(cat "digests/oss-digests-$component-amd64/$component.txt")" \
               "$(cat "digests/oss-digests-$component-arm64/$component.txt")"
           done
@@ -266,13 +300,15 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ env.RELEASE_SHA }}
       - name: Run the release installer without credentials or prompts
         run: |
           set -euo pipefail
           export DOCKER_CONFIG
           DOCKER_CONFIG=$(mktemp -d)
           trap 'rm -rf "$DOCKER_CONFIG"' EXIT
-          bash scripts/ci/smoke-installer.sh "$GITHUB_SHA"
+          bash scripts/ci/smoke-installer.sh "$RELEASE_SHA"
 
   promote:
     needs: verify-installer
@@ -292,7 +328,7 @@ jobs:
           set -euo pipefail
           for component in workers web; do
             image="ghcr.io/affromero/sotto-$component"
-            docker buildx imagetools create --tag "$image:latest" "$image:$GITHUB_SHA"
+            docker buildx imagetools create --tag "$image:latest" "$image:$RELEASE_SHA"
           done
 
   verify-release:
@@ -308,6 +344,8 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ env.RELEASE_SHA }}
       - name: Verify public latest manifests and matching revisions
         env:
           EXPECTED_ARCH: ${{ matrix.arch }}
@@ -321,7 +359,7 @@ jobs:
             docker pull "$image"
             revision=$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$image")
             architecture=$(docker image inspect --format '{{.Architecture}}' "$image")
-            test "$revision" = "$GITHUB_SHA"
+            test "$revision" = "$RELEASE_SHA"
             test "$architecture" = "$EXPECTED_ARCH"
           done
       - name: Run the published installer without credentials or prompts
@@ -330,4 +368,4 @@ jobs:
           export DOCKER_CONFIG
           DOCKER_CONFIG=$(mktemp -d)
           trap 'rm -rf "$DOCKER_CONFIG"' EXIT
-          bash scripts/ci/smoke-installer.sh "$GITHUB_SHA" latest
+          bash scripts/ci/smoke-installer.sh "$RELEASE_SHA" latest

@@ -1,0 +1,71 @@
+name: Source validation
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  source:
+    name: Lint, Type Check, Test & Build
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_APP_URL: https://selfhost.example.com
+      SIDEDOOR_TEST_DATABASE_URL: postgresql://postgres:sidedoor-test-only@127.0.0.1:5432/sidedoor_test
+      SIDEDOOR_TEST_REDIS_URL: redis://127.0.0.1:6379/15
+      REDIS_URL: redis://127.0.0.1:6379/14
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: sidedoor-test-only
+          POSTGRES_DB: sidedoor_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d sidedoor_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Install media tools
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg libchromaprint-tools
+      - name: Validate GitHub Actions workflows
+        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
+      - run: npx --no-install prisma generate --schema=apps/web/prisma/schema.prisma
+      - name: Run repository CI
+        run: npm run ci
+      - name: Verify local speech services
+        working-directory: services/local-tts
+        run: |
+          curl --proto '=https' --tlsv1.2 -LsSf https://astral.sh/uv/0.11.17/install.sh | sh
+          "$HOME/.local/bin/uv" sync --locked --python 3.11
+          "$HOME/.local/bin/uv" run pytest
+          "$HOME/.local/bin/uv" run pytest ../local-stt/tests
+          "$HOME/.local/bin/uv" run ruff check .
+          "$HOME/.local/bin/uv" run ruff format --check .
+          "$HOME/.local/bin/uv" run ruff check ../local-stt
+          "$HOME/.local/bin/uv" run ruff format --check ../local-stt
+      - name: Verify PostgreSQL backup and restore
+        env:
+          SOTTO_TEST_POSTGRES: '1'
+        run: python3 -m unittest discover -s scripts/tests -p test_database_command.py

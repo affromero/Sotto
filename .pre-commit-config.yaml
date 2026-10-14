@@ -4,13 +4,10 @@
 #   default_install_hook_types below). /worktree runs this on every worktree.
 # See https://pre-commit.com for more information
 #
-# Two tiers, mirroring CI (.github/workflows/sotto-ci.yml). Every hook sets
-# `stages` explicitly — default_stages proved unreliable for excluding the
-# remote hygiene hooks from the push stage, so scope each hook directly:
-#   pre-commit (fast, every commit): hygiene + lint-staged + tsc + cargo
-#     fmt --check + clippy -D warnings (cargo scoped to tui/ changes).
-#   pre-push (the full gate, every push): vitest + next build + cargo
-#     build --locked + cargo test. Heavy, run once per push.
+# Local checks cover the staged work. GitHub runs the full source gate before
+# publishing verified images. Each hook scopes its stages explicitly.
+#   pre-commit: hygiene, lint-staged, affected typechecks/tests, TUI fmt/clippy.
+#   pre-push: TUI build/tests for TUI or shared contract changes.
 default_install_hook_types: [pre-commit, pre-push]
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -123,59 +120,20 @@ repos:
         files: ^(package\.json|package-lock\.json|apps/[^/]+/package\.json|packages/[^/]+/package\.json)$
         pass_filenames: false
 
-      - id: typecheck
-        name: typecheck (tsc --noEmit)
-        entry: npm run type-check
+      - id: affected-checks
+        name: affected typechecks and tests
+        entry: node scripts/ci/check-affected.mjs --staged
         language: system
         stages: [pre-commit]
+        # Read the staged diff directly because pre-commit omits deleted files.
         always_run: true
         pass_filenames: false
 
-      - id: cargo-fmt
-        name: cargo fmt --check (tui)
-        entry: bash -c 'cd tui && cargo fmt --check'
-        language: system
-        stages: [pre-commit]
-        files: ^tui/
-        pass_filenames: false
-
-      - id: cargo-clippy
-        name: cargo clippy -D warnings (tui)
-        entry: bash -c 'cd tui && cargo clippy --all-targets -- -D warnings'
-        language: system
-        stages: [pre-commit]
-        files: ^tui/
-        pass_filenames: false
-
-      # --- pre-push: the full CI-equivalent gate, run once per push ---
-      - id: web-test
-        name: vitest (web)
-        entry: bash -c './scripts/run-with-env.sh npm run test --workspace=@sotto/web -- --no-file-parallelism'
+      - id: affected-push-checks
+        name: affected TUI build and tests
+        entry: node scripts/ci/check-affected.mjs --push
         language: system
         stages: [pre-push]
-        always_run: true
-        pass_filenames: false
-
-      - id: web-build
-        name: next build (web)
-        entry: bash -c './scripts/run-with-env.sh npm run build'
-        language: system
-        stages: [pre-push]
-        always_run: true
-        pass_filenames: false
-
-      - id: cargo-build
-        name: cargo build --locked (tui)
-        entry: bash -c 'cd tui && cargo build --locked'
-        language: system
-        stages: [pre-push]
-        always_run: true
-        pass_filenames: false
-
-      - id: cargo-test
-        name: cargo test (tui)
-        entry: bash -c 'cd tui && cargo test'
-        language: system
-        stages: [pre-push]
+        # Push refs include renames and deletions; a new branch uses its merge base.
         always_run: true
         pass_filenames: false

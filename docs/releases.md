@@ -88,3 +88,30 @@ The OSS image workflow publishes tested web and worker images using full and sho
 Before distributing a self-hosted release, verify the `oss-image.yml` run for `RELEASE_SHA` succeeded and both images report that revision. Pin `SOTTO_IMAGE_TAG` to that commit, or use the verified image digests. A GitHub release tag alone does not prove that its images have been published.
 
 The README release badge links to the latest canonical GitHub release. It will have no release version to display until the first canonical release is published.
+
+## Main branch delivery
+
+PRs and main commits use `source-ci.yml` for full source validation. The
+`Production images` workflow keeps the existing `deploy.yml` filename. After
+source validation, it builds showcase web, personal web, and the worker base in
+parallel. Workers depend on the verified base digest. Each image passes its
+runtime smoke check before publication.
+
+The workflow records the exact source commit and verified production image
+digests in its release artifact. Download that artifact from the successful
+run for the intended commit. Use those digest references for the guarded
+production runner in `scripts/deploy.sh`; measure images off-server before
+capacity admission. The runner continues to own backups, compatibility checks,
+worker draining, health verification, and rollback protection.
+
+Production and OSS builds start independently after successful main source
+validation. OSS publication verifies the source run and its validation artifact,
+then checks out that exact commit. Native-only and documentation-only changes
+skip backend validation and runtime images. Web tests retain full source
+validation and skip runtime images. Manual source validation qualifies the
+selected main commit for rebuilding images; image publication requires that
+successful validation at the exact commit.
+
+Native checks select iOS and desktop separately. iOS checks retain both iPhone
+and iPad simulators. Changes to the desktop icon source also select desktop
+validation. A manual native run validates all surfaces for release qualification.

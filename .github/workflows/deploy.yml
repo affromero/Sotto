@@ -1,173 +1,320 @@
-name: CI
+name: Production images
 
 on:
-  push:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
     branches: [main]
   workflow_dispatch:
 
 env:
-  # Stop docker/build-push-action uploading a *.dockerbuild record as an artifact on every run.
   DOCKER_BUILD_RECORD_UPLOAD: false
   DOCKER_BUILD_SUMMARY: false
+  RELEASE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
 
 permissions:
   contents: read
+  actions: read
   packages: write
 
 concurrency:
-  group: ci
+  group: production-images-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   ci:
-    if: github.repository == 'affromero/Sotto'
-    name: CI Checks
-    outputs:
-      base_digest: ${{ steps.worker_base.outputs.digest }}
-      publish: ${{ steps.production_image_env.outputs.publish }}
+    if: >-
+      github.repository == 'affromero/Sotto' &&
+      ((github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+       (github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_branch == 'main' &&
+        github.event.workflow_run.head_repository.full_name == github.repository))
     runs-on: ubuntu-latest
-    # `next build` statically generates /_not-found, which resolves absolute
-    # Sotto URLs at build time and throws without this. ci.yml sets the same.
-    env:
-      NEXT_PUBLIC_APP_URL: https://selfhost.example.com
-      SIDEDOOR_TEST_DATABASE_URL: postgresql://postgres:sidedoor-test-only@127.0.0.1:5432/sidedoor_test
-      SIDEDOOR_TEST_REDIS_URL: redis://127.0.0.1:6379/15
-    services:
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 12
-      postgres:
-        image: pgvector/pgvector:pg17
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: sidedoor-test-only
-          POSTGRES_DB: sidedoor_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres -d sidedoor_test"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 12
+    outputs:
+      runtime: ${{ steps.validation.outputs.runtime }}
+      sha: ${{ steps.validation.outputs.sha }}
+      publish: ${{ steps.validation.outputs.publish }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+      - name: Find successful source validation for this exact main commit
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+          mkdir -p delivery
+          if [ -n "$SOURCE_RUN_ID" ]; then
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID" > delivery/source-run.json
+          else
+            gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?branch=main&head_sha=$RELEASE_SHA&status=success&per_page=100" > delivery/source-runs.json
+          fi
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          single = Path('delivery/source-run.json')
+          runs = [json.loads(single.read_text())] if single.exists() else json.loads(
+              Path('delivery/source-runs.json').read_text())['workflow_runs']
+          valid = [run for run in runs if (
+              run.get('head_sha') == os.environ['RELEASE_SHA'] and
+              run.get('head_branch') == 'main' and
+              run.get('head_repository', {}).get('full_name') == os.environ['GITHUB_REPOSITORY'] and
+              run.get('conclusion') == 'success' and
+              run.get('status') == 'completed' and
+              run.get('path') == '.github/workflows/ci.yml'
+          )]
+          if not valid:
+              raise SystemExit('No successful production source gate exists for this exact main commit')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f"run_id={valid[0]['id']}\n")
+          PY
+      - name: Download source validation from the verified run
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
-          fetch-depth: 0
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.gate.outputs.run_id }}
+          name: source-validation-${{ env.RELEASE_SHA }}
+          path: delivery/verified
+      - name: Validate release revision and runtime scope
+        id: validation
+        env:
+          SOTTO_PUBLIC_APP_URL: ${{ vars.SOTTO_PUBLIC_APP_URL }}
+          SOTTO_PERSONAL_APP_URL: ${{ vars.SOTTO_PERSONAL_APP_URL }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          record = json.loads(Path('delivery/verified/source-validation.json').read_text())
+          if (
+              record.get('sha') != os.environ['RELEASE_SHA'] or
+              type(record.get('runtime_changed')) is not bool or
+              type(record.get('source_validated')) is not bool or
+              (record['runtime_changed'] and not record['source_validated'])
+          ):
+              raise SystemExit('Source validation artifact does not match this release')
+          manual = os.environ.get('GITHUB_EVENT_NAME') == 'workflow_dispatch'
+          if manual and not record['source_validated']:
+              raise SystemExit('Dispatch ci.yml on main to validate this commit before rebuilding images')
+          runtime = manual or record['runtime_changed']
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f"runtime={str(runtime).lower()}\n")
+              output.write(f"sha={record['sha']}\n")
+              publish = bool(os.environ['SOTTO_PUBLIC_APP_URL'] and os.environ['SOTTO_PERSONAL_APP_URL'])
+              output.write(f"publish={str(publish).lower()}\n")
+          PY
+
+  worker-base:
+    needs: ci
+    if: needs.ci.outputs.runtime == 'true' && needs.ci.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      digest: ${{ steps.publish.outputs.digest }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ env.RELEASE_SHA }}
           submodules: recursive
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      - name: Install media tools
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg libchromaprint-tools
-      - run: npx --no-install prisma generate --schema=apps/web/prisma/schema.prisma
-      - run: npm run ci
-
-      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
-
-      - name: Login to GHCR
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Build worker base candidate
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc
         with:
           context: .
           file: apps/web/Dockerfile.workers-base
           load: true
           tags: |
-            ghcr.io/affromero/sotto-workers-base:${{ github.sha }}
+            ghcr.io/affromero/sotto-workers-base:${{ env.RELEASE_SHA }}
             ghcr.io/affromero/sotto-workers-base:node24
           cache-from: type=gha,scope=sotto-workers-base
           cache-to: type=gha,mode=max,scope=sotto-workers-base
-
       - name: Verify and publish worker base
-        id: worker_base
+        id: publish
         run: |
           set -euo pipefail
-          base="ghcr.io/affromero/sotto-workers-base:${{ github.sha }}"
+          base="ghcr.io/affromero/sotto-workers-base:$RELEASE_SHA"
           bash scripts/deploy/smoke-worker-base.sh "$base"
           docker push "$base"
           reference=$(docker image inspect --format '{{index .RepoDigests 0}}' "$base")
           echo "digest=${reference##*@}" >> "$GITHUB_OUTPUT"
           docker push ghcr.io/affromero/sotto-workers-base:node24
 
-      - name: Validate production image env
-        id: production_image_env
-        run: |
-          set -euo pipefail
-          if [ -z "$SOTTO_PUBLIC_APP_URL" ] || [ -z "$SOTTO_PERSONAL_APP_URL" ]; then
-            echo "SOTTO_PUBLIC_APP_URL and SOTTO_PERSONAL_APP_URL repository variables are required; skipping production image publication."
-            echo "publish=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          echo "publish=true" >> "$GITHUB_OUTPUT"
-        env:
-          SOTTO_PUBLIC_APP_URL: ${{ vars.SOTTO_PUBLIC_APP_URL }}
-          SOTTO_PERSONAL_APP_URL: ${{ vars.SOTTO_PERSONAL_APP_URL }}
-
+  showcase:
+    needs: ci
+    if: needs.ci.outputs.runtime == 'true' && needs.ci.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.publish.outputs.image }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ env.RELEASE_SHA }}
+          submodules: recursive
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build showcase web candidate
-        if: steps.production_image_env.outputs.publish == 'true'
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc
         with:
           context: .
           file: apps/web/Dockerfile
           load: true
           build-args: |
-            COMMIT_SHA=${{ github.sha }}
+            COMMIT_SHA=${{ env.RELEASE_SHA }}
             RUNTIME_UID=1000
             NEXT_PUBLIC_APP_URL=${{ vars.SOTTO_PUBLIC_APP_URL }}
             NEXT_PUBLIC_VAPID_PUBLIC_KEY=${{ vars.NEXT_PUBLIC_VAPID_PUBLIC_KEY || '' }}
-          tags: |
-            ghcr.io/affromero/sotto-web-prod:${{ github.sha }}
+          tags: ghcr.io/affromero/sotto-web-prod:${{ env.RELEASE_SHA }}
           cache-from: type=gha,scope=sotto-web-prod
           cache-to: type=gha,mode=max,scope=sotto-web-prod
-
       - name: Verify and publish showcase web
-        if: steps.production_image_env.outputs.publish == 'true'
+        id: publish
         run: |
-          bash scripts/deploy/smoke-web-image.sh ghcr.io/affromero/sotto-web-prod:${{ github.sha }} 1000
-          docker push ghcr.io/affromero/sotto-web-prod:${{ github.sha }}
+          set -euo pipefail
+          image="ghcr.io/affromero/sotto-web-prod:$RELEASE_SHA"
+          test "$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$image")" = "$RELEASE_SHA"
+          bash scripts/deploy/smoke-web-image.sh "$image" 1000
+          docker push "$image"
+          reference=$(docker image inspect --format '{{index .RepoDigests 0}}' "$image")
+          echo "image=$reference" >> "$GITHUB_OUTPUT"
 
+  personal:
+    needs: ci
+    if: needs.ci.outputs.runtime == 'true' && needs.ci.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.publish.outputs.image }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ env.RELEASE_SHA }}
+          submodules: recursive
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build personal web candidate
-        if: steps.production_image_env.outputs.publish == 'true'
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc
         with:
           context: .
           file: apps/web/Dockerfile
           load: true
           build-args: |
-            COMMIT_SHA=${{ github.sha }}
+            COMMIT_SHA=${{ env.RELEASE_SHA }}
             RUNTIME_UID=1000
             NEXT_PUBLIC_APP_URL=${{ vars.SOTTO_PERSONAL_APP_URL }}
             NEXT_PUBLIC_VAPID_PUBLIC_KEY=${{ vars.NEXT_PUBLIC_VAPID_PUBLIC_KEY || '' }}
-          tags: |
-            ghcr.io/affromero/sotto-web-personal-prod:${{ github.sha }}
+          tags: ghcr.io/affromero/sotto-web-personal-prod:${{ env.RELEASE_SHA }}
           cache-from: type=gha,scope=sotto-web-personal-prod
           cache-to: type=gha,mode=max,scope=sotto-web-personal-prod
-
       - name: Verify and publish personal web
-        if: steps.production_image_env.outputs.publish == 'true'
+        id: publish
         run: |
-          bash scripts/deploy/smoke-web-image.sh ghcr.io/affromero/sotto-web-personal-prod:${{ github.sha }} 1000
-          docker push ghcr.io/affromero/sotto-web-personal-prod:${{ github.sha }}
+          set -euo pipefail
+          image="ghcr.io/affromero/sotto-web-personal-prod:$RELEASE_SHA"
+          test "$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$image")" = "$RELEASE_SHA"
+          bash scripts/deploy/smoke-web-image.sh "$image" 1000
+          docker push "$image"
+          reference=$(docker image inspect --format '{{index .RepoDigests 0}}' "$image")
+          echo "image=$reference" >> "$GITHUB_OUTPUT"
+
+  workers:
+    needs: [ci, worker-base]
+    if: needs.ci.outputs.runtime == 'true' && needs.ci.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.publish.outputs.image }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ env.RELEASE_SHA }}
+          submodules: recursive
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build production worker candidate
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc
+        with:
+          context: .
+          file: apps/web/Dockerfile.workers
+          load: true
+          build-args: |
+            WORKER_BASE_IMAGE=ghcr.io/affromero/sotto-workers-base@${{ needs.worker-base.outputs.digest }}
+            COMMIT_SHA=${{ env.RELEASE_SHA }}
+            RUNTIME_UID=1000
+          tags: ghcr.io/affromero/sotto-workers-prod:${{ env.RELEASE_SHA }}
+          cache-from: type=gha,scope=sotto-workers-prod
+          cache-to: type=gha,mode=max,scope=sotto-workers-prod
+      - name: Verify and publish production worker
+        id: publish
+        run: |
+          set -euo pipefail
+          image="ghcr.io/affromero/sotto-workers-prod:$RELEASE_SHA"
+          test "$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$image")" = "$RELEASE_SHA"
+          bash scripts/deploy/smoke-worker-image.sh "$image" 1000
+          docker push "$image"
+          reference=$(docker image inspect --format '{{index .RepoDigests 0}}' "$image")
+          echo "image=$reference" >> "$GITHUB_OUTPUT"
+
+  release-record:
+    needs: [showcase, personal, workers]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Record verified production image digests
+        env:
+          SHOWCASE_IMAGE: ${{ needs.showcase.outputs.image }}
+          PERSONAL_IMAGE: ${{ needs.personal.outputs.image }}
+          WORKERS_IMAGE: ${{ needs.workers.outputs.image }}
+        run: |
+          mkdir -p delivery
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          from pathlib import Path
+          images = {role: os.environ[f'{role.upper()}_IMAGE'] for role in ('showcase', 'personal', 'workers')}
+          repositories = {
+              'showcase': 'sotto-web-prod',
+              'personal': 'sotto-web-personal-prod',
+              'workers': 'sotto-workers-prod',
+          }
+          for role, image in images.items():
+              expected = rf'ghcr.io/affromero/{repositories[role]}@sha256:[0-9a-f]{{64}}'
+              if not re.fullmatch(expected, image):
+                  raise SystemExit(f'Invalid immutable image reference: {image}')
+          Path('delivery/production-release.json').write_text(json.dumps({
+              'sha': os.environ['RELEASE_SHA'],
+              'images': images,
+          }, indent=2) + '\n')
+          PY
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: production-release-${{ env.RELEASE_SHA }}
+          path: delivery/production-release.json
+          if-no-files-found: error
+          retention-days: 14
 
   local-speech:
     needs: ci
-    if: needs.ci.outputs.publish == 'true'
+    if: needs.ci.outputs.runtime == 'true' && needs.ci.outputs.publish == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ env.RELEASE_SHA }}
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069
       - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
         with:
@@ -183,21 +330,23 @@ jobs:
           target: piper
           platforms: linux/amd64
           load: true
-          build-args: COMMIT_SHA=${{ github.sha }}
-          tags: ghcr.io/affromero/sotto-local-piper-prod:${{ github.sha }}
+          build-args: COMMIT_SHA=${{ env.RELEASE_SHA }}
+          tags: ghcr.io/affromero/sotto-local-piper-prod:${{ env.RELEASE_SHA }}
           cache-from: type=gha,scope=sotto-local-piper
           cache-to: type=gha,mode=max,scope=sotto-local-piper
       - name: Verify real offline German synthesis
-        run: bash scripts/deploy/smoke-local-speech-image.sh ghcr.io/affromero/sotto-local-piper-prod:${{ github.sha }} '${{ github.sha }}'
+        run: bash scripts/deploy/smoke-local-speech-image.sh ghcr.io/affromero/sotto-local-piper-prod:${{ env.RELEASE_SHA }} '${{ env.RELEASE_SHA }}'
       - name: Publish verified local speech image
-        run: docker push ghcr.io/affromero/sotto-local-piper-prod:${{ github.sha }}
+        run: docker push ghcr.io/affromero/sotto-local-piper-prod:${{ env.RELEASE_SHA }}
 
   local-stt:
     needs: [ci, local-speech]
-    if: needs.ci.outputs.publish == 'true'
+    if: needs.ci.outputs.runtime == 'true' && needs.ci.outputs.publish == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ env.RELEASE_SHA }}
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069
       - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
         with:
@@ -212,57 +361,25 @@ jobs:
           context: services/local-stt
           platforms: linux/amd64
           load: true
-          build-args: COMMIT_SHA=${{ github.sha }}
-          tags: ghcr.io/affromero/sotto-local-stt-prod:${{ github.sha }}
+          build-args: COMMIT_SHA=${{ env.RELEASE_SHA }}
+          tags: ghcr.io/affromero/sotto-local-stt-prod:${{ env.RELEASE_SHA }}
           cache-from: type=gha,scope=sotto-local-stt
           cache-to: type=gha,mode=max,scope=sotto-local-stt
       - name: Verify offline German speech round trip
         run: |
-          docker pull ghcr.io/affromero/sotto-local-piper-prod:${{ github.sha }}
+          docker pull ghcr.io/affromero/sotto-local-piper-prod:${{ env.RELEASE_SHA }}
           bash scripts/deploy/smoke-local-stt-image.sh \
-            ghcr.io/affromero/sotto-local-stt-prod:${{ github.sha }} \
-            ghcr.io/affromero/sotto-local-piper-prod:${{ github.sha }} \
-            '${{ github.sha }}' \
-            '${{ runner.temp }}/local-stt-evidence-${{ github.sha }}'
+            ghcr.io/affromero/sotto-local-stt-prod:${{ env.RELEASE_SHA }} \
+            ghcr.io/affromero/sotto-local-piper-prod:${{ env.RELEASE_SHA }} \
+            '${{ env.RELEASE_SHA }}' \
+            '${{ runner.temp }}/local-stt-evidence-${{ env.RELEASE_SHA }}'
       - name: Retain public speech qualification evidence
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: local-stt-evidence-${{ github.sha }}
-          path: ${{ runner.temp }}/local-stt-evidence-${{ github.sha }}
+          name: local-stt-evidence-${{ env.RELEASE_SHA }}
+          path: ${{ runner.temp }}/local-stt-evidence-${{ env.RELEASE_SHA }}
           if-no-files-found: warn
           retention-days: 7
       - name: Publish verified local transcription image
-        run: docker push ghcr.io/affromero/sotto-local-stt-prod:${{ github.sha }}
-
-  workers:
-    needs: ci
-    if: needs.ci.outputs.publish == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
-        with:
-          submodules: recursive
-      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
-      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build production worker candidate
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
-        with:
-          context: .
-          file: apps/web/Dockerfile.workers
-          load: true
-          build-args: |
-            WORKER_BASE_IMAGE=ghcr.io/affromero/sotto-workers-base@${{ needs.ci.outputs.base_digest }}
-            COMMIT_SHA=${{ github.sha }}
-            RUNTIME_UID=1000
-          tags: ghcr.io/affromero/sotto-workers-prod:${{ github.sha }}
-          cache-from: type=gha,scope=sotto-workers-prod
-          cache-to: type=gha,mode=max,scope=sotto-workers-prod
-      - name: Verify worker runtime before publication
-        run: bash scripts/deploy/smoke-worker-image.sh ghcr.io/affromero/sotto-workers-prod:${{ github.sha }} 1000
-      - name: Publish verified worker
-        run: docker push ghcr.io/affromero/sotto-workers-prod:${{ github.sha }}
+        run: docker push ghcr.io/affromero/sotto-local-stt-prod:${{ env.RELEASE_SHA }}
