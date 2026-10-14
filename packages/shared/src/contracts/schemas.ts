@@ -504,14 +504,12 @@ export const nextClassDoneResponseSchema = z.object({
 // POST /api/v1/classes/{classId}/submit — MC answers only (speaking/writing are
 // graded via their own endpoints). selectedIndex is 0..3 per the route.
 export const submitClassRequestSchema = z.object({
-  answers: z
-    .array(
-      z.object({
-        questionId: z.string(),
-        selectedIndex: z.number().int().min(0).max(3),
-      })
-    )
-    .min(1),
+  answers: z.array(
+    z.object({
+      questionId: z.string(),
+      selectedIndex: z.number().int().min(0).max(3),
+    })
+  ),
 });
 
 export const submitClassSectionResultSchema = z.object({

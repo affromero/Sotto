@@ -1,11 +1,39 @@
 import PDFKit
 import PencilKit
 import XCTest
+import Vision
 
 @testable import Sotto
 
 @MainActor
 final class WorkbookTests: XCTestCase {
+    func testExerciseSnapshotPreservesPrintedContextOutsideTheLearnersInk() throws {
+        let paper = try PencilExercisePaper(prompt: "Choose the past tense", passage: "Yesterday I visited Berlin.", options: ["visited", "visits"])
+        XCTAssertGreaterThan(paper.size.height, 600)
+        let marked = try paper.answerImage(drawing: drawing())
+        let plain = try paper.answerImage(drawing: PKDrawing())
+        XCTAssertNotEqual(marked, plain)
+        let bytes = try XCTUnwrap(Data(base64Encoded: String(marked.split(separator: ",").last!)))
+        let image = try XCTUnwrap(UIImage(data: bytes))
+        XCTAssertEqual(image.size, paper.size)
+        let text = try recognizedText(image)
+        XCTAssertTrue(text.lowercased().contains("berlin"), text)
+        XCTAssertTrue(text.lowercased().contains("visited"), text)
+    }
+
+    func testLongExerciseKeepsItsEntirePassageAndInkOnTheSamePaper() throws {
+        let short = try PencilExercisePaper(prompt: "Choose", passage: nil, options: ["A", "B"])
+        let long = try PencilExercisePaper(prompt: "Choose", passage: String(repeating: "Read this sentence carefully. ", count: 80), options: ["A", "B"])
+        XCTAssertGreaterThan(long.size.height, short.size.height)
+        XCTAssertNotEqual(short.digest, long.digest)
+    }
+
+    private func recognizedText(_ image: UIImage) throws -> String {
+        let request = VNRecognizeTextRequest()
+        try VNImageRequestHandler(cgImage: XCTUnwrap(image.cgImage)).perform([request])
+        return (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
+    }
+
     func testWorkbookInkReopensAndStaysWithinItsDocument() throws {
         let directory = temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }

@@ -191,11 +191,17 @@ final class InkPaperView: UIView {
     let canvas: PKCanvasView
     let pageSize: CGSize
     var onAttached: (() -> Void)?
+    private let backgroundView: UIImageView?
 
-    init(canvas: PKCanvasView, pageSize: CGSize) {
+    init(canvas: PKCanvasView, pageSize: CGSize, backgroundImage: UIImage? = nil) {
         self.canvas = canvas
         self.pageSize = pageSize
+        backgroundView = backgroundImage.map { UIImageView(image: $0) }
         super.init(frame: .zero)
+        if let backgroundView {
+            backgroundView.isUserInteractionEnabled = false
+            addSubview(backgroundView)
+        }
         addSubview(canvas)
         clipsToBounds = true
     }
@@ -215,5 +221,6 @@ final class InkPaperView: UIView {
         canvas.center = CGPoint(x: bounds.midX, y: bounds.midY)
         let scale = min(bounds.width / pageSize.width, bounds.height / pageSize.height)
         canvas.transform = CGAffineTransform(scaleX: scale, y: scale)
+        backgroundView?.frame = canvas.frame
     }
 }

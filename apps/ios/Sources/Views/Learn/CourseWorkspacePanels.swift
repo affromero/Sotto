@@ -557,6 +557,7 @@ struct CourseClassHistoryPanel: View {
 
 private struct CourseClassHistoryRow: View {
     @EnvironmentObject private var model: SottoAppModel
+    @Environment(\.sottoLayout) private var layout
     let item: SottoCourseClassSummary
 
     var body: some View {
@@ -609,7 +610,7 @@ private struct CourseClassHistoryRow: View {
 
                 Button {
                     model.run {
-                        await model.openWorkbook(for: item.id)
+                        await model.openWorkbook(for: item.id, pencil: layout.supportsHandwriting)
                     }
                 } label: {
                     Label("Workbook", systemImage: "pencil.and.scribble")

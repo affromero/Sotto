@@ -41,6 +41,7 @@ const SOTTO_DURABLE_JOB_VERSIONS: ReadonlyMap<string, readonly number[]> = new M
   ['episode-status', [1]],
   ['speaking-grading', [1]],
   ['worksheet-pdf', [1]],
+  ['pencil-homework', [1]],
   ['pricing-fetch', [1]],
 ]);
 

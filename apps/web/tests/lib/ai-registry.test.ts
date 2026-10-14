@@ -46,6 +46,9 @@ describe('getCheapestModelForProvider', () => {
 });
 
 describe('isValidModelId', () => {
+  it('advertises image input for the Codex attachment transport', () => {
+    expect(getAiProviderMeta('codex').capabilities).toEqual({ web: true, vision: true });
+  });
   it('routes Standard Muse explicitly and excludes the training-eligible tier', async () => {
     expect(await resolveAiModelAndProvider({ episodeAiModel: 'muse-spark-1.3' })).toEqual({
       model: 'muse-spark-1.3',

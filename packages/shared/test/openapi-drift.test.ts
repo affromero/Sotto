@@ -26,6 +26,7 @@ import {
   speakingPollResponseSchema,
   startPracticeResponseSchema,
   submitClassResponseSchema,
+  submitClassRequestSchema,
   submitExamResponseSchema,
   submitPlacementResponseSchema,
   submitPracticeResponseSchema,
@@ -34,6 +35,10 @@ import {
 } from '../src/contracts/schemas';
 
 describe('openapi.json drift guard', () => {
+  it('allows class completion when writing or speaking provides the graded evidence', () => {
+    expect(submitClassRequestSchema.safeParse({ answers: [] }).success).toBe(true);
+    expect(submitClassRequestSchema.safeParse({}).success).toBe(false);
+  });
   it('preserves a practice reading passage and accepts historical items without one', () => {
     const base = {
       status: 'ready',
@@ -152,6 +157,8 @@ describe('openapi.json drift guard', () => {
         'POST /api/v1/practice/{sessionId}/generation',
         'POST /api/v1/courses/{courseId}/next-class',
         'GET /api/v1/classes/{classId}',
+        'GET /api/v1/classes/{classId}/pencil',
+        'POST /api/v1/classes/{classId}/pencil',
         'POST /api/v1/classes/{classId}',
         'POST /api/v1/classes/{classId}/submit',
         'POST /api/v1/exams',

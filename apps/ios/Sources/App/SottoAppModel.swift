@@ -6,6 +6,7 @@ final class SottoAppModel: ObservableObject {
     @Published private(set) var profiles: [SottoProfile] = []
     @Published private(set) var courses: [SottoCourse] = []
     @Published var selectedClass: SottoClassDetail?
+    @Published var pencilWorkbook = false
     var learningSessions: [String: NativeLearningSessionState] = [:]
     var pendingPracticeAdmissions: [String: UUID] = [:]
     @Published var practiceStart: SottoPracticeStart?
@@ -203,6 +204,7 @@ final class SottoAppModel: ObservableObject {
         courses = []
         selectedClass = nil
         practiceStart = nil
+        pencilWorkbook = false
         classResult = nil
         practiceResult = nil
         workbook = nil
@@ -217,6 +219,7 @@ final class SottoAppModel: ObservableObject {
 
     func closeClass() {
         selectedClass = nil
+        pencilWorkbook = false
         classResult = nil
         workbook = nil
     }
@@ -404,6 +407,7 @@ final class SottoAppModel: ObservableObject {
 
     func openClass(_ classId: String) async {
         guard let client = makeClient() else { return }
+        pencilWorkbook = false
         isLoading = true
         errorMessage = nil
 
@@ -731,26 +735,12 @@ final class SottoAppModel: ObservableObject {
         isLoading = false
     }
 
-    func openWorkbook(for classId: String) async {
-        guard let client = makeClient() else { return }
-        isLoading = true
-        errorMessage = nil
-
-        do {
-            workbook = try await client.fetchWorksheet(classId: classId)
-        } catch {
-            report(error)
-        }
-
-        isLoading = false
-    }
-
-    func openWorkbook(for course: SottoCourse) async {
+    func openWorkbook(for course: SottoCourse, pencil: Bool) async {
         guard let activeClassId = course.activeClassId else {
             errorMessage = "Take class first. Sotto creates the workbook after the class exists."
             return
         }
-        await openWorkbook(for: activeClassId)
+        await openWorkbook(for: activeClassId, pencil: pencil)
     }
 
     func fetchSelectionHelp(

@@ -1,11 +1,47 @@
 import PencilKit
 import UIKit
 import XCTest
+import CoreImage
 
 @testable import Sotto
 
 @MainActor
 final class HandwritingTests: XCTestCase {
+    func testPrintedPaperStaysVisibleInTheSameResizedAreaAsTheInk() throws {
+        let background = UIGraphicsImageRenderer(size: CGSize(width: 800, height: 600)).image { context in
+            UIColor.blue.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 800, height: 600))
+        }
+        let canvas = PKCanvasView()
+        canvas.backgroundColor = .clear
+        canvas.isOpaque = false
+        let paper = InkPaperView(canvas: canvas, pageSize: background.size, backgroundImage: background)
+        paper.frame = CGRect(x: 0, y: 0, width: 400, height: 600)
+        paper.layoutIfNeeded()
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let snapshot = UIGraphicsImageRenderer(size: paper.bounds.size, format: format).image { context in
+            UIColor.white.setFill()
+            context.fill(paper.bounds)
+            paper.layer.render(in: context.cgContext)
+        }
+        let image = try XCTUnwrap(snapshot.cgImage)
+        func pixel(at point: CGPoint) -> [UInt8] {
+            var bytes = [UInt8](repeating: 0, count: 4)
+            bytes.withUnsafeMutableBytes { buffer in
+                CIContext().render(CIImage(cgImage: image), toBitmap: buffer.baseAddress!, rowBytes: 4,
+                    bounds: CGRect(origin: point, size: CGSize(width: 1, height: 1)), format: .RGBA8,
+                    colorSpace: CGColorSpaceCreateDeviceRGB())
+            }
+            return bytes
+        }
+        let center = pixel(at: CGPoint(x: 200, y: 300))
+        let edge = pixel(at: CGPoint(x: 10, y: 10))
+        XCTAssertGreaterThan(center[2], 200)
+        XCTAssertLessThan(center[0], 20)
+        XCTAssertGreaterThan(edge[0], 240)
+    }
+
     func testPaperResizesWithoutDistortingInkCoordinates() {
         let canvas = PKCanvasView()
         let paper = InkPaperView(canvas: canvas, pageSize: CGSize(width: 800, height: 600))

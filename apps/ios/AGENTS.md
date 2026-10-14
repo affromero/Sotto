@@ -58,6 +58,11 @@ their UDIDs to `xcodebuild`. Test **both** families: the layout differs by size 
 
 ## App Store
 
+- Native class Workbook uses per-exercise Pencil canvases without requiring a PDF.
+  `Read my marks` sends the complete exercise and ink image for queued AI interpretation.
+  Learners review the proposal before it updates canonical answers or writing drafts.
+  Changed ink requires review, including when reopening in normal class mode.
+  Keep recording, feedback, and Submit in the class flow. PDF notes remain a separate surface.
 - iPad writing prompts offer a Pencil canvas with on-device Vision text recognition.
   Learners review the recognized text before it enters `WritingDraftStore`; the
   existing class, practice, and exam submission paths own grading.

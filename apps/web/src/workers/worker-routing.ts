@@ -24,6 +24,7 @@ const PIPELINE_WORKERS = new Set([
   'segment-regeneration',
   'speaking-grading',
   'worksheet-pdf',
+  'pencil-homework',
 ]);
 
 /**

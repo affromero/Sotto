@@ -22,7 +22,7 @@ struct WorkbookView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                if layout.supportsHandwriting {
+                if layout.supportsHandwriting, pdfData != nil {
                     PencilStatusBar(isRecognized: pencilRecognized)
                     if let error = annotationStore.saveError {
                         Text(error).font(.caption).foregroundStyle(.red).padding(12)
@@ -124,6 +124,8 @@ struct WorkbookView: View {
     @ViewBuilder
     private var fallbackWorkbookSurface: some View {
         VStack(spacing: 12) {
+            Text("PDF notes are unavailable until a workbook PDF is prepared on your server. Use the class workbook for Pencil answers, recording, and submission.")
+                .font(.callout).foregroundStyle(SottoTheme.muted).padding(18)
             if sourcePDFURL != nil {
                 Button("Retry PDF", systemImage: "arrow.clockwise") {
                     Task { await loadWorkbookPDF() }
@@ -308,7 +310,7 @@ private struct PencilStatusBar: View {
     }
 }
 
-private enum WorkbookTools {
+enum WorkbookTools {
     static func makeWorkbookToolPicker() -> PKToolPicker {
         let toolPicker = PKToolPicker(toolItems: workbookToolItems())
         toolPicker.stateAutosaveName = "SottoWorkbookToolPicker"

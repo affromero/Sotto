@@ -295,6 +295,14 @@ struct SottoAPIClient {
         try await get("/api/v1/classes/\(classId)/worksheet")
     }
 
+    func requestPencilInterpretation(classId: String, answer: SottoPencilRequest) async throws -> SottoPencilInterpretation {
+        try await post("/api/v1/classes/\(classId)/pencil", body: answer, acceptedStatuses: [202])
+    }
+
+    func pollPencilInterpretation(classId: String, operationId: UUID) async throws -> SottoPencilInterpretation {
+        try await get("/api/v1/classes/\(classId)/pencil?operationId=\(operationId.uuidString)")
+    }
+
     func fetchSelectionHelp(
         courseId: String,
         text: String,

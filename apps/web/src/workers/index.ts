@@ -42,6 +42,7 @@ import { processWaveformGeneration } from '@/workers/waveform-generation.worker'
 import { processEpisodeStatus } from '@/workers/durable/status/episode-status.worker';
 import { processSpeakingGrading } from '@/workers/speaking-grading.worker';
 import { processWorksheetPdf } from '@/workers/worksheet-pdf.worker';
+import { processPencilHomework } from '@/workers/pencil/pencil-homework.worker';
 import { startPricingRefreshInterval } from '@/lib/pricing';
 
 const WORKER_PROFILE = process.env.WORKER_PROFILE || 'all';
@@ -137,6 +138,11 @@ const workers = [
     createWorker('speaking-grading', processSpeakingGrading, { concurrency: 5 }),
   shouldRun('worksheet-pdf') &&
     createWorker('worksheet-pdf', processWorksheetPdf, { concurrency: 2 }),
+  shouldRun('pencil-homework') &&
+    createWorker('pencil-homework', processPencilHomework, {
+      concurrency: 2,
+      lockDuration: 300000,
+    }),
 ].filter(Boolean) as ReturnType<typeof createWorker>[];
 
 // The outbox job identity is the UTC day. Every restart immediately reconciles

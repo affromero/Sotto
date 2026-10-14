@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import PencilKit
 
 struct ClassSessionView: View {
     @Environment(\.sottoLayout) private var layout
@@ -19,6 +20,9 @@ struct ClassSessionView: View {
     @State private var isExportingClass = false
     @State private var classExportError: String?
     @State private var exportedClass: ClassPDFExport?
+    @State private var unreviewedPencilAnswers = Set<String>()
+    @State private var pencilReviewError: String?
+    @State private var pencilToolPicker = WorkbookTools.makeWorkbookToolPicker()
 
     private var currentClass: SottoClassDetail {
         model.selectedClass ?? classDetail
@@ -66,6 +70,12 @@ struct ClassSessionView: View {
                     )
 
                     LearningSaveFailureView(progress: progress)
+                    if let pencilReviewError { Text(pencilReviewError).foregroundStyle(.red) }
+                    if !unreviewedPencilAnswers.isEmpty && !model.pencilWorkbook {
+                        Text(layout.supportsHandwriting ? "Open Workbook to review your saved Pencil answers before submitting." :
+                            "Widen this window to review your saved Pencil answers before submitting.")
+                            .foregroundStyle(SottoTheme.primary)
+                    }
                     if let intro = currentClass.intro {
                         ClassIntroBlock(intro: intro, onSelectionHelp: openSelectionHelp)
                     }
@@ -80,6 +90,13 @@ struct ClassSessionView: View {
                             section: section,
                             answers: $answers,
                             drafts: drafts,
+                            pencilWorkbook: model.pencilWorkbook && layout.supportsHandwriting,
+                            classAttempt: currentClass.attempt ?? 1,
+                            pencilToolPicker: pencilToolPicker,
+                            onPencilReviewRequired: { id, required in
+                                if required { unreviewedPencilAnswers.insert(id) }
+                                else { unreviewedPencilAnswers.remove(id) }
+                            },
                             onSelectionHelp: openSelectionHelp
                         )
                     }
@@ -88,12 +105,19 @@ struct ClassSessionView: View {
                         classDetail: currentClass,
                         result: model.classResult
                     )
+                    if model.pencilWorkbook && layout.supportsHandwriting {
+                        if !unreviewedPencilAnswers.isEmpty {
+                            Text("Review your Pencil answers before submitting. Read my marks helps you check circles, edits, and handwriting.")
+                                .foregroundStyle(SottoTheme.primary)
+                        }
+                        submitButton.buttonStyle(SottoPrimaryButtonStyle())
+                    }
                 }
                 .padding(layout == .compact ? 16 : 28)
                 .frame(maxWidth: 980, alignment: .leading)
             }
             .background(SottoTheme.paper)
-            .navigationTitle("Class \(currentClass.order)")
+            .navigationTitle(model.pencilWorkbook && layout.supportsHandwriting ? "Class \(currentClass.order) workbook" : "Class \(currentClass.order)")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -168,12 +192,14 @@ struct ClassSessionView: View {
                 answers = progress.answers ?? currentClass.learnerAnswers ?? [:]
                 drafts.register(currentClass.sections.flatMap(\.writingPrompts), savedDrafts: currentClass.writingDrafts ?? [:])
                 hydrated = true
+                refreshPencilReviews()
             }
-            .onChange(of: answers) { _, _ in saveProgress() }
-            .onChange(of: drafts.texts) { _, _ in saveProgress() }
+            .onChange(of: answers) { _, _ in saveProgress(); refreshPencilReviews() }
+            .onChange(of: drafts.texts) { _, _ in saveProgress(); refreshPencilReviews() }
             .onDisappear { Task { await progress.flush() } }
             .onChange(of: currentClass.sections.map(\.id)) { _, _ in
                 answers = currentClass.learnerAnswers ?? [:]
+                refreshPencilReviews()
             }
         }
     }
@@ -192,12 +218,22 @@ struct ClassSessionView: View {
         .disabled(isExportingClass)
 
         Button {
+            if layout.supportsHandwriting {
+                model.pencilWorkbook.toggle()
+                return
+            }
             let classId = currentClass.id
             model.run {
-                await model.openWorkbook(for: classId)
+                await model.openWorkbookPDF(for: classId)
             }
         } label: {
-            Label("Workbook", systemImage: "pencil.and.scribble")
+            Label(model.pencilWorkbook ? "Class view" : "Workbook", systemImage: "pencil.and.scribble")
+        }
+
+        if layout.supportsHandwriting {
+            Button("PDF notes", systemImage: "doc") {
+                model.run { await model.openWorkbookPDF(for: currentClass.id) }
+            }
         }
 
         Menu {
@@ -234,15 +270,38 @@ struct ClassSessionView: View {
                 guard graded else { return }
 
                 let payload = everyAnswer
-                if !payload.isEmpty {
-                    await model.submitClassAnswers(payload)
-                    submittedAnswers = answers
-                }
+                await model.submitClassAnswers(payload)
+                submittedAnswers = answers
             }
         } label: {
             Label("Submit", systemImage: "checkmark.circle.fill")
         }
-        .disabled(drafts.isOverLimit || drafts.isSubmitting)
+        .disabled(!hydrated || drafts.isOverLimit || drafts.isSubmitting || !unreviewedPencilAnswers.isEmpty)
+    }
+
+    private func refreshPencilReviews() {
+        guard let credentials = model.credentials, let profile = credentials.selectedProfile else { return }
+        let reviews = PencilReviewStore()
+        let inks = LearningInkStore()
+        var required = Set<String>()
+        pencilReviewError = nil
+        for section in currentClass.sections {
+            let exercises = section.questions.map { PencilExercise.question($0) } + section.writingPrompts.map { PencilExercise.writing($0) }
+            for exercise in exercises {
+                let digest = PencilExercisePaper.taskDigest(prompt: exercise.prompt, passage: exercise.passage, options: exercise.options)
+                let key = LearningInkStore.scope(server: credentials.serverURL, profileID: profile.id,
+                    activity: "pencil/v1/\(currentClass.id)/\(currentClass.attempt ?? 1)/\(exercise.id)/\(digest)")
+                let confirmed: PencilAnswer? = exercise.kind == "QUESTION" ? answers[exercise.id].map { .choice($0) } :
+                    drafts.draft(for: exercise.id).map { .writing($0.text) }
+                do {
+                    if try reviews.requiresReview(drawing: inks.load(key), key: key, confirmedAnswer: confirmed) { required.insert(exercise.id) }
+                } catch {
+                    required.insert(exercise.id)
+                    pencilReviewError = "Saved Pencil work could not be opened. It will not be overwritten. \(error.localizedDescription)"
+                }
+            }
+        }
+        unreviewedPencilAnswers = required
     }
 
     private func saveProgress() {

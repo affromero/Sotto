@@ -3,6 +3,7 @@
 // path with its Zod request/response schemas so a single source generates both
 // the OpenAPI document and any client-side validation.
 import { z } from 'zod';
+import { pencilHomeworkRequestSchema, pencilHomeworkResponseSchema } from './pencil-homework';
 import {
   classRegenerationRequestSchema,
   classRegenerationAcceptedSchema,
@@ -278,6 +279,26 @@ export const endpoints: EndpointDef[] = [
     request: submitClassRequestSchema,
     response: submitClassResponseSchema,
     successStatuses: [200],
+  },
+  {
+    id: 'interpretPencilHomework',
+    method: 'POST',
+    path: '/api/v1/classes/{classId}/pencil',
+    summary: 'Queue interpretation of exercise context and learner ink for review before grading.',
+    auth: 'bearer',
+    request: pencilHomeworkRequestSchema,
+    response: pencilHomeworkResponseSchema,
+    successStatuses: [202],
+  },
+  {
+    id: 'getPencilHomeworkInterpretation',
+    method: 'GET',
+    path: '/api/v1/classes/{classId}/pencil',
+    summary: 'Read the private interpretation for the current class exercise.',
+    auth: 'bearer',
+    response: pencilHomeworkResponseSchema,
+    successStatuses: [200],
+    query: [{ name: 'operationId', required: true }],
   },
   {
     id: 'startExam',

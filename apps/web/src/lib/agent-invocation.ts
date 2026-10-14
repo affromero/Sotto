@@ -23,6 +23,7 @@ const BASE_ENV_KEYS = [
 export interface AgentInvocationOptions {
   remoteEnvKeys?: string[];
   remoteOutputSchema?: { json: string; cleanupToken: string };
+  remoteImageInputs?: { names: string[]; cleanupToken: string };
 }
 
 /**
@@ -74,18 +75,40 @@ export function buildAgentInvocation(
   // preserving only allowlisted values from the remote agent host. Local app
   // credentials are intentionally never copied across SSH.
   const assignments = remoteKeys.map((key) => `${key}="\${${key}-}"`).join(' ');
-  const command = [cli, ...args].map(shellQuote).join(' ');
+  if (options.remoteImageInputs?.names.length && args.at(-1) !== '-')
+    throw new Error('Remote Codex images require a stdin prompt');
+  const invocationArgs = options.remoteImageInputs?.names.length ? args.slice(0, -1) : args;
+  const command = [cli, ...invocationArgs].map(shellQuote).join(' ');
   let remote = `env -i ${assignments} ${command}`;
-  if (options.remoteOutputSchema) {
-    const { json, cleanupToken } = options.remoteOutputSchema;
+  if (options.remoteOutputSchema || options.remoteImageInputs) {
+    const json = options.remoteOutputSchema?.json;
+    const cleanupToken =
+      options.remoteOutputSchema?.cleanupToken ?? options.remoteImageInputs!.cleanupToken;
     if (cli !== 'codex' || !/^[a-f0-9-]{36}$/.test(cleanupToken))
       throw new Error('Invalid remote output schema invocation');
-    if (Buffer.byteLength(json) > 1_048_576)
+    if (json && Buffer.byteLength(json) > 1_048_576)
       throw new Error('Output schema exceeds its size limit');
-    const parsed: unknown = JSON.parse(json);
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
+    const parsed: unknown = json ? JSON.parse(json) : undefined;
+    if (json && (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)))
       throw new Error('Output schema must be a JSON object');
-    const encoded = Buffer.from(json).toString('base64');
+    const names = options.remoteImageInputs?.names ?? [];
+    if (
+      names.length > 5 ||
+      names.some((name) => !/^image-[0-4]\.(?:png|jpeg)$/.test(name)) ||
+      new Set(names).size !== names.length
+    )
+      throw new Error('Invalid remote Codex image input names');
+    const encoded = json ? Buffer.from(json).toString('base64') : undefined;
+    const prepareImages = names
+      .map(
+        (name) =>
+          `IFS= read -r sotto_image_frame || exit 75\nprintf '%s' "$sotto_image_frame" | base64 -d > "$sotto_schema_dir/${name}" || exit 75`
+      )
+      .join('\n');
+    const imageArgs = names.length
+      ? names.map((name) => `'--image' "$sotto_schema_dir/${name}"`).join(' ') + " '--' '-'"
+      : '';
+    const schemaArg = json ? `'--output-schema' "$sotto_schema_dir/schema.json"` : '';
     remote = `umask 077
 sotto_schema_dir=$(mktemp -d) || exit 75
 sotto_schema_child=
@@ -105,9 +128,10 @@ trap 'sotto_schema_status=$?; trap - EXIT; sotto_schema_cleanup; exit "$sotto_sc
 trap 'exit 129' HUP
 trap 'exit 130' INT
 trap 'exit 143' TERM
-printf '%s' ${shellQuote(encoded)} | base64 -d > "$sotto_schema_dir/schema.json" || exit 75
+${encoded ? `printf '%s' ${shellQuote(encoded)} | base64 -d > "$sotto_schema_dir/schema.json" || exit 75` : ''}
+${prepareImages}
 exec 3<&0
-${remote} '--output-schema' "$sotto_schema_dir/schema.json" <&3 3<&- &
+${remote} ${schemaArg} ${imageArgs} <&3 3<&- &
 sotto_schema_child=$!
 exec 3<&-
 wait "$sotto_schema_child"

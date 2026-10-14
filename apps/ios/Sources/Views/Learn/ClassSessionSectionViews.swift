@@ -1,11 +1,16 @@
 import SwiftUI
 import UIKit
+import PencilKit
 
 struct ClassSectionView: View {
     let classId: String
     let section: SottoClassSection
     @Binding var answers: [String: Int]
     @ObservedObject var drafts: WritingDraftStore
+    let pencilWorkbook: Bool
+    let classAttempt: Int
+    let pencilToolPicker: PKToolPicker
+    let onPencilReviewRequired: (String, Bool) -> Void
     let onSelectionHelp: (String, String) -> Void
 
     private var skill: String {
@@ -58,6 +63,13 @@ struct ClassSectionView: View {
             }
 
             ForEach(sortedQuestions) { question in
+                if pencilWorkbook {
+                    PencilHomeworkCard(classId: classId, attempt: classAttempt, exercise: .question(question),
+                        toolPicker: pencilToolPicker,
+                        confirmedAnswer: answers[question.id].map { .choice($0) }, onUseAnswer: { answer in
+                            if case .choice(let index) = answer { answers[question.id] = index }
+                        }, onReviewRequired: { onPencilReviewRequired(question.id, $0) })
+                }
                 QuestionView(
                     question: question,
                     selectedIndex: answers[question.id],
@@ -77,9 +89,19 @@ struct ClassSectionView: View {
             }
 
             if !section.writingPrompts.isEmpty {
+                if pencilWorkbook {
+                    ForEach(section.writingPrompts) { prompt in
+                        PencilHomeworkCard(classId: classId, attempt: classAttempt, exercise: .writing(prompt),
+                            toolPicker: pencilToolPicker,
+                            confirmedAnswer: drafts.draft(for: prompt.id).map { .writing($0.text) }, onUseAnswer: { answer in
+                                if case .writing(let text) = answer { drafts.binding(for: prompt.id).wrappedValue = text }
+                            }, onReviewRequired: { onPencilReviewRequired(prompt.id, $0) })
+                    }
+                }
                 WritingPracticeView(
                     drafts: drafts,
                     prompts: section.writingPrompts,
+                    offersHandwriting: !pencilWorkbook,
                     onSelectionHelp: onSelectionHelp
                 )
             }

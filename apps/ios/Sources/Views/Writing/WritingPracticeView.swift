@@ -13,14 +13,17 @@ struct WritingPracticeView: View {
     @ObservedObject var drafts: WritingDraftStore
     let prompts: [SottoWritingPrompt]
     let onSelectionHelp: ((String, String) -> Void)?
+    let offersHandwriting: Bool
 
     init(
         drafts: WritingDraftStore,
         prompts: [SottoWritingPrompt],
+        offersHandwriting: Bool = true,
         onSelectionHelp: ((String, String) -> Void)? = nil
     ) {
         self.drafts = drafts
         self.prompts = prompts
+        self.offersHandwriting = offersHandwriting
         self.onSelectionHelp = onSelectionHelp
     }
 
@@ -34,6 +37,7 @@ struct WritingPracticeView: View {
                 WritingPromptCard(
                     drafts: drafts,
                     prompt: prompt,
+                    offersHandwriting: offersHandwriting,
                     onSelectionHelp: onSelectionHelp
                 )
             }
@@ -50,6 +54,7 @@ private struct WritingPromptCard: View {
     @State private var showsHandwriting = false
 
     let prompt: SottoWritingPrompt
+    let offersHandwriting: Bool
     let onSelectionHelp: ((String, String) -> Void)?
 
     private var draft: WritingDraftStore.Draft? {
@@ -97,7 +102,7 @@ private struct WritingPromptCard: View {
                 )
                 .disabled(drafts.isSubmitting)
 
-            if layout.supportsHandwriting, let credentials = model.credentials,
+            if offersHandwriting, layout.supportsHandwriting, let credentials = model.credentials,
                let profile = credentials.selectedProfile {
                 Button("Write with Apple Pencil", systemImage: "pencil.tip") { showsHandwriting = true }
                     .buttonStyle(.bordered).controlSize(.large)

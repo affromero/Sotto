@@ -20,6 +20,13 @@ function opts(overrides: Partial<Parameters<typeof shouldRun>[1]> = {}) {
 }
 
 describe('matchesProfile', () => {
+  it('runs image homework on pipeline workers and honors explicit exclusion', () => {
+    expect(shouldRun('pencil-homework', opts({ profile: 'pipeline', preset: 'core' }))).toBe(true);
+    expect(shouldRun('pencil-homework', opts({ profile: 'light' }))).toBe(false);
+    expect(
+      shouldRun('pencil-homework', opts({ excludeFilter: new Set(['pencil-homework']) }))
+    ).toBe(false);
+  });
   it('runs class preparation on pipeline workers while honoring explicit exclusions', () => {
     expect(shouldRun('class-preparation', opts({ profile: 'pipeline', preset: 'core' }))).toBe(
       true

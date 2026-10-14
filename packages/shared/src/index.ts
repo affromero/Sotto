@@ -38,6 +38,7 @@ export {
 } from './learning-requirements';
 export type { SkillRequirements, SkillRequirement } from './learning-requirements';
 export * from './learning-evidence';
+export * from './contracts/pencil-homework';
 export * from './reading-vocabulary';
 
 export type {
