@@ -60,59 +60,7 @@ struct ClassSessionView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 26) {
-                    ClassHeroHeader(
-                        classDetail: currentClass,
-                        answeredCount: answers.count,
-                        questionCount: questions.count,
-                        completionProgress: completionProgress,
-                        completionPercent: completionPercent
-                    )
-
-                    LearningSaveFailureView(progress: progress)
-                    if let pencilReviewError { Text(pencilReviewError).foregroundStyle(.red) }
-                    if !unreviewedPencilAnswers.isEmpty && !model.pencilWorkbook {
-                        Text(layout.supportsHandwriting ? "Open Workbook to review your saved Pencil answers before submitting." :
-                            "Widen this window to review your saved Pencil answers before submitting.")
-                            .foregroundStyle(SottoTheme.primary)
-                    }
-                    if let intro = currentClass.intro {
-                        ClassIntroBlock(intro: intro, onSelectionHelp: openSelectionHelp)
-                    }
-
-                    if let result = model.classResult {
-                        ClassResultBanner(result: result)
-                    }
-
-                    ForEach(currentClass.sections) { section in
-                        ClassSectionView(
-                            classId: currentClass.id,
-                            section: section,
-                            answers: $answers,
-                            drafts: drafts,
-                            pencilWorkbook: model.pencilWorkbook && layout.supportsHandwriting,
-                            classAttempt: currentClass.attempt ?? 1,
-                            pencilToolPicker: pencilToolPicker,
-                            onPencilReviewRequired: { id, required in
-                                if required { unreviewedPencilAnswers.insert(id) }
-                                else { unreviewedPencilAnswers.remove(id) }
-                            },
-                            onSelectionHelp: openSelectionHelp
-                        )
-                    }
-
-                    ClassFeedbackClinicBlock(
-                        classDetail: currentClass,
-                        result: model.classResult
-                    )
-                    if model.pencilWorkbook && layout.supportsHandwriting {
-                        if !unreviewedPencilAnswers.isEmpty {
-                            Text("Review your Pencil answers before submitting. Read my marks helps you check circles, edits, and handwriting.")
-                                .foregroundStyle(SottoTheme.primary)
-                        }
-                        submitButton.buttonStyle(SottoPrimaryButtonStyle())
-                    }
-                }
+                classContent
                 .padding(layout == .compact ? 16 : 28)
                 .frame(maxWidth: 980, alignment: .leading)
             }
@@ -120,24 +68,7 @@ struct ClassSessionView: View {
             .navigationTitle(model.pencilWorkbook && layout.supportsHandwriting ? "Class \(currentClass.order) workbook" : "Class \(currentClass.order)")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") {
-                        model.closeClass()
-                    }
-                }
-                ToolbarItemGroup(placement: .primaryAction) {
-                    if layout == .compact {
-                        Menu {
-                            classTools
-                        } label: {
-                            Label("Class actions", systemImage: "ellipsis.circle")
-                        }
-                    } else {
-                        classTools
-                    }
-
-                    submitButton
-                }
+                sessionToolbar
             }
             .sheet(isPresented: workbookSheetBinding) {
                 if let workbook = model.workbook {
@@ -201,6 +132,88 @@ struct ClassSessionView: View {
                 answers = currentClass.learnerAnswers ?? [:]
                 refreshPencilReviews()
             }
+        }
+    }
+
+    private var classContent: some View {
+        VStack(alignment: .leading, spacing: 26) {
+            ClassHeroHeader(
+                classDetail: currentClass,
+                answeredCount: answers.count,
+                questionCount: questions.count,
+                completionProgress: completionProgress,
+                completionPercent: completionPercent
+            )
+            LearningSaveFailureView(progress: progress)
+            pencilReviewStatus
+            if let intro = currentClass.intro {
+                ClassIntroBlock(intro: intro, onSelectionHelp: openSelectionHelp)
+            }
+            if let result = model.classResult {
+                ClassResultBanner(result: result)
+            }
+            ForEach(currentClass.sections) { section in
+                classSection(section)
+            }
+            ClassFeedbackClinicBlock(classDetail: currentClass, result: model.classResult)
+            workbookSubmissionFooter
+        }
+    }
+
+    private func classSection(_ section: SottoClassSection) -> some View {
+        ClassSectionView(
+            classId: currentClass.id,
+            section: section,
+            answers: $answers,
+            drafts: drafts,
+            pencilWorkbook: model.pencilWorkbook && layout.supportsHandwriting,
+            classAttempt: currentClass.attempt ?? 1,
+            pencilToolPicker: pencilToolPicker,
+            onPencilReviewRequired: updatePencilReview,
+            onSelectionHelp: openSelectionHelp
+        )
+    }
+
+    private func updatePencilReview(id: String, required: Bool) {
+        if required { unreviewedPencilAnswers.insert(id) }
+        else { unreviewedPencilAnswers.remove(id) }
+    }
+
+    @ViewBuilder
+    private var pencilReviewStatus: some View {
+        if let pencilReviewError { Text(pencilReviewError).foregroundStyle(.red) }
+        if !unreviewedPencilAnswers.isEmpty && !model.pencilWorkbook {
+            Text(layout.supportsHandwriting ? "Open Workbook to review your saved Pencil answers before submitting." :
+                "Widen this window to review your saved Pencil answers before submitting.")
+                .foregroundStyle(SottoTheme.primary)
+        }
+    }
+
+    @ViewBuilder
+    private var workbookSubmissionFooter: some View {
+        if model.pencilWorkbook && layout.supportsHandwriting {
+            if !unreviewedPencilAnswers.isEmpty {
+                Text("Review your Pencil answers before submitting. Read my marks helps you check circles, edits, and handwriting.")
+                    .foregroundStyle(SottoTheme.primary)
+            }
+            submitButton.buttonStyle(SottoPrimaryButtonStyle())
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var sessionToolbar: some ToolbarContent {
+        ToolbarItem(placement: .cancellationAction) {
+            Button("Close") { model.closeClass() }
+        }
+        ToolbarItemGroup(placement: .primaryAction) {
+            if layout == .compact {
+                Menu { classTools } label: {
+                    Label("Class actions", systemImage: "ellipsis.circle")
+                }
+            } else {
+                classTools
+            }
+            submitButton
         }
     }
 
