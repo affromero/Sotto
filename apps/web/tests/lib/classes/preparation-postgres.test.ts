@@ -423,6 +423,8 @@ suite('durable preparation admission and provider accounting', () => {
     const activity = await readPreparationActivity(courseId, execution);
     expect(activity).toMatchObject({
       providerRequestsAdmitted: 0,
+      providerRequestsCompleted: 0,
+      providerRequestInFlight: false,
       maxProviderRequests: 2,
       events: [{ type: 'created' }],
     });
@@ -451,6 +453,8 @@ suite('durable preparation admission and provider accounting', () => {
     expect(dispatched).toBe(2);
     const activity = await readPreparationActivity(courseId, execution);
     expect(activity?.providerRequestsAdmitted).toBe(2);
+    expect(activity?.providerRequestsCompleted).toBe(2);
+    expect(activity?.providerRequestInFlight).toBe(false);
     expect(activity?.events.map((event) => event.type)).toEqual([
       'created',
       'admitted',

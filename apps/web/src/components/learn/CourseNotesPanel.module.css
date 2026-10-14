@@ -189,3 +189,27 @@
 .error {
   color: var(--bad, #be4a2c);
 }
+
+.materials {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 12px;
+}
+
+.materialLink,
+.materials summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  overflow-wrap: anywhere;
+}
+
+.materialText {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+  max-height: 300px;
+  overflow: auto;
+}

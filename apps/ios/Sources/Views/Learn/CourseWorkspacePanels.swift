@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct CourseHeroPanel: View {
     @Environment(\.sottoLayout) private var layout
@@ -409,6 +410,8 @@ struct CourseNotesEditor: View {
     let course: SottoCourse
 
     @State private var bodyText = ""
+    @State private var materials: [SottoCourseMaterial] = []
+    @State private var showingImporter = false
     @State private var isLoaded = false
     @State private var isLoading = false
     @State private var isSaving = false
@@ -425,6 +428,13 @@ struct CourseNotesEditor: View {
                 icon: "note.text"
             )
 
+            CourseMaterialList(materials: materials)
+
+            Button("Upload notes") { showingImporter = true }
+                .buttonStyle(.bordered)
+                .frame(minHeight: 44)
+                .disabled(!isLoaded || isLoading || isSaving)
+
             TextEditor(text: $bodyText)
                 .font(.body)
                 .frame(minHeight: 150)
@@ -436,7 +446,7 @@ struct CourseNotesEditor: View {
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
                         .stroke(SottoTheme.line)
                 )
-                .disabled(isLoading)
+                .disabled(!isLoaded || isLoading || isSaving)
                 .onChange(of: bodyText) { _, next in
                     if next.count > maxLength {
                         bodyText = String(next.prefix(maxLength))
@@ -456,7 +466,7 @@ struct CourseNotesEditor: View {
                     Label(isSaving ? "Saving" : "Save notes", systemImage: "tray.and.arrow.down")
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(isLoading || isSaving)
+                .disabled(!isLoaded || isLoading || isSaving)
             }
 
             if !message.isEmpty {
@@ -474,6 +484,22 @@ struct CourseNotesEditor: View {
         .task(id: course.id) {
             await loadNotes()
         }
+        .fileImporter(isPresented: $showingImporter, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
+            switch result {
+            case .success(let urls):
+                isSaving = true
+                error = ""
+                Task {
+                    defer { isSaving = false }
+                    do {
+                        let response = try await model.importCourseMaterials(courseId: course.id, urls: urls)
+                        materials = response.materials ?? []
+                        message = notesStatus(response)
+                    } catch { self.error = "Could not upload these materials. Use supported documents totaling 10MB or less." }
+                }
+            case .failure: error = "Could not select the material."
+            }
+        }
     }
 
     private func loadNotes() async {
@@ -484,6 +510,7 @@ struct CourseNotesEditor: View {
         do {
             let response = try await model.fetchCourseNotes(courseId: course.id)
             bodyText = response.body ?? ""
+            materials = response.materials ?? []
             isLoaded = true
         } catch {
             self.error = "Could not load course notes."

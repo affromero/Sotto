@@ -110,6 +110,7 @@ export interface ContextItem {
   kind: ContextItemKind;
   label: string;
   value: string;
+  materialId?: string;
 }
 
 export interface FlowState {

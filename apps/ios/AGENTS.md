@@ -58,6 +58,10 @@ their UDIDs to `xcodebuild`. Test **both** families: the layout differs by size 
 
 ## App Store
 
+- Course materials download through the owning profile's material endpoint and
+  open locally with Quick Look. Keep originals and imported text outside the
+  editable notes field. Native uploads use bounded reads and a 10MB total limit.
+
 - iPad writing prompts offer a Pencil canvas with on-device Vision text recognition.
   Learners review the recognized text before it enters `WritingDraftStore`; the
   existing class, practice, and exam submission paths own grading.

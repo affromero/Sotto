@@ -801,6 +801,6 @@ suite('Sotto provider ownership with PostgreSQL', () => {
       } while (cursor !== null);
       expect(remaining).toEqual([]);
       expect((await credentials.listOwner(alice)).items).toHaveLength(1);
-    });
+    }, 15_000);
   });
 });

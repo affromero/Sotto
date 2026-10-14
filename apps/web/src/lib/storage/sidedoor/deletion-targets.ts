@@ -25,7 +25,16 @@ export function ownedStorageReferences(
 }
 
 export interface StorageDeletionReferencePage {
-  source: 'episode' | 'segment' | 'version' | 'user' | 'class' | 'prompt' | 'recording' | 'focus';
+  source:
+    | 'episode'
+    | 'segment'
+    | 'version'
+    | 'user'
+    | 'class'
+    | 'prompt'
+    | 'recording'
+    | 'focus'
+    | 'material';
   rows: Array<{ id: string; references: Record<string, string>; episodePrefix?: string }>;
 }
 
@@ -89,6 +98,23 @@ export async function visitStorageDeletionReferences(
   }
   const page = { orderBy: { id: 'asc' as const }, take: 100 };
   const afterId = (after: string | null) => (after === null ? {} : { id: { gt: after } });
+  await pages(
+    'material',
+    (after) =>
+      database.courseMaterial.findMany({
+        ...page,
+        where: {
+          ...(scope.kind === 'instance'
+            ? {}
+            : scope.kind === 'profile'
+              ? { userId: scope.id }
+              : { courseId: scope.id }),
+          ...afterId(after),
+        },
+        select: { id: true, originalUrl: true },
+      }),
+    ({ originalUrl }) => ({ originalUrl })
+  );
   if (scope.kind !== 'course' || scope.episodeIds.length > 0) {
     await pages(
       'episode',

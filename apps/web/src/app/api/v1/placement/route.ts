@@ -12,7 +12,13 @@ import {
   type PlacementQuestion,
 } from '@/lib/placement-test';
 import { createOrRaiseCourse } from '@/lib/placement-course';
-import { getCourseNote, mergeCourseNote, setCourseNote } from '@/lib/course-notes';
+import {
+  getCourseNote,
+  getEditableCourseNote,
+  mergeCourseNote,
+  setCourseNote,
+} from '@/lib/course-notes';
+import { persistPlacementMaterials } from '@/lib/course-materials';
 import { getCachedNotesDeduction, clearNotesDeduction } from '@/lib/placement-notes';
 import { extractAndStoreNoteVocab } from '@/lib/live-vocab';
 import { sottoRequestExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
@@ -147,8 +153,18 @@ export async function POST(request: NextRequest) {
     // questions", seed the cached materials as the course note + vocabulary,
     // the same personalization the direct "start here" confirm does.
     if (cachedNotes) {
-      const merged = mergeCourseNote(await getCourseNote(course.id), cachedNotes.content);
-      await setCourseNote(course.id, merged);
+      if (cachedNotes.materialIds?.length) {
+        await persistPlacementMaterials(course.id, sottoRequestExecution(request, authed), {
+          materialIds: cachedNotes.materialIds,
+          editableContent: cachedNotes.editableContent ?? '',
+        });
+      } else {
+        await setCourseNote(
+          course.id,
+          mergeCourseNote(await getEditableCourseNote(course.id), cachedNotes.content)
+        );
+      }
+      const merged = await getCourseNote(course.id);
       await extractAndStoreNoteVocab({
         userId,
         execution: sottoRequestExecution(request, authed),

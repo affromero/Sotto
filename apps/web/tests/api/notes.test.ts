@@ -5,6 +5,11 @@ import { NextRequest } from 'next/server';
 const mockAuthenticateRequest = vi.fn();
 const mockCourseFindFirst = vi.fn();
 const mockGetCourseNote = vi.fn();
+const mockGetEditableNote = vi.fn();
+const mockMaterials = vi.fn();
+const mockCreateMaterial = vi.fn();
+const mockUpdateMaterial = vi.fn();
+const mockWriteReference = vi.fn();
 const mockSetCourseNote = vi.fn();
 const mockExtractAndStoreNoteVocab = vi.fn();
 const mockExtractViaMarkit = vi.fn();
@@ -13,11 +18,31 @@ vi.mock('@/lib/api-keys', () => ({
   authenticateRequest: (...a: unknown[]) => mockAuthenticateRequest(...a),
 }));
 vi.mock('@/lib/prisma', () => ({
-  prisma: { course: { findFirst: (...a: unknown[]) => mockCourseFindFirst(...a) } },
+  prisma: {
+    course: { findFirst: (...a: unknown[]) => mockCourseFindFirst(...a) },
+    courseMaterial: { findMany: (...a: unknown[]) => mockMaterials(...a) },
+  },
+  prismaUnfiltered: {},
+}));
+vi.mock('@/lib/sidedoor/access/core/http', () => ({
+  accessOperation: (_request: Request, _browser: boolean, operation: () => Promise<Response>) =>
+    operation(),
+}));
+vi.mock('@/lib/sidedoor/storage/core/storage-write', () => ({
+  writeStorageReference: (...a: unknown[]) => mockWriteReference(...a),
+}));
+vi.mock('@/lib/sidedoor/access/core/request-identity', () => ({
+  requireOriginalSottoAdmission: async () => {},
+}));
+vi.mock('@/lib/sidedoor/access/state/store', () => ({
+  sottoStorageInstance: () => ({
+    read: async () => ({ instanceId: 'instance', subjectId: 'instance', generation: 1 }),
+  }),
 }));
 vi.mock('@/lib/course-notes', () => ({
   MAX_NOTE_LENGTH: 12000,
   getCourseNote: (...a: unknown[]) => mockGetCourseNote(...a),
+  getEditableCourseNote: (...a: unknown[]) => mockGetEditableNote(...a),
   mergeCourseNote: (current: string, addition: string) =>
     [current.trim(), addition.trim()].filter(Boolean).join('\n\n').trim().slice(0, 12000),
   normalizeCourseNote: (body: string) => body.trim().slice(0, 12000),
@@ -80,14 +105,39 @@ beforeEach(() => {
   });
   mockExtractAndStoreNoteVocab.mockResolvedValue(0);
   mockExtractViaMarkit.mockResolvedValue({ markdown: 'ciao from pdf', text: 'ciao from pdf' });
+  mockGetEditableNote.mockResolvedValue('');
+  mockGetCourseNote.mockResolvedValue('focus on speaking');
+  mockMaterials.mockResolvedValue([]);
+  mockCreateMaterial.mockImplementation(async ({ data }) => {
+    mockMaterials.mockResolvedValue([data]);
+    return data;
+  });
+  mockUpdateMaterial.mockImplementation(async ({ data }) => {
+    const rows = await mockMaterials();
+    mockMaterials.mockResolvedValue(
+      rows.map((row: Record<string, unknown>) => ({ ...row, ...data }))
+    );
+    return { count: 1 };
+  });
+  mockWriteReference.mockImplementation(async (options) => {
+    const url = '/api/v1/storage/materials/immutable-original';
+    const database = {
+      course: { findFirst: mockCourseFindFirst },
+      user: { findUnique: async () => ({ createdAt: new Date(1) }) },
+      courseMaterial: { create: mockCreateMaterial, updateMany: mockUpdateMaterial },
+    };
+    await options.captureAdmission(database);
+    await options.commit(database, url, null);
+    return url;
+  });
 });
 
 describe('GET /api/v1/courses/[courseId]/notes', () => {
   it('returns the note body for the owner', async () => {
-    mockGetCourseNote.mockResolvedValue('travel to Italy');
+    mockGetEditableNote.mockResolvedValue('travel to Italy');
     const res = await GET(getReq(), PARAMS);
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ body: 'travel to Italy' });
+    expect(await res.json()).toEqual({ body: 'travel to Italy', materials: [] });
   });
 
   it('401s without auth', async () => {
@@ -138,8 +188,9 @@ describe('PUT /api/v1/courses/[courseId]/notes', () => {
 });
 
 describe('POST /api/v1/courses/[courseId]/notes', () => {
-  it('imports uploaded text notes, appends them to the note, and updates vocab', async () => {
+  it('retains original files separately from editable notes and updates vocabulary', async () => {
     mockGetCourseNote.mockResolvedValue('existing official course notes');
+    mockGetEditableNote.mockResolvedValue('editable note');
     mockExtractAndStoreNoteVocab.mockResolvedValue(3);
 
     const file = {
@@ -151,14 +202,16 @@ describe('POST /api/v1/courses/[courseId]/notes', () => {
     const body = await res.json();
 
     expect(res.status).toBe(200);
-    expect(mockSetCourseNote).toHaveBeenCalledWith(
-      'course-1',
-      expect.stringContaining('existing official course notes')
-    );
-    expect(mockSetCourseNote.mock.calls[0][1]).toContain('Uploaded course note: official.md');
-    expect(mockSetCourseNote.mock.calls[0][1]).toContain('buongiorno');
+    expect(mockSetCourseNote).not.toHaveBeenCalled();
+    expect(body.body).toBe('editable note');
+    expect(body.materials[0]).toMatchObject({
+      name: 'official.md',
+      extractedText: expect.stringContaining('buongiorno'),
+    });
+    expect(body.materials[0]).not.toHaveProperty('originalUrl');
+    expect(Buffer.from(mockWriteReference.mock.calls[0][0].body).toString()).toBe(file.content);
     expect(mockExtractAndStoreNoteVocab).toHaveBeenCalledWith(
-      expect.objectContaining({ courseId: 'course-1', note: mockSetCourseNote.mock.calls[0][1] })
+      expect.objectContaining({ courseId: 'course-1', note: 'existing official course notes' })
     );
     expect(body).toMatchObject({ imported: 1, failed: 0, addedVocabulary: 3 });
   });
@@ -175,7 +228,7 @@ describe('POST /api/v1/courses/[courseId]/notes', () => {
       expect.any(Buffer),
       expect.objectContaining({ extension: '.pdf', url: 'upload://course.pdf' })
     );
-    expect(mockSetCourseNote.mock.calls[0][1]).toContain('# Capitolo');
+    expect((await res.json()).materials[0].extractedText).toContain('# Capitolo');
   });
 
   it('400s when no files are uploaded', async () => {

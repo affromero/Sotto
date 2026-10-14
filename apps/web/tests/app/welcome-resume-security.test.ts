@@ -2,6 +2,20 @@ import { expect, it } from 'vitest';
 import { resumeEndpoint, resumeEndpoints } from '@/app/welcome/session/resume-security';
 import { parseStoredSnapshot } from '@/app/welcome/session/welcome-snapshot';
 
+it('preserves owned attachment identifiers when resuming onboarding', () => {
+  const materialId = 'a604f52a-d011-4a21-9c6c-23de4930eeed';
+  const snapshot = parseStoredSnapshot(
+    JSON.stringify({
+      contextItems: [
+        { id: 'context-1', kind: 'file', label: 'notes.pdf', value: 'Imported text', materialId },
+      ],
+    })
+  );
+  expect(snapshot?.contextItems).toEqual([
+    { id: 'context-1', kind: 'file', label: 'notes.pdf', value: 'Imported text', materialId },
+  ]);
+});
+
 it('removes browser credentials and connection claims while retaining safe resume choices', () => {
   const result = parseStoredSnapshot(
     JSON.stringify({

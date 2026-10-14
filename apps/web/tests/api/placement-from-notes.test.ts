@@ -28,6 +28,7 @@ vi.mock('@/lib/placement-course', () => ({
 }));
 vi.mock('@/lib/course-notes', () => ({
   getCourseNote: (...a: unknown[]) => mockGetCourseNote(...a),
+  getEditableCourseNote: vi.fn().mockResolvedValue(''),
   mergeCourseNote: (...a: unknown[]) => mockMergeCourseNote(...a),
   setCourseNote: (...a: unknown[]) => mockSetCourseNote(...a),
 }));
@@ -122,7 +123,7 @@ describe('POST /api/v1/placement/from-notes/confirm', () => {
       content: 'mis materiales',
     });
     mockCreateOrRaiseCourse.mockResolvedValue({ id: 'course-1', currentLevel: 'B1' });
-    mockGetCourseNote.mockResolvedValue('');
+    mockGetCourseNote.mockResolvedValue('mis materiales');
     mockMergeCourseNote.mockReturnValue('mis materiales');
     mockSetCourseNote.mockResolvedValue(undefined);
     mockExtractAndStoreNoteVocab.mockResolvedValue(7);

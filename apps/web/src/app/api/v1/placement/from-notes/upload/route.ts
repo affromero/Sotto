@@ -4,7 +4,10 @@ import { authenticateRequest } from '@/lib/api-keys';
 import { checkRateLimit } from '@/lib/redis';
 import { errorResponse } from '@/lib/api-response';
 import { logger } from '@/lib/logger';
-import { extractUploadTexts, isUploadFile } from '@/lib/note-upload';
+import { importCourseMaterials, readMaterialForm } from '@/lib/course-materials';
+import { RequestBodyTooLargeError } from 'thesidedoor-core/runtime/request';
+import { accessOperation } from '@/lib/sidedoor/access/core/http';
+import { isAccessError } from 'thesidedoor-core/access';
 import { runNotesDeduction } from '@/lib/placement-notes';
 import { sottoRequestExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 
@@ -20,13 +23,17 @@ const langCode = z.string().trim().toLowerCase().length(2);
  * in the OpenAPI contract (multipart does not codegen); the TUI uses the JSON
  * /from-notes route with pasted text.
  */
-export async function POST(request: NextRequest) {
+export function POST(request: NextRequest) {
+  return accessOperation(request, !request.headers.has('authorization'), () => upload(request));
+}
+
+async function upload(request: NextRequest) {
   try {
     const authed = await authenticateRequest(request);
     if (!authed) return errorResponse('Unauthorized', 401);
     const userId = authed.userId;
 
-    const form = await request.formData();
+    const { form, files } = await readMaterialForm(request);
     const nativeParse = langCode.safeParse(form.get('native'));
     const targetParse = langCode.safeParse(form.get('target'));
     if (!nativeParse.success || !targetParse.success) {
@@ -41,10 +48,16 @@ export async function POST(request: NextRequest) {
       return errorResponse('Rate limit exceeded. Try again later.', 429, { resetAt: rate.resetAt });
     }
 
-    const files = form.getAll('files').filter(isUploadFile);
-    const pasted =
-      typeof form.get('content') === 'string' ? (form.get('content') as string).trim() : '';
-    const { texts, failed } = await extractUploadTexts(files);
+    const parsedContent = z
+      .string()
+      .trim()
+      .max(20000)
+      .safeParse(form.get('content') ?? '');
+    if (!parsedContent.success)
+      return errorResponse('Pasted notes must contain at most 20,000 characters.', 400);
+    const pasted = parsedContent.data;
+    const { materials, failed } = await importCourseMaterials(request, authed, files);
+    const texts = materials.map((material) => material.extractedText);
     const content = [pasted, ...texts].filter(Boolean).join('\n\n');
     if (!content) return errorResponse('No readable materials uploaded', 422);
 
@@ -53,7 +66,8 @@ export async function POST(request: NextRequest) {
       sottoRequestExecution(request, authed),
       native,
       target,
-      content
+      content,
+      { materialIds: materials.map((material) => material.id), editableContent: pasted }
     );
     return NextResponse.json({
       native,
@@ -63,8 +77,12 @@ export async function POST(request: NextRequest) {
       confidence: deduction.confidence,
       imported: texts.length,
       failed,
+      materials,
     });
   } catch (error: unknown) {
+    if (error instanceof RequestBodyTooLargeError)
+      return errorResponse('Materials must total 10MB or less.', 413);
+    if (isAccessError(error)) throw error;
     const message = error instanceof Error ? error.message : 'Level deduction failed';
     logger.error('Notes upload deduction failed', { error: message });
     return errorResponse(message, 500);

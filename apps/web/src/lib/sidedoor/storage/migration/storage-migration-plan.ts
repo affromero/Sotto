@@ -21,6 +21,7 @@ import {
 } from '@/lib/sidedoor/storage/core/speaking-storage';
 import { requireOriginalSottoAdmission } from '@/lib/sidedoor/access/core/request-identity';
 import { SIDEDOOR_STATE_ID, sottoStorageInstance } from '@/lib/sidedoor/access/state/store';
+import { materialStorageScopes } from '@/lib/course-materials';
 
 type Scope = { subjectId: string; generation: number };
 type ConsumerState = { reference: string | null; scopes: Scope[]; associations?: Prisma.JsonValue };
@@ -34,6 +35,14 @@ async function currentConsumer(
   if (parts.length !== 3) return null;
   const [kind, id, slot] = parts;
   if (!id) return null;
+  if (kind === 'material' && slot === 'original') {
+    const material = await database.courseMaterial.findUnique({ where: { id } });
+    if (!material) return { reference: null, scopes: [] };
+    return {
+      reference: material.originalUrl,
+      ...(await materialStorageScopes(database, material)),
+    };
+  }
   if (kind === 'profile' && slot === 'avatar') {
     const profile = await database.user.findUnique({
       where: { id },
