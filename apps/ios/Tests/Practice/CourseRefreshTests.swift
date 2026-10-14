@@ -111,22 +111,27 @@ final class CourseRefreshTests: XCTestCase {
     }
 
     @MainActor
-    func testLateRefreshForPreviousProfileDoesNotReplaceCurrentCourses() async throws {
+    func testLateRefreshAfterClearingProfileDoesNotRestorePreviousCourses() async {
         let store = CredentialStore()
-        let original = try store.load()
+        let original = try? store.load()
         defer {
             if let original { try? store.save(original) }
             else { try? store.delete() }
         }
         let model = model()
+        let credentials = model.credentials!
         let host = model.credentials!.serverURL.host!
-        await CourseRefreshServer.shared.set("delayed", host: host)
+        await CourseRefreshServer.shared.set("profile-refresh", host: host)
         let previous = Task { await model.loadCourses(showLoading: false) }
-        try await Task.sleep(for: .milliseconds(20))
-        await model.selectProfile(profile("bob"))
+        await CourseRefreshServer.shared.waitForBlockedRequest(host: host)
+        model.clearSelectedProfile()
+        await CourseRefreshServer.shared.release(host: host)
         await previous.value
-        XCTAssertEqual(model.activeProfile?.id, "bob")
-        XCTAssertEqual(model.courses.map(\.id), ["bob-course"])
+        XCTAssertTrue(model.isPaired)
+        XCTAssertEqual(model.credentials?.serverURL, credentials.serverURL)
+        XCTAssertEqual(model.credentials?.apiKey, credentials.apiKey)
+        XCTAssertNil(model.activeProfile)
+        XCTAssertTrue(model.courses.isEmpty)
         XCTAssertNil(model.courseRefreshError)
     }
 
@@ -210,7 +215,6 @@ private actor CourseRefreshServer {
 
     func respond(_ request: URLRequest) async -> (Int, String) {
         let mode = modes[request.url!.host!] ?? "ready"
-        let profile = request.value(forHTTPHeaderField: "X-Sotto-Profile-Id") ?? "alice"
         let host = request.url!.host!
         if mode == "practice-admission", request.httpMethod == "POST" {
             await block(host: host)
@@ -224,14 +228,12 @@ private actor CourseRefreshServer {
         }
         if mode == "failed" { return (503, #"{"error":"Server unavailable"}"#) }
         if request.url?.path == "/api/v1/courses" {
-            if mode == "final-generation" { await block(host: host) }
-            if mode == "delayed", profile == "alice" { try? await Task.sleep(for: .milliseconds(150)) }
+            if mode == "final-generation" || mode == "profile-refresh" { await block(host: host) }
             if mode == "empty" { return (200, #"{"courses":[]}"#) }
-            let id = profile == "bob" ? "bob-course" : "course-1"
             let classes = mode == "reset" ? "[]" : #"[{"id":"class-1","order":9,"status":"SUBMITTED","attempt":1,"createdAt":"2026-09-29T10:00:00Z","lesson":{"title":"Past events","level":"A2"}}]"#
             let active = mode == "reset" ? "null" : #""class-1""#
             return (200, """
-                {"courses":[{"id":"\(id)","nativeLang":"en","targetLang":"de","currentLevel":"A2","startLevel":"A2","placementSource":"MANUAL","activeClassId":\(active),"classes":\(classes)}]}
+                {"courses":[{"id":"course-1","nativeLang":"en","targetLang":"de","currentLevel":"A2","startLevel":"A2","placementSource":"MANUAL","activeClassId":\(active),"classes":\(classes)}]}
                 """)
         }
         if mode == "reset" || mode == "empty" { return (404, #"{"error":"Class not found"}"#) }
