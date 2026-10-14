@@ -1,99 +1,110 @@
 name: CI
 
-# Only run on PRs — push to main is covered by deploy.yml which includes the same CI steps.
-# Running CI twice on every push to main was consuming ~50% of the monthly minute budget.
+# Production and OSS images consume this exact successful source validation.
 on:
+  push:
+    branches: [main]
+  workflow_dispatch:
   pull_request:
     branches: [main]
-    paths:
-      - 'apps/web/**'
-      - 'packages/**'
-      - 'services/local-tts/**'
-      - 'services/local-stt/**'
-      - 'scripts/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - '.github/workflows/ci.yml'
-      - '.github/workflows/oss-image.yml'
-      - 'docker-compose*.yml'
-      - '.dockerignore'
+
+permissions:
+  contents: read
 
 concurrency:
-  group: ci-${{ github.head_ref }}
+  group: ci-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
 
 jobs:
   ci:
-    name: Lint, Type Check, Test & Build
+    needs: changes
+    if: needs.changes.outputs.source == 'true'
+    uses: ./.github/workflows/source-ci.yml
+
+  changes:
     runs-on: ubuntu-latest
-    env:
-      NEXT_PUBLIC_APP_URL: https://selfhost.example.com
-      SIDEDOOR_TEST_DATABASE_URL: postgresql://postgres:sidedoor-test-only@127.0.0.1:5432/sidedoor_test
-      SIDEDOOR_TEST_REDIS_URL: redis://127.0.0.1:6379/15
-    services:
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 12
-      postgres:
-        image: pgvector/pgvector:pg17
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: sidedoor-test-only
-          POSTGRES_DB: sidedoor_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres -d sidedoor_test"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 12
-
+    outputs:
+      runtime: ${{ steps.scope.outputs.runtime }}
+      source: ${{ steps.scope.outputs.source }}
     steps:
-      - name: Checkout code with public submodules
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          submodules: recursive
-
-      - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: 24
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Install media tools
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg libchromaprint-tools
-
-      - name: Validate GitHub Actions workflows
-        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
-
-      - name: Generate Prisma client
-        run: npx prisma generate --schema=apps/web/prisma/schema.prisma
-
-      - name: Run repository CI
-        run: npm run ci
-
-      - name: Verify local speech service
-        working-directory: services/local-tts
-        run: |
-          curl --proto '=https' --tlsv1.2 -LsSf https://astral.sh/uv/0.11.17/install.sh | sh
-          "$HOME/.local/bin/uv" sync --locked --python 3.11
-          "$HOME/.local/bin/uv" run pytest
-          "$HOME/.local/bin/uv" run pytest ../local-stt/tests
-          "$HOME/.local/bin/uv" run ruff check .
-          "$HOME/.local/bin/uv" run ruff format --check .
-          "$HOME/.local/bin/uv" run ruff check ../local-stt
-          "$HOME/.local/bin/uv" run ruff format --check ../local-stt
-
-      - name: Verify PostgreSQL backup and restore
+          fetch-depth: 0
+      - name: Select runtime image work
+        id: scope
         env:
-          SOTTO_TEST_POSTGRES: '1'
-        run: python3 -m unittest discover -s scripts/tests -p test_database_command.py
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          python3 - <<'PY'
+          import fnmatch
+          import os
+          import subprocess
+
+          def runtime_path(path):
+              if path.startswith('apps/web/'):
+                  return not path.startswith('apps/web/tests/')
+              if path.startswith(('packages/', 'services/', 'scripts/', 'vendor/', '.github/workflows/')):
+                  return True
+              return path in {
+                  'package.json', 'package-lock.json', 'prisma.config.ts',
+                  '.dockerignore', '.npmrc', '.gitmodules', '.node-version', 'Caddyfile',
+                  '.env.example', '.env.oss.example',
+              } or fnmatch.fnmatch(path, 'tsconfig*.json') or fnmatch.fnmatch(path, 'docker-compose*.yml')
+
+          before = os.environ.get('BASE_SHA', '')
+          head = os.environ['HEAD_SHA']
+          runtime = True
+          source = True
+          if os.environ['EVENT_NAME'] in ('push', 'pull_request') and before and set(before) != {'0'}:
+              comparison = f'{before}...{head}' if os.environ['EVENT_NAME'] == 'pull_request' else f'{before}..{head}'
+              paths = subprocess.check_output([
+                  'git', 'diff', '--no-renames', '--name-only', '-z', comparison,
+              ]).decode().split('\0')
+              runtime = any(runtime_path(path) for path in paths if path)
+              source = runtime or any(
+                  path.startswith('apps/web/') or fnmatch.fnmatch(path, 'vitest*.config.ts')
+                  or path == '.pre-commit-config.yaml'
+                  for path in paths if path
+              )
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f"runtime={str(runtime).lower()}\n")
+              output.write(f"source={str(source).lower()}\n")
+          print(f"Backend source validation required: {source}; runtime images required: {runtime}")
+          PY
+
+  source-record:
+    needs: [ci, changes]
+    if: >-
+      always() && github.repository == 'affromero/Sotto' &&
+      github.ref == 'refs/heads/main' && github.event_name != 'pull_request' &&
+      needs.changes.result == 'success' &&
+      (needs.ci.result == 'success' ||
+       (needs.ci.result == 'skipped' &&
+        needs.changes.outputs.source == 'false' &&
+        needs.changes.outputs.runtime == 'false'))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Record successful source validation
+        env:
+          RUNTIME_CHANGED: ${{ needs.changes.outputs.runtime }}
+          SOURCE_VALIDATED: ${{ needs.ci.result == 'success' }}
+        run: |
+          mkdir -p delivery
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          Path('delivery/source-validation.json').write_text(json.dumps({
+              'sha': os.environ['GITHUB_SHA'],
+              'runtime_changed': os.environ['RUNTIME_CHANGED'] == 'true',
+              'source_validated': os.environ['SOURCE_VALIDATED'] == 'true',
+          }) + '\n')
+          PY
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: source-validation-${{ github.sha }}
+          path: delivery/source-validation.json
+          if-no-files-found: error
+          retention-days: 14

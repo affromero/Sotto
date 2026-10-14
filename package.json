@@ -13,6 +13,7 @@
   "scripts": {
     "access": "npm run access --workspace=@sotto/web --",
     "build": "scripts/run-with-env.sh npm run build --workspace=@sotto/web",
+    "check:affected": "node scripts/ci/check-affected.mjs",
     "ci": "node scripts/ci/audit-gate.mjs && python3 -m unittest discover -s scripts/tests -p 'test*.py' && npm run ci:web && npm run ci:packages",
     "ci:packages": "npm test --workspace=@sotto/shared -- --run && npm run type-check --workspace=@sotto/mcp && npm run build --workspace=@sotto/mcp && npm test --workspace=groundcheck -- --run && npm run typecheck --workspace=groundcheck && npm run build --workspace=groundcheck && npm test --workspace=@sotto/learning-model -- --run && npm run typecheck --workspace=@sotto/learning-model && npm run build --workspace=@sotto/learning-model",
     "ci:web": "npm run ci --workspace=@sotto/web",
@@ -85,5 +86,8 @@
   },
   "optionalDependencies": {
     "@next/swc-darwin-arm64": "^16.3.5"
+  },
+  "engines": {
+    "node": ">=24 <25"
   }
 }

@@ -183,12 +183,33 @@ No missing capability should be hidden by an implicit provider fallback.
 | `npm run test`            | run Vitest                         |
 | `npm run test:browser`    | run isolated learner browser tests |
 | `npm run build`           | build web app                      |
-| `npm run ci`              | lint, type-check, test, and build  |
+| `npm run check:affected`  | checks for staged changes          |
+| `npm run ci`              | full source validation             |
 | `npm run prisma:push`     | push Prisma schema                 |
 | `npm run prisma:generate` | generate Prisma client             |
 | `npm run prisma:studio`   | open Prisma Studio                 |
 
-Run `npm run ci` before each commit.
+Use Node 24, as recorded in `.node-version`, and install both Git hook stages:
+
+```bash
+pre-commit install --install-hooks
+git add <changed-files>
+git commit
+```
+
+The commit gate selects type checks and related tests from staged paths,
+including deletions. Configuration and runtime inputs that cannot be covered
+by the test import graph select the full affected workspace suite. Documentation
+and native-only commits avoid web validation. Pushes run Rust checks when the
+TUI or its shared contracts change, without repeating the web suite and build.
+Use `npm run check:affected` to run the staged gate manually during debugging;
+the commit hook already runs it.
+
+GitHub runs full source validation for web, package, and tooling changes before
+merge. Production and OSS images share the main revision's validation. Native
+and documentation changes avoid backend validation. Run `npm run ci` locally
+to investigate broader failures or qualify an offline release. A passing focused
+check does not replace applicable remote checks for the exact release revision.
 
 ### Browser tests
 

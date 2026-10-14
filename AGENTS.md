@@ -73,6 +73,7 @@ SKIP_DB_SYNC=1 npm run dev     # Faster start without DB sync
 npm run dev:web                # Web only
 npm run dev:workers            # Workers only
 npm run ci                     # lint + type-check + test + build
+npm run check:affected         # checks for staged changes
 ```
 
 ## Subdirectory AGENTS.md Index
@@ -170,9 +171,21 @@ When modifying any source file that has a corresponding test file, update the te
 
 ## Commit Checklist
 
-Run `npm run ci` before every commit. No exceptions.
+Use the installed pre-commit hooks to validate staged changes, alongside
+formatting and secret checks. `npm run check:affected` runs the same scoped
+gate manually when needed. Avoid running it again immediately before the hook.
+Use focused tests during development. Run the full `npm run ci` locally when
+investigating a cross-workspace failure or verifying a release offline.
 
-- [ ] `npm run ci` passes with zero errors and a successful build.
+GitHub runs the full source gate for web, package, and tooling changes. Native
+changes run their own checks. Require successful applicable checks at the exact
+source revision before merging or deploying. Production and OSS images retain
+their runtime smoke checks; OSS publication reuses the trusted
+main revision's source validation. Do not repeat completed full gates locally
+at commit and push, or rebuild images that CI has already verified.
+
+- [ ] Installed pre-commit hooks pass, including the affected checks.
+- [ ] Applicable GitHub checks pass before merging or deploying.
 - [ ] No secrets or `.env` values are staged.
 - [ ] Lint errors, type errors, and test failures are fixed.
 - [ ] Unused imports are removed.

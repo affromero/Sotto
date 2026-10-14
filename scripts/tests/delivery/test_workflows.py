@@ -1,0 +1,390 @@
+"""Exercise delivery scope and exact-commit release admission."""
+
+from __future__ import annotations
+
+import json
+import os
+from pathlib import Path
+import subprocess
+import tempfile
+import textwrap
+import unittest
+
+ROOT = Path(__file__).resolve().parents[3]
+WORKFLOWS = ROOT / '.github/workflows'
+SHA = 'a' * 40
+
+
+def python_step(workflow: str, name: str) -> str:
+    lines = (WORKFLOWS / workflow).read_text().splitlines()
+    start = next(index for index, line in enumerate(lines)
+                 if line.strip() == f'- name: {name}')
+    command = next(index for index in range(start, len(lines))
+                   if "python3 - <<'PY'" in lines[index])
+    end = next(index for index in range(command + 1, len(lines))
+               if lines[index].strip() == 'PY')
+    return textwrap.dedent('\n'.join(lines[command + 1:end]))
+
+
+class WorkflowScopeTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.root = Path(self.directory.name)
+        self.git_environment = {
+            key: value for key, value in os.environ.items()
+            if not key.startswith('GIT_')
+        }
+        self.git('init', '--quiet')
+        (self.root / 'README.md').write_text('Initial fixture\n')
+        self.git('add', '.')
+        self.commit()
+        self.before = self.git('rev-parse', 'HEAD').strip()
+
+    def git(self, *arguments: str) -> str:
+        return subprocess.check_output(
+            ['git', '-C', str(self.root), *arguments], text=True,
+            env=self.git_environment, stderr=subprocess.STDOUT)
+
+    def commit(self) -> None:
+        self.git('-c', 'user.name=Workflow Test',
+                 '-c', 'user.email=workflow@example.test',
+                 'commit', '--quiet', '--allow-empty', '-m', 'Fixture')
+
+    def add_paths(self, paths: list[str]) -> None:
+        for path in paths:
+            destination = self.root / path
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_text('Changed fixture\n')
+        self.git('add', '.')
+        self.commit()
+
+    def scope(self, event: str = 'push',
+              before: str | None = None) -> dict[str, str]:
+        output = self.root / 'scope-output'
+        environment = {
+            **self.git_environment,
+            'BASE_SHA': self.before if before is None else before,
+            'HEAD_SHA': self.git('rev-parse', 'HEAD').strip(),
+            'GITHUB_SHA': self.git('rev-parse', 'HEAD').strip(),
+            'EVENT_NAME': event,
+            'SOTTO_PUBLIC_APP_URL': 'https://showcase.example.test',
+            'SOTTO_PERSONAL_APP_URL': 'https://personal.example.test',
+            'GITHUB_OUTPUT': str(output),
+        }
+        result = subprocess.run(
+            ['python3', '-c', python_step(
+                'ci.yml', 'Select runtime image work')],
+            cwd=self.root, env=environment, text=True, capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        return dict(line.split('=', 1)
+                    for line in output.read_text().splitlines())
+
+    def test_native_and_docs_skip_backend_checks_and_images(self) -> None:
+        self.add_paths([
+            'apps/ios/Tests/CourseRefreshTests.swift',
+            'apps/desktop/src/app.ts',
+            'docs/learning.md',
+        ])
+        self.assertEqual(self.scope(), {'runtime': 'false', 'source': 'false'})
+
+    def test_web_tests_validate_without_images(self) -> None:
+        self.add_paths([
+            'apps/web/tests/components/Class.test.tsx', 'vitest.config.ts',
+        ])
+        self.assertEqual(self.scope(), {'runtime': 'false', 'source': 'true'})
+
+    def test_hook_changes_validate_without_images(self) -> None:
+        self.add_paths(['.pre-commit-config.yaml'])
+        self.assertEqual(self.scope(), {'runtime': 'false', 'source': 'true'})
+
+    def test_installer_env_templates_validate_and_build_images(self) -> None:
+        for path in ('.env.example', '.env.oss.example'):
+            with self.subTest(path=path):
+                self.add_paths([path])
+                self.assertEqual(self.scope(), {
+                    'runtime': 'true', 'source': 'true',
+                })
+                (self.root / 'scope-output').unlink()
+                self.before = self.git('rev-parse', 'HEAD').strip()
+
+    def test_runtime_and_dependency_changes_require_images(self) -> None:
+        for path in (
+            'apps/web/src/app/page.tsx',
+            'apps/web/prisma/schema.prisma',
+            'packages/shared/src/contracts.ts',
+            'services/local-stt/server.py',
+            'scripts/deploy.sh',
+            'vendor/braces/index.js',
+            '.github/workflows/source-ci.yml',
+            'prisma.config.ts',
+            'tsconfig.base.json',
+            'docker-compose.personal.yml',
+            'package-lock.json',
+            '.dockerignore',
+            '.node-version',
+            'Caddyfile',
+        ):
+            with self.subTest(path=path):
+                self.add_paths([path])
+                self.assertEqual(self.scope()['runtime'], 'true')
+                (self.root / 'scope-output').unlink()
+                self.before = self.git('rev-parse', 'HEAD').strip()
+
+    def test_push_range_includes_earlier_runtime_changes(self) -> None:
+        self.add_paths(['apps/web/src/lib/runtime.ts'])
+        self.add_paths(['apps/ios/Sources/App.swift'])
+        self.assertEqual(self.scope()['runtime'], 'true')
+
+    def test_moving_runtime_code_to_docs_still_builds_images(self) -> None:
+        self.add_paths(['apps/web/src/lib/runtime.ts'])
+        self.before = self.git('rev-parse', 'HEAD').strip()
+        (self.root / 'docs').mkdir()
+        self.git('mv', 'apps/web/src/lib/runtime.ts',
+                 'docs/removed-runtime.ts')
+        self.commit()
+        self.assertEqual(self.scope()['runtime'], 'true')
+
+    def test_manual_and_initial_pushes_build_all_images(self) -> None:
+        self.add_paths(['docs/learning.md'])
+        self.assertEqual(
+            self.scope(event='workflow_dispatch')['runtime'], 'true')
+        (self.root / 'scope-output').unlink()
+        self.assertEqual(self.scope(before='0' * 40)['runtime'], 'true')
+
+    def test_native_pull_request_ignores_base_branch_changes(self) -> None:
+        base_branch = self.git('branch', '--show-current').strip()
+        self.git('checkout', '--quiet', '-b', 'native-feature')
+        self.add_paths(['apps/ios/Sources/App.swift', 'docs/learning.md'])
+        self.git('checkout', '--quiet', base_branch)
+        self.add_paths(['apps/web/src/lib/runtime.ts'])
+        self.before = self.git('rev-parse', 'HEAD').strip()
+        self.git('checkout', '--quiet', 'native-feature')
+        self.assertEqual(self.scope(event='pull_request'), {
+            'runtime': 'false', 'source': 'false',
+        })
+
+
+class ReleaseAdmissionTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.root = Path(self.directory.name)
+        (self.root / 'delivery/verified').mkdir(parents=True)
+        self.environment = {
+            **os.environ,
+            'RELEASE_SHA': SHA,
+            'GITHUB_SHA': SHA,
+            'GITHUB_REPOSITORY': 'affromero/Sotto',
+            'GITHUB_EVENT_NAME': 'workflow_run',
+            'GITHUB_OUTPUT': str(self.root / 'output'),
+            'SOTTO_PUBLIC_APP_URL': 'https://showcase.example.test',
+            'SOTTO_PERSONAL_APP_URL': 'https://personal.example.test',
+        }
+
+    def run_step(self, workflow: str,
+                 name: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            ['python3', '-c', python_step(workflow, name)],
+            cwd=self.root, env=self.environment,
+            text=True, capture_output=True)
+
+    def admitted_run(self) -> dict[str, object]:
+        return {
+            'id': 123,
+            'head_sha': SHA,
+            'head_branch': 'main',
+            'head_repository': {'full_name': 'affromero/Sotto'},
+            'conclusion': 'success',
+            'status': 'completed',
+            'path': '.github/workflows/ci.yml',
+        }
+
+    def check_run(
+        self, record: dict[str, object], workflow: str = 'oss-image.yml',
+    ) -> subprocess.CompletedProcess[str]:
+        (self.root / 'delivery/source-run.json').write_text(json.dumps(record))
+        return self.run_step(
+            workflow,
+            'Find successful source validation for this exact main commit')
+
+    def test_successful_trusted_exact_main_gate_is_admitted(self) -> None:
+        for workflow in ('deploy.yml', 'oss-image.yml'):
+            with self.subTest(workflow=workflow):
+                (self.root / 'output').unlink(missing_ok=True)
+                result = self.check_run(self.admitted_run(), workflow)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(
+                    (self.root / 'output').read_text(), 'run_id=123\n')
+
+    def test_failed_or_untrusted_source_runs_are_rejected(self) -> None:
+        changes = [
+            {'head_sha': 'b' * 40},
+            {'head_branch': 'feature'},
+            {'head_repository': {'full_name': 'contributor/Sotto'}},
+            {'path': '.github/workflows/browser.yml'},
+            {'conclusion': 'failure'},
+            {'status': 'in_progress'},
+        ]
+        for workflow in ('deploy.yml', 'oss-image.yml'):
+            for change in changes:
+                with self.subTest(change=change, workflow=workflow):
+                    result = self.check_run(
+                        {**self.admitted_run(), **change}, workflow)
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn(
+                        'No successful production source gate', result.stderr)
+
+    def test_manual_dispatch_selects_only_an_exact_matching_gate(self) -> None:
+        records = [
+            {**self.admitted_run(), 'head_sha': 'b' * 40, 'id': 999},
+            self.admitted_run(),
+        ]
+        (self.root / 'delivery/source-runs.json').write_text(
+            json.dumps({'workflow_runs': records}))
+        result = self.run_step(
+            'oss-image.yml',
+            'Find successful source validation for this exact main commit')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((self.root / 'output').read_text(), 'run_id=123\n')
+
+    def check_artifact(
+        self, record: dict[str, object],
+    ) -> subprocess.CompletedProcess[str]:
+        (self.root / 'delivery/verified/source-validation.json').write_text(
+            json.dumps(record))
+        return self.run_step(
+            'oss-image.yml', 'Validate release revision and runtime scope')
+
+    def test_verified_test_only_commit_skips_public_image_builds(self) -> None:
+        result = self.check_artifact({
+            'sha': SHA, 'runtime_changed': False, 'source_validated': True,
+        })
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((self.root / 'output').read_text(), 'runtime=false\n')
+
+    def test_mismatched_or_malformed_gate_artifacts_are_rejected(self) -> None:
+        for record in (
+            {'sha': 'b' * 40, 'runtime_changed': True},
+            {'sha': SHA, 'runtime_changed': 'false'},
+            {'sha': SHA},
+            {'sha': SHA, 'runtime_changed': True, 'source_validated': False},
+            {'sha': SHA, 'runtime_changed': True, 'source_validated': 'true'},
+        ):
+            with self.subTest(record=record):
+                result = self.check_artifact(record)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn('does not match this release', result.stderr)
+
+    def test_production_consumes_verified_sha_and_scope(self) -> None:
+        (self.root / 'delivery/verified/source-validation.json').write_text(
+            json.dumps({
+                'sha': SHA, 'runtime_changed': False, 'source_validated': True,
+            }))
+        result = self.run_step(
+            'deploy.yml', 'Validate release revision and runtime scope')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        output = dict(line.split('=', 1) for line in
+                      (self.root / 'output').read_text().splitlines())
+        self.assertEqual(output, {
+            'sha': SHA, 'runtime': 'false', 'publish': 'true',
+        })
+
+    def test_native_commit_without_backend_gate_skips_images(self) -> None:
+        for workflow in ('deploy.yml', 'oss-image.yml'):
+            with self.subTest(workflow=workflow):
+                (self.root / 'output').unlink(missing_ok=True)
+                artifact = (
+                    self.root / 'delivery/verified/source-validation.json')
+                artifact.write_text(
+                    json.dumps({
+                        'sha': SHA, 'runtime_changed': False,
+                        'source_validated': False,
+                    }))
+                result = self.run_step(
+                    workflow, 'Validate release revision and runtime scope')
+                self.assertEqual(result.returncode, 0, result.stderr)
+                output = (self.root / 'output').read_text()
+                self.assertIn('runtime=false\n', output)
+
+    def test_manual_rebuild_requires_actual_source_validation(self) -> None:
+        self.environment['GITHUB_EVENT_NAME'] = 'workflow_dispatch'
+        for workflow in ('deploy.yml', 'oss-image.yml'):
+            for validated in (True, False):
+                with self.subTest(workflow=workflow, validated=validated):
+                    (self.root / 'output').unlink(missing_ok=True)
+                    artifact = (
+                        self.root / 'delivery/verified/source-validation.json')
+                    artifact.write_text(
+                        json.dumps({
+                            'sha': SHA, 'runtime_changed': False,
+                            'source_validated': validated,
+                        }))
+                    result = self.run_step(
+                        workflow,
+                        'Validate release revision and runtime scope')
+                    if validated:
+                        self.assertEqual(result.returncode, 0, result.stderr)
+                        output = (self.root / 'output').read_text()
+                        self.assertIn('runtime=true\n', output)
+                    else:
+                        self.assertNotEqual(result.returncode, 0)
+                        self.assertIn('Dispatch ci.yml on main', result.stderr)
+
+    def test_checkouts_and_revisions_use_the_validated_commit(self) -> None:
+        for workflow in ('deploy.yml', 'oss-image.yml'):
+            with self.subTest(workflow=workflow):
+                content = (WORKFLOWS / workflow).read_text()
+                lines = content.splitlines()
+                checkouts = [index for index, line in enumerate(lines)
+                             if 'uses: actions/checkout@' in line]
+                self.assertGreater(len(checkouts), 0)
+                for index in checkouts:
+                    self.assertIn('ref: ${{ env.RELEASE_SHA }}',
+                                  '\n'.join(lines[index + 1:index + 4]))
+                remaining = content.replace(
+                    '${{ github.event.workflow_run.head_sha || github.sha }}',
+                    '')
+                self.assertNotIn('github.sha', remaining)
+                self.assertNotIn('$GITHUB_SHA', content)
+
+    def set_images(self) -> None:
+        for role, repository in (
+            ('SHOWCASE', 'sotto-web-prod'),
+            ('PERSONAL', 'sotto-web-personal-prod'),
+            ('WORKERS', 'sotto-workers-prod'),
+        ):
+            self.environment[f'{role}_IMAGE'] = (
+                f'ghcr.io/affromero/{repository}@sha256:' + 'c' * 64)
+
+    def test_release_record_pins_three_role_images(self) -> None:
+        self.set_images()
+        result = self.run_step(
+            'deploy.yml', 'Record verified production image digests')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        record = json.loads(
+            (self.root / 'delivery/production-release.json').read_text())
+        self.assertEqual(record['sha'], SHA)
+        self.assertEqual(
+            set(record['images']), {'showcase', 'personal', 'workers'})
+        self.assertEqual(
+            record['images']['workers'], self.environment['WORKERS_IMAGE'])
+
+    def test_tags_and_crossed_role_digests_are_rejected(self) -> None:
+        self.set_images()
+        for image in (
+            'ghcr.io/affromero/sotto-web-prod:latest',
+            self.environment['WORKERS_IMAGE'],
+            '',
+        ):
+            with self.subTest(image=image):
+                self.environment['SHOWCASE_IMAGE'] = image
+                result = self.run_step(
+                    'deploy.yml', 'Record verified production image digests')
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(
+                    'Invalid immutable image reference', result.stderr)
+
+
+if __name__ == '__main__':
+    unittest.main()
