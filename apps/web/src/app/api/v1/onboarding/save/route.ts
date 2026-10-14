@@ -12,6 +12,7 @@ import { validateSottoCredentialSelection } from '@/lib/sidedoor/credentials/con
 import { onboardingSaveSchema } from '@/lib/validations';
 import { getOrCreateCurriculum } from '@/lib/curriculum-generator';
 import { setCourseNote } from '@/lib/course-notes';
+import { attachCourseMaterials } from '@/lib/course-materials';
 import { setSiteConfig } from '@/lib/site-config';
 import { invalidateServerInfra } from '@/lib/server-config';
 import { isSelfHosted } from '@/lib/self-hosted';
@@ -103,7 +104,8 @@ async function save(request: NextRequest) {
   if (!authed) throw new AccessError('unauthorized');
   const parsed = onboardingSaveSchema.safeParse(await readAccessJson(request));
   if (!parsed.success) return errorResponse(parsed.error.issues[0].message, 400);
-  const { course, note, preferred, infra, credentials, storageCredential } = parsed.data;
+  const { course, note, materialIds, preferred, infra, credentials, storageCredential } =
+    parsed.data;
   if (course.native === course.target)
     return errorResponse('Native and target languages must differ.', 400);
   if ((infra || storageCredential) && !authed.isOwner) throw new AccessError('forbidden');
@@ -223,6 +225,7 @@ async function save(request: NextRequest) {
       select: { id: true },
     });
     if (note?.trim()) await setCourseNote(created.id, note, database);
+    await attachCourseMaterials(database, current.userId, created.id, materialIds ?? []);
     await database.user.update({
       where: { id: current.userId },
       data: {

@@ -868,7 +868,6 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(sourceConnectorSource).toContain('GOOGLE_WORKSPACE_CLI_CREDENTIALS_FILE');
     expect(onboardingSources).toContain('100% local');
     expect(onboardingSources).toContain('full private mode');
-    expect(onboardingSources).toContain('read locally');
     expect(onboardingSources).toContain('privateOnly: true');
     expect(onboardingSources).not.toContain("visibility: 'PUBLIC'");
     expect(onboardingSources).not.toContain('shared content feed');

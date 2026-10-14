@@ -15,6 +15,7 @@ interface NotesResponse {
   imported?: number;
   failed?: number;
   error?: string;
+  materials?: Array<{ id: string; name: string; fileUrl: string; extractedText: string }>;
 }
 
 type Phase = 'idle' | 'loading' | 'saving' | 'importing';
@@ -37,6 +38,7 @@ export function CourseNotesPanel({ courseId }: CourseNotesPanelProps) {
   const [loaded, setLoaded] = useState(false);
   const [phase, setPhase] = useState<Phase>('idle');
   const [body, setBody] = useState('');
+  const [materials, setMaterials] = useState<NonNullable<NotesResponse['materials']>>([]);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -58,6 +60,7 @@ export function CourseNotesPanel({ courseId }: CourseNotesPanelProps) {
           return;
         }
         setBody(data.body ?? '');
+        setMaterials(data.materials ?? []);
         setLoaded(true);
       } catch {
         if (!cancelled) setError('Could not load course notes.');
@@ -89,6 +92,7 @@ export function CourseNotesPanel({ courseId }: CourseNotesPanelProps) {
         return;
       }
       setBody(data.body ?? '');
+      if (data.materials) setMaterials(data.materials);
       setMessage(statusText(data, 'Saved'));
     } catch {
       setError('Could not save course notes.');
@@ -118,7 +122,7 @@ export function CourseNotesPanel({ courseId }: CourseNotesPanelProps) {
         setError(data.error ?? 'Could not import those notes.');
         return;
       }
-      setBody(data.body ?? '');
+      setMaterials(data.materials ?? []);
       setLoaded(true);
       setMessage(statusText(data, 'Imported'));
     } catch {
@@ -163,9 +167,28 @@ export function CourseNotesPanel({ courseId }: CourseNotesPanelProps) {
       <label className={styles.fieldLabel} htmlFor={`course-notes-${courseId}`}>
         Paste notes from an official course
       </label>
+      {materials.length > 0 && (
+        <ul className={styles.materials} aria-label="Uploaded materials">
+          {materials.map((material) => (
+            <li key={material.id}>
+              <a
+                className={styles.materialLink}
+                href={`/api/v1/materials/${encodeURIComponent(material.id)}/file`}
+              >
+                {material.name}
+              </a>
+              <details>
+                <summary>View imported text</summary>
+                <pre className={styles.materialText}>{material.extractedText}</pre>
+              </details>
+            </li>
+          ))}
+        </ul>
+      )}
       <p>
         These notes guide future preparation. Your practice results determine mastery. Clearing and
-        saving the notes does not remove vocabulary already imported or change your scores.
+        saving the notes does not remove vocabulary already imported or change your scores. Uploaded
+        documents are kept separately from these editable notes.
       </p>
       <textarea
         id={`course-notes-${courseId}`}

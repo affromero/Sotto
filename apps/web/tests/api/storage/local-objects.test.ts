@@ -40,6 +40,12 @@ beforeEach(() => {
 });
 
 describe('GET /api/v1/storage/[...key]', () => {
+  it('requires the owned material endpoint for original document bytes', async () => {
+    expect(
+      (await GET(request(), params('materials', 'other-profile', 'original.pdf'))).status
+    ).toBe(404);
+    expect(mockReadLocalObject).not.toHaveBeenCalled();
+  });
   it('serves a stored object with its content type', async () => {
     const res = await GET(request(), params('speaking-ref', 'abc', '0.mp3'));
 

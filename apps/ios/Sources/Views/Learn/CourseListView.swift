@@ -524,8 +524,26 @@ private struct ClassGenerationStatusPanel: View {
                     .foregroundStyle(SottoTheme.muted)
                     .fixedSize(horizontal: false, vertical: true)
 
-                ProgressView(value: operation.progress ?? 0.04)
-                    .tint(SottoTheme.primary)
+                if let progress = operation.progress {
+                    ProgressView(value: progress)
+                        .tint(SottoTheme.primary)
+                } else {
+                    ProgressView()
+                        .tint(SottoTheme.primary)
+                }
+
+                if let activity = operation.activity {
+                    Text(activity)
+                        .font(.caption)
+                        .foregroundStyle(SottoTheme.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                if let step = operation.currentStep, let total = operation.totalSteps {
+                    Text("Step \(step) of \(total)")
+                        .font(.caption)
+                        .foregroundStyle(SottoTheme.muted)
+                }
 
                 HStack {
                     if let elapsedSeconds = operation.elapsedSeconds {
@@ -539,6 +557,7 @@ private struct ClassGenerationStatusPanel: View {
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
+                    .frame(minHeight: 44)
                 }
             }
         }

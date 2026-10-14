@@ -524,15 +524,10 @@ final class SottoAppModel: ObservableObject {
         issues: [String]
     ) -> SottoLoadingOperation {
         if let progress {
-            return SottoLoadingOperation(
-                title: progress.lessonTitle.map { "Preparing \($0)" } ?? "Preparing class",
-                detail: "\(progress.stage). \(progress.detail)",
-                progress: max(0, min(1, progress.progress)),
-                currentStep: progress.currentStep == 0 ? nil : progress.currentStep,
-                totalSteps: progress.totalSteps,
-                elapsedSeconds: progress.elapsedSeconds ?? elapsedSeconds,
-                remainingSeconds: progress.remainingSeconds
-            )
+            return progress.loadingOperation(title: progress.lessonTitle.map { "Preparing \($0)" } ?? "Preparing class", elapsedSeconds: elapsedSeconds)
+        }
+        if let previous = loadingOperation {
+            return previous.progressUnavailable(elapsedSeconds: elapsedSeconds)
         }
 
         let detail: String
@@ -545,11 +540,12 @@ final class SottoAppModel: ObservableObject {
         return SottoLoadingOperation(
             title: "Preparing class",
             detail: detail,
-            progress: min(0.95, max(0.08, Double(elapsedSeconds) / 420.0)),
+            progress: nil,
             currentStep: nil,
             totalSteps: nil,
             elapsedSeconds: elapsedSeconds,
-            remainingSeconds: max(0, 420 - elapsedSeconds)
+            remainingSeconds: nil,
+            activity: "Cannot refresh progress. Check your connection to the server."
         )
     }
 
@@ -902,7 +898,8 @@ final class SottoAppModel: ObservableObject {
             classGenerationOperations[course.id] = classGenerationOperation(
                 progress: progress,
                 course: course,
-                elapsedSeconds: elapsedSeconds
+                elapsedSeconds: elapsedSeconds,
+                previous: classGenerationOperations[course.id]
             )
 
             if let progress, let classId = progress.classId {
@@ -945,7 +942,8 @@ final class SottoAppModel: ObservableObject {
                         self.classGenerationOperations[course.id] = self.classGenerationOperation(
                             progress: nil,
                             course: course,
-                            elapsedSeconds: elapsedSeconds
+                            elapsedSeconds: elapsedSeconds,
+                            previous: self.classGenerationOperations[course.id]
                         )
                     }
                 }
@@ -958,30 +956,23 @@ final class SottoAppModel: ObservableObject {
     private func classGenerationOperation(
         progress: SottoGenerationProgress?,
         course: SottoCourse,
-        elapsedSeconds: Int
+        elapsedSeconds: Int,
+        previous: SottoLoadingOperation? = nil
     ) -> SottoLoadingOperation {
         if let progress {
             let title = progress.lessonTitle.map { "Generating \($0)" } ?? "Generating class"
-            return SottoLoadingOperation(
-                title: title,
-                detail: "\(progress.stage). \(progress.detail)",
-                progress: max(0, min(1, progress.progress)),
-                currentStep: progress.currentStep == 0 ? nil : progress.currentStep,
-                totalSteps: progress.totalSteps,
-                elapsedSeconds: progress.elapsedSeconds ?? elapsedSeconds,
-                remainingSeconds: progress.remainingSeconds
-            )
+            return progress.loadingOperation(title: title, elapsedSeconds: elapsedSeconds)
         }
-
-        let fallbackProgress = min(0.08, Double(elapsedSeconds) / 300.0)
+        if let previous { return previous.progressUnavailable(elapsedSeconds: elapsedSeconds) }
         return SottoLoadingOperation(
             title: "Generating \(course.curriculum?.title ?? "class")",
             detail: "Contacting your Sotto server and preparing the lesson plan.",
-            progress: fallbackProgress,
+            progress: nil,
             currentStep: nil,
             totalSteps: nil,
             elapsedSeconds: elapsedSeconds,
-            remainingSeconds: max(0, 240 - elapsedSeconds)
+            remainingSeconds: nil,
+            activity: "Waiting for a progress report from the server."
         )
     }
 }
