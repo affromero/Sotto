@@ -272,6 +272,48 @@ struct SottoAPIClient {
         try await put("/api/v1/courses/\(courseId)/notes", body: CourseNotesRequest(body: body))
     }
 
+    func downloadCourseMaterial(_ material: SottoCourseMaterial) async throws -> URL {
+        guard UUID(uuidString: material.id) != nil else { throw SottoAPIError.message("The material identifier is invalid.") }
+        let request = try makeRequest(path: "/api/v1/materials/\(material.id)/file", method: "GET", authorized: true)
+        let (temporary, response) = try await session.download(for: request, delegate: WorkbookDownloadRedirectPolicy(serverURL: serverURL))
+        defer { try? FileManager.default.removeItem(at: temporary) }
+        guard let response = response as? HTTPURLResponse, response.statusCode == 200 else {
+            throw SottoAPIError.message("Could not download the original material.")
+        }
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("Sotto-material-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let name = URL(fileURLWithPath: material.name).lastPathComponent
+        let local = directory.appendingPathComponent(name.isEmpty || name == "." || name == ".." ? "material" : name)
+        do { try FileManager.default.moveItem(at: temporary, to: local) }
+        catch { try? FileManager.default.removeItem(at: directory); throw error }
+        return local
+    }
+
+    func importCourseMaterials(courseId: String, urls: [URL]) async throws -> SottoCourseNotesResponse {
+        guard !urls.isEmpty, urls.count <= 10 else { throw SottoAPIError.message("Choose up to 10 files.") }
+        let boundary = "Sotto-material-\(UUID().uuidString)"
+        var body = Data()
+        for url in urls {
+            let scoped = url.startAccessingSecurityScopedResource()
+            defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+            let file = try FileHandle(forReadingFrom: url)
+            defer { try? file.close() }
+            let available = 10 * 1024 * 1024 - body.count
+            guard available >= 0 else { throw SottoAPIError.message("Materials must total 10MB or less.") }
+            let data = try file.read(upToCount: available + 1) ?? Data()
+            guard body.count + data.count <= 10 * 1024 * 1024 else { throw SottoAPIError.message("Materials must total 10MB or less.") }
+            let name = url.lastPathComponent.replacingOccurrences(of: "\"", with: "_").replacingOccurrences(of: "\r", with: "_").replacingOccurrences(of: "\n", with: "_")
+            body.append(Data("--\(boundary)\r\nContent-Disposition: form-data; name=\"files\"; filename=\"\(name)\"\r\nContent-Type: application/octet-stream\r\n\r\n".utf8))
+            body.append(data)
+            body.append(Data("\r\n".utf8))
+        }
+        body.append(Data("--\(boundary)--\r\n".utf8))
+        var request = try makeRequest(path: "/api/v1/courses/\(courseId)/notes", method: "POST", authorized: true, timeout: Self.generationTimeout)
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        request.httpBody = body
+        return try await send(request, acceptedStatuses: [200])
+    }
+
     func updateCoursePedagogy(
         courseId: String,
         pedagogy: SottoPedagogyStyle

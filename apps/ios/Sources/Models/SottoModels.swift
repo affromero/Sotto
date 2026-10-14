@@ -207,6 +207,7 @@ struct SottoCourseNotesResponse: Decodable, Equatable {
     let addedVocabulary: Int?
     let imported: Int?
     let failed: Int?
+    let materials: [SottoCourseMaterial]?
 }
 
 struct SottoCoursePedagogyResponse: Decodable, Equatable {
@@ -241,6 +242,9 @@ struct SottoGenerationProgress: Decodable, Equatable {
     let elapsedSeconds: Int?
     let remainingSeconds: Int?
     let sections: [SottoGenerationSection]
+    let updatedAt: String?
+    let providerRequestsCompleted: Int?
+    let providerRequestInFlight: Bool?
 }
 
 struct SottoGenerationSection: Decodable, Equatable {
@@ -256,6 +260,7 @@ struct SottoLoadingOperation: Equatable {
     let totalSteps: Int?
     let elapsedSeconds: Int?
     let remainingSeconds: Int?
+    var activity: String? = nil
 }
 
 struct SottoAgentUsageStatus: Decodable, Equatable {

@@ -191,6 +191,10 @@ function parseContextItems(value: unknown): ContextItem[] {
             ? record.label.trim()
             : record.kind,
         value: trimmed,
+        ...(typeof record.materialId === 'string' &&
+        /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(record.materialId)
+          ? { materialId: record.materialId }
+          : {}),
       },
     ];
   });

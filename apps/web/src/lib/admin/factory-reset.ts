@@ -64,6 +64,7 @@ async function deleteDatabaseState(database: Prisma.TransactionClient): Promise<
   await database.learnerFocusTarget.deleteMany({});
   await database.practiceSession.deleteMany({});
   await database.courseNote.deleteMany({});
+  await database.courseMaterial.deleteMany({});
   await database.placementResult.deleteMany({});
   await database.learnerVocab.deleteMany({});
   await database.learnerGrammar.deleteMany({});
@@ -96,12 +97,17 @@ export async function factoryReset(): Promise<FactoryResetResult> {
   const admitted = await sottoTransaction(
     prismaUnfiltered,
     async (database) => {
-      const [profilesPreserved, episodes, courses] = await Promise.all([
+      const [profilesPreserved, episodes, courses, materials] = await Promise.all([
         database.user.count(),
         database.episode.findMany({ select: { id: true, createdAt: true } }),
         database.course.findMany({ select: { id: true, createdAt: true } }),
+        database.courseMaterial.findMany({ select: { id: true, createdAt: true } }),
       ]);
       const subjects = [
+        ...materials.map((material) => ({
+          subjectId: `material:${material.id}`,
+          generation: material.createdAt.getTime(),
+        })),
         ...episodes.map((episode) => ({
           subjectId: 'episode:' + episode.id,
           generation: episode.createdAt.getTime(),

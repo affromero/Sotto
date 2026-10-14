@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
+import {
+  SAMPLE_CLASS_UNSUBMITTED,
+  SAMPLE_CLASS_SPEAKING,
+  SAMPLE_CLASS_LISTENING,
+  SAMPLE_CLASS_SUBMITTED,
+} from './classes/fixtures';
 
 // ---- Mocks ----
 
@@ -32,6 +38,7 @@ const mockGetClassForUser = vi.fn();
 const mockSubmitClass = vi.fn();
 const mockDeleteClassForUser = vi.fn();
 const mockReadPreparation = vi.fn();
+const mockPreparationActivity = vi.fn();
 const mockCancelPreparation = vi.fn();
 const mockRequestPreparation = vi.fn();
 
@@ -39,6 +46,7 @@ vi.mock('@/lib/classes/preparation', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/classes/preparation')>()),
   requestClassPreparation: (...args: unknown[]) => mockRequestPreparation(...args),
   readClassPreparation: (...args: unknown[]) => mockReadPreparation(...args),
+  readPreparationActivity: (...args: unknown[]) => mockPreparationActivity(...args),
   cancelClassPreparation: (...args: unknown[]) => mockCancelPreparation(...args),
 }));
 
@@ -87,152 +95,6 @@ function classParams(classId: string) {
 function courseParams(courseId: string) {
   return { params: Promise.resolve({ courseId }) };
 }
-
-// A class with two sections, each with two questions. Submission is null (not yet submitted).
-const SAMPLE_CLASS_UNSUBMITTED = {
-  id: 'class-1',
-  courseId: 'course-1',
-  status: 'IN_PROGRESS',
-  order: 1,
-  passThreshold: 0.6,
-  sourceUrl: null,
-  sourceTitle: null,
-  adaptiveSeed: {
-    intro: {
-      purpose: 'Practice greetings.',
-      about: 'Use greetings before the questions.',
-      focus: ['Greet someone'],
-      examples: [{ target: 'Hola', meaning: 'Hello', note: 'Greeting' }],
-      tips: ['Listen for formal and informal forms.'],
-    },
-  },
-  course: { nativeLang: 'en', targetLang: 'es' },
-  lesson: {
-    title: 'Greetings',
-    level: 'A1',
-    objective: 'Learn greetings',
-    grammarPoints: ['ser-present'],
-    targetVocab: [{ lemma: 'hola', gloss: 'hello' }],
-  },
-  submission: null,
-  sections: [
-    {
-      id: 'sec-grammar',
-      skill: 'GRAMMAR',
-      status: 'READY',
-      attempt: 1,
-      score: null,
-      passed: null,
-      episode: null,
-      questions: [
-        {
-          id: 'q1',
-          order: 1,
-          question: 'Q1?',
-          options: ['a', 'b', 'c', 'd'],
-          passageRef: null,
-          passageText: null,
-          correctIndex: 0,
-          explanation: 'Exp1',
-        },
-        {
-          id: 'q2',
-          order: 2,
-          question: 'Q2?',
-          options: ['a', 'b', 'c', 'd'],
-          passageRef: null,
-          passageText: null,
-          correctIndex: 1,
-          explanation: 'Exp2',
-        },
-      ],
-      prompts: [],
-      writingPrompts: [],
-    },
-  ],
-};
-
-// A class whose SPEAKING section carries prompts (no MC questions).
-const SAMPLE_CLASS_SPEAKING = {
-  ...SAMPLE_CLASS_UNSUBMITTED,
-  sections: [
-    {
-      id: 'sec-speaking',
-      skill: 'SPEAKING',
-      status: 'READY',
-      attempt: 1,
-      score: null,
-      passed: null,
-      episode: null,
-      questions: [],
-      prompts: [
-        {
-          id: 'p1',
-          order: 1,
-          targetPhrase: 'Hola',
-          translation: 'Hello',
-          ipa: 'ˈola',
-          referenceTtsUrl: 'https://r2/ref.mp3',
-          recordings: [
-            {
-              id: 'rec-1',
-              status: 'SCORED',
-              transcript: 'Hola',
-              overallScore: 0.91,
-              rubricScores: { accuracy: 0.93, fluency: 0.89, completeness: 0.92 },
-              phonemeScores: [{ op: 'match', expected: 'hola', actual: 'hola' }],
-              feedback: 'Clear pronunciation.',
-            },
-          ],
-        },
-      ],
-      writingPrompts: [],
-    },
-  ],
-};
-
-// A class whose LISTENING section reuses a episode (audio + comprehension MC).
-const SAMPLE_CLASS_LISTENING = {
-  ...SAMPLE_CLASS_UNSUBMITTED,
-  sections: [
-    {
-      id: 'sec-listening',
-      skill: 'LISTENING',
-      status: 'READY',
-      attempt: 1,
-      score: null,
-      passed: null,
-      episode: {
-        id: 'pod-1',
-        audioUrl: 'https://r2/listen.mp3',
-        status: 'READY',
-        title: 'Listening',
-        references: [],
-      },
-      questions: [
-        {
-          id: 'l1',
-          order: 1,
-          question: 'What did they discuss?',
-          options: ['a', 'b', 'c', 'd'],
-          passageRef: null,
-          passageText: null,
-          correctIndex: 0,
-          explanation: 'E',
-        },
-      ],
-      prompts: [],
-      writingPrompts: [],
-    },
-  ],
-};
-
-// Same class after submission — submission is non-null.
-const SAMPLE_CLASS_SUBMITTED = {
-  ...SAMPLE_CLASS_UNSUBMITTED,
-  status: 'PASSED',
-  submission: { passed: true, overallScore: 1, submittedAt: new Date('2026-01-01T00:00:00Z') },
-};
 
 // ---- GET /api/v1/classes/[classId] ----
 
@@ -592,11 +454,18 @@ describe('POST /api/v1/classes/[classId]/submit', () => {
 
 // ---- GET /api/v1/courses/[courseId]/generation ----
 
+const EXPECTED_TEST_SKILLS = ['GRAMMAR', 'READING', 'LISTENING', 'SPEAKING', 'WRITING'];
 describe('GET /api/v1/courses/[courseId]/generation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuthenticateRequest.mockResolvedValue({ userId: 'u1' });
     mockReadPreparation.mockResolvedValue(null);
+    mockPreparationActivity.mockResolvedValue({
+      operationId: 'operation-1',
+      updatedAt: new Date(1000).toISOString(),
+      providerRequestsCompleted: 4,
+      providerRequestInFlight: true,
+    });
   });
 
   function generationState(
@@ -672,6 +541,73 @@ describe('GET /api/v1/courses/[courseId]/generation', () => {
       });
     }
   );
+  it('shows section milestones and provider activity while durable preparation is running', async () => {
+    generationState('RUNNING', 'current-class', 500, 1, 'GENERATING');
+    const course = await mockCourseFindFirst();
+    course.classes[0].sections = [
+      { skill: 'GRAMMAR', status: 'READY', attempt: 1, updatedAt: new Date(4000), episode: null },
+      { skill: 'READING', status: 'PENDING', attempt: 1, updatedAt: new Date(5000), episode: null },
+    ];
+    mockCourseFindFirst.mockResolvedValue(course);
+    expect(await progress()).toMatchObject({
+      operationStatus: 'RUNNING',
+      status: 'GENERATING',
+      stage: 'Generating reading questions',
+      progress: 0.34,
+      currentStep: 2,
+      updatedAt: new Date(5000).toISOString(),
+      providerRequestsCompleted: 4,
+      providerRequestInFlight: true,
+    });
+  });
+  it('excludes old section attempts from whole-class regeneration progress', async () => {
+    generationState('RUNNING', 'current-class', 500, 2, 'GENERATING');
+    mockReadPreparation.mockResolvedValue({
+      ...(await mockReadPreparation()),
+      intent: { kind: 'REGENERATE', attempt: 2, skills: EXPECTED_TEST_SKILLS },
+    });
+    const course = await mockCourseFindFirst();
+    course.classes[0].sections = EXPECTED_TEST_SKILLS.map((skill) => ({
+      skill,
+      status: 'READY',
+      attempt: 1,
+      updatedAt: new Date(9000),
+      episode: null,
+    }));
+    mockCourseFindFirst.mockResolvedValue(course);
+    expect(await progress()).toMatchObject({
+      stage: 'Preparing class',
+      progress: 0,
+      sections: [],
+      updatedAt: new Date(3000).toISOString(),
+    });
+  });
+  it('counts preserved passed material when repairing another skill', async () => {
+    generationState('RUNNING', 'current-class', 500, 2, 'GENERATING');
+    mockReadPreparation.mockResolvedValue({
+      ...(await mockReadPreparation()),
+      intent: { kind: 'REPAIR', attempt: 2, skills: ['READING'] },
+    });
+    const course = await mockCourseFindFirst();
+    course.classes[0].sections = [
+      { skill: 'GRAMMAR', status: 'PASSED', attempt: 1, updatedAt: new Date(3000), episode: null },
+      { skill: 'READING', status: 'PENDING', attempt: 2, updatedAt: new Date(5000), episode: null },
+    ];
+    mockCourseFindFirst.mockResolvedValue(course);
+    expect(await progress()).toMatchObject({
+      stage: 'Generating reading questions',
+      progress: 0.34,
+    });
+  });
+  it('does not combine activity from a replacement preparation', async () => {
+    generationState('RUNNING', 'current-class', 500);
+    mockPreparationActivity.mockResolvedValue({ operationId: 'new-operation' });
+    const response = await GETGeneration(
+      makeRequest('http://localhost/api/v1/courses/course-1/generation', 'GET'),
+      courseParams('course-1')
+    );
+    expect(response.status).toBe(409);
+  });
   it.each([
     ['FAILED', 'GENERATING'],
     ['FAILED', 'AVAILABLE'],
@@ -787,15 +723,23 @@ describe('GET /api/v1/courses/[courseId]/generation', () => {
           updatedAt: new Date(),
           lesson: { title: 'Past events' },
           sections: [
-            { skill: 'GRAMMAR', status: 'READY', episode: null },
-            { skill: 'READING', status: 'READY', episode: null },
+            { skill: 'GRAMMAR', status: 'READY', attempt: 1, updatedAt: new Date(), episode: null },
+            { skill: 'READING', status: 'READY', attempt: 1, updatedAt: new Date(), episode: null },
             {
               skill: 'LISTENING',
+              attempt: 1,
+              updatedAt: new Date(),
               status: 'READY',
-              episode: { status: 'STITCHING', audioUrl: null },
+              episode: { status: 'STITCHING', audioUrl: null, updatedAt: new Date() },
             },
-            { skill: 'SPEAKING', status: 'READY', episode: null },
-            { skill: 'WRITING', status: 'READY', episode: null },
+            {
+              skill: 'SPEAKING',
+              status: 'READY',
+              attempt: 1,
+              updatedAt: new Date(),
+              episode: null,
+            },
+            { skill: 'WRITING', status: 'READY', attempt: 1, updatedAt: new Date(), episode: null },
           ],
         },
       ],
@@ -824,15 +768,23 @@ describe('GET /api/v1/courses/[courseId]/generation', () => {
           updatedAt: new Date(),
           lesson: { title: 'Past events' },
           sections: [
-            { skill: 'GRAMMAR', status: 'READY', episode: null },
-            { skill: 'READING', status: 'READY', episode: null },
+            { skill: 'GRAMMAR', status: 'READY', attempt: 1, updatedAt: new Date(), episode: null },
+            { skill: 'READING', status: 'READY', attempt: 1, updatedAt: new Date(), episode: null },
             {
               skill: 'LISTENING',
+              attempt: 1,
+              updatedAt: new Date(),
               status: 'READY',
-              episode: { status: 'READY', audioUrl: null },
+              episode: { status: 'READY', audioUrl: null, updatedAt: new Date() },
             },
-            { skill: 'SPEAKING', status: 'READY', episode: null },
-            { skill: 'WRITING', status: 'READY', episode: null },
+            {
+              skill: 'SPEAKING',
+              status: 'READY',
+              attempt: 1,
+              updatedAt: new Date(),
+              episode: null,
+            },
+            { skill: 'WRITING', status: 'READY', attempt: 1, updatedAt: new Date(), episode: null },
           ],
         },
       ],

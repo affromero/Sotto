@@ -59,11 +59,12 @@ function buildContextNote(sources: Set<string>, contextItems: ContextItem[]) {
     );
   }
 
-  if (contextItems.length > 0) {
+  const editableItems = contextItems.filter((item) => !item.materialId);
+  if (editableItems.length > 0) {
     parts.push(
       [
         'Direct context:',
-        ...contextItems.map((item) => `[${contextKindLabel(item)}] ${item.label}\n${item.value}`),
+        ...editableItems.map((item) => `[${contextKindLabel(item)}] ${item.label}\n${item.value}`),
       ].join('\n\n')
     );
   }
@@ -212,6 +213,7 @@ export function StepReady({
       const res = await submitSetup({
         course: { native: baseLang, target: language, ...(level && { level }) },
         ...(note && { note }),
+        materialIds: contextItems.flatMap((item) => (item.materialId ? [item.materialId] : [])),
         preferred: {
           language,
           ...(ai.preferredAiProvider && { aiProvider: ai.preferredAiProvider }),

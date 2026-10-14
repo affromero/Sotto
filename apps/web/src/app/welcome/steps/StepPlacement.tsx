@@ -108,7 +108,9 @@ export function StepPlacement({
     toggleUnderstood(nextLevel);
   };
 
-  function addNotesAsContext() {
+  function addNotesAsContext(
+    materials: Array<{ id: string; name: string; extractedText: string }> = []
+  ) {
     const itemsToAdd: Array<Omit<ContextItem, 'id'>> = [];
     const trimmed = notesText.trim();
     if (trimmed) {
@@ -118,11 +120,12 @@ export function StepPlacement({
         value: trimmed,
       });
     }
-    for (const file of notesFiles) {
+    for (const material of materials) {
       itemsToAdd.push({
         kind: 'file',
-        label: file.name,
-        value: `Uploaded placement material: ${file.name}`,
+        label: material.name,
+        value: material.extractedText,
+        materialId: material.id,
       });
     }
     if (itemsToAdd.length) onAddContextItems?.(itemsToAdd);
@@ -182,6 +185,7 @@ export function StepPlacement({
         confidence?: number;
         imported?: number;
         failed?: number;
+        materials?: Array<{ id: string; name: string; extractedText: string }>;
       };
       const deducedLevel = isCefrLevel(data.deducedLevel) ? data.deducedLevel : 'A1';
       const deduction: NotesDeduction = {
@@ -193,7 +197,7 @@ export function StepPlacement({
       };
       setNotesDeduction(deduction);
       chooseLevel(deducedLevel);
-      addNotesAsContext();
+      addNotesAsContext(data.materials ?? []);
       setNotesPhase('result');
     } catch {
       setNotesError('Could not reach the server. Try again or choose a level manually.');

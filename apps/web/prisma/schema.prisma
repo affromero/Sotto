@@ -92,6 +92,7 @@ model User {
 
   // Language learning
   courses            Course[]
+  courseMaterials    CourseMaterial[]
   classSubmissions   ClassSubmission[]
   speakingRecordings SpeakingRecording[]
   writingResponses   WritingResponse[]
@@ -964,6 +965,7 @@ model Course {
   practiceSessions PracticeSession[]
   practiceRequests PracticeRequestReceipt[]
   note             CourseNote?
+  materials        CourseMaterial[]
   mockExams        MockExam[]
   focusTargets     LearnerFocusTarget[]
 
@@ -1588,4 +1590,22 @@ model CourseNote {
   createdAt DateTime @default(now())
 
   course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+}
+
+model CourseMaterial {
+  id            String   @id @default(uuid())
+  userId        String
+  courseId      String?
+  name          String
+  mimeType      String
+  byteSize      Int
+  originalUrl   String?
+  extractedText String   @db.Text
+  createdAt     DateTime @default(now())
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course Course? @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([userId, courseId])
+  @@index([courseId])
 }

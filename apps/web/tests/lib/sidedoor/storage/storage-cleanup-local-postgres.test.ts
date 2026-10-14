@@ -11,6 +11,8 @@ import {
   StorageBackendRegistry,
   StorageCleanupJournal,
   StorageReferenceRegistry,
+  StorageWriteJournal,
+  prepareStorageWrite,
 } from 'thesidedoor-core/storage';
 import type { PrismaClient } from '@/generated/prisma/client';
 import { captureStorageBackend } from '@/lib/r2';
@@ -62,7 +64,7 @@ suite('durable local storage cleanup', () => {
     await Promise.all(roots.map((root) => rm(root, { recursive: true, force: true })));
   });
 
-  it('deletes an attributed file and completes its journal after application rows commit', async () => {
+  it('deletes published files and retained unreferenced writes after application rows commit', async () => {
     const root = await mkdtemp(join(tmpdir(), 'sotto-local-cleanup-'));
     roots.push(root);
     await setSiteConfig({ storageProvider: 'local', localStorageRoot: root }, identity.ownerId);
@@ -92,6 +94,12 @@ suite('durable local storage cleanup', () => {
       new TextEncoder().encode('image'),
       'image/png'
     );
+    const unreferencedKey = `visual-cues/${randomUUID()}.png`;
+    await backend.writeBuffer(
+      unreferencedKey,
+      new TextEncoder().encode('unreferenced image'),
+      'image/png'
+    );
     const job = await sottoTransaction(instance.database, async (database) => {
       const preparedBackend = prepareStorageBackend(SIDEDOOR_STATE_ID, backend.descriptor);
       const prepared = prepareStorageReference({
@@ -113,6 +121,19 @@ suite('durable local storage cleanup', () => {
       await new StorageBackendRegistry(executor, 'postgres', SIDEDOOR_STATE_ID).register(
         preparedBackend
       );
+      const writes = new StorageWriteJournal(executor, 'postgres', SIDEDOOR_STATE_ID);
+      const intent = prepareStorageWrite({
+        namespace: SIDEDOOR_STATE_ID,
+        subjectId: `course:${course.id}`,
+        generation: course.createdAt.getTime(),
+        target: {
+          backendId: preparedBackend.id,
+          binding: preparedBackend.binding,
+          key: unreferencedKey,
+        },
+      });
+      await writes.begin(intent, course.createdAt.getTime());
+      await writes.finish(intent, { kind: 'unreferenced' });
       await new StorageReferenceRegistry(executor, 'postgres', SIDEDOOR_STATE_ID).replaceMany({
         consumers: [{ consumer: `focus-target:${focus.id}:visual`, previousReference: null }],
         next: prepared,
@@ -137,6 +158,7 @@ suite('durable local storage cleanup', () => {
       openConnection: () => openSottoStorageConnection(databaseUrl, instance.schema),
     });
     await expect(readFile(join(root, key))).rejects.toMatchObject({ code: 'ENOENT' });
+    await expect(readFile(join(root, unreferencedKey))).rejects.toMatchObject({ code: 'ENOENT' });
     const status = await sottoTransaction(instance.database, (database) =>
       new StorageCleanupJournal(
         {
@@ -147,7 +169,7 @@ suite('durable local storage cleanup', () => {
         SIDEDOOR_STATE_ID
       ).get(job.id)
     );
-    expect(status).toMatchObject({ phase: 'complete', deleted: 1, pending: 0 });
+    expect(status).toMatchObject({ phase: 'complete', deleted: 2, pending: 0 });
   });
 
   it('keeps a referenced file when an erased scope still has a live consumer', async () => {

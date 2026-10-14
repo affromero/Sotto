@@ -8,6 +8,7 @@ import {
   StorageCleanupJournal,
   StorageReferenceRegistry,
   StorageRelocationRegistry,
+  StorageWriteJournal,
   type StorageCleanupJob,
 } from 'thesidedoor-core/storage';
 import type { Prisma } from '@/generated/prisma/client';
@@ -34,6 +35,7 @@ function stores(database: Prisma.TransactionClient) {
     backends: new StorageBackendRegistry(executor, 'postgres', SIDEDOOR_STATE_ID),
     references: new StorageReferenceRegistry(executor, 'postgres', SIDEDOOR_STATE_ID),
     relocations: new StorageRelocationRegistry(executor, 'postgres', SIDEDOOR_STATE_ID),
+    writes: new StorageWriteJournal(executor, 'postgres', SIDEDOOR_STATE_ID),
   };
 }
 
@@ -145,6 +147,19 @@ export async function admitLearningStorageDeletion(options: {
         asset.prepared.target
       );
     }
+    let intentCursor: string | null = null;
+    do {
+      const page = await state.writes.list(job.subjectId, {
+        after: intentCursor ?? undefined,
+        limit: 1000,
+      });
+      for (const intent of page.intents) {
+        if (intent.generation !== job.generation)
+          throw new Error('Storage deletion intent generation changed');
+        targets.set(`${intent.target.backendId}:${intent.target.key}`, intent.target);
+      }
+      intentCursor = page.cursor;
+    } while (intentCursor !== null);
     const inventory = targets.size
       ? [...targets.values()].map((target, index) => ({
           id: 'asset-' + index,

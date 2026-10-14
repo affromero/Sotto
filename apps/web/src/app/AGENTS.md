@@ -4,6 +4,11 @@ Class preparation is durably admitted through `courses/[courseId]/next-class`.
 The `courses/[courseId]/preparation` route exposes explicit scheduling (POST),
 sanitized activity (GET), and acknowledged recovery after verified cleanup (PATCH).
 Generation status and cancellation include queued work before a class exists.
+Running generation status includes current-attempt section milestones and observed
+provider request activity. `/api/v1/materials` stages uploaded originals and
+`/api/v1/materials/[materialId]/file` serves them only to their owning profile.
+Course notes expose separate editable text and document metadata. Onboarding
+attaches owned material IDs in its final transaction.
 
 `settings/local-speech` atomically changes the authenticated selected profile's speech
 preference. Local endpoint/voice configuration and paid credit checks require owner

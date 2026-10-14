@@ -7,9 +7,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const mockFindUnique = vi.fn();
 const mockUpsert = vi.fn();
 const mockDeleteMany = vi.fn();
+const mockMaterials = vi.fn();
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
+    courseMaterial: { findMany: (...a: unknown[]) => mockMaterials(...a) },
     courseNote: {
       findUnique: (...a: unknown[]) => mockFindUnique(...a),
       upsert: (...a: unknown[]) => mockUpsert(...a),
@@ -21,6 +23,7 @@ vi.mock('@/lib/prisma', () => ({
 import {
   MAX_NOTE_LENGTH,
   getCourseNote,
+  getEditableCourseNote,
   setCourseNote,
   formatNotesForPrompt,
   mergeCourseNote,
@@ -28,9 +31,20 @@ import {
   sanitizeLearnerContext,
 } from '@/lib/course-notes';
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  mockMaterials.mockResolvedValue([]);
+});
 
 describe('getCourseNote', () => {
+  it('keeps document extracts in generation context and outside the editable note', async () => {
+    mockFindUnique.mockResolvedValue({ body: 'Focus on travel' });
+    mockMaterials.mockResolvedValue([
+      { extractedText: 'Uploaded course note: vocab.pdf\nBahnhof means station.' },
+    ]);
+    expect(await getCourseNote('c1')).toContain('Bahnhof means station.');
+    expect(await getEditableCourseNote('c1')).toBe('Focus on travel');
+  });
   it('returns the trimmed body when a note exists', async () => {
     mockFindUnique.mockResolvedValue({ body: '  I want to travel to Italy.  ' });
     expect(await getCourseNote('c1')).toBe('I want to travel to Italy.');

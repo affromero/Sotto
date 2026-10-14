@@ -5,7 +5,13 @@ import { errorResponse } from '@/lib/api-response';
 import { logger } from '@/lib/logger';
 import { createOrRaiseCourse } from '@/lib/placement-course';
 import { getCachedNotesDeduction, clearNotesDeduction } from '@/lib/placement-notes';
-import { getCourseNote, mergeCourseNote, setCourseNote } from '@/lib/course-notes';
+import {
+  getCourseNote,
+  getEditableCourseNote,
+  mergeCourseNote,
+  setCourseNote,
+} from '@/lib/course-notes';
+import { persistPlacementMaterials } from '@/lib/course-materials';
 import { extractAndStoreNoteVocab } from '@/lib/live-vocab';
 import { sottoRequestExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 
@@ -47,8 +53,18 @@ export async function POST(request: NextRequest) {
 
     // Personalize from day one: keep the materials as the course note and seed
     // the memory graph with vocabulary extracted from them.
-    const merged = mergeCourseNote(await getCourseNote(course.id), cached.content);
-    await setCourseNote(course.id, merged);
+    if (cached.materialIds?.length) {
+      await persistPlacementMaterials(course.id, execution, {
+        materialIds: cached.materialIds,
+        editableContent: cached.editableContent ?? '',
+      });
+    } else {
+      await setCourseNote(
+        course.id,
+        mergeCourseNote(await getEditableCourseNote(course.id), cached.content)
+      );
+    }
+    const merged = await getCourseNote(course.id);
     const addedVocabulary = await extractAndStoreNoteVocab({
       userId,
       execution,

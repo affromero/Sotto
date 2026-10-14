@@ -41,12 +41,30 @@ ${UNTRUSTED_CONTEXT_CLOSE}
 }
 
 /** The learner's note for a course, or '' when none. Trimmed + length-capped. */
-export async function getCourseNote(courseId: string): Promise<string> {
-  const note = await prisma.courseNote.findUnique({
+export async function getEditableCourseNote(
+  courseId: string,
+  transaction?: Pick<Prisma.TransactionClient, 'courseNote'>
+): Promise<string> {
+  const note = await (transaction ?? prisma).courseNote.findUnique({
     where: { courseId },
     select: { body: true },
   });
   return normalizeCourseNote(note?.body ?? '');
+}
+
+/** Generation sees imported extracts; editing notes never edits attached documents. */
+export async function getCourseNote(courseId: string): Promise<string> {
+  const [body, materials] = await Promise.all([
+    getEditableCourseNote(courseId),
+    prisma.courseMaterial.findMany({
+      where: { courseId, originalUrl: { not: null } },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      select: { extractedText: true },
+    }),
+  ]);
+  return normalizeCourseNote(
+    [body, ...materials.map((material) => material.extractedText)].filter(Boolean).join('\n\n')
+  );
 }
 
 /** Upsert the learner's note for a course. Empty body deletes the note. */

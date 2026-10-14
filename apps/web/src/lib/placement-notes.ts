@@ -17,6 +17,8 @@ function notesCacheKey(userId: string, native: string, target: string): string {
 export interface CachedNotesDeduction extends NotesDeduction {
   /** The extracted materials, reused as the course note on confirmation. */
   content: string;
+  materialIds?: string[];
+  editableContent?: string;
 }
 
 /**
@@ -28,10 +30,11 @@ export async function runNotesDeduction(
   execution: SottoProviderExecution,
   native: string,
   target: string,
-  content: string
+  content: string,
+  materials?: { materialIds: string[]; editableContent: string }
 ): Promise<NotesDeduction> {
   const { deduction } = await deduceLevelFromNotes(userId, execution, native, target, content);
-  const cached: CachedNotesDeduction = { ...deduction, content };
+  const cached: CachedNotesDeduction = { ...deduction, content, ...materials };
   await cache.set(notesCacheKey(userId, native, target), cached, NOTES_TTL_SECONDS);
   return deduction;
 }
