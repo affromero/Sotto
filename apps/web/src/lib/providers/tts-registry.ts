@@ -13,6 +13,7 @@ export type TtsProviderId =
   | 'elevenlabs'
   | 'openai'
   | 'cartesia'
+  | 'fish'
   | 'hume'
   | 'fal'
   | 'replicate'
@@ -39,6 +40,9 @@ interface TtsModelOption {
   tier: 'standard' | 'premium' | 'ultra';
   /** ISO 639-1 codes this model can produce speech for. */
   supportedLanguages: ReadonlySet<string>;
+  costPerMByte?: number;
+  freeAccessUntil?: string;
+  promotionalPricing?: { costPerMByte: number; endsAt: string };
 }
 
 export interface TtsProviderMeta {
@@ -213,6 +217,58 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     auth: {
       fields: providerCredentialForm('cartesia', 'speech').fields,
     },
+  },
+
+  fish: {
+    id: 'fish',
+    availabilityCheck: 'direct_audio',
+    displayName: 'Fish Audio',
+    getApiKeyUrl: providerCredentialForm('fish', 'speech').getApiKeyUrl,
+    supportsSfx: false,
+    supportsStreaming: false,
+    maxSegmentChars: 5000,
+    defaultModel: 's2.1-pro-free',
+    models: [
+      {
+        id: 's2.1-pro-free',
+        displayName: 'S2.1 Pro Free',
+        tier: 'standard',
+        supportedLanguages: LANG_ALL,
+        costPerMByte: 0,
+        freeAccessUntil: '2026-12-01T00:00:00Z',
+      },
+      {
+        id: 'drama-3',
+        displayName: 'Drama 3 (paid)',
+        tier: 'ultra',
+        supportedLanguages: LANG_ALL,
+        costPerMByte: 50,
+        promotionalPricing: { costPerMByte: 10, endsAt: '2026-11-13T00:00:00Z' },
+      },
+      {
+        id: 's2.1-pro',
+        displayName: 'S2.1 Pro (paid)',
+        tier: 'premium',
+        supportedLanguages: LANG_ALL,
+        costPerMByte: 15,
+      },
+      {
+        id: 's2-pro',
+        displayName: 'S2 Pro (paid)',
+        tier: 'premium',
+        supportedLanguages: LANG_ALL,
+        costPerMByte: 15,
+      },
+    ],
+    supportsAudioTags: true,
+    docsUrl: 'https://docs.fish.audio/developer-guide/models-pricing/models-overview',
+    qualityTier: 'premium',
+    platformCostPerKChar: 0,
+    modelsWithoutTextContext: ['s2.1-pro-free', 'drama-3', 's2.1-pro', 's2-pro'],
+    languageDetection: 'auto',
+    languageParam: null,
+    voicesAreCrossLingual: true,
+    auth: { fields: providerCredentialForm('fish', 'speech').fields },
   },
 
   hume: {
@@ -564,6 +620,39 @@ export function getProviderMeta(id: TtsProviderId): TtsProviderMeta {
 
 export function getAllProviderMeta(): TtsProviderMeta[] {
   return Object.values(TTS_PROVIDERS);
+}
+
+/** Unknown headers or an expired free offer must never reach a paid vendor default. */
+export function assertTtsModelAvailable(
+  provider: TtsProviderId,
+  model: string,
+  now = new Date()
+): void {
+  const meta = getProviderMeta(provider);
+  const selected = meta.models.find((option) => option.id === model);
+  if (!selected) throw new Error(`Unknown ${meta.displayName} model: ${model}`);
+  if (selected.freeAccessUntil && now.getTime() >= Date.parse(selected.freeAccessUntil))
+    throw new Error(
+      `${meta.displayName} free API availability must be reverified after November 30, 2026. Choose a model explicitly.`
+    );
+}
+
+/** Estimated input cost. Fish prices were verified on October 14, 2026. */
+export function estimateTtsCost(
+  provider: TtsProviderId,
+  model: string,
+  text: string,
+  now = new Date()
+): number {
+  const meta = getProviderMeta(provider);
+  const selected = meta.models.find((option) => option.id === model);
+  if (selected?.costPerMByte === undefined) return (text.length / 1000) * meta.platformCostPerKChar;
+  const promotion = selected.promotionalPricing;
+  const price =
+    promotion && now.getTime() < Date.parse(promotion.endsAt)
+      ? promotion.costPerMByte
+      : selected.costPerMByte;
+  return (new TextEncoder().encode(text).length / 1_000_000) * price;
 }
 
 export function getProviderIds(): TtsProviderId[] {

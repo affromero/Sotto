@@ -64,6 +64,7 @@ interface InworldExpression {
 }
 
 export interface TtsExpressionParams {
+  fish?: { audioTagPrefix: string };
   elevenlabs?: ElevenLabsExpression;
   cartesia?: CartesiaExpression;
   hume?: HumeExpression;
@@ -385,6 +386,13 @@ export function mapDirectionToExpression(
   const baseline = SPEAKER_BASELINES[speaker?.toUpperCase() ?? ''] ?? DEFAULT_BASELINE;
 
   switch (providerId) {
+    case 'fish': {
+      if (normalizedDirection) {
+        const cue = normalizedDirection.replace(/[\[\]\r\n]/g, ' ').trim();
+        if (cue) params.fish = { audioTagPrefix: `[${cue}] ` };
+      }
+      break;
+    }
     case 'elevenlabs': {
       if (mapping) {
         params.elevenlabs = mapping.elevenlabs;
@@ -468,6 +476,7 @@ export function getSupportedDirections(): string[] {
 export function convertInlineAudioTags(text: string, providerId: TtsProviderId): string {
   switch (providerId) {
     case 'elevenlabs':
+    case 'fish':
       return text;
 
     case 'hume':

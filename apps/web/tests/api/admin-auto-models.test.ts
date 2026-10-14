@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
 const mockAuth = vi.fn();
@@ -48,6 +48,7 @@ vi.mock('@/lib/providers/tts-registry', () => ({
     'elevenlabs',
     'openai',
     'cartesia',
+    'fish',
     'hume',
     'fal',
     'replicate',
@@ -144,6 +145,22 @@ describe('GET /api/v1/admin/auto-models', () => {
 });
 
 describe('PATCH /api/v1/admin/auto-models', () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it.each([
+    { model: { ttsProvider: 'fish', ttsModel: 's2.1-pro-free' } },
+    { includedTtsModels: ['fish:s2.1-pro-free'] },
+  ])(
+    'returns an activation conflict for Fish configuration during overlap: %j',
+    async (selection) => {
+      vi.stubEnv('SOTTO_PROVIDER_ACTIVATION_FILE', '/missing-fish-activation.json');
+      mockAuth.mockResolvedValue({ user: { id: 'owner-1', role: 'ADMIN' } });
+      const response = await PATCH(patchRequest(selection));
+      expect(response.status).toBe(409);
+      expect((await response.json()).error).toContain('being enabled');
+    }
+  );
+
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });

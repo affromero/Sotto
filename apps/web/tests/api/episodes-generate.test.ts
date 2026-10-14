@@ -402,6 +402,27 @@ describe('POST /api/v1/episodes/[episodeId]/generate', () => {
   });
 
   describe('FAILED retry provider override', () => {
+    it.each(['explicit', 'persisted'])(
+      'leaves failed audio unchanged while %s Fish selection is awaiting activation',
+      async (selection) => {
+        vi.stubEnv('SOTTO_PROVIDER_ACTIVATION_FILE', '/missing-fish-activation.json');
+        if (selection === 'persisted')
+          mockPrismaEpisodeFindUnique.mockResolvedValue({ ...failedEpisode, ttsProvider: 'fish' });
+        const response = await POST(
+          createMockRequest(
+            undefined,
+            selection === 'explicit' ? { ttsProvider: 'fish' } : undefined
+          ),
+          await createMockParams('episode-fail')
+        );
+        expect(response.status).toBe(409);
+        expect((await response.json()).error).toContain('being enabled');
+        expect(mockPrismaEpisodeUpdateMany).not.toHaveBeenCalled();
+        expect(mockPrismaEpisodeUpdate).not.toHaveBeenCalled();
+        expect(mockPrismaEpisodeVoiceDeleteMany).not.toHaveBeenCalled();
+      }
+    );
+
     const failedEpisode = {
       id: 'episode-fail',
       userId: 'user-001',

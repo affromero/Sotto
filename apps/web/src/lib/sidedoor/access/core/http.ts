@@ -5,6 +5,7 @@ import {
 } from 'thesidedoor-core/access/http';
 import { isAccessError } from 'thesidedoor-core/access';
 import { errorResponse } from '@/lib/api-response';
+import { ProviderActivationPendingError } from '@/lib/providers/shared/runtime-activation';
 import { getAppBaseUrl } from '@/lib/urls';
 import {
   sharedAccess,
@@ -33,14 +34,17 @@ export async function accessOperation(
     }
     response = await operation();
   } catch (error) {
-    response = isAccessError(error)
-      ? errorResponse(error.code, accessErrorStatus(error))
-      : error instanceof SyntaxError
-        ? errorResponse('Invalid JSON request', 400)
-        : errorResponse(
-            'Access is unavailable. Check the instance configuration and access setup.',
-            503
-          );
+    response =
+      error instanceof ProviderActivationPendingError
+        ? errorResponse(error.message, 409)
+        : isAccessError(error)
+          ? errorResponse(error.code, accessErrorStatus(error))
+          : error instanceof SyntaxError
+            ? errorResponse('Invalid JSON request', 400)
+            : errorResponse(
+                'Access is unavailable. Check the instance configuration and access setup.',
+                503
+              );
   }
   response.headers.set('Cache-Control', 'private, no-store');
   return response;

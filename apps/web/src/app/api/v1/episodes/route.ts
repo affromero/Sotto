@@ -14,6 +14,10 @@ import type { ExtractContentPayload } from '@/lib/queue';
 import { errorResponse } from '@/lib/api-response';
 import { requireOriginalSottoAdmission } from '@/lib/sidedoor/access/core/request-identity';
 import { randomUUID } from 'node:crypto';
+import {
+  assertProviderActivated,
+  ProviderActivationPendingError,
+} from '@/lib/providers/shared/runtime-activation';
 export async function GET(request: NextRequest) {
   const authResult = await authenticateRequest(request);
   if (!authResult) {
@@ -157,6 +161,12 @@ export async function POST(request: NextRequest) {
   };
 
   const episodeId = randomUUID();
+  try {
+    if (episodeData.ttsProvider) assertProviderActivated(episodeData.ttsProvider);
+  } catch (error) {
+    if (error instanceof ProviderActivationPendingError) return errorResponse(error.message, 409);
+    throw error;
+  }
   const sourceUrl = parsed.data.metadata?.sourceUrl;
   const sourceText = parsed.data.metadata?.sourceContent;
   const payload: ExtractContentPayload = {
@@ -174,6 +184,7 @@ export async function POST(request: NextRequest) {
       return { userId: authResult.userId };
     },
     mutate: async (database, operationId) => {
+      if (episodeData.ttsProvider) assertProviderActivated(episodeData.ttsProvider);
       await database.episode.create({
         data: {
           id: episodeId,

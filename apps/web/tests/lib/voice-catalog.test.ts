@@ -39,6 +39,18 @@ describe('getVoiceCatalog', () => {
   });
 
   describe('fixed-set providers', () => {
+    it('returns verified official Fish voices without requesting generation', async () => {
+      const catalog = await getVoiceCatalog('fish');
+      expect(catalog).toHaveLength(8);
+      expect(catalog).toContainEqual(
+        expect.objectContaining({
+          id: '536d3a5e000945adb7038665781a4aca',
+          name: 'Ethan',
+          gender: 'male',
+        })
+      );
+      expect(catalog).toContainEqual(expect.objectContaining({ name: 'Sarah', gender: 'female' }));
+    });
     it('returns static OpenAI voices', async () => {
       const catalog = await getVoiceCatalog('openai');
 

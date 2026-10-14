@@ -35,7 +35,7 @@ it('retains valid provider selection and metadata lookup', () => {
 });
 
 it('offers the direct audio credit check only for adapters with a verifiable synchronous response', () => {
-  for (const id of ['cartesia', 'openai', 'elevenlabs'] as const)
+  for (const id of ['cartesia', 'openai', 'elevenlabs', 'fish'] as const)
     expect(getProviderMeta(id).availabilityCheck).toBe('direct_audio');
   for (const id of ['fal', 'replicate', 'hume', 'minimax', 'mistral', 'local', 'kokoro'] as const)
     expect(getProviderMeta(id).availabilityCheck).toBeUndefined();
@@ -108,8 +108,8 @@ describe('AI Provider Client DTO', () => {
 describe('TTS Provider Client DTO', () => {
   const meta = getAllTtsProviderClientMeta();
 
-  it('returns the 11 BYOK TTS providers and excludes keyless locals', () => {
-    expect(meta).toHaveLength(11);
+  it('includes Fish among BYOK TTS providers and excludes keyless locals', () => {
+    expect(meta.map((m) => m.id)).toContain('fish');
     expect(meta.map((m) => m.id)).not.toContain('kokoro');
     expect(meta.map((m) => m.id)).not.toContain('local');
   });

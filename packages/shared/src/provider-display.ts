@@ -19,6 +19,7 @@ export const AI_PROVIDER_DISPLAY: Record<string, { label: string; shortLabel: st
 };
 
 export const TTS_PROVIDER_DISPLAY: Record<string, { label: string; shortLabel: string }> = {
+  fish: { label: 'Fish Audio', shortLabel: 'Fish' },
   elevenlabs: { label: 'ElevenLabs', shortLabel: 'ElevenLabs' },
   openai: { label: 'OpenAI TTS', shortLabel: 'OpenAI' },
   cartesia: { label: 'Cartesia', shortLabel: 'Cartesia' },
@@ -160,6 +161,10 @@ export const AI_MODEL_SHORT_DISPLAY: Record<string, string> = {
 };
 
 export const TTS_MODEL_DISPLAY: Record<string, string> = {
+  'drama-3': 'Drama 3',
+  's2.1-pro-free': 'S2.1 Pro Free',
+  's2.1-pro': 'S2.1 Pro',
+  's2-pro': 'S2 Pro',
   eleven_v3: 'v3',
   eleven_multilingual_v2: 'v2',
   'tts-1-hd': 'HD',

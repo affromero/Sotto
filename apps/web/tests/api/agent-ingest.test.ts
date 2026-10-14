@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
 const mockAuthenticateRequest = vi.fn();
@@ -118,6 +118,19 @@ const validPayload = {
 };
 
 describe('POST /api/v1/ingest/agent', () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it('rejects Fish ingestion without creating private episode state while activation is pending', async () => {
+    vi.stubEnv('SOTTO_PROVIDER_ACTIVATION_FILE', '/missing-fish-activation.json');
+    const response = await POST(
+      createRequest({ ...validPayload, ttsProvider: 'fish', ttsModel: 's2.1-pro-free' })
+    );
+    expect(response.status).toBe(409);
+    expect((await response.json()).error).toContain('being enabled');
+    expect(mockEpisodeCreate).not.toHaveBeenCalled();
+    expect(mockAgentIngestionCreate).not.toHaveBeenCalled();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
 

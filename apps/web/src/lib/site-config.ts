@@ -3,6 +3,7 @@ import type { Prisma } from '@/generated/prisma/client';
 import { prismaUnfiltered } from './prisma';
 import { sidedoorStateStore } from '@/lib/sidedoor/access/state/store';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
+import { assertProviderActivated } from './providers/shared/runtime-activation';
 
 export const serverInfraConfigSchema = z
   .object({
@@ -90,6 +91,7 @@ async function write(
       const normalized = normalizeInfra(data[key]);
       if (normalized !== undefined) current[key] = normalized;
     }
+    if (current.ttsProvider) assertProviderActivated(current.ttsProvider);
     state.configuration.site = current;
     state.revision++;
   });
@@ -100,6 +102,7 @@ export async function setSiteConfig(
   adminId: string,
   transaction?: SharedDatabase
 ): Promise<void> {
+  if (data.ttsProvider) assertProviderActivated(data.ttsProvider);
   if (transaction) return write(transaction, data, adminId);
   await sottoTransaction(prismaUnfiltered, (database) => write(database, data, adminId));
 }

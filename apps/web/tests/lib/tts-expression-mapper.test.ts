@@ -6,6 +6,14 @@ import {
 } from '@/lib/tts-expression-mapper';
 
 describe('tts-expression-mapper', () => {
+  it('preserves Fish bracket cues and Drama word-level delivery tags', () => {
+    expect(mapDirectionToExpression('  calm, clear  ', 'HOST', 'fish').fish).toEqual({
+      audioTagPrefix: '[calm, clear] ',
+    });
+    expect(mapDirectionToExpression(undefined, 'HOST', 'fish')).toEqual({});
+    const text = '[laughs] Hallo [pause] <whisper>leise</whisper>';
+    expect(convertInlineAudioTags(text, 'fish')).toBe(text);
+  });
   describe('ElevenLabs', () => {
     it('maps energetic to [excited] tag with Creative stability', () => {
       const result = mapDirectionToExpression('energetic', 'HOST', 'elevenlabs');

@@ -79,6 +79,7 @@ suite('speech tooling uses complete canonical credentials', () => {
     invalidateServerInfra();
   });
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
@@ -613,6 +614,67 @@ suite('speech tooling uses complete canonical credentials', () => {
     await expect(provider.generateSpeech({ text: 'Hello', voiceId: 'voice' })).rejects.toThrow();
     expect(outgoing).toEqual([]);
   });
+  it.each(['preview', 'admin'] as const)(
+    '%s uses the saved Fish key and free model',
+    async (kind) => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2026-10-14T12:00:00Z'));
+      await seed('enabled', 'fish', { apiKey: 'saved-fish-key' });
+      let captured: Request | undefined;
+      vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+        captured = new Request(input, init);
+        return new Response(new Uint8Array([0xff, 0xfb, 0x90, 0x00]));
+      });
+      const body =
+        kind === 'preview'
+          ? { provider: 'fish', voiceId: '536d3a5e000945adb7038665781a4aca', text: 'Hallo' }
+          : { type: 'tts', provider: 'fish', model: 's2.1-pro-free' };
+      const response = await (kind === 'preview' ? preview : admin).POST(request(kind, body));
+      expect(response.status).toBe(200);
+      if (kind === 'preview') {
+        expect(response.headers.get('content-type')).toBe('audio/mpeg');
+        expect(new Uint8Array(await response.arrayBuffer())).toEqual(
+          new Uint8Array([0xff, 0xfb, 0x90, 0x00])
+        );
+        expect(
+          await instance.database.apiUsageLog.findFirst({
+            where: { userId: identity.ownerId, category: 'voice_preview' },
+          })
+        ).toMatchObject({ service: 'fish', totalCost: 0 });
+      } else expect(await response.json()).toMatchObject({ success: true });
+      expect(captured?.url).toBe('https://api.fish.audio/v1/tts');
+      expect(captured?.headers.get('authorization')).toBe('Bearer saved-fish-key');
+      expect(captured?.headers.get('model')).toBe('s2.1-pro-free');
+      expect(await captured?.json()).toMatchObject({ format: 'mp3' });
+    }
+  );
+
+  it.skipIf(process.env.FISH_AUDIO_LIVE_TESTS !== '1' || !process.env.FISH_AUDIO_API_KEY)(
+    'generates real free Fish audio through the authenticated preview route',
+    async () => {
+      await seed('enabled', 'fish', { apiKey: process.env.FISH_AUDIO_API_KEY! });
+      const response = await preview.POST(
+        request('preview', {
+          provider: 'fish',
+          voiceId: '536d3a5e000945adb7038665781a4aca',
+          text: 'Hallo, wie geht es dir?',
+        })
+      );
+      expect(response.status).toBe(200);
+      expect(response.headers.get('content-type')).toBe('audio/mpeg');
+      const audio = Buffer.from(await response.arrayBuffer());
+      expect(audio.length).toBeGreaterThan(1_000);
+      const hasId3Header = audio.subarray(0, 3).toString('ascii') === 'ID3';
+      const hasMpegFrame = audio[0] === 0xff && (audio[1]! & 0xe0) === 0xe0;
+      expect(hasId3Header || hasMpegFrame).toBe(true);
+      expect(
+        await instance.database.apiUsageLog.findFirst({
+          where: { userId: identity.ownerId, category: 'voice_preview' },
+        })
+      ).toMatchObject({ service: 'fish', totalCost: 0 });
+    }
+  );
+
   it.each(['preview', 'admin'] as const)('%s sends the complete saved account', async (kind) => {
     await seed();
     const startedAt = Date.now();

@@ -79,7 +79,13 @@ function clean(v: string | undefined | null): string {
 }
 
 export function resolveWelcomeTtsProviderId(ttsId: string): string | null {
-  if (ttsId === 'elevenlabs' || ttsId === 'hume' || ttsId === 'openai' || ttsId === 'cartesia') {
+  if (
+    ttsId === 'elevenlabs' ||
+    ttsId === 'hume' ||
+    ttsId === 'openai' ||
+    ttsId === 'cartesia' ||
+    ttsId === 'fish'
+  ) {
     return ttsId;
   }
   if (ttsId === 'kokoro' || ttsId === 'local') return ttsId;

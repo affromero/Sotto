@@ -11,6 +11,10 @@ import type { ScriptTurn } from '@/lib/script-generator';
 
 import { errorResponse } from '@/lib/api-response';
 import { requireOriginalSottoAdmission } from '@/lib/sidedoor/access/core/request-identity';
+import {
+  assertProviderActivated,
+  ProviderActivationPendingError,
+} from '@/lib/providers/shared/runtime-activation';
 type RouteParams = { params: Promise<{ episodeId: string }> };
 
 export async function POST(request: NextRequest, { params }: RouteParams) {
@@ -59,6 +63,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return errorResponse('Choose a TTS provider before approving the script.', 400, {
       code: 'tts_provider_required',
     });
+  }
+
+  try {
+    assertProviderActivated(nextTtsProvider);
+  } catch (error) {
+    if (error instanceof ProviderActivationPendingError) return errorResponse(error.message, 409);
+    throw error;
   }
 
   const [script, discovery] = await Promise.all([

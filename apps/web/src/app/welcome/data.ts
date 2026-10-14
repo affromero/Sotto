@@ -727,6 +727,14 @@ export const TTS_PROVIDERS: VoiceProvider[] = [
     keyHint: 'sk_car_…',
   },
   {
+    id: 'fish',
+    name: 'Fish Audio',
+    note: '83 languages; free S2.1 Pro or paid Drama 3',
+    apiUrl: 'https://fish.audio/app/api-keys',
+    apiLabel: 'API',
+    keyHint: 'sk-fish-…',
+  },
+  {
     id: 'deepgram',
     name: 'Deepgram Aura',
     note: 'real-time voice-agent TTS',

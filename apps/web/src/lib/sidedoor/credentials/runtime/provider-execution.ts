@@ -24,6 +24,7 @@ import { sottoStateWriteTransaction } from '@/lib/sidedoor/access/state/write-tr
 import type { AuthenticatedRequest } from '@/lib/api-keys';
 import { requireOriginalSottoAdmission } from '@/lib/sidedoor/access/core/request-identity';
 import { captureSpeechAvailability } from '@/lib/providers/shared/speech-availability';
+import { assertProviderActivated } from '@/lib/providers/shared/runtime-activation';
 
 export interface SottoProviderExecution {
   userId: string;
@@ -133,9 +134,11 @@ export async function captureSottoProviderAdmission(execution: SottoProviderExec
         signal,
         implementation: async (input, init) => {
           const request = new Request(input, init);
-          return providerRequest
-            ? await providerRequest(request, () => globalThis.fetch(request))
-            : await globalThis.fetch(request);
+          const dispatch = () => {
+            if (credential) assertProviderActivated(credential.provider);
+            return globalThis.fetch(request);
+          };
+          return providerRequest ? await providerRequest(request, dispatch) : await dispatch();
         },
         admit: async (request, requestSignal) => {
           if (

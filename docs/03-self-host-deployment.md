@@ -213,13 +213,87 @@ Install your reviewed shared-host capacity checker before using this production 
 
 Provide `SOTTO_BACKUP_BYTES` as a measured allowance for the database archive. The checker reserves that allocation alongside absent images; exact digests already present need no import budget. `SOTTO_BACKUP_DIR` defaults to `$HOME/.local/state/sotto-backups/$SOTTO_STACK`. Before candidate startup, the script checks database size, creates a custom-format `pg_dump`, reads the full archive with `pg_restore` without restoring a database, and retains its checksum. The current site keeps serving during this transactionally consistent backup. Completed deployments retain the newest ten successful backups and all backups younger than thirty days, including the current and previous deployment. Cleanup removes only older backups with matching success metadata and checksums. Failed, unmarked, malformed, and symlinked backups remain for review.
 
-Existing-stack deployments require identical Prisma schema, migration assets, shared job contracts and Sidedoor runtime assets between current and candidate workers. The runner verifies the applied migration checksums and finalized access state without writing to the database. It preserves shared credentials and running infrastructure. Handle incompatible changes through a separately reviewed migration procedure.
+Existing-stack deployments require identical Prisma schema and migration assets. The default rolling path also requires identical shared job contracts and Sidedoor runtime assets between current and candidate workers. The runner verifies applied migration checksums and finalized access state without writing to the database. It preserves shared credentials and running infrastructure. Runtime differences require the exact-pair compatibility procedure below. Schema changes require a separate migration procedure.
 
 The old site serves pages, APIs and audio throughout backup, candidate startup and worker draining. After candidate health and smoke checks pass, the runner saves each queue's original pause flag, pauses delivery and waits for active jobs and provider cleanup to settle. New asynchronous requests remain durable and wait for delivery to resume. Workers are replaced individually only after their captured process trees are idle. Caddy then routes to the healthy candidate, the runner restores the original queue flags and gracefully retires the old web slot without a forced-kill deadline. Routine compatible releases do not install a full-site maintenance response.
 
 A failed candidate leaves the old slot serving. Failures during replacement restore old routing and verified workers before resuming queues. Unknown provider ownership, unresolved cleanup or an unverified rollback retains the deployment lock and evidence, with queues paused. The durable `$HOME/.local/state/sotto-deploy/unresolved.json` marker also blocks a new attempt after an interrupted controller. Inspect the recorded containers, queue manifest and cleanup state before clearing that marker. Never clear it to bypass unresolved work.
 
 Matching schema-review hashes cannot bypass this restriction. Additive enum changes can still make newly written rows unreadable by older Prisma clients. Before a separate schema-changing rollout, fence HTTP admissions, preserve and pause the affected queues, verify that active jobs and provider executions have settled, and only then stop the old services. Worker shutdown cancels active jobs; it does not safely drain them. The migration procedure must define the point after which recovery keeps admissions fenced and proceeds with compatible code instead of restarting the previous release.
+
+### Reviewed runtime compatibility
+
+For a runtime upgrade with unchanged Prisma assets, independently review the
+exact current and candidate immutable images before enabling overlap. Compare
+installed dependency versions and executable changes, existing queued job
+versions and payloads, credential envelopes, authority checks, storage records,
+provider execution ownership, and cleanup semantics. Verify that old HTTP
+requests can finish safely while new workers run. Verify that shared state
+written before old HTTP retirement remains readable by the old code. Defer
+new provider state when the old catalog cannot read it. A version number or passing schema hash does not establish
+that compatibility.
+
+Set `SOTTO_COMPATIBILITY_REVIEW_FILE` and
+`SOTTO_COMPATIBILITY_EVIDENCE_FILE` to private, operator-owned regular files.
+The evidence contains the actual independent review. The review file is JSON
+with exactly these fields:
+
+| Field                     | Required value                                                              |
+| ------------------------- | --------------------------------------------------------------------------- |
+| `schemaVersion`           | Integer `1`                                                                 |
+| `procedure`               | `compatible-runtime-overlap`                                                |
+| `stack`                   | Exact `SOTTO_STACK`                                                         |
+| `releaseSha`              | Full candidate source SHA                                                   |
+| `candidateWebImage`       | Exact digest-pinned web reference                                           |
+| `candidateWorkersImage`   | Exact digest-pinned worker reference                                        |
+| `previousWebImage`        | Captured previous web image ID                                              |
+| `previousWorkerContracts` | Object mapping every captured worker image ID to its measured contract hash |
+| `candidateContract`       | Measured candidate worker contract hash                                     |
+| `reviewer`                | Independent reviewer identity                                               |
+| `evidenceSha256`          | SHA-256 of the exact evidence file bytes                                    |
+
+Use `scripts/deploy/checks/rolling-contract.cjs` against the exact images to
+measure runtime hashes. It follows Node's workspace package search paths while
+rejecting symlinked or incomplete executable packages. The validator rejects
+duplicate JSON fields, stale identities, extra fields, changed evidence, and
+unreviewed mismatches. Accepted review and evidence bytes are saved together
+in the durable attempt directory before services change.
+
+The Fish upgrade also inspects existing credentials, profile and server
+selections, episodes, segments, voice assignments, and queued work without
+changing them. Existing Fish state rejects
+this procedure. The candidate web and workers receive a read-only directory
+mount with `SOTTO_PROVIDER_ACTIVATION_FILE`, bound to `SOTTO_RELEASE_SHA`.
+It keeps Fish credential saves, selections, configuration writes, episode
+admission, audio retries, and HTTP dispatch disabled while old HTTP remains
+active. Other providers stay usable.
+The mounted gate is readable by the verified runtime UID without exposing the
+private review directory. Missing, unreadable, malformed, oversized, symlinked,
+empty, or mismatched configured gates fail closed. An absent variable preserves
+ordinary local behavior.
+
+After saving original queue flags, a compatibility rollout persists a
+`compatibility-preparation` recovery marker before pausing or replacing
+workers. A crash blocks subsequent deployments so the original queue manifest
+cannot be overwritten. Verified failures before candidate routing may restore
+the old services and clear only that attempt's preparation marker.
+
+Before installing candidate routing, the runner atomically advances the
+marker to `compatibility-cutover`. From that point, new features may write
+state or jobs that old code cannot process. Automatic rollback to old code is
+disabled. Any failure retains the deployment lock, compatible services,
+review evidence and original queue manifest. The runner attempts to pause
+delivery again and records observed queue flags, including after a partial
+restore. Unconfirmed fencing remains an error; active work is never killed to
+claim a drain. Recovery requires reviewed forward progress with compatible
+code. Do not clear the marker to retry a deployment.
+
+Successful rollout clears its cutover marker only after public health, old
+HTTP retirement, image retention, backup retention and rollback-tag updates
+finish. Only then does the runner atomically enable Fish. The mounted gate
+directory remains available for the active containers. Saved old image digests remain recovery evidence. They do not authorize
+rolling back after a new provider or job format has been activated. Register
+the operator's Fish key and test it after old services have fully settled.
 
 Rollback protection records live in `PRODUCTION_IMAGE_RETENTION_DIR`, defaulting to `$HOME/.local/state/production-image-retention`. Each attempt protects its incoming and existing image IDs before service changes. Success retains the new images and pre-deploy images; failed-attempt records remain until reviewed maintenance retires them. Deployment does not prune images, build caches or volumes.
 

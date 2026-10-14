@@ -6,6 +6,7 @@ import { getSttProviderMeta, type SttProviderId } from './providers/stt-registry
 import { prismaUnfiltered } from './prisma';
 import { sidedoorStateStore } from '@/lib/sidedoor/access/state/store';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
+import { assertProviderActivated } from './providers/shared/runtime-activation';
 
 export interface ModelConfig {
   aiProvider: AiProviderId;
@@ -166,6 +167,9 @@ export async function setAutoModelConfig(
   _adminId: string,
   transaction?: SharedDatabase
 ): Promise<void> {
+  if (data.model?.ttsProvider) assertProviderActivated(data.model.ttsProvider);
+  for (const selection of data.includedTtsModels ?? [])
+    assertProviderActivated(selection.split(':')[0]);
   assertModelProviderPairs(data);
   const write = async (database: SharedDatabase) => {
     const store = sidedoorStateStore(database);
@@ -185,6 +189,9 @@ export async function setAutoModelConfig(
         includedSttModels:
           data.includedSttModels === undefined ? current.includedSttModels : data.includedSttModels,
       };
+      assertProviderActivated(updated.model.ttsProvider);
+      for (const selection of updated.includedTtsModels ?? [])
+        assertProviderActivated(selection.split(':')[0]);
       assertModelProviderPairs({ model: updated.model, platform: updated.platform });
       state.configuration.automaticModels = autoModelConfigSchema.parse(updated);
       state.revision++;

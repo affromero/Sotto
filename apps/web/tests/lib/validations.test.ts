@@ -5,7 +5,21 @@ import {
   interactionSchema,
   updateEpisodeSchema,
   regenerateWithFeedbackSchema,
+  voicePreviewSchema,
 } from '@/lib/validations';
+
+it('accepts Fish voice previews and episode provider selection', () => {
+  expect(
+    voicePreviewSchema.safeParse({ provider: 'fish', voiceId: 'voice', text: 'Hallo' }).success
+  ).toBe(true);
+  expect(
+    createEpisodeSchema.safeParse({
+      title: 'German practice',
+      topic: 'Greetings',
+      ttsProvider: 'fish',
+    }).success
+  ).toBe(true);
+});
 
 describe('discoveryMessageSchema', () => {
   it('accepts valid content', () => {

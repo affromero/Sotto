@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
 const mockAuthenticateRequest = vi.fn();
@@ -89,6 +89,32 @@ const defaultTurns = [
 ];
 
 describe('POST /api/v1/episodes/[episodeId]/script/approve', () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it.each(['explicit', 'persisted', 'configured'])(
+    'leaves the script ready when %s Fish selection is awaiting activation',
+    async (selection) => {
+      vi.stubEnv('SOTTO_PROVIDER_ACTIVATION_FILE', '/missing-fish-activation.json');
+      mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+      mockEpisodeFindUnique.mockResolvedValue({
+        userId: 'user-1',
+        status: 'SCRIPT_READY',
+        ...(selection === 'persisted' ? { ttsProvider: 'fish' } : {}),
+      });
+      if (selection === 'configured')
+        mockGetAutoModelConfig.mockResolvedValue({ model: { ttsProvider: 'fish' } });
+      const response = await POST(
+        createRequest(selection === 'explicit' ? { ttsProvider: 'fish' } : undefined),
+        await createParams('pod-1')
+      );
+      expect(response.status).toBe(409);
+      expect((await response.json()).error).toContain('being enabled');
+      expect(mockEpisodeUpdateMany).not.toHaveBeenCalled();
+      expect(mockEpisodeUpdate).not.toHaveBeenCalled();
+      expect(mockEpisodeVoiceCreateMany).not.toHaveBeenCalled();
+    }
+  );
+
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetAutoModelConfig.mockResolvedValue({

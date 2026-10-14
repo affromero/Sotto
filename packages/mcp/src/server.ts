@@ -76,6 +76,7 @@ export function createServer(client: SottoClient): McpServer {
           'elevenlabs',
           'openai',
           'cartesia',
+          'fish',
           'hume',
           'fal',
           'replicate',

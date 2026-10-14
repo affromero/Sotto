@@ -2,12 +2,41 @@
 
 const { createHash } = require('node:crypto');
 const fs = require('node:fs');
+const { createRequire } = require('node:module');
 const path = require('node:path');
 
 // Mixed web/worker revisions must share executable payloads and authority.
 const hash = createHash('sha256');
 const flags = fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK;
-const root = fs.openSync('/app', flags);
+const rootPath = '/app';
+const root = fs.openSync(rootPath, flags);
+function hasDirectory(relative) {
+  let descriptor = root;
+  try {
+    for (const name of relative.split('/')) {
+      const child = fs.openSync(`/proc/self/fd/${descriptor}/${name}`, flags);
+      if (descriptor !== root) fs.closeSync(descriptor);
+      descriptor = child;
+      if (!fs.fstatSync(descriptor).isDirectory()) throw new Error('Malformed package ancestor');
+    }
+    return true;
+  } catch (error) {
+    if (error.code === 'ENOENT') return false;
+    throw error;
+  } finally {
+    if (descriptor !== root) fs.closeSync(descriptor);
+  }
+}
+function packageDirectory(name, from) {
+  const load = createRequire(path.join(rootPath, from, 'probe.cjs'));
+  for (const directory of load.resolve.paths(name)) {
+    const absolute = path.join(directory, name);
+    if (!absolute.startsWith(rootPath + path.sep)) continue;
+    const relative = path.relative(rootPath, absolute);
+    if (hasDirectory(relative)) return relative;
+  }
+  throw new Error(`Missing executable package: ${name}`);
+}
 function add(relative, parent, components) {
   const [name, ...remaining] = components;
   const descriptor = fs.openSync(`/proc/self/fd/${parent}/${name}`, flags);
@@ -47,12 +76,14 @@ try {
     'packages/learning-model/src',
   ])
     include(relative);
-  for (const name of ['thesidedoor', 'thesidedoor-core']) {
-    include('node_modules/' + name + '/package.json');
-    include('node_modules/' + name + '/dist');
+  const coreDirectory = packageDirectory('thesidedoor-core', 'apps/web');
+  for (const directory of [packageDirectory('thesidedoor', 'apps/web'), coreDirectory]) {
+    include(directory + '/package.json');
+    include(directory + '/dist');
   }
+  const flockDirectory = packageDirectory('thesidedoor-flock', coreDirectory + '/dist/storage');
   for (const name of ['package.json', 'index.cjs', 'binding.gyp', 'fs-ext.cc']) {
-    include('node_modules/thesidedoor-flock/' + name);
+    include(flockDirectory + '/' + name);
   }
   process.stdout.write(hash.digest('hex') + '\n');
 } finally {
