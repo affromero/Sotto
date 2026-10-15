@@ -316,3 +316,45 @@
   text-decoration-thickness: 1px;
   text-underline-offset: 4px;
 }
+
+.retrySection {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.retrySection p {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.retryButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  max-width: 100%;
+  min-height: 44px;
+  padding: 12px 18px;
+  border: 1px solid var(--accent);
+  border-radius: var(--r);
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-family: var(--sans);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.retryButton:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.retryButton:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}

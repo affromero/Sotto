@@ -13,6 +13,7 @@ interface ProgressQueue {
   inFlight: ProgressPatch | null;
   latest: ProgressPatch;
   saving: boolean;
+  flushTask: Promise<void> | null;
   reconciling: boolean;
   epoch: number;
   error: string;
@@ -78,6 +79,7 @@ function getQueue(endpoint: string, revision: number, material: string): Progres
     inFlight: null,
     latest: {},
     saving: false,
+    flushTask: null,
     reconciling: false,
     epoch: 0,
     error: '',
@@ -120,50 +122,74 @@ function publish(key: string, queue: ProgressQueue, error: string) {
   queue.listeners.forEach((listener) => listener(error));
 }
 
-async function flush(endpoint: string, material: string, queue: ProgressQueue) {
-  if (queue.saving || queue.reconciling || !queue.pending || queue.error) return;
-  if (queue.timer) clearTimeout(queue.timer);
-  queue.timer = null;
+function flush(endpoint: string, material: string, queue: ProgressQueue): Promise<void> {
+  if (queue.flushTask) return queue.flushTask;
+  if (queue.reconciling || !queue.pending || queue.error) return Promise.resolve();
+  queue.flushTask = flushPending(endpoint, material, queue).finally(() => {
+    queue.flushTask = null;
+  });
+  return queue.flushTask;
+}
+
+async function flushPending(endpoint: string, material: string, queue: ProgressQueue) {
   const key = keyFor(endpoint, material);
-  const patch = queue.pending;
-  queue.pending = null;
-  queue.saving = true;
-  queue.inFlight = patch;
-  retain(key, queue);
-  try {
-    const response = await fetch(endpoint, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      keepalive: true,
-      body: JSON.stringify({ ...patch, expectedRevision: queue.revision }),
-    });
-    const result = (await response.json().catch(() => ({}))) as {
-      error?: string;
-      progressRevision?: number;
-    };
-    if (!response.ok) throw new Error(result.error ?? 'Your progress could not be saved.');
-    if (
-      typeof result.progressRevision !== 'number' ||
-      !Number.isSafeInteger(result.progressRevision)
-    )
-      throw new Error(
-        'Your progress save could not be confirmed. Check saved progress before continuing.'
-      );
-    queue.revision = result.progressRevision;
-    publish(key, queue, '');
-  } catch (failure: unknown) {
-    queue.pending = merge(patch, queue.pending ?? {});
-    publish(
-      key,
-      queue,
-      failure instanceof Error ? failure.message : 'Your progress could not be saved.'
-    );
-  } finally {
-    queue.inFlight = null;
-    queue.saving = false;
+  while (queue.pending && !queue.error && !queue.reconciling) {
+    if (queue.timer) clearTimeout(queue.timer);
+    queue.timer = null;
+    const patch = queue.pending;
+    queue.pending = null;
+    queue.saving = true;
+    queue.inFlight = patch;
     retain(key, queue);
-    if (queue.pending && !queue.error) void flush(endpoint, material, queue);
+    try {
+      const response = await fetch(endpoint, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        keepalive: true,
+        body: JSON.stringify({ ...patch, expectedRevision: queue.revision }),
+      });
+      const result = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        progressRevision?: number;
+      };
+      if (!response.ok) throw new Error(result.error ?? 'Your progress could not be saved.');
+      if (
+        typeof result.progressRevision !== 'number' ||
+        !Number.isSafeInteger(result.progressRevision)
+      )
+        throw new Error(
+          'Your progress save could not be confirmed. Check saved progress before continuing.'
+        );
+      queue.revision = result.progressRevision;
+      publish(key, queue, '');
+    } catch (failure: unknown) {
+      queue.pending = merge(patch, queue.pending ?? {});
+      publish(
+        key,
+        queue,
+        failure instanceof Error ? failure.message : 'Your progress could not be saved.'
+      );
+    } finally {
+      queue.inFlight = null;
+      queue.saving = false;
+      retain(key, queue);
+    }
   }
+}
+
+/** Confirm all queued edits before an operation replaces learning material. */
+export async function flushLearningProgress(
+  endpoint: string,
+  material = '',
+  initialRevision = 0
+): Promise<number> {
+  const queue = getQueue(endpoint, initialRevision, material);
+  if (queue.reconciling) throw new Error('Wait for the saved progress check to finish.');
+  await flush(endpoint, material, queue);
+  if (queue.error) throw new Error(queue.error);
+  if (queue.pending || queue.saving || queue.reconciling)
+    throw new Error('Wait for your progress to finish saving.');
+  return queue.revision;
 }
 
 interface SavedProgress {

@@ -18,7 +18,7 @@ import { SIDEDOOR_STATE_ID } from '@/lib/sidedoor/access/state/store';
 import { requireSottoJobVersion } from '@/lib/sidedoor/jobs/core/job-contracts';
 import type { SkillRequirements } from '@sotto/shared';
 
-export const pristineSnapshotSchema = z.string().regex(/^[a-f0-9]{64}$/);
+const pristineSnapshotSchema = z.string().regex(/^[a-f0-9]{64}$/);
 export class PristineRegenerationConflict extends Error {
   constructor() {
     super(

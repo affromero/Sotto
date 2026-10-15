@@ -460,6 +460,7 @@ export const classSectionSchema = z
     id: z.string(),
     skill: skillTypeSchema,
     status: sectionStatusSchema,
+    passThreshold: z.number().min(0).max(1).optional(),
     questions: z.array(classQuestionSchema),
     prompts: z.array(classSpeakingPromptSchema),
     writingPrompts: z.array(classWritingPromptSchema),

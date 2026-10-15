@@ -2,6 +2,7 @@ import { type CefrLevel } from '@sotto/shared';
 import { resolveSkillRequirementsInTransaction } from '../learning/skill-requirements';
 import { readSkillRequirements } from '../learning/skill-requirements';
 import { selectClassRepairSkills } from '../learning/classes/class-repair';
+import { captureClassQuizRetry } from '../learning/classes/class-quiz-retry';
 import { claimClassRegenerationInTransaction } from '../learning/classes/class-generation-state';
 import { readPristine } from './regeneration/pristine';
 import { learningSpeechFingerprint } from '../learning/speech-configuration';
@@ -10,7 +11,7 @@ import { sqlStateBackend } from 'thesidedoor-core/storage/sql';
 import { prepareJob } from 'thesidedoor-core/runtime/outbox';
 import { z } from 'zod';
 import { delegationGrantBinding, type DelegationGrant } from 'thesidedoor-core/runtime/delegation';
-import type { Prisma } from '@/generated/prisma/client';
+import { Prisma } from '@/generated/prisma/client';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
@@ -170,6 +171,7 @@ export async function requestClassPreparation(
       classId: string;
       expectedAttempt: number;
       pristineSnapshot?: string;
+      retry?: { sectionId: string; expectedRevision: number };
     };
     availableAt?: number;
     maxProviderRequests?: number;
@@ -278,6 +280,21 @@ export async function requestClassPreparation(
           currentLevel: true,
         },
       });
+      const store = classPreparationStore(database, courseId);
+      let current = await store.read();
+      if (
+        current?.status === 'FAILED' ||
+        (input.intent?.retry && current?.status === 'CANCELLED')
+      ) {
+        const cleanup = await settlePreparationCleanup(database, current);
+        current = cleanup.operation;
+        if (!cleanup.settled)
+          throw new PreparationConflictError(
+            'The previous preparation still needs execution cleanup.'
+          );
+      }
+      if (input.intent?.retry)
+        await database.$queryRaw`SELECT id FROM "CourseClass" WHERE id = ${input.intent.classId} FOR UPDATE`;
       const target = input.intent
         ? await database.courseClass.findFirst({
             where: { id: input.intent.classId, courseId, course: { userId: actor.userId } },
@@ -315,6 +332,44 @@ export async function requestClassPreparation(
         requirements,
         execution.signal
       );
+      let retry: NonNullable<NonNullable<ClassPreparation['intent']>['retry']> | undefined;
+      let retrySkill: 'GRAMMAR' | 'READING' | 'LISTENING' | undefined;
+      if (input.intent?.retry) {
+        if (input.intent.kind !== 'REPAIR' || !target)
+          throw new PreparationConflictError('A quiz retry requires an owned class repair.');
+        const request = { ...input.intent.retry, expectedAttempt: input.intent.expectedAttempt };
+        const previous = current?.intent?.retry;
+        if (
+          previous &&
+          previous.sectionId === request.sectionId &&
+          previous.expectedAttempt === request.expectedAttempt &&
+          previous.expectedRevision === request.expectedRevision &&
+          current?.intent?.classId === target.id &&
+          current.intent.attempt === target.attempt &&
+          ['QUEUED', 'RUNNING', 'CANCELLING', 'UNRESOLVED', 'COMPLETED'].includes(current.status)
+        ) {
+          const skill = current.intent.skills[0];
+          if (
+            current.intent.skills.length !== 1 ||
+            (skill !== 'GRAMMAR' && skill !== 'READING' && skill !== 'LISTENING')
+          )
+            throw new PreparationConflictError('The admitted quiz retry target changed.');
+          retry = previous;
+          retrySkill = skill;
+        } else {
+          const captured = captureClassQuizRetry(target, requirements, request);
+          retry = {
+            sectionId: request.sectionId,
+            expectedAttempt: request.expectedAttempt,
+            expectedRevision: request.expectedRevision,
+            context: captured.context,
+            ...(captured.skill === 'READING'
+              ? { readingVocabulary: z.json().parse(target.readingVocabulary) }
+              : {}),
+          };
+          retrySkill = captured.skill;
+        }
+      }
       const proposed: ClassPreparation = {
         id,
         courseId,
@@ -342,6 +397,7 @@ export async function requestClassPreparation(
                     kind: input.intent.kind,
                     classId: input.intent.classId,
                     expectedAttempt: input.intent.expectedAttempt,
+                    ...(retry ? { retry } : {}),
                   }
                 : null,
             })
@@ -356,8 +412,6 @@ export async function requestClassPreparation(
         result: null,
         failure: null,
       };
-      const store = classPreparationStore(database, courseId);
-      let current = await store.read();
       if (
         input.intent &&
         current?.intent &&
@@ -370,14 +424,6 @@ export async function requestClassPreparation(
         current.status === 'COMPLETED'
       )
         return current;
-      if (current?.status === 'FAILED') {
-        const cleanup = await settlePreparationCleanup(database, current);
-        current = cleanup.operation;
-        if (!cleanup.settled)
-          throw new PreparationConflictError(
-            'The previous preparation still needs execution cleanup.'
-          );
-      }
       const admitted = admitPreparation(current, proposed);
       if (admitted.id !== id) return admitted;
       if (input.intent && target) {
@@ -404,8 +450,10 @@ export async function requestClassPreparation(
           attempt,
           priorStatus: target.status,
           classFingerprint: targetFingerprint(target),
-          skills:
-            input.intent.kind === 'REPAIR'
+          ...(retry ? { retry } : {}),
+          skills: retrySkill
+            ? [retrySkill]
+            : input.intent.kind === 'REPAIR'
               ? await selectClassRepairSkills(database, target, requirements)
               : (
                   Object.keys(requirements.skills) as Array<keyof typeof requirements.skills>
@@ -447,8 +495,9 @@ async function reconcileKnownPreparationFailure(
   const current = await validateClassPreparation(database, operation.courseId, operation.id, true);
   if (
     current.intent &&
-    current.status === 'UNRESOLVED' &&
-    (current.failure === 'generation_failed' || current.failure === 'source_unreadable')
+    ((current.status === 'UNRESOLVED' &&
+      (current.failure === 'generation_failed' || current.failure === 'source_unreadable')) ||
+      (current.intent.retry && ['FAILED', 'CANCELLED'].includes(current.status)))
   )
     return settleCancelledPreparation(database, current);
   return current;
@@ -563,6 +612,30 @@ async function settlePreparationCleanup(
   const audio = await settlePreparationAudio(database, operation);
   if (!audio.settled) return { operation, settled: false };
   if (operation.intent) {
+    const intent = operation.intent;
+    await database.$queryRaw`SELECT id FROM "CourseClass" WHERE id = ${intent.classId} FOR UPDATE`;
+    const pending =
+      intent.retry &&
+      (await database.courseClass.findFirst({
+        where: {
+          id: intent.classId,
+          courseId: operation.courseId,
+          attempt: intent.attempt,
+          status: 'GENERATING',
+        },
+        select: { id: true },
+      }));
+    if (pending && intent.retry) {
+      const original = await database.classSection.findFirst({
+        where: { id: intent.retry.sectionId, classId: pending.id, skill: { in: intent.skills } },
+        select: { id: true },
+      });
+      if (!original || !['AVAILABLE', 'IN_PROGRESS'].includes(intent.priorStatus))
+        throw new PreparationConflictError('The original quiz retry material changed.');
+      await database.classSection.deleteMany({
+        where: { classId: pending.id, attempt: intent.attempt, skill: { in: intent.skills } },
+      });
+    }
     await database.courseClass.updateMany({
       where: {
         id: operation.intent.classId,
@@ -570,7 +643,15 @@ async function settlePreparationCleanup(
         attempt: operation.intent.attempt,
         status: 'GENERATING',
       },
-      data: { status: 'FAILED', failedAt: new Date() },
+      data: intent.retry
+        ? {
+            status: intent.priorStatus as 'AVAILABLE' | 'IN_PROGRESS',
+            progressRevision: { increment: 1 },
+            ...(intent.retry.readingVocabulary !== undefined
+              ? { readingVocabulary: intent.retry.readingVocabulary ?? Prisma.DbNull }
+              : {}),
+          }
+        : { status: 'FAILED', failedAt: new Date() },
     });
   }
   if (!operation.intent && operation.classId && operation.result !== 'created') {

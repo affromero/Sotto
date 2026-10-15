@@ -121,6 +121,7 @@ export async function processClassPreparation(job: Job<unknown>, workerSignal?: 
             {
               repair: target.kind === 'REPAIR',
               skills: target.skills,
+              retry: target.retry?.context,
               attempt: target.attempt,
               requirements: operation.requirements,
               deferAudio: operation.deferAudio,

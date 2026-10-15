@@ -22,8 +22,10 @@ interface MasteryMeterProps {
 }
 
 export function MasteryMeter({ value, gate, label = 'Recall' }: MasteryMeterProps) {
-  const v = clampScore(value);
-  const passed = v >= gate;
+  const raw = Math.max(0, Math.min(100, value));
+  const passed = raw >= gate;
+  const rounded = clampScore(raw);
+  const v = !passed && rounded >= gate ? Math.floor(raw * 10) / 10 : rounded;
   return (
     <div className={styles.meterWrap}>
       <div className={styles.meterTop}>

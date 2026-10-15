@@ -22,9 +22,9 @@ import guardStyles from '@/components/ui/LearningTextGuard.module.css';
 import { learningTextGuardProps } from '@/components/ui/learningTextGuard';
 
 import { ContinueBar, ScoreDial } from './ClassWidgets';
-import type { WritingCorrection, WritingPromptData } from './classTypes';
+import type { WritingCorrection, WritingPromptData, WritingResponse } from './classTypes';
 import { LearningSaveRecovery } from './progress/LearningSaveRecovery';
-import type { WritingDrafts } from './writing/useWritingDrafts';
+import { useWritingDrafts, type WritingDrafts } from './writing/useWritingDrafts';
 import styles from './WritingSection.module.css';
 
 interface WritingSectionProps {
@@ -52,6 +52,55 @@ interface WritingSectionProps {
 }
 
 const MAX_CHARS = 4000;
+
+/** Own the class drafts and grade them before opening the next activity. */
+export function ClassWritingStage({
+  classId,
+  progressRevision,
+  attempt,
+  prompts,
+  gate,
+  nextName,
+  onScore,
+  onFeedback,
+  onContinue,
+}: {
+  classId: string;
+  progressRevision: number;
+  attempt: number;
+  prompts: WritingPromptData[];
+  gate: number;
+  nextName: string | null;
+  onScore: (score: number) => void;
+  onFeedback: (promptId: string, response: WritingResponse) => void;
+  onContinue: () => void;
+}) {
+  const drafts = useWritingDrafts(
+    prompts,
+    `/api/v1/classes/${classId}/writing`,
+    onFeedback,
+    progressRevision,
+    String(attempt)
+  );
+  return (
+    <WritingSection
+      drafts={drafts}
+      prompts={prompts}
+      gate={gate}
+      nextName={nextName}
+      onScore={onScore}
+      feedbackHref="#feedback-clinic"
+      onContinue={onContinue}
+      submitAction={{
+        label: 'Check writing',
+        busyLabel: 'Checking…',
+        busy: drafts.isSubmitting,
+        disabled: drafts.isOverLimit,
+        onSubmit: () => void drafts.submit(!drafts.hasChanges),
+      }}
+    />
+  );
+}
 
 // ---- inline corrected text ----
 

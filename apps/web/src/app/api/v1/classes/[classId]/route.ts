@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { classRegenerationRequestSchema } from '@sotto/shared';
 import { sottoRequestExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import { authenticateRequest } from '@/lib/api-keys';
 import { errorResponse } from '@/lib/api-response';
@@ -12,10 +13,8 @@ import {
   speechCreditsMessage,
 } from '@/lib/providers/shared/speech-availability';
 import { classIntroFromSeed } from '@/lib/classes/class-intro';
-import { z } from 'zod';
 import { patchLearningProgress } from '@/lib/learning/progress-route';
 import {
-  pristineSnapshotSchema,
   PristineRegenerationConflict,
   readPristineRegenerationSnapshot,
   validatePristineRegeneration,
@@ -56,6 +55,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       attempt: s.attempt,
       score: s.score,
       passed: s.passed,
+      passThreshold: s.passThreshold,
       episode: s.episode
         ? {
             id: s.episode.id,
@@ -186,17 +186,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const authed = await authenticateRequest(request);
     if (!authed) return errorResponse('Unauthorized', 401);
     const { classId } = await params;
-    const parsed = z
-      .object({
-        scope: z.enum(['class', 'sections']).optional(),
-        pristineSnapshot: pristineSnapshotSchema.optional(),
-        expectedAttempt: z.number().int().positive(),
-      })
-      .safeParse(await request.json().catch(() => ({})));
+    const parsed = classRegenerationRequestSchema.safeParse(await request.json().catch(() => ({})));
     if (!parsed.success) return errorResponse('Invalid regeneration request', 400);
     const body = parsed.data;
-    if (body.pristineSnapshot && body.scope !== 'class')
-      return errorResponse('Pristine regeneration requires class scope', 400);
 
     {
       const cls = await prisma.courseClass.findFirst({
@@ -214,13 +206,16 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
             classId,
             expectedAttempt: body.expectedAttempt,
             ...(body.pristineSnapshot ? { pristineSnapshot: body.pristineSnapshot } : {}),
+            ...(body.scope === 'section'
+              ? { retry: { sectionId: body.sectionId!, expectedRevision: body.expectedRevision! } }
+              : {}),
           },
         }
       );
       return NextResponse.json(
         {
           started: true,
-          scope: body.scope === 'class' ? 'class' : 'sections',
+          scope: body.scope ?? 'sections',
           status: 'GENERATING',
           operationId: operation.id,
           courseId: cls.courseId,

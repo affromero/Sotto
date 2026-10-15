@@ -24,6 +24,7 @@ interface GrammarSectionProps {
   sourceId: string;
   skill: 'GRAMMAR' | 'READING';
   questions: ClassQuestion[];
+  savedAnswers?: Record<string, number>;
   gate: number; // 0..100
   nextName: string | null;
   /**
@@ -38,6 +39,9 @@ interface GrammarSectionProps {
   onFeedback?: (note: ClassFeedbackNote) => void;
   feedbackHref?: string;
   onContinue: () => void;
+  onCompletionChange?: (complete: boolean, passed: boolean) => void;
+  onRetry?: () => void;
+  retrying?: boolean;
 }
 
 const SKILL_COPY: Record<'GRAMMAR' | 'READING', { eyebrow: string; title: string; lede: string }> =
@@ -59,6 +63,7 @@ export function GrammarSection({
   sourceId,
   skill,
   questions,
+  savedAnswers = {},
   gate,
   nextName,
   references = [],
@@ -67,11 +72,26 @@ export function GrammarSection({
   onFeedback,
   feedbackHref = '#feedback-clinic',
   onContinue,
+  onCompletionChange,
+  onRetry,
+  retrying = false,
 }: GrammarSectionProps) {
   const total = questions.length;
-  const [pos, setPos] = useState(0);
   // picked[questionId] = selected option index
-  const [picked, setPicked] = useState<Record<string, number>>({});
+  const [picked, setPicked] = useState<Record<string, number>>(() =>
+    Object.fromEntries(
+      questions.flatMap((question) => {
+        const selected = savedAnswers[question.id];
+        return Number.isInteger(selected) && selected >= 0 && selected < question.options.length
+          ? [[question.id, selected]]
+          : [];
+      })
+    )
+  );
+  const [pos, setPos] = useState(() => {
+    const unanswered = questions.findIndex((question) => picked[question.id] === undefined);
+    return unanswered < 0 ? total : unanswered;
+  });
 
   const cur = questions[pos];
   const done = pos >= total;
@@ -86,12 +106,16 @@ export function GrammarSection({
     [questions, picked]
   );
 
-  const recall = total > 0 ? Math.round((correctCount / total) * 100) : 0;
-  const passed = done && recall >= gate;
+  const recall = total > 0 ? (correctCount / total) * 100 : 0;
+  const passed = done && total > 0 && correctCount / total >= gate / 100;
 
   useEffect(() => {
     onScore(recall);
   }, [recall, onScore]);
+
+  useEffect(() => {
+    onCompletionChange?.(done && total > 0, passed);
+  }, [done, total, passed, onCompletionChange]);
 
   function pick(optIndex: number) {
     if (!cur || picked[cur.id] !== undefined) return;
@@ -104,7 +128,6 @@ export function GrammarSection({
         skill,
         title: correct ? `${copy.eyebrow}: right choice` : `${copy.eyebrow}: review this`,
         body: cur.explanation,
-        score: correct ? 1 : 0,
         returnHref: '#class-active-stage',
         tone: correct ? 'good' : 'review',
       });
@@ -290,22 +313,28 @@ export function GrammarSection({
                 · {correctCount} of {total}
               </span>
             </div>
-            <p className={styles.drillPrompt}>
-              {passed ? (
-                <>
-                  Solid: you can tell them <em className={styles.emGood}>apart</em>.
-                </>
-              ) : (
-                <>
-                  Close. A couple still <em className={styles.emBad}>slipped</em>.
-                </>
-              )}
-            </p>
+            <h2 className={`${styles.drillPrompt} ${styles.resultTitle}`}>
+              {passed ? 'Ready to continue' : 'More practice needed'}
+            </h2>
             <div className={styles.drillEn}>
               {passed
-                ? 'The distinction is holding. Carry it forward.'
-                : 'Your final score is graded when you finish the class.'}
+                ? 'You reached the mastery gate. Continue when you are ready.'
+                : `You need ${gate}% to continue. Practise the missed concepts with new questions.`}
             </div>
+            {!passed && onRetry && total > 0 && (
+              <div className={styles.cactions}>
+                <button
+                  type="button"
+                  className={`${styles.btn} ${styles.btnPrimary}`}
+                  onClick={onRetry}
+                  disabled={retrying}
+                  aria-busy={retrying}
+                >
+                  {retrying ? 'Preparing new questions...' : 'Practise with new questions'}
+                  <ClassGlyph name="retry" size={16} />
+                </button>
+              </div>
+            )}
           </div>
         )}
 

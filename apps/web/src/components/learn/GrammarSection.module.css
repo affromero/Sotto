@@ -134,14 +134,8 @@
   text-wrap: pretty;
 }
 
-.emGood {
-  font-style: italic;
-  color: var(--good);
-}
-
-.emBad {
-  font-style: italic;
-  color: var(--bad);
+.resultTitle {
+  font-weight: 420;
 }
 
 .drillEn {

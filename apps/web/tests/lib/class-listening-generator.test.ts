@@ -44,6 +44,7 @@ import { authorizedLearnerExecution } from '../helpers/runtime/provider-executio
 import { captureGenerationFailure } from '@/lib/classes/quality/generation-failure';
 import { SectionQualityError } from '@/lib/classes/section-quality';
 import { classListeningTranscriptPolicy } from '@/lib/classes/class-language-policy';
+import { QuizRetryRepetitionError } from '@/lib/classes/quiz/retry';
 
 describe('Listening audio admission', () => {
   it('rejects obsolete class audio inside admission while preserving the saved episode', async () => {
@@ -74,6 +75,119 @@ describe('Listening audio admission', () => {
 // ---- Tests ----
 
 describe('generateClassListening', () => {
+  it('replaces an initially repeated quiz with fresh reviewed listening questions', async () => {
+    setupHappyPath();
+    const replacement = [
+      {
+        question: 'Which greeting opens the conversation?',
+        options: ['Hola', 'Adiós', 'Gracias', 'Por favor'],
+        correctIndex: 0,
+        explanation: 'Hola opens the conversation.',
+      },
+      {
+        question: 'What are the speakers doing?',
+        options: ['Writing', 'Reading', 'Listening', 'Speaking'],
+        correctIndex: 2,
+        explanation: 'This is listening practice.',
+      },
+      {
+        question: 'Who introduces the conversation?',
+        options: ['HOST', 'EXPERT', 'NARRATOR', 'GUEST'],
+        correctIndex: 0,
+        explanation: 'The host introduces the scene.',
+      },
+      {
+        question: 'Which topic do the speakers discuss?',
+        options: ['Weather', 'Numbers', 'Greetings', 'Food'],
+        correctIndex: 2,
+        explanation: 'They discuss greetings.',
+      },
+    ];
+    mockGenerateResponse
+      .mockResolvedValueOnce({
+        content: JSON.stringify({
+          questions: [
+            { ...replacement[0], question: 'What does "hola" mean?' },
+            ...replacement.slice(1),
+          ],
+        }),
+        model: 'm',
+      })
+      .mockResolvedValue({ content: JSON.stringify({ questions: replacement }), model: 'm' });
+    await generateClassListening({
+      ...PARAMS,
+      retry: {
+        previousQuestions: [
+          { question: 'What does "hola" mean?', options: ['hello', 'goodbye', 'please', 'thanks'] },
+        ],
+        missedQuestions: [],
+      },
+    });
+    const saved = mockLessonQuestionCreateMany.mock.calls[0][0].data;
+    expect(saved).toEqual(
+      expect.arrayContaining([expect.objectContaining({ question: replacement[0].question })])
+    );
+    expect(
+      saved.some((question: { question: string }) => question.question === 'What does "hola" mean?')
+    ).toBe(false);
+    expect(mockGenerateResponse.mock.calls[1][0]).toContain('previous candidate repeated');
+  });
+
+  it('refuses repeated listening questions before publishing a replacement or starting audio', async () => {
+    setupHappyPath();
+    await expect(
+      generateClassListening({
+        ...PARAMS,
+        retry: {
+          previousQuestions: [
+            {
+              question: 'What does "hola" mean?',
+              options: ['hello', 'goodbye', 'please', 'thanks'],
+            },
+          ],
+          missedQuestions: [
+            {
+              question: 'What does "hola" mean?',
+              selectedAnswer: 'goodbye',
+              explanation: 'Review greetings.',
+            },
+          ],
+        },
+      })
+    ).rejects.toBeInstanceOf(QuizRetryRepetitionError);
+    expect(mockClassSectionCreate).not.toHaveBeenCalled();
+    expect(mockCreateSegmentsAndQueueAudio).not.toHaveBeenCalled();
+    expect(mockEpisodeUpdate).toHaveBeenCalledWith({
+      where: { id: 'episode-1' },
+      data: { status: 'FAILED' },
+    });
+  });
+
+  it('uses missed listening concepts to prepare a fresh reviewed exercise', async () => {
+    setupHappyPath();
+    const result = await generateClassListening({
+      ...PARAMS,
+      retry: {
+        previousQuestions: [
+          { question: 'Which greeting did Ana use yesterday?', options: ['Hola', 'Adiós'] },
+        ],
+        missedQuestions: [
+          {
+            question: 'Which greeting did Ana use yesterday?',
+            selectedAnswer: 'Adiós',
+            explanation: 'Review greetings.',
+          },
+        ],
+      },
+    });
+    expect(result).toMatchObject({ sectionId: 'section-1', episodeId: 'episode-1' });
+    expect(mockLessonQuestionCreateMany.mock.calls[0][0].data).toEqual(
+      expect.arrayContaining([expect.objectContaining({ question: 'What does "hola" mean?' })])
+    );
+    expect(mockGenerateResponse.mock.calls[0][0]).toContain('Review greetings.');
+    expect(mockGenerateScript.mock.calls[0][0].focusAreas.join(' ')).toContain('Review greetings.');
+  });
+
   it('blocks default listening while speech is disabled even with a configured cloud provider', async () => {
     setupHappyPath();
     mockGetConfiguredTtsProviderId.mockReturnValue('cartesia');

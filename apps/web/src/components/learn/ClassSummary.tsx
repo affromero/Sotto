@@ -182,6 +182,9 @@ export function FeedbackClinic({
   feedbackNotes = [],
   returnHref,
   returnLabel = 'Back to class',
+  liveSection,
+  onRetrySection,
+  retrying = false,
 }: {
   result?: ClassSubmitResult | null;
   sections: ClassSection[];
@@ -189,8 +192,17 @@ export function FeedbackClinic({
   feedbackNotes?: ClassFeedbackNote[];
   returnHref?: string;
   returnLabel?: string;
+  liveSection?: {
+    id: string;
+    skill: string;
+    score: number;
+    complete: boolean;
+    passed: boolean;
+  } | null;
+  onRetrySection?: () => void;
+  retrying?: boolean;
 }) {
-  const weakSections = (result?.sections ?? [])
+  const weakSections = (result?.sections ?? (liveSection?.complete ? [liveSection] : []))
     .filter((section) => !section.passed || section.score < 0.82)
     .sort((a, b) => a.score - b.score)
     .slice(0, 3);
@@ -226,23 +238,26 @@ export function FeedbackClinic({
           <article className={styles.clinicCard}>
             <h3>Live notes</h3>
             <div className={styles.feedbackNoteList}>
-              {feedbackNotes.slice(0, 5).map((note) => (
-                <div
-                  className={`${styles.feedbackNote} ${
-                    note.tone === 'good' ? styles.feedbackNoteGood : styles.feedbackNoteReview
-                  }`}
-                  key={note.id}
-                >
-                  <div className={styles.speechLine}>
-                    <span>{note.title}</span>
-                    {typeof note.score === 'number' && <b>{formatPercent(note.score)}</b>}
+              {[...feedbackNotes]
+                .sort((left, right) => Number(left.tone === 'good') - Number(right.tone === 'good'))
+                .slice(0, 5)
+                .map((note) => (
+                  <div
+                    className={`${styles.feedbackNote} ${
+                      note.tone === 'good' ? styles.feedbackNoteGood : styles.feedbackNoteReview
+                    }`}
+                    key={note.id}
+                  >
+                    <div className={styles.speechLine}>
+                      <span>{note.title}</span>
+                      {typeof note.score === 'number' && <b>{formatPercent(note.score)}</b>}
+                    </div>
+                    <p className={styles.clinicText}>{note.body}</p>
+                    <a className={styles.returnLink} href={note.returnHref}>
+                      Return to current exercise
+                    </a>
                   </div>
-                  <p className={styles.clinicText}>{note.body}</p>
-                  <a className={styles.returnLink} href={note.returnHref}>
-                    Return to current exercise
-                  </a>
-                </div>
-              ))}
+                ))}
             </div>
           </article>
         )}
@@ -254,14 +269,29 @@ export function FeedbackClinic({
               {weakSections.map((section) => (
                 <div key={section.id} className={styles.drillRow}>
                   <span>{skillLabel(section.skill)}</span>
-                  <b>{formatPercent(section.score)}</b>
+                  <b>{formatPercent(section.score, !section.passed)}</b>
                 </div>
               ))}
             </div>
           ) : (
             <p className={styles.clinicText}>
-              No weak skill score stood out yet. This updates as the class is graded.
+              {result
+                ? 'No sections need extra practice.'
+                : liveSection?.complete
+                  ? 'The current activity cleared its gate.'
+                  : 'Finish the current activity to see its score and next steps.'}
             </p>
+          )}
+          {liveSection?.complete && !liveSection.passed && onRetrySection && (
+            <button
+              type="button"
+              className={`${styles.btn} ${styles.btnBare}`}
+              disabled={retrying}
+              aria-busy={retrying}
+              onClick={onRetrySection}
+            >
+              {retrying ? 'Preparing new questions...' : 'Practise with new questions'}
+            </button>
           )}
         </article>
 
@@ -380,8 +410,8 @@ export function FeedbackClinic({
   );
 }
 
-function formatPercent(value: number): string {
-  return `${Math.round(value * 100)}%`;
+function formatPercent(value: number, belowGate = false): string {
+  return `${belowGate ? Math.floor(value * 1000) / 10 : Math.round(value * 100)}%`;
 }
 
 function formatFocusToken(token: ClassSpeakingAlignmentToken): string {

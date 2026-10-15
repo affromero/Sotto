@@ -111,17 +111,33 @@ export const practiceGenerationActionSchema = z
   })
   .strict();
 
-export const classRegenerationRequestSchema = z.object({
-  scope: z.enum(['class', 'sections']).optional(),
-  expectedAttempt: z.number().int().positive(),
-  pristineSnapshot: z
-    .string()
-    .regex(/^[a-f0-9]{64}$/)
-    .optional(),
-});
+export const classRegenerationRequestSchema = z
+  .object({
+    scope: z.enum(['class', 'sections', 'section']).optional(),
+    expectedAttempt: z.number().int().positive(),
+    sectionId: z.string().min(1).optional(),
+    expectedRevision: z.number().int().nonnegative().optional(),
+    pristineSnapshot: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/)
+      .optional(),
+  })
+  .superRefine((request, context) => {
+    if (
+      request.scope === 'section'
+        ? request.sectionId === undefined || request.expectedRevision === undefined
+        : request.sectionId !== undefined || request.expectedRevision !== undefined
+    )
+      context.addIssue({
+        code: 'custom',
+        message: 'A section retry requires its section and saved progress revision.',
+      });
+    if (request.pristineSnapshot && request.scope !== 'class')
+      context.addIssue({ code: 'custom', message: 'Pristine regeneration requires class scope.' });
+  });
 export const classRegenerationAcceptedSchema = z.object({
   started: z.literal(true),
-  scope: z.enum(['class', 'sections']),
+  scope: z.enum(['class', 'sections', 'section']),
   status: z.literal('GENERATING'),
   operationId: z.uuid(),
   courseId: z.string(),

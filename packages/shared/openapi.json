@@ -143,12 +143,21 @@
         "properties": {
           "scope": {
             "type": "string",
-            "enum": ["class", "sections"]
+            "enum": ["class", "sections", "section"]
           },
           "expectedAttempt": {
             "type": "integer",
             "minimum": 0,
             "exclusiveMinimum": true,
+            "maximum": 9007199254740991
+          },
+          "sectionId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 0,
             "maximum": 9007199254740991
           },
           "pristineSnapshot": {
@@ -168,7 +177,7 @@
           },
           "scope": {
             "type": "string",
-            "enum": ["class", "sections"]
+            "enum": ["class", "sections", "section"]
           },
           "status": {
             "type": "string",
@@ -2844,6 +2853,11 @@
           },
           "status": {
             "$ref": "#/components/schemas/SectionStatus"
+          },
+          "passThreshold": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
           },
           "questions": {
             "type": "array",

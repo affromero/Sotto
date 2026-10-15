@@ -217,7 +217,8 @@ export function ClassHub({
 
           <ol className={styles.activityList} aria-label="Class activities">
             {sections.map((section) => {
-              const score = scores[section.id] ?? section.score;
+              const score =
+                scores[section.id] ?? (section.score == null ? null : section.score * 100);
               const itemCount =
                 section.questions.length || section.prompts.length || section.writingPrompts.length;
               return (
@@ -231,7 +232,7 @@ export function ClassHub({
                   </div>
                   {score !== null && score !== undefined && (
                     <span className={score ? styles.activityScored : styles.activityScore}>
-                      {score}%
+                      {Math.round(score * 10) / 10}%
                     </span>
                   )}
                 </li>

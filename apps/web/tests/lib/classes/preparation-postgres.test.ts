@@ -36,6 +36,7 @@ import {
 } from '@/lib/classes/preparation';
 import { classPreparationGrant } from '@/lib/classes/preparation-grant';
 import { registerPreparationFailureTests } from './quality/preparation-failure-cases';
+import { registerQuizRetryAdmissionTests } from './quiz-retry/admission-cases';
 import { preparationProviderRequest } from '@/lib/classes/preparation-provider';
 import { capturedLearningAiOptions, resolveCapturedLearningAi } from '@/lib/learning-ai';
 import { createAIProvider } from '@/lib/providers/ai';
@@ -140,6 +141,7 @@ suite('durable preparation admission and provider accounting', () => {
   }
 
   registerPreparationFailureTests(() => ({ instance, courseId, execution, running, lesson }));
+  registerQuizRetryAdmissionTests(() => ({ instance, courseId, execution, lesson, queuedJob }));
 
   it.each(['local', 'disabled'] as const)(
     'captures the current %s speech policy for a new whole-class regeneration without changing old material',
