@@ -15,7 +15,7 @@ struct RootView: View {
                 if model.hasSelectedProfile {
                     if !model.hasAIConsent, let serverURL = model.credentials?.serverURL {
                         PrivacyConsentView(serverURL: serverURL) {
-                            model.acceptedAIScope = model.aiConsentScope
+                            model.acceptAIProcessing()
                         } onDecline: {
                             model.signOut()
                         }

@@ -1,0 +1,5 @@
+Answer class exercises directly with Apple Pencil in the workbook. Circle choices, edit sentences, and review the AI interpretation before submitting your answers.
+
+Speaking includes recording controls and clearer instructions about what to read aloud. Writing exercises provide the sentences and facts to work from, with guidance kept visible when writing by hand.
+
+AI permission is now remembered for each learner and server on this device. Submit is available at the end of the class, and Settings shows the installed version and build.

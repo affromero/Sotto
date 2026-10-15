@@ -6,6 +6,7 @@ struct HandwritingView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     let title: String
+    let guidance: String?
     let storageKey: String
     let onUseText: (String) -> Void
 
@@ -14,8 +15,9 @@ struct HandwritingView: View {
     @State private var canvas = PKCanvasView()
     @State private var showUnsavedConfirmation = false
 
-    init(title: String, storageKey: String, onUseText: @escaping (String) -> Void) {
+    init(title: String, guidance: String? = nil, storageKey: String, onUseText: @escaping (String) -> Void) {
         self.title = title
+        self.guidance = guidance
         self.storageKey = storageKey
         self.onUseText = onUseText
         _session = StateObject(wrappedValue: HandwritingSession(storageKey: storageKey))
@@ -26,6 +28,9 @@ struct HandwritingView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     Text(title).font(.title3).fixedSize(horizontal: false, vertical: true)
+                    if let guidance, !guidance.isEmpty {
+                        Text(guidance).font(.body).fixedSize(horizontal: false, vertical: true)
+                    }
                     Text("Write with Apple Pencil. Convert your handwriting on this device, then check the text before using it as your answer.")
                         .font(.callout).foregroundStyle(SottoTheme.muted)
                     HandwritingCanvas(canvas: canvas, drawing: Binding(get: { session.drawing }, set: { session.updateDrawing($0) }))

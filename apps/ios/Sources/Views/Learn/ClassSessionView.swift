@@ -145,6 +145,10 @@ struct ClassSessionView: View {
                 completionPercent: completionPercent
             )
             LearningSaveFailureView(progress: progress)
+            if model.pencilWorkbook && layout.supportsHandwriting {
+                Text("Write or mark your answers on each white exercise page with Apple Pencil. Use a finger to scroll. Tap Read my marks, check the interpretation, then Use reviewed answer. Record speaking below and tap Submit at the end for class feedback.")
+                    .font(.callout).foregroundStyle(SottoTheme.muted)
+            }
             pencilReviewStatus
             if let intro = currentClass.intro {
                 ClassIntroBlock(intro: intro, onSelectionHelp: openSelectionHelp)
@@ -191,13 +195,11 @@ struct ClassSessionView: View {
 
     @ViewBuilder
     private var workbookSubmissionFooter: some View {
-        if model.pencilWorkbook && layout.supportsHandwriting {
-            if !unreviewedPencilAnswers.isEmpty {
-                Text("Review your Pencil answers before submitting. Read my marks helps you check circles, edits, and handwriting.")
-                    .foregroundStyle(SottoTheme.primary)
-            }
-            submitButton.buttonStyle(SottoPrimaryButtonStyle())
+        if !unreviewedPencilAnswers.isEmpty {
+            Text("Review your Pencil answers before submitting. Read my marks helps you check circles, edits, and handwriting.")
+                .foregroundStyle(SottoTheme.primary)
         }
+        submitButton.buttonStyle(SottoPrimaryButtonStyle())
     }
 
     @ToolbarContentBuilder

@@ -39,6 +39,10 @@ struct ClassSpeakingPracticeView: View {
                 .font(.headline)
                 .foregroundStyle(SottoTheme.ink)
 
+            Text("Read the phrase under Say this aloud. Tap Record, then Stop and send when you finish. Your recording is sent for pronunciation feedback. The meaning is a reading aid; you do not need to say it.")
+                .font(.callout)
+                .foregroundStyle(SottoTheme.muted)
+
             ForEach(prompts.sorted { ($0.order ?? 0) < ($1.order ?? 0) }) { prompt in
                 ClassSpeakingPromptCard(
                     source: source,
@@ -129,7 +133,7 @@ private struct ClassSpeakingPromptCard: View {
                         Task { await startRecording() }
                     }
                 } label: {
-                    Label(isRecording ? "Stop" : "Record", systemImage: isRecording ? "stop.fill" : "mic.fill")
+                    Label(isRecording ? "Stop and send" : "Record", systemImage: isRecording ? "stop.fill" : "mic.fill")
                 }
                 .buttonStyle(SottoPrimaryButtonStyle())
                 .disabled(!isRecording && !saved.canRecord)

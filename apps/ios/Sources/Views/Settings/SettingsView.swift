@@ -68,11 +68,14 @@ struct SettingsView: View {
 
                     PrivacyPolicyLink()
                     Button("Withdraw AI permission and unpair") {
-                        model.signOut()
-                        dismiss()
+                        if model.signOut() { dismiss() }
                     }
                     .frame(minHeight: 44)
                     .disabled(isDeleting || isSaving)
+
+                    Text("Sotto \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "") (\(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? ""))")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(SottoTheme.muted)
 
                     if account != nil {
                         Button("Delete learner profile", role: .destructive) {
