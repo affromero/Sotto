@@ -146,4 +146,4 @@ jobs:
           -scheme Sotto
           -destination "platform=iOS Simulator,id=$SOTTO_IPHONE_SIMULATOR"
           -destination "platform=iOS Simulator,id=$SOTTO_IPAD_SIMULATOR"
-          CODE_SIGNING_ALLOWED=NO
+          CODE_SIGN_IDENTITY=-

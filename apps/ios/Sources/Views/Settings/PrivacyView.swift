@@ -57,7 +57,7 @@ struct PrivacyConsentView: View {
             VStack(alignment: .leading, spacing: 22) {
                 Text("Before you learn").font(.largeTitle.bold())
                 Text("You are connected to \(serverURL.host ?? serverURL.absoluteString).")
-                Text("Your learning requests, written answers, recordings, and transcripts may be sent to the AI and speech providers configured by this server's operator. They process this information to generate lessons, recognize speech, and provide feedback. Your server stores your learning activity and results.")
+                Text("Your learning requests, written answers, exercise images with your Pencil marks, recordings, and transcripts may be sent to the AI and speech providers configured by this server's operator. They process this information to generate lessons, read your marks, recognize speech, and provide feedback. Your server stores your learning activity and results.")
                 Text("Ask your server operator which providers are enabled and review their policies before continuing. Live translation asks separately before sending audio to Google Gemini.")
                 PrivacyPolicyLink()
                 Button("Allow AI processing", action: onAccept)

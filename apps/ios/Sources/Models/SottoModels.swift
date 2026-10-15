@@ -4,7 +4,8 @@ struct SottoCredentials: Codable, Equatable {
     let serverURL: URL
     let apiKey: String
     let user: SottoUser?
-    let selectedProfile: SottoProfile?
+    var selectedProfile: SottoProfile?
+    var acceptedAIScopes: [String]? = nil
 }
 
 struct SottoUser: Codable, Equatable {

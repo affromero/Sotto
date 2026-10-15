@@ -1,9 +1,17 @@
 import Foundation
 import Security
 
-struct CredentialStore {
+protocol SottoCredentialPersistence {
+    func load() throws -> SottoCredentials?
+    func save(_ credentials: SottoCredentials) throws
+    func delete() throws
+}
+
+struct CredentialStore: SottoCredentialPersistence {
     private let service = "fm.sotto.app"
-    private let account = "default"
+    private let account: String
+
+    init(account: String = "default") { self.account = account }
 
     func load() throws -> SottoCredentials? {
         var query = baseQuery()

@@ -1,9 +1,12 @@
 import { stat } from 'fs/promises';
 import { abortable } from 'thesidedoor-core/runtime/stream';
+import { ProcessExecutionError } from 'thesidedoor-core/runtime/process';
 import { AccessError } from 'thesidedoor-core/access';
 import { captureLocalUsageAccount } from '../account';
 import { homedir } from 'os';
 import path from 'path';
+import { installCurrentProviderCredentialSnapshot } from '../../agent-credentials';
+import { renewCodexUsageAccount, CodexRefreshError } from '../../agent-credentials/codex-refresh';
 import { logger } from '../../logger';
 import type {
   AgentUsageCacheEntry,
@@ -34,6 +37,9 @@ import {
 
 interface CodexCredentials {
   accessToken: string;
+  accountId: string;
+  home: string;
+  expiresAt: number | null;
   key: string;
 }
 
@@ -154,22 +160,39 @@ function parseCodexAdditionalWindows(
   return windows;
 }
 
-function parseCodexCredentials(value: unknown, authMtimeMs: number): CodexCredentials | null {
+function parseCodexCredentials(
+  value: unknown,
+  authMtimeMs: number,
+  home: string
+): CodexCredentials | null {
   const tokens = getRecord(value, 'tokens');
   const accessToken = getString(tokens?.access_token);
   if (!accessToken) return null;
 
   const accountId = getString(tokens?.account_id) ?? 'unknown';
   const lastRefresh = getString(isRecord(value) ? value.last_refresh : undefined) ?? '';
+  let expiresAt: number | null = null;
+  try {
+    const claims: unknown = JSON.parse(
+      Buffer.from(accessToken.split('.')[1], 'base64url').toString('utf8')
+    );
+    if (isRecord(claims)) expiresAt = getNumber(claims.exp);
+  } catch {
+    /* Opaque access tokens are checked by the provider. */
+  }
   return {
     accessToken,
+    accountId,
+    home,
+    expiresAt: expiresAt === null ? null : expiresAt * 1000,
     key: `${Math.round(authMtimeMs)}:${accountId}:${hashToken(accessToken)}:${lastRefresh}`,
   };
 }
 
 async function getCodexCredentials(signal?: AbortSignal): Promise<CodexCredentials | null> {
   signal?.throwIfAborted();
-  const codexHome = process.env.CODEX_HOME || path.join(homedir(), '.codex');
+  installCurrentProviderCredentialSnapshot('codex');
+  const codexHome = path.resolve(process.env.CODEX_HOME || path.join(homedir(), '.codex'));
   const authPath = path.join(codexHome, 'auth.json');
   const statResult = stat(authPath).catch(() => null);
   const [authJson, authStat] = await Promise.all([
@@ -178,7 +201,7 @@ async function getCodexCredentials(signal?: AbortSignal): Promise<CodexCredentia
   ]);
   signal?.throwIfAborted();
   if (!authJson || !authStat) return null;
-  return parseCodexCredentials(authJson, authStat.mtimeMs);
+  return parseCodexCredentials(authJson, authStat.mtimeMs, codexHome);
 }
 
 export function parseCodexUsagePayload(
@@ -261,12 +284,10 @@ export function parseCodexUsagePayload(
 export async function getCodexUsageProvider(
   context: UsageProviderContext
 ): Promise<AgentUsageProvider> {
-  const { credentials, admission, signal, fingerprint } = await captureLocalUsageAccount(
-    context,
-    'codex',
-    getCodexCredentials
-  );
-  const cacheKey = fingerprint();
+  const captured = await captureLocalUsageAccount(context, 'codex', getCodexCredentials);
+  let { credentials, admission, fingerprint } = captured;
+  const { signal } = captured;
+  let cacheKey = fingerprint();
   const now = Date.now();
   if (codexCache && codexCache.key === cacheKey && codexCache.expiresAt > now) {
     return structuredClone(codexCache.value);
@@ -298,18 +319,57 @@ export async function getCodexUsageProvider(
   }
 
   try {
+    let renewed = false;
+    const renew = async () => {
+      if (!credentials || renewed || credentials.accountId === 'unknown')
+        throw new CodexRefreshError('action_required');
+      renewed = true;
+      await admission.validate(signal);
+      const expected = credentials;
+      await renewCodexUsageAccount(
+        expected,
+        getCodexCredentials,
+        (renewalSignal) => admission.validate(renewalSignal),
+        signal
+      );
+      await admission.validate(signal);
+      const captured = await captureLocalUsageAccount(context, 'codex', getCodexCredentials);
+      if (
+        !captured.credentials ||
+        captured.credentials.accountId !== expected.accountId ||
+        captured.credentials.home !== expected.home
+      )
+        throw new CodexRefreshError('unavailable');
+      credentials = captured.credentials;
+      admission = captured.admission;
+      fingerprint = captured.fingerprint;
+      cacheKey = fingerprint();
+    };
+    if (credentials.expiresAt !== null && credentials.expiresAt <= Date.now()) await renew();
     const transport = admission.createTransport([
       { method: 'GET', url: 'https://chatgpt.com/backend-api/wham/usage' },
     ]);
-    const { response, payload } = await fetchJsonWithTimeout(
-      'https://chatgpt.com/backend-api/wham/usage',
-      {
-        signal,
-        headers: { Authorization: `Bearer ${credentials.accessToken}` },
-      },
-      CODEX_TIMEOUT_MS,
-      transport.authenticatedFetch
-    );
+    const fetchUsage = () =>
+      fetchJsonWithTimeout(
+        'https://chatgpt.com/backend-api/wham/usage',
+        {
+          signal,
+          headers: { Authorization: `Bearer ${credentials!.accessToken}` },
+        },
+        CODEX_TIMEOUT_MS,
+        transport.authenticatedFetch
+      );
+    let { response, payload } = await fetchUsage();
+    const authError = parseCodexUsagePayload(payload).errorCode;
+    if (
+      !renewed &&
+      (response.status === 401 ||
+        authError === 'token_expired' ||
+        authError === 'token_invalidated')
+    ) {
+      await renew();
+      ({ response, payload } = await fetchUsage());
+    }
 
     if (!response.ok) {
       const provider = buildProvider({
@@ -318,11 +378,10 @@ export async function getCodexUsageProvider(
         label: 'Codex',
         shortLabel: 'Codex',
         planLabel: null,
-        status:
-          response.status === 401 || response.status === 403 ? 'action_required' : 'unavailable',
+        status: response.status === 401 ? 'action_required' : 'unavailable',
         detail:
-          response.status === 401 || response.status === 403
-            ? 'Codex auth needs to be refreshed on this server.'
+          response.status === 401
+            ? 'Codex sign-in could not be renewed. Reconnect Codex on this server.'
             : 'Codex usage is unavailable right now.',
         windows: [],
         credits: null,
@@ -343,7 +402,7 @@ export async function getCodexUsageProvider(
         planLabel: null,
         status: needsAuth ? 'action_required' : 'unavailable',
         detail: needsAuth
-          ? 'Codex auth needs to be refreshed on this server.'
+          ? 'Codex sign-in could not be renewed. Reconnect Codex on this server.'
           : 'Codex usage is unavailable right now.',
         windows: [],
         credits: null,
@@ -367,8 +426,25 @@ export async function getCodexUsageProvider(
     return await publish(provider);
   } catch (error) {
     if (error instanceof AggregateError) throw error;
+    if (error instanceof ProcessExecutionError && error.code === 'cleanup_failed') throw error;
     signal.throwIfAborted();
     if (error instanceof AccessError) throw error;
+    if (error instanceof CodexRefreshError && error.reason === 'action_required') {
+      return publish(
+        buildProvider({
+          id: 'codex',
+          category: 'agent',
+          label: 'Codex',
+          shortLabel: 'Codex',
+          planLabel: null,
+          status: 'action_required',
+          detail: 'Codex sign-in could not be renewed. Reconnect Codex on this server.',
+          windows: [],
+          credits: null,
+          limitReached: false,
+        })
+      );
+    }
     logger.warn('Failed to fetch Codex usage status');
     const provider = buildProvider({
       id: 'codex',

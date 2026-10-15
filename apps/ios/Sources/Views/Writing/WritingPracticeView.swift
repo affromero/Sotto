@@ -110,6 +110,7 @@ private struct WritingPromptCard: View {
                     .sheet(isPresented: $showsHandwriting) {
                         HandwritingView(
                             title: prompt.task,
+                            guidance: prompt.guidance,
                             storageKey: LearningInkStore.scope(
                                 server: credentials.serverURL, profileID: profile.id,
                                 activity: "writing/\(prompt.id)"

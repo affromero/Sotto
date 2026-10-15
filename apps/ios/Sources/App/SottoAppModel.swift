@@ -22,22 +22,28 @@ final class SottoAppModel: ObservableObject {
     @Published private(set) var classGenerationOperations: [String: SottoLoadingOperation] = [:]
     @Published private(set) var classGenerationErrors: [String: String] = [:]
     @Published var errorMessage: String?
-    @Published var acceptedAIScope: String?
     @Published var courseRefreshError: String?
     var courseRefreshTasks: [SottoLearnerIdentity: SottoCourseRefreshRequest] = [:]
     var practiceCourses: [String: String] = [:]
     var practiceOverviewCourseId: String?
 
-    private let credentialStore = CredentialStore()
+    private let credentialStore: any SottoCredentialPersistence
     private let session: URLSession
     private var work: Task<Void, Never>?
     private var activeClassGenerationCourseId: String?
     private var cancelledClassGenerationCourseIds = Set<String>()
     private var classGenerationTasks: [String: Task<Void, Never>] = [:]
 
-    init(credentials: SottoCredentials? = nil, session: URLSession = .shared) {
+    init(credentials: SottoCredentials? = nil, session: URLSession = .shared,
+         credentialStore: any SottoCredentialPersistence = CredentialStore()) {
         self.session = session
+        self.credentialStore = credentialStore
         self.credentials = credentials ?? (try? credentialStore.load())
+    }
+
+    func persistCredentials(_ next: SottoCredentials) throws {
+        try credentialStore.save(next)
+        credentials = next
     }
 
     var isPaired: Bool {
@@ -105,9 +111,10 @@ final class SottoAppModel: ObservableObject {
         loadingOperation = nil
     }
 
-    func signOut() {
-        acceptedAIScope = nil
-        try? credentialStore.delete()
+    @discardableResult
+    func signOut() -> Bool {
+        do { try credentialStore.delete() }
+        catch { report(error); return false }
         credentials = nil
         profiles = []
         resetLearnerState()
@@ -116,19 +123,14 @@ final class SottoAppModel: ObservableObject {
         classGenerationTasks.values.forEach { $0.cancel() }
         classGenerationTasks.removeAll()
         errorMessage = nil
+        return true
     }
 
     func clearSelectedProfile() {
-        acceptedAIScope = nil
-        guard let credentials else { return }
-        let nextCredentials = SottoCredentials(
-            serverURL: credentials.serverURL,
-            apiKey: credentials.apiKey,
-            user: credentials.user,
-            selectedProfile: nil
-        )
-        try? credentialStore.save(nextCredentials)
-        self.credentials = nextCredentials
+        guard var nextCredentials = credentials else { return }
+        nextCredentials.selectedProfile = nil
+        do { try persistCredentials(nextCredentials) }
+        catch { report(error); return }
         resetLearnerState()
         errorMessage = nil
     }
@@ -150,16 +152,11 @@ final class SottoAppModel: ObservableObject {
     func selectProfile(_ profile: SottoProfile) async {
         guard let credentials else { return }
         let selected = profiles.first { $0.id == profile.id } ?? profile
-        let nextCredentials = SottoCredentials(
-            serverURL: credentials.serverURL,
-            apiKey: credentials.apiKey,
-            user: credentials.user,
-            selectedProfile: selected
-        )
+        var nextCredentials = credentials
+        nextCredentials.selectedProfile = selected
 
         do {
-            try credentialStore.save(nextCredentials)
-            self.credentials = nextCredentials
+            try persistCredentials(nextCredentials)
             resetLearnerState()
             await loadCourses()
         } catch {

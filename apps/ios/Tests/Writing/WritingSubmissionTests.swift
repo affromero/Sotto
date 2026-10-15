@@ -35,11 +35,11 @@ final class WritingSubmissionTests: XCTestCase {
             {
               "id": "wp_1",
               "order": 1,
-              "task": "Describe your weekend in five sentences.",
-              "guidance": null,
+              "task": "Transform into the past: Elle va au marché samedi.",
+              "guidance": "Keep the supplied person, place, and day.",
               "responses": [
                 {
-                  "text": "Ce week-end, je suis allée au marché.",
+                  "text": "Elle est allée au marché samedi.",
                   "overallScore": 0.8,
                   "corrections": [],
                   "feedback": "Nicely done."
@@ -51,7 +51,9 @@ final class WritingSubmissionTests: XCTestCase {
         )
 
         XCTAssertEqual(prompt.latestResponse?.overallScore, 0.8)
-        XCTAssertEqual(prompt.latestResponse?.text, "Ce week-end, je suis allée au marché.")
+        XCTAssertEqual(prompt.latestResponse?.text, "Elle est allée au marché samedi.")
+        XCTAssertTrue(prompt.task.contains("Elle va au marché samedi."))
+        XCTAssertEqual(prompt.guidance, "Keep the supplied person, place, and day.")
     }
 
     /// Older payloads and the practice start response omit `responses`.
