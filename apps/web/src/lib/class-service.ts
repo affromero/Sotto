@@ -125,7 +125,8 @@ async function buildSection(
   targetLang: string,
   note: string,
   attempt = 1,
-  over?: SectionOverride
+  over?: SectionOverride,
+  retry?: import('./classes/quiz/retry').QuizRetryContext
 ): Promise<void> {
   await assertClassStillGenerating(classId, attempt);
   const { grammarPoints, targetVocab } = lessonInputs(lesson);
@@ -155,6 +156,7 @@ async function buildSection(
     seed: section.seed,
     note,
     sourceContent: over?.sourceContent,
+    retry,
   });
   await assertClassStillGenerating(classId, attempt);
   await withClassGeneration(execution, classId, attempt, async (database) => {
@@ -235,6 +237,7 @@ interface ClassBuildCourse {
 interface ClassContentBuildParams {
   requirements: SkillRequirements;
   skills?: ReadonlySet<SkillType>;
+  retry?: import('./classes/quiz/retry').QuizRetryContext;
   existingSeed?: Prisma.InputJsonObject;
   deferAudio?: boolean;
   execution: import('@/lib/sidedoor/credentials/runtime/provider-execution').SottoProviderExecution;
@@ -297,7 +300,8 @@ async function buildClassContent(p: ClassContentBuildParams): Promise<Prisma.Inp
       p.requirements.targetLang,
       note,
       p.attempt,
-      { ...p.override, level: p.requirements.level }
+      { ...p.override, level: p.requirements.level },
+      p.retry
     );
   }
   await assertClassStillGenerating(p.classId, p.attempt);
@@ -337,6 +341,7 @@ async function buildClassContent(p: ClassContentBuildParams): Promise<Prisma.Inp
         sourceContent: p.listeningSource?.sourceContent,
         sourceMetadata: p.listeningSource?.sourceMetadata,
         sourceUrl: p.listeningSource?.sourceUrl,
+        retry: p.retry,
       });
       await assertClassStillGenerating(p.classId, p.attempt);
     } catch (err) {
@@ -585,6 +590,7 @@ export async function regenerateCurrentClass(
   pristineSnapshot?: string,
   lifecycle?: {
     repair?: boolean;
+    retry?: import('./classes/quiz/retry').QuizRetryContext;
     skills?: readonly SkillType[];
     requirements?: SkillRequirements;
     attempt?: number;
@@ -694,11 +700,12 @@ export async function regenerateCurrentClass(
     } else if (cls.sourceTitle) {
       override = { level: requirements.level, objective: cls.sourceTitle };
     }
-    if (repair && !skills?.has('READING'))
+    if (repair && !lifecycle?.retry && !skills?.has('READING'))
       await repairClassReadingMemory(cls, requirements, execution, attempt);
     const adaptiveSeed = await buildClassContent({
       requirements,
       skills,
+      retry: lifecycle?.retry,
       deferAudio: lifecycle?.deferAudio,
       existingSeed:
         repair &&

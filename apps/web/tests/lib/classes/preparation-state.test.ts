@@ -67,6 +67,40 @@ describe('durable class preparation state', () => {
     expect(startPreparation(queued, 2000).status).toBe('RUNNING');
     expect(startPreparation(queued, 3000)).toMatchObject({ status: 'FAILED', failure: 'expired' });
   });
+  it('retains the exact missed concepts and reading snapshot in durable retry state', async () => {
+    const operation = fixture();
+    operation.intent = {
+      kind: 'REPAIR',
+      classId: 'class-1',
+      attempt: 2,
+      priorStatus: 'IN_PROGRESS',
+      classFingerprint: 'c'.repeat(64),
+      skills: ['READING'],
+      retry: {
+        sectionId: 'reading-1',
+        expectedAttempt: 1,
+        expectedRevision: 4,
+        context: {
+          previousQuestions: [{ question: 'Who travelled?', options: ['Ana', 'Ben'] }],
+          missedQuestions: [
+            {
+              question: 'Who travelled?',
+              selectedAnswer: 'Ben',
+              explanation: 'Ana bought the ticket.',
+            },
+          ],
+        },
+        readingVocabulary: { passageText: 'Ana bought a ticket.' },
+      },
+    };
+    const backend = sqlStateBackend(
+      { query: async (sql, values) => database.prepare(sql).all(...(values as SQLInputValue[])) },
+      'sqlite',
+      'targeted-retry'
+    );
+    await backend.compareAndSwap(null, { revision: randomUUID(), state: operation });
+    expect((await preparationStore(backend).read())?.intent?.retry).toEqual(operation.intent.retry);
+  });
 
   it('fences interrupted executions instead of repeating their provider effects', async () => {
     const current = startPreparation(fixture(), 2000);

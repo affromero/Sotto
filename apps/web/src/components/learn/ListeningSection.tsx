@@ -45,6 +45,7 @@ interface ListeningSectionProps {
   sourceId: string;
   episode: ClassSectionEpisode | null;
   questions: ClassQuestion[];
+  savedAnswers?: Record<string, number>;
   gate: number; // 0..100
   nextName: string | null;
   onAnswer: (questionId: string, selectedIndex: number) => void;
@@ -52,6 +53,9 @@ interface ListeningSectionProps {
   onFeedback?: (note: ClassFeedbackNote) => void;
   feedbackHref?: string;
   onContinue: () => void;
+  onCompletionChange?: (complete: boolean, passed: boolean) => void;
+  onRetry?: () => void;
+  retrying?: boolean;
 }
 
 export function ListeningSection({
@@ -59,6 +63,7 @@ export function ListeningSection({
   sourceId,
   episode,
   questions,
+  savedAnswers = {},
   gate,
   nextName,
   onAnswer,
@@ -66,6 +71,9 @@ export function ListeningSection({
   onFeedback,
   feedbackHref = '#feedback-clinic',
   onContinue,
+  onCompletionChange,
+  onRetry,
+  retrying = false,
 }: ListeningSectionProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const wave = useMemo(() => genWave(BAR_COUNT), []);
@@ -75,7 +83,16 @@ export function ListeningSection({
   const [duration, setDuration] = useState(0);
   const [speed, setSpeed] = useState<number>(1);
   // picked[questionId] = selected option index
-  const [picked, setPicked] = useState<Record<string, number>>({});
+  const [picked, setPicked] = useState<Record<string, number>>(() =>
+    Object.fromEntries(
+      questions.flatMap((question) => {
+        const selected = savedAnswers[question.id];
+        return Number.isInteger(selected) && selected >= 0 && selected < question.options.length
+          ? [[question.id, selected]]
+          : [];
+      })
+    )
+  );
 
   const total = questions.length;
   const answered = questions.filter((q) => picked[q.id] !== undefined).length;
@@ -84,13 +101,17 @@ export function ListeningSection({
     if (sel === undefined || q.correctIndex === undefined) return n;
     return n + (sel === q.correctIndex ? 1 : 0);
   }, 0);
-  const score = total > 0 ? Math.round((correctCount / total) * 100) : 0;
+  const score = total > 0 ? (correctCount / total) * 100 : 0;
   const allDone = answered === total;
-  const passed = allDone && score >= gate;
+  const passed = allDone && total > 0 && correctCount / total >= gate / 100;
 
   useEffect(() => {
     onScore(score);
   }, [score, onScore]);
+
+  useEffect(() => {
+    onCompletionChange?.(allDone && total > 0, passed);
+  }, [allDone, total, passed, onCompletionChange]);
 
   // Keep playback rate synced to the speed control.
   useEffect(() => {
@@ -119,7 +140,6 @@ export function ListeningSection({
         skill: 'LISTENING',
         title: correct ? 'Listening: heard it' : 'Listening: review this',
         body: question.explanation,
-        score: correct ? 1 : 0,
         returnHref: '#class-active-stage',
         tone: correct ? 'good' : 'review',
       });
@@ -295,6 +315,22 @@ export function ListeningSection({
             );
           })}
         </div>
+
+        {allDone && total > 0 && !passed && onRetry && (
+          <div className={styles.retrySection}>
+            <p>Practise the missed concepts with new questions and new listening audio.</p>
+            <button
+              type="button"
+              className={styles.retryButton}
+              onClick={onRetry}
+              disabled={retrying}
+              aria-busy={retrying}
+            >
+              {retrying ? 'Preparing new questions and audio...' : 'Practise with new questions'}
+              <ClassGlyph name="retry" size={16} />
+            </button>
+          </div>
+        )}
 
         <ContinueBar
           passed={passed}

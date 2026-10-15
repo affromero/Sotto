@@ -252,7 +252,7 @@ describe('class reading flow', () => {
       scores: { 'grammar-1': 0 },
       sections: [
         activity('grammar-1', 'GRAMMAR'),
-        { ...activity('reading-1', 'READING'), score: 80, attempt: 2 },
+        { ...activity('reading-1', 'READING'), score: 0.8, attempt: 2 },
       ],
     });
     const activities = within(screen.getByRole('list', { name: 'Class activities' }));
@@ -260,5 +260,18 @@ describe('class reading flow', () => {
     expect(activities.getByText('80%')).toBeVisible();
     expect(activities.queryByText('Not started')).not.toBeInTheDocument();
     expect(screen.getByText('1 of 2 activities')).toBeVisible();
+  });
+
+  it('formats live percentages and stored score fractions without floating-point noise', () => {
+    renderClass({
+      scores: { 'grammar-1': 100 / 3 },
+      sections: [
+        activity('grammar-1', 'GRAMMAR'),
+        { ...activity('reading-1', 'READING'), score: 0.5890000000000001 },
+      ],
+    });
+    const activities = within(screen.getByRole('list', { name: 'Class activities' }));
+    expect(activities.getByText('33.3%')).toBeVisible();
+    expect(activities.getByText('58.9%')).toBeVisible();
   });
 });

@@ -67,6 +67,7 @@ import { TeachingQualityRejectionError } from '@/lib/classes/quality/teaching-qu
 import type { SectionGenParams } from '@/lib/class-generation';
 import type { SkillType } from '@sotto/shared';
 import { blockedProviderExecution } from '../helpers/runtime/provider-execution';
+import { registerQuizRetryTests } from './class-generation/retry-cases';
 import {
   GENERATED_PASSAGE,
   SAMPLE_QUESTIONS,
@@ -93,6 +94,7 @@ const BASE: SectionGenParams = {
   targetVocab: [{ lemma: 'descubrir', gloss: 'to discover' }],
   seed: 'class-1-READING-1',
 };
+registerQuizRetryTests(BASE, mockGenerateResponse, mockTeachingResponse);
 
 const PASSAGE = 'Una vez un científico descubrió algo importante en el laboratorio.';
 

@@ -111,6 +111,7 @@ export interface ClassSection {
   attempt: number;
   score: number | null;
   passed: boolean | null;
+  passThreshold?: number;
   episode: ClassSectionEpisode | null;
   questions: ClassQuestion[];
   prompts: ClassSpeakingPrompt[];

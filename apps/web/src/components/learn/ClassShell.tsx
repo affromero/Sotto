@@ -13,9 +13,13 @@
  * task card + textarea + inline corrections.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LearningSaveRecovery } from './progress/LearningSaveRecovery';
-import { retainedLearningProgress, useLearningProgress } from './progress/useLearningProgress';
+import {
+  flushLearningProgress,
+  retainedLearningProgress,
+  useLearningProgress,
+} from './progress/useLearningProgress';
 import { useRouter } from 'next/navigation';
 import { SottoSpinner } from '@/components/ui/SottoSpinner';
 import { ClassGlyph } from './ClassGlyph';
@@ -24,9 +28,12 @@ import { ClassSummary, FeedbackClinic } from './ClassSummary';
 import { GrammarSection } from './GrammarSection';
 import { ListeningSection } from './ListeningSection';
 import { SpeakingSection } from './SpeakingSection';
-import { WritingSection } from './WritingSection';
-import { useWritingDrafts } from './writing/useWritingDrafts';
+import { ClassWritingStage } from './WritingSection';
 import { ClassSources } from './ClassSources';
+import {
+  waitForClassRefresh as pollClassRefresh,
+  type ClassRefreshOptions,
+} from './recovery/classRefresh';
 import {
   SKILL_GLYPH,
   skillLabel,
@@ -38,7 +45,6 @@ import {
   type ClassSection,
   type ClassSpeakingRecording,
   type ClassSubmitResult,
-  type WritingPromptData,
   type WritingResponse,
 } from './classTypes';
 import styles from './ClassShell.module.css';
@@ -59,15 +65,8 @@ const SKILL_ORDER: Record<string, number> = {
   WRITING: 4,
 };
 
-const CLASS_REFRESH_POLL_INTERVAL_MS = 2000;
-const CLASS_REFRESH_TIMEOUT_MS = 10 * 60 * 1000;
-
 function orderSections(sections: ClassSection[]): ClassSection[] {
   return [...sections].sort((a, b) => (SKILL_ORDER[a.skill] ?? 99) - (SKILL_ORDER[b.skill] ?? 99));
-}
-
-function wait(ms: number): Promise<void> {
-  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
 function shouldReturnToLearn(errorMessage: string): boolean {
@@ -86,59 +85,6 @@ function isClassPresentationStillRendering(cls: ClassData): boolean {
   );
 }
 
-/**
- * The class flow's writing stage. It owns the segment's drafts so one button
- * grades them, which is also what opens the score gate below.
- */
-function ClassWritingStage({
-  classId,
-  progressRevision,
-  attempt,
-  prompts,
-  gate,
-  nextName,
-  onScore,
-  onFeedback,
-  onContinue,
-}: {
-  classId: string;
-  progressRevision: number;
-  attempt: number;
-  prompts: WritingPromptData[];
-  gate: number;
-  nextName: string | null;
-  onScore: (score: number) => void;
-  onFeedback: (promptId: string, response: WritingResponse) => void;
-  onContinue: () => void;
-}) {
-  const drafts = useWritingDrafts(
-    prompts,
-    `/api/v1/classes/${classId}/writing`,
-    onFeedback,
-    progressRevision,
-    String(attempt)
-  );
-
-  return (
-    <WritingSection
-      drafts={drafts}
-      prompts={prompts}
-      gate={gate}
-      nextName={nextName}
-      onScore={onScore}
-      feedbackHref="#feedback-clinic"
-      onContinue={onContinue}
-      submitAction={{
-        label: 'Check writing',
-        busyLabel: 'Checking…',
-        busy: drafts.isSubmitting,
-        disabled: drafts.isOverLimit,
-        onSubmit: () => void drafts.submit(!drafts.hasChanges),
-      }}
-    />
-  );
-}
-
 export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
   const router = useRouter();
   const [view, setView] = useState<View>('loading');
@@ -148,6 +94,11 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
   const [segIdx, setSegIdx] = useState(0);
   // running 0..100 score for the active segment (drives the rail + gate)
   const [curScore, setCurScore] = useState(0);
+  const [mcCompletion, setMcCompletion] = useState<{
+    sectionId: string;
+    complete: boolean;
+    passed: boolean;
+  } | null>(null);
   // committed 0..100 score per section id, max-kept
   const [scores, setScores] = useState<Record<string, number>>({});
   // selected option index per questionId, accumulated across all sections
@@ -169,6 +120,7 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
 
   const [result, setResult] = useState<ClassSubmitResult | null>(null);
   const [regenerating, setRegenerating] = useState(false);
+  const retryInFlight = useRef(false);
   const [autoRefreshing, setAutoRefreshing] = useState(false);
 
   const sections = useMemo(() => (cls ? orderSections(cls.sections) : []), [cls]);
@@ -187,7 +139,14 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
       })),
     [liveSpeakingRecordings, liveWritingResponses, sections]
   );
-  const gate = cls ? Math.round(cls.passThreshold * 100) : 70;
+  const gate = (sections[segIdx]?.passThreshold ?? cls?.passThreshold ?? 0.7) * 100;
+  const recordMcCompletion = useCallback(
+    (complete: boolean, passed: boolean) => {
+      const sectionId = sections[segIdx]?.id;
+      if (sectionId) setMcCompletion({ sectionId, complete, passed });
+    },
+    [sections, segIdx]
+  );
 
   // The class's verified sources live on the LISTENING episode (sourced classes).
   // Collected once for the Sources panel + READING citation resolution.
@@ -279,30 +238,10 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
     [classId, initialSectionId]
   );
 
-  const waitForClassRefresh = useCallback(async (): Promise<ClassData> => {
-    const startedAt = Date.now();
-    let lastIssues: string[] = [];
-
-    while (Date.now() - startedAt < CLASS_REFRESH_TIMEOUT_MS) {
-      await wait(CLASS_REFRESH_POLL_INTERVAL_MS);
-      const data = await fetchClassData();
-      const issues = data.submitted ? [] : classPresentationIssues(data);
-      lastIssues = issues;
-
-      if (data.status === 'FAILED') {
-        throw new Error(`Class refresh failed: ${issues.join(' ') || 'generation failed.'}`);
-      }
-      if (data.status !== 'GENERATING' && issues.length === 0) {
-        return data;
-      }
-    }
-
-    throw new Error(
-      `Class refresh timed out before required material was ready: ${
-        lastIssues.join(' ') || 'class is still incomplete.'
-      }`
-    );
-  }, [fetchClassData]);
+  const waitForClassRefresh = useCallback(
+    (options?: ClassRefreshOptions) => pollClassRefresh(fetchClassData, options),
+    [fetchClassData]
+  );
 
   const loadClass = useCallback(async () => {
     try {
@@ -476,6 +415,91 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
     }
   }
 
+  async function handleRetrySection() {
+    const section = sections[segIdx];
+    if (!cls || !section || retryInFlight.current) return;
+    retryInFlight.current = true;
+    setRegenerating(true);
+    setErrorMessage('');
+    try {
+      const expectedRevision = await flushLearningProgress(
+        `/api/v1/classes/${classId}`,
+        String(cls.attempt ?? 1),
+        cls.progressRevision ?? 0
+      );
+      const res = await fetch(`/api/v1/classes/${classId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scope: 'section',
+          sectionId: section.id,
+          expectedAttempt: cls.attempt ?? 1,
+          expectedRevision,
+        }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(body.error ?? 'New questions could not be prepared. Please try again.');
+      }
+      const accepted = (await res.json()) as { operationId?: string };
+      if (!accepted.operationId)
+        throw new Error(
+          'Preparation was accepted without an operation ID. Please reload the class to check its status.'
+        );
+      const applyMaterial = (data: ClassData) => {
+        const questionIds = new Set(
+          data.sections.flatMap((item) => item.questions.map((question) => question.id))
+        );
+        const sectionIds = new Set(data.sections.map((item) => item.id));
+        setCls(data);
+        setAnswers((previous) =>
+          Object.fromEntries(
+            Object.entries({ ...previous, ...data.learnerAnswers }).filter(([id]) =>
+              questionIds.has(id)
+            )
+          )
+        );
+        setScores((previous) =>
+          Object.fromEntries(Object.entries(previous).filter(([id]) => sectionIds.has(id)))
+        );
+      };
+      const retainedIds = new Set(
+        sections.filter((item) => item.id !== section.id).map((item) => item.id)
+      );
+      const replacementIn = (data: ClassData) =>
+        data.sections.find(
+          (item) =>
+            item.skill === section.skill &&
+            item.id !== section.id &&
+            !retainedIds.has(item.id) &&
+            item.attempt > section.attempt
+        );
+      const data = await waitForClassRefresh({
+        isExpectedMaterial: (candidate) =>
+          (candidate.attempt ?? 1) > (cls.attempt ?? 1) && Boolean(replacementIn(candidate)),
+        operation: { id: accepted.operationId, courseId: cls.courseId, onStopped: applyMaterial },
+      });
+      const ordered = orderSections(data.sections);
+      const replacement = replacementIn(data);
+      if (!replacement)
+        throw new Error('The new questions are not ready. Please reload the class.');
+      const oldQuestionNotes = new Set(
+        section.questions.map((question) => `${section.skill}:${question.id}`)
+      );
+      applyMaterial(data);
+      setFeedbackNotes((previous) => previous.filter((note) => !oldQuestionNotes.has(note.id)));
+      setMcCompletion(null);
+      setSegIdx(ordered.findIndex((item) => item.id === replacement.id));
+      setCurScore(0);
+      setView('hour');
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Network error. Please try again.');
+    } finally {
+      retryInFlight.current = false;
+      setRegenerating(false);
+    }
+  }
+
   async function handleRegenerateClass() {
     setRegenerating(true);
     setErrorMessage('');
@@ -560,7 +584,12 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
   let stage: React.ReactNode = null;
   const nextName = segIdx < sections.length - 1 ? skillLabel(sections[segIdx + 1].skill) : null;
   const activeSection = sections[segIdx];
+  const liveMcResult =
+    activeSection && mcCompletion?.sectionId === activeSection.id
+      ? { id: activeSection.id, skill: activeSection.skill, score: curScore / 100, ...mcCompletion }
+      : null;
   const hasLiveFeedback =
+    Boolean(liveMcResult?.complete) ||
     feedbackNotes.length > 0 ||
     feedbackSections.some(
       (section) =>
@@ -624,11 +653,12 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
       if (seg.skill === 'GRAMMAR' || seg.skill === 'READING') {
         stage = (
           <GrammarSection
-            key={seg.id}
+            key={`${seg.id}:${seg.attempt}`}
             courseId={cls.courseId}
             sourceId={seg.id}
             skill={seg.skill}
             questions={seg.questions}
+            savedAnswers={answers}
             gate={gate}
             nextName={nextName}
             references={passageReferences}
@@ -637,16 +667,20 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
             onFeedback={upsertFeedbackNote}
             feedbackHref="#feedback-clinic"
             onContinue={advanceHour}
+            onCompletionChange={recordMcCompletion}
+            onRetry={() => void handleRetrySection()}
+            retrying={regenerating}
           />
         );
       } else if (seg.skill === 'LISTENING') {
         stage = (
           <ListeningSection
-            key={seg.id}
+            key={`${seg.id}:${seg.attempt}`}
             courseId={cls.courseId}
             sourceId={seg.id}
             episode={seg.episode}
             questions={seg.questions}
+            savedAnswers={answers}
             gate={gate}
             nextName={nextName}
             onAnswer={recordAnswer}
@@ -654,6 +688,9 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
             onFeedback={upsertFeedbackNote}
             feedbackHref="#feedback-clinic"
             onContinue={advanceHour}
+            onCompletionChange={recordMcCompletion}
+            onRetry={() => void handleRetrySection()}
+            retrying={regenerating}
           />
         );
       } else if (seg.skill === 'SPEAKING') {
@@ -719,6 +756,7 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
             completionPct={completionPct}
             gate={gate}
             isSummary={view === 'summary'}
+            busy={regenerating}
             onLeave={() => setView('hub')}
             onJump={(i) => {
               if (view === 'hour' && i <= segIdx) {
@@ -751,6 +789,9 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
               sections={feedbackSections}
               vocabulary={cls.vocabulary}
               feedbackNotes={feedbackNotes}
+              liveSection={liveMcResult}
+              retrying={regenerating}
+              onRetrySection={() => void handleRetrySection()}
               returnHref="#class-active-stage"
               returnLabel={
                 activeSection ? `Back to ${skillLabel(activeSection.skill)}` : 'Back to class'
@@ -825,6 +866,7 @@ interface TimelineRailProps {
   completionPct: number;
   gate: number;
   isSummary: boolean;
+  busy: boolean;
   onLeave: () => void;
   onJump: (index: number) => void;
 }
@@ -837,13 +879,14 @@ function TimelineRail({
   completionPct,
   gate,
   isSummary,
+  busy,
   onLeave,
   onJump,
 }: TimelineRailProps) {
   return (
     <>
       <div className={styles.ctlHead}>
-        <button type="button" className={styles.ctlLeave} onClick={onLeave}>
+        <button type="button" className={styles.ctlLeave} onClick={onLeave} disabled={busy}>
           <ClassGlyph name="back" size={13} /> Leave class
         </button>
       </div>
@@ -868,13 +911,14 @@ function TimelineRail({
 
       <div className={styles.ctl}>
         {sections.map((s, i) => {
+          const sectionGate = s.passThreshold === undefined ? gate : s.passThreshold * 100;
           let state: 'done' | 'active' | 'locked';
           if (isSummary) state = 'done';
           else if (i < segIdx) state = 'done';
           else if (i === segIdx) state = 'active';
           else state = 'locked';
 
-          const clickable = !isSummary && state === 'done';
+          const clickable = !busy && !isSummary && state === 'done';
           const committed = scores[s.id] ?? 0;
           const mini = state === 'done' ? committed || 100 : state === 'active' ? curScore : 0;
 
@@ -909,7 +953,7 @@ function TimelineRail({
               </span>
               <span className={styles.ctlBody}>
                 <span className={styles.ctlName}>{skillLabel(s.skill)}</span>
-                <span className={styles.ctlMeta}>gate {gate}%</span>
+                <span className={styles.ctlMeta}>gate {sectionGate}%</span>
                 <span className={styles.ctlMini}>
                   <i style={{ width: `${Math.min(100, mini)}%` }} />
                 </span>

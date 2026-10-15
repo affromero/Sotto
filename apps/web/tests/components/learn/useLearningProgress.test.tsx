@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  flushLearningProgress,
   reconcileLearningProgress,
   retainedLearningProgress,
   useLearningProgress,
@@ -8,6 +9,83 @@ import {
 
 afterEach(() => vi.unstubAllGlobals());
 describe('learning progress persistence', () => {
+  it('confirms debounced answers before returning the revision for replacement material', async () => {
+    let saved: unknown;
+    vi.stubGlobal('fetch', async (_input: RequestInfo | URL, init?: RequestInit) => {
+      saved = JSON.parse(String(init?.body));
+      return Response.json({ progressRevision: 8 });
+    });
+    const endpoint = '/api/v1/classes/flush-before-replacement';
+    const hook = renderHook(
+      ({ answers }) => useLearningProgress(endpoint, { answers }, true, 7, '2'),
+      { initialProps: { answers: {} as Record<string, number> } }
+    );
+    hook.rerender({ answers: { q1: 1, q2: 0 } });
+    await act(async () => {
+      expect(await flushLearningProgress(endpoint, '2', 7)).toBe(8);
+    });
+    expect(saved).toEqual({ answers: { q1: 1, q2: 0 }, expectedRevision: 7 });
+    expect(JSON.parse(sessionStorage.getItem(`learning:${endpoint}/2`)!).pending).toBeNull();
+    hook.unmount();
+  });
+
+  it('waits for an in-flight save and the edits queued behind it', async () => {
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const saved: unknown[] = [];
+    vi.stubGlobal('fetch', async (_input: RequestInfo | URL, init?: RequestInit) => {
+      saved.push(JSON.parse(String(init?.body)));
+      if (saved.length === 1) await held;
+      return Response.json({ progressRevision: saved.length + 3 });
+    });
+    const endpoint = '/api/v1/classes/flush-serialized-edits';
+    const hook = renderHook(
+      ({ answers }) => useLearningProgress(endpoint, { answers }, true, 3, '1'),
+      { initialProps: { answers: {} as Record<string, number> } }
+    );
+    hook.rerender({ answers: { q1: 1 } });
+    act(() => window.dispatchEvent(new Event('pagehide')));
+    hook.rerender({ answers: { q1: 1, q2: 0 } });
+    let confirmed = false;
+    const confirmation = flushLearningProgress(endpoint, '1', 3).then((revision) => {
+      confirmed = true;
+      return revision;
+    });
+    await Promise.resolve();
+    expect(confirmed).toBe(false);
+    await act(async () => {
+      release();
+      expect(await confirmation).toBe(5);
+    });
+    expect(saved).toEqual([
+      { answers: { q1: 1 }, expectedRevision: 3 },
+      { answers: { q2: 0 }, expectedRevision: 4 },
+    ]);
+    hook.unmount();
+  });
+
+  it('blocks replacement when saving fails and retains answers for recovery', async () => {
+    vi.stubGlobal('fetch', async () =>
+      Response.json({ error: 'Progress service unavailable' }, { status: 503 })
+    );
+    const endpoint = '/api/v1/classes/flush-failed-save';
+    const hook = renderHook(
+      ({ answers }) => useLearningProgress(endpoint, { answers }, true, 4, '1'),
+      { initialProps: { answers: {} as Record<string, number> } }
+    );
+    hook.rerender({ answers: { q1: 0 } });
+    await act(async () => {
+      await expect(flushLearningProgress(endpoint, '1', 4)).rejects.toThrow(
+        'Progress service unavailable'
+      );
+    });
+    expect(hook.result.current).toBe('Progress service unavailable');
+    expect(retainedLearningProgress(endpoint, {}, 4, '1').answers).toEqual({ q1: 0 });
+    hook.unmount();
+  });
+
   it('flushes the most recent draft when the learner leaves before the debounce', async () => {
     let saved: unknown;
     vi.stubGlobal('fetch', async (_input: RequestInfo | URL, init?: RequestInit) => {

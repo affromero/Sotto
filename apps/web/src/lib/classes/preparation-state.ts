@@ -4,6 +4,35 @@ import { OptimisticStateStore } from 'thesidedoor-core/storage/optimistic';
 import type { AtomicStateBackend } from 'thesidedoor-core/storage/optimistic';
 import { delegationBindingSchema } from 'thesidedoor-core/runtime/delegation';
 
+export const quizRetryContextSchema = z
+  .object({
+    previousQuestions: z
+      .array(
+        z
+          .object({
+            question: z.string().min(1).max(16000),
+            options: z.array(z.string().max(8000)).min(2).max(4),
+          })
+          .strict()
+      )
+      .min(1)
+      .max(1000),
+    missedQuestions: z
+      .array(
+        z
+          .object({
+            question: z.string().min(1).max(16000),
+            selectedAnswer: z.string().min(1).max(8000),
+            explanation: z.string().min(1).max(32000),
+          })
+          .strict()
+      )
+      .min(1)
+      .max(5),
+  })
+  .strict()
+  .refine((value) => new TextEncoder().encode(JSON.stringify(value)).length <= 262144);
+
 export const preparationSchema = z
   .object({
     id: z.uuid(),
@@ -27,6 +56,16 @@ export const preparationSchema = z
         priorStatus: z.string().min(1),
         classFingerprint: z.string().regex(/^[a-f0-9]{64}$/),
         skills: z.array(z.enum(['GRAMMAR', 'READING', 'LISTENING', 'SPEAKING', 'WRITING'])),
+        retry: z
+          .object({
+            sectionId: z.string().min(1),
+            expectedAttempt: z.number().int().positive(),
+            expectedRevision: z.number().int().nonnegative(),
+            context: quizRetryContextSchema,
+            readingVocabulary: z.json().optional(),
+          })
+          .strict()
+          .optional(),
       })
       .strict()
       .optional(),

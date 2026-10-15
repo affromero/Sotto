@@ -147,6 +147,25 @@ describe('GET /api/v1/classes/[classId]', () => {
       explanation: SAMPLE_CLASS_UNSUBMITTED.sections[0].questions[0].explanation,
     });
   });
+  it('preserves the section mastery threshold independently of the class threshold', async () => {
+    mockGetClassForUser.mockResolvedValue({
+      ...SAMPLE_CLASS_UNSUBMITTED,
+      passThreshold: 0.6,
+      sections: SAMPLE_CLASS_UNSUBMITTED.sections.map((section) => ({
+        ...section,
+        passThreshold: 0.85,
+      })),
+    });
+    const response = await GET(
+      makeRequest('http://localhost/api/v1/classes/class-1', 'GET'),
+      classParams('class-1')
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      passThreshold: 0.6,
+      sections: [{ passThreshold: 0.85 }],
+    });
+  });
 
   it('returns SPEAKING section prompts (phrase + translation + reference audio)', async () => {
     mockGetClassForUser.mockResolvedValue(SAMPLE_CLASS_SPEAKING);
@@ -277,6 +296,38 @@ describe('POST /api/v1/classes/[classId]', () => {
     expect(await response.json()).toMatchObject({
       error: expect.stringMatching(/cleanup.*confirmed/i),
     });
+  });
+  it('admits a targeted section retry with its confirmed progress revision', async () => {
+    const response = await POST(
+      makeRequest('http://localhost/api/v1/classes/class-1', 'POST', {
+        scope: 'section',
+        sectionId: 'grammar-1',
+        expectedAttempt: 3,
+        expectedRevision: 8,
+      }),
+      classParams('class-1')
+    );
+    expect(response.status).toBe(202);
+    expect(await response.json()).toMatchObject({ scope: 'section', operationId: 'operation-1' });
+    expect(mockRequestPreparation.mock.calls.at(-1)?.[2]).toMatchObject({
+      intent: {
+        kind: 'REPAIR',
+        classId: 'class-1',
+        expectedAttempt: 3,
+        retry: { sectionId: 'grammar-1', expectedRevision: 8 },
+      },
+    });
+  });
+  it.each([
+    { scope: 'section', expectedAttempt: 1, sectionId: 'grammar-1' },
+    { scope: 'section', expectedAttempt: 1, expectedRevision: 0 },
+    { scope: 'sections', expectedAttempt: 1, sectionId: 'grammar-1', expectedRevision: 0 },
+  ])('rejects an incomplete or mismatched targeted retry request: %j', async (body) => {
+    const response = await POST(
+      makeRequest('http://localhost/api/v1/classes/class-1', 'POST', body),
+      classParams('class-1')
+    );
+    expect(response.status).toBe(400);
   });
   it.each([null, { courseId: 'course-1', status: 'PASSED' }])(
     'rejects an unavailable target: %j',

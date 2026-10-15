@@ -1,6 +1,6 @@
 # User Flows - Sotto
 
-**Date:** 2026-10-14
+**Date:** 2026-10-15
 
 **Summary:** End-to-end learner and operator flows for starting a self-hosted Sotto instance, creating a course, taking classes, using iPad workbooks, connecting devices, and maintaining the private learning stack.
 
@@ -242,6 +242,10 @@ Start from `/learn`.
 
 The class runner handles grammar, reading, listening, speaking, and writing sections when the generated class includes them. The web class is the source of truth for audio playback, microphone recording, writing submission, grading, regeneration, and progress.
 
+If a grammar, reading, or listening quiz falls below its section's mastery threshold, choose `Practise with new questions`. Sotto prepares fresh questions about the missed concepts and opens the replacement activity. Listening retries include new audio. The course, other activities, saved answers, and writing drafts remain available. Continue unlocks after the new exercise meets its threshold.
+
+If preparation fails, the runner keeps the original activity and shows the failure. An uncertain provider outcome requires recovery through the course's preparation controls before another generation request can proceed.
+
 Only one active gated class should exist for a course. If a learner tries to start another class while one is active, Sotto sends them back to the active class.
 
 ### Class lifecycle
@@ -252,6 +256,8 @@ stateDiagram-v2
     NoActiveClass --> Generating: Take a class
     Generating --> Available: workers finish
     Available --> InProgress: Begin the class
+    InProgress --> RetryingSection: quiz below threshold
+    RetryingSection --> InProgress: fresh activity ready or original restored
     InProgress --> Submitted: Submit answers
     Submitted --> Passed: score meets threshold
     Submitted --> Failed: score below threshold

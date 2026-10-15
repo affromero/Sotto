@@ -125,6 +125,45 @@ describe('regenerateCurrentClass', () => {
     expect(result).toBe(false);
     expect(mockClassSectionDeleteMany).not.toHaveBeenCalled();
   });
+  it.each(['GRAMMAR', 'LISTENING'] as const)(
+    'generates only the retry skill with the captured missed concepts: %s',
+    async (skill) => {
+      mockCourseClassFindFirst.mockResolvedValue({
+        id: 'class-1',
+        courseId: 'course-1',
+        status: 'GENERATING',
+        attempt: 2,
+        sourceUrl: null,
+        sourceTitle: null,
+        lesson: SAMPLE_LESSON,
+        course: SAMPLE_COURSE,
+        sections: [],
+        adaptiveSeed: { intro: { purpose: 'Retained goal' } },
+      });
+      const retry = {
+        previousQuestions: [{ question: 'Old question', options: ['A', 'B', 'C', 'D'] }],
+        missedQuestions: [
+          { question: 'Old question', selectedAnswer: 'B', explanation: 'Review past tense' },
+        ],
+      };
+      const result = await regenerateCurrentClass(
+        'class-1',
+        'u1',
+        authorizedLearnerExecution('u1'),
+        undefined,
+        { repair: true, attempt: 2, skills: [skill], retry }
+      );
+      expect(result).toBe(true);
+      const generation =
+        skill === 'GRAMMAR' ? mockGenerateSectionQuestions : mockGenerateClassListening;
+      expect(generation.mock.calls.at(-1)?.[0]).toMatchObject({ retry });
+      expect(mockGenerateClassSpeaking).not.toHaveBeenCalled();
+      expect(mockGenerateClassWriting).not.toHaveBeenCalled();
+      expect(mockGenerateClassIntro).not.toHaveBeenCalled();
+      if (skill === 'LISTENING') expect(mockGenerateSectionQuestions).not.toHaveBeenCalled();
+      else expect(mockGenerateClassListening).not.toHaveBeenCalled();
+    }
+  );
 
   it('settles this attempt as failed when the course acquired another active class', async () => {
     mockCourseClassFindFirst.mockResolvedValue({

@@ -5,6 +5,12 @@ import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/
 import { createAIProvider } from './providers/ai';
 import { loadAndRender } from './prompt-loader';
 import { formatNotesForPrompt } from './course-notes';
+import {
+  assertFreshQuizQuestions,
+  buildQuizRetryPrompt,
+  QuizRetryRepetitionError,
+  type QuizRetryContext,
+} from './classes/quiz/retry';
 import { logUsage } from './usage-logger';
 import { logger } from './logger';
 import {
@@ -138,6 +144,7 @@ export interface SectionGenParams {
   targetVocab: Array<{ lemma: string; gloss: string }>;
   seed: string;
   note?: string;
+  retry?: QuizRetryContext;
   /**
    * Optional sourced-class reading passage (CEFR-leveled, target language).
    * When present for a READING section, MCQs are based on it and each returned
@@ -557,6 +564,7 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
                 ? `"targetIndex": ${activeVocabularyTargets[0]},\n      "distractors": ["…", "…", "…"],`
                 : '"options": ["…", "…", "…", "…"],',
             }) +
+            buildQuizRetryPrompt(p.retry) +
             (vocabularyRepair
               ? `\nGenerate only the requested original target indices ${JSON.stringify(activeVocabularyTargets)}. Other questions are preserved by the application and must not be returned. The complete merged set will be independently reviewed again.`
               : ''),
@@ -687,6 +695,7 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
   let lastMalformedContent = '';
   let qualityFailed = false;
   let rejectedCandidate: string | undefined;
+  let repeatedQuestionError: QuizRetryRepetitionError | undefined;
 
   const compileCandidate = (content: string, requestCount: number, mayCaptureRepair = false) => {
     const parsed: ParsedGeneratedQuestions = distractorRepair
@@ -718,12 +727,14 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
       ? mergeVocabularyRepair(vocabularyRepair, questions, targetOrder)
       : questions;
     const composedTargetOrder = vocabularyRepair?.targetOrder ?? targetOrder;
+    const finalQuestions = composed.map(
+      (question, index) =>
+        retainedApprovedQuestions.get(p.vocabularyReview ? composedTargetOrder[index] : index) ??
+        question
+    );
+    assertFreshQuizQuestions(finalQuestions, p.retry);
     return {
-      questions: composed.map(
-        (question, index) =>
-          retainedApprovedQuestions.get(p.vocabularyReview ? composedTargetOrder[index] : index) ??
-          question
-      ),
+      questions: finalQuestions,
       targetOrder: composedTargetOrder,
       duplicateTargets: normalized.duplicateTargets,
     };
@@ -773,6 +784,7 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
     let candidateTargetOrder: number[] = [];
     let duplicateTargets: number[] = [];
     try {
+      repeatedQuestionError = undefined;
       const compiled = compileCandidate(
         response.content,
         requestCount,
@@ -782,6 +794,7 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
       candidateTargetOrder = compiled.targetOrder;
       duplicateTargets = compiled.duplicateTargets;
     } catch (err) {
+      if (err instanceof QuizRetryRepetitionError) repeatedQuestionError = err;
       lastError = err instanceof Error ? err.message : String(err);
       lastMalformedContent = response.content;
     }
@@ -921,8 +934,10 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
     terminalTeachingRejection = undefined;
     let candidate: GeneratedQuestion[] | undefined;
     try {
+      repeatedQuestionError = undefined;
       candidate = compileCandidate(repairResponse.content, requestCount).questions;
     } catch (err) {
+      if (err instanceof QuizRetryRepetitionError) repeatedQuestionError = err;
       lastError = err instanceof Error ? err.message : String(err);
     }
     if (candidate) {
@@ -937,6 +952,7 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
     error: lastError,
     outputSnippet: lastMalformedContent ? loggedOutputSnippet(lastMalformedContent) : undefined,
   });
+  if (repeatedQuestionError) throw repeatedQuestionError;
   if (qualityFailed) {
     if (terminalTeachingRejection) {
       throw new TeachingQualityRejectionError(
