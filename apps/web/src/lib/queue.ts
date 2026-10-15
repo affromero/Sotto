@@ -12,6 +12,7 @@ import {
 } from '@/lib/sidedoor/jobs/core/durable-queue';
 import { deliverSottoJob } from '@/lib/sidedoor/jobs/core/job-delivery';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
+import { sottoStateWriteTransaction } from '@/lib/sidedoor/access/state/write-transaction';
 import { withSottoJobExecution } from '@/lib/sidedoor/jobs/core/job-execution-lifetime';
 import { createRedisConnection, getSharedQueueRedisClient } from './redis';
 import { logger } from './logger';
@@ -404,8 +405,10 @@ export function createWorker<T>(
             run: async ({ markCleanupUnconfirmed }) => {
               bindDurableQueueCleanup(bound, markCleanupUnconfirmed);
               const result = await processor(bound, executionSignal, token);
-              await sottoTransaction(prisma, (database) =>
-                completeDurableQueueJob(database, bound)
+              await sottoStateWriteTransaction(
+                prisma,
+                (database) => completeDurableQueueJob(database, bound),
+                executionSignal
               );
               return result;
             },

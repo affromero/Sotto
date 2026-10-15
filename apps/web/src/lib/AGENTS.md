@@ -910,8 +910,10 @@ projection with the canonical `generateEpisodeTranscript` renderer.
 
 `sidedoor/access/state/write-transaction.ts` serializes mutations of the shared
 Sidedoor state before opening a Serializable transaction. Provider credential-use
-recording and storage writes share its database/schema/relation-scoped advisory
-lock; the lock connection closes before provider HTTP dispatch or storage I/O.
+recording, storage writes and durable queue completion share its
+database/schema/relation-scoped advisory lock. Queue processors finish their
+external effects before completion enters admission; provider HTTP dispatch and
+storage I/O also run outside the lock.
 
 `sidedoor/storage-write.ts` adapts profile and single-file writes to the shared
 `writeReferenceSet` engine. Sidedoor owns immutable artifact allocation, intent
