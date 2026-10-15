@@ -511,6 +511,13 @@ is unresolved. Canonical recovery restores `FAILED` only after exact owned root
 and audio receipts settle. Pristine replacement of incomplete audio requires that
 known failure and the existing lineage, fingerprint, revocation, and drain proofs.
 
+`learning/classes/class-quiz-retry.ts` admits fresh practice for a complete quiz
+below its stored mastery threshold. Capture missed concepts and every shown
+question on the server before preparing only that section. Keep other learner
+work and restore the prior material after known failure and settled execution.
+`classes/quiz/retry.ts` shares retry prompts and rejects repeated question stems
+after final question mapping, including retained teaching items.
+
 `sidedoor/storage-probe-runtime.ts` adapts the shared probe lifecycle to a captured
 backend, original authority callback and dedicated PostgreSQL lock. It checks
 configuration and authority after lock release. `storage-probe.ts` supplies owner
