@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET } from '@/app/download/[platform]/route';
+import packageJson from '../../../package.json';
 
 function request(path: string): NextRequest {
   return new NextRequest(new URL(path, 'https://sotto.fm'));
@@ -120,7 +121,30 @@ describe('desktop download redirects', () => {
 
     expect(response.status).toBe(307);
     expect(response.headers.get('location')).toBe(
-      'https://github.com/affromero/Sotto/releases/download/v0.1.0/sotto-host-v0.1.0-linux.AppImage'
+      `https://github.com/affromero/Sotto/releases/download/v${packageJson.version}/sotto-host-v${packageJson.version}-linux.AppImage`
+    );
+  });
+
+  it('uses the current release when CDN downloads are not configured', async () => {
+    delete process.env.DESKTOP_DOWNLOAD_BASE_URL;
+
+    const response = await GET(request('/download/windows'), params('windows'));
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe(
+      `https://github.com/affromero/Sotto/releases/download/v${packageJson.version}/sotto-host-v${packageJson.version}-windows.msi`
+    );
+  });
+
+  it('keeps an explicitly configured older desktop release', async () => {
+    delete process.env.DESKTOP_DOWNLOAD_BASE_URL;
+    process.env.DESKTOP_LATEST_VERSION = '0.1';
+
+    const response = await GET(request('/download/mac'), params('mac'));
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe(
+      'https://github.com/affromero/Sotto/releases/download/v0.1.0/sotto-host-v0.1.0-mac.dmg'
     );
   });
 

@@ -1,6 +1,6 @@
 {
   "name": "@sotto/web",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Language learning you run yourself, with CEFR courses, adaptive listening, speaking practice, and a vocabulary memory graph on your own stack.",
   "license": "AGPL-3.0-only",

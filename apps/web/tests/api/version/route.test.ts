@@ -4,6 +4,8 @@ import packageJson from '../../../package.json';
 
 describe('GET /api/version', () => {
   const originalFetch = global.fetch;
+  const currentTag = `v${packageJson.version}`;
+  const [major, minor, patch] = packageJson.version.split('.').map(Number);
 
   beforeEach(() => {
     vi.unstubAllEnvs();
@@ -25,8 +27,8 @@ describe('GET /api/version', () => {
     process.env.DESKTOP_LATEST_VERSION = '0.1';
     const fetchMock = vi.fn().mockResolvedValue(
       Response.json({
-        tag_name: 'v0.1.0',
-        html_url: 'https://github.com/affromero/Sotto/releases/tag/v0.1.0',
+        tag_name: currentTag,
+        html_url: `https://github.com/affromero/Sotto/releases/tag/${currentTag}`,
         published_at: '2026-06-28T12:00:00Z',
       })
     );
@@ -48,8 +50,8 @@ describe('GET /api/version', () => {
       version: packageJson.version,
       commit: '6b2b9122',
       latest: {
-        version: 'v0.1.0',
-        url: 'https://github.com/affromero/Sotto/releases/tag/v0.1.0',
+        version: currentTag,
+        url: `https://github.com/affromero/Sotto/releases/tag/${currentTag}`,
         publishedAt: '2026-06-28T12:00:00Z',
       },
       updateAvailable: false,
@@ -64,20 +66,45 @@ describe('GET /api/version', () => {
     });
   });
 
-  it('reports update availability when the latest release is newer', async () => {
-    process.env.NEXT_PUBLIC_COMMIT_SHA = 'abc1234';
-    global.fetch = vi.fn().mockResolvedValue(
-      Response.json({
-        tag_name: 'v0.2.0',
-      })
-    );
+  it.each([`v${major + 1}.0.0`, `v${major}.${minor + 10}.0`, `v${major}.${minor}.${patch + 1}`])(
+    'reports update availability for newer release %s',
+    async (latestVersion) => {
+      process.env.NEXT_PUBLIC_COMMIT_SHA = 'abc1234';
+      global.fetch = vi.fn().mockResolvedValue(
+        Response.json({
+          tag_name: latestVersion,
+        })
+      );
+
+      const response = await GET();
+      const body = await response.json();
+
+      expect(body.commit).toBe('abc1234');
+      expect(body.latest).toMatchObject({ version: latestVersion });
+      expect(body.updateAvailable).toBe(true);
+    }
+  );
+
+  it.each([
+    packageJson.version,
+    currentTag,
+    'v0.0.0',
+    'v999.0.0-rc.1',
+    'desktop-v999.0.0',
+    'sotto-v999.0.0',
+    'v01.0.0',
+    'v9007199254740992.0.0',
+    'v999.invalid.0',
+    'latest',
+  ])('does not advertise an update for %s', async (latestVersion) => {
+    global.fetch = vi.fn().mockResolvedValue(Response.json({ tag_name: latestVersion }));
 
     const response = await GET();
     const body = await response.json();
 
-    expect(body.commit).toBe('abc1234');
-    expect(body.latest).toMatchObject({ version: 'v0.2.0' });
-    expect(body.updateAvailable).toBe(true);
+    expect(response.status).toBe(200);
+    expect(body.latest).toMatchObject({ version: latestVersion });
+    expect(body.updateAvailable).toBe(false);
   });
 
   it('keeps the endpoint useful when GitHub release lookup fails', async () => {
@@ -91,5 +118,6 @@ describe('GET /api/version', () => {
     expect(body.commit).toBe('dev');
     expect(body.latest).toBeNull();
     expect(body.updateAvailable).toBe(false);
+    expect(body.desktop.latest).toBe(currentTag);
   });
 });

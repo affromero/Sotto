@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import packageJson from '../../../../package.json';
 
 type RouteParams = { params: Promise<{ platform: string }> };
 
@@ -16,7 +17,7 @@ interface DesktopDownloadManifest {
 }
 
 const PLATFORMS = new Set<DesktopPlatform>(['mac', 'windows', 'linux']);
-const DEFAULT_LATEST_DESKTOP_VERSION = 'v0.1.0';
+const DEFAULT_LATEST_DESKTOP_VERSION = `v${packageJson.version}`;
 const DEFAULT_GITHUB_RELEASE_BASE_URL = 'https://github.com/affromero/Sotto/releases/download';
 const GITHUB_RELEASE_EXTENSIONS: Record<DesktopPlatform, string> = {
   mac: 'dmg',

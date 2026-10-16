@@ -220,10 +220,43 @@ jobs:
           cp -R "$VERSION_DIR"/. "$LATEST_DIR"/
           cp -R "$VERSION_DIR"/. "$SHA_DIR"/
 
+          GITHUB_DIR="$ARTIFACT_ROOT/github/${{ matrix.slug }}"
+          mkdir -p "$GITHUB_DIR"
+          node - "$VERSION_DIR" "$GITHUB_DIR" "sotto-host-$RELEASE_VERSION-${{ matrix.slug }}-manifest.json" <<'NODE'
+          const fs = require('fs');
+          const path = require('path');
+
+          const [source, destination, manifestName] = process.argv.slice(2);
+          const manifest = JSON.parse(fs.readFileSync(path.join(source, 'manifest.json'), 'utf8'));
+          const names = new Map();
+          const reserved = new Set(['manifest.json', manifestName.toLowerCase()]);
+          for (const file of manifest.files) {
+            const filename = file.filename.replace(/[^A-Za-z0-9._-]+/g, '.').replace(/^\.+|\.+$/g, '');
+            const key = filename.toLowerCase();
+            if (!filename || reserved.has(key)) throw new Error(`Unsafe or colliding GitHub asset name: ${file.filename}`);
+            reserved.add(key);
+            names.set(file.filename, filename);
+          }
+          const reference = (file) => {
+            const filename = names.get(file.filename);
+            if (!filename) throw new Error(`Missing GitHub asset: ${file.filename}`);
+            return { ...file, filename, href: filename };
+          };
+          const githubManifest = {
+            ...manifest,
+            primary: reference(manifest.primary),
+            files: manifest.files.map(reference),
+          };
+          for (const [original, filename] of names) {
+            fs.copyFileSync(path.join(source, original), path.join(destination, filename), fs.constants.COPYFILE_EXCL);
+          }
+          fs.writeFileSync(path.join(destination, manifestName), `${JSON.stringify(githubManifest, null, 2)}\n`, { flag: 'wx' });
+          NODE
+
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: sotto-host-${{ matrix.slug }}-${{ needs.prepare.outputs.release_version }}
-          path: ${{ runner.temp }}/sotto-desktop-downloads/download/desktop/${{ needs.prepare.outputs.release_version }}/${{ matrix.slug }}/*
+          path: ${{ runner.temp }}/sotto-desktop-downloads/github/${{ matrix.slug }}/*
           # Handoff to the release job only; binaries live permanently on R2 + the GitHub Release.
           retention-days: 1
 

@@ -4,7 +4,7 @@ import packageJson from '../../../../package.json';
 export const dynamic = 'force-dynamic';
 
 const DEFAULT_GITHUB_REPOSITORY = 'affromero/Sotto';
-const DEFAULT_DESKTOP_LATEST_VERSION = 'v0.1.0';
+const DEFAULT_DESKTOP_LATEST_VERSION = `v${packageJson.version}`;
 
 type GithubLatestRelease = {
   tag_name?: unknown;
@@ -26,14 +26,22 @@ function normalizeDesktopVersion(value: string | undefined): string {
   return `v${version}`;
 }
 
-function normalizeComparableVersion(value: string): string {
-  const parts = value.trim().replace(/^v/i, '').split('.').filter(Boolean);
+function isNewerRelease(latest: string, current: string): boolean {
+  const stableVersion = /^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
+  const latestMatch = latest.trim().match(stableVersion);
+  const currentMatch = current.trim().match(stableVersion);
+  if (!latestMatch || !currentMatch) return false;
 
-  while (parts.length < 3) {
-    parts.push('0');
+  const latestParts = latestMatch.slice(1).map(Number);
+  const currentParts = currentMatch.slice(1).map(Number);
+  if (![...latestParts, ...currentParts].every(Number.isSafeInteger)) return false;
+
+  for (let index = 0; index < 3; index++) {
+    if (latestParts[index] !== currentParts[index]) {
+      return latestParts[index] > currentParts[index];
+    }
   }
-
-  return parts.slice(0, 3).join('.');
+  return false;
 }
 
 function getGithubRepository(): string {
@@ -86,9 +94,7 @@ export async function GET() {
     version: current,
     commit: getCurrentCommit(),
     latest,
-    updateAvailable: latest
-      ? normalizeComparableVersion(latest.version) !== normalizeComparableVersion(current)
-      : false,
+    updateAvailable: latest ? isNewerRelease(latest.version, current) : false,
     desktop: {
       latest: desktopLatest,
       downloads: {
