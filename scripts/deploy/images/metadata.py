@@ -153,7 +153,12 @@ def assemble(release_value: object, receipts: dict[str, object],
     for role in ROLES:
         reference = image_reference(role, images[role])
         receipt = validate_receipt(receipts[role], role, sha, reference)
-        if receipt['provenance'] != expected:
+        actual = provenance(receipt['provenance'])
+        attempt = positive_integer(actual['runAttempt'], 'receipt runAttempt')
+        latest = positive_integer(expected['runAttempt'], 'current runAttempt')
+        if attempt > latest or any(
+                actual[key] != value for key, value in expected.items()
+                if key != 'runAttempt'):
             raise ValueError(f'{role}: receipt came from another Actions run')
         verified[role] = receipt
     return {

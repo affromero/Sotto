@@ -70,6 +70,9 @@ class ImageCollectorTests(ReceiptFixture):
                 assert '--read-only' in args and '--pull' in args
                 source = args[-1]
                 if 'ALL_QUEUE_NAMES' in source:
+                    if os.environ.get('FAIL_QUEUE_PROBE') == '1':
+                        raise RuntimeError(
+                            'Runtime queue module is unavailable')
                     print(json.dumps([
                         'audio-generation', 'class-preparation']))
                 elif 'protectedHash' in source:
@@ -135,4 +138,13 @@ class ImageCollectorTests(ReceiptFixture):
         result = self.capture()
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('identity does not match', result.stderr)
+        self.assertFalse((self.root / 'receipt.json').exists())
+
+    def test_runtime_probe_failure_never_publishes_partial_metadata(
+        self,
+    ) -> None:
+        self.env['FAIL_QUEUE_PROBE'] = '1'
+        result = self.capture()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('Runtime queue module is unavailable', result.stderr)
         self.assertFalse((self.root / 'receipt.json').exists())

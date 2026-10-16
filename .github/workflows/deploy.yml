@@ -154,6 +154,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       image: ${{ steps.publish.outputs.image }}
+      metadata-id: ${{ steps.metadata.outputs.artifact-id }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -198,8 +199,9 @@ jobs:
         env:
           SOURCE_RUN_ID: ${{ needs.ci.outputs.source-run-id }}
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        id: metadata
         with:
-          name: production-image-metadata-${{ env.RELEASE_SHA }}-showcase
+          name: production-image-metadata-${{ env.RELEASE_SHA }}-showcase-${{ github.run_attempt }}
           path: delivery/showcase.json
           if-no-files-found: error
           retention-days: 14
@@ -210,6 +212,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       image: ${{ steps.publish.outputs.image }}
+      metadata-id: ${{ steps.metadata.outputs.artifact-id }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -254,8 +257,9 @@ jobs:
         env:
           SOURCE_RUN_ID: ${{ needs.ci.outputs.source-run-id }}
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        id: metadata
         with:
-          name: production-image-metadata-${{ env.RELEASE_SHA }}-personal
+          name: production-image-metadata-${{ env.RELEASE_SHA }}-personal-${{ github.run_attempt }}
           path: delivery/personal.json
           if-no-files-found: error
           retention-days: 14
@@ -266,6 +270,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       image: ${{ steps.publish.outputs.image }}
+      metadata-id: ${{ steps.metadata.outputs.artifact-id }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -309,8 +314,9 @@ jobs:
         env:
           SOURCE_RUN_ID: ${{ needs.ci.outputs.source-run-id }}
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        id: metadata
         with:
-          name: production-image-metadata-${{ env.RELEASE_SHA }}-workers
+          name: production-image-metadata-${{ env.RELEASE_SHA }}-workers-${{ github.run_attempt }}
           path: delivery/workers.json
           if-no-files-found: error
           retention-days: 14
@@ -322,9 +328,29 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ env.RELEASE_SHA }}
+      - name: Validate exact image metadata artifact IDs
+        id: receipts
+        env:
+          SHOWCASE_METADATA_ID: ${{ needs.showcase.outputs.metadata-id }}
+          PERSONAL_METADATA_ID: ${{ needs.personal.outputs.metadata-id }}
+          WORKERS_METADATA_ID: ${{ needs.workers.outputs.metadata-id }}
+        run: |
+          python3 - <<'PY'
+          import os
+          import re
+
+          ids = [os.environ[f'{role}_METADATA_ID'] for role in ('SHOWCASE', 'PERSONAL', 'WORKERS')]
+          if not all(re.fullmatch(r'[1-9][0-9]*', value) for value in ids) or len(set(ids)) != 3:
+              raise SystemExit('Exactly three distinct image metadata artifact IDs are required')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f"ids={','.join(ids)}\n")
+          PY
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
-          pattern: production-image-metadata-${{ env.RELEASE_SHA }}-*
+          artifact-ids: ${{ steps.receipts.outputs.ids }}
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ github.run_id }}
           path: delivery/image-metadata
           merge-multiple: true
       - name: Record verified production image digests
@@ -367,6 +393,7 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: production-release-${{ env.RELEASE_SHA }}
+          overwrite: true
           path: |
             delivery/production-release.json
             delivery/production-release-metadata.json

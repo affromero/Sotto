@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import unittest
 
@@ -10,6 +11,69 @@ from images.fixtures import ROOT, ReceiptFixture
 
 
 class ImageWorkflowTests(ReceiptFixture):
+    def test_reruns_download_exact_receipts_and_preserve_attempt_artifacts(
+        self,
+    ) -> None:
+        result = subprocess.run([
+            'node', '-e',
+            'process.stdout.write(JSON.stringify(require("yaml").parse('
+            'require("node:fs").readFileSync(process.argv[1], "utf8")).jobs))',
+            str(ROOT / '.github/workflows/deploy.yml'),
+        ], cwd=ROOT, text=True, capture_output=True, check=True)
+        jobs = json.loads(result.stdout)
+        for role in ('showcase', 'personal', 'workers'):
+            job = jobs[role]
+            upload = next(step for step in job['steps']
+                          if step.get('id') == 'metadata')
+            self.assertEqual(job['outputs']['metadata-id'],
+                             '${{ steps.metadata.outputs.artifact-id }}')
+            self.assertEqual(
+                upload['with']['name'],
+                'production-image-metadata-${{ env.RELEASE_SHA }}-'
+                + role + '-${{ github.run_attempt }}')
+            self.assertFalse(upload['with'].get('overwrite', False))
+        steps = jobs['release-record']['steps']
+        selection = next(step for step in steps
+                         if step.get('id') == 'receipts')
+        self.assertEqual(selection['env'], {
+            role.upper() + '_METADATA_ID':
+                '${{ needs.' + role + '.outputs.metadata-id }}'
+            for role in ('showcase', 'personal', 'workers')
+        })
+        output = self.root / 'selected-ids'
+        for identifiers, admitted in (
+            (('101', '102', '103'), True), (('', '102', '103'), False),
+            (('101', '101', '103'), False), (('0', '102', '103'), False),
+            (('101\n102', '102', '103'), False),
+        ):
+            with self.subTest(identifiers=identifiers):
+                status = subprocess.run(
+                    ['bash', '-e', '-o', 'pipefail', '-c', selection['run']],
+                    env={**os.environ, 'GITHUB_OUTPUT': str(output),
+                         **dict(zip(selection['env'], identifiers))},
+                    text=True, capture_output=True,
+                )
+                self.assertEqual(status.returncode == 0, admitted,
+                                 status.stdout + status.stderr)
+                if admitted:
+                    self.assertEqual(output.read_text(), 'ids=101,102,103\n')
+        download = next(step for step in steps if step.get('uses', '')
+                        .startswith('actions/download-artifact@'))
+        self.assertNotIn('pattern', download['with'])
+        self.assertEqual(download['with']['artifact-ids'],
+                         '${{ steps.receipts.outputs.ids }}')
+        self.assertEqual(download['with']['run-id'], '${{ github.run_id }}')
+        self.assertEqual(download['with']['repository'],
+                         '${{ github.repository }}')
+        self.assertIs(download['with']['merge-multiple'], True)
+        final = next(step for step in steps if step.get('uses', '')
+                     .startswith('actions/upload-artifact@'))
+        self.assertIs(final['with']['overwrite'], True)
+        self.assertEqual(final['with']['path'].splitlines(), [
+            'delivery/production-release.json',
+            'delivery/production-release-metadata.json',
+        ])
+
     def test_production_collects_all_smoked_images_in_matching_stores(
         self,
     ) -> None:

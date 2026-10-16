@@ -6,6 +6,37 @@ from images.fixtures import PROVENANCE, SHA, ReceiptFixture, field, receipt
 
 
 class ImageMetadataTests(ReceiptFixture):
+    def test_rerun_preserves_successful_receipts_from_earlier_attempts(
+        self,
+    ) -> None:
+        field(self.receipts['workers'], 'provenance')['runAttempt'] = 2
+        status, output, metadata = self.aggregate(attempt=2)
+        self.assertEqual(status, 0, output)
+        assert metadata is not None
+        self.assertEqual(metadata['provenance'],
+                         {**PROVENANCE, 'runAttempt': 2})
+        self.assertEqual(metadata['images'], self.receipts)
+        # Repeating final aggregation retains original image evidence.
+        status, output, metadata = self.aggregate(attempt=3)
+        self.assertEqual(status, 0, output)
+        assert metadata is not None
+        self.assertEqual(metadata['images'], self.receipts)
+
+    def test_rerun_rejects_future_attempts_and_different_source_or_runs(
+        self,
+    ) -> None:
+        for key, value in (
+            ('runAttempt', 3), ('runAttempt', 0), ('runAttempt', True),
+            ('runId', 124), ('sourceRunId', 101),
+            ('repository', 'other/Sotto'),
+            ('workflow', '.github/workflows/oss-image.yml'),
+        ):
+            with self.subTest(key=key, value=value):
+                self.receipts['showcase'] = receipt('showcase')
+                field(self.receipts['showcase'], 'provenance')[key] = value
+                status, output, _ = self.aggregate(attempt=2)
+                self.assertNotEqual(status, 0, output)
+
     def test_three_role_metadata_preserves_actual_budgets_and_identity(
         self,
     ) -> None:

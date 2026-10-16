@@ -108,7 +108,9 @@ class ReceiptFixture(unittest.TestCase):
         }
         self.receipts = {role: receipt(role) for role in REPOSITORIES}
 
-    def aggregate(self) -> tuple[int, str, dict[str, object] | None]:
+    def aggregate(
+        self, attempt: int = 1,
+    ) -> tuple[int, str, dict[str, object] | None]:
         (self.root / 'receipts').mkdir(exist_ok=True)
         for role, value in self.receipts.items():
             (self.root / f'receipts/{role}.json').write_text(json.dumps(value))
@@ -118,7 +120,8 @@ class ReceiptFixture(unittest.TestCase):
             sys.executable, '-m', 'scripts.deploy.images.metadata',
             '--release', str(self.root / 'release.json'),
             '--receipts', str(self.root / 'receipts'),
-            '--output', str(output), '--run-id', '123', '--run-attempt', '1',
+            '--output', str(output), '--run-id', '123',
+            '--run-attempt', str(attempt),
             '--source-run-id', '100',
         ], cwd=ROOT, env=environment(), text=True, capture_output=True)
         return (result.returncode, result.stdout + result.stderr,

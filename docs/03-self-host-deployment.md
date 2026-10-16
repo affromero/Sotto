@@ -219,6 +219,11 @@ names and complete provider asset inventory. Verify the artifact's run and
 source identities before using these records. Operators can use the published
 measurements and inventories without downloading the images locally.
 
+Failed-job retries reuse the exact artifacts from successful image jobs in the
+same run. Each receipt retains its actual attempt number. Full reruns preserve
+separate image receipts and replace the final release artifact with the latest
+verified aggregate.
+
 The builder runs `scripts/deploy/images/measure_image.py` against each verified
 image. Expanded bytes retain the larger of allocated layer storage and image
 history. Transfer bytes retain the larger of the saved archive and its gzip.
