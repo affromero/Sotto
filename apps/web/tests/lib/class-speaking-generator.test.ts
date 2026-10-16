@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { sampleTeaching } from '../helpers/learning/class-teaching';
 import { authorizedLearnerExecution } from '../helpers/runtime/provider-execution';
 import {
   emptyTeachingCriticFixture,
@@ -553,6 +554,14 @@ describe('generateClassSpeaking', () => {
 describe('composeSpeakingPrompts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('uses the accepted class teaching in the speaking task and its quality review', async () => {
+    setupHappyPath();
+    await composeSpeakingPrompts({ ...PARAMS, refId: 'class-1', teaching: sampleTeaching });
+    expect(mockGenerateResponse.mock.calls[0][0]).toContain(JSON.stringify(sampleTeaching));
+    const review = JSON.parse(mockTeachingResponse.mock.calls[0][1][0].content);
+    expect(review.lessonContext.teaching).toEqual(sampleTeaching);
   });
 
   it('returns composed prompts (with reference TTS) without persisting a class section', async () => {

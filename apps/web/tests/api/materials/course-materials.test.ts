@@ -4,6 +4,9 @@ import { NextRequest } from 'next/server';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PrismaClient } from '@/generated/prisma/client';
 import { POST as upload } from '@/app/api/v1/materials/route';
+import { POST as placementUpload } from '@/app/api/v1/placement/from-notes/upload/route';
+import { getCachedNotesDeduction } from '@/lib/placement-notes';
+import { closeRedis } from '@/lib/redis';
 import { GET as download } from '@/app/api/v1/materials/[materialId]/file/route';
 import { GET as notes, PUT as saveNotes } from '@/app/api/v1/courses/[courseId]/notes/route';
 import { getCourseNote } from '@/lib/course-notes';
@@ -27,7 +30,16 @@ import {
 const boundary = vi.hoisted(() => ({
   database: null as PrismaClient | null,
   beforeWrite: null as (() => Promise<void>) | null,
+  generate: vi.fn(),
 }));
+vi.mock('@/lib/learning-ai', () => ({
+  resolveCapturedLearningAi: async () => ({ provider: 'anthropic', model: 'captured' }),
+  capturedLearningAiOptions: async () => ({}),
+}));
+vi.mock('@/lib/providers/ai', () => ({
+  createAIProvider: () => ({ generateResponse: boundary.generate }),
+}));
+vi.mock('@/lib/usage-logger', () => ({ logUsage: vi.fn() }));
 vi.mock('@/lib/r2', async (original) => {
   const actual = await original<typeof import('@/lib/r2')>();
   return {
@@ -62,6 +74,15 @@ suite('owned original course materials', () => {
   });
   beforeEach(async () => {
     boundary.beforeWrite = null;
+    boundary.generate.mockReset();
+    boundary.generate.mockResolvedValue({
+      content: JSON.stringify({
+        level: 'A2',
+        rationale: 'Past-tense source examples.',
+        confidence: 0.8,
+      }),
+      model: 'captured',
+    });
     vi.stubEnv('SELF_HOSTED', 'true');
     vi.stubEnv('NEXT_PUBLIC_APP_URL', 'http://localhost:3000');
     vi.stubEnv('SIDEDOOR_PASSWORD_ORIGINS', '[]');
@@ -86,6 +107,7 @@ suite('owned original course materials', () => {
   afterEach(() => vi.unstubAllEnvs());
   afterAll(async () => {
     await instance?.close();
+    await closeRedis();
   });
   function request(
     path: string,
@@ -127,6 +149,44 @@ suite('owned original course materials', () => {
     expect(await response.text()).toBe('Original German notes\nBahnhof means station.');
     expect(response.headers.get('content-disposition')).toContain('Vocab%20Deutsch.TXT');
   });
+  it('bounds placement input and cached excerpts while retaining all uploaded endings and originals', async () => {
+    const first =
+      'Anfang A. '.repeat(10000) + 'FINAL A: Explain the contrast before translation exercises.';
+    const second = 'Anfang B. '.repeat(10000) + 'FINAL B: Mia ist gestern nach Hause gegangen.';
+    const form = new FormData();
+    form.append('native', 'en');
+    form.append('target', 'de');
+    form.append('content', 'Personal goals: '.repeat(1000));
+    form.append('files', new File([first], 'Vocab Deutsch.txt', { type: 'text/plain' }));
+    form.append('files', new File([second], 'Newer notes.txt', { type: 'text/plain' }));
+    const response = await placementUpload(
+      request('placement/from-notes/upload', identity.ownerToken, { method: 'POST', body: form })
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(
+      body.materials.map((material: { extractedText: string }) => material.extractedText)
+    ).toEqual([first, second]);
+    const cached = await getCachedNotesDeduction(identity.ownerId, 'en', 'de');
+    expect(cached?.content.length).toBeLessThanOrEqual(12000);
+    expect(cached?.content).toContain('Vocab Deutsch.txt');
+    expect(cached?.content).toContain('Newer notes.txt');
+    expect(cached?.content).toContain(
+      'FINAL A: Explain the contrast before translation exercises.'
+    );
+    expect(cached?.content).toContain('FINAL B: Mia ist gestern nach Hause gegangen.');
+    expect(cached?.materialIds).toEqual(
+      body.materials.map((material: { id: string }) => material.id)
+    );
+    const prompt = boundary.generate.mock.calls.at(-1)![0];
+    expect(prompt.length).toBeLessThan(16000);
+    expect(prompt).toContain(cached?.content);
+    expect(
+      (await instance.database.courseMaterial.findMany({ where: { userId: identity.ownerId } }))
+        .map((material) => material.extractedText)
+        .sort()
+    ).toEqual([first, second].sort());
+  });
   it('rejects oversized originals before retaining files or extracting content', async () => {
     const form = new FormData();
     form.append(
@@ -151,12 +211,42 @@ suite('owned original course materials', () => {
     expect(result.failed).toBe(1);
     expect(result.materials).toHaveLength(1);
     expect(result.materials[0].name).toBe('good.txt');
-    expect(result.materials[0].extractedText).toContain('good.txt');
-    expect(result.materials[0].extractedText).toContain('Hallo');
+    expect(result.materials[0].extractedText).toBe('Hallo');
     const original = await download(request(`materials/${result.materials[0].id}/file`), {
       params: Promise.resolve({ materialId: result.materials[0].id }),
     });
     expect(await original.text()).toBe('Hallo');
+  });
+  it('retains the full extracted ending without turning the filename into source evidence', async () => {
+    const source =
+      'Vokabeln und Beispiele. '.repeat(4000) +
+      'FINAL: Explain the contrast before proposing exercises.';
+    const form = new FormData();
+    form.append('files', new File([source], 'Vocab Deutsch.txt', { type: 'text/plain' }));
+    const response = await upload(
+      request('materials', identity.ownerToken, { method: 'POST', body: form })
+    );
+    expect(response.status).toBe(201);
+    const result = await response.json();
+    expect(result.materials[0].name).toBe('Vocab Deutsch.txt');
+    expect(result.materials[0].extractedText).toBe(source);
+    expect(result.materials[0].extractedText).not.toContain('Uploaded course note:');
+    const stored = await instance.database.courseMaterial.findUniqueOrThrow({
+      where: { id: result.materials[0].id },
+    });
+    expect(stored.extractedText).toBe(source);
+  });
+  it('rejects unsupported extracted length instead of saving a prefix as the complete document', async () => {
+    const form = new FormData();
+    form.append(
+      'files',
+      new File(['a'.repeat(1000001)], 'oversize-extract.txt', { type: 'text/plain' })
+    );
+    const response = await upload(
+      request('materials', identity.ownerToken, { method: 'POST', body: form })
+    );
+    expect(response.status).toBe(400);
+    expect(await instance.database.courseMaterial.count()).toBe(0);
   });
   it('returns exact original bytes through the owning profile and rejects another learner', async () => {
     const material = await retained();

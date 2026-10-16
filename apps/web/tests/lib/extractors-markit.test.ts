@@ -22,6 +22,35 @@ vi.mock('@/lib/logger', () => ({
 import { extractViaMarkit } from '@/lib/extractors/markit';
 
 describe('markit extractor', () => {
+  it('retains a complete uploaded document ending beyond the generic URL extraction limit', async () => {
+    const markdown = 'Wort '.repeat(15000) + 'FINAL EXERCISE INSTRUCTIONS';
+    mockConvert.mockResolvedValue({ markdown });
+    const result = await extractViaMarkit(Buffer.from('pdf'), {
+      extension: '.pdf',
+      url: 'upload://vocab.pdf',
+      completeTextLimit: 1000000,
+    });
+    expect(result.markdown).toBe(markdown);
+    expect(result.text).toContain('FINAL EXERCISE INSTRUCTIONS');
+  });
+  it('rejects an unsupported complete extract while retaining generic URL clipping', async () => {
+    mockConvert.mockResolvedValue({ markdown: 'a'.repeat(60000) });
+    await expect(
+      extractViaMarkit(Buffer.from('pdf'), {
+        extension: '.pdf',
+        url: 'upload://vocab.pdf',
+        completeTextLimit: 50000,
+      })
+    ).rejects.toThrow('complete-text limit');
+    expect(
+      (
+        await extractViaMarkit(Buffer.from('pdf'), {
+          extension: '.pdf',
+          url: 'https://example.com/vocab.pdf',
+        })
+      ).markdown
+    ).toHaveLength(50000);
+  });
   beforeEach(() => {
     vi.clearAllMocks();
   });

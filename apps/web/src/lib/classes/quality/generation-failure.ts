@@ -39,6 +39,23 @@ export const generationFailureSchema = failureDetailSchema.extend({
     .optional(),
 });
 export type GenerationFailure = z.infer<typeof generationFailureSchema>;
+
+/** The durable explanation category is shared with older readers; review authority stays private. */
+export function durableGenerationFailure(failure: GenerationFailure): GenerationFailure {
+  const durable = generationFailureSchema.parse(failure);
+  const project = (detail: z.infer<typeof failureDetailSchema>) => {
+    if (detail.teachingFailure?.kind === 'teaching') detail.teachingFailure.kind = 'explanations';
+    for (const attempt of detail.attemptFailures ?? [])
+      if (attempt.type === 'teaching' && attempt.failure.kind === 'teaching')
+        attempt.failure.kind = 'explanations';
+    for (const evidence of detail.protocolEvidence ?? [])
+      if (evidence.kind === 'teaching') evidence.kind = 'explanations';
+  };
+  project(durable);
+  for (const stage of durable.stages ?? []) project(stage);
+  return durable;
+}
+
 const parallelFailures = new WeakMap<
   object,
   { stages: z.infer<typeof stageFailureSchema>[]; cleanupUnconfirmed: boolean }

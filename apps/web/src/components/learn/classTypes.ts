@@ -5,7 +5,7 @@
  */
 
 import type { ReferenceData } from '@/types/reference';
-import { requiredLearningSkills, type SkillRequirements } from '@sotto/shared';
+import { requiredLearningSkills, type SkillRequirements, type ClassTeaching } from '@sotto/shared';
 import type { ReferenceType, VerificationStatus } from '@/generated/prisma/client';
 
 type ClassSkill = 'GRAMMAR' | 'READING' | 'LISTENING' | 'SPEAKING' | 'WRITING';
@@ -173,6 +173,7 @@ export interface ClassFeedbackNote {
 }
 
 export interface ClassData {
+  teaching?: ClassTeaching;
   attempt?: number;
   progressRevision?: number;
   learnerAnswers?: Record<string, number> | null;
@@ -299,12 +300,6 @@ export function classPresentationIssues(cls: ClassData): string[] {
   }
 
   return issues;
-}
-
-/** Format seconds as m:ss. */
-export function fmtClock(seconds: number): string {
-  const s = Math.max(0, Math.floor(seconds));
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
 /**

@@ -87,7 +87,15 @@ const reviewEvidenceSchema = z
 
 export const teachingFailureSchema = z
   .object({
-    kind: z.enum(['intro', 'explanations', 'writing', 'listening', 'speaking', 'vocabulary']),
+    kind: z.enum([
+      'intro',
+      'teaching',
+      'explanations',
+      'writing',
+      'listening',
+      'speaking',
+      'vocabulary',
+    ]),
     reviews: z.array(reviewEvidenceSchema).min(1).max(2),
   })
   .strict()

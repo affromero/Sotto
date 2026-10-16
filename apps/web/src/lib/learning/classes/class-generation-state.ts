@@ -5,6 +5,7 @@ import type { SkillRequirements } from '@sotto/shared';
 import type { SottoProviderExecution } from '../../sidedoor/credentials/runtime/provider-execution';
 import { sottoTransaction } from '../../sidedoor/access/state/transaction';
 import { assertStoredClassMaterial } from './class-material';
+import { seedPublishedClassMemory } from './class-memory';
 
 /** Allocate from the full history and claim before any regeneration provider request. */
 export async function claimClassRegeneration(
@@ -130,7 +131,10 @@ export async function publishClassGeneration(
   }
 ) {
   await assertClassGeneration(database, input.classId, input.attempt, input.userId);
-  const cls = await assertStoredClassMaterial(database, input.classId);
+  const cls = await database.courseClass.findUniqueOrThrow({
+    where: { id: input.classId },
+    select: { courseId: true },
+  });
   const published = await database.course.updateMany({
     where: {
       id: cls.courseId,
@@ -140,6 +144,8 @@ export async function publishClassGeneration(
     data: { activeClassId: input.classId },
   });
   if (published.count !== 1) throw new Error('The active course class changed during generation.');
+  await seedPublishedClassMemory(database, input.classId, input.userId, input.data.adaptiveSeed);
+  await assertStoredClassMaterial(database, input.classId);
   await database.courseClass.update({
     where: { id: input.classId },
     data: { ...input.data, status: input.status ?? 'AVAILABLE' },

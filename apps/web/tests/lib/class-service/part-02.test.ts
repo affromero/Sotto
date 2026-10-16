@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createSkillRequirements } from '@sotto/shared';
+import { sampleTeaching } from '../../helpers/learning/class-teaching';
 import {
   mockCourseClassFindFirst,
+  mockCourseFindFirst,
   mockResolveSkillRequirements,
   mockCourseClassFindUnique,
   mockCourseClassUpdate,
@@ -22,6 +24,9 @@ import {
   SAMPLE_LESSON,
   SAMPLE_COURSE,
   SAMPLE_QUESTIONS,
+  mockDueVocabRows,
+  mockCourseMaterialRows,
+  mockLearnerVocabFindMany,
 } from './fixtures';
 import { authorizedLearnerExecution } from '../../helpers/runtime/provider-execution';
 import { getClassForUser, regenerateCurrentClass, deleteClassForUser } from '@/lib/class-service';
@@ -29,6 +34,12 @@ import { getClassForUser, regenerateCurrentClass, deleteClassForUser } from '@/l
 describe('regenerateCurrentClass', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockCourseFindFirst.mockResolvedValue(SAMPLE_COURSE);
+    mockDueVocabRows.mockResolvedValue([]);
+    mockCourseMaterialRows.mockResolvedValue([]);
+    mockLearnerVocabFindMany.mockResolvedValue([
+      { lemma: 'hola', mastery: 0, reps: 0, lastReviewed: null },
+    ]);
     mockResolveSkillRequirements.mockResolvedValue(
       createSkillRequirements({
         scope: 'CLASS',
@@ -138,7 +149,14 @@ describe('regenerateCurrentClass', () => {
         lesson: SAMPLE_LESSON,
         course: SAMPLE_COURSE,
         sections: [],
-        adaptiveSeed: { intro: { purpose: 'Retained goal' } },
+        adaptiveSeed: {
+          intro: { purpose: 'Retained goal' },
+          teaching: sampleTeaching,
+          classTargets: {
+            vocab: [{ lemma: 'retained', gloss: 'retained word' }],
+            grammarPoints: ['retained grammar'],
+          },
+        },
       });
       const retry = {
         previousQuestions: [{ question: 'Old question', options: ['A', 'B', 'C', 'D'] }],
@@ -146,17 +164,33 @@ describe('regenerateCurrentClass', () => {
           { question: 'Old question', selectedAnswer: 'B', explanation: 'Review past tense' },
         ],
       };
+      let published: unknown;
       const result = await regenerateCurrentClass(
         'class-1',
         'u1',
         authorizedLearnerExecution('u1'),
         undefined,
-        { repair: true, attempt: 2, skills: [skill], retry }
+        {
+          repair: true,
+          attempt: 2,
+          skills: [skill],
+          retry,
+          publish: async (seed) => {
+            published = seed;
+          },
+        }
       );
       expect(result).toBe(true);
       const generation =
         skill === 'GRAMMAR' ? mockGenerateSectionQuestions : mockGenerateClassListening;
       expect(generation.mock.calls.at(-1)?.[0]).toMatchObject({ retry });
+      expect(published).toMatchObject({
+        teaching: sampleTeaching,
+        classTargets: {
+          vocab: [{ lemma: 'retained', gloss: 'retained word' }],
+          grammarPoints: ['retained grammar'],
+        },
+      });
       expect(mockGenerateClassSpeaking).not.toHaveBeenCalled();
       expect(mockGenerateClassWriting).not.toHaveBeenCalled();
       expect(mockGenerateClassIntro).not.toHaveBeenCalled();
@@ -245,5 +279,44 @@ describe('getClassForUser', () => {
         where: { id: 'class-1', course: { userId: 'u1' } },
       })
     );
+  });
+
+  it('returns accepted class teaching and rejects present malformed teaching instead of hiding it', async () => {
+    mockCourseClassFindFirst.mockResolvedValue({
+      id: 'class-1',
+      sections: [],
+      adaptiveSeed: { teaching: sampleTeaching },
+    });
+    expect((await getClassForUser('class-1', 'u1'))?.teaching).toEqual(sampleTeaching);
+    mockCourseClassFindFirst.mockResolvedValue({
+      id: 'class-1',
+      sections: [],
+      adaptiveSeed: { teaching: { title: 'Incomplete' } },
+    });
+    await expect(getClassForUser('class-1', 'u1')).rejects.toThrow();
+  });
+
+  it('projects the accepted source vocabulary and grammar instead of the shared curriculum defaults', async () => {
+    const classTargets = {
+      vocab: [{ lemma: 'Bahnhof', gloss: 'station' }],
+      grammarPoints: ['accepted grammar'],
+    };
+    mockCourseClassFindFirst.mockResolvedValue({
+      id: 'class-1',
+      sections: [],
+      lesson: SAMPLE_LESSON,
+      adaptiveSeed: { teaching: sampleTeaching, classTargets },
+    });
+    const result = await getClassForUser('class-1', 'u1');
+    expect(result?.lesson.targetVocab).toEqual(classTargets.vocab);
+    expect(result?.lesson.grammarPoints).toEqual(classTargets.grammarPoints);
+    expect(SAMPLE_LESSON.targetVocab).toEqual([{ lemma: 'hola', gloss: 'hello' }]);
+    mockCourseClassFindFirst.mockResolvedValue({
+      id: 'class-1',
+      sections: [],
+      lesson: SAMPLE_LESSON,
+      adaptiveSeed: { classTargets: { vocab: 'invalid' } },
+    });
+    await expect(getClassForUser('class-1', 'u1')).rejects.toThrow();
   });
 });

@@ -9,6 +9,7 @@ export function teachingReviewCandidate(options: Parameters<typeof requestTeachi
     ? buildListeningSourceUnits(options.items[0], options.listeningTurns, options.variables.TARGET)
     : undefined;
   return {
+    ...(options.lessonContext ? { lessonContext: options.lessonContext } : {}),
     ...(options.introContext ? { introContext: options.introContext } : {}),
     ...(options.novelFindingProposals
       ? { novelFindingProposals: options.novelFindingProposals }

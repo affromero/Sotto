@@ -3,6 +3,8 @@ import { CONTENT_SAFETY_INSTRUCTIONS } from './safety-prompts';
 import { VOICE_REALISM_INSTRUCTIONS } from './voice-realism-prompts';
 import { loadPrompt, loadAndRender } from './prompt-loader';
 import { minutesToWords, wordCountBounds } from './duration';
+import { formatLearningAuthoringContext } from './classes/lesson/teaching-context';
+import type { ClassTeaching } from '@sotto/shared';
 import { getMinReferenceCount, getMinSeriousRatio } from './reference-thresholds';
 import { generatedScriptSchema } from './validations';
 import { logger } from './logger';
@@ -620,6 +622,8 @@ export async function generateScript(params: {
   languageMode?: string | null;
   mustIncludeVocabulary?: Array<{ word: string; translation: string }>;
   forLearning?: boolean;
+  learnerContext?: string;
+  teaching?: ClassTeaching;
   learningRepair?:
     | {
         candidate: {
@@ -721,6 +725,8 @@ export async function generateScript(params: {
   let userMessage = params.sourceContent
     ? `${authoringContext.scriptObjectiveInstruction(params.topic, params.forLearning)}\nDepth: ${params.depth}\n\n${formatSourceBlock(params.sourceContent, params.sourceMetadata)}`
     : `${authoringContext.scriptObjectiveInstruction(params.topic, params.forLearning)}\nDepth: ${params.depth}`;
+  if (params.forLearning)
+    userMessage += formatLearningAuthoringContext(params.learnerContext, params.teaching);
 
   let turnContract: ReturnType<typeof teachingScriptRepairContract> | undefined;
   if (params.learningRepair) {
@@ -792,10 +798,7 @@ export async function generateScript(params: {
   return result;
 }
 
-/**
- * Shared response parser: JSON extraction, Zod validation, coercion,
- * sound cue defaults, reference dedup, and markdown generation.
- */
+/** Parse and normalize a generated script while preserving vocabulary identities. */
 export function parseScriptResponse(response: {
   content: string;
   inputTokens: number | null;

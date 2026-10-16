@@ -2892,6 +2892,110 @@
       "ClassDetailResponse": {
         "type": "object",
         "properties": {
+          "teaching": {
+            "type": "object",
+            "properties": {
+              "version": {
+                "type": "number",
+                "enum": [1]
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              },
+              "explanation": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1800
+              },
+              "workedExamples": {
+                "minItems": 2,
+                "maxItems": 3,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "prompt": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 800
+                    },
+                    "answer": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 800
+                    },
+                    "explanation": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 1800
+                    }
+                  },
+                  "required": ["prompt", "answer", "explanation"],
+                  "additionalProperties": false
+                }
+              },
+              "commonMistake": {
+                "type": "object",
+                "properties": {
+                  "incorrect": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 800
+                  },
+                  "correction": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 800
+                  },
+                  "explanation": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1800
+                  }
+                },
+                "required": ["incorrect", "correction", "explanation"],
+                "additionalProperties": false
+              },
+              "guidedPractice": {
+                "type": "object",
+                "properties": {
+                  "prompt": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 800
+                  },
+                  "hint": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 800
+                  },
+                  "answer": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 800
+                  },
+                  "explanation": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1800
+                  }
+                },
+                "required": ["prompt", "hint", "answer", "explanation"],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "version",
+              "title",
+              "explanation",
+              "workedExamples",
+              "commonMistake",
+              "guidedPractice"
+            ],
+            "additionalProperties": false
+          },
           "skillRequirements": {
             "type": "object",
             "properties": {

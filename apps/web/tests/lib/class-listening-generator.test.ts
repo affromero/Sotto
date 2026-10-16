@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { sampleTeaching } from '../helpers/learning/class-teaching';
 import {
   mockEpisodeCreate,
   mockEpisodeUpdate,
@@ -453,26 +454,15 @@ describe('generateClassListening', () => {
       expect(mockCreateSegmentsAndQueueAudio).not.toHaveBeenCalled();
     });
 
-    it('upserts each generated vocabulary word into learnerVocab', async () => {
+    it('retains episode vocabulary without adding unseen course memory before class publication', async () => {
       setupHappyPath();
 
       await generateClassListening(PARAMS);
 
-      expect(mockLearnerVocabUpsert).toHaveBeenCalledTimes(SAMPLE_VOCABULARY.length);
-      for (const v of SAMPLE_VOCABULARY) {
-        expect(mockLearnerVocabUpsert).toHaveBeenCalledWith(
-          expect.objectContaining({
-            where: { courseId_lemma: { courseId: 'course-1', lemma: v.word } },
-            create: expect.objectContaining({
-              courseId: 'course-1',
-              lemma: v.word,
-              translation: v.translation,
-              firstSeenClassId: 'class-1',
-            }),
-            update: {},
-          })
-        );
-      }
+      expect(mockLearnerVocabUpsert).not.toHaveBeenCalled();
+      expect(
+        mockVocabEntryCreateMany.mock.calls[0][0].data.map((entry: { word: string }) => entry.word)
+      ).toEqual(SAMPLE_VOCABULARY.map(({ word }) => word));
     });
 
     it('creates a LISTENING ClassSection with the episodeId and status READY', async () => {
@@ -640,7 +630,7 @@ describe('generateClassListening', () => {
       expect(mockLearnerVocabUpsert).not.toHaveBeenCalled();
     });
 
-    it('skips learnerVocab upsert entries whose word is falsy', async () => {
+    it('keeps class vocabulary out of course memory until publication even with an empty entry', async () => {
       setupHappyPath();
       mockGenerateScript.mockResolvedValue({
         ...SAMPLE_SCRIPT_RESULT,
@@ -652,13 +642,7 @@ describe('generateClassListening', () => {
 
       await generateClassListening(PARAMS);
 
-      // Only the non-empty word should be upserted
-      expect(mockLearnerVocabUpsert).toHaveBeenCalledTimes(1);
-      expect(mockLearnerVocabUpsert).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { courseId_lemma: { courseId: 'course-1', lemma: 'gracias' } },
-        })
-      );
+      expect(mockLearnerVocabUpsert).not.toHaveBeenCalled();
     });
   });
 });
@@ -711,6 +695,31 @@ describe('composeListeningContent', () => {
   });
 
   describe('curriculum class (no sourceContent)', () => {
+    it('gives the script writer the course context and accepted lesson while retaining the listening duration', async () => {
+      setupHappyPath();
+      await composeListeningContent({
+        ...CONTENT_PARAMS,
+        note: 'Practise museum visits.',
+        teaching: sampleTeaching,
+      });
+      expect(mockGenerateScript.mock.calls[0][0]).toMatchObject({
+        learnerContext: 'Practise museum visits.',
+        teaching: sampleTeaching,
+        durationTarget: 4,
+      });
+      for (const messages of [
+        mockBlindResponse.mock.calls[0][1],
+        mockTeachingCriticResponse.mock.calls[0][1],
+        mockTeachingResponse.mock.calls[0][1],
+      ])
+        expect(JSON.parse(messages[0].content).lessonContext).toMatchObject({
+          teaching: sampleTeaching,
+          targetVocab: CONTENT_PARAMS.mustIncludeVocab.map(({ word, translation }) => ({
+            lemma: word,
+            gloss: translation,
+          })),
+        });
+    });
     it('lets generateScript run with web search and persists no references', async () => {
       setupHappyPath();
 

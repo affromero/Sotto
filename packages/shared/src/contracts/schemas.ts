@@ -5,6 +5,7 @@
 import { z } from 'zod';
 import { readingVocabularySchema } from '../reading-vocabulary';
 import { skillRequirementsSchema } from '../learning-requirements';
+import { classTeachingSchema } from './class-teaching';
 import {
   practicePreparingSchema,
   practiceReceiptSchema,
@@ -472,6 +473,7 @@ export const classSectionSchema = z
 // attribution the client does not need; only the modeled fields are read.
 export const classDetailResponseSchema = z
   .object({
+    teaching: classTeachingSchema.optional(),
     skillRequirements: skillRequirementsSchema.nullable().optional(),
     readingVocabulary: readingVocabularySchema.nullable().optional(),
     learnerAnswers: z.record(z.string(), z.number().int().min(0).max(3)).nullable().optional(),

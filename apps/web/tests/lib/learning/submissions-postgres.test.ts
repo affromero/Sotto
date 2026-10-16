@@ -416,7 +416,6 @@ suite('Complete learning submissions against PostgreSQL', () => {
   it.each([
     'questions',
     'extraction',
-    'memory',
     'script',
     'reference',
     'changed_script',
@@ -436,8 +435,6 @@ suite('Complete learning submissions against PostgreSQL', () => {
         where: { id: cls.id },
         data: { readingVocabulary: { passageText: 'Unrelated source' } },
       });
-    if (missing === 'memory')
-      await instance.database.learnerVocab.deleteMany({ where: { courseId } });
     if (missing === 'script') await instance.database.script.deleteMany();
     if (missing === 'changed_script')
       await instance.database.script.updateMany({
@@ -931,6 +928,51 @@ suite('Complete learning submissions against PostgreSQL', () => {
       where: { id: lessonId },
       data: { targetVocab: [{ lemma: 'hola', gloss: 'hello' }] },
     });
+  });
+
+  it('reviews frozen class grammar after a curriculum edit without crediting unassessed words', async () => {
+    const cls = await seedClass(requirements('CLASS', false, false));
+    await instance.database.courseClass.update({
+      where: { id: cls.id },
+      data: {
+        adaptiveSeed: {
+          classTargets: {
+            vocab: [{ lemma: 'amigo', gloss: 'friend' }],
+            grammarPoints: ['articles'],
+          },
+        },
+      },
+    });
+    await instance.database.learnerVocab.create({
+      data: { courseId, lemma: 'amigo', translation: 'friend' },
+    });
+    await instance.database.learnerGrammar.create({
+      data: { courseId, topicKey: 'verbs', title: 'Verbs' },
+    });
+    await instance.database.lesson.update({
+      where: { id: lessonId },
+      data: { grammarPoints: ['verbs'] },
+    });
+    try {
+      await submitClass(cls.id, userId, cls.answers);
+      await submitClass(cls.id, userId, cls.answers);
+      const grammar = await instance.database.learnerGrammar.findMany({ where: { courseId } });
+      expect(grammar.find((item) => item.topicKey === 'articles')).toMatchObject({ reps: 1 });
+      expect(grammar.find((item) => item.topicKey === 'verbs')).toMatchObject({
+        reps: 0,
+        lastReviewed: null,
+      });
+      expect(
+        await instance.database.learnerVocab.findUniqueOrThrow({
+          where: { courseId_lemma: { courseId, lemma: 'amigo' } },
+        })
+      ).toMatchObject({ reps: 0, lastReviewed: null });
+    } finally {
+      await instance.database.lesson.update({
+        where: { id: lessonId },
+        data: { grammarPoints: ['articles'] },
+      });
+    }
   });
 
   it('preserves both vocabulary reviews when different sessions finish concurrently', async () => {

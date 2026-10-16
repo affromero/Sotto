@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createSkillRequirements } from '@sotto/shared';
+import { sampleTeaching } from '../../helpers/learning/class-teaching';
 import {
   mockCourseFindFirst,
   mockCourseClassFindFirst,
@@ -29,6 +30,10 @@ import {
   SAMPLE_QUESTIONS,
   mockResolveSkillRequirements,
   mockReadingProviderInput,
+  mockTeachingProviderInput,
+  mockDueVocabRows,
+  mockCourseMaterialRows,
+  mockLearnerVocabFindMany,
 } from './fixtures';
 import { authorizedLearnerExecution } from '../../helpers/runtime/provider-execution';
 import {
@@ -40,6 +45,11 @@ import {
 describe('createNextClass', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockDueVocabRows.mockResolvedValue([]);
+    mockCourseMaterialRows.mockResolvedValue([]);
+    mockLearnerVocabFindMany.mockResolvedValue([
+      { lemma: 'hola', mastery: 0, reps: 0, lastReviewed: null },
+    ]);
     mockResolveSkillRequirements.mockImplementation(async (_execution, context) =>
       createSkillRequirements({ ...context, ttsProvider: 'cartesia', sttProvider: 'openai' })
     );
@@ -89,6 +99,89 @@ describe('createNextClass', () => {
     await expect(
       createNextClass('course-1', 'u1', authorizedLearnerExecution('u1'))
     ).rejects.toBeInstanceOf(CourseNotFoundError);
+  });
+
+  it('publishes accepted teaching with a frozen mix of new and struggling words', async () => {
+    mockCourseFindFirst.mockResolvedValue({
+      ...SAMPLE_COURSE,
+      curriculum: {
+        lessons: [{ ...SAMPLE_LESSON, targetVocab: [{ lemma: 'museo', gloss: 'museum' }] }],
+      },
+    });
+    mockCourseClassFindFirst.mockResolvedValue(null);
+    mockCourseClassFindMany.mockResolvedValue([]);
+    mockDueVocabRows.mockResolvedValue([
+      {
+        id: 'weak-word',
+        lemma: 'visitar',
+        translation: 'visit',
+        mastery: 0.1,
+        reps: 1,
+        lapses: 1,
+        dueAt: new Date('2026-01-01'),
+        lastReviewed: new Date('2026-01-01'),
+      },
+    ]);
+    mockLearnerVocabFindMany.mockResolvedValue([
+      { lemma: 'visitar', mastery: 0.1, reps: 1, lastReviewed: new Date('2026-01-01') },
+      { lemma: 'hola', mastery: 0, reps: 0, lastReviewed: null },
+    ]);
+    let published: unknown;
+    await createNextClass('course-1', 'u1', authorizedLearnerExecution('u1'), undefined, {
+      create: async () => ({ id: 'class-new' }),
+      publish: async (id, seed) => {
+        expect(id).toBe('class-new');
+        published = seed;
+      },
+    });
+    const expected = [
+      { lemma: 'visitar', gloss: 'visit' },
+      { lemma: 'museo', gloss: 'museum' },
+    ];
+    expect(published).toMatchObject({
+      teaching: sampleTeaching,
+      classTargets: { vocab: expected, grammarPoints: SAMPLE_LESSON.grammarPoints },
+    });
+    const unitReview = mockTeachingProviderInput.mock.calls.find(
+      ([, , options]) => options.jsonSchema.name === 'class_teaching_critic'
+    );
+    expect(JSON.parse(unitReview![1][0].content).lessonContext.targetVocab).toEqual(expected);
+  });
+
+  it('rejects imported material with no new or due words before teaching or publication', async () => {
+    mockCourseFindFirst.mockResolvedValue(SAMPLE_COURSE);
+    mockCourseClassFindFirst.mockResolvedValue(null);
+    mockCourseClassFindMany.mockResolvedValue([]);
+    mockCourseMaterialRows.mockResolvedValue([
+      {
+        id: 'owned-material',
+        name: 'greetings.txt',
+        originalUrl: '/owned/greetings.txt',
+        extractedText: 'Hola, Ana.',
+      },
+    ]);
+    mockLearnerVocabFindMany.mockResolvedValue([
+      {
+        lemma: 'hola',
+        translation: 'hello',
+        partOfSpeech: 'expression',
+        mastery: 1,
+        reps: 10,
+        lastReviewed: new Date('2026-10-15'),
+      },
+    ]);
+    const published: unknown[] = [];
+    await expect(
+      createNextClass('course-1', 'u1', authorizedLearnerExecution('u1'), undefined, {
+        create: async () => ({ id: 'class-new' }),
+        publish: async (id, seed) => {
+          published.push({ id, seed });
+        },
+      })
+    ).rejects.toThrow('No new or due vocabulary');
+    expect(published).toEqual([]);
+    expect(mockTeachingProviderInput).not.toHaveBeenCalled();
+    expect(mockClassSectionCreate).not.toHaveBeenCalled();
   });
 
   it('returns {kind:"gated"} when a non-PASSED class already exists', async () => {

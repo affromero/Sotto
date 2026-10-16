@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
+import { sampleTeaching } from '../helpers/learning/class-teaching';
 import {
   SAMPLE_CLASS_UNSUBMITTED,
   SAMPLE_CLASS_SPEAKING,
@@ -245,7 +246,23 @@ describe('GET /api/v1/classes/[classId]', () => {
     expect(body.passThreshold).toBe(0.6);
     expect(body.lesson).toMatchObject({ title: 'Greetings' });
     expect(body.intro).toMatchObject({ purpose: 'Practice greetings.' });
+    expect(body).not.toHaveProperty('teaching');
     expect(body.sections).toHaveLength(1);
+  });
+
+  it('returns the accepted teaching with its worked examples and guided exercise', async () => {
+    mockGetClassForUser.mockResolvedValue({
+      ...SAMPLE_CLASS_UNSUBMITTED,
+      teaching: sampleTeaching,
+    });
+
+    const response = await GET(
+      makeRequest('http://localhost/api/v1/classes/class-1', 'GET'),
+      classParams('class-1')
+    );
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).teaching).toEqual(sampleTeaching);
   });
 });
 

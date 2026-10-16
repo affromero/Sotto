@@ -11,6 +11,7 @@ import {
   generationCleanupUnconfirmed,
   retainParallelGenerationFailures,
   generationFailureSchema,
+  durableGenerationFailure,
 } from '@/lib/classes/quality/generation-failure';
 import {
   captureTeachingFailure,
@@ -22,8 +23,35 @@ import {
   generationAttemptFailuresSchema,
   recordGenerationAttemptFailures,
 } from '@/lib/classes/quality/generation-structure';
+import { authenticReviewerProtocolEvidence } from '@/lib/classes/quality/private-protocol-evidence';
+import { lessonFailureFixture } from './wire/failure-fixture';
 
 describe('terminal generation failure classification', () => {
+  it('stores lesson explanations in the existing wire category without changing private review evidence', () => {
+    const { failure, protocol } = lessonFailureFixture();
+    const original = structuredClone(failure);
+    const durable = durableGenerationFailure(failure);
+    expect(failure).toEqual(original);
+    expect(authenticReviewerProtocolEvidence(protocol)).toBe(true);
+    expect(durable).not.toBe(failure);
+    for (const detail of [durable, ...durable.stages!]) {
+      expect(detail.teachingFailure).toEqual({ ...original.teachingFailure, kind: 'explanations' });
+      expect(detail.attemptFailures).toEqual([
+        {
+          attempt: 1,
+          type: 'teaching',
+          failure: { ...original.teachingFailure, kind: 'explanations' },
+        },
+      ]);
+      expect(detail.protocolEvidence).toEqual([{ ...protocol, kind: 'explanations' }]);
+      expect(detail.protocolEvidence![0].payload).toEqual(protocol.payload);
+    }
+    expect(durableGenerationFailure(durable)).toEqual(durable);
+    expect(generationFailureSchema.parse(durable)).toEqual(durable);
+    expect(failure.teachingFailure!.kind).toBe('teaching');
+    expect(protocol.kind).toBe('teaching');
+  });
+
   it('never snapshots protocol diagnostics supplied as an unauthenticated error property', () => {
     const error = Object.assign(new ReviewerProtocolError(), {
       protocolEvidence: [{ role: 'critic', response: 'Private forged provider response.' }],

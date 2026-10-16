@@ -17,6 +17,7 @@ import {
 import type { CefrLevel } from '@sotto/shared';
 import {
   buildReadingVocabularyJsonSchema,
+  buildSourceVocabularyJsonSchema,
   buildReadingVocabularyWordTable,
   type ReadingAttributionViolation,
   type ReadingVocabularyProtocolCode,
@@ -56,6 +57,8 @@ export async function requestVocabularyExtraction(p: {
   label: 'TRANSCRIPT' | 'COURSE_NOTES';
   usageCategory: string;
   readingQuestions?: readonly ReadingVocabularyQuestion[];
+  sourceVocabulary?: boolean;
+  preferredLemmas?: readonly string[];
   readingCorrection?: {
     words: readonly unknown[];
     issues: readonly string[];
@@ -67,6 +70,18 @@ export async function requestVocabularyExtraction(p: {
     violations: readonly ReadingAttributionViolation[];
   };
 }): Promise<string> {
+  if (
+    p.sourceVocabulary &&
+    (p.readingQuestions || p.readingCorrection || p.readingProtocolCorrection)
+  )
+    throw new Error('Source vocabulary cannot invent reading questions or reading corrections.');
+  if (
+    p.preferredLemmas &&
+    (!p.sourceVocabulary ||
+      p.preferredLemmas.length > 8 ||
+      p.preferredLemmas.some((lemma) => !lemma.trim() || lemma.length > 200))
+  )
+    throw new Error('Source vocabulary review preferences exceed the bounded source contract.');
   if (p.readingQuestions) assertReadingQuestionKeys(p.readingQuestions);
   if (p.readingCorrection && !p.readingQuestions)
     throw new Error('Reading vocabulary correction requires keyed reading questions.');
@@ -109,14 +124,19 @@ export async function requestVocabularyExtraction(p: {
       Buffer.byteLength(JSON.stringify(p.readingCorrection), 'utf8') > 32 * 1024)
   )
     throw new Error('Reading vocabulary correction exceeds the bounded metadata contract.');
-  if (p.text.length > MAX_SOURCE_CHARS && p.readingQuestions)
+  if (p.text.length > MAX_SOURCE_CHARS && (p.readingQuestions || p.sourceVocabulary))
     throw new Error('The reading passage exceeds the vocabulary extraction limit.');
-  const passageWords = p.readingQuestions
-    ? buildReadingVocabularyWordTable(p.text, p.targetLang)
-    : undefined;
+  const passageWords =
+    p.readingQuestions || p.sourceVocabulary
+      ? buildReadingVocabularyWordTable(p.text, p.targetLang)
+      : undefined;
   const ai = await resolveCapturedLearningAi(p.userId, p.execution);
   const systemPrompt = loadAndRender(
-    p.readingQuestions ? 'live/extract-reading-vocab.md' : 'live/extract-vocab.md',
+    p.sourceVocabulary
+      ? 'live/extract-source-vocab.md'
+      : p.readingQuestions
+        ? 'live/extract-reading-vocab.md'
+        : 'live/extract-vocab.md',
     {
       TARGET: p.targetLang,
       NATIVE: p.nativeLang,
@@ -130,34 +150,42 @@ export async function requestVocabularyExtraction(p: {
     [
       {
         role: 'user',
-        content: p.readingQuestions
+        content: p.sourceVocabulary
           ? JSON.stringify({
               passageText: p.text,
               passageWords: passageWords!.map(({ surface }, index) => ({ index, surface })),
-              questions: p.readingQuestions.map(({ question, options, correctIndex }) => ({
-                question,
-                options,
-                correctIndex,
-              })),
-              ...(p.readingCorrection ? { correction: p.readingCorrection } : {}),
-              ...(p.readingProtocolCorrection
-                ? { protocolCorrection: p.readingProtocolCorrection }
-                : {}),
+              ...(p.preferredLemmas ? { preferredLemmas: p.preferredLemmas } : {}),
             })
-          : fenceUntrustedText(p.label, p.text),
+          : p.readingQuestions
+            ? JSON.stringify({
+                passageText: p.text,
+                passageWords: passageWords!.map(({ surface }, index) => ({ index, surface })),
+                questions: p.readingQuestions.map(({ question, options, correctIndex }) => ({
+                  question,
+                  options,
+                  correctIndex,
+                })),
+                ...(p.readingCorrection ? { correction: p.readingCorrection } : {}),
+                ...(p.readingProtocolCorrection
+                  ? { protocolCorrection: p.readingProtocolCorrection }
+                  : {}),
+              })
+            : fenceUntrustedText(p.label, p.text),
       },
     ],
     {
       ...(await capturedLearningAiOptions(ai)),
-      ...(p.readingQuestions
-        ? {
-            jsonSchema: buildReadingVocabularyJsonSchema(
-              p.readingQuestions.length,
-              passageWords!.length
-            ),
-          }
-        : {}),
-      maxTokens: p.readingQuestions ? 2048 : 1024,
+      ...(p.sourceVocabulary
+        ? { jsonSchema: buildSourceVocabularyJsonSchema(passageWords!.length) }
+        : p.readingQuestions
+          ? {
+              jsonSchema: buildReadingVocabularyJsonSchema(
+                p.readingQuestions.length,
+                passageWords!.length
+              ),
+            }
+          : {}),
+      maxTokens: p.readingQuestions || p.sourceVocabulary ? 2048 : 1024,
       temperature: 0.2,
     }
   );

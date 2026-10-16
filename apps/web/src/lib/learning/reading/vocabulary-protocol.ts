@@ -44,6 +44,19 @@ export function buildReadingVocabularyWordTable(
   return words;
 }
 
+/** A quotation must cover complete source tokens, not a substring of another word. */
+export function hasSourceVocabularyQuote(
+  source: string,
+  quote: string,
+  targetLang: string
+): boolean {
+  const words = buildReadingVocabularyWordTable(source, targetLang);
+  const ends = new Set(words.map((word) => word.end));
+  return words.some(
+    (word) => source.startsWith(quote, word.start) && ends.has(word.start + quote.length)
+  );
+}
+
 export function buildReadingVocabularyJsonSchema(questionCount: number, sourceWordCount: number) {
   if (!Number.isSafeInteger(questionCount) || questionCount < 1)
     throw new Error('Reading vocabulary requires a positive safe question count.');
@@ -74,6 +87,34 @@ export function buildReadingVocabularyJsonSchema(questionCount: number, sourceWo
   });
   return {
     name: 'reading_vocabulary_extraction',
+    schema: z.toJSONSchema(
+      readingVocabularyResponseSchema.extend({ words: z.array(word).min(1).max(12) }),
+      { target: 'draft-7' }
+    ),
+  };
+}
+
+/** Imported source vocabulary has quotations, never invented assessment associations. */
+export function buildSourceVocabularyJsonSchema(sourceWordCount: number) {
+  if (!Number.isSafeInteger(sourceWordCount) || sourceWordCount < 1)
+    throw new Error('Source vocabulary requires a positive safe source-word count.');
+  const word = readingVocabularyResponseSchema.shape.words.element.extend({
+    sourceSpan: readingVocabularyResponseSchema.shape.words.element.shape.sourceSpan.extend({
+      startWordIndex: z
+        .number()
+        .int()
+        .nonnegative()
+        .max(sourceWordCount - 1),
+      endWordIndex: z
+        .number()
+        .int()
+        .nonnegative()
+        .max(sourceWordCount - 1),
+    }),
+    questionIndices: z.array(z.number().int().nonnegative()).length(0),
+  });
+  return {
+    name: 'source_vocabulary_extraction',
     schema: z.toJSONSchema(
       readingVocabularyResponseSchema.extend({ words: z.array(word).min(1).max(12) }),
       { target: 'draft-7' }

@@ -24,6 +24,7 @@ import { useRouter } from 'next/navigation';
 import { SottoSpinner } from '@/components/ui/SottoSpinner';
 import { ClassGlyph } from './ClassGlyph';
 import { ClassHub } from './ClassHub';
+import { ClassTeachingNotes } from './lesson/ClassTeachingNotes';
 import { ClassSummary, FeedbackClinic } from './ClassSummary';
 import { GrammarSection } from './GrammarSection';
 import { ListeningSection } from './ListeningSection';
@@ -614,6 +615,7 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
           courseId={cls.courseId}
           lesson={cls.lesson}
           intro={cls.intro}
+          teaching={cls.teaching}
           order={cls.order}
           sections={sections}
           scores={scores}
@@ -782,7 +784,19 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
               {errorMessage}
             </p>
           )}
-          <div id="class-active-stage">{stage}</div>
+          <div id="class-active-stage">
+            {view === 'hour' && (
+              <ClassTeachingNotes
+                key={`${cls.id}:${cls.attempt ?? 1}`}
+                classId={cls.id}
+                courseId={cls.courseId}
+                intro={cls.intro}
+                teaching={cls.teaching}
+                collapsible
+              />
+            )}
+            {stage}
+          </div>
           {view === 'hour' && hasLiveFeedback && (
             <FeedbackClinic
               result={null}

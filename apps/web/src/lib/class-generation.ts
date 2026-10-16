@@ -5,6 +5,8 @@ import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/
 import { createAIProvider } from './providers/ai';
 import { loadAndRender } from './prompt-loader';
 import { formatNotesForPrompt } from './course-notes';
+import { orderQuizChoices } from './classes/quiz/choice-order';
+import type { ClassTeaching } from '@sotto/shared';
 import {
   assertFreshQuizQuestions,
   buildQuizRetryPrompt,
@@ -144,6 +146,7 @@ export interface SectionGenParams {
   targetVocab: Array<{ lemma: string; gloss: string }>;
   seed: string;
   note?: string;
+  teaching?: ClassTeaching;
   retry?: QuizRetryContext;
   /**
    * Optional sourced-class reading passage (CEFR-leveled, target language).
@@ -557,6 +560,7 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
               SEED: p.seed,
               NOTES: formatNotesForPrompt(p.note ?? ''),
               SOURCE: sourceBlock,
+              TEACHING: p.teaching ? formatNotesForPrompt(JSON.stringify(p.teaching)) : '',
               TASK_CONTEXT_FIELD: requireTaskContext
                 ? '"taskContext": "…(explicit task scope or disambiguating situation)",'
                 : '',
@@ -606,7 +610,20 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
     if (coverage.issues.length) return coverage.issues;
     const response = await provider.generateResponse(
       reviewPrompt(questions),
-      [{ role: 'user', content: sectionReviewInput(questions) }],
+      [
+        {
+          role: 'user',
+          content: JSON.stringify({
+            ...JSON.parse(sectionReviewInput(questions)),
+            lessonContext: {
+              objective: p.objective,
+              grammarPoints: p.grammarPoints,
+              targetVocab: p.targetVocab,
+              ...(p.teaching ? { teaching: p.teaching } : {}),
+            },
+          }),
+        },
+      ],
       {
         ...(await capturedLearningAiOptions(ai)),
         maxTokens: 2048,
@@ -674,6 +691,13 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
           targetLang: p.targetLang,
           kind: 'explanations',
           sectionSkill,
+          lessonContext: {
+            title: p.objective,
+            objective: p.objective,
+            grammarPoints: p.grammarPoints,
+            targetVocab: p.targetVocab,
+            ...(p.teaching ? { teaching: p.teaching } : {}),
+          },
           items: questions,
           readingPassageReview: assessment.readingPassageReview,
         });
@@ -717,7 +741,10 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
       distractorRepair = captureVocabularyDistractorRepair(parsed.questions, error);
       if (!distractorRepair) throw error;
     }
-    const questions = normalized.questions;
+    const questions =
+      p.teaching && !p.vocabularyReview
+        ? orderQuizChoices(normalized.questions, p.seed)
+        : normalized.questions;
     if (p.skill === 'READING' && !questions[0].passageText?.trim())
       throw new Error('reading response omitted the required passage');
     const targetOrder = p.vocabularyReview

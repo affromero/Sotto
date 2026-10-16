@@ -5,6 +5,7 @@ import { checkRateLimit } from '@/lib/redis';
 import { errorResponse } from '@/lib/api-response';
 import { logger } from '@/lib/logger';
 import { importCourseMaterials, readMaterialForm } from '@/lib/course-materials';
+import { buildCourseSourceContext } from '@/lib/course-materials/context';
 import { RequestBodyTooLargeError } from 'thesidedoor-core/runtime/request';
 import { accessOperation } from '@/lib/sidedoor/access/core/http';
 import { isAccessError } from 'thesidedoor-core/access';
@@ -57,9 +58,16 @@ async function upload(request: NextRequest) {
       return errorResponse('Pasted notes must contain at most 20,000 characters.', 400);
     const pasted = parsedContent.data;
     const { materials, failed } = await importCourseMaterials(request, authed, files);
-    const texts = materials.map((material) => material.extractedText);
-    const content = [pasted, ...texts].filter(Boolean).join('\n\n');
-    if (!content) return errorResponse('No readable materials uploaded', 422);
+    const documents = [
+      ...(pasted ? [{ id: 'pasted-notes', name: 'Pasted learner notes', text: pasted }] : []),
+      ...materials.map((material) => ({
+        id: material.id,
+        name: material.name,
+        text: material.extractedText,
+      })),
+    ];
+    if (!documents.length) return errorResponse('No readable materials uploaded', 422);
+    const content = buildCourseSourceContext(documents, `${userId}:${native}:${target}`).text;
 
     const deduction = await runNotesDeduction(
       userId,
@@ -75,7 +83,7 @@ async function upload(request: NextRequest) {
       deducedLevel: deduction.level,
       rationale: deduction.rationale,
       confidence: deduction.confidence,
-      imported: texts.length,
+      imported: materials.length,
       failed,
       materials,
     });

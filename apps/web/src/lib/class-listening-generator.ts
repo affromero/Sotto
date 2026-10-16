@@ -8,6 +8,7 @@ import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/
 import { createAIProvider } from './providers/ai';
 import { loadAndRender } from './prompt-loader';
 import { formatNotesForPrompt } from './course-notes';
+import type { ClassTeaching } from '@sotto/shared';
 import {
   assertFreshQuizQuestions,
   buildQuizRetryPrompt,
@@ -99,6 +100,7 @@ export interface ClassListeningParams {
   objective: string;
   mustIncludeVocab: Array<{ word: string; translation: string }>;
   note?: string;
+  teaching?: ClassTeaching;
   retry?: QuizRetryContext;
   /** Optional sourced-class content + provenance (see ListeningContentParams). */
   sourceContent?: string;
@@ -136,6 +138,7 @@ export interface ListeningContentParams {
   /** Provenance for graph vocab (a class id). Undefined for practice sessions. */
   firstSeenClassId?: string;
   note?: string;
+  teaching?: ClassTeaching;
   retry?: QuizRetryContext;
   /**
    * Optional sourced-class content: a CEFR-leveled passage in the target
@@ -196,6 +199,16 @@ export async function composeListeningContent(
 ): Promise<ListeningContent> {
   const sourceContent = p.sourceContent;
   const sourceMetadata = structuredClone(p.sourceMetadata);
+  const lessonContext = {
+    title: p.objective,
+    objective: p.objective,
+    grammarPoints: [],
+    targetVocab: p.mustIncludeVocab.map(({ word, translation }) => ({
+      lemma: word,
+      gloss: translation,
+    })),
+    ...(p.teaching ? { teaching: p.teaching } : {}),
+  };
   const listeningSource = sourceContent
     ? formatSourceBlock(sourceContent, sourceMetadata)
     : undefined;
@@ -283,6 +296,8 @@ export async function composeListeningContent(
             learningRepair,
             ...(await capturedLearningAiOptions(ai)),
             topic: p.objective,
+            learnerContext: p.note,
+            teaching: p.teaching,
             depth: 'standard',
             audienceLevel: p.level,
             focusAreas: p.retry
@@ -500,7 +515,15 @@ export async function composeListeningContent(
           REVIEW_SCHEMA: JSON.stringify(blindSchema.schema),
           LANGUAGE_POLICY: classListeningTranscriptPolicy(p),
         }),
-        [{ role: 'user', content: sectionReviewInput(reviewedQuestions) }],
+        [
+          {
+            role: 'user',
+            content: JSON.stringify({
+              ...JSON.parse(sectionReviewInput(reviewedQuestions)),
+              lessonContext,
+            }),
+          },
+        ],
         {
           ...(await capturedLearningAiOptions(ai)),
           temperature: 0,
@@ -579,6 +602,7 @@ export async function composeListeningContent(
           targetLang: p.targetLang,
           kind: 'listening',
           items: reviewedQuestions,
+          lessonContext,
           listeningPassageReview,
           listeningSource,
           listeningTurns,
@@ -698,7 +722,7 @@ export async function composeListeningContent(
     });
 
     // Step 7: upsert generated vocab into the learner's knowledge graph
-    for (const v of result.vocabulary ?? []) {
+    for (const v of p.firstSeenClassId ? [] : (result.vocabulary ?? [])) {
       if (!v.word) continue;
       await prisma.learnerVocab.upsert({
         where: { courseId_lemma: { courseId: p.courseId, lemma: v.word } },
@@ -745,6 +769,7 @@ export async function generateClassListening(
     firstSeenClassId: p.classId,
     deferAudio: p.deferAudio,
     note: p.note,
+    teaching: p.teaching,
     retry: p.retry,
     sourceContent: p.sourceContent,
     sourceMetadata: p.sourceMetadata,

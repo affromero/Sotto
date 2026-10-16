@@ -319,7 +319,7 @@ suite('complete class material and retained repair', () => {
   });
 
   it('runs an extraction-memory-only repair without replacing answered material or calling a provider', async () => {
-    const { cls, writing } = await repairTarget();
+    const { cls, writing, requirements } = await repairTarget();
     await instance.database.writingPrompt.createMany({
       data: [2, 3].map((order) => ({
         sectionId: writing.id,
@@ -382,6 +382,23 @@ suite('complete class material and retained repair', () => {
       intent: { kind: 'REPAIR', classId: cls.id, expectedAttempt: cls.attempt },
     });
     expect(admitted.intent?.skills).toEqual([]);
+    const prepared = await instance.database.courseClass.findUniqueOrThrow({
+      where: { id: cls.id },
+      include: {
+        course: true,
+        lesson: true,
+        sections: {
+          include: {
+            questions: true,
+            prompts: true,
+            writingPrompts: true,
+            episode: { include: { script: true } },
+          },
+        },
+      },
+    });
+    await repairClassReadingMemory(prepared, requirements, execution, prepared.attempt);
+    expect(await instance.database.learnerVocab.count({ where: { courseId } })).toBe(0);
     await processClassPreparation(await queuedJob(admitted.id));
     await processClassPreparation(await queuedJob(admitted.id));
     expect((await classPreparationStore(instance.database, courseId).read())?.status).toBe(

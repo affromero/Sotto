@@ -9,6 +9,8 @@ provider request activity. `/api/v1/materials` stages uploaded originals and
 `/api/v1/materials/[materialId]/file` serves them only to their owning profile.
 Course notes expose separate editable text and document metadata. Onboarding
 attaches owned material IDs in its final transaction.
+Placement deduction uses bounded excerpts from every uploaded document,
+including its ending. Complete supported extracts remain stored with originals.
 
 `settings/local-speech` atomically changes the authenticated selected profile's speech
 preference. Local endpoint/voice configuration and paid credit checks require owner

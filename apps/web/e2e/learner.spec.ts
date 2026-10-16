@@ -158,12 +158,16 @@ test('a learner plays audio and completes all five skills on a narrow screen', a
     await page.getByRole('button', { name: `Continue · ${next}` }).click();
   }
   const audio = page.getByLabel('Lesson audio', { exact: true });
-  await page.getByRole('button', { name: 'Play audio', exact: true }).click();
+  await expect(audio).toBeVisible();
+  await expect
+    .poll(() => audio.evaluate((element: HTMLAudioElement) => element.readyState))
+    .toBeGreaterThanOrEqual(1);
+  await audio.press('Space');
   await expect
     .poll(() => audio.evaluate((element: HTMLAudioElement) => element.currentTime))
     .toBeGreaterThan(0.3);
-  await page.getByRole('button', { name: 'Pause audio', exact: true }).click();
-  expect(await audio.evaluate((element: HTMLAudioElement) => element.paused)).toBe(true);
+  await audio.press('Space');
+  await expect.poll(() => audio.evaluate((element: HTMLAudioElement) => element.paused)).toBe(true);
   await expect(page.getByRole('button', { name: 'Option 1: Hallo' })).toHaveCount(
     fixture.counts.LISTENING
   );

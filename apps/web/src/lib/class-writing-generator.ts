@@ -4,6 +4,7 @@
 // persistence.
 import { withClassGeneration } from './learning/classes/class-generation-state';
 import { z } from 'zod';
+import type { ClassTeaching } from '@sotto/shared';
 import { capturedLearningAiOptions, resolveCapturedLearningAi } from './learning-ai';
 import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import { createAIProvider } from './providers/ai';
@@ -25,6 +26,7 @@ import {
   writingAuthoringProofSchema,
   writingIdeasSchema,
   writingStarterSchema,
+  writingTaskTypeSchema,
   type WritingCorrectionDelta,
 } from './learning/writing/writing-output-protocol';
 import {
@@ -38,7 +40,7 @@ import {
 
 const WRITING_PROMPT_COUNT = 3;
 const WRITING_REPAIR_SCHEMA_INSTRUCTION =
-  'Conform to the supplied JSON Schema, including modelAnswer, correctionReason and optional ideas as exact prefixes of modelAnswer in a string array or null. Do not add other properties.';
+  'Conform to the supplied JSON Schema, including the private modelAnswer and task-appropriate correctionReason. Supply ideas or a starter only when the schema permits them; any permitted opening must be an exact proper prefix of modelAnswer. Do not add other properties.';
 const writingPromptProviderSchema = z
   .object({
     prompts: z
@@ -47,7 +49,7 @@ const writingPromptProviderSchema = z
           .object({
             task: z.string().trim().min(1),
             sourceText: z.string().trim().min(1),
-            taskType: z.enum(['transformation', 'correction', 'completion', 'guided_reply']),
+            taskType: writingTaskTypeSchema.exclude(['translation']),
             starterText: writingStarterSchema,
             guidance: z.string().nullable(),
             ...writingAuthoringProofSchema.shape,
@@ -58,13 +60,32 @@ const writingPromptProviderSchema = z
       .length(WRITING_PROMPT_COUNT),
   })
   .strict();
-const WRITING_PROMPTS_JSON_SCHEMA = {
-  name: 'class_writing_prompts',
-  schema: z.toJSONSchema(writingPromptProviderSchema, { target: 'draft-7' }),
-};
+const translationPromptSchema = writingPromptProviderSchema.shape.prompts.element.extend({
+  taskType: z.literal('translation'),
+  sourceText: z.string().trim().min(1).max(1200),
+  starterText: z.null(),
+  correctionReason: z.null(),
+  ideas: z.null(),
+});
+
+function writingResponseSchema(translation: boolean) {
+  return {
+    name: 'class_writing_prompts',
+    schema: z.toJSONSchema(
+      translation
+        ? z
+            .object({ prompts: z.array(translationPromptSchema).length(WRITING_PROMPT_COUNT) })
+            .strict()
+        : writingPromptProviderSchema,
+      { target: 'draft-7' }
+    ),
+  };
+}
 const writingPromptResponseSchema = z.object({ prompts: z.array(z.unknown()) }).strict();
 
 export interface WritingPromptsParams {
+  taskMode?: 'translation';
+  teaching?: ClassTeaching;
   userId: string;
   execution: SottoProviderExecution;
   level: string;
@@ -85,7 +106,7 @@ export interface ComposedWritingPrompt {
 interface RawWritingPrompt {
   task: string;
   sourceText: string;
-  taskType: 'transformation' | 'correction' | 'completion' | 'guided_reply';
+  taskType: z.infer<typeof writingTaskTypeSchema>;
   guidance?: string;
   ideas?: unknown;
   modelAnswer: string;
@@ -113,7 +134,7 @@ function isValidRawPrompt(item: unknown): item is RawWritingPrompt {
     obj.task.trim() !== '' &&
     typeof obj.sourceText === 'string' &&
     obj.sourceText.trim() !== '' &&
-    ['transformation', 'correction', 'completion', 'guided_reply'].includes(String(obj.taskType))
+    writingTaskTypeSchema.safeParse(obj.taskType).success
   );
 }
 
@@ -121,22 +142,30 @@ export async function composeWritingPrompts(
   p: WritingPromptsParams
 ): Promise<ComposedWritingPrompt[]> {
   const ai = await resolveCapturedLearningAi(p.userId, p.execution);
+  const translation = p.taskMode === 'translation';
+  const translationRepairPolicy = translation
+    ? `These are translation tasks: taskType must be translation, sourceText must remain in ${p.nativeLang}, and modelAnswer must be in ${p.targetLang}. Instructions and guidance follow the normal language policy. Native-language source sentences are a required exception to generic target-language wording below. Preserve their meaning. starterText, correctionReason and ideas must all be null. Never reveal a translation or an answer prefix.\n\n`
+    : '';
 
   const vocabList = p.targetVocab.map((v) => `${v.lemma} — ${v.gloss}`).join('\n');
-  const systemPrompt = loadAndRender('writing/generate-writing-prompts.md', {
-    COUNT: String(WRITING_PROMPT_COUNT),
-    LEVEL: p.level,
-    NATIVE: p.nativeLang,
-    TARGET: p.targetLang,
-    LANGUAGE_POLICY: classLanguagePolicy({
-      level: p.level,
-      nativeLang: p.nativeLang,
-      targetLang: p.targetLang,
-    }),
-    OBJECTIVE: p.objective,
-    VOCAB: vocabList,
-    NOTES: formatNotesForPrompt(p.note ?? ''),
-  });
+  const systemPrompt = loadAndRender(
+    translation ? 'writing/generate-translation-prompts.md' : 'writing/generate-writing-prompts.md',
+    {
+      COUNT: String(WRITING_PROMPT_COUNT),
+      LEVEL: p.level,
+      NATIVE: p.nativeLang,
+      TARGET: p.targetLang,
+      LANGUAGE_POLICY: classLanguagePolicy({
+        level: p.level,
+        nativeLang: p.nativeLang,
+        targetLang: p.targetLang,
+      }),
+      OBJECTIVE: p.objective,
+      VOCAB: vocabList,
+      NOTES: formatNotesForPrompt(p.note ?? ''),
+      TEACHING: p.teaching ? formatNotesForPrompt(JSON.stringify(p.teaching)) : '',
+    }
+  );
 
   const client = createAIProvider(ai.provider);
   const generate = async (
@@ -149,7 +178,7 @@ export async function composeWritingPrompts(
       ...(await capturedLearningAiOptions(ai)),
       maxTokens: 2048,
       temperature,
-      jsonSchema: WRITING_PROMPTS_JSON_SCHEMA,
+      jsonSchema: writingResponseSchema(translation),
     });
     logUsage({
       service: ai.provider,
@@ -200,7 +229,13 @@ export async function composeWritingPrompts(
           ...(guidance === null ? {} : { guidance }),
           ...(ideas === null ? {} : { ideas }),
         } as RawWritingPrompt;
-        if (!isValidRawPrompt(normalized)) issues.push({ code: 'invalid_item', index });
+        if (
+          !isValidRawPrompt(normalized) ||
+          (translation
+            ? !translationPromptSchema.safeParse(prompt).success
+            : normalized.taskType === 'translation')
+        )
+          issues.push({ code: 'invalid_item', index });
         else {
           try {
             const proof = parseWritingAuthoringProof(
@@ -265,6 +300,13 @@ export async function composeWritingPrompts(
       nativeLang: p.nativeLang,
       targetLang: p.targetLang,
       kind: 'writing',
+      lessonContext: {
+        title: p.teaching?.title ?? p.objective,
+        objective: p.objective,
+        grammarPoints: [],
+        targetVocab: p.targetVocab,
+        ...(p.teaching ? { teaching: p.teaching } : {}),
+      },
       items,
     });
 
@@ -276,7 +318,9 @@ export async function composeWritingPrompts(
     try {
       p.execution.signal?.throwIfAborted();
       generated = await generate(
-        attempt === 1 ? `Generate ${WRITING_PROMPT_COUNT} writing tasks.` : replacementRequest!,
+        attempt === 1
+          ? `Generate ${WRITING_PROMPT_COUNT} ${translation ? 'translation' : 'writing'} tasks.`
+          : translationRepairPolicy + replacementRequest!,
         attempt === 1 ? 'class-writing-prompts' : 'class-writing-prompts-repair',
         attempt === 1 ? 0.7 : 0,
         attempt
@@ -354,6 +398,7 @@ export async function composeWritingPrompts(
 }
 
 export interface ClassWritingParams {
+  teaching?: ClassTeaching;
   userId: string;
   execution: SottoProviderExecution;
   classId: string;
@@ -373,6 +418,8 @@ export interface ClassWritingResult {
 export async function generateClassWriting(p: ClassWritingParams): Promise<ClassWritingResult> {
   const attempt = p.attempt ?? 1;
   const prompts = await composeWritingPrompts({
+    taskMode: 'translation',
+    teaching: p.teaching,
     userId: p.userId,
     execution: p.execution,
     level: p.level,

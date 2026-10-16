@@ -7,7 +7,6 @@ import { currentClassSections } from './current-sections';
 import { classQuestionMaterialSchema } from './class-material';
 import { learningScriptHash } from '../script-hash';
 import { extractReadingVocabulary } from '../reading-vocabulary';
-import { seedLessonItems } from '../../knowledge-graph';
 import { withClassGeneration } from './class-generation-state';
 import type { SottoProviderExecution } from '../../sidedoor/credentials/runtime/provider-execution';
 
@@ -134,7 +133,6 @@ export async function repairClassReadingMemory(
         questions,
       });
   await withClassGeneration(execution, cls.id, attempt, async (database) => {
-    await seedLessonItems(cls.courseId, cls.id, requirements.level, vocabulary.words, [], database);
     await database.courseClass.update({
       where: { id: cls.id },
       data: { readingVocabulary: vocabulary },

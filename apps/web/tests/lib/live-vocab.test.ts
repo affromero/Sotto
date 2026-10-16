@@ -81,6 +81,50 @@ const PARAMS = {
 };
 
 describe('keyed reading extraction requests', () => {
+  it('uses indexed source vocabulary without inventing keyed questions or assessment links', async () => {
+    mockGenerateResponse.mockResolvedValue({ content: '{"words":[]}', model: 'captured' });
+    await requestVocabularyExtraction({
+      ...PARAMS,
+      text: 'Mia ist gegangen.',
+      label: 'COURSE_NOTES',
+      usageCategory: 'course-source-vocabulary',
+      sourceVocabulary: true,
+    });
+    const [prompt, messages, options] = mockGenerateResponse.mock.calls.at(-1)!;
+    expect(mockLoadAndRender.mock.calls.at(-1)?.[0]).toBe('live/extract-source-vocab.md');
+    expect(prompt).toBeDefined();
+    expect(JSON.parse(messages[0].content)).toEqual({
+      passageText: 'Mia ist gegangen.',
+      passageWords: [
+        { index: 0, surface: 'Mia' },
+        { index: 1, surface: 'ist' },
+        { index: 2, surface: 'gegangen' },
+      ],
+    });
+    expect(options.jsonSchema.name).toBe('source_vocabulary_extraction');
+    expect(
+      options.jsonSchema.schema.properties.words.items.properties.questionIndices.maxItems
+    ).toBe(0);
+  });
+  it('rejects mixing source vocabulary and reading assessments before provider admission', async () => {
+    await expect(
+      requestVocabularyExtraction({ ...reading, sourceVocabulary: true })
+    ).rejects.toThrow('cannot invent reading questions');
+    expect(mockGenerateResponse).not.toHaveBeenCalled();
+  });
+  it('rejects oversized source preferences before provider admission', async () => {
+    await expect(
+      requestVocabularyExtraction({
+        ...PARAMS,
+        text: 'Mia ist gegangen.',
+        label: 'COURSE_NOTES',
+        usageCategory: 'source',
+        sourceVocabulary: true,
+        preferredLemmas: Array.from({ length: 9 }, () => 'gehen'),
+      })
+    ).rejects.toThrow('bounded source contract');
+    expect(mockGenerateResponse).not.toHaveBeenCalled();
+  });
   const question = {
     question: 'What does Ana order?',
     options: ['Coffee', 'Tea', 'Milk', 'Water'],

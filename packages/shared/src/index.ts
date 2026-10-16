@@ -40,6 +40,7 @@ export type { SkillRequirements, SkillRequirement } from './learning-requirement
 export * from './learning-evidence';
 export * from './contracts/pencil-homework';
 export * from './reading-vocabulary';
+export * from './contracts/class-teaching';
 
 export type {
   EpisodeSummary,

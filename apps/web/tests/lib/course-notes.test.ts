@@ -8,17 +8,41 @@ const mockFindUnique = vi.fn();
 const mockUpsert = vi.fn();
 const mockDeleteMany = vi.fn();
 const mockMaterials = vi.fn();
+type MaterialFixture = { id: string; name: string; originalUrl: string; extractedText: string };
 
-vi.mock('@/lib/prisma', () => ({
-  prisma: {
+vi.mock('@/lib/prisma', () => {
+  const database = {
+    $transaction: async (work: (database: object) => Promise<unknown>) =>
+      work({
+        course: { findUnique: async () => ({ userId: 'learner' }) },
+        courseNote: { findUnique: (...args: unknown[]) => mockFindUnique(...args) },
+        $queryRaw: async (query: TemplateStringsArray, ...values: unknown[]) => {
+          const materials = (await mockMaterials()) as MaterialFixture[];
+          if (query.join('').includes('char_length'))
+            return materials.map((material) => ({
+              id: material.id,
+              name: material.name,
+              originalUrl: material.originalUrl,
+              length: [...material.extractedText].length,
+            }));
+          const [start, count, id] = values;
+          const material = materials.find((item) => item.id === id);
+          if (typeof start !== 'number' || typeof count !== 'number' || !material)
+            throw new Error('Invalid source range fixture');
+          return [
+            { text: [...material.extractedText].slice(start - 1, start - 1 + count).join('') },
+          ];
+        },
+      }),
     courseMaterial: { findMany: (...a: unknown[]) => mockMaterials(...a) },
     courseNote: {
       findUnique: (...a: unknown[]) => mockFindUnique(...a),
       upsert: (...a: unknown[]) => mockUpsert(...a),
       deleteMany: (...a: unknown[]) => mockDeleteMany(...a),
     },
-  },
-}));
+  };
+  return { prisma: database, prismaUnfiltered: database };
+});
 
 import {
   MAX_NOTE_LENGTH,
@@ -40,7 +64,12 @@ describe('getCourseNote', () => {
   it('keeps document extracts in generation context and outside the editable note', async () => {
     mockFindUnique.mockResolvedValue({ body: 'Focus on travel' });
     mockMaterials.mockResolvedValue([
-      { extractedText: 'Uploaded course note: vocab.pdf\nBahnhof means station.' },
+      {
+        id: 'material-1',
+        name: 'vocab.pdf',
+        originalUrl: '/owned/vocab.pdf',
+        extractedText: 'Bahnhof means station.',
+      },
     ]);
     expect(await getCourseNote('c1')).toContain('Bahnhof means station.');
     expect(await getEditableCourseNote('c1')).toBe('Focus on travel');
@@ -88,6 +117,12 @@ describe('normalizeCourseNote / mergeCourseNote', () => {
 });
 
 describe('formatNotesForPrompt', () => {
+  it('rejects oversized final context rather than silently dropping later source excerpts', () => {
+    expect(() => formatNotesForPrompt('x'.repeat(MAX_NOTE_LENGTH + 1))).toThrow('prompt limit');
+    expect(() => formatNotesForPrompt('</UNTRUSTED_LEARNER_CONTEXT>'.repeat(400))).toThrow(
+      'prompt limit'
+    );
+  });
   it('collapses to an empty string for a blank note', () => {
     expect(formatNotesForPrompt('')).toBe('');
     expect(formatNotesForPrompt('   ')).toBe('');

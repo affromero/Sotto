@@ -1,10 +1,11 @@
 // Shared helpers for importing learner-uploaded note/material files. Used by the
 // course-notes import route and by notes-based placement. Text files are read
-// directly; office/PDF/epub go through Markit. Output is clipped to a safe size.
+// directly; office/PDF/epub go through Markit. Oversized extracts fail explicitly.
 import { extname } from 'path';
-import { extractViaMarkit } from '@/lib/extractors/markit';
+import { CompleteTextLimitError, extractViaMarkit } from '@/lib/extractors/markit';
+import { AccessError, isAccessError } from 'thesidedoor-core/access';
 
-const MAX_IMPORTED_FILE_CHARS = 3000;
+export const MAX_IMPORTED_FILE_CHARS = 1000000;
 
 const TEXT_EXTENSIONS = new Set([
   '.csv',
@@ -29,36 +30,48 @@ export function isUploadFile(value: unknown): value is File {
   return typeof value === 'object' && value !== null && 'arrayBuffer' in value && 'name' in value;
 }
 
-/** Strip NULs, trim, and cap to MAX_IMPORTED_FILE_CHARS with a trimmed marker. */
-function clipImportedText(text: string): string {
+/** Preserve the complete supported extract instead of silently losing its ending. */
+function normalizeImportedText(text: string): string {
   const trimmed = text.replace(/\0/g, '').trim();
-  if (trimmed.length <= MAX_IMPORTED_FILE_CHARS) return trimmed;
-  return `${trimmed.slice(0, MAX_IMPORTED_FILE_CHARS).trim()}\n[Trimmed from a longer upload.]`;
+  if (trimmed.length > MAX_IMPORTED_FILE_CHARS)
+    throw new AccessError(
+      'invalid',
+      `The extracted document exceeds ${MAX_IMPORTED_FILE_CHARS} characters.`
+    );
+  return trimmed;
 }
 
 /**
  * Extract readable text from an uploaded note/material file, prefixed with the
  * file name. Throws for empty or unsupported files.
  */
-async function extractUploadText(file: File): Promise<string> {
+async function extractUploadText(file: File): Promise<{ text: string; sourceText: string }> {
   const name = file.name || 'uploaded-notes';
   const extension = extname(name).toLowerCase();
   const buffer = Buffer.from(await file.arrayBuffer());
 
   if (file.type.startsWith('text/') || TEXT_EXTENSIONS.has(extension)) {
-    const text = clipImportedText(buffer.toString('utf8'));
+    const text = normalizeImportedText(buffer.toString('utf8'));
     if (!text) throw new Error('Empty note file');
-    return `Uploaded course note: ${name}\n${text}`;
+    return { text: `Uploaded course note: ${name}\n${text}`, sourceText: text };
   }
 
   if (MARKIT_EXTENSIONS.has(extension)) {
     const extracted = await extractViaMarkit(buffer, {
       extension,
       url: `upload://${encodeURIComponent(name)}`,
+      completeTextLimit: MAX_IMPORTED_FILE_CHARS,
+    }).catch((error: unknown) => {
+      if (error instanceof CompleteTextLimitError)
+        throw new AccessError(
+          'invalid',
+          `The extracted document exceeds ${MAX_IMPORTED_FILE_CHARS} characters.`
+        );
+      throw error;
     });
-    const text = clipImportedText(extracted.markdown || extracted.text);
+    const text = normalizeImportedText(extracted.markdown || extracted.text);
     if (!text) throw new Error('No readable text');
-    return `Uploaded course note: ${name}\n${text}`;
+    return { text: `Uploaded course note: ${name}\n${text}`, sourceText: text };
   }
 
   throw new Error('Unsupported note file');
@@ -68,12 +81,16 @@ async function extractUploadText(file: File): Promise<string> {
  * Extract text from many uploaded files, dropping unreadable ones. Returns the
  * successful texts and the count that failed.
  */
-export async function extractUploadTexts(
-  files: File[]
-): Promise<{ texts: string[]; uploads: Array<{ file: File; text: string }>; failed: number }> {
+export async function extractUploadTexts(files: File[]): Promise<{
+  texts: string[];
+  uploads: Array<{ file: File; text: string; sourceText: string }>;
+  failed: number;
+}> {
   const results = await Promise.allSettled(
-    files.map(async (file) => ({ file, text: await extractUploadText(file) }))
+    files.map(async (file) => ({ file, ...(await extractUploadText(file)) }))
   );
+  for (const result of results)
+    if (result.status === 'rejected' && isAccessError(result.reason)) throw result.reason;
   const uploads = results.flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []));
   return {
     texts: uploads.map((upload) => upload.text),

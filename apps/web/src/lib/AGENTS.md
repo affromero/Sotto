@@ -55,7 +55,14 @@ Raw bodies are capped at 65,536 bytes, parsed feedback at 20,000 characters, and
 feedback with its original dialogue at 40,000 characters.
 
 Learner note imports use `note-upload.ts`: text MIME types and supported text
-extensions remain source text, including subtitle timestamps. There is no episode
+extensions remain source text, including subtitle timestamps. Supported uploads
+retain their complete extract; oversized extracts fail explicitly.
+`course-materials/context.ts` budgets named head, tail and seeded middle excerpts
+from every attached document. `course-materials/vocabulary-context.ts` selects
+source-backed candidates through the canonical lexical extraction and review
+protocol. Source text and document names remain untrusted educational context.
+Placement uses the same excerpt planner for staged uploads before deduction.
+There is no episode
 subtitle parser or automatic speaker diarization contract. Onboarding readiness
 comes from the live credential session and local speech checks in `/welcome`,
 not a separate provider-key availability heuristic.
@@ -271,6 +278,16 @@ evidence preserves batch-local candidates/verdicts; offsets apply to correction
 feedback only. Metadata failure evidence labels the complete actual private decision
 and its derived metadata-only outer verdict inside the unchanged sealed envelope.
 
+New classes generate a reviewed unit through `classes/lesson/teaching.ts` before
+their questions. The unit and selected vocabulary are frozen in `adaptiveSeed`
+and reused during section repair. Historical classes preserve missing teaching;
+invalid present teaching fails explicitly. Every skill and reviewer receives the
+accepted unit and targets. `learning/classes/class-memory.ts` seeds vocabulary
+inside successful class publication, preserving existing mastery on upsert.
+Lesson teaching failures retain their runtime review identity. Durable failure
+records use the existing explanation category so older readers can validate them;
+candidate text, verdicts and protocol payload bytes remain unchanged.
+
 Speaking permits one complete four-phrase replacement after structural validation
 or the canonical teaching review rejects the first set. Writing shares its existing
 single replacement between structural validation and teaching rejection of three
@@ -279,6 +296,10 @@ Writing semantic repair receives the original validated authoring tasks, before
 source text, starters and display ellipses are compiled into learner material.
 Accepted compiled tasks remain exact, and the complete replacement still passes
 structural validation and both teaching reviews.
+Class writing supplies native-language sentences for translation. The private
+target-language model answer reaches the reviewers; answers and prefixes never
+enter published prompts. Grading checks the supplied meaning and accepts valid
+paraphrases. Practice and exam writing retain their existing task modes.
 A structural replacement receives bounded output and static codes as untrusted data. The replacement uses the same captured provider,
 model, objective, vocabulary, language policy, and execution authority. Candidate
 and indexed feedback are untrusted correction data. Both generation and review
@@ -795,7 +816,7 @@ Retain tombstones and cleanup identities while durable jobs can be replayed.
 | `placement-test.ts`            | Placement test generation + scoring: `generatePlacement(userId, native, target, note?)`, `scorePlacement()`, `toPublic()` — generates CEFR-adaptive MC questions and returns per-skill scores. Pair-agnostic (any native→target). Optional `note` informs level emphasis. Curricula for non-seeded pairs come from `curriculum-generator.ts`. Also `idkLabel()` (native "I don't know") and `deduceLevelFromNotes()` (LLM CEFR estimate from uploaded materials, no DB writes) | Uses `llm.ts`                                                                                            |
 | `placement-notes.ts`           | Notes-based placement orchestration: `runNotesDeduction()` (deduce a level + cache the materials under a `placement-notes:` key), `getCachedNotesDeduction()`, `clearNotesDeduction()`. No DB writes — the course is created only on confirm                                                                                                                                                                                                                                   | Uses `placement-test.ts`, `redis.ts`                                                                     |
 | `placement-course.ts`          | `createOrRaiseCourse(userId, native, target, level)` — create the pair's course at `level` or raise an existing `currentLevel` to it (never lowering, keeping `startLevel`). Shared by MC placement and notes-based placement                                                                                                                                                                                                                                                  | Uses `prisma.ts`, `curriculum-generator.ts`, `cefr-levels.ts`                                            |
-| `note-upload.ts`               | Shared uploaded-file text extraction: `isUploadFile()`, `clipImportedText()`, `extractUploadText()`, `extractUploadTexts()` (text files direct, office/PDF/epub via Markit, clipped). Used by course-notes import and notes-based placement                                                                                                                                                                                                                                    | Uses `extractors/markit`                                                                                 |
+| `note-upload.ts`               | Shared uploaded-file text extraction: `isUploadFile()`, `extractUploadText()`, `extractUploadTexts()` (text files direct, office/PDF/epub via Markit, complete supported extraction with explicit oversized rejection). Used by course-notes import and notes-based placement                                                                                                                                                                                                  | Uses `extractors/markit`                                                                                 |
 | `class-generation.ts`          | Class content generation: builds ClassSection questions and SpeakingPrompts from Lesson spec + adaptive SRS seed                                                                                                                                                                                                                                                                                                                                                               | Uses `llm.ts`, `prisma.ts`                                                                               |
 | `class-source.ts`              | `prepareClassSource()` — sourced classes: `extractContent()` a real link/paper/video → CEFR-level it to a target-language passage (prompt `class/level-source.md`) used as the reading passage AND the listening `sourceContent`. Throws `ClassSourceError` (fails closed, never fabricates a source)                                                                                                                                                                          | Uses `extractors/`, `learning-ai.ts`, `providers/ai.ts`                                                  |
 | `class-service.ts`             | Class orchestration: `createNextClass()` (gating + generation), `getClassForUser()`, `regenerateCurrentClass()`, `CourseNotFoundError`                                                                                                                                                                                                                                                                                                                                         | Uses `prisma.ts`, `queue.ts`                                                                             |

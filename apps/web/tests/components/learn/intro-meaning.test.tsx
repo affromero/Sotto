@@ -3,6 +3,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ClassHub } from '@/components/learn/ClassHub';
 import WorksheetPage from '@/app/classes/[classId]/worksheet/page';
 import type { ClassIntroData, ClassSection } from '@/components/learn/classTypes';
+import type { ClassTeaching } from '@sotto/shared';
+import { teaching } from './lesson/teaching-fixture';
 
 const boundary = vi.hoisted(() => ({ findFirst: vi.fn() }));
 vi.mock('@/lib/auth', () => ({ auth: async () => ({ user: { id: 'learner' } }) }));
@@ -111,6 +113,7 @@ function renderClass(
     regenerating?: boolean;
     sections?: ClassSection[];
     scores?: Record<string, number>;
+    teaching?: ClassTeaching;
   } = {}
 ) {
   const onBegin = vi.fn();
@@ -121,6 +124,7 @@ function renderClass(
       courseId="course-1"
       lesson={{ title: 'Talking About Past Events', level: 'A2', objective: classIntro.purpose }}
       intro={overrides.intro ?? classIntro}
+      teaching={overrides.teaching}
       order={9}
       sections={
         overrides.sections ?? [activity('grammar-1', 'GRAMMAR'), activity('reading-1', 'READING')]
@@ -136,6 +140,37 @@ function renderClass(
 }
 
 describe('class reading flow', () => {
+  it('teaches through worked examples before beginning and reveals guided answers only on request', () => {
+    const { onBegin } = renderClass({ teaching });
+    const lesson = screen.getByRole('heading', { name: teaching.title });
+    expect(lesson).toBeVisible();
+    expect(screen.getByText(teaching.explanation)).toBeVisible();
+    const examples = within(screen.getByRole('region', { name: 'Worked examples' }));
+    for (const example of teaching.workedExamples) {
+      expect(examples.getByText(example.prompt)).toBeVisible();
+      expect(examples.getByText(example.answer)).toBeVisible();
+      expect(examples.getByText(example.explanation)).toBeVisible();
+    }
+    const mistake = within(screen.getByRole('region', { name: 'Common mistake' }));
+    expect(mistake.getByText(/Incorrect:/).closest('p')).toHaveTextContent(
+      teaching.commonMistake.incorrect
+    );
+    expect(mistake.getByText(/Correction:/).closest('p')).toHaveTextContent(
+      teaching.commonMistake.correction
+    );
+    expect(screen.getByText(teaching.guidedPractice.prompt)).toBeVisible();
+    expect(screen.getByText(teaching.guidedPractice.answer)).not.toBeVisible();
+    fireEvent.click(screen.getByText('Show the worked answer'));
+    expect(screen.getByText(teaching.guidedPractice.answer)).toBeVisible();
+    expect(screen.getByText(teaching.guidedPractice.explanation)).toBeVisible();
+    const begin = screen.getByRole('button', { name: 'Begin the class' });
+    expect(lesson.compareDocumentPosition(begin) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    fireEvent.click(begin);
+    expect(onBegin).toHaveBeenCalled();
+    fireEvent.click(screen.getByText('Class summary'));
+    expect(screen.getByText(classIntro.purpose)).toBeVisible();
+  });
+
   it('labels the reading sequence and shows every example note immediately', () => {
     renderClass();
     expect(
