@@ -1,6 +1,6 @@
 [package]
 name = "sotto-host"
-version = "0.1.0"
+version = "0.2.0"
 description = "Sotto Host — desktop launcher for a self-hosted Sotto stack"
 authors = ["Sotto"]
 edition = "2021"

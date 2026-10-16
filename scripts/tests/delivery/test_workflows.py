@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
+import glob
 import json
 import os
-from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import textwrap
 import unittest
+import zipfile
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
 WORKFLOWS = ROOT / '.github/workflows'
@@ -76,7 +78,8 @@ class WorkflowScopeTests(unittest.TestCase):
         result = subprocess.run(
             ['python3', '-c', python_step(
                 'ci.yml', 'Select runtime image work')],
-            cwd=self.root, env=environment, text=True, capture_output=True)
+            cwd=self.root, env=environment, text=True, capture_output=True,
+            check=False)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         return dict(line.split('=', 1)
                     for line in output.read_text().splitlines())
@@ -170,8 +173,8 @@ class NativeResultBundleTests(unittest.TestCase):
     def test_failed_ios_tests_preserve_their_diagnostic_bundle(self) -> None:
         parsed = subprocess.run([
             'node', '-e',
-            "process.stdout.write(JSON.stringify(require('yaml').parse("
-            "require('node:fs').readFileSync(process.argv[1], 'utf8'))))",
+            ("process.stdout.write(JSON.stringify(require('yaml').parse("
+             "require('node:fs').readFileSync(process.argv[1], 'utf8'))))"),
             str(WORKFLOWS / 'release-surfaces-ci.yml'),
         ], cwd=ROOT, text=True, capture_output=True, check=True)
         steps = json.loads(parsed.stdout)['jobs']['ios']['steps']
@@ -214,7 +217,7 @@ class NativeResultBundleTests(unittest.TestCase):
                     'SOTTO_IPHONE_SIMULATOR': 'synthetic-phone',
                     'SOTTO_IPAD_SIMULATOR': 'synthetic-tablet',
                     'XCODE_ARGUMENTS': str(arguments),
-                }, text=True, capture_output=True,
+                }, text=True, capture_output=True, check=False,
             )
             self.assertEqual(result.returncode, 65,
                              result.stdout + result.stderr)
@@ -231,6 +234,185 @@ class NativeResultBundleTests(unittest.TestCase):
                 'platform=iOS Simulator,id=synthetic-tablet',
             ])
             self.assertIn('CODE_SIGN_IDENTITY=-', actual)
+
+
+class DesktopArtifactTests(unittest.TestCase):
+    def test_release_retains_each_platform_manifest_and_website_copy(
+        self,
+    ) -> None:
+        parsed = subprocess.run([
+            'node', '-e',
+            ("process.stdout.write(JSON.stringify(require('yaml').parse("
+             "require('node:fs').readFileSync(process.argv[1], 'utf8'))))"),
+            str(WORKFLOWS / 'desktop-release.yml'),
+        ], cwd=ROOT, text=True, capture_output=True, check=True)
+        jobs = json.loads(parsed.stdout)['jobs']
+        normalize = next(step for step in jobs['build']['steps']
+                         if step.get('name') == 'Normalize desktop artifacts')
+        upload = next(step for step in jobs['build']['steps']
+                      if step.get('uses', '').startswith(
+                          'actions/upload-artifact@'))
+        download = next(step for step in jobs['release']['steps']
+                        if step.get('uses', '').startswith(
+                            'actions/download-artifact@'))
+        publish = next(step for step in jobs['release']['steps']
+                       if step.get('uses', '').startswith(
+                           'softprops/action-gh-release@'))
+        payloads = {
+            'mac': {'Original Mac installer.dmg': b'mac installer'},
+            'windows': {
+                'Original Windows installer.msi': b'windows msi',
+                'Original Windows setup.exe': b'windows setup',
+            },
+            'linux': {
+                'Original Linux installer.AppImage': b'linux appimage',
+                'Original Linux package.deb': b'linux deb',
+            },
+        }
+        github_names = {
+            'mac': {'Original Mac installer.dmg':
+                    'Original.Mac.installer.dmg'},
+            'windows': {
+                'Original Windows installer.msi':
+                'Original.Windows.installer.msi',
+                'Original Windows setup.exe': 'Original.Windows.setup.exe',
+            },
+            'linux': {
+                'Original Linux installer.AppImage':
+                'Original.Linux.installer.AppImage',
+                'Original Linux package.deb': 'Original.Linux.package.deb',
+            },
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            release_root = root / 'release'
+            release_root.mkdir()
+            for platform, installers in payloads.items():
+                workspace = root / platform
+                bundle = workspace / (
+                    'apps/desktop/src-tauri/target/release/bundle'
+                )
+                bundle.mkdir(parents=True)
+                for filename, data in installers.items():
+                    (bundle / filename).write_bytes(data)
+                runner_temp = workspace / 'runner temp'
+                replacements = {
+                    '${{ matrix.slug }}': platform,
+                    '${{ needs.prepare.outputs.release_version }}': 'v0.2.0',
+                    '${{ needs.prepare.outputs.short_sha }}': SHA[:8],
+                    '${{ runner.temp }}': str(runner_temp),
+                }
+                command = normalize['run']
+                upload_path = upload['with']['path']
+                artifact_name = upload['with']['name']
+                for expression, value in replacements.items():
+                    command = command.replace(expression, value)
+                    upload_path = upload_path.replace(expression, value)
+                    artifact_name = artifact_name.replace(expression, value)
+                result = subprocess.run(
+                    ['bash', '-e', '-o', 'pipefail', '-c', command],
+                    cwd=workspace, env={
+                        **os.environ, 'RUNNER_TEMP': str(runner_temp),
+                        'RELEASE_SHA': SHA,
+                    }, text=True, capture_output=True, check=False,
+                )
+                self.assertEqual(result.returncode, 0,
+                                 result.stdout + result.stderr)
+                website = runner_temp / (
+                    'sotto-desktop-downloads/download/desktop'
+                )
+                version = website / 'v0.2.0' / platform
+                expected_files = {
+                    path.name: path.read_bytes() for path in version.iterdir()
+                }
+                for channel in (SHA[:8], 'latest'):
+                    self.assertEqual({
+                        path.name: path.read_bytes()
+                        for path in (website / channel / platform).iterdir()
+                    }, expected_files)
+                website_manifest = json.loads(expected_files['manifest.json'])
+                self.assertEqual(website_manifest['platform'], platform)
+                self.assertEqual(set(expected_files), {'manifest.json'} | {
+                    item['filename'] for item in website_manifest['files']
+                })
+                for filename, data in installers.items():
+                    self.assertEqual(expected_files[filename], data)
+                archive = root / f'{platform}.zip'
+                with zipfile.ZipFile(archive, 'w') as zipped:
+                    for filename in glob.glob(upload_path):
+                        zipped.write(filename, Path(filename).name)
+                extracted = release_root / download['with']['path']
+                if not download['with'].get('merge-multiple', False):
+                    extracted /= artifact_name
+                with zipfile.ZipFile(archive) as zipped:
+                    zipped.extractall(extracted)
+            published: dict[str, bytes] = {}
+            for filename in glob.glob(
+                str(release_root / publish['with']['files']), recursive=True,
+            ):
+                path = Path(filename)
+                if path.is_file():
+                    self.assertNotIn(path.name, published,
+                                     'Release asset names must be unique')
+                    published[path.name] = path.read_bytes()
+            manifests = [json.loads(data) for name, data in published.items()
+                         if name.endswith('.json')]
+            self.assertEqual({item['platform'] for item in manifests},
+                             set(payloads))
+            for manifest in manifests:
+                self.assertEqual(manifest['version'], 'v0.2.0')
+                self.assertEqual(manifest['commit']['sha'], SHA)
+                self.assertIn(manifest['primary']['filename'], published)
+                originals = payloads[manifest['platform']]
+                for filename, data in originals.items():
+                    expected_name = github_names[
+                        manifest['platform']][filename]
+                    self.assertEqual(published[expected_name], data)
+                    self.assertNotIn(filename, published)
+                for item in manifest['files']:
+                    data = published[item['filename']]
+                    self.assertEqual(item['href'], item['filename'])
+                    self.assertEqual(item['size'], len(data))
+                    self.assertIn(data, originals.values())
+
+    def test_colliding_github_names_stop_before_upload_staging(self) -> None:
+        parsed = subprocess.run([
+            'node', '-e',
+            ("process.stdout.write(JSON.stringify(require('yaml').parse("
+             "require('node:fs').readFileSync(process.argv[1], 'utf8'))))"),
+            str(WORKFLOWS / 'desktop-release.yml'),
+        ], cwd=ROOT, text=True, capture_output=True, check=True)
+        steps = json.loads(parsed.stdout)['jobs']['build']['steps']
+        normalize = next(step for step in steps
+                         if step.get('name') == 'Normalize desktop artifacts')
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            bundle = root / 'apps/desktop/src-tauri/target/release/bundle'
+            bundle.mkdir(parents=True)
+            (bundle / 'Collision name.dmg').write_bytes(b'first installer')
+            (bundle / 'Collision.name.dmg').write_bytes(b'second installer')
+            runner_temp = root / 'runner temp'
+            command = normalize['run'].replace(
+                '${{ matrix.slug }}', 'mac').replace(
+                '${{ needs.prepare.outputs.release_version }}', 'v0.2.0'
+            ).replace('${{ needs.prepare.outputs.short_sha }}', SHA[:8])
+            result = subprocess.run(
+                ['bash', '-e', '-o', 'pipefail', '-c', command],
+                cwd=root, env={
+                    **os.environ, 'RUNNER_TEMP': str(runner_temp),
+                    'RELEASE_SHA': SHA,
+                }, text=True, capture_output=True, check=False,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            staged = runner_temp / 'sotto-desktop-downloads/github/mac'
+            self.assertEqual(list(staged.iterdir()), [])
+            website = runner_temp / (
+                'sotto-desktop-downloads/download/desktop/v0.2.0/mac'
+            )
+            self.assertEqual((website / 'Collision name.dmg').read_bytes(),
+                             b'first installer')
+            self.assertEqual((website / 'Collision.name.dmg').read_bytes(),
+                             b'second installer')
 
 
 class ReleaseAdmissionTests(unittest.TestCase):
@@ -255,7 +437,7 @@ class ReleaseAdmissionTests(unittest.TestCase):
         return subprocess.run(
             ['python3', '-c', python_step(workflow, name)],
             cwd=self.root, env=self.environment,
-            text=True, capture_output=True)
+            text=True, capture_output=True, check=False)
 
     def admitted_run(self) -> dict[str, object]:
         return {

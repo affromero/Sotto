@@ -22,7 +22,7 @@ Canonical `v*` releases can become GitHub's latest release. Desktop-only and TUI
 
 1. Open or reuse a tracking issue with the release scope and acceptance criteria.
 2. Create a branch and update the version files for the selected release family. Regenerate the relevant npm and Cargo lockfiles, then review their diffs. Do not reuse a published version for changed code.
-3. Move the relevant **Unreleased** notes into a dated version section. The root changelog already has a `0.1.0` section; consolidate it when preparing that still-unpublished version, rather than adding a duplicate. Describe behavior changes and upgrade steps, link PRs or commits, and credit human contributors. Leave unrelated stream changes under **Unreleased**.
+3. Move the relevant **Unreleased** notes into one dated version section. Describe behavior changes and upgrade steps, link PRs or commits, and credit human contributors. Leave unrelated stream changes under **Unreleased**.
 4. Validate the prepared version. This command reads files and Git metadata; it does not create a tag, edit versions, or publish anything:
 
    ```bash

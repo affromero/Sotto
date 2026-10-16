@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { PrismaPg } from '@prisma/adapter-pg';
+import type { Job, Worker } from 'bullmq';
 import { expect, vi } from 'vitest';
 import { PrismaClient } from '@/generated/prisma/client';
 import {
@@ -32,6 +33,21 @@ import {
   practicePreparationGrant,
 } from '@/lib/practice/preparation';
 import type { SharedTestInstance, SharedTestIdentity } from '../setup/shared-instance';
+
+export async function finishAudioWorkerJobs(
+  worker: Pick<Worker, 'close'>,
+  jobs: ReadonlyArray<Pick<Job, 'getState'>>,
+  deadline: number
+): Promise<string[]> {
+  let states: string[] = [];
+  do {
+    states = await Promise.all(jobs.map((job) => job.getState()));
+    if (states.every((state) => state === 'completed' || state === 'failed')) break;
+    await delay(50);
+  } while (Date.now() < deadline);
+  await worker.close();
+  return Promise.all(jobs.map((job) => job.getState()));
+}
 
 /** Exercise the production worker envelope and encrypted FULL speech authorization. */
 export async function publishesFullPracticeAudio(options: {
@@ -227,14 +243,7 @@ export async function publishesFullPracticeAudio(options: {
       failures.push(`${job?.id}: ${error.stack ?? error.message}`)
     );
     await worker.waitUntilReady();
-    const deadline = Date.now() + 60_000;
-    let states: string[] = [];
-    do {
-      states = await Promise.all(jobs.map((job) => job.getState()));
-      if (states.every((state) => state === 'completed' || state === 'failed')) break;
-      await delay(50);
-    } while (Date.now() < deadline);
-    await worker.close();
+    const states = await finishAudioWorkerJobs(worker, jobs, Date.now() + 60_000);
     worker = undefined;
     expect(failures).toEqual([]);
     expect(states).toEqual(Array.from({ length: 26 }, () => 'completed'));
