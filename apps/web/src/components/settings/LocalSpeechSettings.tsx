@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/Input';
 import { resumeEndpoint } from '@/app/welcome/session/resume-security';
 import styles from './LocalSpeechSettings.module.css';
 
-interface LocalSpeechSettingsProps {
+export interface LocalSpeechSettingsProps {
   initialEndpoint: string;
   initialModel: string;
   initialVoices: string[];
@@ -152,6 +152,7 @@ export function LocalSpeechSettings({
         Speech selection
       </h2>
       <p className={styles.description}>
+        This selection applies to your profile. Shared provider defaults are managed in Admin.{' '}
         {canManageSharedSpeech
           ? 'Select a local speech server for your profile. Its model and voices must support your learning language. Cloud credentials stay saved.'
           : 'Use configured speech or explicitly disable audio for your profile.'}{' '}

@@ -115,6 +115,7 @@ export async function captureSpeechAvailability(
     provider: captured.provider,
     origin: new URL(captured.binding.endpoint).origin,
     credential,
+    model: captured.scope === 'tts' ? execution.ttsModel : undefined,
   });
   const status = () => registry.status(account);
   const assertAvailable = () => registry.assertAvailable(account);

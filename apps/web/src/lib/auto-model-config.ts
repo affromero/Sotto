@@ -130,7 +130,7 @@ export async function getAutoModelConfig(
  * silently self-healed away on the next read, and a mismatched TTS/STT pair
  * would persist but never apply (the resolvers only use the model when the
  * provider matches). Only checks pairs where both provider and a non-empty
- * model are supplied — partial updates and keyless/STT-only providers are skipped.
+ * model are supplied. Local speech servers validate their own custom model IDs.
  */
 export function assertModelProviderPairs(data: AutoModelConfigUpdate): void {
   const m = data.model;
@@ -139,6 +139,7 @@ export function assertModelProviderPairs(data: AutoModelConfigUpdate): void {
   }
   if (
     m?.ttsProvider &&
+    m.ttsProvider !== 'local' &&
     m.ttsModel &&
     !getProviderMeta(m.ttsProvider).models.some((x) => x.id === m.ttsModel)
   ) {
@@ -146,6 +147,7 @@ export function assertModelProviderPairs(data: AutoModelConfigUpdate): void {
   }
   if (
     m?.sttProvider &&
+    m.sttProvider !== 'local' &&
     m.sttModel &&
     !getSttProviderMeta(m.sttProvider).models.some((x) => x.id === m.sttModel)
   ) {

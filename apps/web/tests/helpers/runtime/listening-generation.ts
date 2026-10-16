@@ -199,6 +199,9 @@ vi.mock('@/lib/providers/ai', () => ({
 const mockGetConfiguredTtsProviderId = vi.fn(() => null as string | null);
 const mockResolveTtsProvider = vi.fn();
 const mockGetServerInfra = vi.fn().mockResolvedValue({});
+vi.mock('@/lib/auto-model-config', () => ({
+  getAutoModelConfig: async () => ({ model: { ttsProvider: 'kokoro', ttsModel: 'kokoro' } }),
+}));
 vi.mock('@/lib/server-config', () => ({
   getServerInfra: () => mockGetServerInfra(),
 }));

@@ -30,6 +30,8 @@ export interface SottoProviderExecution {
   userId: string;
   authorize: CredentialExecutionAuthority;
   credential?: SottoExecutionCredential | null;
+  /** Exact TTS model whose billing scope is admitted and observed. */
+  ttsModel?: string;
   signal?: AbortSignal;
   onCleanupError?: (error: unknown) => void;
   /** Durable learning work pins its non-secret selection before queue admission. */

@@ -93,6 +93,9 @@ section; complete practice remains finishable at low scores.
 
 `learning/skill-requirements.ts`, `speech-configuration.ts`, and `speech-selection.ts`
 capture versioned requirements and explicit provider bindings without paid probes.
+Admin model configuration supplies shared speech defaults. `getSiteConfig()` projects
+those defaults over legacy infrastructure values, and legacy speech writes update
+the same admin configuration transactionally. Endpoints and voices stay in site settings.
 Personal TTS selection precedes the configured server provider. An explicit local
 selection keeps its model and endpoint through canonical credential, transport,
 capacity and preparation admission. Explicit durable provider overrides retain
@@ -103,6 +106,8 @@ regeneration captures current requirements; section repair keeps its stored requ
 Sidedoor `providers/availability` owns persistent provider account availability,
 scoped by instance, provider, billing origin and exact credential. Its catalogue
 classifies documented credit errors, separately from authentication and rate limits.
+Fish's concrete model is captured through status, admission, transport and recheck.
+Paid Fish models share API credit status; `s2.1-pro-free` has an independent scope.
 Sotto `providers/shared/speech-availability.ts` composes authorized SQL state and
 observes complete bounded error bodies through the canonical transport. Known TTS
 exhaustion blocks lesson admission; each new paid request checks its captured account.

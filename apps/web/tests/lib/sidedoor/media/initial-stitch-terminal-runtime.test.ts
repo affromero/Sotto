@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { Queue, Worker } from 'bullmq';
+import { Queue, QueueEvents, Worker } from 'bullmq';
 import { NextRequest } from 'next/server';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PrismaClient } from '@/generated/prisma/client';
@@ -63,6 +63,7 @@ suite('initial stitching terminal delivery and administrator retry', () => {
   let prefix: string;
   let connection: { host: string; port: number; db: number; maxRetriesPerRequest: null };
   let workers: Worker[];
+  let terminalEvents: QueueEvents;
   beforeAll(async () => {
     const url = new URL(process.env.SIDEDOOR_TEST_REDIS_URL!);
     if (!['localhost', '127.0.0.1'].includes(url.hostname) || url.pathname !== '/15')
@@ -84,9 +85,12 @@ suite('initial stitching terminal delivery and administrator retry', () => {
     for (const name of ['audio-stitching', 'episode-status', 'notifications'])
       boundary.queues.set(name, new Queue(name, { connection, prefix }));
     workers = [];
+    terminalEvents = new QueueEvents('audio-stitching', { connection, prefix });
+    await terminalEvents.waitUntilReady();
   });
   afterEach(async () => {
     for (const worker of workers) await worker.close();
+    await terminalEvents?.close();
     for (const queue of boundary.queues.values()) {
       await queue.obliterate({ force: true });
       await queue.close();
@@ -135,6 +139,7 @@ suite('initial stitching terminal delivery and administrator retry', () => {
     return { episode, record };
   }
   async function fail(operationId: string, actualProcessing = true) {
+    const job = (await queue().getJob(operationId))!;
     const processor = actualProcessing
       ? processAudioStitching
       : async () => {
@@ -147,11 +152,12 @@ suite('initial stitching terminal delivery and administrator retry', () => {
     );
     workers.push(worker);
     await worker.waitUntilReady();
-    await expect
-      .poll(async () => (await queue().getJob(operationId))?.getState(), { timeout: 5000 })
-      .toBe('failed');
+    await expect(job.waitUntilFinished(terminalEvents, 15_000)).rejects.toThrow(
+      actualProcessing ? 'ffprobe process exit_failed' : 'Worker execution unavailable'
+    );
     await worker.close();
     const failed = (await queue().getJob(operationId))!;
+    expect(await failed.getState()).toBe('failed');
     if (actualProcessing) expect(failed.failedReason).toContain('ffprobe process exit_failed');
     return failed;
   }

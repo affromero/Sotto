@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import Link from 'next/link';
 import styles from './InlineModelTest.module.css';
 
 interface Props {
@@ -16,6 +17,7 @@ interface TestResult {
   audioData?: string;
   transcript?: string;
   error?: string;
+  code?: string;
 }
 
 /**
@@ -87,6 +89,12 @@ export function InlineModelTest({ type, provider, model }: Props) {
           )}
           {detail && <span className={styles.detail}>{detail}</span>}
         </span>
+      )}
+      {type === 'tts' && result?.code === 'PROVIDER_CREDITS_EXHAUSTED' && (
+        <p>
+          <Link href="#local-speech-title">Select local speech or disable audio</Link>, or add API
+          credits to this provider and check speech again.
+        </p>
       )}
 
       {/* Kept mounted so a TTS result can play the moment it arrives. */}

@@ -29,6 +29,12 @@ const creditStatus = (blocked = false, provider = 'cartesia', providerLabel = 'C
   });
 
 describe('explicit local speech settings', () => {
+  it('explains that a profile selection takes priority over shared admin defaults', async () => {
+    vi.stubGlobal('fetch', async () => creditStatus());
+    render(<LocalSpeechSettings {...props} />);
+    expect(screen.getByText(/This selection applies to your profile/)).toBeVisible();
+    await screen.findByRole('button', { name: 'Check Cartesia credits' });
+  });
   it('shows a personal cloud provider and allows an explicit return to the actual server default', async () => {
     const posted: unknown[] = [];
     vi.stubGlobal('fetch', async (_url: string, init: RequestInit) => {

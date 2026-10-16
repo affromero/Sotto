@@ -67,6 +67,7 @@ export function getProvidersForLanguage(
  * Find a compatible model for a provider + language combination.
  * If `preferred` model already supports the language, returns it.
  * Otherwise scans the provider's models for one that does.
+ * Local servers validate custom model IDs and their language support.
  * Returns null if no model on this provider supports the language.
  */
 export function getDefaultModelForLanguage(
@@ -76,6 +77,7 @@ export function getDefaultModelForLanguage(
 ): string | null {
   const normalized = normalizeSottoLanguageCode(lang);
   if (!normalized) return null;
+  if (providerId === 'local' && preferred?.trim()) return preferred.trim();
   try {
     const meta = getProviderMeta(providerId);
 

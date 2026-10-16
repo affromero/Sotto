@@ -188,6 +188,38 @@ suite('owner model testing with canonical credentials and actual provider transp
       audioData: 'data:audio/mpeg;base64,SUQzAQI=',
     });
   });
+  it('reports Fish API credit exhaustion with recovery status while its free model still works', async () => {
+    await instance.seedProfileCredential(identity.ownerId, 'tts', 'fish', {
+      apiKey: 'fish-owner-key',
+    });
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      const sent = new Request(input, init);
+      requests.push(sent);
+      if (sent.headers.get('model') === 's2.1-pro-free')
+        return new Response(new Uint8Array([0x49, 0x44, 0x33, 1, 2]));
+      return Response.json(
+        {
+          status: 402,
+          message:
+            'Insufficient API credit. API credit is managed independently from platform credit. Please visit https://fish.audio/app/developers to view your API credit balance or add funds.',
+        },
+        { status: 402 }
+      );
+    });
+    const paid = await route.POST(request({ type: 'tts', provider: 'fish', model: 'drama-3' }));
+    expect(await paid.json()).toMatchObject({
+      success: false,
+      code: 'PROVIDER_CREDITS_EXHAUSTED',
+      error: expect.stringContaining('Insufficient API credit'),
+    });
+    const free = await route.POST(
+      request({ type: 'tts', provider: 'fish', model: 's2.1-pro-free' })
+    );
+    expect(await free.json()).toMatchObject({
+      success: true,
+      audioData: expect.stringContaining('data:audio/mpeg;base64,'),
+    });
+  });
   it('uses an explicitly selected local TTS service without a hosted key', async () => {
     expect(
       await (

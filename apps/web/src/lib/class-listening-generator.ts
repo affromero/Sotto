@@ -27,6 +27,7 @@ import {
   isSpeechDisabled,
 } from './providers/tts';
 import { getServerInfra } from './server-config';
+import { getAutoModelConfig } from './auto-model-config';
 import { logUsage } from './usage-logger';
 import { logger } from './logger';
 import {
@@ -230,6 +231,11 @@ export async function composeListeningContent(
       'AI audio is not enabled. Select a speech provider in Settings before starting listening practice.'
     );
   }
+  const requestedTtsModel = selectedTtsModel(
+    userSpeechPrefs,
+    configuredTtsProvider,
+    (await getAutoModelConfig()).model
+  );
   const resolvedTts = p.deferAudio
     ? null
     : await resolveTtsProvider({
@@ -237,7 +243,7 @@ export async function composeListeningContent(
         execution: p.execution,
         episodeId: p.firstSeenClassId ?? p.courseId,
         requestedProvider: configuredTtsProvider,
-        requestedModel: selectedTtsModel(userSpeechPrefs, configuredTtsProvider),
+        requestedModel: requestedTtsModel,
         language: p.targetLang,
       });
 
@@ -254,9 +260,7 @@ export async function composeListeningContent(
       language: p.targetLang,
       status: 'PENDING',
       ttsProvider: resolvedTts?.providerId ?? configuredTtsProvider ?? undefined,
-      ttsModel:
-        resolvedTts?.provider.getModelId() ??
-        selectedTtsModel(userSpeechPrefs, configuredTtsProvider),
+      ttsModel: resolvedTts?.provider.getModelId() ?? requestedTtsModel,
     },
   });
   const episodeId = episode.id;

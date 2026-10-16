@@ -147,14 +147,14 @@ suite('complete class material and retained repair', () => {
     ).rejects.toThrow(/language or level changed/);
   });
 
-  it('does not waive a frozen listening requirement when its provider is removed', async () => {
+  it('does not waive a frozen listening requirement when its provider changes', async () => {
     await setSiteConfig(
       { ttsProvider: 'local', ttsBaseUrl: 'http://localhost:9001', sttProvider: null },
       identity.ownerId
     );
     const admitted = await running();
     expect(admitted.requirements?.skills.LISTENING.state).toBe('REQUIRED');
-    await setSiteConfig({ ttsProvider: null }, identity.ownerId);
+    await setSiteConfig({ ttsProvider: 'cartesia' }, identity.ownerId);
     await expect(
       sottoTransaction(instance.database, (database) =>
         validateClassPreparation(database, courseId, admitted.id)
@@ -167,6 +167,10 @@ suite('complete class material and retained repair', () => {
   });
 
   async function repairTarget() {
+    await instance.database.user.update({
+      where: { id: identity.ownerId },
+      data: { preferredTtsProvider: 'disabled' },
+    });
     const course = await instance.database.course.findUniqueOrThrow({ where: { id: courseId } });
     const lesson = await instance.database.lesson.create({
       data: {

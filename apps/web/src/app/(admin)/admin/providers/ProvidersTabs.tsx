@@ -4,6 +4,10 @@ import { useState } from 'react';
 import { Glyph } from '@/components/Glyph';
 import { AiProviderCards } from '@/components/settings/AiProviderCards';
 import { TtsProviderCards } from '@/components/settings/TtsProviderCards';
+import {
+  LocalSpeechSettings,
+  type LocalSpeechSettingsProps,
+} from '@/components/settings/LocalSpeechSettings';
 import type { AiProviderClientMeta } from '@/lib/providers/ai-registry';
 import type { TtsProviderClientMeta } from '@/lib/providers/tts-registry';
 import { ProviderModelConfig, type ProviderModelConfigProps } from './ProviderModelConfig';
@@ -33,6 +37,7 @@ interface ProvidersTabsProps {
   autoModels: ProviderModelConfigProps;
   keys: ProviderKeyConfigProps;
   testable: React.ComponentProps<typeof ModelTestPanel>;
+  speech: LocalSpeechSettingsProps;
 }
 
 function ProviderKeyConfig({
@@ -83,7 +88,7 @@ function ProviderKeyConfig({
   );
 }
 
-export function ProvidersTabs({ autoModels, keys, testable }: ProvidersTabsProps) {
+export function ProvidersTabs({ autoModels, keys, testable, speech }: ProvidersTabsProps) {
   const [tab, setTab] = useState<Tab>('models');
 
   return (
@@ -123,7 +128,13 @@ export function ProvidersTabs({ autoModels, keys, testable }: ProvidersTabsProps
       </div>
 
       {tab === 'models' ? (
-        <ProviderModelConfig {...autoModels} />
+        <>
+          <ProviderModelConfig {...autoModels} />
+          <LocalSpeechSettings
+            key={`${speech.configuredProviderLabel}:${speech.configuredModelLabel}:${speech.selectedProviderLabel}:${speech.initialMode}:${speech.initialEndpoint}:${speech.initialModel}`}
+            {...speech}
+          />
+        </>
       ) : tab === 'keys' ? (
         <ProviderKeyConfig {...keys} />
       ) : (

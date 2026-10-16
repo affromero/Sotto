@@ -26,6 +26,7 @@ import { getTestVoiceId } from '@/lib/providers/tts-voices';
 import { getServerInfra, infra } from '@/lib/server-config';
 import { capturedLearningAiOptions, resolveCapturedLearningAiForProvider } from '@/lib/learning-ai';
 import { resolveTtsProvider } from '@/lib/providers/tts';
+import { ProviderCreditsExhaustedError } from '@/lib/providers/shared/speech-availability';
 
 const requestSchema = z.object({
   type: z.enum(['ai', 'tts', 'stt']),
@@ -298,10 +299,12 @@ export async function POST(request: NextRequest) {
     return errorResponse('Invalid type', 400);
   } catch (error) {
     const err = error instanceof Error ? error : new Error(String(error));
+    const exhausted = err instanceof ProviderCreditsExhaustedError;
     return NextResponse.json({
       success: false,
       latencyMs: Date.now() - start,
-      error: classifyError(err),
+      error: classifyError(exhausted && err.cause instanceof Error ? err.cause : err),
+      ...(exhausted ? { code: err.code } : {}),
     });
   }
 }

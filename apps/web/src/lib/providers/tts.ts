@@ -7,6 +7,7 @@ import { getSharedByokKey, hasSharedByokKey } from '../byok';
 import { supportsLanguage, getDefaultModelForLanguage } from '../tts-language-support';
 import { logger } from '../logger';
 import { infra } from '../server-config';
+import { getAutoModelConfig, type ModelConfig } from '../auto-model-config';
 import { normalizeSottoLanguageCode } from '../speech-language-support';
 import {
   createSottoMediaTransport,
@@ -196,6 +197,11 @@ export async function createTtsProviderAsync(
   extraData?: Record<string, string>,
   model?: string
 ): Promise<TtsProvider> {
+  if (!model) {
+    model = selectedTtsModel(null, providerId, (await getAutoModelConfig()).model);
+  }
+  model ??= getProviderMeta(providerId).defaultModel;
+  execution = { ...execution, ttsModel: model };
   let capturedEndpoint: string | undefined;
   const provider = await createTtsProviderBare(
     providerId,
@@ -445,7 +451,7 @@ export async function resolveTtsProvider(context: {
   /** ISO 639-1 language code — when set, validates provider/model compatibility. */
   language?: string | null;
 }): Promise<ResolvedProvider> {
-  const { userId, requestedProvider, requestedModel } = context;
+  const { userId, requestedProvider } = context;
   const language = normalizeSottoLanguageCode(context.language);
 
   if (!requestedProvider || requestedProvider === 'auto') {
@@ -487,6 +493,11 @@ export async function resolveTtsProvider(context: {
     );
   };
 
+  let requestedModel = context.requestedModel;
+  if (!requestedModel) {
+    const { model } = await getAutoModelConfig();
+    if (model.ttsProvider === requestedProvider) requestedModel = model.ttsModel;
+  }
   const resolvedModel = resolveModelForLanguage(requestedProvider, requestedModel);
 
   const saved = await sottoTransaction(prismaUnfiltered, (database) =>
@@ -592,14 +603,23 @@ export function isSpeechDisabled(
 /** An explicit provider override cannot inherit another provider's personal model. */
 export function selectedTtsModel(
   preferences: { preferredTtsProvider?: string | null; preferredTtsModel?: string | null } | null,
-  provider: TtsProviderId | null
+  provider: TtsProviderId | null,
+  configured?: Pick<ModelConfig, 'ttsProvider' | 'ttsModel'>
 ): string | undefined {
   if (
     preferences?.preferredTtsProvider?.trim() &&
     preferences.preferredTtsProvider.trim() !== provider
   )
-    return undefined;
-  return preferences?.preferredTtsModel ?? undefined;
+    return configured?.ttsProvider === provider ? configured.ttsModel : undefined;
+  const preferred = preferences?.preferredTtsModel;
+  if (
+    preferred &&
+    (preferences?.preferredTtsProvider?.trim() === provider ||
+      provider === 'local' ||
+      (provider && getProviderMeta(provider).models.some((model) => model.id === preferred)))
+  )
+    return preferred;
+  return configured?.ttsProvider === provider ? configured.ttsModel : undefined;
 }
 
 /**
