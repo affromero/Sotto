@@ -8,6 +8,7 @@ import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 import { sidedoorStateStore, sottoStorageInstance } from '@/lib/sidedoor/access/state/store';
 import { sottoAccessStore } from '@/lib/sidedoor/access/core/access-store';
 import { resolveSottoRequest } from '@/lib/sidedoor/access/core/request-identity';
+import { defaultAutoModelConfig } from '@/lib/auto-model-config';
 
 const databaseUrl = process.env.SIDEDOOR_TEST_DATABASE_URL;
 
@@ -75,6 +76,7 @@ export function useProviderCredentialDatabase() {
         );
       await sottoStorageInstance(tx).initialize(randomUUID());
       await sidedoorStateStore(tx).transact((state) => {
+        state.configuration.automaticModels = JSON.parse(JSON.stringify(defaultAutoModelConfig()));
         state.access.principals = ['alice', 'bob'].map((id) => ({
           id,
           name: id,

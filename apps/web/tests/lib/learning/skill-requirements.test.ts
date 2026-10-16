@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { requiredLearningSkills } from '@sotto/shared';
 import type { PrismaClient } from '@/generated/prisma/client';
 import { useProviderCredentialDatabase } from '../../helpers/runtime/provider-credentials-postgres';
-import { EMPTY_INFRA } from '@/lib/site-config';
+import { EMPTY_INFRA, setSiteConfig } from '@/lib/site-config';
 import { sidedoorStateStore } from '@/lib/sidedoor/access/state/store';
 import {
   captureSottoCredentialOwner,
@@ -49,6 +49,7 @@ suite('learner speech access with canonical PostgreSQL credential selection', ()
       await sidedoorStateStore(tx).transact((state) => {
         state.configuration.site = { ...EMPTY_INFRA, ...settings };
       });
+      await setSiteConfig(settings, 'alice', tx);
       await tx.user.update({
         where: { id: 'alice' },
         data: { preferredTtsProvider: preference },
@@ -174,7 +175,7 @@ suite('learner speech access with canonical PostgreSQL credential selection', ()
   it.each(['unknown-provider', 'auto'])(
     'rejects invalid selection %s instead of waiving listening',
     async (provider) => {
-      await configure({ ttsProvider: provider });
+      await configure({}, provider);
       await expect(requirements()).rejects.toMatchObject({
         name: 'LearningConfigurationError',
         message: expect.stringMatching(/TTS provider/),

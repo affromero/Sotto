@@ -17,7 +17,7 @@ vi.mock('@/lib/server-config', () => ({
   infra: (key: string) => state.configuration[key],
 }));
 
-import { canResolveTts, selectTtsProviderId } from '@/lib/providers/tts';
+import { canResolveTts, selectTtsProviderId, selectedTtsModel } from '@/lib/providers/tts';
 
 beforeEach(() => {
   state.provider = null;
@@ -26,6 +26,28 @@ beforeEach(() => {
 });
 
 describe('personal speech selection', () => {
+  it('uses the admin model unless the selected profile explicitly chose its own model', () => {
+    const configured = { ttsProvider: 'fish' as const, ttsModel: 'drama-3' };
+    expect(selectedTtsModel(null, 'fish', configured)).toBe('drama-3');
+    expect(selectedTtsModel({ preferredTtsModel: 's2-pro' }, 'fish', configured)).toBe('s2-pro');
+    expect(selectedTtsModel({ preferredTtsModel: 'sonic-3.5' }, 'fish', configured)).toBe(
+      'drama-3'
+    );
+    expect(
+      selectedTtsModel(
+        { preferredTtsProvider: 'local', preferredTtsModel: 'piper' },
+        'fish',
+        configured
+      )
+    ).toBe('drama-3');
+    expect(
+      selectedTtsModel(
+        { preferredTtsProvider: 'local', preferredTtsModel: 'piper' },
+        'local',
+        configured
+      )
+    ).toBe('piper');
+  });
   it('keeps audio disabled despite a cloud key and a saved local endpoint', async () => {
     state.provider = 'disabled';
     state.key = true;

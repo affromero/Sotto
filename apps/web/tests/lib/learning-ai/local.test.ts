@@ -155,7 +155,7 @@ suite('Local learning generation', () => {
       userId: identity.ownerId,
       execution: execution(),
       requestedProvider: 'local',
-      requestedModel: 'whisper-small',
+      language: 'de',
     });
     expect(await stt.provider.transcribe(Buffer.from('audio'))).toMatchObject({
       text: 'Hallo!',
@@ -164,6 +164,7 @@ suite('Local learning generation', () => {
       `${speechEndpoint}/audio/transcriptions`,
     ]);
     expect(speechRequests[0].headers.get('authorization')).toBe('Bearer local');
+    expect((await speechRequests[0].formData()).get('model')).toBe('whisper-small');
     const ai = await resolveCapturedLearningAi(identity.ownerId, execution());
     expect(ai.apiKey).toBe('private-ai-secret');
     expect(ai.endpoint).toBe(endpoint);

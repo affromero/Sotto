@@ -4,6 +4,9 @@ import { prismaUnfiltered } from './prisma';
 import { sidedoorStateStore } from '@/lib/sidedoor/access/state/store';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 import { assertProviderActivated } from './providers/shared/runtime-activation';
+import { getAutoModelConfig, setAutoModelConfig } from './auto-model-config';
+import { getProviderMeta, isValidProviderId } from './providers/tts-registry';
+import { getSttProviderMeta, isValidSttProviderId } from './providers/stt-registry';
 
 export const serverInfraConfigSchema = z
   .object({
@@ -57,7 +60,14 @@ async function read(database: SharedDatabase): Promise<SiteConfigData> {
     throw new Error(
       'Initialize Sotto with `npm run access -- initialize` before starting the application'
     );
-  return serverInfraConfigSchema.parse(state.configuration.site);
+  const site = serverInfraConfigSchema.parse(state.configuration.site);
+  const { model } = await getAutoModelConfig(database);
+  return {
+    ...site,
+    ttsProvider: model.ttsProvider,
+    sttProvider: model.sttProvider,
+    sttModel: model.sttModel,
+  };
 }
 
 /** Read the single shared configuration source. Runtime never reads imported tables or env. */
@@ -103,6 +113,35 @@ export async function setSiteConfig(
   transaction?: SharedDatabase
 ): Promise<void> {
   if (data.ttsProvider) assertProviderActivated(data.ttsProvider);
-  if (transaction) return write(transaction, data, adminId);
-  await sottoTransaction(prismaUnfiltered, (database) => write(database, data, adminId));
+  const update = async (database: SharedDatabase) => {
+    if (data.ttsProvider || data.sttProvider || data.sttModel) {
+      const { model } = await getAutoModelConfig(database);
+      const ttsProvider = data.ttsProvider ?? model.ttsProvider;
+      const sttProvider = data.sttProvider ?? model.sttProvider;
+      if (!isValidProviderId(ttsProvider) || !isValidSttProviderId(sttProvider))
+        throw new Error('Select a valid speech provider in Providers & models.');
+      await setAutoModelConfig(
+        {
+          model: {
+            ttsProvider,
+            ttsModel:
+              ttsProvider === model.ttsProvider
+                ? model.ttsModel
+                : getProviderMeta(ttsProvider).defaultModel,
+            sttProvider,
+            sttModel:
+              data.sttModel ??
+              (sttProvider === model.sttProvider
+                ? model.sttModel
+                : getSttProviderMeta(sttProvider).defaultModel),
+          },
+        },
+        adminId,
+        database
+      );
+    }
+    await write(database, data, adminId);
+  };
+  if (transaction) return update(transaction);
+  await sottoTransaction(prismaUnfiltered, update);
 }

@@ -18,6 +18,7 @@ import {
   getConfiguredTtsProviderId,
   isSpeechDisabled,
   selectTtsProviderId,
+  selectedTtsModel,
 } from '@/lib/providers/tts';
 import { SettingsForm } from './SettingsForm';
 import { LocalAiSettings } from '@/components/settings/LocalAiSettings';
@@ -144,18 +145,23 @@ export default async function SettingsPage() {
         ? getDefaultModelForLanguage(
             configuredTtsProvider,
             speechLanguage,
-            configuredTtsMeta.defaultModel
+            autoConfig.model.ttsModel
           )
-        : configuredTtsMeta.defaultModel;
+        : autoConfig.model.ttsModel;
   const configuredModelLabel =
     configuredTtsMeta?.models.find((model) => model.id === configuredDefaultModel)?.displayName ??
     configuredDefaultModel;
-  if (selectedTtsProvider === 'local' && user.preferredTtsModel) {
+  const selectedLocalModel =
+    selectedTtsProvider === 'local'
+      ? (selectedTtsModel(user, selectedTtsProvider, autoConfig.model) ??
+        getTtsProviderMeta(selectedTtsProvider).defaultModel)
+      : '';
+  if (selectedLocalModel) {
     const localMeta = speechTtsProviderMeta.find((meta) => meta.id === 'local');
-    if (localMeta && !localMeta.models.some((model) => model.id === user.preferredTtsModel)) {
+    if (localMeta && !localMeta.models.some((model) => model.id === selectedLocalModel)) {
       localMeta.models.push({
-        id: user.preferredTtsModel,
-        displayName: user.preferredTtsModel,
+        id: selectedLocalModel,
+        displayName: selectedLocalModel,
         tier: 'standard',
         supportedLanguages: localMeta.models[0]?.supportedLanguages ?? [],
       });
@@ -240,9 +246,9 @@ export default async function SettingsPage() {
 
       <LocalSpeechSettings
         canManageSharedSpeech={session?.isOwner === true}
-        key={`${selectedTtsProvider}:${user.preferredTtsModel ?? ''}:${infra.ttsBaseUrl ?? ''}`}
+        key={`${selectedTtsProvider}:${user.preferredTtsModel ?? ''}:${selectedLocalModel}:${infra.ttsBaseUrl ?? ''}`}
         initialEndpoint={infra.ttsBaseUrl ?? ''}
-        initialModel={selectedTtsProvider === 'local' ? (user.preferredTtsModel ?? '') : ''}
+        initialModel={selectedLocalModel}
         initialVoices={(infra.ttsVoices ?? '')
           .split(',')
           .map((voice) => voice.trim())

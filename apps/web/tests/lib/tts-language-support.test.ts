@@ -164,6 +164,10 @@ describe('getProvidersForLanguage', () => {
 });
 
 describe('getDefaultModelForLanguage', () => {
+  it('preserves an explicit custom local model for server validation', () => {
+    expect(getDefaultModelForLanguage('local', 'de', ' piper-de ')).toBe('piper-de');
+  });
+
   it('returns preferred model if it supports the language', () => {
     expect(getDefaultModelForLanguage('elevenlabs', 'es', 'eleven_v3')).toBe('eleven_v3');
   });

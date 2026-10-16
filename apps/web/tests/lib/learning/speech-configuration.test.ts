@@ -16,6 +16,10 @@ const state = vi.hoisted(() => ({
     ttsVoices: null as string | null,
     sttModel: null,
   },
+  model: { ttsProvider: 'local' as const, ttsModel: 'local' },
+}));
+vi.mock('@/lib/auto-model-config', () => ({
+  getAutoModelConfig: async () => ({ model: state.model }),
 }));
 vi.mock('@/lib/site-config', () => ({ getSiteConfig: async () => state.configuration }));
 vi.mock('@/lib/sidedoor/credentials/runtime/provider-credentials', () => ({
@@ -44,6 +48,7 @@ const requirements = () =>
 
 beforeEach(() => {
   state.user = { preferredTtsProvider: null, preferredTtsModel: null, preferredSttModel: null };
+  state.model.ttsModel = 'local';
   state.configuration = {
     ttsProvider: null,
     sttProvider: null,
@@ -55,6 +60,14 @@ beforeEach(() => {
 });
 
 describe('captured speech configuration', () => {
+  it('invalidates prepared speech when the admin changes only its default model', async () => {
+    state.configuration.ttsProvider = 'local';
+    state.configuration.ttsBaseUrl = 'http://local-tts:8000';
+    const captured = await requirements();
+    const initial = await learningSpeechFingerprint(database, authorize, captured);
+    state.model.ttsModel = 'piper-de';
+    expect(await learningSpeechFingerprint(database, authorize, captured)).not.toBe(initial);
+  });
   it('preserves the historical empty fingerprint when audio is unconfigured', async () => {
     expect(await learningSpeechFingerprint(database, authorize, await requirements())).toBe(
       createHash('sha256').update('{}').digest('hex')

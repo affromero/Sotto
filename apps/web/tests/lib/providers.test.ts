@@ -290,6 +290,7 @@ describe('Provider Factories', () => {
           execution: blockedProviderExecution('user-1'),
           episodeId: 'episode-1',
           requestedProvider: 'hume',
+          requestedModel: 'octave-v2',
           language: 'uk',
         })
       ).rejects.toThrow('TTS provider "hume" does not support language "uk"');

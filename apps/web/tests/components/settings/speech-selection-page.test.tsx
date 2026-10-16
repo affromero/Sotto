@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
 const state = vi.hoisted(() => ({
   provider: 'local' as string | null,
   model: 'piper' as string | null,
   owner: true,
-  configured: 'cartesia' as 'cartesia' | 'openai' | null,
+  configured: 'cartesia' as 'cartesia' | 'openai' | 'local' | null,
+  configuredModel: 'stale-model',
   preferredLanguage: 'de',
   courseLanguage: 'de',
 }));
@@ -37,7 +39,11 @@ vi.mock('@/lib/byok', () => ({
 }));
 vi.mock('@/lib/auto-model-config', () => ({
   getAutoModelConfig: async () => ({
-    model: { ttsProvider: 'cartesia', ttsModel: 'stale-model', sttProvider: 'cartesia' },
+    model: {
+      ttsProvider: state.configured ?? 'cartesia',
+      ttsModel: state.configuredModel,
+      sttProvider: 'cartesia',
+    },
   }),
 }));
 vi.mock('@/lib/server-config', () => ({
@@ -56,6 +62,7 @@ beforeEach(() => {
   state.model = 'piper';
   state.owner = true;
   state.configured = 'cartesia';
+  state.configuredModel = 'stale-model';
   state.preferredLanguage = 'de';
   state.courseLanguage = 'de';
   vi.stubGlobal('fetch', async (url: string) => {
@@ -72,6 +79,46 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 describe('settings speech selection', () => {
+  it('shows and saves an inherited custom local model without replacing it with a catalog default', async () => {
+    state.provider = null;
+    state.model = null;
+    state.configured = 'local';
+    state.configuredModel = 'piper-de';
+    const posted: unknown[] = [];
+    vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
+      if (url === '/api/v1/ai-models') return Response.json({ models: [] });
+      if (url === '/api/v1/settings/local-speech') {
+        if (init?.body) {
+          const body: unknown = JSON.parse(String(init.body));
+          posted.push(body);
+          return Response.json(body);
+        }
+        return Response.json({
+          provider: 'local',
+          providerLabel: 'Local TTS sidecar',
+          creditsBlocked: false,
+          canCheckCredits: false,
+        });
+      }
+      throw new Error(`Unexpected HTTP request: ${url}`);
+    });
+    render(await SettingsPage());
+    expect(screen.getByLabelText('Local speech model ID')).toHaveValue('piper-de');
+    expect(
+      within(screen.getByLabelText('Preferred text-to-speech model')).getByRole('option', {
+        name: /piper-de/,
+      })
+    ).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole('button', { name: 'Use local speech' }));
+    await screen.findByText('Local speech selected for your profile.');
+    expect(posted).toContainEqual({
+      mode: 'local',
+      endpoint: 'http://local-tts:8090',
+      model: 'piper-de',
+      voices: ['voice-a', 'voice-b'],
+    });
+  });
+
   it('shows the explicitly selected local provider and custom model while retaining the real cloud default', async () => {
     render(await SettingsPage());
     expect(screen.getByText('Local speech is selected.')).toBeVisible();

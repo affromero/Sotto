@@ -82,6 +82,19 @@ describe('automatic model configuration', () => {
     ).toThrow(/is not a model of provider "openai"/);
   });
 
+  it('accepts custom speech model IDs owned by the configured local servers', () => {
+    expect(() =>
+      assertModelProviderPairs({
+        model: {
+          ttsProvider: 'local',
+          ttsModel: 'de_DE-thorsten-medium',
+          sttProvider: 'local',
+          sttModel: 'Systran/faster-whisper-small',
+        },
+      })
+    ).not.toThrow();
+  });
+
   it('derives included models from defaults when lists are unset', () => {
     expect(resolveIncludedModels(config)).toEqual(['claude-sonnet-4-6']);
     expect(resolveTtsIncludedModels(config)).toEqual(['openai:tts-1-hd']);

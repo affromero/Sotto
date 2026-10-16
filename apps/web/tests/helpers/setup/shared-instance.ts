@@ -198,15 +198,17 @@ export async function createSharedTestInstance(label: string) {
     );
   }
   async function configureInfrastructure(overrides: Partial<typeof initialInfrastructure>) {
-    await sottoTransaction(database, (tx) =>
-      sidedoorStateStore(tx).transact((state) => {
+    const { setSiteConfig } = await import('@/lib/site-config');
+    await sottoTransaction(database, async (tx) => {
+      await sidedoorStateStore(tx).transact((state) => {
         state.configuration.site = sharedConfigurationValueSchema.parse({
           ...initialInfrastructure,
           ...overrides,
         });
         state.revision++;
-      })
-    );
+      });
+      await setSiteConfig(overrides, 'fixture-owner', tx);
+    });
   }
   return {
     database,

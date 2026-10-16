@@ -5,7 +5,15 @@ import { getAgentStatus } from '@/lib/agent-availability';
 import { credentialReloadAvailable } from '@/lib/agent-credentials';
 import { getAgentModelOffering } from '@/lib/agent-models';
 import { getAllAiProviderClientMeta, getAllAiProviderMeta } from '@/lib/providers/ai-registry';
-import { getAllProviderMeta, getAllTtsProviderClientMeta } from '@/lib/providers/tts-registry';
+import {
+  getAllProviderMeta,
+  getAllTtsProviderClientMeta,
+  getProviderMeta,
+} from '@/lib/providers/tts-registry';
+import { getServerInfra } from '@/lib/server-config';
+import { prisma } from '@/lib/prisma';
+import { selectTtsProviderId, selectedTtsModel, isSpeechDisabled } from '@/lib/providers/tts';
+import { getDefaultModelForLanguage } from '@/lib/tts-language-support';
 import { getAllSttProviderMeta } from '@/lib/providers/stt-registry';
 import { getTestableProviders } from '@/lib/admin/testable-providers';
 import { ProvidersTabs } from './ProvidersTabs';
@@ -17,14 +25,31 @@ export default async function AdminProvidersPage() {
   const session = await auth();
   const userId = session!.user!.id!;
 
-  const [config, testable, byokKeys, aiKeys, claudeStatus, codexStatus] = await Promise.all([
-    getAutoModelConfig(),
-    getTestableProviders(userId),
-    listByokProviders(userId),
-    listAiProviders(userId),
-    getAgentStatus('claude-code'),
-    getAgentStatus('codex'),
-  ]);
+  const [config, testable, byokKeys, aiKeys, claudeStatus, codexStatus, infra, user, latestCourse] =
+    await Promise.all([
+      getAutoModelConfig(),
+      getTestableProviders(userId),
+      listByokProviders(userId),
+      listAiProviders(userId),
+      getAgentStatus('claude-code'),
+      getAgentStatus('codex'),
+      getServerInfra(),
+      prisma.user.findUniqueOrThrow({
+        where: { id: userId },
+        select: { preferredTtsProvider: true, preferredTtsModel: true, preferredLanguage: true },
+      }),
+      prisma.course.findFirst({
+        where: { userId },
+        orderBy: { updatedAt: 'desc' },
+        select: { targetLang: true },
+      }),
+    ]);
+  const configured = getProviderMeta(config.model.ttsProvider);
+  const selected = selectTtsProviderId(user.preferredTtsProvider, config.model.ttsProvider);
+  const language = latestCourse?.targetLang ?? user.preferredLanguage;
+  const configuredModel = language
+    ? getDefaultModelForLanguage(config.model.ttsProvider, language, config.model.ttsModel)
+    : config.model.ttsModel;
   const configuredTtsProviders = byokKeys.map((k) => ({
     provider: k.provider,
     isValid: k.isValid,
@@ -110,6 +135,31 @@ export default async function AdminProvidersPage() {
       </div>
 
       <ProvidersTabs
+        speech={{
+          initialEndpoint: infra.ttsBaseUrl ?? '',
+          initialModel:
+            selected === 'local'
+              ? (selectedTtsModel(user, selected, config.model) ??
+                getProviderMeta(selected).defaultModel)
+              : getProviderMeta('local').defaultModel,
+          initialVoices: (infra.ttsVoices ?? '')
+            .split(',')
+            .map((voice) => voice.trim())
+            .filter(Boolean),
+          initialMode: isSpeechDisabled(user)
+            ? 'disabled'
+            : selected === 'local'
+              ? 'local'
+              : 'configured',
+          configuredProviderLabel: configured.displayName,
+          configuredModelLabel:
+            configured.models.find((model) => model.id === configuredModel)?.displayName ??
+            configuredModel,
+          selectedProviderLabel: selected ? getProviderMeta(selected).displayName : null,
+          initialUsesConfiguredProvider:
+            !user.preferredTtsProvider?.trim() && !user.preferredTtsModel?.trim(),
+          canManageSharedSpeech: session?.isOwner === true,
+        }}
         autoModels={{ initialConfig: config, aiProviders, ttsProviders, sttProviders }}
         keys={{
           configuredAiProviders,

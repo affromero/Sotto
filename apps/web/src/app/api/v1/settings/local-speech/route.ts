@@ -24,6 +24,7 @@ import {
 import { getProviderMeta, isValidProviderId } from '@/lib/providers/tts-registry';
 import { getDefaultModelForLanguage } from '@/lib/tts-language-support';
 import { normalizeSottoLanguageCode } from '@/lib/speech-language-support';
+import { getAutoModelConfig } from '@/lib/auto-model-config';
 import {
   ProviderCreditsExhaustedError,
   captureSpeechAvailability,
@@ -70,7 +71,11 @@ async function selectedSpeechAccount(
     });
     const language =
       normalizeSottoLanguageCode(course?.targetLang ?? user.preferredLanguage) ?? undefined;
-    const preferredModel = selectedTtsModel(user, providerId);
+    const preferredModel = selectedTtsModel(
+      user,
+      providerId,
+      (await getAutoModelConfig(database)).model
+    );
     const model = language
       ? getDefaultModelForLanguage(providerId, language, preferredModel ?? meta.defaultModel)
       : (preferredModel ?? meta.defaultModel);
@@ -94,12 +99,12 @@ export async function GET(request: NextRequest) {
   return accessOperation(request, false, async () => {
     const identity = await authenticateRequest(request);
     if (!identity) return errorResponse('Unauthorized', 401);
-    const { captured, execution, providerId, disabled } = await selectedSpeechAccount(
+    const { captured, execution, providerId, disabled, model } = await selectedSpeechAccount(
       request,
       identity
     );
     const availability = captured
-      ? await captureSpeechAvailability({ ...execution, credential: captured })
+      ? await captureSpeechAvailability({ ...execution, credential: captured, ttsModel: model })
       : null;
     const status = availability ? await availability.status() : null;
     return NextResponse.json({
@@ -146,7 +151,11 @@ export async function PATCH(request: NextRequest) {
           'The selected speech provider does not support a direct audio credit check.',
           400
         );
-      const availability = await captureSpeechAvailability({ ...execution, credential: captured });
+      const availability = await captureSpeechAvailability({
+        ...execution,
+        credential: captured,
+        ttsModel: model,
+      });
       if (!availability) return errorResponse('The selected speech account is unavailable.', 400);
       const fields = sottoExecutionCredentialFields(captured);
       try {

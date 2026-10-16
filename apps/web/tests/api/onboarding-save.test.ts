@@ -502,13 +502,13 @@ suite('Atomic onboarding with shared authority', () => {
     await noLearnerChanges(household.id);
     expect(await getSiteConfig()).toEqual(initialConfiguration);
   });
-  it('commits owner infrastructure and model choices with completed onboarding', async () => {
+  it('commits owner model choices ahead of conflicting legacy infrastructure', async () => {
     const preferred = modelPreference();
     const response = await POST(
       await request({ ...base, preferred, infra: { ttsProvider: 'kokoro' } }, identity.ownerToken)
     );
     expect(response.status).toBe(200);
-    expect(await getSiteConfig()).toMatchObject({ ttsProvider: 'kokoro' });
+    expect(await getSiteConfig()).toMatchObject({ ttsProvider: preferred.ttsProvider });
     expect(await getAutoModelConfig()).toMatchObject({ model: preferred });
   });
   it('passes the wizard AI choice to curriculum generation before saving preferences', async () => {

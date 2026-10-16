@@ -16,7 +16,11 @@ import {
 import { captureSpeechAvailability } from '@/lib/providers/shared/speech-availability';
 import { createTtsProviderAsync } from '@/lib/providers/tts';
 import { resolveSkillRequirementsInTransaction } from '@/lib/learning/skill-requirements';
-import { EMPTY_INFRA } from '@/lib/site-config';
+import { EMPTY_INFRA, getSiteConfig, setSiteConfig } from '@/lib/site-config';
+import { getAutoModelConfig, setAutoModelConfig } from '@/lib/auto-model-config';
+import { resolveTtsProvider } from '@/lib/providers/tts';
+import { resolveCapturedSttProvider } from '@/lib/providers/stt';
+import { getServerInfra } from '@/lib/server-config';
 import { sidedoorStateStore } from '@/lib/sidedoor/access/state/store';
 
 let database: PrismaClient;
@@ -65,6 +69,7 @@ suite(
         await sidedoorStateStore(tx).transact((state) => {
           state.configuration.site = { ...EMPTY_INFRA, ttsProvider: provider };
         });
+        await setSiteConfig({ ttsProvider: provider }, 'alice', tx);
       });
       const admission = await fixture.transaction((tx) => fixture.admission(tx));
       const execution = sottoRequestExecution(admission.request, admission.identity);
@@ -112,6 +117,134 @@ suite(
         })
       ).text();
     }
+
+    it('uses admin speech defaults and models despite conflicting saved infrastructure', async () => {
+      const account = await selected('fish');
+      await fixture.transaction(async (tx) => {
+        await setAutoModelConfig(
+          {
+            model: {
+              ttsProvider: 'fish',
+              ttsModel: 'drama-3',
+              sttProvider: 'cartesia',
+              sttModel: 'ink-2',
+            },
+          },
+          'alice',
+          tx
+        );
+        await sidedoorStateStore(tx).transact((state) => {
+          state.configuration.site = {
+            ...EMPTY_INFRA,
+            ttsProvider: 'cartesia',
+            sttProvider: 'openai',
+            sttModel: 'whisper-1',
+            ttsBaseUrl: 'http://local-tts:8000',
+            ttsVoices: 'voice-a,voice-b',
+          };
+        });
+      });
+      const configuration = await getSiteConfig();
+      expect(configuration).toMatchObject({
+        ttsProvider: 'fish',
+        sttProvider: 'cartesia',
+        sttModel: 'ink-2',
+        ttsBaseUrl: 'http://local-tts:8000',
+        ttsVoices: 'voice-a,voice-b',
+      });
+      const resolved = await resolveTtsProvider({
+        userId: 'alice',
+        execution: account.execution,
+        episodeId: 'admin-default',
+        requestedProvider: 'fish',
+        language: 'de',
+      });
+      expect(resolved.provider.getModelId()).toBe('drama-3');
+    });
+
+    it('uses the admin cloud transcription model and preserves an explicit model choice', async () => {
+      const account = await selected();
+      await fixture.transaction((tx) =>
+        setAutoModelConfig({ model: { sttProvider: 'cartesia', sttModel: 'ink-2' } }, 'alice', tx)
+      );
+      await getServerInfra();
+      const configured = await resolveCapturedSttProvider({
+        userId: 'alice',
+        execution: account.execution,
+        requestedProvider: 'cartesia',
+        language: 'en',
+      });
+      expect(configured.selection.model).toBe('ink-2');
+      const explicit = await resolveCapturedSttProvider({
+        userId: 'alice',
+        execution: account.execution,
+        requestedProvider: 'cartesia',
+        requestedModel: 'ink-whisper',
+        language: 'de',
+      });
+      expect(explicit.selection.model).toBe('ink-whisper');
+    });
+
+    it('blocks paid Fish models after a credit failure while free speech remains usable', async () => {
+      const account = await selected('fish');
+      const models: string[] = [];
+      vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+        const model = new Request(input, init).headers.get('model')!;
+        models.push(model);
+        return model === 's2.1-pro-free'
+          ? new Response(wav())
+          : Response.json(
+              {
+                status: 402,
+                message:
+                  'Insufficient API credit. API credit is managed independently from platform credit. Please visit https://fish.audio/app/developers to view your API credit balance or add funds.',
+              },
+              { status: 402 }
+            );
+      });
+      async function speech(model: string) {
+        const resolved = await resolveTtsProvider({
+          userId: 'alice',
+          execution: account.execution,
+          episodeId: 'fish-credit-test',
+          requestedProvider: 'fish',
+          requestedModel: model,
+          language: 'de',
+        });
+        return resolved.provider.generateSpeech({
+          text: 'Hallo.',
+          voiceId: resolved.provider.getVoiceId('HOST'),
+          language: 'de',
+        });
+      }
+      await expect(speech('drama-3')).rejects.toMatchObject({ code: 'PROVIDER_CREDITS_EXHAUSTED' });
+      await expect(speech('s2-pro')).rejects.toMatchObject({ code: 'PROVIDER_CREDITS_EXHAUSTED' });
+      expect(await speech('s2.1-pro-free')).toEqual(wav());
+      await expect(speech('s2.1-pro')).rejects.toMatchObject({
+        code: 'PROVIDER_CREDITS_EXHAUSTED',
+      });
+      expect(models).toEqual(['drama-3', 's2.1-pro-free']);
+      const paid = await captureSpeechAvailability({ ...account.execution, ttsModel: 's2-pro' });
+      expect((await paid!.status()).state).toBe('credits_exhausted');
+      expect((await getAutoModelConfig()).model.ttsModel).toBe('s2.1-pro-free');
+      await fixture.transaction(async (tx) => {
+        await setAutoModelConfig(
+          { model: { ttsProvider: 'openai', ttsModel: 'tts-1-hd' } },
+          'alice',
+          tx
+        );
+        await tx.user.update({
+          where: { id: 'alice' },
+          data: { preferredTtsProvider: 'fish', preferredTtsModel: null },
+          select: { id: true },
+        });
+      });
+      const requirements = await fixture.transaction((tx) =>
+        resolveSkillRequirementsInTransaction(tx, account.execution, context)
+      );
+      expect(requirements.ttsProvider).toBe('fish');
+      expect(requirements.skills.LISTENING.state).toBe('REQUIRED');
+    });
 
     it.each([
       ['cartesia', 402, 'Model credits limit reached: restore your subscription'],

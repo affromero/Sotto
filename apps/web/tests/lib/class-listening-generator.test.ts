@@ -264,6 +264,14 @@ describe('generateClassListening', () => {
   });
 
   describe('happy path', () => {
+    it('pins the admin model when listening audio is deferred for learner review', async () => {
+      setupHappyPath();
+      await generateClassListening({ ...PARAMS, deferAudio: true });
+      expect(mockEpisodeCreate.mock.calls[0][0].data).toMatchObject({
+        ttsProvider: 'kokoro',
+        ttsModel: 'kokoro',
+      });
+    });
     it('prepares scheduled listening without requiring a speech provider or starting audio jobs', async () => {
       setupHappyPath();
       mockGetConfiguredTtsProviderId.mockReturnValue(null);

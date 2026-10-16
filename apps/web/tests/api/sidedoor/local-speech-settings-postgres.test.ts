@@ -67,6 +67,7 @@ suite('atomic explicit local speech settings with canonical PostgreSQL authority
         if (!owner || !profile) throw new Error('Missing fixture owner profile');
         profile.ownerPrincipalId = owner.id;
       });
+      await setSiteConfig({ ttsProvider: 'cartesia' }, 'alice', tx);
       await tx.user.update({
         where: { id: 'alice' },
         data: {

@@ -26,7 +26,11 @@ export function registerQuizRetryAdmissionTests(
   }
 ) {
   async function fixture(skill: 'GRAMMAR' | 'READING' = 'GRAMMAR') {
-    const { instance, courseId, lesson } = context();
+    const { instance, courseId, lesson, execution } = context();
+    await instance.database.user.update({
+      where: { id: execution.userId },
+      data: { preferredTtsProvider: 'disabled' },
+    });
     const cls = await instance.database.courseClass.create({
       data: {
         courseId,

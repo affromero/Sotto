@@ -8,7 +8,9 @@ import {
   type CredentialExecutionAuthority,
 } from '../sidedoor/credentials/runtime/credential-execution';
 import { learningCredentialFingerprint } from '../classes/preparation-selection';
-import { isSpeechDisabled } from '../providers/tts';
+import { isSpeechDisabled, selectedTtsModel } from '../providers/tts';
+import { getAutoModelConfig } from '../auto-model-config';
+import { getProviderMeta, isValidProviderId } from '../providers/tts-registry';
 
 /** Hash selected speech configuration and immutable credential metadata without secrets. */
 export async function learningSpeechFingerprint(
@@ -23,6 +25,7 @@ export async function learningSpeechFingerprint(
     select: { preferredTtsModel: true, preferredSttModel: true, preferredTtsProvider: true },
   });
   const configuration = await getSiteConfig({ database });
+  const { model: configuredModels } = await getAutoModelConfig(database);
   const selected = await resolveSkillRequirementsInTransaction(
     database,
     { userId: actor.userId, authorize, signal },
@@ -55,7 +58,11 @@ export async function learningSpeechFingerprint(
       credential: learningCredentialFingerprint(credential),
       model:
         scope === 'tts'
-          ? user.preferredTtsModel
+          ? (selectedTtsModel(
+              user,
+              isValidProviderId(provider) ? provider : null,
+              configuredModels
+            ) ?? (isValidProviderId(provider) ? getProviderMeta(provider).defaultModel : undefined))
           : (user.preferredSttModel ?? configuration.sttModel),
       endpoint:
         provider === 'local' || provider === 'kokoro'

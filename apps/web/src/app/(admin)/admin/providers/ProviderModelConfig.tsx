@@ -1,6 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Glyph, type GlyphName } from '@/components/Glyph';
 import { TtsProviderLogo } from '@/components/ui/TtsProviderLogo';
 import { InlineModelTest } from './InlineModelTest';
@@ -324,7 +326,7 @@ function TaskSection({ title, icon, testType, lede, state }: TaskSectionProps) {
   );
 
   return (
-    <div className={shell.panel}>
+    <section className={shell.panel} aria-label={title}>
       <div className={shell.panelHead}>
         <span className={shell.phTitle}>
           <Glyph name={icon} size={15} />
@@ -334,6 +336,13 @@ function TaskSection({ title, icon, testType, lede, state }: TaskSectionProps) {
 
       <div className={shell.panelBody}>
         {lede ? <p className={shell.sectionLede}>{lede}</p> : null}
+        {testType === 'tts' && (
+          <p className={shell.sectionLede}>
+            If provider credits run out, you can explicitly{' '}
+            <Link href="#local-speech-title">select local speech or disable audio below</Link>. Your
+            profile selection takes priority over these shared defaults.
+          </p>
+        )}
 
         {/* Provider chips */}
         <div className={shell.pickLabel}>Provider</div>
@@ -488,7 +497,7 @@ function TaskSection({ title, icon, testType, lede, state }: TaskSectionProps) {
           )}
         </div>
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -506,6 +515,7 @@ export function ProviderModelConfig({
   ttsProviders,
   sttProviders,
 }: ProviderModelConfigProps) {
+  const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -606,6 +616,7 @@ export function ProviderModelConfig({
         if (!active) return;
         lastSavedKeyRef.current = saveKey;
         setSaved(true);
+        router.refresh();
         if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
         savedTimerRef.current = setTimeout(() => setSaved(false), SAVED_VISIBLE_MS);
       } catch (err) {
@@ -619,7 +630,7 @@ export function ProviderModelConfig({
       active = false;
       clearTimeout(timeout);
     };
-  }, [saveKey]);
+  }, [saveKey, router]);
 
   const saveStatusClass = [
     shell.saveStatus,

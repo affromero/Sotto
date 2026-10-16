@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import styles from './page.module.css';
 
 // The same server settings the onboarding wizard sets for the owner, editable here.
@@ -67,11 +68,6 @@ const GROUPS: Array<{
   {
     title: 'Text to speech',
     fields: [
-      {
-        key: 'ttsProvider',
-        label: 'Provider',
-        placeholder: 'elevenlabs · openai · cartesia · kokoro',
-      },
       { key: 'ttsBaseUrl', label: 'Base URL', placeholder: 'local TTS endpoint (optional)' },
       { key: 'ttsVoices', label: 'Voice IDs', placeholder: 'comma-separated local voice IDs' },
     ],
@@ -79,11 +75,6 @@ const GROUPS: Array<{
   {
     title: 'Speech to text',
     fields: [
-      {
-        key: 'sttProvider',
-        label: 'Provider',
-        placeholder: 'openai · deepgram · assemblyai · whisper',
-      },
       { key: 'sttBaseUrl', label: 'Base URL', placeholder: 'local STT endpoint (optional)' },
     ],
   },
@@ -196,7 +187,9 @@ export default function SiteConfigPage() {
         <h1 className={styles.title}>Admin Settings</h1>
         <p className={styles.subtitle}>
           These are the shared settings used by web and worker processes. Provider credentials stay
-          encrypted in Sidedoor. Storage changes run a verified copy before activation.
+          encrypted in Sidedoor. Storage changes run a verified copy before activation. Manage
+          speech defaults and local speech selection in{' '}
+          <Link href="/admin/providers">Providers &amp; models</Link>.
         </p>
       </div>
 

@@ -9,6 +9,8 @@
 }
 
 .button {
+  min-height: 44px;
+  min-width: 44px;
   padding: 0.45rem 0.9rem;
   font-family: inherit;
   font-size: 0.8125rem;
@@ -59,14 +61,12 @@
   opacity: 0.85;
 }
 
-/* The provider's reply, or the reason it failed. Truncated: this is a signal,
-   not a transcript, and a long error must not push the layout around. */
+/* Keep the provider reply and failure details readable on narrow screens. */
 .detail {
   color: var(--text-muted, var(--text));
   opacity: 0.8;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: normal;
   max-width: 32ch;
 }
 

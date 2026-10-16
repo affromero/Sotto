@@ -296,7 +296,7 @@ suite('Durable practice preparation against PostgreSQL', () => {
     expect(await instance.database.practiceSession.count()).toBe(2);
   });
 
-  it('retains required listening and rejects a removed provider before queued work can run', async () => {
+  it('retains required listening and rejects a provider change before queued work can run', async () => {
     await setSiteConfig(
       { ttsProvider: 'local', ttsBaseUrl: 'http://local-tts:8000' },
       identity.ownerId
@@ -309,7 +309,7 @@ suite('Durable practice preparation against PostgreSQL', () => {
         data: { generationState: { ...work.operation, status: 'RUNNING' } },
       });
     });
-    await setSiteConfig({ ttsProvider: null }, identity.ownerId);
+    await setSiteConfig({ ttsProvider: 'cartesia' }, identity.ownerId);
     await expect(
       sottoTransaction(instance.database, (database) =>
         validatePracticePreparation(database, operation.sessionId, operation.id)

@@ -5,7 +5,7 @@ import {
 } from '@sotto/shared';
 import { prismaUnfiltered } from '../prisma';
 import { getSiteConfig } from '../site-config';
-import { isValidProviderId } from '../providers/tts-registry';
+import { getProviderMeta, isValidProviderId } from '../providers/tts-registry';
 import { isValidSttProviderId } from '../providers/stt-registry';
 import { resolveSottoProfileCredential } from '../sidedoor/credentials/runtime/provider-credentials';
 import type { SottoProviderExecution } from '../sidedoor/credentials/runtime/provider-execution';
@@ -13,7 +13,8 @@ import { sottoTransaction } from '../sidedoor/access/state/transaction';
 import type { Prisma } from '@/generated/prisma/client';
 import { captureSpeechAvailability } from '../providers/shared/speech-availability';
 import { captureSottoExecutionCredential } from '../sidedoor/credentials/runtime/credential-execution';
-import { isSpeechDisabled } from '../providers/tts';
+import { isSpeechDisabled, selectedTtsModel } from '../providers/tts';
+import { getAutoModelConfig } from '../auto-model-config';
 
 class LearningConfigurationError extends Error {
   constructor(message: string) {
@@ -45,7 +46,7 @@ export async function resolveSkillRequirementsInTransaction(
   const configuration = await getSiteConfig({ database });
   const user = await database.user.findUnique({
     where: { id: recipient.userId },
-    select: { preferredTtsProvider: true },
+    select: { preferredTtsProvider: true, preferredTtsModel: true },
   });
   if (!user) throw new LearningConfigurationError('Learner no longer exists.');
   const disabled = isSpeechDisabled(user);
@@ -113,7 +114,20 @@ export async function resolveSkillRequirementsInTransaction(
         if (!captured)
           throw new LearningConfigurationError('The selected speech credential changed.');
         await (
-          await captureSpeechAvailability({ ...execution, credential: captured }, database)
+          await captureSpeechAvailability(
+            {
+              ...execution,
+              credential: captured,
+              ttsModel:
+                selectedTtsModel(
+                  user,
+                  isValidProviderId(provider) ? provider : null,
+                  (await getAutoModelConfig(database)).model
+                ) ??
+                (isValidProviderId(provider) ? getProviderMeta(provider).defaultModel : undefined),
+            },
+            database
+          )
         )?.assertAvailable();
       }
     }

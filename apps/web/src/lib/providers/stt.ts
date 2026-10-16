@@ -220,7 +220,7 @@ export async function resolveCapturedSttProvider(context: {
           requestedProvider,
           requestedModel:
             context.requestedModel ??
-            (requestedProvider === 'local' ? infra('sttModel') || undefined : undefined),
+            (requestedProvider === infra('sttProvider') ? infra('sttModel') : undefined),
         },
         sottoExecutionCredentialFields(credential).apiKey,
         'credential'
@@ -231,7 +231,7 @@ export async function resolveCapturedSttProvider(context: {
           requestedProvider,
           requestedModel:
             context.requestedModel ??
-            (requestedProvider === 'local' ? infra('sttModel') || undefined : undefined),
+            (requestedProvider === infra('sttProvider') ? infra('sttModel') : undefined),
         },
         '',
         'local'
@@ -278,6 +278,7 @@ function compatibleSttModel(
   requestedModel?: string,
   language?: string | null
 ): string {
+  if (provider === 'local' && requestedModel?.trim()) return requestedModel.trim();
   let model = requestedModel ?? getSttProviderMeta(provider).defaultModel;
   if (language && !supportsSttLanguage(provider, model, language)) {
     const replacement = getDefaultSttModelForLanguage(provider, language, model);
