@@ -2,6 +2,7 @@
 
 import argparse
 import hashlib
+import importlib.metadata
 import io
 import json
 import os
@@ -22,6 +23,12 @@ def main() -> None:
         "--text",
         default="Grüße aus Köln. Gestern bin ich zu Fuß zum Markt gegangen.",
     )
+    parser.add_argument(
+        "--qualification-seed",
+        type=int,
+        choices=[0],
+        help="Use fixed ONNX randomness only for reproducible qualification.",
+    )
     args = parser.parse_args()
     text = args.text.strip()
     if not text or len(text) > 4096:
@@ -33,17 +40,22 @@ def main() -> None:
             "Use a fresh output directory to preserve earlier smoke evidence."
         )
     started = time.monotonic()
-    process = subprocess.Popen(
-        [
+    server = ["app:app", "--host", "127.0.0.1", "--port", "8000"]
+    launch = [sys.executable, "-m", "uvicorn", *server]
+    if args.qualification_seed is not None:
+        launch = [
             sys.executable,
-            "-m",
-            "uvicorn",
-            "app:app",
-            "--host",
-            "127.0.0.1",
-            "--port",
-            "8000",
-        ],
+            "-c",
+            (
+                "import onnxruntime, runpy, sys; "
+                "onnxruntime.set_seed(0); "
+                "sys.argv = ['uvicorn', *sys.argv[1:]]; "
+                "runpy.run_module('uvicorn', run_name='__main__')"
+            ),
+            *server,
+        ]
+    process = subprocess.Popen(
+        launch,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.PIPE,
         env={**os.environ, "LOCAL_TTS_ENGINE": "piper"},
@@ -64,6 +76,10 @@ def main() -> None:
                     raise RuntimeError("Piper image did not become healthy.")
                 time.sleep(0.2)
         startup_seconds = time.monotonic() - started
+        manifest_path = Path(
+            os.environ.get("PIPER_VOICE_MANIFEST", "/opt/piper/models/manifest.json")
+        )
+        manifest = manifest_path.read_bytes()
         with urllib.request.urlopen(
             "http://127.0.0.1:8000/voices", timeout=5
         ) as response:
@@ -95,6 +111,7 @@ def main() -> None:
                 measurements.append(
                     {
                         "voiceId": voice["id"],
+                        "requestIndex": run,
                         "warm": run == 1,
                         "seconds": elapsed,
                         "audioSeconds": duration,
@@ -121,6 +138,15 @@ def main() -> None:
         json.dumps(
             {
                 "engine": "piper",
+                "qualificationSeed": args.qualification_seed,
+                "engineVersions": {
+                    "piper": importlib.metadata.version("piper-tts"),
+                    "onnxruntime": importlib.metadata.version("onnxruntime"),
+                },
+                "voiceBundle": {
+                    "manifestSha256": hashlib.sha256(manifest).hexdigest(),
+                    "models": json.loads(manifest)["models"],
+                },
                 "referenceText": text,
                 "startupSeconds": startup_seconds,
                 "measurements": measurements,
