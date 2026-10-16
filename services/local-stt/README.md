@@ -50,11 +50,15 @@ Piper has a 512 MiB limit; STT has a 2048 MiB limit, two CPUs and a 128 process
 limit. The published image contains Small itself; no model overlay or alternate
 image is substituted by this smoke.
 
-The previous Base model failed this whole-sentence check on newly synthesized
-audio. Piper generates fresh samples, so one passing pair does not guarantee
-other generated samples will pass. CI retains the public WAVs, full transcripts,
-timestamps and resource receipts on success and failure. Its publication gate
-still requires every fresh voice sample to pass the unchanged whole sentence.
+The previous Base model failed this whole-sentence check. Qualification sets
+ONNX Runtime seed zero before the Piper server loads its models, preserving
+the same cold and warm request order for both voices. This makes the synthetic
+input reproducible without changing normal synthesis. Receipts retain the seed,
+engine versions, voice manifest and sample hashes. CI retains the public WAVs,
+full transcripts, timestamps and resource receipts on success and failure.
+Every voice must still pass the unchanged complete reference sentence
+comparison. This bounded qualification does not establish recognition accuracy
+for other audio.
 
 Publish the verified image offserver and supply its full `repository@sha256`
 reference as `SOTTO_LOCAL_STT_IMAGE` to `docker-compose.local-stt.yml`. The optional

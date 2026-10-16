@@ -70,7 +70,8 @@ piper_container=$(docker create --pull never --network none --read-only --user 1
   --memory 512m --cpus 2 --pids-limit 64 --cap-drop ALL \
   --security-opt no-new-privileges --tmpfs /tmp:size=128m,mode=1777 \
   --mount "type=bind,source=$evidence/piper,target=/evidence" \
-  "$piper_id" python smoke.py --text "$expected_text" --output-directory /evidence/results)
+  "$piper_id" python smoke.py --qualification-seed 0 \
+  --text "$expected_text" --output-directory /evidence/results)
 set +e
 docker start --attach "$piper_container" >"$evidence/piper-receipt.json" 2>"$evidence/piper.stderr"
 piper_attach_exit=$?
@@ -101,6 +102,7 @@ import sys
 receipt = json.load(open(sys.argv[1]))
 assert receipt['referenceText'] == sys.argv[2]
 assert receipt['engine'] == 'piper'
+assert type(receipt['qualificationSeed']) is int and receipt['qualificationSeed'] == 0
 samples = [sample for sample in receipt['measurements'] if sample['warm']]
 assert len(samples) >= 2
 assert len({sample['voiceId'] for sample in samples}) == len(samples)
