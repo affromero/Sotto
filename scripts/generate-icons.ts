@@ -1,5 +1,5 @@
 import sharp from 'sharp';
-import { readFileSync, writeFileSync } from 'fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -19,13 +19,22 @@ const IOS_ICON_DIR = join(
   'Assets.xcassets',
   'AppIcon.appiconset'
 );
+const IOS_COMPOSER_ASSETS_DIR = join(
+  scriptDir,
+  '..',
+  'apps',
+  'ios',
+  'Sources',
+  'AppIcon.icon',
+  'Assets'
+);
 
 // Every unique pixel size referenced by AppIcon.appiconset/Contents.json.
 const IOS_ICON_SIZES = [20, 29, 40, 58, 60, 80, 87, 120, 152, 167, 180, 1024];
 
-// SottoTheme.paper. iOS app icons must be fully opaque, since an alpha channel
-// is rejected at upload as ITMS-90717, so the mark is flattened onto the brand
-// ground rather than shipped with transparent corners like the web icons.
+// SottoTheme.paper. Legacy app icon PNGs must be opaque for App Store upload.
+// Icon Composer uses a separate transparent foreground and renders its own
+// backgrounds for the system's default, dark, clear, and tinted appearances.
 const IOS_ICON_BACKGROUND = { r: 245, g: 244, b: 240 };
 
 interface IcoImage {
@@ -106,6 +115,13 @@ async function main() {
   for (const size of IOS_ICON_SIZES) {
     await generateIosIcon(size);
   }
+
+  mkdirSync(IOS_COMPOSER_ASSETS_DIR, { recursive: true });
+  await sharp(markSvg)
+    .resize(1024, 1024)
+    .png()
+    .toFile(join(IOS_COMPOSER_ASSETS_DIR, 'sotto-mark.png'));
+  log('Generated Icon Composer foreground (1024x1024, transparent)');
 
   log('All icons generated.');
 }

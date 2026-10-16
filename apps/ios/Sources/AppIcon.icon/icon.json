@@ -1,0 +1,40 @@
+{
+  "fill-specializations": [
+    {
+      "value": {
+        "solid": "srgb:0.96078,0.95686,0.94118,1.00000"
+      }
+    },
+    {
+      "appearance": "dark",
+      "value": "automatic"
+    },
+    {
+      "appearance": "tinted",
+      "value": "automatic"
+    }
+  ],
+  "groups": [
+    {
+      "layers": [
+        {
+          "glass": true,
+          "image-name": "sotto-mark.png",
+          "name": "Sotto mark"
+        }
+      ],
+      "name": "Glass bead",
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.3
+      },
+      "translucency": {
+        "enabled": true,
+        "value": 0.5
+      }
+    }
+  ],
+  "supported-platforms": {
+    "squares": ["iOS"]
+  }
+}
