@@ -76,10 +76,11 @@ struct PracticeStartView: View {
             }
             .task(id: "\(currentStart.sessionId)/\(currentStart.status)/\(currentStart.preparationStatus ?? "")") {
                 if currentStart.status == "preparing" {
-                    while !Task.isCancelled && model.practiceStart?.status == "preparing" {
+                    while !Task.isCancelled && model.practiceStart?.isPreparing == true {
                         do {
                             try await model.refreshPractice(sessionId: start.sessionId)
-                            if !["QUEUED", "RUNNING", "CANCELLING"].contains(model.practiceStart?.preparationStatus ?? "") { return }
+                            preparationError = nil
+                            if model.practiceStart?.isPreparing != true { return }
                             try await Task.sleep(for: .seconds(2))
                         } catch {
                             if !Task.isCancelled { preparationError = error.localizedDescription }
@@ -98,11 +99,12 @@ struct PracticeStartView: View {
             .onChange(of: drafts.texts) { _, _ in saveProgress() }
             .onDisappear { Task { await progress.flush() } }
             .background(SottoTheme.paper)
-            .navigationTitle(practiceTitle)
+            .navigationTitle(currentStart.title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") {
+                        model.closePractice()
                         dismiss()
                     }
                 }
@@ -179,7 +181,21 @@ struct PracticeStartView: View {
 
     private var preparationControls: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(currentStart.message ?? "Preparing practice.").foregroundStyle(SottoTheme.muted)
+            HStack(spacing: 12) {
+                if currentStart.isPreparing {
+                    ProgressView()
+                        .tint(SottoTheme.primary)
+                        .accessibilityLabel(currentStart.preparationTitle)
+                }
+                Text(currentStart.preparationTitle)
+                    .font(.headline)
+                    .foregroundStyle(SottoTheme.ink)
+            }
+            if currentStart.isPreparing {
+                Text("This can take a few minutes while exercises are generated and checked. You can close this screen and return later.")
+                    .foregroundStyle(SottoTheme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             if let preparationError { Text(preparationError).foregroundStyle(.red) }
             Button("Check status") {
                 Task {
@@ -213,7 +229,7 @@ struct PracticeStartView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(practiceTitle)
+            Text(currentStart.title)
                 .font(.system(size: 40, weight: .bold, design: .serif))
                 .foregroundStyle(SottoTheme.ink)
             Text(statusCopy)
@@ -223,26 +239,8 @@ struct PracticeStartView: View {
         }
     }
 
-    private var practiceTitle: String {
-        switch currentStart.kind {
-        case "GRAMMAR":
-            return "Grammar practice"
-        case "READING":
-            return "Reading practice"
-        case "LISTENING":
-            return "Listening practice"
-        case "SPEAKING":
-            return "Speaking practice"
-        case "WRITING":
-            return "Writing practice"
-        case "VOCAB":
-            return "Vocabulary practice"
-        default:
-            return "Full catch-up"
-        }
-    }
-
     private var statusCopy: String {
+        if currentStart.status == "preparing" { return currentStart.preparationDetail }
         if currentStart.status == "unavailable" {
             return "Sotto does not have enough due material for this practice type yet."
         }
@@ -338,7 +336,7 @@ private struct UnavailablePractice: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Label("No catch-up session available", systemImage: "clock.badge.exclamationmark")
+            Label("Practice unavailable", systemImage: "clock.badge.exclamationmark")
                 .font(.title2.bold())
                 .foregroundStyle(SottoTheme.ink)
             Text(reasonText)
@@ -357,7 +355,7 @@ private struct UnavailablePractice: View {
     private var reasonText: String {
         switch reason {
         case "not_enough_vocab":
-            return "Add more learning material or finish a few classes before trying full catch-up."
+            return "Add more learning material or finish a few classes before trying vocabulary practice."
         case "nothing_due":
             return "There is nothing due right now."
         case "no_content":

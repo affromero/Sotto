@@ -63,6 +63,7 @@ struct RootView: View {
             guard scenePhase == .active, model.hasSelectedProfile else { return }
             while !Task.isCancelled {
                 await model.loadCourses(showLoading: false)
+                await model.refreshPreparingPracticeOverview()
                 do { try await Task.sleep(for: .seconds(15)) }
                 catch { return }
             }
@@ -105,8 +106,7 @@ struct RootView: View {
             model.practiceStart != nil
         } set: { isPresented in
             if !isPresented {
-                model.practiceStart = nil
-                model.practiceResult = nil
+                model.closePractice()
             }
         }
     }

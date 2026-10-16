@@ -654,7 +654,8 @@ final class SottoAppModel: ObservableObject {
         do {
             let resumed = try await client.fetchPractice(sessionId: sessionId)
             guard isCurrentLearningClient(client) else { return }
-            practiceStart = resumed
+            practiceStart = resumed.preservingContext(
+                kind: practiceOverview?.recent.first { $0.id == sessionId }?.kind, sessionId: sessionId)
             practiceResult = resumed.submissionResult
         } catch {
             report(error)

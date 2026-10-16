@@ -36,7 +36,7 @@ enum LayoutFixtures {
 
     static func practiceOverview() throws -> SottoPracticeOverview {
         try JSONDecoder().decode(SottoPracticeOverview.self, from: Data(
-            #"{"due":{"vocab":4,"grammar":2},"totalVocab":40,"recent":[{"id":"synthetic-practice","kind":"FULL","status":"IN_PROGRESS","score":null,"startedAt":null,"completedAt":null}]}"#.utf8
+            #"{"due":{"vocab":4,"grammar":2},"totalVocab":40,"recent":[{"id":"synthetic-practice","kind":"FULL","status":"ACTIVE","score":null,"startedAt":null,"completedAt":null}]}"#.utf8
         ))
     }
 
@@ -125,6 +125,9 @@ private final class LayoutFixtureHTTP: URLProtocol {
         case ("PATCH", "/api/v1/classes/synthetic-layout-class"):
             status = 200
             body = #"{"progressRevision":1}"#
+        case ("GET", "/api/v1/practice/synthetic-attempt"):
+            status = 200
+            body = #"{"status":"ready","sessionId":"synthetic-attempt","kind":"VOCAB","items":[]}"#
         default:
             status = 404
             body = #"{"error":"No live service exists in the layout fixture."}"#

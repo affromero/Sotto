@@ -310,6 +310,46 @@ final class LayoutAppearanceTests: XCTestCase {
         }
     }
 
+    func testPreparationAndUnsuccessfulAttemptsFitPhoneAndTablet() async throws {
+        for viewport in [viewports[0], viewports[2]] {
+            for state in ["RUNNING", "FAILED", "CANCELLED", "UNRESOLVED"] {
+                let start = try JSONDecoder().decode(SottoPracticeStart.self, from: Data("""
+                    {"status":"preparing","sessionId":"synthetic-attempt","kind":"VOCAB",
+                    "preparationStatus":"\(state)","canRecover":\(state == "UNRESOLVED")}
+                    """.utf8))
+                let model = LayoutFixtures.model()
+                if !start.isPreparing { model.practiceStart = start }
+                let host = try mount(
+                    PracticeStartView(start: start, progress: LearningProgressStore(), drafts: WritingDraftStore())
+                        .environmentObject(model), viewport: viewport, style: .light
+                )
+                await settle()
+                if !start.isPreparing {
+                    XCTAssertEqual(model.practiceStart, start,
+                        "Terminal attempts must not poll and replace their outcome.")
+                }
+                let scroll = try XCTUnwrap(descendants(of: host.content.view)
+                    .compactMap { $0 as? UIScrollView }.first)
+                XCTAssertLessThanOrEqual(scroll.contentSize.width, scroll.bounds.width + 1)
+                attach(host.content.view, name: "practice-\(state.lowercased())-\(viewport.name)")
+                host.close()
+            }
+
+            let overview = try JSONDecoder().decode(SottoPracticeOverview.self, from: Data(
+                #"{"due":{"vocab":0,"grammar":0},"totalVocab":12,"recent":[{"id":"failed","kind":"VOCAB","status":"FAILED"},{"id":"cancelled","kind":"VOCAB","status":"CANCELLED"}]}"#.utf8))
+            let panel = PracticeDuePanel(overview: overview, onResume: { _ in }, onDelete: { _ in })
+                .padding(18).environmentObject(LayoutFixtures.model())
+            let size = measuredSize(panel, viewport: viewport)
+            XCTAssertGreaterThan(size.height, 100,
+                "Failed and cancelled attempts remain visible when nothing is due.")
+            XCTAssertLessThanOrEqual(size.width, viewport.size.width + 1)
+            let host = try mount(ScrollView { panel }, viewport: viewport, style: .light)
+            await settle()
+            attach(host.content.view, name: "practice-unsuccessful-\(viewport.name)")
+            host.close()
+        }
+    }
+
     private struct Viewport {
         let name: String
         let size: CGSize

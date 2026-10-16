@@ -7,23 +7,32 @@ final class PracticeOverviewTests: XCTestCase {
         try JSONDecoder().decode(SottoPracticeOverview.self, from: Data(json.utf8))
     }
 
-    func testUnfinishedSessionsAreTheOnesWithoutACompletionTime() throws {
+    func testOnlyActiveSessionsWaitForLearnerAnswers() throws {
         let result = try overview(
             """
             {
               "due": { "vocab": 4, "grammar": 2 },
               "totalVocab": 40,
               "recent": [
-                { "id": "s1", "kind": "FULL", "status": "IN_PROGRESS", "score": null,
+                { "id": "s1", "kind": "FULL", "status": "ACTIVE", "score": null,
                   "startedAt": "2026-08-22T10:00:00.000Z", "completedAt": null },
-                { "id": "s2", "kind": "VOCAB", "status": "DONE", "score": 0.8,
-                  "startedAt": "2026-08-21T10:00:00.000Z", "completedAt": "2026-08-21T10:20:00.000Z" }
+                { "id": "s2", "kind": "VOCAB", "status": "COMPLETED", "score": 0.8,
+                  "startedAt": "2026-08-21T10:00:00.000Z", "completedAt": "2026-08-21T10:20:00.000Z" },
+                { "id": "cancelled", "kind": "VOCAB", "status": "CANCELLED", "completedAt": null },
+                { "id": "failed", "kind": "VOCAB", "status": "FAILED", "completedAt": null },
+                { "id": "generating", "kind": "VOCAB", "status": "GENERATING", "completedAt": null }
               ]
             }
             """
         )
 
         XCTAssertEqual(result.unfinished.map(\.id), ["s1"])
+        XCTAssertEqual(result.preparing.map(\.id), ["generating"])
+        XCTAssertEqual(result.unsuccessful.map(\.id), ["cancelled", "failed"])
+        XCTAssertEqual(result.preparing.first?.statusLabel, "Preparing")
+        XCTAssertEqual(result.preparing.first?.actionLabel, "View status")
+        XCTAssertEqual(result.unsuccessful.map(\.statusLabel), ["Cancelled", "Generation failed"])
+        XCTAssertTrue(result.unsuccessful.allSatisfy { $0.actionLabel != "Resume" })
         XCTAssertEqual(result.totalDue, 6)
     }
 
@@ -63,9 +72,9 @@ final class PracticeOverviewTests: XCTestCase {
               "due": { "vocab": 1, "grammar": 0 },
               "totalVocab": 10,
               "recent": [
-                { "id": "s1", "kind": "FULL", "status": "IN_PROGRESS", "score": null,
+                { "id": "s1", "kind": "FULL", "status": "ACTIVE", "score": null,
                   "startedAt": "2026-08-22T10:00:00.000Z", "completedAt": null },
-                { "id": "s2", "kind": "FULL", "status": "IN_PROGRESS", "score": null,
+                { "id": "s2", "kind": "FULL", "status": "ACTIVE", "score": null,
                   "startedAt": "2026-08-22T09:00:00.000Z", "completedAt": null }
               ]
             }
@@ -80,7 +89,7 @@ final class PracticeOverviewTests: XCTestCase {
               "due": { "vocab": 1, "grammar": 0 },
               "totalVocab": 10,
               "recent": [
-                { "id": "s2", "kind": "FULL", "status": "IN_PROGRESS", "score": null,
+                { "id": "s2", "kind": "FULL", "status": "ACTIVE", "score": null,
                   "startedAt": "2026-08-22T09:00:00.000Z", "completedAt": null }
               ]
             }

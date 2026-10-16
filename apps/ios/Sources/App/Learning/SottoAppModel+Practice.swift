@@ -70,15 +70,19 @@ extension SottoAppModel {
         let requestId = pendingPracticeAdmissions[key] ?? UUID()
         pendingPracticeAdmissions[key] = requestId
         isLoading = true
+        loadingOperation = SottoLoadingOperation(title: "Starting \(kind.lowercased() == "vocab" ? "vocabulary" : kind.lowercased()) practice",
+            detail: "Saving your request. Generation continues on the server.", progress: nil,
+            currentStep: nil, totalSteps: nil, elapsedSeconds: nil, remainingSeconds: nil)
         errorMessage = nil
-        defer { isLoading = false }
+        defer { isLoading = false; loadingOperation = nil }
         do {
             let response = try await client.startPractice(courseId: courseId, kind: kind, requestId: requestId)
             guard isCurrentLearningClient(client), courses.contains(where: { $0.id == courseId }) else { return }
-            practiceStart = response
-            practiceCourses[response.sessionId] = courseId
-            practiceResult = response.submissionResult
-            clearSettledPracticeAdmission(response, client: client)
+            let admitted = response.preservingContext(kind: kind, sessionId: requestId.uuidString)
+            practiceStart = admitted
+            practiceCourses[admitted.sessionId] = courseId
+            practiceResult = admitted.submissionResult
+            clearSettledPracticeAdmission(admitted, client: client)
         } catch { report(error) }
     }
 
@@ -93,9 +97,10 @@ extension SottoAppModel {
         guard let client = makeClient() else { throw SottoAPIError.message("Pair this device to resume practice.") }
         let response = try await client.fetchPractice(sessionId: sessionId)
         guard isCurrentLearningClient(client), practiceStart?.sessionId == sessionId else { return }
-        practiceStart = response
+        let admitted = response.preservingContext(kind: practiceStart?.kind, sessionId: sessionId)
+        practiceStart = admitted
         practiceResult = response.submissionResult
-        clearSettledPracticeAdmission(response, client: client)
+        clearSettledPracticeAdmission(admitted, client: client)
     }
 
     func practiceGenerationAction(sessionId: String, action: String, acknowledgeUnknownOutcome: Bool = false) async throws {
@@ -103,7 +108,24 @@ extension SottoAppModel {
         let response = try await client.practiceGenerationAction(sessionId: sessionId, action: action,
             acknowledgeUnknownOutcome: acknowledgeUnknownOutcome)
         guard isCurrentLearningClient(client), practiceStart?.sessionId == sessionId else { return }
-        practiceStart = response
-        clearSettledPracticeAdmission(response, client: client)
+        let admitted = response.preservingContext(kind: practiceStart?.kind, sessionId: sessionId)
+        practiceStart = admitted
+        clearSettledPracticeAdmission(admitted, client: client)
+    }
+
+    func refreshPreparingPracticeOverview() async {
+        guard let courseId = practiceOverviewCourseId, practiceOverview?.preparing.isEmpty == false else { return }
+        await loadPracticeOverview(courseId: courseId)
+    }
+
+    func closePractice() {
+        let courseId = practiceStart.flatMap { practiceCourses[$0.sessionId] }
+        practiceStart = nil
+        practiceResult = nil
+        guard let courseId, let client = makeClient() else { return }
+        Task {
+            guard isCurrentLearningClient(client) else { return }
+            await loadPracticeOverview(courseId: courseId)
+        }
     }
 }

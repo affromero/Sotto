@@ -40,8 +40,8 @@ struct SottoPracticeSpeakingFeedback: Decodable, Equatable, Identifiable {
 struct SottoPracticeStart: Decodable, Identifiable, Equatable {
     var id: String { sessionId }
     let status: String
-    let sessionId: String
-    let kind: String?
+    var sessionId: String
+    var kind: String?
     let reason: String?
     let episodeId: String?
     let items: [SottoPracticeItem]?
@@ -55,6 +55,53 @@ struct SottoPracticeStart: Decodable, Identifiable, Equatable {
     let preparationStatus: String?
     let message: String?
     let canRecover: Bool?
+
+    func preservingContext(kind knownKind: String?, sessionId knownId: String) -> Self {
+        var response = self
+        if response.kind == nil { response.kind = knownKind }
+        if response.sessionId == "unavailable" { response.sessionId = knownId }
+        return response
+    }
+
+    var title: String {
+        switch kind {
+        case "FULL": return "Full catch-up"
+        case "VOCAB": return "Vocabulary practice"
+        case "GRAMMAR": return "Grammar practice"
+        case "READING": return "Reading practice"
+        case "LISTENING": return "Listening practice"
+        case "SPEAKING": return "Speaking practice"
+        case "WRITING": return "Writing practice"
+        default: return "Practice"
+        }
+    }
+
+    var isPreparing: Bool {
+        status == "preparing" && ["QUEUED", "RUNNING", "CANCELLING"].contains(preparationStatus ?? "")
+    }
+
+    var preparationTitle: String {
+        switch preparationStatus {
+        case "QUEUED": return "Waiting to prepare"
+        case "RUNNING": return "Preparing exercises"
+        case "CANCELLING": return "Cancelling practice"
+        case "CANCELLED": return "Practice cancelled"
+        case "FAILED": return "Practice generation failed"
+        case "UNRESOLVED": return "Practice interrupted"
+        case "COMPLETED": return "Preparation finished"
+        default: return "Checking practice status"
+        }
+    }
+
+    var preparationDetail: String {
+        if let message, !message.isEmpty { return message }
+        switch preparationStatus {
+        case "CANCELLED": return "Generation was cancelled before your practice was ready."
+        case "FAILED": return "Generation could not finish. Start a new attempt from the practice menu."
+        case "UNRESOLVED": return "Generation was interrupted. Check its status before recovering this attempt."
+        default: return "Waiting for the server to prepare your practice."
+        }
+    }
 
     private enum CodingKeys: String, CodingKey {
         case status, sessionId, kind, reason, episodeId, items, prompts
@@ -84,6 +131,49 @@ struct SottoPracticeStart: Decodable, Identifiable, Equatable {
         message = try values.decodeIfPresent(String.self, forKey: .message)
         canRecover = try values.decodeIfPresent(Bool.self, forKey: .canRecover)
     }
+}
+
+struct SottoPracticeOverview: Decodable, Equatable {
+    struct Due: Decodable, Equatable {
+        let vocab: Int
+        let grammar: Int
+    }
+
+    let due: Due
+    let totalVocab: Int
+    let recent: [SottoPracticeSessionSummary]
+
+    var totalDue: Int { due.vocab + due.grammar }
+    var unfinished: [SottoPracticeSessionSummary] {
+        recent.filter { $0.status == "ACTIVE" && $0.completedAt == nil }
+    }
+    var preparing: [SottoPracticeSessionSummary] {
+        recent.filter { $0.status == "GENERATING" }
+    }
+    var unsuccessful: [SottoPracticeSessionSummary] {
+        recent.filter { ["FAILED", "CANCELLED"].contains($0.status) }
+    }
+}
+
+struct SottoPracticeSessionSummary: Decodable, Equatable, Identifiable {
+    let id: String
+    let kind: String
+    let status: String
+    let score: Double?
+    let startedAt: String?
+    let completedAt: String?
+
+    var statusLabel: String {
+        switch status {
+        case "ACTIVE": return "In progress"
+        case "GENERATING": return "Preparing"
+        case "FAILED": return "Generation failed"
+        case "CANCELLED": return "Cancelled"
+        default: return "Completed"
+        }
+    }
+
+    var actionLabel: String { status == "ACTIVE" ? "Resume" : "View status" }
 }
 
 struct SottoLearningProgressResponse: Decodable {
