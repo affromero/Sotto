@@ -8,6 +8,12 @@ import Vision
 @MainActor
 final class WorkbookTests: XCTestCase {
     func testExerciseSnapshotPreservesPrintedContextOutsideTheLearnersInk() throws {
+        for style: UIUserInterfaceStyle in [.light, .dark] {
+            try withAppearance(style) { try assertExerciseSnapshotPreservesPrintedContext() }
+        }
+    }
+
+    private func assertExerciseSnapshotPreservesPrintedContext() throws {
         let paper = try PencilExercisePaper(prompt: "Choose the past tense", passage: "Yesterday I visited Berlin.", options: ["visited", "visits"])
         XCTAssertGreaterThan(paper.size.height, 600)
         let marked = try paper.answerImage(drawing: drawing())
@@ -78,6 +84,12 @@ final class WorkbookTests: XCTestCase {
     }
 
     func testExportPreservesRotatedPageSizeAndVisibleInk() throws {
+        for style: UIUserInterfaceStyle in [.light, .dark] {
+            try withAppearance(style) { try assertExportPreservesRotatedPageSizeAndVisibleInk() }
+        }
+    }
+
+    private func assertExportPreservesRotatedPageSizeAndVisibleInk() throws {
         let directory = temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let source = try XCTUnwrap(PDFDocument(data: makePDF()))
@@ -97,6 +109,14 @@ final class WorkbookTests: XCTestCase {
         XCTAssertTrue(ink.string?.contains("Write here") == true)
         let size = CGSize(width: 300, height: 200)
         XCTAssertNotEqual(plain.thumbnail(of: size, for: .mediaBox).pngData(), ink.thumbnail(of: size, for: .mediaBox).pngData())
+    }
+
+    private func withAppearance(_ style: UIUserInterfaceStyle, _ action: () throws -> Void) throws {
+        var result: Result<Void, Error>?
+        UITraitCollection(userInterfaceStyle: style).performAsCurrent {
+            result = Result { try action() }
+        }
+        try XCTUnwrap(result).get()
     }
 
     private func temporaryDirectory() -> URL {

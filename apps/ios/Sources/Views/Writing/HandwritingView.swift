@@ -183,7 +183,10 @@ struct HandwritingCanvas: UIViewRepresentable {
         var drawing: Binding<PKDrawing>
         let picker = PKToolPicker()
         var didActivate = false
-        init(drawing: Binding<PKDrawing>) { self.drawing = drawing }
+        init(drawing: Binding<PKDrawing>) {
+            self.drawing = drawing
+            picker.colorUserInterfaceStyle = .light
+        }
         func canvasViewDrawingDidChange(_ canvasView: PKCanvasView) { drawing.wrappedValue = canvasView.drawing }
         func canvasViewDidBeginUsingTool(_ canvasView: PKCanvasView) {
             picker.setVisible(true, forFirstResponder: canvasView)
@@ -203,6 +206,8 @@ final class InkPaperView: UIView {
         self.pageSize = pageSize
         backgroundView = backgroundImage.map { UIImageView(image: $0) }
         super.init(frame: .zero)
+        overrideUserInterfaceStyle = .light
+        canvas.overrideUserInterfaceStyle = .light
         if let backgroundView {
             backgroundView.isUserInteractionEnabled = false
             addSubview(backgroundView)

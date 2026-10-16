@@ -68,5 +68,8 @@ struct PrivacyConsentView: View {
             .padding(24)
             .frame(maxWidth: 680, alignment: .leading)
         }
+        .foregroundStyle(SottoTheme.ink)
+        .background(SottoTheme.paper)
+        .tint(SottoTheme.primary)
     }
 }

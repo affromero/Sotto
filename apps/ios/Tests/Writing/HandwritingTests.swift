@@ -8,6 +8,12 @@ import CoreImage
 @MainActor
 final class HandwritingTests: XCTestCase {
     func testPrintedPaperStaysVisibleInTheSameResizedAreaAsTheInk() throws {
+        for style: UIUserInterfaceStyle in [.light, .dark] {
+            try assertPrintedPaperStaysVisible(style)
+        }
+    }
+
+    private func assertPrintedPaperStaysVisible(_ style: UIUserInterfaceStyle) throws {
         let background = UIGraphicsImageRenderer(size: CGSize(width: 800, height: 600)).image { context in
             UIColor.blue.setFill()
             context.fill(CGRect(x: 0, y: 0, width: 800, height: 600))
@@ -16,6 +22,9 @@ final class HandwritingTests: XCTestCase {
         canvas.backgroundColor = .clear
         canvas.isOpaque = false
         let paper = InkPaperView(canvas: canvas, pageSize: background.size, backgroundImage: background)
+        let parent = UIView(frame: CGRect(x: 0, y: 0, width: 400, height: 600))
+        parent.overrideUserInterfaceStyle = style
+        parent.addSubview(paper)
         paper.frame = CGRect(x: 0, y: 0, width: 400, height: 600)
         paper.layoutIfNeeded()
         let format = UIGraphicsImageRendererFormat()
@@ -40,6 +49,7 @@ final class HandwritingTests: XCTestCase {
         XCTAssertGreaterThan(center[2], 200)
         XCTAssertLessThan(center[0], 20)
         XCTAssertGreaterThan(edge[0], 240)
+        XCTAssertEqual(canvas.traitCollection.userInterfaceStyle, .light)
     }
 
     func testPaperResizesWithoutDistortingInkCoordinates() {

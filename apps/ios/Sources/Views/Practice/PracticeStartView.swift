@@ -127,7 +127,7 @@ struct PracticeStartView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            HStack(spacing: 14) {
+            SottoAdaptiveStack(verticalAlignment: .center, spacing: 14) {
                 Button {
                     model.run {
                         let graded = await drafts.submit(
@@ -151,6 +151,7 @@ struct PracticeStartView: View {
                     .font(.callout)
                     .foregroundStyle(SottoTheme.muted)
             }
+            .environment(\.sottoLayout, .regular)
         }
     }
 

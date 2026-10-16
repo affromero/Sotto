@@ -4,6 +4,7 @@ import UIKit
 
 struct PairingView: View {
     @EnvironmentObject private var model: SottoAppModel
+    @ScaledMetric(relativeTo: .callout) private var minimumScannerHeight: CGFloat = 420
     @State private var manualCode = ""
     @State private var serverAddress = ""
     @State private var accessPassword = ""
@@ -19,7 +20,7 @@ struct PairingView: View {
                         manualPairingForm
 
                         scannerPanel
-                            .frame(height: min(max(proxy.size.width * 1.12, 320), 480))
+                            .frame(height: max(min(max(proxy.size.width * 1.12, 320), 480), minimumScannerHeight))
                     }
                     .padding(.horizontal, 22)
                     .padding(.top, 42)
@@ -28,20 +29,24 @@ struct PairingView: View {
                 }
             } else {
                 HStack(spacing: 0) {
-                    VStack(alignment: .leading, spacing: 24) {
-                        pairingHeader(isCompact: false)
-                        serverPairingForm
-                        manualPairingForm
-
-                        Spacer()
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 24) {
+                            pairingHeader(isCompact: false)
+                            serverPairingForm
+                            manualPairingForm
+                        }
+                        .padding(48)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .frame(width: max(360, proxy.size.width * 0.36), alignment: .leading)
-                    .padding(48)
+                    .frame(width: max(360, proxy.size.width * 0.36) + 96)
 
-                    scannerPanel
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .padding(.trailing, 42)
-                        .padding(.vertical, 42)
+                    ScrollView {
+                        scannerPanel
+                            .frame(height: max(minimumScannerHeight, proxy.size.height - 84))
+                            .padding(.trailing, 42)
+                            .padding(.vertical, 42)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
         }
@@ -195,12 +200,12 @@ private struct QRScannerPanel: View {
                     .font(.headline)
                 Text("The scan happens locally. Your server URL and access token stay on this device.")
                     .font(.callout)
-                    .foregroundStyle(.white.opacity(0.82))
+                    .foregroundStyle(SottoTheme.cameraCaption)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            .foregroundStyle(.white)
+            .foregroundStyle(SottoTheme.onCameraOverlay)
             .padding(18)
-            .background(.black.opacity(0.34))
+            .background(SottoTheme.cameraOverlay)
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             .padding(18)
         }

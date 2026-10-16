@@ -9,19 +9,22 @@ struct LearnerSelectionHelpRequest: Identifiable, Equatable {
 }
 
 enum LearnerTextFonts {
-    static let title2Bold = scaledFont(size: 22, weight: .bold, textStyle: .title2)
-    static let headline = scaledFont(size: 17, weight: .semibold, textStyle: .headline)
-    static let body = scaledFont(size: 17, weight: .regular, textStyle: .body)
-    static let callout = scaledFont(size: 16, weight: .regular, textStyle: .callout)
-    static let caption = scaledFont(size: 12, weight: .regular, textStyle: .caption1)
+    static let title2Bold = LearnerTextFont(size: 22, weight: .bold, textStyle: .title2)
+    static let headline = LearnerTextFont(size: 17, weight: .semibold, textStyle: .headline)
+    static let body = LearnerTextFont(size: 17, weight: .regular, textStyle: .body)
+    static let callout = LearnerTextFont(size: 16, weight: .regular, textStyle: .callout)
+    static let caption = LearnerTextFont(size: 12, weight: .regular, textStyle: .caption1)
+}
 
-    private static func scaledFont(
-        size: CGFloat,
-        weight: UIFont.Weight,
-        textStyle: UIFont.TextStyle
-    ) -> UIFont {
+struct LearnerTextFont {
+    let size: CGFloat
+    let weight: UIFont.Weight
+    let textStyle: UIFont.TextStyle
+
+    func resolved(for traits: UITraitCollection) -> UIFont {
         UIFontMetrics(forTextStyle: textStyle).scaledFont(
-            for: UIFont.systemFont(ofSize: size, weight: weight)
+            for: UIFont.systemFont(ofSize: size, weight: weight),
+            compatibleWith: traits
         )
     }
 }
@@ -86,13 +89,13 @@ func classSkillColor(_ skill: String) -> Color {
     case "GRAMMAR":
         return SottoTheme.primary
     case "READING":
-        return Color(red: 0.165, green: 0.549, blue: 0.471)
+        return SottoTheme.teal
     case "LISTENING":
-        return Color(red: 0.071, green: 0.478, blue: 0.231)
+        return SottoTheme.success
     case "SPEAKING":
-        return Color(red: 0.72, green: 0.31, blue: 0.45)
+        return SottoTheme.rose
     case "WRITING":
-        return Color(red: 0.72, green: 0.39, blue: 0.18)
+        return SottoTheme.amber
     default:
         return SottoTheme.muted
     }
@@ -101,11 +104,11 @@ func classSkillColor(_ skill: String) -> Color {
 func calloutToneColor(_ tone: String) -> Color {
     switch tone.lowercased() {
     case "teal":
-        return Color(red: 0.165, green: 0.549, blue: 0.471)
+        return SottoTheme.teal
     case "rose":
-        return Color(red: 0.72, green: 0.31, blue: 0.45)
+        return SottoTheme.rose
     case "amber":
-        return Color(red: 0.72, green: 0.39, blue: 0.18)
+        return SottoTheme.amber
     default:
         return SottoTheme.primary
     }
@@ -121,13 +124,13 @@ func sectionStatusLabel(_ section: SottoClassSection) -> String {
 
 struct SelectableLearnerText: UIViewRepresentable {
     let text: String
-    let font: UIFont
+    let font: LearnerTextFont
     let color: UIColor
     let onExamples: (String, String) -> Void
 
     init(
         _ text: String,
-        font: UIFont,
+        font: LearnerTextFont,
         color: UIColor,
         onExamples: @escaping (String, String) -> Void
     ) {
@@ -158,7 +161,7 @@ struct SelectableLearnerText: UIViewRepresentable {
         if textView.text != text {
             textView.text = text
         }
-        textView.font = font
+        textView.font = font.resolved(for: textView.traitCollection)
         textView.textColor = color
     }
 

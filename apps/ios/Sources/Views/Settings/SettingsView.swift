@@ -12,6 +12,8 @@ struct SettingsView: View {
     @EnvironmentObject private var model: SottoAppModel
     @Environment(\.dismiss) private var dismiss
     @Environment(\.sottoLayout) private var layout
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @ScaledMetric(relativeTo: .caption) private var avatarSize: CGFloat = 44
 
     @State private var account: SottoAccount?
     @State private var aiModels: [SottoAiModel] = []
@@ -133,7 +135,7 @@ struct SettingsView: View {
             TextField("Name", text: $name)
                 .textFieldStyle(.roundedBorder)
 
-            HStack(spacing: 14) {
+            SottoAdaptiveStack(verticalAlignment: .center, spacing: 14) {
                 SottoAvatar(
                     name: name,
                     avatarPath: model.activeProfile?.avatarUrl,
@@ -146,13 +148,14 @@ struct SettingsView: View {
                 }
                 .buttonStyle(SottoSecondaryButtonStyle())
             }
+            .environment(\.sottoLayout, dynamicTypeSize.isAccessibilitySize ? .compact : .regular)
 
             Text("Or pick an avatar")
                 .font(.caption)
                 .foregroundStyle(SottoTheme.muted)
 
             LazyVGrid(
-                columns: Array(repeating: GridItem(.flexible()), count: layout == .compact ? 4 : 8),
+                columns: [GridItem(.adaptive(minimum: avatarSize), spacing: 8)],
                 spacing: 8
             ) {
                 ForEach(Self.presetAvatars, id: \.self) { slug in
@@ -161,7 +164,7 @@ struct SettingsView: View {
                     } label: {
                         Text(slug.prefix(2).uppercased())
                             .font(.caption.bold())
-                            .frame(width: 42, height: 42)
+                            .frame(width: avatarSize, height: avatarSize)
                             .background(
                                 account.image == "/avatars/\(slug).png"
                                     ? SottoTheme.primary.opacity(0.16)
@@ -211,16 +214,17 @@ struct SettingsView: View {
     }
 
     private func settingRow(_ label: String, _ value: String?) -> some View {
-        HStack {
+        SottoAdaptiveStack(spacing: 4) {
             Text(label)
                 .font(.callout)
                 .foregroundStyle(SottoTheme.ink)
-            Spacer()
+            if !dynamicTypeSize.isAccessibilitySize { Spacer() }
             Text(value?.isEmpty == false ? value! : "Server default")
                 .font(.callout)
                 .foregroundStyle(SottoTheme.muted)
-                .lineLimit(1)
+                .fixedSize(horizontal: false, vertical: true)
         }
+        .environment(\.sottoLayout, dynamicTypeSize.isAccessibilitySize ? .compact : .regular)
     }
 
     private func load() async {
