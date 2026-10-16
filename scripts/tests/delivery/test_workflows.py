@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import textwrap
 import unittest
@@ -163,6 +164,73 @@ class WorkflowScopeTests(unittest.TestCase):
         self.assertEqual(self.scope(event='pull_request'), {
             'runtime': 'false', 'source': 'false',
         })
+
+
+class NativeResultBundleTests(unittest.TestCase):
+    def test_failed_ios_tests_preserve_their_diagnostic_bundle(self) -> None:
+        parsed = subprocess.run([
+            'node', '-e',
+            "process.stdout.write(JSON.stringify(require('yaml').parse("
+            "require('node:fs').readFileSync(process.argv[1], 'utf8'))))",
+            str(WORKFLOWS / 'release-surfaces-ci.yml'),
+        ], cwd=ROOT, text=True, capture_output=True, check=True)
+        steps = json.loads(parsed.stdout)['jobs']['ios']['steps']
+        test = next(step for step in steps
+                    if step.get('name') == 'Run app tests on iPhone and iPad')
+        upload = next(
+            step for step in steps
+            if step.get('name') == 'Preserve failed iOS test results')
+        self.assertEqual(upload['if'], 'failure()')
+        self.assertIn('${{ github.run_attempt }}', upload['with']['name'])
+        self.assertEqual(upload['with']['retention-days'], 7)
+        self.assertEqual(upload['with']['if-no-files-found'], 'warn')
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            runner_temp = root / 'runner temp'
+            runner_temp.mkdir()
+            binary = root / 'xcodebuild'
+            binary.write_text(
+                '#!' + sys.executable + '\n'
+                'import json, os, pathlib, sys\n'
+                'arguments = sys.argv[1:]\n'
+                "pathlib.Path(os.environ['XCODE_ARGUMENTS']).write_text("
+                'json.dumps(arguments))\n'
+                'bundle = pathlib.Path(arguments['
+                "arguments.index('-resultBundlePath') + 1])\n"
+                'bundle.mkdir()\n'
+                "(bundle / 'failure.txt').write_text("
+                "'The test process terminated unexpectedly.')\n"
+                'raise SystemExit(65)\n'
+            )
+            binary.chmod(0o700)
+            arguments = root / 'arguments.json'
+            result = subprocess.run(
+                ['bash', '-e', '-o', 'pipefail', '-c', test['run']],
+                cwd=ROOT, env={
+                    **os.environ,
+                    'PATH': str(root) + os.pathsep + os.environ['PATH'],
+                    'RUNNER_TEMP': str(runner_temp),
+                    'SOTTO_IPHONE_SIMULATOR': 'synthetic-phone',
+                    'SOTTO_IPAD_SIMULATOR': 'synthetic-tablet',
+                    'XCODE_ARGUMENTS': str(arguments),
+                }, text=True, capture_output=True,
+            )
+            self.assertEqual(result.returncode, 65,
+                             result.stdout + result.stderr)
+            emitted = Path(upload['with']['path'].replace(
+                '${{ runner.temp }}', str(runner_temp)))
+            self.assertEqual((emitted / 'failure.txt').read_text(),
+                             'The test process terminated unexpectedly.')
+            actual = json.loads(arguments.read_text())
+            destinations = [actual[index + 1]
+                            for index, value in enumerate(actual)
+                            if value == '-destination']
+            self.assertEqual(destinations, [
+                'platform=iOS Simulator,id=synthetic-phone',
+                'platform=iOS Simulator,id=synthetic-tablet',
+            ])
+            self.assertIn('CODE_SIGN_IDENTITY=-', actual)
 
 
 class ReleaseAdmissionTests(unittest.TestCase):

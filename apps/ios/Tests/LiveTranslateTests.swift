@@ -5,6 +5,84 @@ import XCTest
 
 final class LiveTranslateTests: XCTestCase {
     @MainActor
+    func testIdleAudioCleanupDoesNotAcquireOrReleaseAudioHardware() {
+        let audio = LiveAudioEngine(
+            makeEngine: { XCTFail("Idle cleanup must not create an audio graph."); throw AudioStartFailure.unavailable },
+            activateSession: { XCTFail("Idle cleanup must not activate audio."); throw AudioStartFailure.unavailable },
+            deactivateSession: { _ in XCTFail("Idle cleanup must not deactivate someone else's audio session.") }
+        )
+        audio.stop()
+        audio.stop()
+        audio.flushPlayback()
+        audio.enqueue(base64Pcm24k: Data([0, 0, 1, 0]).base64EncodedString())
+        audio.stop()
+    }
+
+    @MainActor
+    func testAudioCanRestartWithAFreshGraphAfterStopping() throws {
+        let first = try manualEngine(AVAudioEngine())
+        let second = try manualEngine(AVAudioEngine())
+        var pending = [first, second]
+        var sessionActive = false
+        let audio = LiveAudioEngine(
+            makeEngine: { pending.removeFirst() },
+            activateSession: { sessionActive = true; return AVAudioSession.sharedInstance() },
+            deactivateSession: { _ in sessionActive = false }
+        )
+        for engine in [first, second] {
+            try audio.start { _ in }
+            XCTAssertTrue(engine.isRunning)
+            XCTAssertTrue(sessionActive)
+            audio.stop()
+            XCTAssertFalse(engine.isRunning)
+            XCTAssertFalse(sessionActive)
+            try assertCaptureTapWasReleased(engine)
+            audio.stop()
+        }
+    }
+
+    @MainActor
+    func testFailedAudioStartReleasesItsTapAndSessionBeforeAnotherAttempt() throws {
+        let failed = try manualEngine(FailingStartAudioEngine())
+        let recovered = try manualEngine(AVAudioEngine())
+        var pending: [AVAudioEngine] = [failed, recovered]
+        var sessionActive = false
+        let audio = LiveAudioEngine(
+            makeEngine: { pending.removeFirst() },
+            activateSession: { sessionActive = true; return AVAudioSession.sharedInstance() },
+            deactivateSession: { _ in sessionActive = false }
+        )
+        XCTAssertThrowsError(try audio.start { _ in }) { error in
+            XCTAssertEqual(error as? AudioStartFailure, .unavailable)
+        }
+        XCTAssertFalse(failed.isRunning)
+        XCTAssertFalse(sessionActive)
+        try assertCaptureTapWasReleased(failed)
+        try audio.start { _ in }
+        XCTAssertTrue(recovered.isRunning)
+        audio.stop()
+        XCTAssertFalse(recovered.isRunning)
+        XCTAssertFalse(sessionActive)
+    }
+
+    private func manualEngine<Engine: AVAudioEngine>(_ engine: Engine) throws -> Engine {
+        let format = try XCTUnwrap(AVAudioFormat(standardFormatWithSampleRate: 24_000, channels: 1))
+        try engine.enableManualRenderingMode(.offline, format: format, maximumFrameCount: 2048)
+        let input = engine.inputNode
+        XCTAssertTrue(input.setManualRenderingInputPCMFormat(format) { _ in nil })
+        engine.connect(input, to: engine.mainMixerNode, fromBus: 0, toBus: 1, format: format)
+        XCTAssertEqual(input.outputFormat(forBus: 0), format)
+        return engine
+    }
+
+    private func assertCaptureTapWasReleased(_ engine: AVAudioEngine) throws {
+        let input = engine.inputNode
+        let format = input.outputFormat(forBus: 0)
+        input.installTap(onBus: 0, bufferSize: 2048, format: format) { _, _ in }
+        input.removeTap(onBus: 0)
+    }
+
+    @MainActor
     func testLiveConnectionRequiresExplicitConsentForEachSession() throws {
         let lifecycle = LiveConversationLifecycle()
         XCTAssertNil(lifecycle.acceptConsent())
@@ -224,5 +302,15 @@ final class LiveTranslateTests: XCTestCase {
             SottoLiveFailure.message(for: SottoAPIError.message("Course not found")),
             "Course not found"
         )
+    }
+}
+
+private enum AudioStartFailure: Error, Equatable {
+    case unavailable
+}
+
+private final class FailingStartAudioEngine: AVAudioEngine, @unchecked Sendable {
+    override func start() throws {
+        throw AudioStartFailure.unavailable
     }
 }
