@@ -39,11 +39,12 @@ extension EnvironmentValues {
     }
 }
 
-/// A row on iPad that becomes a column on iPhone. Alignments are given per
-/// axis because "top-aligned row" and "leading-aligned column" are the pair we
-/// want almost everywhere.
+/// Stacks controls in compact windows and at accessibility text sizes.
+/// Alignments are given per axis so rows stay top-aligned and columns
+/// stay leading-aligned.
 struct SottoAdaptiveStack<Content: View>: View {
     @Environment(\.sottoLayout) private var layout
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var horizontalAlignment: HorizontalAlignment = .leading
     var verticalAlignment: VerticalAlignment = .top
@@ -51,7 +52,7 @@ struct SottoAdaptiveStack<Content: View>: View {
     @ViewBuilder var content: () -> Content
 
     var body: some View {
-        if layout == .compact {
+        if layout == .compact || dynamicTypeSize.isAccessibilitySize {
             VStack(alignment: horizontalAlignment, spacing: spacing, content: content)
         } else {
             HStack(alignment: verticalAlignment, spacing: spacing, content: content)

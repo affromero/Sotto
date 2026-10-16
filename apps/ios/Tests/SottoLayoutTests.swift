@@ -1,18 +1,20 @@
 import SwiftUI
+import UIKit
 import XCTest
 
 @testable import Sotto
 
 final class SottoLayoutTests: XCTestCase {
     @MainActor
-    func testFiveSkillClassHeaderFitsNarrowPhoneReadingColumn() throws {
+    func testFiveSkillClassHeaderFitsNarrowPhoneAndTabletReadingColumns() throws {
         let detail = try JSONDecoder().decode(SottoClassDetail.self, from: Data(#"{"id":"class","courseId":"course","status":"AVAILABLE","order":2,"passThreshold":0.7,"submitted":false,"lesson":{"title":"Numbers and dates","level":"A1","objective":"Count to 100 in German and state the day of the week and today's date."},"sections":[{"id":"g","skill":"GRAMMAR","status":"AVAILABLE","attempt":0,"questions":[],"prompts":[],"writingPrompts":[]},{"id":"r","skill":"READING","status":"AVAILABLE","attempt":0,"questions":[],"prompts":[],"writingPrompts":[]},{"id":"l","skill":"LISTENING","status":"AVAILABLE","attempt":0,"questions":[],"prompts":[],"writingPrompts":[]},{"id":"s","skill":"SPEAKING","status":"AVAILABLE","attempt":0,"questions":[],"prompts":[],"writingPrompts":[]},{"id":"w","skill":"WRITING","status":"AVAILABLE","attempt":0,"questions":[],"prompts":[],"writingPrompts":[]}]}"#.utf8))
-        let view = ClassHeroHeader(classDetail: detail, answeredCount: 0, questionCount: 8, completionProgress: 0, completionPercent: 0)
-            .environment(\.sottoLayout, .compact)
-        let controller = UIHostingController(rootView: view)
-        for width: CGFloat in [343, 408] {
+        let viewports: [(CGFloat, SottoLayoutMode)] = [(343, .compact), (408, .compact), (540, .regular)]
+        for (width, layout) in viewports {
+            let view = ClassHeroHeader(classDetail: detail, answeredCount: 0, questionCount: 8, completionProgress: 0, completionPercent: 0)
+                .environment(\.sottoLayout, layout)
+            let controller = UIHostingController(rootView: view)
             let size = controller.sizeThatFits(in: CGSize(width: width, height: 10_000))
-            XCTAssertLessThanOrEqual(size.width, width + 0.5, "Five skills must wrap inside the phone reading column.")
+            XCTAssertLessThanOrEqual(size.width, width + 0.5, "Five skills must wrap inside the available reading column.")
             XCTAssertGreaterThan(size.height, 300)
         }
     }
@@ -24,6 +26,46 @@ final class SottoLayoutTests: XCTestCase {
         let size = controller.sizeThatFits(in: CGSize(width: 343, height: 10_000))
         XCTAssertLessThanOrEqual(size.width, 343.5)
         XCTAssertGreaterThan(size.height, 300)
+    }
+
+    @MainActor
+    func testAccessibilityTextStacksRegularWidthControls() throws {
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let previousWindow = scene.windows.first { $0.isKeyWindow }
+        for textSize in [DynamicTypeSize.large, .accessibility5] {
+            let content = SottoAdaptiveStack(spacing: 12) {
+                TextField("First action", text: .constant("First action"))
+                TextField("Second action", text: .constant("Second action"))
+            }
+            .environment(\.sottoLayout, .regular)
+            .environment(\.dynamicTypeSize, textSize)
+            let controller = UIHostingController(rootView: content)
+            let window = UIWindow(windowScene: scene)
+            window.rootViewController = controller
+            window.makeKeyAndVisible()
+            defer {
+                window.isHidden = true
+                previousWindow?.makeKeyAndVisible()
+            }
+            controller.view.frame = CGRect(x: 0, y: 0, width: 600, height: 400)
+            controller.view.layoutIfNeeded()
+            func fields(in view: UIView) -> [UITextField] {
+                view.subviews.flatMap { child in
+                    (child as? UITextField).map { [$0] } ?? fields(in: child)
+                }
+            }
+            let inputs = fields(in: controller.view)
+            let first = try XCTUnwrap(inputs.first { $0.text == "First action" })
+            let second = try XCTUnwrap(inputs.first { $0.text == "Second action" })
+            let firstFrame = first.convert(first.bounds, to: controller.view)
+            let secondFrame = second.convert(second.bounds, to: controller.view)
+            if textSize.isAccessibilitySize {
+                XCTAssertGreaterThanOrEqual(secondFrame.minY, firstFrame.maxY)
+            } else {
+                XCTAssertEqual(secondFrame.midY, firstFrame.midY, accuracy: 1)
+            }
+            XCTAssertLessThanOrEqual(secondFrame.maxX, 601)
+        }
     }
 
     func testCompactSizeClassStacksAndDropsHandwriting() {

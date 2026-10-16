@@ -167,7 +167,7 @@ private struct ActionButton: View {
                     .minimumScaleFactor(0.84)
                 Spacer(minLength: 4)
             }
-            .foregroundStyle(.white)
+            .foregroundStyle(SottoTheme.onPrimary)
             .padding(.horizontal, 16)
             .frame(minHeight: 52)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -250,10 +250,10 @@ struct SourcedClassPanel: View {
                 } label: {
                     Image(systemName: "arrow.right")
                         .font(.headline)
-                        .frame(width: 42, height: 42)
+                        .frame(width: 44, height: 44)
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(.white)
+                .foregroundStyle(SottoTheme.onPrimary)
                 .background(SottoTheme.primary)
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .disabled(link.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)

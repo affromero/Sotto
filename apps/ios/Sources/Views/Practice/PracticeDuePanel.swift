@@ -5,6 +5,7 @@ import SwiftUI
 /// shown this all along; the iPad had no way to see it.
 struct PracticeDuePanel: View {
     @EnvironmentObject private var model: SottoAppModel
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     let overview: SottoPracticeOverview
     let onResume: (String) -> Void
@@ -29,7 +30,7 @@ struct PracticeDuePanel: View {
                 }
 
                 ForEach(overview.unfinished) { session in
-                    HStack(spacing: 12) {
+                    SottoAdaptiveStack(verticalAlignment: .center, spacing: 12) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(kindLabel(session.kind))
                                 .font(.callout.bold())
@@ -39,7 +40,7 @@ struct PracticeDuePanel: View {
                                 .foregroundStyle(SottoTheme.muted)
                         }
 
-                        Spacer(minLength: 8)
+                        if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 8) }
 
                         Button("Resume") {
                             onResume(session.id)
@@ -50,10 +51,12 @@ struct PracticeDuePanel: View {
                             pendingDeletion = session
                         } label: {
                             Image(systemName: "trash")
+                                .frame(minWidth: 44, minHeight: 44)
                         }
                         .buttonStyle(.borderless)
                         .accessibilityLabel("Delete this \(kindLabel(session.kind)) session")
                     }
+                    .environment(\.sottoLayout, .regular)
                 }
             }
             .padding(18)

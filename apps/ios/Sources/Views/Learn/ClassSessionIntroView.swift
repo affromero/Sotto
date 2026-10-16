@@ -13,17 +13,19 @@ struct ClassHeroHeader: View {
         VStack(alignment: .leading, spacing: 20) {
             SottoAdaptiveStack(spacing: layout == .compact ? 14 : 24) {
                 VStack(alignment: .leading, spacing: 10) {
-                    HStack(spacing: 8) {
+                    SottoAdaptiveStack(verticalAlignment: .center, spacing: 8) {
                         Text("Class \(classDetail.order)")
                         if let level = classDetail.lesson?.level {
                             Text(level)
                         }
                         Text(classDetail.status.capitalized)
                     }
+                    .environment(\.sottoLayout, .regular)
                     .font(.caption.bold())
                     .foregroundStyle(SottoTheme.primary)
                     .textCase(.uppercase)
                     .tracking(1.2)
+                    .fixedSize(horizontal: false, vertical: true)
 
                     Text(classDetail.lesson?.title ?? "Sotto class")
                         .font(.system(size: layout == .compact ? 30 : 44, weight: .bold, design: .serif))
@@ -66,7 +68,7 @@ struct ClassHeroHeader: View {
                 colors: [
                     SottoTheme.surface,
                     SottoTheme.primary.opacity(0.07),
-                    Color(red: 0.96, green: 0.98, blue: 0.95)
+                    SottoTheme.introductionTint
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
@@ -111,24 +113,33 @@ struct ClassProgressDonut: View {
 
 struct ClassSkillMap: View {
     @Environment(\.sottoLayout) private var layout
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let sections: [SottoClassSection]
 
     var body: some View {
         Group {
-            if layout == .compact {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 84))], spacing: 16) {
-                    ForEach(sections) { section in
-                        SkillNode(section: section)
-                    }
-                }
+            if layout == .compact || dynamicTypeSize.isAccessibilitySize {
+                adaptiveSkills
             } else {
-                connectedSkills
+                ViewThatFits(in: .horizontal) {
+                    connectedSkills
+                    adaptiveSkills
+                }
             }
         }
         .frame(minHeight: 96)
         .padding(14)
         .background(SottoTheme.surface.opacity(0.7))
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    private var adaptiveSkills: some View {
+        LazyVGrid(columns: [dynamicTypeSize.isAccessibilitySize
+            ? GridItem(.flexible()) : GridItem(.adaptive(minimum: 84))], spacing: 16) {
+            ForEach(sections) { section in
+                SkillNode(section: section)
+            }
+        }
     }
 
     private var connectedSkills: some View {
@@ -184,11 +195,13 @@ struct SkillNode: View {
             Text(classSkillLabel(section.skill))
                 .font(.caption.bold())
                 .foregroundStyle(SottoTheme.ink)
-                .lineLimit(1)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
             Text(sectionStatusLabel(section))
                 .font(.caption2)
                 .foregroundStyle(SottoTheme.muted)
-                .lineLimit(1)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .frame(minWidth: 84)
     }
@@ -202,16 +215,17 @@ struct ClassMetricPill: View {
         Label(label, systemImage: icon)
             .font(.callout.weight(.semibold))
             .foregroundStyle(SottoTheme.muted)
-            .lineLimit(1)
+            .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .background(SottoTheme.surface.opacity(0.78))
-            .clipShape(Capsule())
-            .overlay(Capsule().stroke(SottoTheme.line))
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(SottoTheme.line))
     }
 }
 
 struct TimelineFigure: View {
+    @ScaledMetric(relativeTo: .caption) private var markerSize: CGFloat = 34
     let timeline: SottoClassTimeline
     let onSelectionHelp: (String, String) -> Void
 
@@ -227,9 +241,9 @@ struct TimelineFigure: View {
                     HStack(alignment: .center, spacing: 10) {
                         Text(String(format: "%02d", index + 1))
                             .font(.caption.bold().monospacedDigit())
-                            .foregroundStyle(.white)
-                            .frame(width: 34, height: 34)
-                            .background(Color(red: 0.165, green: 0.549, blue: 0.471))
+                            .foregroundStyle(SottoTheme.onPrimary)
+                            .frame(width: markerSize, height: markerSize)
+                            .background(SottoTheme.teal)
                             .clipShape(Circle())
                         SelectableLearnerText(
                             step,
@@ -242,11 +256,11 @@ struct TimelineFigure: View {
             }
         }
         .padding(16)
-        .background(Color(red: 0.165, green: 0.549, blue: 0.471).opacity(0.09))
+        .background(SottoTheme.teal.opacity(0.09))
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color(red: 0.165, green: 0.549, blue: 0.471).opacity(0.26))
+                .stroke(SottoTheme.teal.opacity(0.26))
         )
     }
 }
@@ -273,7 +287,7 @@ struct ContrastFigure: View {
                 ContrastSide(
                     title: contrast.rightLabel,
                     items: contrast.rightItems,
-                    color: Color(red: 0.72, green: 0.39, blue: 0.18),
+                    color: SottoTheme.amber,
                     onSelectionHelp: onSelectionHelp
                 )
             }
@@ -328,6 +342,7 @@ struct ContrastSide: View {
 
 struct ClassIntroBlock: View {
     @Environment(\.sottoLayout) private var layout
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let intro: SottoClassIntro
     let onSelectionHelp: (String, String) -> Void
 
@@ -437,7 +452,7 @@ struct ClassIntroBlock: View {
                 LazyVGrid(
                     columns: Array(
                         repeating: GridItem(.flexible()),
-                        count: layout.gridColumns
+                        count: dynamicTypeSize.isAccessibilitySize ? 1 : layout.gridColumns
                     ),
                     alignment: .leading,
                     spacing: 10
@@ -457,7 +472,7 @@ struct ClassIntroBlock: View {
                         }
                         .padding(14)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(calloutToneColor(callout.tone).opacity(0.12))
+                        .background(calloutToneColor(callout.tone).opacity(0.08))
                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                         .overlay(
                             RoundedRectangle(cornerRadius: 12, style: .continuous)

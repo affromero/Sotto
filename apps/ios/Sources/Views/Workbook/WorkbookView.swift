@@ -315,6 +315,7 @@ enum WorkbookTools {
         let toolPicker = PKToolPicker(toolItems: workbookToolItems())
         toolPicker.stateAutosaveName = "SottoWorkbookToolPicker"
         toolPicker.showsDrawingPolicyControls = false
+        toolPicker.colorUserInterfaceStyle = .light
         return toolPicker
     }
 
@@ -324,7 +325,7 @@ enum WorkbookTools {
             PKToolPickerInkingItem(type: .pencil, color: .darkGray, width: 6),
             PKToolPickerInkingItem(type: .marker, color: UIColor.systemYellow.withAlphaComponent(0.55), width: 14),
             PKToolPickerInkingItem(type: .monoline, color: UIColor.systemBlue, width: 4),
-            PKToolPickerInkingItem(type: .fountainPen, color: UIColor.label, width: 4),
+            PKToolPickerInkingItem(type: .fountainPen, color: .black, width: 4),
             PKToolPickerInkingItem(type: .watercolor, color: UIColor.systemTeal.withAlphaComponent(0.65), width: 10),
             PKToolPickerInkingItem(type: .crayon, color: UIColor.systemPurple, width: 8),
             PKToolPickerEraserItem(type: .bitmap),
@@ -344,7 +345,7 @@ private struct WorkbookPDFReaderView: UIViewRepresentable {
 
     func makeUIView(context: Context) -> PDFView {
         let pdfView = PDFView()
-        pdfView.backgroundColor = UIColor(red: 0.961, green: 0.957, blue: 0.941, alpha: 1)
+        pdfView.backgroundColor = UIColor(SottoTheme.paper)
         pdfView.displayMode = .singlePageContinuous
         pdfView.displayDirection = .vertical
         pdfView.displaysPageBreaks = true
@@ -382,7 +383,7 @@ private struct AnnotatedWorkbookPDFView: UIViewRepresentable {
 
     func makeUIView(context: Context) -> PDFView {
         let pdfView = PDFView()
-        pdfView.backgroundColor = UIColor(red: 0.961, green: 0.957, blue: 0.941, alpha: 1)
+        pdfView.backgroundColor = UIColor(SottoTheme.paper)
         pdfView.displayMode = .singlePageContinuous
         pdfView.displayDirection = .vertical
         pdfView.displaysPageBreaks = true

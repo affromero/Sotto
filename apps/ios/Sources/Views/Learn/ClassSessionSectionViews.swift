@@ -178,7 +178,7 @@ private struct ClassReadingPassageBlock: View {
                 colors: [
                     SottoTheme.paper,
                     SottoTheme.primary.opacity(0.08),
-                    Color(red: 0.98, green: 0.95, blue: 0.88),
+                    SottoTheme.readingTint,
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
@@ -193,6 +193,8 @@ private struct ClassReadingPassageBlock: View {
 }
 
 struct ClassFeedbackClinicBlock: View {
+    @Environment(\.sottoLayout) private var layout
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let classDetail: SottoClassDetail
     let result: SottoClassSubmitResult?
 
@@ -234,7 +236,9 @@ struct ClassFeedbackClinicBlock: View {
                 Spacer()
             }
 
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 12) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible()),
+                count: layout == .compact || dynamicTypeSize.isAccessibilitySize ? 1 : 2),
+                alignment: .leading, spacing: 12) {
                 ClinicCard(title: "Targeted drills") {
                     if weakSections.isEmpty {
                         Text("No weak skill score stood out in this attempt.")
@@ -279,7 +283,9 @@ struct ClassFeedbackClinicBlock: View {
                             .foregroundStyle(SottoTheme.muted)
                     } else {
                         VStack(alignment: .leading, spacing: 12) {
-                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), spacing: 8)], alignment: .leading, spacing: 8) {
+                            LazyVGrid(columns: [dynamicTypeSize.isAccessibilitySize
+                                ? GridItem(.flexible())
+                                : GridItem(.adaptive(minimum: 120), spacing: 8)], alignment: .leading, spacing: 8) {
                                 ForEach(vocabulary.prefix(10), id: \.lemma) { item in
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(item.lemma)

@@ -346,7 +346,7 @@ private struct ClassSpeakingPromptCard: View {
 private struct SpeakingPromptTextBlock: View {
     let label: String
     let text: String
-    let font: UIFont
+    let font: LearnerTextFont
     let color: Color
     let emphasized: Bool
     let onSelectionHelp: ((String, String) -> Void)?
