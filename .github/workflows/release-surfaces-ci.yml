@@ -146,4 +146,13 @@ jobs:
           -scheme Sotto
           -destination "platform=iOS Simulator,id=$SOTTO_IPHONE_SIMULATOR"
           -destination "platform=iOS Simulator,id=$SOTTO_IPAD_SIMULATOR"
+          -resultBundlePath "$RUNNER_TEMP/sotto-ios-results.xcresult"
           CODE_SIGN_IDENTITY=-
+      - name: Preserve failed iOS test results
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ios-test-results-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/sotto-ios-results.xcresult
+          retention-days: 7
+          if-no-files-found: warn

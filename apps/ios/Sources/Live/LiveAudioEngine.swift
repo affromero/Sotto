@@ -8,8 +8,13 @@ import Foundation
 /// capture converts into 16 kHz mono Int16 and playback schedules 24 kHz
 /// buffers on a player node, letting the engine resample on the way out.
 final class LiveAudioEngine {
-    private let engine = AVAudioEngine()
-    private let player = AVAudioPlayerNode()
+    private let makeEngine: () throws -> AVAudioEngine
+    private let activateAudioSession: () throws -> AVAudioSession
+    private let deactivateAudioSession: (AVAudioSession) throws -> Void
+    private var engine: AVAudioEngine?
+    private var player: AVAudioPlayerNode?
+    private var tappedInput: AVAudioInputNode?
+    private var activatedSession: AVAudioSession?
     private var converter: AVAudioConverter?
     private var onFrame: ((String) -> Void)?
 
@@ -30,55 +35,88 @@ final class LiveAudioEngine {
         interleaved: true
     )
 
-    /// Mic in, speaker out, and keep working when the phone is on silent —
-    /// a translation the learner cannot hear is useless.
-    func activateSession() throws {
+    init(
+        makeEngine: @escaping () throws -> AVAudioEngine = { AVAudioEngine() },
+        activateSession: (() throws -> AVAudioSession)? = nil,
+        deactivateSession: ((AVAudioSession) throws -> Void)? = nil
+    ) {
+        self.makeEngine = makeEngine
+        activateAudioSession = activateSession ?? Self.activateSession
+        deactivateAudioSession = deactivateSession ?? {
+            try $0.setActive(false, options: [.notifyOthersOnDeactivation])
+        }
+    }
+
+    /// Mic in, speaker out, and keep working when the phone is on silent.
+    /// A translation the learner cannot hear is useless.
+    private static func activateSession() throws -> AVAudioSession {
         let session = AVAudioSession.sharedInstance()
         try session.setCategory(.playAndRecord, mode: .voiceChat, options: [.defaultToSpeaker, .allowBluetoothHFP])
         try session.setActive(true)
+        return session
     }
 
     func start(onFrame: @escaping (String) -> Void) throws {
+        guard engine == nil, activatedSession == nil else {
+            throw SottoAPIError.message("Live audio is already running.")
+        }
         self.onFrame = onFrame
-        try activateSession()
-
-        let input = engine.inputNode
-        let hardwareFormat = input.outputFormat(forBus: 0)
-        guard let captureFormat else {
-            throw SottoAPIError.message("This device cannot record at the rate live translation needs.")
+        do {
+            activatedSession = try activateAudioSession()
+            let engine = try makeEngine()
+            self.engine = engine
+            let input = engine.inputNode
+            let hardwareFormat = input.outputFormat(forBus: 0)
+            guard hardwareFormat.sampleRate > 0, hardwareFormat.channelCount > 0,
+                  let captureFormat,
+                  let converter = AVAudioConverter(from: hardwareFormat, to: captureFormat) else {
+                throw SottoAPIError.message("This device cannot record at the rate live translation needs.")
+            }
+            self.converter = converter
+            let player = AVAudioPlayerNode()
+            self.player = player
+            if let playbackFormat {
+                engine.attach(player)
+                engine.connect(player, to: engine.mainMixerNode, format: playbackFormat)
+            }
+            input.installTap(onBus: 0, bufferSize: 2048, format: hardwareFormat) { [weak self] buffer, _ in
+                self?.handleCaptured(buffer)
+            }
+            tappedInput = input
+            engine.prepare()
+            try engine.start()
+            player.play()
+        } catch {
+            stop()
+            throw error
         }
-        converter = AVAudioConverter(from: hardwareFormat, to: captureFormat)
-
-        if let playbackFormat {
-            engine.attach(player)
-            engine.connect(player, to: engine.mainMixerNode, format: playbackFormat)
-        }
-
-        input.installTap(onBus: 0, bufferSize: 2048, format: hardwareFormat) { [weak self] buffer, _ in
-            self?.handleCaptured(buffer)
-        }
-
-        engine.prepare()
-        try engine.start()
-        player.play()
     }
 
     func stop() {
-        engine.inputNode.removeTap(onBus: 0)
-        player.stop()
-        engine.stop()
+        tappedInput?.removeTap(onBus: 0)
+        tappedInput = nil
+        player?.stop()
+        engine?.stop()
+        player = nil
+        engine = nil
+        converter = nil
         onFrame = nil
-        try? AVAudioSession.sharedInstance().setActive(false, options: [.notifyOthersOnDeactivation])
+        if let session = activatedSession {
+            try? deactivateAudioSession(session)
+            activatedSession = nil
+        }
     }
 
     /// The model was interrupted, so anything still queued is stale.
     func flushPlayback() {
+        guard let engine, engine.isRunning, let player else { return }
         player.stop()
         player.play()
     }
 
     func enqueue(base64Pcm24k: String) {
         guard
+            let engine, engine.isRunning, let player,
             let data = Data(base64Encoded: base64Pcm24k),
             let playbackFormat,
             let buffer = Self.buffer(from: data, format: playbackFormat)
