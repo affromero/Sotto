@@ -10,7 +10,9 @@ docker run --rm --network none -e EXPECTED_LIBC="$libc" --entrypoint node "$imag
   assert.equal(glibc ? "glibc" : "musl", process.env.EXPECTED_LIBC);
   const fs = require("node:fs");
   const path = require("node:path");
-  const native = require("thesidedoor-flock");
+  const { createRequire } = require("node:module");
+  const storageRequire = createRequire(require.resolve("thesidedoor-core/storage"));
+  const native = storageRequire("thesidedoor-flock");
   const directory = fs.mkdtempSync(path.join(require("node:os").tmpdir(), "sotto-native-smoke-"));
   const file = path.join(directory, "state.lock");
   const descriptors = new Set();
