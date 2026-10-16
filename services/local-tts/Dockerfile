@@ -1,4 +1,4 @@
-FROM python:3.11-slim AS piper
+FROM python:3.14-slim AS piper
 
 ARG COMMIT_SHA=local
 LABEL org.opencontainers.image.revision=$COMMIT_SHA
@@ -17,7 +17,7 @@ USER 1000:1000
 EXPOSE 8000
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
 
-FROM python:3.11-slim AS kokoro
+FROM python:3.14-slim AS kokoro
 
 # System dependencies:
 #   - libsndfile1 for the `soundfile` package (WAV encoding)
