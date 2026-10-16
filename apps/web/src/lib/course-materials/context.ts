@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { LearningDatabase } from '../learning/database';
 
-export const COURSE_CONTEXT_LIMIT = 12000;
+const COURSE_CONTEXT_LIMIT = 12000;
 type DocumentMetadata = { id: string; name: string; length: number; originalUrl: string };
 export type CourseSourceFragment = { documentId: string; start: number; end: number; text: string };
 type Range = { label: string; start: number; end: number };

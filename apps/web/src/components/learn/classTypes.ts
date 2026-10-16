@@ -302,12 +302,6 @@ export function classPresentationIssues(cls: ClassData): string[] {
   return issues;
 }
 
-/** Format seconds as m:ss. */
-export function fmtClock(seconds: number): string {
-  const s = Math.max(0, Math.floor(seconds));
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-}
-
 /**
  * Adapt a class's narrow {@link ClassReference} into the shared {@link ReferenceData}
  * shape consumed by the citation parser + `CitationMarker`. The class API doesn't

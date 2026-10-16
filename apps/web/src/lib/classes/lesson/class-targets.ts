@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /** Private learning targets shared by teaching and every skill in this class. */
-export const classTargetsSchema = z
+const classTargetsSchema = z
   .object({
     vocab: z
       .array(
