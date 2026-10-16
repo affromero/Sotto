@@ -19,6 +19,7 @@ const nextConfig = {
     'pg',
     'markit-ai',
     '@shiftlabs/markit',
+    'thesidedoor-core',
     'thesidedoor-flock',
   ],
   // Per-instance build dir, so two dev servers (e.g. the self-hosted instance and
