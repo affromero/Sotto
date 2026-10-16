@@ -15,6 +15,7 @@ This release expands class teaching, recovery, and native learning. Desktop inst
 
 ### Fixed
 
+- Desktop release assets retain all three platform manifests and valid installer references. Update notices compare stable versions numerically, and default desktop links follow the app version. ([#246](https://github.com/affromero/Sotto/pull/246))
 - Class notes follow one reading order, and native light, dark, and larger-text layouts keep practice actions, settings, pairing forms, and white workbook paper readable. ([#222](https://github.com/affromero/Sotto/pull/222), [#238](https://github.com/affromero/Sotto/pull/238), closes [#221](https://github.com/affromero/Sotto/issues/221) and [#237](https://github.com/affromero/Sotto/issues/237))
 - Practice distinguishes preparing, resumable, failed, and cancelled attempts, retaining server progress when the practice screen closes. ([#241](https://github.com/affromero/Sotto/pull/241), closes [#240](https://github.com/affromero/Sotto/issues/240))
 - Listening supports seeking, replaying individual turns, and replaying one speaker. Closing an idle native Live screen releases only audio resources that it acquired. ([#230](https://github.com/affromero/Sotto/pull/230), [#242](https://github.com/affromero/Sotto/pull/242), closes [#239](https://github.com/affromero/Sotto/issues/239))
@@ -30,6 +31,7 @@ This release expands class teaching, recovery, and native learning. Desktop inst
 
 ### Upgrading
 
+- Legacy course attachments saved only as filenames have no retained source text. Re-upload those files before preparing a class that uses them. Original-file retention applies to new uploads. ([#217](https://github.com/affromero/Sotto/pull/217), [#230](https://github.com/affromero/Sotto/pull/230))
 - Back up PostgreSQL, retained uploads, and configuration before upgrading from 0.1.0. Use the supported self-host update flow so migrations, Sidedoor access conversion, and finalization run in the required order. Hosted blue-green deployments need a separate migration procedure when schema hashes differ. ([#148](https://github.com/affromero/Sotto/pull/148), [#217](https://github.com/affromero/Sotto/pull/217), [deployment guide](https://github.com/affromero/Sotto/blob/main/docs/03-self-host-deployment.md))
 - Pin self-hosted web and worker images to the same verified source revision. The GitHub tag does not add SemVer image aliases; check the successful OSS publication for that revision. ([release guide](https://github.com/affromero/Sotto/blob/main/docs/releases.md))
 
