@@ -1,7 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
 import { ClassShell } from '@/components/learn/ClassShell';
 import type { ClassData, ClassSection } from '@/components/learn/classTypes';
+import { teaching } from './lesson/teaching-fixture';
 
 const mockPush = vi.fn();
 
@@ -171,6 +172,46 @@ describe('ClassShell', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     global.fetch = vi.fn();
+    vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  it('keeps teaching open on a section deep link and preserves an answer when returning to notes', async () => {
+    const cls = recoverableClass('teaching-deep-link');
+    cls.teaching = teaching;
+    const reading = cls.sections.find((item) => item.skill === 'READING')!;
+    const writes: Record<string, unknown>[] = [];
+    global.fetch = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === 'PATCH') {
+        writes.push(JSON.parse(String(init.body)) as Record<string, unknown>);
+        return jsonResponse({ revision: 11 });
+      }
+      return jsonResponse(cls);
+    });
+    render(<ClassShell classId={cls.id} initialSectionId={reading.id} />);
+    await screen.findByRole('heading', { name: 'Read, then decide.' });
+    const notes = screen.getByText('Lesson notes').closest('details')!;
+    expect(notes).toHaveAttribute('open');
+    expect(screen.getByText(teaching.explanation)).toBeVisible();
+    const option = screen.getByRole('button', { name: 'Option 1: A' });
+    expect(notes.compareDocumentPosition(option) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    fireEvent.click(screen.getByText('Lesson notes'));
+    expect(screen.getByText(teaching.explanation)).not.toBeVisible();
+    fireEvent.click(option);
+    await waitFor(() => expect(option).toBeDisabled());
+    fireEvent.click(screen.getByText('Lesson notes'));
+    expect(screen.getByText(teaching.explanation)).toBeVisible();
+    expect(option).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled();
+    await waitFor(() =>
+      expect(writes).toEqual([
+        expect.objectContaining({
+          answers: expect.objectContaining({
+            [reading.questions[0].id]: 0,
+          }),
+        }),
+      ])
+    );
   });
 
   it.each([

@@ -10,6 +10,7 @@ import { z } from 'zod';
 import { prisma, prismaUnfiltered } from './prisma';
 import { capturedLearningAiOptions, resolveCapturedLearningAi } from './learning-ai';
 import { formatNotesForPrompt } from './course-notes';
+import type { ClassTeaching } from '@sotto/shared';
 import { createAIProvider } from './providers/ai';
 import { loadAndRender } from './prompt-loader';
 import {
@@ -83,6 +84,7 @@ export interface ClassSpeakingParams {
   objective: string;
   targetVocab: Array<{ lemma: string; gloss: string }>;
   note?: string;
+  teaching?: ClassTeaching;
 }
 
 export interface ClassSpeakingResult {
@@ -103,6 +105,7 @@ export interface SpeakingPromptsParams {
   targetVocab: Array<{ lemma: string; gloss: string }>;
   refId: string;
   note?: string;
+  teaching?: ClassTeaching;
 }
 
 export interface ComposedSpeakingPrompt {
@@ -157,20 +160,25 @@ export async function composeSpeakingPrompts(
 
   // Step 2: generate target phrases via LLM
   const vocabList = p.targetVocab.map((v) => `${v.lemma} — ${v.gloss}`).join('\n');
-  const systemPrompt = loadAndRender('speaking/generate-speaking-prompts.md', {
-    COUNT: String(SPEAKING_PROMPT_COUNT),
-    LEVEL: p.level,
-    NATIVE: p.nativeLang,
-    TARGET: p.targetLang,
-    LANGUAGE_POLICY: classSpeakingMeaningPolicy({
-      level: p.level,
-      nativeLang: p.nativeLang,
-      targetLang: p.targetLang,
-    }),
-    OBJECTIVE: p.objective,
-    VOCAB: vocabList,
-    NOTES: formatNotesForPrompt(p.note ?? ''),
-  });
+  const systemPrompt =
+    loadAndRender('speaking/generate-speaking-prompts.md', {
+      COUNT: String(SPEAKING_PROMPT_COUNT),
+      LEVEL: p.level,
+      NATIVE: p.nativeLang,
+      TARGET: p.targetLang,
+      LANGUAGE_POLICY: classSpeakingMeaningPolicy({
+        level: p.level,
+        nativeLang: p.nativeLang,
+        targetLang: p.targetLang,
+      }),
+      OBJECTIVE: p.objective,
+      VOCAB: vocabList,
+      NOTES: formatNotesForPrompt(p.note ?? ''),
+    }) +
+    (p.teaching
+      ? '\nAlready taught lesson. Apply these forms in new situations:\n' +
+        formatNotesForPrompt(JSON.stringify(p.teaching))
+      : '');
 
   const client = createAIProvider(ai.provider);
   const generate = async (
@@ -270,6 +278,13 @@ export async function composeSpeakingPrompts(
       nativeLang: p.nativeLang,
       targetLang: p.targetLang,
       kind: 'speaking',
+      lessonContext: {
+        title: p.objective,
+        objective: p.objective,
+        grammarPoints: [],
+        targetVocab: p.targetVocab,
+        teaching: p.teaching,
+      },
       items: phrases,
     });
   };
@@ -509,6 +524,7 @@ export async function generateClassSpeaking(p: ClassSpeakingParams): Promise<Cla
     targetVocab: p.targetVocab,
     refId: `${p.classId}-${attempt}`,
     note: p.note,
+    teaching: p.teaching,
   });
 
   const { section, savedPrompts } = await withClassGeneration(

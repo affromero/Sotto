@@ -31,6 +31,7 @@ const evidenceSchema = reviewerProtocolDiagnosticSchema
   .extend({
     kind: z.enum([
       'intro',
+      'teaching',
       'explanations',
       'writing',
       'listening',

@@ -4,7 +4,7 @@ import { teachingReviewCandidate } from './teaching-source/request-candidate';
 import { isDeepStrictEqual } from 'node:util';
 import type { CapturedLearningAi } from '../../learning-ai';
 import type { AIProvider } from '../../providers/ai';
-import { requestTeachingReview } from './teaching-source/request';
+import { requestTeachingReview, type TeachingLessonContext } from './teaching-source/request';
 import { corroborateTeachingAdjudicator } from './teaching-source/novel-findings';
 import {
   SectionQualityError,
@@ -254,14 +254,14 @@ export async function reviewTeachingContent(options: {
   level: string;
   nativeLang: string;
   targetLang: string;
-  lessonContext?: { title: string; objective: string; grammarPoints: readonly string[] };
+  lessonContext?: TeachingLessonContext;
   previousIntroRejection?: TeachingQualityRejectionError;
   readingPassageReview?: SectionReviewFeedback;
   listeningPassageReview?: SectionReviewFeedback;
   listeningSource?: string;
   listeningTurns?: readonly NormalizedListeningTurn[];
   sectionSkill?: 'GRAMMAR' | 'READING';
-  kind: 'intro' | 'explanations' | 'writing' | 'listening' | 'speaking' | 'vocabulary';
+  kind: 'intro' | 'teaching' | 'explanations' | 'writing' | 'listening' | 'speaking' | 'vocabulary';
   items: readonly unknown[];
 }): Promise<void> {
   if (
@@ -327,6 +327,7 @@ export async function reviewTeachingContent(options: {
       ...request,
       items: structuredClone(request.items),
       variables: structuredClone(request.variables),
+      ...(request.lessonContext ? { lessonContext: structuredClone(request.lessonContext) } : {}),
       jsonSchema: structuredClone(request.jsonSchema),
       ...(request.introContext ? { introContext: structuredClone(request.introContext) } : {}),
       ...(request.criticisms ? { criticisms: structuredClone(request.criticisms) } : {}),
@@ -385,6 +386,17 @@ export async function reviewTeachingContent(options: {
       ].join(' ');
     else if (options.kind === 'listening') languagePolicy = classListeningTranscriptPolicy(options);
     else if (options.kind === 'speaking') languagePolicy = classSpeakingMeaningPolicy(options);
+    else if (
+      options.kind === 'writing' &&
+      options.items.some(
+        (item) =>
+          item !== null &&
+          typeof item === 'object' &&
+          'taskType' in item &&
+          item.taskType === 'translation'
+      )
+    )
+      languagePolicy += ` For writing items explicitly marked taskType="translation", sourceText is intentionally in the learner's native language (${options.nativeLang}). The identical native-language source excerpt may also appear inside task. Other task directions and guidance follow the ordinary class policy, while the private modelAnswer is in the target language (${options.targetLang}). Do not reject this native-language source text under the general immersion rule. Judge whether the target answer faithfully preserves its actor, action, time, place, negation and modality, allowing valid idiomatic paraphrases. No correctionReason, starter, or answer-prefix ideas belong to this translation task.`;
     const reviewVariables = {
       LEVEL: options.level,
       NATIVE: options.nativeLang,

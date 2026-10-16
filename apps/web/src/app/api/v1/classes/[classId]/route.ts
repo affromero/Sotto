@@ -159,6 +159,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         objective: cls.lesson.objective,
       },
       intro,
+      ...(cls.teaching ? { teaching: cls.teaching } : {}),
       vocabulary: targetVocab
         .filter((item) => typeof item.lemma === 'string' && item.lemma.trim() !== '')
         .map((item) => ({

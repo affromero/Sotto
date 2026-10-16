@@ -60,6 +60,7 @@ export async function reviewReadingVocabularyContent(options: {
   level: string;
   nativeLang: string;
   targetLang: string;
+  sourceVocabulary?: boolean;
   items: readonly ReadingReviewItem[];
 }): Promise<number[][]> {
   if (
@@ -88,7 +89,9 @@ export async function reviewReadingVocabularyContent(options: {
       LEVEL: options.level,
       NATIVE: options.nativeLang,
       TARGET: options.targetLang,
-      LANGUAGE_POLICY: classLanguagePolicy(options),
+      LANGUAGE_POLICY: options.sourceVocabulary
+        ? 'Imported excerpts and their source labels retain their original languages. Review only the target-language lexical unit and its native-language dictionary meaning; these source quotations are not newly authored learner-visible class explanations.'
+        : classLanguagePolicy(options),
       REVIEW_SCHEMA: JSON.stringify(jsonSchema.schema),
     },
   });

@@ -20,6 +20,13 @@ const verdict = teachingQualityVerdictSchema.parse({
 });
 
 describe('private teaching failure evidence', () => {
+  it('retains a rejected complete teaching unit as its own content kind', () => {
+    const unit = { explanation: 'A private explanation with an incorrect rule.' };
+    const evidence = captureTeachingFailure('teaching', [unit], verdict);
+    expect(teachingFailureSchema.parse(evidence)).toEqual(evidence);
+    expect(evidence.kind).toBe('teaching');
+    expect(JSON.parse(evidence.reviews[0].candidate!)).toEqual([unit]);
+  });
   it('retains six ordinary findings and the separate reading answer-support rejection', () => {
     const feedback = [
       'First supported critic defect.',

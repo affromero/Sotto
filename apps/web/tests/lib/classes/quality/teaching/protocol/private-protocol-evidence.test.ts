@@ -20,7 +20,27 @@ import {
 import {
   captureReviewerProtocolEvidence,
   authenticReviewerProtocolEvidence,
+  reviewerProtocolEvidenceSchema,
 } from '@/lib/classes/quality/private-protocol-evidence';
+
+it('retains malformed whole-teaching review evidence under the teaching kind', () => {
+  let rejection: unknown;
+  try {
+    parseTeachingCriticResponse('not JSON', [{ explanation: 'The original teaching.' }]);
+  } catch (error) {
+    rejection = error;
+  }
+  const evidence = captureReviewerProtocolEvidence(rejection, {
+    kind: 'teaching',
+    role: 'critic',
+    offset: 0,
+    candidate: [{ explanation: 'The original teaching.' }],
+    response: 'not JSON',
+  });
+  expect(evidence).toBeDefined();
+  expect(reviewerProtocolEvidenceSchema.parse([evidence])[0].kind).toBe('teaching');
+  expect(authenticReviewerProtocolEvidence(evidence)).toBe(true);
+});
 import {
   reviewTeachingContent,
   requestTeachingReview,

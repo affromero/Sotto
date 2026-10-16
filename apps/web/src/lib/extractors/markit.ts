@@ -9,6 +9,8 @@ let markitInstance: any = null;
 const PDF_EXTENSIONS = new Set(['.pdf']);
 const DOCUMENT_EXTENSIONS = new Set(['.docx', '.pptx', '.xlsx', '.epub']);
 
+export class CompleteTextLimitError extends Error {}
+
 async function getMarkit() {
   if (!markitInstance) {
     const { Markit } = await import('markit-ai');
@@ -31,19 +33,33 @@ function resolveSourceType(extension: string): ExtractedContent['sourceType'] {
  */
 export async function extractViaMarkit(
   buffer: Buffer,
-  info: { extension: string; url: string }
+  info: { extension: string; url: string; completeTextLimit?: number }
 ): Promise<ExtractedContent> {
   const markit = await getMarkit();
 
   logger.info('Extracting via Markit', { url: info.url, extension: info.extension });
 
   const result = await markit.convert(buffer, { extension: info.extension });
-  const markdown = (result.markdown || '').substring(0, MAX_CONTENT_LENGTH);
+  const completeMarkdown = result.markdown || '';
+  if (
+    info.completeTextLimit !== undefined &&
+    (!Number.isSafeInteger(info.completeTextLimit) ||
+      info.completeTextLimit < 1 ||
+      completeMarkdown.length > info.completeTextLimit)
+  )
+    throw new CompleteTextLimitError(
+      'The extracted document exceeds the supported complete-text limit.'
+    );
+  const markdown =
+    info.completeTextLimit === undefined
+      ? completeMarkdown.substring(0, MAX_CONTENT_LENGTH)
+      : completeMarkdown;
   const text = markdown
     .replace(/[#*_`>\[\]()~|-]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
-  const truncatedText = text.substring(0, MAX_CONTENT_LENGTH);
+  const truncatedText =
+    info.completeTextLimit === undefined ? text.substring(0, MAX_CONTENT_LENGTH) : text;
   const wordCount = countWords(truncatedText);
 
   logger.info('Markit extraction complete', {

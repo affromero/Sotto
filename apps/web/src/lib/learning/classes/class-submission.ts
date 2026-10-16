@@ -7,6 +7,7 @@ import {
 import { Prisma } from '@/generated/prisma/client';
 import { prismaUnfiltered as prisma } from '../../prisma';
 import { applyReviewOutcome } from '../../knowledge-graph';
+import { classTargetsFromSeed } from '../../classes/lesson/class-targets';
 import { readSkillRequirements } from '../skill-requirements';
 import { reviewReadingVocabulary } from '../reading-vocabulary';
 import { assertStoredClassMaterial } from './class-material';
@@ -282,8 +283,10 @@ export async function submitClass(
           where: { id: cls.courseId, activeClassId: classId },
           data: { activeClassId: null },
         });
-      const vocab = cls.lesson.targetVocab as unknown as Array<{ lemma: string }>;
-      const grammar = cls.lesson.grammarPoints as unknown as string[];
+      const targets = classTargetsFromSeed(cls.adaptiveSeed);
+      const vocab =
+        targets?.vocab ?? (cls.lesson.targetVocab as unknown as Array<{ lemma: string }>);
+      const grammar = targets?.grammarPoints ?? (cls.lesson.grammarPoints as unknown as string[]);
       const previousEvidence = [
         cls.submission?.answers ?? [],
         ...history.flatMap((entry) => {

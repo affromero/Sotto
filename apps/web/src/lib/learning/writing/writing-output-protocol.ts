@@ -1,5 +1,13 @@
 import { z } from 'zod';
 
+export const writingTaskTypeSchema = z.enum([
+  'transformation',
+  'correction',
+  'completion',
+  'guided_reply',
+  'translation',
+]);
+
 export const writingAuthoringProofSchema = z.object({
   modelAnswer: z
     .string()

@@ -1,8 +1,23 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
-import { extractUploadTexts } from '@/lib/note-upload';
+import { extractUploadTexts, MAX_IMPORTED_FILE_CHARS } from '@/lib/note-upload';
 
 describe('learner note text imports', () => {
+  it('retains the final exercise instructions beyond the former 3000-character prefix', async () => {
+    const text = `${'Wort vocabulary\n'.repeat(1000)}END: Explain the contrast, then translate the supplied phrases.`;
+    const result = await extractUploadTexts([
+      new File([text], 'Vocab Deutsch.txt', { type: 'text/plain' }),
+    ]);
+    expect(result.texts[0]).toBe(`Uploaded course note: Vocab Deutsch.txt\n${text}`);
+    expect(result.texts[0]).not.toContain('[Trimmed');
+  });
+  it('rejects an oversized extract explicitly instead of accepting a truncated document', async () => {
+    await expect(
+      extractUploadTexts([
+        new File(['a'.repeat(MAX_IMPORTED_FILE_CHARS + 1)], 'oversize.txt', { type: 'text/plain' }),
+      ])
+    ).rejects.toThrow('exceeds 1000000 characters');
+  });
   it('preserves plain text and subtitle text as supplied material without AI diarization', async () => {
     const subtitle = 'WEBVTT\n\n00:00.000 --> 00:01.000\nHallo zusammen.';
     const result = await extractUploadTexts([

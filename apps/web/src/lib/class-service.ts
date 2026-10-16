@@ -7,7 +7,7 @@ import {
   claimPristineRegeneration,
   validatePristineRegeneration,
 } from './classes/regeneration/pristine';
-import { seedLessonItems, getDueItems } from './knowledge-graph';
+import { getDueItems } from './knowledge-graph';
 import { generateClassListening } from './class-listening-generator';
 import { prepareClassSource, type PreparedClassSource } from './class-source';
 import { generateClassSpeaking } from './class-speaking-generator';
@@ -18,6 +18,9 @@ import { Prisma } from '@/generated/prisma/client';
 import { ensureCurriculumHasLevelLessons } from './curriculum-generator';
 import { cefrRank } from './cefr-levels';
 import { generateClassIntro } from './classes/class-intro';
+import { generateClassTeaching, teachingFromSeed } from './classes/lesson/teaching';
+import { classTargetsFromSeed, selectClassVocabulary } from './classes/lesson/class-targets';
+import { getCourseVocabularyTargets } from './course-materials/vocabulary-context';
 import { logger } from './logger';
 import { resolveSkillRequirements, readSkillRequirements } from './learning/skill-requirements';
 import { extractReadingVocabulary } from './learning/reading-vocabulary';
@@ -30,7 +33,7 @@ import {
   settleClassGenerationFailure,
   publishClassGeneration,
 } from './learning/classes/class-generation-state';
-import type { SkillType, CefrLevel, SkillRequirements } from '@sotto/shared';
+import type { SkillType, CefrLevel, SkillRequirements, ClassTeaching } from '@sotto/shared';
 
 const MC_SKILLS: SkillType[] = ['GRAMMAR', 'READING'];
 
@@ -116,7 +119,6 @@ interface SectionOverride {
 
 async function buildSection(
   classId: string,
-  courseId: string,
   userId: string,
   execution: import('@/lib/sidedoor/credentials/runtime/provider-execution').SottoProviderExecution,
   skill: SkillType,
@@ -126,7 +128,8 @@ async function buildSection(
   note: string,
   attempt = 1,
   over?: SectionOverride,
-  retry?: import('./classes/quiz/retry').QuizRetryContext
+  retry?: import('./classes/quiz/retry').QuizRetryContext,
+  teaching?: ClassTeaching
 ): Promise<void> {
   await assertClassStillGenerating(classId, attempt);
   const { grammarPoints, targetVocab } = lessonInputs(lesson);
@@ -155,6 +158,7 @@ async function buildSection(
     targetVocab,
     seed: section.seed,
     note,
+    teaching,
     sourceContent: over?.sourceContent,
     retry,
   });
@@ -196,14 +200,6 @@ async function buildSection(
     });
     await assertClassStillGenerating(classId, attempt);
     await withClassGeneration(execution, classId, attempt, async (database) => {
-      await seedLessonItems(
-        courseId,
-        classId,
-        (over?.level ?? lesson.level) as CefrLevel,
-        readingVocabulary.words,
-        [],
-        database
-      );
       await database.courseClass.update({ where: { id: classId }, data: { readingVocabulary } });
     });
   }
@@ -239,6 +235,7 @@ interface ClassContentBuildParams {
   skills?: ReadonlySet<SkillType>;
   retry?: import('./classes/quiz/retry').QuizRetryContext;
   existingSeed?: Prisma.InputJsonObject;
+  preserveTeaching?: boolean;
   deferAudio?: boolean;
   execution: import('@/lib/sidedoor/credentials/runtime/provider-execution').SottoProviderExecution;
   classId: string;
@@ -257,18 +254,59 @@ interface ClassContentBuildParams {
 }
 
 async function buildClassContent(p: ClassContentBuildParams): Promise<Prisma.InputJsonObject> {
+  await assertClassStillGenerating(p.classId, p.attempt);
+  const due = await getDueItems(p.courseId);
+  const corpus = p.preserveTeaching
+    ? undefined
+    : await getCourseVocabularyTargets({
+        courseId: p.courseId,
+        userId: p.userId,
+        execution: p.execution,
+        nativeLang: p.requirements.nativeLang,
+        targetLang: p.requirements.targetLang,
+        level: p.requirements.level,
+        seed: `${p.classId}:${p.attempt}`,
+      });
+  const capturedContext =
+    corpus === undefined
+      ? await getCourseNote(p.courseId, `${p.classId}:${p.attempt}`)
+      : corpus.context;
   const note = noteForAttempt(
     buildLearnerContext(
-      await getCourseNote(p.courseId),
+      capturedContext,
       p.course.pedagogy as Parameters<typeof buildLearnerContext>[1]
     ),
     p.classId,
     p.attempt
   );
   await assertClassStillGenerating(p.classId, p.attempt);
-  const { grammarPoints, targetVocab } = lessonInputs(p.lesson);
+  let targets = (p.preserveTeaching && classTargetsFromSeed(p.existingSeed)) || {
+    vocab: lessonInputs(p.lesson).targetVocab,
+    grammarPoints: lessonInputs(p.lesson).grammarPoints,
+  };
+  if (corpus) {
+    const candidates = corpus.imported ? corpus.vocab : targets.vocab;
+    const memory = await prisma.learnerVocab.findMany({
+      where: {
+        courseId: p.courseId,
+        lemma: {
+          in: [...candidates.map(({ lemma }) => lemma), ...due.vocab.map(({ lemma }) => lemma)],
+        },
+      },
+      select: { lemma: true, mastery: true, reps: true, lastReviewed: true },
+    });
+    targets = {
+      ...targets,
+      vocab: selectClassVocabulary(candidates, due.vocab, memory, corpus.imported),
+    };
+    if (corpus.imported && !targets.vocab.length)
+      throw new Error('No new or due vocabulary was available in the imported material.');
+  }
+  const { grammarPoints } = targets;
+  const targetVocab = targets.vocab;
   const lessonLevel = p.requirements.level;
   const lessonObjective = p.override?.objective ?? p.lesson.objective;
+  await assertClassStillGenerating(p.classId, p.attempt);
 
   const intro =
     p.existingSeed?.intro ??
@@ -287,30 +325,40 @@ async function buildClassContent(p: ClassContentBuildParams): Promise<Prisma.Inp
     }));
   await assertClassStillGenerating(p.classId, p.attempt);
 
+  const teaching = p.preserveTeaching
+    ? teachingFromSeed(p.existingSeed)
+    : await generateClassTeaching({
+        userId: p.userId,
+        execution: p.execution,
+        level: lessonLevel,
+        nativeLang: p.requirements.nativeLang,
+        targetLang: p.requirements.targetLang,
+        title: p.lesson.title,
+        objective: lessonObjective,
+        grammarPoints,
+        targetVocab,
+        note,
+        sourceContent: p.override?.sourceContent,
+      });
+  await assertClassStillGenerating(p.classId, p.attempt);
+
   for (const skill of MC_SKILLS) {
     if (p.skills && !p.skills.has(skill)) continue;
     await buildSection(
       p.classId,
-      p.courseId,
       p.userId,
       p.execution,
       skill,
-      { ...p.lesson, level: p.requirements.level },
+      { ...p.lesson, grammarPoints, targetVocab, level: p.requirements.level },
       p.requirements.nativeLang,
       p.requirements.targetLang,
       note,
       p.attempt,
       { ...p.override, level: p.requirements.level },
-      p.retry
+      p.retry,
+      teaching
     );
   }
-  await assertClassStillGenerating(p.classId, p.attempt);
-
-  await withClassGeneration(p.execution, p.classId, p.attempt, (database) =>
-    seedLessonItems(p.courseId, p.classId, lessonLevel, targetVocab, grammarPoints, database)
-  );
-  await assertClassStillGenerating(p.classId, p.attempt);
-  const due = await getDueItems(p.courseId);
   await assertClassStillGenerating(p.classId, p.attempt);
 
   // These generated skills are required class surfaces. If one fails, the class
@@ -336,8 +384,9 @@ async function buildClassContent(p: ClassContentBuildParams): Promise<Prisma.Inp
         nativeLang: p.requirements.nativeLang,
         targetLang: p.requirements.targetLang,
         objective: lessonObjective,
-        mustIncludeVocab: due.vocab.map((v) => ({ word: v.lemma, translation: v.translation })),
+        mustIncludeVocab: targetVocab.map((v) => ({ word: v.lemma, translation: v.gloss })),
         note,
+        teaching,
         sourceContent: p.listeningSource?.sourceContent,
         sourceMetadata: p.listeningSource?.sourceMetadata,
         sourceUrl: p.listeningSource?.sourceUrl,
@@ -374,6 +423,7 @@ async function buildClassContent(p: ClassContentBuildParams): Promise<Prisma.Inp
         objective: lessonObjective,
         targetVocab,
         note,
+        teaching,
       });
       await assertClassStillGenerating(p.classId, p.attempt);
     } catch (err) {
@@ -399,6 +449,7 @@ async function buildClassContent(p: ClassContentBuildParams): Promise<Prisma.Inp
         objective: lessonObjective,
         targetVocab,
         note,
+        teaching,
       });
       await assertClassStillGenerating(p.classId, p.attempt);
     } catch (err) {
@@ -417,6 +468,10 @@ async function buildClassContent(p: ClassContentBuildParams): Promise<Prisma.Inp
     grammarKeys: due.grammar.map((g) => g.topicKey),
     dueCount: due.vocab.length + due.grammar.length,
     intro: intro as unknown as Prisma.InputJsonObject,
+    ...(!p.preserveTeaching || p.existingSeed?.classTargets
+      ? { classTargets: targets as unknown as Prisma.InputJsonObject }
+      : {}),
+    ...(teaching ? { teaching: teaching as unknown as Prisma.InputJsonObject } : {}),
   };
 }
 
@@ -705,6 +760,7 @@ export async function regenerateCurrentClass(
     const adaptiveSeed = await buildClassContent({
       requirements,
       skills,
+      preserveTeaching: repair,
       retry: lifecycle?.retry,
       deferAudio: lifecycle?.deferAudio,
       existingSeed:
@@ -859,7 +915,21 @@ export async function getClassForUser(classId: string, userId: string) {
     cls.learnerAnswers = Object.fromEntries(
       Object.entries(cls.learnerAnswers).filter(([id]) => questionIds.has(id))
     );
-  return cls;
+  const teaching = teachingFromSeed(cls.adaptiveSeed);
+  const targets = classTargetsFromSeed(cls.adaptiveSeed);
+  return {
+    ...cls,
+    ...(targets
+      ? {
+          lesson: {
+            ...cls.lesson,
+            targetVocab: targets.vocab,
+            grammarPoints: targets.grammarPoints,
+          },
+        }
+      : {}),
+    ...(teaching ? { teaching } : {}),
+  };
 }
 
 export { submitClass, ClassIncompleteError } from './learning/classes/class-submission';

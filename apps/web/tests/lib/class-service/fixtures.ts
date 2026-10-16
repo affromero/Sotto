@@ -2,8 +2,15 @@ import { learningScriptHash } from '@/lib/learning/script-hash';
 import { createHash } from 'node:crypto';
 import { createSkillRequirements, learningSkills } from '@sotto/shared';
 import { expect, vi } from 'vitest';
+import { sampleTeaching } from '../../helpers/learning/class-teaching';
+import {
+  emptyTeachingCriticFixture,
+  shapeTeachingProviderFixture,
+} from '../classes/quality/intro-provider-fixture';
 
 const mockReadingProviderInput = vi.hoisted(() => vi.fn());
+const mockTeachingProviderInput = vi.hoisted(() => vi.fn());
+export { mockTeachingProviderInput };
 
 export { mockReadingProviderInput };
 vi.mock('@/lib/learning-ai', () => ({
@@ -17,7 +24,39 @@ vi.mock('@/lib/providers/ai', () => ({
       messages: { content: string }[],
       options: { jsonSchema?: { name: string } }
     ) => {
+      if (options.jsonSchema?.name?.startsWith('class_teaching_'))
+        mockTeachingProviderInput(system, messages, options);
+      if (options.jsonSchema?.name === 'class_teaching_generation')
+        return { content: JSON.stringify(sampleTeaching), model: 'fixture' };
+      if (options.jsonSchema?.name === 'class_teaching_critic')
+        return emptyTeachingCriticFixture(messages, options);
+      if (options.jsonSchema?.name === 'class_teaching_adjudicator')
+        return shapeTeachingProviderFixture(system, messages, options, {
+          content: JSON.stringify({
+            items: [{ index: 0, acceptable: true, issues: [], feedback: [] }],
+          }),
+          model: 'fixture',
+        });
       const input = JSON.parse(messages[0]!.content);
+      if (options.jsonSchema?.name === 'source_vocabulary_extraction') {
+        const index = input.passageWords.findIndex(
+          (word: { surface: string }) => word.surface === 'Hola'
+        );
+        return {
+          content: JSON.stringify({
+            words: [
+              {
+                lemma: 'hola',
+                gloss: 'hello',
+                pos: 'expression',
+                sourceSpan: { startWordIndex: index, endWordIndex: index },
+                questionIndices: [],
+              },
+            ],
+          }),
+          model: 'fixture',
+        };
+      }
       if (input.passageText) {
         expect(system).toContain('JSON object containing only a words array');
         expect(options.jsonSchema?.name).toBe('reading_vocabulary_extraction');
@@ -55,6 +94,7 @@ vi.mock('@/lib/sidedoor/storage/core/storage-inputs', async (importOriginal) => 
   resolveStorageInput: async () => ({
     input: { consumer: 'fixture', reference: '/reference.mp3' },
   }),
+  validateStorageInputs: async () => [],
 }));
 vi.mock('@/lib/usage-logger', () => ({ logUsage: vi.fn() }));
 
@@ -84,10 +124,39 @@ const mockClassSubmissionDeleteMany = vi.fn();
 const mockCourseUpdate = vi.fn();
 const mockCourseUpdateMany = vi.fn().mockResolvedValue({ count: 1 });
 const mockTransaction = vi.fn();
+export const mockDueVocabRows = vi.fn().mockResolvedValue([]);
+export const mockCourseMaterialRows = vi.fn().mockResolvedValue([]);
+export const mockLearnerVocabFindMany = vi
+  .fn()
+  .mockResolvedValue([{ lemma: 'hola', mastery: 0, reps: 0, lastReviewed: null }]);
 
 vi.mock('@/lib/prisma', () => {
   const database = {
-    $queryRaw: async () => [],
+    $queryRaw: async (query: TemplateStringsArray, ...values: unknown[]) => {
+      const materials = (await mockCourseMaterialRows()) as Array<{
+        id: string;
+        name: string;
+        originalUrl: string;
+        extractedText: string;
+      }>;
+      if (query.join('').includes('char_length'))
+        return materials.map(({ extractedText, ...material }) => ({
+          ...material,
+          length: [...extractedText].length,
+        }));
+      if (!query.join('').includes('substring')) return [];
+      const [start, count, id] = values;
+      const material = materials.find((row) => row.id === id);
+      if (!material || typeof start !== 'number' || typeof count !== 'number')
+        throw new Error('Invalid source range fixture');
+      return [{ text: [...material.extractedText].slice(start - 1, start - 1 + count).join('') }];
+    },
+    courseMaterial: {
+      findMany: (...args: unknown[]) => mockCourseMaterialRows(...args),
+      findFirst: async ({ where }: { where: { id: string } }) =>
+        (await mockCourseMaterialRows()).find((row: { id: string }) => row.id === where.id),
+    },
+    courseNote: { findUnique: async () => null },
     course: {
       findFirst: (...args: unknown[]) => mockCourseFindFirst(...args),
       update: (...args: unknown[]) => mockCourseUpdate(...args),
@@ -179,6 +248,7 @@ vi.mock('@/lib/prisma', () => {
                       audioUrl: null,
                       deletedAt: null,
                       script: { turns: [{ speaker: 'Ana', text: 'Hola.' }] },
+                      vocabularyEntries: [],
                     }
                   : null,
             })),
@@ -211,7 +281,14 @@ vi.mock('@/lib/prisma', () => {
       create: (...args: unknown[]) => mockLessonQuestionCreate(...args),
       deleteMany: (...args: unknown[]) => mockLessonQuestionDeleteMany(...args),
     },
-    learnerVocab: { findMany: async () => [{ lemma: 'hola' }] },
+    learnerVocab: {
+      findMany: (...args: unknown[]) => {
+        const query = args[0] as { select?: { dueAt?: boolean } };
+        return query.select?.dueAt ? mockDueVocabRows(...args) : mockLearnerVocabFindMany(...args);
+      },
+    },
+    learnerGrammar: { findMany: async () => [] },
+    learnerFocusTarget: { findMany: async () => [] },
     speakingRecording: {
       deleteMany: (...args: unknown[]) => mockSpeakingRecordingDeleteMany(...args),
     },
@@ -252,9 +329,9 @@ vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
-vi.mock('@/lib/knowledge-graph', () => ({
+vi.mock('@/lib/knowledge-graph', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/knowledge-graph')>()),
   seedLessonItems: vi.fn(),
-  getDueItems: vi.fn().mockResolvedValue({ vocab: [], grammar: [] }),
   applyReviewOutcome: vi.fn(),
 }));
 
@@ -270,7 +347,8 @@ vi.mock('@/lib/class-writing-generator', () => ({
   generateClassWriting: (...args: unknown[]) => mockGenerateClassWriting(...args),
 }));
 
-vi.mock('@/lib/course-notes', () => ({
+vi.mock('@/lib/course-notes', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/course-notes')>()),
   getCourseNote: vi.fn().mockResolvedValue(''),
 }));
 

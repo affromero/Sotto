@@ -3,7 +3,7 @@ import type { Prisma } from '@/generated/prisma/client';
 import type { ClassPreparation } from '../preparation-state';
 import type { PracticePreparation } from '@/lib/practice/preparation-state';
 import { sottoJobOutbox, sottoJobSnapshot } from '@/lib/sidedoor/jobs/core/job-delivery';
-import { generationFailureSchema } from './generation-failure';
+import { durableGenerationFailure, generationFailureSchema } from './generation-failure';
 import { StorageWriteJournal } from 'thesidedoor-core/storage';
 import { SIDEDOOR_STATE_ID } from '@/lib/sidedoor/access/state/store';
 
@@ -112,7 +112,7 @@ export async function writeLearningFailure(
   const parent = await binding(database, operation);
   if (parent.fingerprint !== fingerprint || !['FAILED', 'UNRESOLVED'].includes(operation.status))
     throw new Error('Generation failure cannot replace completed or changed work.');
-  const diagnostic = learningFailureSchema.parse(failure);
+  const diagnostic = durableGenerationFailure(failure);
   const existing = await readLearningFailure(database, operation);
   if (existing) {
     if (JSON.stringify(existing) !== JSON.stringify(diagnostic))

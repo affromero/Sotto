@@ -17,6 +17,7 @@ import {
   type ReadingVocabularyProtocolCode,
   type ReadingAttributionViolation,
   buildReadingVocabularyWordTable,
+  hasSourceVocabularyQuote,
   type ReadingPassageWord,
 } from './reading/vocabulary-protocol';
 
@@ -80,6 +81,78 @@ function parseExtraction(
       passageWords[sourceSpan.endWordIndex]!.end
     ),
   }));
+}
+
+export type SourceVocabularyWord = ReturnType<typeof parseExtraction>[number];
+
+/** Source-backed background words use the reading protocol without assessment links. */
+export async function extractSourceVocabulary(options: {
+  userId: string;
+  execution: SottoProviderExecution;
+  nativeLang: string;
+  targetLang: string;
+  level: string;
+  text: string;
+  sourceFragments: readonly string[];
+  preferredLemmas?: readonly string[];
+}) {
+  const passageWords = buildReadingVocabularyWordTable(options.text, options.targetLang);
+  const words = parseExtraction(
+    await requestVocabularyExtraction({
+      ...options,
+      label: 'COURSE_NOTES',
+      usageCategory: 'course-source-vocabulary',
+      sourceVocabulary: true,
+    }),
+    options.text,
+    [],
+    passageWords
+  );
+  if (
+    words.some(
+      (word) =>
+        !options.sourceFragments.some((source) =>
+          hasSourceVocabularyQuote(source, word.sourceForm, options.targetLang)
+        )
+    )
+  )
+    rejectProtocol('source_attribution', options.text, []);
+  await reviewSourceVocabulary(options, words);
+  return words;
+}
+
+/** Reused source candidates retain the same independent lexical evidence gate. */
+export async function reviewSourceVocabulary(
+  options: {
+    userId: string;
+    execution: SottoProviderExecution;
+    nativeLang: string;
+    targetLang: string;
+    level: string;
+    text: string;
+  },
+  words: readonly {
+    lemma: string;
+    gloss: string;
+    pos: string;
+    sourceForm: string;
+    questionIndices: number[];
+  }[]
+) {
+  const ai = await resolveCapturedLearningAi(options.userId, options.execution);
+  const provider = createAIProvider(ai.provider);
+  for (let offset = 0; offset < words.length; offset += 5)
+    await reviewReadingVocabularyContent({
+      ...options,
+      ai,
+      provider,
+      sourceVocabulary: true,
+      items: words.slice(offset, offset + 5).map((word) => ({
+        ...word,
+        passageText: options.text,
+        assessedQuestions: [],
+      })),
+    });
 }
 
 export async function extractReadingVocabulary(options: {

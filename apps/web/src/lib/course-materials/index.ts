@@ -94,7 +94,7 @@ export async function importCourseMaterials(
 ) {
   const { uploads, failed } = await extractUploadTexts(files);
   const materials: ReturnType<typeof materialResponse>[] = [];
-  for (const { file, text } of uploads) {
+  for (const { file, sourceText } of uploads) {
     const id = randomUUID();
     const createdAt = new Date();
     const name = file.name.replace(/[\u0000-\u001f\/\\]/g, '_').slice(0, 240) || 'course-material';
@@ -129,7 +129,7 @@ export async function importCourseMaterials(
             name,
             mimeType,
             byteSize: file.size,
-            extractedText: text,
+            extractedText: sourceText,
             createdAt,
           },
         });
@@ -176,7 +176,14 @@ export async function importCourseMaterials(
       },
     });
     materials.push(
-      materialResponse({ id, name, mimeType, byteSize: file.size, extractedText: text, createdAt })
+      materialResponse({
+        id,
+        name,
+        mimeType,
+        byteSize: file.size,
+        extractedText: sourceText,
+        createdAt,
+      })
     );
   }
   return { materials, failed };

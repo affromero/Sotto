@@ -24,6 +24,12 @@ All React components, organized by feature domain. CSS Modules only — NO Tailw
 
 ### Learn Component Notes
 
+- `LessonAudioPlayer` uses the owned episode detail endpoint for native seeking,
+  existing turn replay and ordered speaker playback. Switching audio or leaving
+  the section pauses playback; replay never generates speech or changes answers.
+- `ClassTeachingNotes` shows the class's accepted teaching before activities and
+  keeps it open above every skill. Historical classes retain their saved intro;
+  guided answers stay behind an explicit disclosure and never affect quiz gates.
 - `PracticeRunner` groups full practice into native collapsible skill sections,
   keeps answer/draft state mounted, and shows one MC question at a time. Listening
   readiness appears in its summary; pending, failed, and playback-error states

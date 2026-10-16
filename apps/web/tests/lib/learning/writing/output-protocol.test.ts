@@ -131,7 +131,7 @@ describe('fixed writing starters', () => {
     }
   );
 
-  it.each(['transformation', 'correction', 'guided_reply'])(
+  it.each(['transformation', 'correction', 'guided_reply', 'translation'])(
     'requires an explicit null starter for %s',
     (taskType) => {
       expect(parseWritingStarter(null, taskType, 'Paul hat gekocht.')).toBeNull();
@@ -192,7 +192,7 @@ describe('writing authoring proof', () => {
     });
   });
 
-  it.each(['transformation', 'completion', 'guided_reply'])(
+  it.each(['transformation', 'completion', 'guided_reply', 'translation'])(
     'requires a full answer and no correction claim for %s',
     (taskType) => {
       expect(
