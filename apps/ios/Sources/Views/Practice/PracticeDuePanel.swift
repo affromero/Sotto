@@ -1,8 +1,6 @@
 import SwiftUI
 
-/// What is waiting on this course: how much is due for review, and the
-/// sessions that were started and never finished. The web practice panel has
-/// shown this all along; the iPad had no way to see it.
+/// Due reviews, resumable sessions, and the outcome of recent generation attempts.
 struct PracticeDuePanel: View {
     @EnvironmentObject private var model: SottoAppModel
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -14,13 +12,15 @@ struct PracticeDuePanel: View {
     @State private var pendingDeletion: SottoPracticeSessionSummary?
 
     var body: some View {
-        if overview.totalDue == 0 && overview.unfinished.isEmpty {
+        if overview.totalDue == 0 && overview.unfinished.isEmpty && overview.preparing.isEmpty && overview.unsuccessful.isEmpty {
             EmptyView()
         } else {
             VStack(alignment: .leading, spacing: 12) {
-                Label("Waiting for you", systemImage: "tray.full")
-                    .font(.headline)
-                    .foregroundStyle(SottoTheme.ink)
+                if overview.totalDue > 0 || !overview.unfinished.isEmpty {
+                    Label("Waiting for you", systemImage: "tray.full")
+                        .font(.headline)
+                        .foregroundStyle(SottoTheme.ink)
+                }
 
                 if overview.totalDue > 0 {
                     Text(dueSummary)
@@ -30,33 +30,16 @@ struct PracticeDuePanel: View {
                 }
 
                 ForEach(overview.unfinished) { session in
-                    SottoAdaptiveStack(verticalAlignment: .center, spacing: 12) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(kindLabel(session.kind))
-                                .font(.callout.bold())
-                                .foregroundStyle(SottoTheme.ink)
-                            Text(startedLabel(session))
-                                .font(.caption)
-                                .foregroundStyle(SottoTheme.muted)
-                        }
+                    sessionRow(session)
+                }
 
-                        if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 8) }
-
-                        Button("Resume") {
-                            onResume(session.id)
-                        }
-                        .buttonStyle(SottoSecondaryButtonStyle())
-
-                        Button(role: .destructive) {
-                            pendingDeletion = session
-                        } label: {
-                            Image(systemName: "trash")
-                                .frame(minWidth: 44, minHeight: 44)
-                        }
-                        .buttonStyle(.borderless)
-                        .accessibilityLabel("Delete this \(kindLabel(session.kind)) session")
+                if !overview.preparing.isEmpty || !overview.unsuccessful.isEmpty {
+                    Label("Recent attempts", systemImage: "clock.arrow.circlepath")
+                        .font(.headline)
+                        .foregroundStyle(SottoTheme.ink)
+                    ForEach(overview.recent.filter { ["GENERATING", "FAILED", "CANCELLED"].contains($0.status) }) { session in
+                        sessionRow(session)
                     }
-                    .environment(\.sottoLayout, .regular)
                 }
             }
             .padding(18)
@@ -91,6 +74,37 @@ struct PracticeDuePanel: View {
         }
     }
 
+    private func sessionRow(_ session: SottoPracticeSessionSummary) -> some View {
+        SottoAdaptiveStack(verticalAlignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(kindLabel(session.kind))
+                    .font(.callout.bold())
+                    .foregroundStyle(SottoTheme.ink)
+                Text(session.statusLabel)
+                    .font(.callout)
+                    .foregroundStyle(session.status == "FAILED" ? SottoTheme.rose : SottoTheme.muted)
+                Text(startedLabel(session))
+                    .font(.caption)
+                    .foregroundStyle(SottoTheme.muted)
+            }
+
+            if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 8) }
+
+            Button(session.actionLabel) { onResume(session.id) }
+                .buttonStyle(SottoSecondaryButtonStyle())
+
+            Button(role: .destructive) {
+                pendingDeletion = session
+            } label: {
+                Image(systemName: "trash")
+                    .frame(minWidth: 44, minHeight: 44)
+            }
+            .buttonStyle(.borderless)
+            .accessibilityLabel("Delete this \(kindLabel(session.kind)) session")
+        }
+        .environment(\.sottoLayout, .regular)
+    }
+
     private var dueSummary: String {
         var parts: [String] = []
         if overview.due.vocab > 0 {
@@ -111,10 +125,10 @@ struct PracticeDuePanel: View {
             let startedAt = session.startedAt,
             let date = ISO8601DateFormatter.sottoInternet.date(from: startedAt)
         else {
-            return "Started earlier, not finished"
+            return "Started earlier"
         }
 
-        return "Started \(date.formatted(.relative(presentation: .named))), not finished"
+        return "Started \(date.formatted(.relative(presentation: .named)))"
     }
 }
 

@@ -73,6 +73,35 @@ final class PracticeSessionContentTests: XCTestCase {
         XCTAssertEqual(prepared.sessionId, "admission")
         XCTAssertEqual(prepared.preparationStatus, "UNRESOLVED")
         XCTAssertEqual(prepared.canRecover, true)
+        XCTAssertFalse(prepared.isPreparing)
+        XCTAssertEqual(prepared.title, "Practice")
+        XCTAssertTrue(prepared.preparationTitle.contains("interrupted"))
+    }
+
+    func testPreparationKeepsTheChosenKindAndOnlyAnimatesActiveWork() throws {
+        for state in ["QUEUED", "RUNNING", "CANCELLING", "FAILED", "CANCELLED", "UNRESOLVED"] {
+            let prepared = try start("""
+                {"status":"preparing","sessionId":"attempt","preparationStatus":"\(state)","message":"Server explanation"}
+                """).preservingContext(kind: "VOCAB", sessionId: "attempt")
+            XCTAssertEqual(prepared.title, "Vocabulary practice")
+            XCTAssertEqual(prepared.isPreparing, ["QUEUED", "RUNNING", "CANCELLING"].contains(state))
+            XCTAssertEqual(prepared.preparationDetail, "Server explanation")
+        }
+        let failed = try start(#"{"status":"preparing","sessionId":"attempt","preparationStatus":"FAILED"}"#)
+        XCTAssertTrue(failed.preparationTitle.contains("failed"))
+        XCTAssertTrue(failed.preparationDetail.contains("could not finish"))
+        let cancelled = try start(#"{"status":"preparing","sessionId":"attempt","preparationStatus":"CANCELLED"}"#)
+        XCTAssertTrue(cancelled.preparationTitle.contains("cancelled"))
+        let full = try start(#"{"status":"ready_full","sessionId":"attempt","kind":"FULL"}"#)
+            .preservingContext(kind: "VOCAB", sessionId: "attempt")
+        XCTAssertEqual(full.title, "Full catch-up")
+    }
+
+    func testUnavailableResultKeepsItsAdmittedSessionForTheOpenSheet() throws {
+        let unavailable = try start(#"{"status":"unavailable","reason":"nothing_due"}"#)
+            .preservingContext(kind: "VOCAB", sessionId: "admitted-attempt")
+        XCTAssertEqual(unavailable.sessionId, "admitted-attempt")
+        XCTAssertEqual(unavailable.title, "Vocabulary practice")
     }
 
     func testReopenedPracticePreservesAnswersDraftsAndCompleteReceipt() throws {
