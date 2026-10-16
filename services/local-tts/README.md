@@ -165,3 +165,10 @@ Replace `FULL_SOURCE_SHA` with the image's full source commit. The script checks
 the source label, writes samples through a private host directory, decodes them
 with FFmpeg, prints the measurements, and removes its temporary container and
 samples. Files in a container's `/tmp` tmpfs cannot be recovered after it exits.
+
+The paired STT qualification invokes `smoke.py --qualification-seed 0` to set
+ONNX Runtime's seed before the server imports the application and loads models.
+Its receipts record the seed, engine versions, voice manifest and request order.
+Normal server startup and unseeded synthesis smoke keep their existing behavior.
+The fixed stimulus permits repeatable complete reference sentence checks; it
+does not establish pronunciation quality or general recognition accuracy.
