@@ -287,6 +287,89 @@ class CompatibilityReviewTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'inventory changed'):
             self.validate()
 
+    def continuity_review(self):
+        return {**self.review, 'schemaVersion': 2, 'providerActivation': {
+            'mode': 'preserve-existing', 'previousReleaseSha': 'd' * 40,
+            'previousAssetsHash': '1' * 64, 'candidateAssetsHash': '2' * 64,
+            'previousRuntimes': {service: {'containerId': str(index + 1) * 64,
+                                         'imageId': self.image}
+                for index, service in enumerate([
+                    'web', 'workers-heavy', 'workers-pipeline', 'workers-light'])},
+            'reviewedRuntimeFiles': {'apps/web/src/lib/providers/fish.ts': {
+                'previousSha256': 'a' * 64, 'candidateSha256': 'b' * 64}},
+        }}
+
+    def test_enabled_provider_review_requires_exact_runtime_and_blob_identities(self):
+        review = self.continuity_review()
+        self.validate(review)
+        provider = review['providerActivation']
+        for key, value in {
+            'mode': 'skip-provider-gate', 'previousReleaseSha': 'main',
+            'previousAssetsHash': 'unchanged', 'candidateAssetsHash': True,
+            'previousRuntimes': {'web': {'containerId': 'short', 'imageId': self.image}},
+            'reviewedRuntimeFiles': {'packages/shared/src/*': {
+                'previousSha256': None, 'candidateSha256': 'a' * 64}},
+        }.items():
+            with self.subTest(field=key), self.assertRaises(ValueError):
+                self.validate({**review, 'providerActivation': {**provider, key: value}})
+        for path, pair in {
+            '../outside.ts': {'previousSha256': None, 'candidateSha256': 'a' * 64},
+            'packages/shared/src/unchanged.ts': {
+                'previousSha256': 'a' * 64, 'candidateSha256': 'a' * 64},
+        }.items():
+            with self.subTest(path=path), self.assertRaises(ValueError):
+                self.validate({**review, 'providerActivation': {
+                    **provider, 'reviewedRuntimeFiles': {path: pair}}})
+
+    def test_continuity_cannot_be_attached_to_a_first_activation_review(self):
+        review = self.continuity_review()
+        with self.assertRaises(ValueError):
+            self.validate({**review, 'schemaVersion': 1})
+
+    def test_provider_authority_requires_unique_readonly_release_bound_activation(self):
+        directory = (self.root / 'existing-activation').resolve()
+        directory.mkdir()
+        path = directory / 'fish.json'
+        enabled = {'releaseSha': 'd' * 40, 'fishEnabled': True}
+        path.write_text(json.dumps(enabled))
+        identifier = '1' * 64
+        row = {'Id': identifier, 'Image': self.image, 'RestartCount': 3,
+               'State': {'Running': True, 'OOMKilled': False},
+               'Config': {'Labels': {
+                   'org.opencontainers.image.revision': 'd' * 40,
+                   'com.docker.compose.project': 'fixture-blue',
+                   'com.docker.compose.service': 'web'}, 'Env': [
+                       'SOTTO_RELEASE_SHA=' + 'd' * 40,
+                       'SOTTO_PROVIDER_ACTIVATION_FILE=/run/sotto-provider-activation/fish.json']},
+               'Mounts': [{'Type': 'bind', 'Source': str(directory),
+                           'Destination': '/run/sotto-provider-activation', 'RW': False}]}
+        def inspect(value):
+            response = subprocess.CompletedProcess([], 0, json.dumps([value]).encode())
+            with patch.object(REVIEW.subprocess, 'run', return_value=response):
+                REVIEW.inspect_enabled_runtime(identifier, self.image, 'd' * 40,
+                                               'fixture-blue', 'web')
+        inspect(row)
+        for invalid in [
+            {**row, 'Image': 'sha256:' + 'f' * 64},
+            {**row, 'Mounts': [{**row['Mounts'][0], 'RW': True}]},
+            {**row, 'Config': {**row['Config'], 'Env': [
+                *row['Config']['Env'], 'SOTTO_RELEASE_SHA=' + 'd' * 40]}},
+        ]:
+            with self.subTest(runtime=invalid), self.assertRaises(ValueError):
+                inspect(invalid)
+        for record in [{**enabled, 'fishEnabled': False},
+                       {**enabled, 'fishEnabled': 'true'},
+                       {**enabled, 'releaseSha': 'e' * 40}]:
+            path.write_text(json.dumps(record))
+            with self.subTest(activation=record), self.assertRaises(ValueError):
+                inspect(row)
+        path.unlink()
+        retained = directory / 'retained.json'
+        retained.write_text(json.dumps(enabled))
+        path.symlink_to(retained)
+        with self.assertRaises(OSError):
+            inspect(row)
+
     def test_duplicate_json_fields_and_public_or_symlinked_files_fail(self):
         with self.assertRaisesRegex(ValueError, 'Duplicate'):
             REVIEW.mapping(b'{"schemaVersion":1,"schemaVersion":1}')
@@ -426,6 +509,31 @@ class RollingContractTests(unittest.TestCase):
         before = self.digest()
         self.assertFalse((self.root / 'node_modules/thesidedoor-flock/dist').exists())
         self.assertEqual(self.digest(), before)
+
+    def test_provider_inventory_names_every_changed_and_retained_runtime_file(self):
+        self.write('apps/web/src/lib/providers/fish.ts', 'original provider\n')
+        self.write('apps/web/prisma/schema.prisma', 'original schema\n')
+        source = (ROOT / 'scripts/deploy/runtime/provider-assets.cjs').read_text()
+        source = source.replace("'/app'", json.dumps(str(self.root)))
+        first = subprocess.run(['node', '-e', source], capture_output=True, text=True)
+        self.assertEqual(first.returncode, 0, first.stderr)
+        before = json.loads(first.stdout)
+        self.assertEqual(before['files']['apps/web/src/lib/providers/fish.ts'],
+                         hashlib.sha256(b'original provider\n').hexdigest())
+        self.assertIn('node_modules/thesidedoor-flock/index.cjs', before['files'])
+        self.write('apps/web/src/lib/providers/fish.ts', 'changed provider\n')
+        second = subprocess.run(['node', '-e', source], capture_output=True, text=True)
+        self.assertEqual(second.returncode, 0, second.stderr)
+        after = json.loads(second.stdout)
+        self.assertNotEqual(before['protectedHash'], after['protectedHash'])
+        self.assertEqual({name for name in before['files']
+                          if before['files'][name] != after['files'][name]},
+                         {'apps/web/src/lib/providers/fish.ts'})
+        target = self.root / 'apps/web/src/lib/providers/fish.ts'
+        target.unlink()
+        target.symlink_to(self.root / 'apps/web/src/lib/queue.ts')
+        self.assertNotEqual(subprocess.run(
+            ['node', '-e', source], capture_output=True).returncode, 0)
 
     def test_changed_payload_or_added_authority_changes_the_contract(self):
         before = self.digest()

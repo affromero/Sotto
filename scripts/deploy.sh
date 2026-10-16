@@ -404,6 +404,7 @@ done < <(python3 -c 'import json,sys; print("\n".join(sorted({item["image"] for 
 
 # Schema identity alone does not establish mixed-version job compatibility.
 COMPATIBILITY_REVIEWED=false
+PRESERVE_EXISTING_PROVIDER=false
 if [ "$OLD_SLOT" != none ]; then
   rolling_contract_source=$(<scripts/deploy/checks/rolling-contract.cjs)
   candidate_contract=$(docker run --rm --pull never --network none --entrypoint node "$SOTTO_WORKERS_IMAGE_REF" -e "$rolling_contract_source")
@@ -422,6 +423,7 @@ if [ "$OLD_SLOT" != none ]; then
       exit 1
     fi
     python3 scripts/deploy/compatibility-review.py validate "$SOTTO_COMPATIBILITY_REVIEW_FILE" "$SOTTO_COMPATIBILITY_EVIDENCE_FILE" "$candidate_contract" "$previous_contracts" > "$IMAGE_OVERRIDES/compatibility-review.json"
+    chmod 600 "$IMAGE_OVERRIDES/compatibility-review.json"
     COMPATIBILITY_REVIEWED=true
   fi
 fi
@@ -442,7 +444,15 @@ os.fsync(directory)
 os.close(directory)
 REVIEW_RECORD
   SOTTO_PROVIDER_ACTIVATION_DIR="$DEPLOY_STATE_DIR/provider-activation"
+  provider_activation_mode=$(python3 scripts/deploy/compatibility-review.py activation-mode "$IMAGE_OVERRIDES/compatibility-review.json")
+  if [ "$provider_activation_mode" = preserve-existing ]; then
+    python3 scripts/deploy/compatibility-review.py continuity-existing "$IMAGE_OVERRIDES/compatibility-review.json" "$OLD_SLOT"
+    PRESERVE_EXISTING_PROVIDER=true
+  fi
   python3 scripts/deploy/compatibility-review.py prepare-activation "$SOTTO_PROVIDER_ACTIVATION_DIR"
+  if [ "$PRESERVE_EXISTING_PROVIDER" = true ]; then
+    python3 scripts/deploy/compatibility-review.py activate "$SOTTO_PROVIDER_ACTIVATION_DIR" "$SOTTO_RELEASE_SHA"
+  fi
 fi
 QUEUE_MANIFEST="$DEPLOY_STATE_DIR/queues-original.json"
 QUEUE_HELPER=$(<scripts/deploy/queue-lifecycle.cjs)
@@ -513,7 +523,9 @@ hold_unresolved() {
 if [ "$OLD_SLOT" != none ]; then
   echo "=== Verifying established access and database state without conversion ==="
   queue_control established
-  if [ "$COMPATIBILITY_REVIEWED" = true ]; then
+  if [ "$PRESERVE_EXISTING_PROVIDER" = true ]; then
+    python3 scripts/deploy/compatibility-review.py continuity-existing "$IMAGE_OVERRIDES/compatibility-review.json" "$OLD_SLOT"
+  elif [ "$COMPATIBILITY_REVIEWED" = true ]; then
     activation_report=$(queue_control activation-ready)
     printf '%s\n' "$activation_report"
     printf '%s\n' "$activation_report" | python3 -c 'import json,sys; assert json.load(sys.stdin)["activationReady"] is True, "Existing Fish state requires separate review"'
@@ -797,6 +809,9 @@ if [ "$OLD_SLOT" != none ]; then
   docker run --rm --pull never --network none --entrypoint node "$SOTTO_WORKERS_IMAGE_REF" -e "$memory_probe" | python3 scripts/deploy/stop-workers.py overlap 1073741824
 fi
 WEB_STARTED=true
+if [ "$PRESERVE_EXISTING_PROVIDER" = true ]; then
+  python3 scripts/deploy/compatibility-review.py enabled-activation "$SOTTO_PROVIDER_ACTIVATION_DIR" "$SOTTO_RELEASE_SHA"
+fi
 docker compose -f "$COMPOSE_APP" -f "$APP_IMAGES" -p "${SOTTO_STACK}-${NEW_SLOT}" up -d --no-build --pull never web
 
 # --- Health check new slot ---
@@ -875,6 +890,9 @@ for service in workers-heavy workers-pipeline workers-light; do
   fi
 done
 
+if [ "$PRESERVE_EXISTING_PROVIDER" = true ]; then
+  python3 scripts/deploy/compatibility-review.py continuity-overlap "$IMAGE_OVERRIDES/compatibility-review.json" "$SOTTO_PROVIDER_ACTIVATION_DIR" "$OLD_SLOT" "$NEW_SLOT"
+fi
 if [ "$COMPATIBILITY_REVIEWED" = true ]; then
   record_unresolved compatibility-cutover
   COMPATIBILITY_CUTOVER=true
@@ -945,7 +963,11 @@ python3 scripts/deploy/production-retention.py backups-success
 if [ -n "${SOTTO_WORKERS_ROLLBACK_TAG:-}" ]; then docker tag "$previous_worker_id" "$SOTTO_WORKERS_ROLLBACK_TAG"; fi
 if [ -n "${SOTTO_WEB_ROLLBACK_TAG:-}" ]; then docker tag "$previous_web_id" "$SOTTO_WEB_ROLLBACK_TAG"; fi
 if [ "$COMPATIBILITY_CUTOVER" = true ]; then
-  python3 scripts/deploy/compatibility-review.py activate "$SOTTO_PROVIDER_ACTIVATION_DIR" "$SOTTO_RELEASE_SHA"
+  if [ "$PRESERVE_EXISTING_PROVIDER" = true ]; then
+    python3 scripts/deploy/compatibility-review.py continuity-final "$IMAGE_OVERRIDES/compatibility-review.json" "$SOTTO_PROVIDER_ACTIVATION_DIR" "$NEW_SLOT"
+  else
+    python3 scripts/deploy/compatibility-review.py activate "$SOTTO_PROVIDER_ACTIVATION_DIR" "$SOTTO_RELEASE_SHA"
+  fi
   python3 scripts/deploy/compatibility-review.py clear "$UNRESOLVED_DEPLOYMENT" "$DEPLOY_STATE_DIR" compatibility-cutover
 fi
 echo "Images and build cache retained. Run host maintenance separately with rollback protection."

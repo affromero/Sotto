@@ -136,6 +136,22 @@ old_workers = {service: str(index + 3) * 64 for index, service in enumerate(serv
 new_workers = {service: str(index + 6) * 64 for index, service in enumerate(services)}
 def image_for(identifier):
     return new if identifier == candidate_web or identifier in new_workers.values() else old
+def runtime_row(identifier):
+    candidate = image_for(identifier) == new
+    service = 'web' if identifier in (old_web, candidate_web) else next(
+        key for key in services if identifier in (old_workers[key], new_workers[key]))
+    project = os.environ['SOTTO_STACK'] + ('-' + (state['new_slot'] if candidate else state['old_slot']) if service == 'web' else '')
+    source = state.get('candidate_activation', state.get('old_activation', '')) if candidate else state.get('old_activation', '')
+    return {'Id': identifier, 'State': {'Running': state['running'].get(identifier, True),
+        'ExitCode': 143 if identifier in (old_web, candidate_web) and not state['running'].get(identifier, True) else 0,
+        'OOMKilled': False, 'Error': ''}, 'Image': image_for(identifier), 'RestartCount': 0,
+        'Config': {'Labels': {'org.opencontainers.image.revision': sha if candidate else 'd' * 40,
+            'com.docker.compose.project': project, 'com.docker.compose.service': service},
+            'Env': ['SOTTO_RELEASE_SHA=' + (sha if candidate else 'd' * 40),
+                'SOTTO_PROVIDER_ACTIVATION_FILE=/run/sotto-provider-activation/fish.json']},
+        'Mounts': [{'Type': 'bind', 'Source': source, 'Destination': '/run/sotto-provider-activation',
+            'RW': (mode == 'compat-provider-old-mount' and not candidate)
+                or (mode == 'compat-provider-overlap' and candidate and state['worker_generation'] == 'new')}]}
 if name == 'sleep': finish()
 if name == 'flock':
     try: fcntl.flock(int(args[-1]), fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -205,10 +221,7 @@ if args[0] == 'ps':
     finish(old_web if project.endswith('-' + state['old_slot']) else (state['worker_ids']['workers-heavy'] if project in ('sotto-test', 'sotto') else ''))
 if args[0] == 'inspect':
     if '--format' not in args and '-f' not in args:
-        finish(json.dumps([{'Id': identifier, 'State': {'Running': state['running'].get(identifier, True),
-            'ExitCode': 143 if identifier in (old_web, candidate_web) and not state['running'].get(identifier, True) else 0,
-            'OOMKilled': False, 'Error': ''}, 'Image': image_for(identifier),
-            'RestartCount': 0} for identifier in args[1:]]))
+        finish(json.dumps([runtime_row(identifier) for identifier in args[1:]]))
     fmt = args[args.index('--format') + 1] if '--format' in args else args[args.index('-f') + 1]
     identifier = args[-1]
     if fmt == '{{json .Config}}':
@@ -229,6 +242,13 @@ if args[0] == 'inspect':
         finish('true false 0 ' + image)
     finish()
 if args[0] == 'run':
+    if 'const files = {};' in args[-1]:
+        candidate = old not in args
+        files = {'apps/web/src/lib/providers/fish.ts': ('b' if candidate else 'a') * 64,
+                 'apps/web/src/lib/sidedoor/authority.ts': 'f' * 64}
+        if mode == 'compat-provider-assets' and candidate:
+            files['apps/web/src/lib/sidedoor/unreviewed.ts'] = 'c' * 64
+        finish(json.dumps({'protectedHash': ('2' if candidate else '1') * 64, 'files': files}))
     if '/proc/meminfo' in args[-1]:
         available = 1024 if mode == 'overlap-memory' else 6291456
         finish('MemTotal: 8388608 kB\nMemAvailable: ' + str(available) + ' kB')
@@ -309,6 +329,11 @@ if 'exec' in args:
     finish()
 if 'up' in args:
     if project.endswith('-' + state['new_slot']):
+        mounts = config.get('services', {}).get('web', {}).get('volumes', [])
+        for mount in mounts:
+            if mount.get('target') == '/run/sotto-provider-activation':
+                state['candidate_activation'] = mount['source']
+                state['provider_enabled_at_web_start'] = json.loads((pathlib.Path(mount['source']) / 'fish.json').read_text())['fishEnabled']
         state['web'] = new
         state['running'][candidate_web] = True
         state['premature_route'] = state['active_route'] == 'candidate'
@@ -342,9 +367,9 @@ finish()
 class DeploymentFailureTests(unittest.TestCase):
     def run_deployment(self, failure, stack='sotto-test', reviewed_schema=False, success=False,
                        expect_rollback=True, prepaused=False, retained_candidate=False, rollback_blocked=False,
-                       old_slot='blue', reviewed_runtime=False, stale_review=False):
+                       old_slot='blue', reviewed_runtime=False, stale_review=False, provider_continuity=False):
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = Path(directory).resolve()
             source = Path(__file__).parents[2]
             shutil.copytree(source / 'scripts/deploy', root / 'scripts/deploy')
             for name in ('deploy.sh', 'smoke-prod.sh'):
@@ -364,6 +389,11 @@ class DeploymentFailureTests(unittest.TestCase):
                      'queue_flags': {'audio-generation': prepaused, 'speaking-grading': False},
                      'active': 1, 'journal_pending': failure == 'unknown-cleanup', 'unsafe_stops': [],
                      'unsafe_starts': [], 'stopped': [], 'worker_generation': 'old'}
+            if provider_continuity:
+                activation = root / 'previous-activation'
+                activation.mkdir()
+                (activation / 'fish.json').write_text(json.dumps({'releaseSha': 'd' * 40, 'fishEnabled': True}))
+                state['old_activation'] = str(activation.resolve())
             (root / 'state.json').write_text(json.dumps(state))
             bin_path = root / 'bin'
             bin_path.mkdir()
@@ -393,7 +423,7 @@ class DeploymentFailureTests(unittest.TestCase):
                 evidence_path.write_bytes(evidence)
                 evidence_path.chmod(0o600)
                 review_path = root / 'compatibility-review.json'
-                review_path.write_text(json.dumps({
+                review = {
                     'schemaVersion': 1,
                     'procedure': 'compatible-runtime-overlap',
                     'stack': stack,
@@ -405,7 +435,17 @@ class DeploymentFailureTests(unittest.TestCase):
                     'candidateContract': ('f' if stale_review else 'e') * 64,
                     'reviewer': 'Independent fixture reviewer',
                     'evidenceSha256': hashlib.sha256(evidence).hexdigest(),
-                }))
+                }
+                if provider_continuity:
+                    review.update(schemaVersion=2, providerActivation={
+                        'mode': 'preserve-existing', 'previousReleaseSha': 'd' * 40,
+                        'previousAssetsHash': '1' * 64, 'candidateAssetsHash': '2' * 64,
+                        'previousRuntimes': {service: {'containerId': identifier, 'imageId': OLD}
+                            for service, identifier in {'web': OLD_WEB, **OLD_WORKERS}.items()},
+                        'reviewedRuntimeFiles': {'apps/web/src/lib/providers/fish.ts': {
+                            'previousSha256': 'a' * 64, 'candidateSha256': 'b' * 64}},
+                    })
+                review_path.write_text(json.dumps(review))
                 review_path.chmod(0o600)
                 values['SOTTO_COMPATIBILITY_REVIEW_FILE'] = str(review_path)
                 values['SOTTO_COMPATIBILITY_EVIDENCE_FILE'] = str(evidence_path)
@@ -459,7 +499,10 @@ class DeploymentFailureTests(unittest.TestCase):
                     after['observed_queues'] = json.loads(observed.read_text())
             for gate in (root / '.local/state/sotto-deploy').glob('*/provider-activation/fish.json'):
                 after['gate_enabled_after_controller'] = json.loads(gate.read_text())['fishEnabled']
-                self.assertFalse(after['gate_enabled_after_controller'] and after['running'][OLD_WEB], result.stdout + result.stderr)
+                if not provider_continuity:
+                    self.assertFalse(after['gate_enabled_after_controller'] and after['running'][OLD_WEB], result.stdout + result.stderr)
+            if provider_continuity:
+                after['previous_activation'] = json.loads((root / 'previous-activation/fish.json').read_text())
             after['observations'] = observations
             after['phase_observations'] = phase_observations
             after['calls'] = [json.loads(line) for line in (root / 'calls.jsonl').read_text().splitlines()]
@@ -606,6 +649,35 @@ class DeploymentFailureTests(unittest.TestCase):
         self.assertFalse(state['stopped'], output)
         self.assertFalse(state['gate_enabled_after_controller'], output)
         self.assertFalse(any('up' in call and 'web' in call for call in state['calls']), output)
+
+    def test_reviewed_enabled_provider_remains_available_through_both_slots(self):
+        state, output = self.run_deployment(
+            'compat-provider-success', reviewed_runtime=True,
+            provider_continuity=True, success=True, expect_rollback=False)
+        self.assertTrue(state['provider_enabled_at_web_start'], output)
+        self.assertFalse(state['gate_disabled_before_cutover'], output)
+        self.assertTrue(state['gate_enabled_after_controller'], output)
+        self.assertEqual(state['previous_activation'], {
+            'releaseSha': 'd' * 40, 'fishEnabled': True}, output)
+        self.assertIsNone(state['unresolved_marker'], output)
+        self.assertTrue(all(not paused for paused in state['queue_flags'].values()), output)
+
+    def test_unreviewed_provider_assets_or_writable_old_mount_never_start_candidate(self):
+        for failure in ('compat-provider-assets', 'compat-provider-old-mount'):
+            with self.subTest(failure=failure):
+                state, output = self.run_deployment(
+                    failure, reviewed_runtime=True, provider_continuity=True)
+                self.assertFalse(state['stopped'], output)
+                self.assertFalse(any('up' in call and 'web' in call for call in state['calls']), output)
+                self.assertTrue(state['previous_activation']['fishEnabled'], output)
+
+    def test_changed_candidate_activation_before_cutover_restores_old_enabled_services(self):
+        state, output = self.run_deployment(
+            'compat-provider-overlap', reviewed_runtime=True, provider_continuity=True)
+        self.assertEqual(state['active_route'], 'old', output)
+        self.assertEqual(state['worker_generation'], 'old', output)
+        self.assertTrue(state['previous_activation']['fishEnabled'], output)
+        self.assertIsNone(state['unresolved_marker'], output)
 
     def test_reviewed_upgrade_can_restore_old_workers_before_cutover(self):
         state, output = self.run_deployment('compat-before', reviewed_runtime=True)

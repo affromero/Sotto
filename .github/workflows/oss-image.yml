@@ -126,6 +126,8 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Read locked Playwright version
+        run: echo "PLAYWRIGHT_VERSION=$(node scripts/deploy/images/playwright-version.cjs)" >> "$GITHUB_ENV"
       - name: Build workers-base candidate
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc
         with:
@@ -133,9 +135,10 @@ jobs:
           file: apps/web/Dockerfile.workers-base
           platforms: linux/${{ matrix.arch }}
           load: true
+          build-args: PLAYWRIGHT_VERSION=${{ env.PLAYWRIGHT_VERSION }}
           tags: ghcr.io/affromero/sotto-workers-base:${{ env.CANDIDATE_TAG }}
-          cache-from: type=gha,scope=sotto-workers-base-${{ matrix.arch }}
-          cache-to: type=gha,mode=max,scope=sotto-workers-base-${{ matrix.arch }}
+          cache-from: type=registry,ref=ghcr.io/affromero/sotto-workers-base:buildcache-oss-${{ matrix.arch }}
+          cache-to: type=registry,ref=ghcr.io/affromero/sotto-workers-base:buildcache-oss-${{ matrix.arch }},mode=max,ignore-error=true
       - name: Verify and publish workers-base candidate
         run: |
           set -euo pipefail
@@ -155,8 +158,8 @@ jobs:
             COMMIT_SHA=${{ env.RELEASE_SHA }}
             NEXT_PUBLIC_APP_URL=http://localhost:3000
           tags: ghcr.io/affromero/sotto-web:${{ env.CANDIDATE_TAG }}
-          cache-from: type=gha,scope=sotto-web-${{ matrix.arch }}
-          cache-to: type=gha,mode=max,scope=sotto-web-${{ matrix.arch }}
+          cache-from: type=registry,ref=ghcr.io/affromero/sotto-web:buildcache-${{ matrix.arch }}
+          cache-to: type=registry,ref=ghcr.io/affromero/sotto-web:buildcache-${{ matrix.arch }},mode=max,ignore-error=true
       - name: Verify and publish web candidate
         run: |
           set -euo pipefail
@@ -217,8 +220,8 @@ jobs:
             COMMIT_SHA=${{ env.RELEASE_SHA }}
             WORKER_BASE_IMAGE=${{ steps.worker_base.outputs.reference }}
           tags: ghcr.io/affromero/sotto-workers:${{ env.CANDIDATE_TAG }}
-          cache-from: type=gha,scope=sotto-workers-${{ matrix.arch }}
-          cache-to: type=gha,mode=max,scope=sotto-workers-${{ matrix.arch }}
+          cache-from: type=registry,ref=ghcr.io/affromero/sotto-workers:buildcache-${{ matrix.arch }}
+          cache-to: type=registry,ref=ghcr.io/affromero/sotto-workers:buildcache-${{ matrix.arch }},mode=max,ignore-error=true
       - name: Verify and publish workers candidate
         run: |
           set -euo pipefail

@@ -1,6 +1,6 @@
 # Self-Host Deployment Guide
 
-**Date:** 2026-10-11
+**Date:** 2026-10-16
 
 **Summary:** Install Sotto on your computer with Docker, or deploy it to a VPS with explicit settings and private storage.
 
@@ -209,6 +209,33 @@ Production deployment uses `SOTTO_IMAGE_SOURCE=registry` and rejects server buil
 
 Set `SOTTO_RELEASE_SHA` to the full committed checkout SHA and provide complete digest references in `SOTTO_WEB_IMAGE_REF` and `SOTTO_WORKERS_IMAGE_REF`. Both images must carry that revision in the `org.opencontainers.image.revision` label. Supply measured positive byte counts from the builder: `SOTTO_WEB_IMAGE_BYTES`, `SOTTO_WEB_TRANSFER_BYTES`, `SOTTO_WORKERS_IMAGE_BYTES`, and `SOTTO_WORKERS_TRANSFER_BYTES`. Expanded image sizes and compressed transfer sizes are separate inputs. The checkout and submodules must be clean and match the selected release; the script does not pull a moving branch.
 
+The production image workflow publishes `production-release.json` and
+`production-release-metadata.json` in the same release artifact. The first file
+retains the source SHA and three immutable image references. The second binds
+each image's actual ID, configuration digest, architecture, source revision and
+canonical storage measurements to the successful source-validation and image
+build runs. Worker metadata also includes the schema, rolling contract, queue
+names and complete provider asset inventory. Verify the artifact's run and
+source identities before using these records. Operators can use the published
+measurements and inventories without downloading the images locally.
+
+Failed-job retries reuse the exact artifacts from successful image jobs in the
+same run. Each receipt retains its actual attempt number. Full reruns preserve
+separate image receipts and replace the final release artifact with the latest
+verified aggregate.
+
+The builder runs `scripts/deploy/images/measure_image.py` against each verified
+image. Expanded bytes retain the larger of allocated layer storage and image
+history. Transfer bytes retain the larger of the saved archive and its gzip.
+Production uses a containerd image store so the recorded image ID matches the
+digest that the serving daemon will inspect. Configuration digests remain
+separate identities. Registry build caches have separate writers for each image
+and platform. A cache miss rebuilds the image through the same smoke checks.
+
+Source validation runs independent web, package, deployment-tooling and speech
+checks in parallel on the same source revision. The final source check requires
+every group to succeed. Local `npm run ci` still runs the complete check suite.
+
 Install your reviewed shared-host capacity checker before using this production script. `PRODUCTION_CAPACITY_CHECKER` defaults to `/usr/local/lib/production/production_capacity.py`. Its `before-import` command receives `--image-bytes` and `--transfer-bytes`; `before-switch` checks remaining capacity after imports. A missing checker or rejected allocation stops deployment. Use a policy that reserves at least 10 GiB, rejects disk or inode usage at 85%, and requires 100,000 free inodes. The script holds `/var/lock/production-build.lock` through health verification. Preinstall any required infrastructure/helper images through the same admission process; service commands cannot pull unbudgeted images.
 
 Provide `SOTTO_BACKUP_BYTES` as a measured allowance for the database archive. The checker reserves that allocation alongside absent images; exact digests already present need no import budget. `SOTTO_BACKUP_DIR` defaults to `$HOME/.local/state/sotto-backups/$SOTTO_STACK`. Before candidate startup, the script checks database size, creates a custom-format `pg_dump`, reads the full archive with `pg_restore` without restoring a database, and retains its checksum. The current site keeps serving during this transactionally consistent backup. Completed deployments retain the newest ten successful backups and all backups younger than thirty days, including the current and previous deployment. Cleanup removes only older backups with matching success metadata and checksums. Failed, unmarked, malformed, and symlinked backups remain for review.
@@ -235,8 +262,8 @@ that compatibility.
 
 Set `SOTTO_COMPATIBILITY_REVIEW_FILE` and
 `SOTTO_COMPATIBILITY_EVIDENCE_FILE` to private, operator-owned regular files.
-The evidence contains the actual independent review. The review file is JSON
-with exactly these fields:
+The evidence contains the actual independent review. A schema version 1 review
+file is JSON with exactly these fields:
 
 | Field                     | Required value                                                              |
 | ------------------------- | --------------------------------------------------------------------------- |
@@ -259,7 +286,7 @@ duplicate JSON fields, stale identities, extra fields, changed evidence, and
 unreviewed mismatches. Accepted review and evidence bytes are saved together
 in the durable attempt directory before services change.
 
-The Fish upgrade also inspects existing credentials, profile and server
+For first activation, the Fish upgrade also inspects existing credentials, profile and server
 selections, episodes, segments, voice assignments, and queued work without
 changing them. Existing Fish state rejects
 this procedure. The candidate web and workers receive a read-only directory
@@ -271,6 +298,30 @@ The mounted gate is readable by the verified runtime UID without exposing the
 private review directory. Missing, unreadable, malformed, oversized, symlinked,
 empty, or mismatched configured gates fail closed. An absent variable preserves
 ordinary local behavior.
+
+An already-enabled Fish installation can instead use a schema version 2 review.
+It retains every version 1 field and adds `providerActivation` with these exact
+fields:
+
+| Field                  | Required value                                                                                                           |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `mode`                 | `preserve-existing`                                                                                                      |
+| `previousReleaseSha`   | Full source SHA of the currently enabled installation                                                                    |
+| `previousAssetsHash`   | Complete protected asset hash of the previous workers                                                                    |
+| `candidateAssetsHash`  | Complete protected asset hash of the candidate workers                                                                   |
+| `reviewedRuntimeFiles` | Exact changed file paths, each with `previousSha256` and `candidateSha256`; use `null` only for an added or removed file |
+| `previousRuntimes`     | Exact `containerId` and `imageId` for `web`, `workers-heavy`, `workers-pipeline` and `workers-light`                     |
+
+Generate both asset inventories with
+`scripts/deploy/runtime/provider-assets.cjs`. Independently review the complete
+changed file set and the resulting behavior. Every changed asset must appear in
+the review; wildcards, missing changes and unrelated entries are rejected. The
+runner verifies each captured runtime's source revision, enabled activation
+record and unique read-only mount. It prepares an enabled candidate record,
+then checks old and candidate mounts again before switching traffic. This
+preserves the existing activation while retaining compatibility, backup, queue,
+capacity and recovery checks. It does not authorize first activation or accept
+provider changes without review.
 
 After saving original queue flags, a compatibility rollout persists a
 `compatibility-preparation` recovery marker before pausing or replacing
@@ -290,7 +341,7 @@ code. Do not clear the marker to retry a deployment.
 
 Successful rollout clears its cutover marker only after public health, old
 HTTP retirement, image retention, backup retention and rollback-tag updates
-finish. Only then does the runner atomically enable Fish. The mounted gate
+finish. Only then does a first-activation rollout atomically enable Fish. The mounted gate
 directory remains available for the active containers. Saved old image digests remain recovery evidence. They do not authorize
 rolling back after a new provider or job format has been activated. Register
 the operator's Fish key and test it after old services have fully settled.

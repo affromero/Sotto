@@ -193,6 +193,24 @@ at commit and push, or rebuild images that CI has already verified.
 - [ ] After Prisma schema changes, run `npx prisma generate` before type-checking.
 - [ ] In RTL tests, `waitFor` a visible UI state before interactions, not mock call counts.
 
+## Production delivery
+
+The production image artifact contains `production-release.json` and
+`production-release-metadata.json`. Verify their exact source SHA, successful
+Actions runs and image identities. Use the published canonical measurements and
+worker runtime inventories for preflight. Do not download images locally just
+to repeat measurements or compatibility probes already verified by CI.
+
+Use the committed deployment runner for reviewed provider continuity. Review
+schema version 2 binds all four previous container identities, both complete
+provider asset inventories and every changed runtime file. It preserves an
+already-enabled provider; first activation keeps its separate readiness checks.
+Never replace this with a temporary runner that skips those checks.
+
+After both stacks are healthy, finalize only the successful release's exact
+import records and run project-owned image maintenance. Preserve every failed
+or unknown attempt, all live container references and current rollback records.
+
 ## Environment Variables
 
 Local OSS development uses `.env.oss.example` copied to `.env.local`. Root npm scripts source `.env.local` through `scripts/run-with-env.sh`; set `SOTTO_ENV_FILE` to point them at a different env file.

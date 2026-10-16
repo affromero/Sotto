@@ -517,6 +517,12 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(workerBaseDockerSource).toContain('"@openai/codex@${CODEX_VERSION}"');
     expect(webDockerSource).toContain('openssh-client');
     expect(workerBaseDockerSource).toContain('openssh-client');
+    expect(workerBaseDockerSource).toContain('ARG PLAYWRIGHT_VERSION');
+    expect(workerBaseDockerSource).not.toContain('COPY package-lock.json');
+    for (const workflow of [deployWorkflow, ossImageWorkflow]) {
+      expect(workflow).toContain('playwright-version.cjs');
+      expect(workflow).toContain('PLAYWRIGHT_VERSION=${{ env.PLAYWRIGHT_VERSION }}');
+    }
     expect(webDockerSource).toContain('ENV HOME=/home/sotto');
     expect(workerDockerSource).toContain('ENV HOME=/home/sotto');
     expect(setupServerSource).toContain('cp .env.example .env.production');

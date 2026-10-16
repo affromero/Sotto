@@ -32,10 +32,6 @@ FROM ${WORKER_BASE_IMAGE} AS runner
 ARG RUNTIME_UID=1001
 
 ENV NODE_ENV=production
-ARG COMMIT_SHA=dev
-LABEL org.opencontainers.image.revision=${COMMIT_SHA}
-LABEL org.opencontainers.image.source="https://github.com/affromero/Sotto"
-ENV COMMIT_SHA=${COMMIT_SHA}
 
 # Match the web image and the shared CLI home owner.
 RUN case "$RUNTIME_UID" in \
@@ -76,6 +72,12 @@ COPY --chown=${RUNTIME_UID}:${RUNTIME_UID} apps/web/prompts ./apps/web/prompts/
 RUN mkdir -p /app/apps/web/.sotto/storage /app/apps/web/.sotto/runtime \
     && chown -R "$RUNTIME_UID:$RUNTIME_UID" /app/apps/web/.sotto \
     && chmod 0700 /app/apps/web/.sotto/runtime
+
+# Release identity changes metadata without invalidating filesystem layers.
+ARG COMMIT_SHA=dev
+LABEL org.opencontainers.image.revision=${COMMIT_SHA}
+LABEL org.opencontainers.image.source="https://github.com/affromero/Sotto"
+ENV COMMIT_SHA=${COMMIT_SHA}
 
 USER ${RUNTIME_UID}
 

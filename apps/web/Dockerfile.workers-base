@@ -16,11 +16,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
-COPY package-lock.json /tmp/playwright-package-lock.json
+ARG PLAYWRIGHT_VERSION
 RUN --mount=type=cache,target=/root/.npm \
-    PLAYWRIGHT_VERSION="$(node -p 'require("/tmp/playwright-package-lock.json").packages["node_modules/playwright"].version')" \
+    test -n "$PLAYWRIGHT_VERSION" \
     && npx --yes "playwright@${PLAYWRIGHT_VERSION}" install --with-deps --only-shell chromium \
-    && rm -rf /var/lib/apt/lists/* /var/cache/apt/* /tmp/playwright-package-lock.json
+    && rm -rf /var/lib/apt/lists/* /var/cache/apt/*
 
 # Pin executable tooling so rebuilding a release cannot silently change it.
 ARG CLAUDE_CODE_VERSION=2.1.225
