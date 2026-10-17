@@ -8,6 +8,48 @@ import { useCredentialEditor } from '@/components/settings/useCredentialEditor';
 import type { CredentialEndpoint } from '@/lib/sidedoor/credentials/config/credential-browser';
 
 afterEach(() => vi.unstubAllGlobals());
+
+it('hides previous endpoint credentials immediately and rejects commands from its old lifetime', async () => {
+  const next = Promise.withResolvers<Response>();
+  const writes: string[] = [];
+  const settings: CredentialSettingsSnapshot = {
+    context: {
+      instanceId: 'instance',
+      scope: 'ai-keys',
+      owner: { subjectId: 'alice', generation: 1 },
+    },
+    heads: { openai: null },
+    keys: [],
+  };
+  vi.stubGlobal('fetch', async (url: string, options?: RequestInit) => {
+    if (options?.method) writes.push(url);
+    return url.endsWith('/byok') ? next.promise : Response.json(settings);
+  });
+  const { result, rerender } = renderHook(
+    ({ endpoint }: { endpoint: CredentialEndpoint }) => useCredentialEditor(endpoint),
+    { initialProps: { endpoint: 'ai-keys' } }
+  );
+  await waitFor(() => expect(result.current.busy).toBe(false));
+  const previous = result.current;
+  act(() => expect(previous.begin('openai')).toBe(true));
+  rerender({ endpoint: 'byok' });
+  expect(result.current.snapshot).toBeNull();
+  expect(result.current.busy).toBe(true);
+  expect(result.current.feedback).toBeNull();
+  act(() => expect(result.current.begin('cartesia')).toBe(false));
+  await act(async () => {
+    await previous.save('openai', { values: { apiKey: 'test-key' } });
+    await previous.remove('openai');
+    await previous.act();
+  });
+  expect(writes).toEqual([]);
+  await act(async () => {
+    next.resolve(Response.json({ ...settings, context: { ...settings.context, scope: 'byok' } }));
+  });
+  expect(result.current.snapshot?.context.scope).toBe('byok');
+  expect(result.current.busy).toBe(false);
+});
+
 it('retains an uncertain receipt across access loss and endpoint changes until reconciled', async () => {
   let denied = false;
   let settings: CredentialSettingsSnapshot = {

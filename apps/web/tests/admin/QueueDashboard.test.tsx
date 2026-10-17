@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 vi.mock('@/app/(admin)/admin/queues/QueueActions', () => ({
@@ -43,6 +43,15 @@ afterEach(() => {
 });
 
 describe('QueueDashboard', () => {
+  it('keeps the observed refresh age when unrelated dashboard controls rerender', async () => {
+    mockFetchSuccess();
+    const { rerender } = render(<QueueDashboard />);
+    await screen.findByText('content-extraction');
+    await act(async () => vi.advanceTimersByTimeAsync(6000));
+    expect(screen.getByText('Updated 6s ago')).toBeInTheDocument();
+    rerender(<QueueDashboard />);
+    expect(screen.getByText('Updated 6s ago')).toBeInTheDocument();
+  });
   it('shows loading state before data arrives', () => {
     (global.fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise(() => {}));
     render(<QueueDashboard />);

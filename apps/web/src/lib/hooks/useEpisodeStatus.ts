@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 
 const TERMINAL_STATUSES = new Set(['READY', 'FAILED', 'SCRIPT_READY', 'DRAFT']);
 const FALLBACK_POLL_MS = 10_000;
@@ -26,16 +26,20 @@ export function useEpisodeStatus({
   initialStatus,
   onStatusChange,
 }: UseEpisodeStatusOptions): UseEpisodeStatusReturn {
-  const [status, setStatus] = useState<string | null>(initialStatus ?? null);
+  const [status, setStatus] = useState<string | null>(episodeId ? (initialStatus ?? null) : null);
   const [isConnected, setIsConnected] = useState(false);
+  const [source, setSource] = useState({ episodeId, initialStatus });
+  if (source.episodeId !== episodeId || source.initialStatus !== initialStatus) {
+    setSource({ episodeId, initialStatus });
+    setStatus(episodeId ? (initialStatus ?? null) : null);
+    setIsConnected(false);
+  }
   const onStatusChangeRef = useRef(onStatusChange);
   useEffect(() => {
     onStatusChangeRef.current = onStatusChange;
   });
 
-  useEffect(() => {
-    setStatus(episodeId ? (initialStatus ?? null) : null);
-    setIsConnected(false);
+  useLayoutEffect(() => {
     if (!episodeId || (initialStatus && TERMINAL_STATUSES.has(initialStatus))) return;
     const id = episodeId;
     const controller = new AbortController();

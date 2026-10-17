@@ -147,6 +147,13 @@ CODEX_MODEL_REASONING_EFFORTS="low,medium,high,xhigh,max"
 
 Use the no-code local contracts when running your own models. Save the local AI URL and model, local STT URL and model, and local TTS URL, model, and voice IDs in `/welcome` or Admin.
 
+Owners can also open **Speech selection** in Settings or Admin. Set the server
+endpoint under **Advanced settings**, then select **Find voices** to see names
+and languages. Use **Listen** to preview a voice before selecting 2 to 8 voices.
+These checks leave the saved speech selection and cloud credentials unchanged.
+Select **Use local speech** to save. Advanced settings also keeps custom model
+and manual voice IDs available; discovery preserves existing selections.
+
 See `docs/05-provider-extension-guide.md` for the exact LLM/STT/TTS contracts and native-provider checklists.
 
 ---

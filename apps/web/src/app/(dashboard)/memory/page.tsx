@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { MemoryGraph } from '@/components/memory/MemoryGraph';
 import { SottoSpinner } from '@/components/ui/SottoSpinner';
 import type { MemoryGraphData } from '@/components/memory/MemoryGraph';
@@ -46,8 +46,13 @@ export default function MemoryPage() {
   const [coursesState, setCoursesState] = useState<LoadState>('loading');
 
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
-  const [graph, setGraph] = useState<MemoryGraphData | null>(null);
-  const [graphState, setGraphState] = useState<LoadState>('idle');
+  const [graphResult, setGraphResult] = useState<{
+    courseId: string;
+    graph: MemoryGraphData | null;
+    state: LoadState;
+  } | null>(null);
+  const graph = graphResult?.courseId === selectedCourseId ? graphResult?.graph : null;
+  const graphState = graphResult?.courseId === selectedCourseId ? graphResult.state : 'loading';
 
   // Load courses on mount
   useEffect(() => {
@@ -67,25 +72,22 @@ export default function MemoryPage() {
     })();
   }, []);
 
-  const loadGraph = useCallback(async (courseId: string) => {
-    setGraphState('loading');
-    setGraph(null);
-    try {
-      const res = await fetch(`/api/v1/courses/${courseId}/graph`);
-      if (!res.ok) throw new Error('Failed to load graph');
-      const data = (await res.json()) as MemoryGraphData;
-      setGraph(data);
-      setGraphState('idle');
-    } catch {
-      setGraphState('error');
-    }
-  }, []);
-
   // Load graph whenever course selection changes
   useEffect(() => {
     if (!selectedCourseId) return;
-    void loadGraph(selectedCourseId);
-  }, [selectedCourseId, loadGraph]);
+    const courseId = selectedCourseId;
+    const controller = new AbortController();
+    void fetch(`/api/v1/courses/${courseId}/graph`, { signal: controller.signal })
+      .then(async (res) => {
+        if (!res.ok) throw new Error('Failed to load graph');
+        const data = (await res.json()) as MemoryGraphData;
+        if (!controller.signal.aborted) setGraphResult({ courseId, graph: data, state: 'idle' });
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setGraphResult({ courseId, graph: null, state: 'error' });
+      });
+    return () => controller.abort();
+  }, [selectedCourseId]);
 
   const selectedCourse = courses.find((course) => course.id === selectedCourseId) ?? null;
 
@@ -130,7 +132,10 @@ export default function MemoryPage() {
                 id="course-select"
                 className={styles.selector}
                 value={selectedCourseId ?? ''}
-                onChange={(e) => setSelectedCourseId(e.target.value)}
+                onChange={(e) => {
+                  setSelectedCourseId(e.target.value);
+                  setGraphResult(null);
+                }}
                 aria-label="Select course to view memory graph"
               >
                 {courses.map((c) => (

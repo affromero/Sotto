@@ -210,11 +210,13 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
   const [credentialSession] = useState(() => new WelcomeCredentialSession());
   const credentialLifetime = useRef<AbortController | null>(null);
   const credentialLock = useRef(false);
-  const [credentialBusy, setCredentialBusy] = useState(false);
+  const [credentialPending, setCredentialBusy] = useState(false);
   const [credentialReady, setCredentialReady] = useState(false);
   const [credentialFeedback, setCredentialFeedback] = useState<WelcomeCredentialResult | null>(
     null
   );
+  const credentialBusy =
+    credentialPending || (config.selfHosted && !credentialReady && credentialFeedback === null);
   const pendingCredentialPosts = useRef<readonly KeyPost[]>([]);
   const clearCredentialSecrets = useCallback(() => {
     setAgent((previous) => ({
@@ -231,28 +233,31 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
   }, []);
 
   const loadCredentials = useCallback(
-    async (signal: AbortSignal) => {
+    (signal: AbortSignal) => {
       credentialLock.current = true;
-      setCredentialBusy(true);
-      try {
-        await credentialSession.load(signal);
-        signal.throwIfAborted();
-        setCredentialReady(true);
-        setCredentialFeedback(null);
-      } catch (error) {
-        if (!signal.aborted && error instanceof WelcomeCredentialContextError)
-          clearCredentialSecrets();
-        if (!signal.aborted)
-          setCredentialFeedback({
-            status: 'review',
-            message: error instanceof Error ? error.message : 'Could not load credential settings.',
-          });
-      } finally {
-        if (!signal.aborted) {
-          credentialLock.current = false;
-          setCredentialBusy(false);
-        }
-      }
+      return credentialSession
+        .load(signal)
+        .then(() => {
+          signal.throwIfAborted();
+          setCredentialReady(true);
+          setCredentialFeedback(null);
+        })
+        .catch((error: unknown) => {
+          if (!signal.aborted && error instanceof WelcomeCredentialContextError)
+            clearCredentialSecrets();
+          if (!signal.aborted)
+            setCredentialFeedback({
+              status: 'review',
+              message:
+                error instanceof Error ? error.message : 'Could not load credential settings.',
+            });
+        })
+        .finally(() => {
+          if (!signal.aborted) {
+            credentialLock.current = false;
+            setCredentialBusy(false);
+          }
+        });
     },
     [credentialSession, clearCredentialSecrets]
   );
@@ -893,7 +898,10 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
                 onClick={() => {
                   if (credentialFeedback.status === 'review') {
                     const signal = credentialLifetime.current?.signal;
-                    if (signal) void loadCredentials(signal);
+                    if (signal) {
+                      setCredentialBusy(true);
+                      void loadCredentials(signal);
+                    }
                   } else {
                     void saveCredentials(
                       pendingCredentialPosts.current,

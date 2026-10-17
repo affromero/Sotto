@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
+import { LocalSpeechPicker } from './local-speech/LocalSpeechPicker';
 import { resumeEndpoint } from '@/app/welcome/session/resume-security';
 import styles from './LocalSpeechSettings.module.css';
 
@@ -33,7 +33,7 @@ export function LocalSpeechSettings({
   const router = useRouter();
   const [endpoint, setEndpoint] = useState(initialEndpoint);
   const [model, setModel] = useState(initialModel);
-  const [voices, setVoices] = useState(initialVoices.join(', '));
+  const [voices, setVoices] = useState(initialVoices);
   const [selectedMode, setSelectedMode] = useState(initialMode);
   const [usesConfiguredProvider, setUsesConfiguredProvider] = useState(
     initialUsesConfiguredProvider && initialMode === 'configured'
@@ -77,7 +77,10 @@ export function LocalSpeechSettings({
       const response = await fetch('/api/v1/settings/local-speech', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'check-credits', expectedProvider: creditProvider }),
+        body: JSON.stringify({
+          mode: 'check-credits',
+          expectedProvider: creditProvider,
+        }),
       });
       if (!response.ok) {
         if (response.status === 402) setCreditsBlocked(true);
@@ -102,16 +105,18 @@ export function LocalSpeechSettings({
   async function save(mode: 'local' | 'configured' | 'disabled') {
     setError('');
     setMessage('');
-    const voiceIds = voices.split(',').map((voice) => voice.trim());
+    const voiceIds = voices.map((voice) => voice.trim());
     if (
       mode === 'local' &&
       (!resumeEndpoint(endpoint.trim()) ||
         !model.trim() ||
         voiceIds.length < 2 ||
+        voiceIds.length > 8 ||
+        voiceIds.join(',').length > 512 ||
         voiceIds.some((voice) => !voice) ||
         new Set(voiceIds).size !== voiceIds.length)
     ) {
-      setError('Enter a valid HTTP(S) endpoint, model ID and at least two distinct voice IDs.');
+      setError('Use a valid speech endpoint and model, and choose 2 to 8 distinct voices.');
       return;
     }
     setBusy(true);
@@ -121,7 +126,12 @@ export function LocalSpeechSettings({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(
           mode === 'local'
-            ? { mode, endpoint: endpoint.trim(), model: model.trim(), voices: voiceIds }
+            ? {
+                mode,
+                endpoint: endpoint.trim(),
+                model: model.trim(),
+                voices: voiceIds,
+              }
             : { mode }
         ),
       });
@@ -152,11 +162,10 @@ export function LocalSpeechSettings({
         Speech selection
       </h2>
       <p className={styles.description}>
-        This selection applies to your profile. Shared provider defaults are managed in Admin.{' '}
+        This selection applies to your profile.{' '}
         {canManageSharedSpeech
-          ? 'Select a local speech server for your profile. Its model and voices must support your learning language. Cloud credentials stay saved.'
-          : 'Use configured speech or explicitly disable audio for your profile.'}{' '}
-        Speech errors are shown without switching providers.
+          ? 'Listen to local voices before saving. Your cloud settings stay saved.'
+          : 'Use configured speech or disable audio.'}
       </p>
       <p role="status">
         {selectedMode === 'disabled'
@@ -181,32 +190,17 @@ export function LocalSpeechSettings({
         </p>
       )}
       {canManageSharedSpeech && (
-        <div className={styles.fields}>
-          <Input
-            label="Speech endpoint URL"
-            type="url"
-            value={endpoint}
-            maxLength={512}
-            onChange={(event) => setEndpoint(event.target.value)}
-            disabled={busy}
-            helperText="Use the endpoint reachable by this Sotto server."
-          />
-          <Input
-            label="Local speech model ID"
-            value={model}
-            maxLength={128}
-            onChange={(event) => setModel(event.target.value)}
-            disabled={busy}
-          />
-          <Input
-            label="Local voice IDs"
-            value={voices}
-            maxLength={512}
-            onChange={(event) => setVoices(event.target.value)}
-            disabled={busy}
-            helperText="Enter at least two distinct voice IDs, separated by commas."
-          />
-        </div>
+        <LocalSpeechPicker
+          endpoint={endpoint}
+          model={model}
+          voices={voices}
+          disabled={busy}
+          onChange={(draft) => {
+            if (draft.endpoint !== undefined) setEndpoint(draft.endpoint);
+            if (draft.model !== undefined) setModel(draft.model);
+            if (draft.voices !== undefined) setVoices(draft.voices);
+          }}
+        />
       )}
       {canManageSharedSpeech && canCheckCredits && (
         <>

@@ -122,39 +122,6 @@ export function ScriptEditor({
     }
   }, [editText]);
 
-  // Auto-save on 5s debounce
-  useEffect(() => {
-    if (!dirty) return;
-    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
-    autoSaveTimerRef.current = setTimeout(() => {
-      saveDraft();
-    }, 5000);
-    return () => {
-      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [turns, dirty]);
-
-  // beforeunload warning
-  const hasFeedback = generalFeedback.trim().length > 0;
-  const hasComments = Object.values(turnComments).some((c) => c.trim().length > 0);
-  const hasHighlights = highlights.length > 0;
-  useEffect(() => {
-    if (!dirty && !hasFeedback && !hasComments && !hasHighlights) return;
-    function handleBeforeUnload(e: BeforeUnloadEvent) {
-      e.preventDefault();
-    }
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [dirty, hasFeedback, hasComments, hasHighlights]);
-
-  // Stats
-  const stats = useMemo(() => {
-    const wordCount = turns.reduce((sum, t) => sum + t.text.split(/\s+/).filter(Boolean).length, 0);
-    const estimatedMinutes = Math.round(wordsToMinutes(wordCount));
-    return { wordCount, estimatedMinutes, turnCount: turns.length, refCount: references.length };
-  }, [turns, references]);
-
   // Save draft
   const saveDraft = useCallback(async () => {
     if (saving) return;
@@ -182,6 +149,38 @@ export function ScriptEditor({
       setSaving(false);
     }
   }, [episodeId, turns, saving]);
+
+  // Auto-save on 5s debounce
+  useEffect(() => {
+    if (!dirty) return;
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(() => {
+      saveDraft();
+    }, 5000);
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
+  }, [dirty, saveDraft]);
+
+  // beforeunload warning
+  const hasFeedback = generalFeedback.trim().length > 0;
+  const hasComments = Object.values(turnComments).some((c) => c.trim().length > 0);
+  const hasHighlights = highlights.length > 0;
+  useEffect(() => {
+    if (!dirty && !hasFeedback && !hasComments && !hasHighlights) return;
+    function handleBeforeUnload(e: BeforeUnloadEvent) {
+      e.preventDefault();
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [dirty, hasFeedback, hasComments, hasHighlights]);
+
+  // Stats
+  const stats = useMemo(() => {
+    const wordCount = turns.reduce((sum, t) => sum + t.text.split(/\s+/).filter(Boolean).length, 0);
+    const estimatedMinutes = Math.round(wordsToMinutes(wordCount));
+    return { wordCount, estimatedMinutes, turnCount: turns.length, refCount: references.length };
+  }, [turns, references]);
 
   // Edit mode handlers
   const startEdit = useCallback(
@@ -401,7 +400,13 @@ export function ScriptEditor({
       turnIndex: index,
       text: selectedText,
       top: rect.top - rootRect.top - 40, // Position above selection
-      left: rect.left - rootRect.left + rect.width / 2,
+      left: Math.max(
+        16,
+        Math.min(
+          rect.left - rootRect.left + rect.width / 2 - 120,
+          (rootRef.current?.clientWidth ?? 400) - 256
+        )
+      ),
     });
     setHighlightNoteInput('');
   }, []);
@@ -725,10 +730,7 @@ export function ScriptEditor({
           className={styles.highlightPopover}
           style={{
             top: selectionPopover.top,
-            left: Math.max(
-              16,
-              Math.min(selectionPopover.left - 120, (rootRef.current?.clientWidth ?? 400) - 256)
-            ),
+            left: selectionPopover.left,
           }}
         >
           <div className={styles.highlightPopoverQuote}>

@@ -1,0 +1,115 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  min-width: 0;
+}
+.root p {
+  margin: 0;
+  font: var(--text-body-sm);
+}
+.connect {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-md);
+  justify-content: space-between;
+}
+.connect h3 {
+  margin: 0 0 var(--spacing-xs);
+  font: var(--text-h3);
+}
+.connect p,
+.language {
+  color: var(--color-text-secondary);
+}
+.choices {
+  margin: 0;
+  padding: var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  min-width: 0;
+}
+.choices legend {
+  padding: 0 var(--spacing-xs);
+  font: var(--text-body-sm);
+}
+.voice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+}
+.voice + .voice,
+.unavailable {
+  border-top: 1px solid var(--color-border);
+}
+.voice label,
+.unavailable {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  min-height: 52px;
+  padding: var(--spacing-sm) 0;
+  min-width: 0;
+}
+.voice label {
+  flex: 1;
+}
+.voice label > span,
+.unavailable > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.choices input {
+  accent-color: var(--color-primary);
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+}
+.language {
+  display: block;
+  font: var(--text-body-sm);
+}
+.voice button,
+.connect button {
+  min-width: 72px;
+  min-height: 44px;
+  flex-shrink: 0;
+}
+.preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+.preview audio {
+  display: block;
+  width: 100%;
+  min-width: 0;
+}
+.error {
+  color: var(--color-error);
+  overflow-wrap: anywhere;
+}
+.advanced {
+  border-top: 1px solid var(--color-border);
+}
+.advanced summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  cursor: pointer;
+  color: var(--color-text-primary);
+  font: var(--text-body-sm);
+}
+.advanced summary:focus-visible,
+.choices input:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+}
+.fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  padding-top: var(--spacing-sm);
+}

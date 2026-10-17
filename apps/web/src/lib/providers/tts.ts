@@ -21,7 +21,11 @@ import {
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 import { prismaUnfiltered } from '../prisma';
 import { captureApiEndpoint } from '@/lib/providers/shared/api-selection';
-import { captureLocalTtsConnection } from '@/lib/providers/shared/local-tts-connection';
+import {
+  captureDraftLocalTtsConnection,
+  captureLocalTtsConnection,
+  type LocalTtsConnection,
+} from '@/lib/providers/shared/local-tts-connection';
 import { createHmac, createHash } from 'node:crypto';
 import { withSpeechAvailabilityFailure } from './shared/speech-availability';
 import { decorateTtsProvider } from '@/lib/providers/capacity/tts';
@@ -195,8 +199,21 @@ export async function createTtsProviderAsync(
   execution: SottoProviderExecution,
   apiKey?: string,
   extraData?: Record<string, string>,
-  model?: string
+  model?: string,
+  localConnection?: LocalTtsConnection
 ): Promise<TtsProvider> {
+  if (
+    localConnection &&
+    (providerId !== 'local' ||
+      execution.credential ||
+      apiKey !== undefined ||
+      extraData !== undefined)
+  )
+    throw new Error('A draft local connection cannot use another provider or saved credentials.');
+  const draft = localConnection ? captureDraftLocalTtsConnection(localConnection) : undefined;
+  if (draft && model !== undefined && model !== draft.model)
+    throw new Error('The draft local model changed during provider construction.');
+  model ??= draft?.model;
   if (!model) {
     model = selectedTtsModel(null, providerId, (await getAutoModelConfig()).model);
   }
@@ -211,7 +228,8 @@ export async function createTtsProviderAsync(
     model,
     (endpoint) => {
       capturedEndpoint = endpoint;
-    }
+    },
+    draft
   );
   const selectedKey = execution.credential
     ? sottoExecutionCredentialFields(execution.credential).apiKey
@@ -274,7 +292,8 @@ async function createTtsProviderBare(
   apiKey?: string,
   extraData?: Record<string, string>,
   model?: string,
-  onEndpoint?: (endpoint: string) => void
+  onEndpoint?: (endpoint: string) => void,
+  localConnection?: LocalTtsConnection
 ): Promise<TtsProvider> {
   if (execution.credential && execution.credential.provider !== providerId)
     throw new Error('The selected credential belongs to another provider');
@@ -409,7 +428,9 @@ async function createTtsProviderBare(
       return new Cls(connection, transport);
     }
     case 'local': {
-      const connection = await captureLocalTtsConnection('local', model, apiKey, execution.signal);
+      const connection =
+        localConnection ??
+        (await captureLocalTtsConnection('local', model, apiKey, execution.signal));
       onEndpoint?.(connection.endpoint);
       const Cls = await importLocalTts();
       const transport = await createSottoProviderTransport(execution, [

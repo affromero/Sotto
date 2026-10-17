@@ -93,8 +93,8 @@ const COLUMNS: { key: SortColumn; label: string }[] = [
 export function QueueDashboard() {
   const [queues, setQueues] = useState<Record<string, QueueStats> | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [lastRefreshed, setLastRefreshed] = useState<number>(Date.now());
-  const [now, setNow] = useState<number>(Date.now());
+  const [lastRefreshed, setLastRefreshed] = useState<number>(() => Date.now());
+  const [now, setNow] = useState<number>(() => Date.now());
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
@@ -103,18 +103,23 @@ export function QueueDashboard() {
   const [grouped, setGrouped] = useState(true);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const fetchQueues = useCallback(async () => {
-    try {
-      const res = await fetch('/api/v1/admin/queues');
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      setQueues(data.queues);
-      setLastRefreshed(Date.now());
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch queues');
-    }
-  }, []);
+  const fetchQueues = useCallback(
+    () =>
+      fetch('/api/v1/admin/queues')
+        .then((res) => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return res.json();
+        })
+        .then((data) => {
+          setQueues(data.queues);
+          setLastRefreshed(Date.now());
+          setError(null);
+        })
+        .catch((err: unknown) => {
+          setError(err instanceof Error ? err.message : 'Failed to fetch queues');
+        }),
+    []
+  );
 
   useEffect(() => {
     fetchQueues();

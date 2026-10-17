@@ -8,6 +8,22 @@ import userEvent from '@testing-library/user-event';
 import { CourseNotesPanel } from '@/components/learn/CourseNotesPanel';
 
 describe('CourseNotesPanel', () => {
+  it('starts a different course with a closed clean editor and discards the old pending read', async () => {
+    const pending = Promise.withResolvers<Response>();
+    vi.spyOn(global, 'fetch')
+      .mockReturnValueOnce(pending.promise)
+      .mockResolvedValueOnce(Response.json({ body: 'New course notes' }));
+    const user = userEvent.setup();
+    const { rerender } = render(<CourseNotesPanel courseId="old" />);
+    await user.click(screen.getByRole('button', { name: /course notes/i }));
+    expect(screen.getByLabelText(/paste notes/i)).toBeDisabled();
+    rerender(<CourseNotesPanel courseId="new" />);
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    pending.resolve(Response.json({ body: 'Private old notes' }));
+    await user.click(screen.getByRole('button', { name: /course notes/i }));
+    await waitFor(() => expect(screen.getByRole('textbox')).toHaveValue('New course notes'));
+    expect(screen.queryByText('Private old notes')).not.toBeInTheDocument();
+  });
   it('keeps original document links and imported text outside the note editor', async () => {
     vi.spyOn(global, 'fetch')
       .mockResolvedValueOnce(

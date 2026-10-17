@@ -104,48 +104,51 @@ async function textOf(stream: AsyncIterable<string>) {
   for await (const chunk of stream) text += chunk;
   return text;
 }
+const ownedRequests: Array<{ controller: AbortController; result: Promise<unknown> }> = [];
 beforeEach(() => {
   vi.clearAllMocks();
   vi.resetModules();
 });
-afterEach(() => {
-  vi.unstubAllGlobals();
-  vi.unstubAllEnvs();
+afterEach(async () => {
+  const requests = ownedRequests.splice(0);
+  try {
+    for (const request of requests) request.controller.abort();
+    await Promise.allSettled(requests.map((request) => request.result));
+  } finally {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  }
 });
 
 describe('LLM routing through shared providers', () => {
   it('cancels an SDK retry without another request or a successful completion', async () => {
     const controller = new AbortController();
     let sent = 0;
-    let abortTimer: ReturnType<typeof setTimeout> | undefined;
+    const retryReady = Promise.withResolvers<void>();
     vi.stubGlobal('fetch', async () => {
       sent += 1;
-      abortTimer = setTimeout(() => controller.abort(), 20);
-      return Response.json(
-        { error: { type: 'overloaded_error', message: 'Retry later' } },
-        {
-          status: 529,
-          headers: { 'retry-after': '6' },
-        }
-      );
+      return new Response(new ReadableStream({ cancel: () => retryReady.resolve() }), {
+        status: 529,
+        headers: { 'retry-after': '6' },
+      });
     });
-    const llm = await import('@/lib/llm');
     const completions: TokenUsage[] = [];
-    try {
-      await expect(
-        textOf(
-          llm.streamResponse('', [], {
-            ...options,
-            signal: controller.signal,
-            onComplete: (usage) => completions.push(usage),
-          })
-        )
-      ).rejects.toMatchObject({ name: 'AbortError' });
-      expect(sent).toBe(1);
-      expect(completions).toEqual([]);
-    } finally {
-      clearTimeout(abortTimer);
-    }
+    const result = (async () => {
+      const llm = await import('@/lib/llm');
+      return textOf(
+        llm.streamResponse('', [], {
+          ...options,
+          signal: controller.signal,
+          onComplete: (usage) => completions.push(usage),
+        })
+      );
+    })();
+    ownedRequests.push({ controller, result });
+    await Promise.race([retryReady.promise, result]);
+    controller.abort();
+    await expect(result).rejects.toMatchObject({ name: 'AbortError' });
+    expect(sent).toBe(1);
+    expect(completions).toEqual([]);
   }, 10_000);
   it.each(['gpt-5.4', 'local:chosen', 'codex', 'claude-code:sonnet'])(
     'rejects restricted search instead of broadening it when routed to %s',
@@ -233,30 +236,26 @@ describe('LLM routing through shared providers', () => {
     async (streaming) => {
       const controller = new AbortController();
       let sent = 0;
-      let abortTimer: ReturnType<typeof setTimeout> | undefined;
+      const retryReady = Promise.withResolvers<void>();
       vi.stubGlobal('fetch', async () => {
         sent += 1;
-        abortTimer = setTimeout(() => controller.abort(new Error('Cancelled by caller')), 20);
-        return Response.json(
-          { error: { type: 'overloaded_error', message: 'Retry later' } },
-          {
-            status: 529,
-            headers: { 'retry-after': '2' },
-          }
-        );
+        return new Response(new ReadableStream({ cancel: () => retryReady.resolve() }), {
+          status: 529,
+          headers: { 'retry-after': '2' },
+        });
       });
-      const llm = await import('@/lib/llm');
-      try {
+      const result = (async () => {
+        const llm = await import('@/lib/llm');
         const selected = { ...options, signal: controller.signal };
-        await expect(
-          streaming
-            ? textOf(llm.streamResponse('', [], selected))
-            : llm.generateResponse('', [], selected)
-        ).rejects.toThrow('Cancelled by caller');
-        expect(sent).toBe(1);
-      } finally {
-        clearTimeout(abortTimer);
-      }
+        return streaming
+          ? textOf(llm.streamResponse('', [], selected))
+          : llm.generateResponse('', [], selected);
+      })();
+      ownedRequests.push({ controller, result });
+      await Promise.race([retryReady.promise, result]);
+      controller.abort(new Error('Cancelled by caller'));
+      await expect(result).rejects.toThrow('Cancelled by caller');
+      expect(sent).toBe(1);
     }
   );
   it('preserves captured Codex identity and unknown usage', async () => {

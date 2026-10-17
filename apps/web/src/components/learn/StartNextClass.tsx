@@ -48,6 +48,14 @@ interface PreparationActivity {
 }
 
 export function StartNextClass({ courseId, activeClassId, children }: StartNextClassProps) {
+  return (
+    <CourseClassPreparation key={courseId} courseId={courseId} activeClassId={activeClassId}>
+      {children}
+    </CourseClassPreparation>
+  );
+}
+
+function CourseClassPreparation({ courseId, activeClassId, children }: StartNextClassProps) {
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>('idle');
   const [error, setError] = useState('');
@@ -67,8 +75,6 @@ export function StartNextClass({ courseId, activeClassId, children }: StartNextC
   useEffect(() => {
     const controller = new AbortController();
     inspectionController.current = controller;
-    setGeneration(null);
-    setStatusUnavailable(false);
     void fetch(`/api/v1/courses/${courseId}/generation`, {
       cache: 'no-store',
       signal: controller.signal,

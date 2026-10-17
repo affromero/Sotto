@@ -50,7 +50,9 @@ describe('explicit local speech settings', () => {
       />
     );
     expect(screen.getByText('Selected speech: OpenAI.')).toBeVisible();
-    const useDefault = screen.getByRole('button', { name: 'Use Cartesia default (Sonic 3.5)' });
+    const useDefault = screen.getByRole('button', {
+      name: 'Use Cartesia default (Sonic 3.5)',
+    });
     expect(useDefault).toBeEnabled();
     await userEvent.click(useDefault);
     await screen.findByText('Configured speech: Cartesia.');
@@ -153,6 +155,7 @@ describe('explicit local speech settings', () => {
     await user.click(screen.getByRole('button', { name: 'Use local speech' }));
     await screen.findByRole('alert');
     expect(submitted).toEqual([]);
+    await user.click(screen.getByText('Advanced settings'));
     await user.clear(screen.getByLabelText('Speech endpoint URL'));
     await user.type(screen.getByLabelText('Speech endpoint URL'), props.initialEndpoint);
     await user.clear(screen.getByLabelText('Local voice IDs'));
@@ -192,7 +195,9 @@ describe('explicit local speech settings', () => {
       )
     ).toBeVisible();
     expect(
-      screen.getByRole('button', { name: 'Turn on Cartesia default (Sonic 3.5)' })
+      screen.getByRole('button', {
+        name: 'Turn on Cartesia default (Sonic 3.5)',
+      })
     ).toBeEnabled();
   });
 
@@ -262,5 +267,41 @@ describe('explicit local speech settings', () => {
     render(<LocalSpeechSettings {...props} initialMode="local" />);
     await screen.findByText('Local speech is selected.');
     expect(screen.queryByRole('button', { name: /Check .* credits/ })).not.toBeInTheDocument();
+  });
+
+  it('finds and selects named voices without saving until Use local speech is pressed', async () => {
+    const saves: unknown[] = [];
+    vi.stubGlobal('fetch', async (url: string, init: RequestInit) => {
+      if (url.endsWith('/discover'))
+        return Response.json({
+          engine: 'piper',
+          model: { id: 'local', label: 'Local speech' },
+          voices: [
+            { id: 'thorsten', name: 'Thorsten', language: 'de' },
+            { id: 'kerstin', name: 'Kerstin', language: 'de' },
+          ],
+        });
+      if (init.method !== 'PATCH') return creditStatus();
+      saves.push(JSON.parse(String(init.body)));
+      return Response.json({ mode: 'local' });
+    });
+    render(<LocalSpeechSettings {...props} initialModel="" initialVoices={[]} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Find voices' }));
+    await screen.findByRole('checkbox', { name: /Thorsten/ });
+    expect(screen.getByRole('checkbox', { name: /Thorsten/ })).not.toBeChecked();
+    await userEvent.click(screen.getByRole('checkbox', { name: /Thorsten/ }));
+    await userEvent.click(screen.getByRole('checkbox', { name: /Kerstin/ }));
+    expect(saves).toEqual([]);
+    expect(screen.getByText('Configured speech: Cartesia.')).toBeVisible();
+    await userEvent.click(screen.getByRole('button', { name: 'Use local speech' }));
+    await screen.findByText('Local speech selected for your profile.');
+    expect(saves).toEqual([
+      {
+        mode: 'local',
+        endpoint: props.initialEndpoint,
+        model: 'local',
+        voices: ['thorsten', 'kerstin'],
+      },
+    ]);
   });
 });

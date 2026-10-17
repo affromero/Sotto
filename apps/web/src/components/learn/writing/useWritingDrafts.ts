@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { WritingPromptData, WritingResponse } from '../classTypes';
 import { retainedLearningProgress, useLearningProgress } from '../progress/useLearningProgress';
 
@@ -93,7 +93,9 @@ export function useWritingDrafts(
 
   // submit() reads the latest drafts without being re-created on every keystroke.
   const latest = useRef(drafts);
-  latest.current = drafts;
+  useLayoutEffect(() => {
+    latest.current = drafts;
+  }, [drafts]);
 
   const setText = useCallback((promptId: string, text: string) => {
     setDrafts((current) => ({
