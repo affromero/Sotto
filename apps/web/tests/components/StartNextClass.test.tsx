@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { StartNextClass } from '@/components/learn/StartNextClass';
 
 const mockPush = vi.fn();
@@ -20,6 +20,23 @@ function jsonResponse(body: unknown, status = 200) {
 }
 
 describe('StartNextClass', () => {
+  it('discards previous course preparation reads when switching courses', async () => {
+    const previous = Promise.withResolvers<Response>();
+    let signal: AbortSignal | null | undefined;
+    vi.mocked(fetch).mockImplementation((url, options) => {
+      if (String(url).includes('/old/')) {
+        signal = options?.signal;
+        return previous.promise;
+      }
+      return Promise.resolve(jsonResponse({ status: 'IDLE' }));
+    });
+    const { rerender } = render(<StartNextClass courseId="old" activeClassId={null} />);
+    rerender(<StartNextClass courseId="new" activeClassId={null} />);
+    expect(await screen.findByText('No class is being prepared.')).toBeInTheDocument();
+    expect(signal?.aborted).toBe(true);
+    await act(async () => previous.resolve(jsonResponse({ status: 'FAILED' }, 503)));
+    expect(screen.queryByText('Could not read class preparation status.')).not.toBeInTheDocument();
+  });
   beforeEach(() => {
     vi.clearAllMocks();
     global.fetch = vi.fn();

@@ -21,12 +21,6 @@
   font: var(--text-body-sm);
 }
 
-.fields {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-sm);
-}
-
 .actions {
   display: flex;
   flex-wrap: wrap;

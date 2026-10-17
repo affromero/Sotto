@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useEffect, useRef, useReducer } from 'react';
+import { useMemo, useEffect, useState, useReducer } from 'react';
 import { STAGE_MESSAGES, resolveMessage } from '@sotto/shared';
 
 const CYCLE_INTERVAL_MS = 9_000;
@@ -25,16 +25,9 @@ export function useRotatingMessage({
 }: UseRotatingMessageOptions): UseRotatingMessageResult {
   // tick increments every cycle; forces re-render + new message derivation
   const [tick, bump] = useReducer((n: number) => n + 1, 0);
-  const stageTickRef = useRef(0);
-  const prevStatusRef = useRef(status);
-
-  // Reset stage tick baseline when status changes
-  useEffect(() => {
-    stageTickRef.current = tick;
-    prevStatusRef.current = status;
-    // Only reset on status change, not on tick
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status]);
+  const [stage, setStage] = useState({ status, startTick: tick });
+  if (stage.status !== status) setStage({ status, startTick: tick });
+  const ticksInStage = stage.status === status ? tick - stage.startTick : 0;
 
   // Cycle interval — only ticks when active
   useEffect(() => {
@@ -50,13 +43,12 @@ export function useRotatingMessage({
     const pool = STAGE_MESSAGES[status];
     if (!pool) return null;
 
-    const ticksInStage = tick - stageTickRef.current;
     const messages = ticksInStage >= LATE_TICK_THRESHOLD ? pool.late : pool.early;
     if (messages.length === 0) return null;
 
     const idx = ticksInStage % messages.length;
     return resolveMessage(messages[idx], topic);
-  }, [isActive, status, topic, tick]);
+  }, [isActive, status, topic, ticksInStage]);
 
   return { message, transitionKey: tick };
 }

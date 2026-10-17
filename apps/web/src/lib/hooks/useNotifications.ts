@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
 import { NotificationData } from '@/types/notification';
 
 /** Background poll interval when SSE is connected (consistency check) */
@@ -48,7 +48,9 @@ export function useNotifications(options?: UseNotificationsOptions): UseNotifica
   const seenIdsRef = useRef<Set<string>>(new Set());
   const initialLoadRef = useRef(true);
   const onNewRef = useRef(options?.onNewNotifications);
-  onNewRef.current = options?.onNewNotifications;
+  useLayoutEffect(() => {
+    onNewRef.current = options?.onNewNotifications;
+  }, [options?.onNewNotifications]);
   const sseConnectedRef = useRef(false);
 
   const fetchNotifications = useCallback(async () => {

@@ -44,6 +44,34 @@ afterEach(() => {
 });
 
 describe('useNotifications', () => {
+  it('delivers new stream messages to the latest committed callback without reopening the stream', () => {
+    let stream: { onmessage: ((event: { data: string }) => void) | null } | undefined;
+    const opened: string[] = [];
+    class NotificationStream {
+      onmessage: ((event: { data: string }) => void) | null = null;
+      constructor(url: string) {
+        stream = this;
+        opened.push(url);
+      }
+      close() {}
+    }
+    vi.stubGlobal('EventSource', NotificationStream);
+    vi.mocked(fetch).mockResolvedValue(Response.json({ notifications: [] }));
+    const received: string[] = [];
+    const { rerender, unmount } = renderHook(
+      ({ label }) =>
+        useNotifications({
+          onNewNotifications: (items) => received.push(`${label}:${items[0].id}`),
+        }),
+      { initialProps: { label: 'old' } }
+    );
+    rerender({ label: 'new' });
+    act(() => stream?.onmessage?.({ data: JSON.stringify(mockNotifications[0]) }));
+    expect(received).toEqual(['new:notif-1']);
+    expect(opened).toEqual(['/api/v1/notifications/stream']);
+    unmount();
+    vi.unstubAllGlobals();
+  });
   it('keeps live notifications during an older history fetch and does not toast repeated SSE deliveries', async () => {
     let stream: { onmessage: ((event: { data: string }) => void) | null } | undefined;
     class NotificationStream {

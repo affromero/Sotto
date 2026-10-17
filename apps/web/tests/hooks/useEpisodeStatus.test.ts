@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
+import { useLayoutEffect } from 'react';
 import { useEpisodeStatus } from '@/lib/hooks/useEpisodeStatus';
 
 // --- Mock EventSource ---
@@ -71,6 +72,35 @@ function deferredStatus() {
 }
 
 describe('useEpisodeStatus', () => {
+  it('closes the previous stream before layout consumers can deliver an old episode event', () => {
+    let previous: MockEventSource | undefined;
+    const { result, rerender } = renderHook(
+      ({ episodeId, initialStatus }) => {
+        const value = useEpisodeStatus({ episodeId, initialStatus });
+        useLayoutEffect(() => {
+          if (initialStatus === 'READY') previous?.simulateMessage({ status: 'FAILED' });
+        }, [initialStatus]);
+        return value;
+      },
+      { initialProps: { episodeId: 'old', initialStatus: 'SCRIPTING' } }
+    );
+    previous = MockEventSource.instances[0];
+    rerender({ episodeId: 'new', initialStatus: 'READY' });
+    expect(previous.closed).toBe(true);
+    expect(result.current).toEqual({ status: 'READY', isConnected: false });
+  });
+  it('resets an existing episode when its initial status changes and ignores the closed stream', () => {
+    const { result, rerender } = renderHook(
+      ({ initialStatus }) => useEpisodeStatus({ episodeId: 'pod-1', initialStatus }),
+      { initialProps: { initialStatus: 'SCRIPTING' } }
+    );
+    const previous = MockEventSource.instances[0];
+    rerender({ initialStatus: 'READY' });
+    expect(result.current).toEqual({ status: 'READY', isConnected: false });
+    expect(previous.closed).toBe(true);
+    act(() => previous.simulateMessage({ status: 'FAILED' }));
+    expect(result.current.status).toBe('READY');
+  });
   describe('initial state', () => {
     it('returns initialStatus when provided', () => {
       const { result } = renderHook(() =>
@@ -82,6 +112,13 @@ describe('useEpisodeStatus', () => {
     it('returns null status when no initialStatus', () => {
       const { result } = renderHook(() => useEpisodeStatus({ episodeId: null }));
       expect(result.current.status).toBeNull();
+    });
+
+    it('does not display a supplied status when no episode is selected', () => {
+      const { result } = renderHook(() =>
+        useEpisodeStatus({ episodeId: null, initialStatus: 'READY' })
+      );
+      expect(result.current).toEqual({ status: null, isConnected: false });
     });
 
     it('does not connect when episodeId is null', () => {

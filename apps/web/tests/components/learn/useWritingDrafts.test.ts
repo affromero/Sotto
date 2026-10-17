@@ -24,6 +24,17 @@ const graded = {
 let endpoint = '';
 let testNumber = 0;
 describe('useWritingDrafts', () => {
+  it('submits the latest committed draft through a previously retained submit callback', async () => {
+    const { result } = renderHook(() => useWritingDrafts([prompt('latest')], endpoint));
+    const submit = result.current.submit;
+    act(() => result.current.setText('latest', 'Die neueste Antwort.'));
+    await act(async () => expect(await submit()).toBe(true));
+    expect(fetch).toHaveBeenCalledWith(
+      `${endpoint}/latest`,
+      expect.objectContaining({ body: JSON.stringify({ text: 'Die neueste Antwort.' }) })
+    );
+    expect(result.current.drafts.latest.submittedText).toBe('Die neueste Antwort.');
+  });
   beforeEach(() => {
     endpoint = `/api/test-writing-${++testNumber}/writing`;
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(graded));

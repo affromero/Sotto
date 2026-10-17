@@ -12,6 +12,9 @@ import {
   getClaudeSshHost,
 } from '@/lib/claude-code-client';
 import { usageFromGenerationError } from 'thesidedoor-core/ai/usage';
+import { createAIProvider } from '@/lib/providers/ai';
+import { ClaudeCodeProvider } from '@/lib/providers/claude-code';
+import { streamResponse } from '@/lib/llm';
 import { isolatedFixture } from './agent-clients/isolated-fixture';
 
 describe('Claude CLI execution', () => {
@@ -24,6 +27,14 @@ describe('Claude CLI execution', () => {
   });
   let directory: string;
   let originalEnv: NodeJS.ProcessEnv;
+  let controller: AbortController;
+  let signal: AbortSignal;
+  const ownedStreams: AsyncGenerator<string>[] = [];
+
+  function ownStream(stream: AsyncGenerator<string>) {
+    ownedStreams.push(stream);
+    return stream;
+  }
   const terminal = {
     type: 'result',
     subtype: 'success',
@@ -62,16 +73,23 @@ describe('Claude CLI execution', () => {
     });
     return home;
   }
-  beforeEach(() => {
+  beforeEach((context) => {
+    controller = new AbortController();
+    signal = AbortSignal.any([controller.signal, context.signal]);
     originalEnv = process.env;
     directory = mkdtempSync(join(tmpdir(), 'sotto-claude-fixture-'));
     process.env = { NODE_ENV: 'test', PATH: directory, HOME: directory, TMPDIR: directory };
     resetClaudeRuntimeForTests();
   });
-  afterEach(() => {
-    process.env = originalEnv;
-    resetClaudeRuntimeForTests();
-    rmSync(directory, { recursive: true, force: true });
+  afterEach(async () => {
+    controller.abort();
+    try {
+      await Promise.allSettled(ownedStreams.splice(0).map((stream) => stream.return(undefined)));
+    } finally {
+      process.env = originalEnv;
+      resetClaudeRuntimeForTests();
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 
   it('keeps a single prompt and labels conversation turns', () => {
@@ -354,27 +372,63 @@ describe('Claude CLI execution', () => {
           JSON.stringify(JSON.stringify(assistant('Ready'))) +
           '); setInterval(() => {}, 1000);'
       );
-      const stream =
+      const stream = ownStream(
         entry === 'client'
-          ? streamClaudeCode('', 'Prompt')
+          ? streamClaudeCode('', 'Prompt', { signal })
           : entry === 'factory'
-            ? (await import('@/lib/providers/ai'))
-                .createAIProvider('claude-code')
-                .streamResponse('', [{ role: 'user', content: 'Prompt' }])
+            ? createAIProvider('claude-code').streamResponse(
+                '',
+                [{ role: 'user', content: 'Prompt' }],
+                { signal }
+              )
             : entry === 'provider'
-              ? new (
-                  await import('@/lib/providers/claude-code')
-                ).ClaudeCodeProvider().streamResponse('', [{ role: 'user', content: 'Prompt' }])
-              : (await import('@/lib/llm')).streamResponse(
-                  '',
-                  [{ role: 'user', content: 'Prompt' }],
-                  { model: 'claude-code:sonnet', skipModeration: true }
-                );
+              ? new ClaudeCodeProvider().streamResponse('', [{ role: 'user', content: 'Prompt' }], {
+                  signal,
+                })
+              : streamResponse('', [{ role: 'user', content: 'Prompt' }], {
+                  model: 'claude-code:sonnet',
+                  skipModeration: true,
+                  signal,
+                })
+      );
       expect(await stream.next()).toMatchObject({ value: 'Ready' });
       const pending = stream.next().catch((error: unknown) => error);
       expect(await stream.return(undefined)).toMatchObject({ done: true });
       expect(await pending).toBeInstanceOf(Error);
       expect(() => process.kill(Number(readFileSync(pidPath, 'utf8')), 0)).toThrow();
+    }
+  );
+
+  it.each(['client', 'provider', 'factory', 'llm'])(
+    'does not launch a cancelled %s stream',
+    async (entry) => {
+      const pidPath = join(directory, 'pid');
+      executable(
+        'require("node:fs").writeFileSync(' + JSON.stringify(pidPath) + ', String(process.pid));'
+      );
+      const reason = new Error('Fixture cancelled before opening');
+      controller.abort(reason);
+      const stream = ownStream(
+        entry === 'client'
+          ? streamClaudeCode('', 'Prompt', { signal })
+          : entry === 'factory'
+            ? createAIProvider('claude-code').streamResponse(
+                '',
+                [{ role: 'user', content: 'Prompt' }],
+                { signal }
+              )
+            : entry === 'provider'
+              ? new ClaudeCodeProvider().streamResponse('', [{ role: 'user', content: 'Prompt' }], {
+                  signal,
+                })
+              : streamResponse('', [{ role: 'user', content: 'Prompt' }], {
+                  model: 'claude-code:sonnet',
+                  skipModeration: true,
+                  signal,
+                })
+      );
+      await expect(stream.next()).rejects.toBe(reason);
+      expect(existsSync(pidPath)).toBe(false);
     }
   );
 
@@ -415,20 +469,23 @@ describe('Claude CLI execution', () => {
       const measured = new Promise<void>((resolve) => {
         observed = resolve;
       });
-      const stream =
+      const stream = ownStream(
         entry === 'client'
-          ? streamClaudeCode('', 'Prompt', { onUsage: () => observed() })
+          ? streamClaudeCode('', 'Prompt', { onUsage: () => observed(), signal })
           : entry === 'factory'
-            ? (await import('@/lib/providers/ai'))
-                .createAIProvider('claude-code')
-                .streamResponse('', [{ role: 'user', content: 'Prompt' }], {
-                  onUsage: () => observed(),
-                })
-            : new (await import('@/lib/providers/claude-code')).ClaudeCodeProvider().streamResponse(
+            ? createAIProvider('claude-code').streamResponse(
                 '',
                 [{ role: 'user', content: 'Prompt' }],
-                { onUsage: () => observed() }
-              );
+                {
+                  onUsage: () => observed(),
+                  signal,
+                }
+              )
+            : new ClaudeCodeProvider().streamResponse('', [{ role: 'user', content: 'Prompt' }], {
+                onUsage: () => observed(),
+                signal,
+              })
+      );
       expect(await stream.next()).toMatchObject({ value: 'Ready' });
       const pending = stream.next().catch((error: unknown) => error);
       await measured;

@@ -70,7 +70,7 @@ jobs:
               output.write(f"run_id={valid[0]['id']}\n")
           PY
       - name: Download source validation from the verified run
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           github-token: ${{ github.token }}
           repository: ${{ github.repository }}
@@ -198,7 +198,7 @@ jobs:
           python3 -m scripts.deploy.images.collect --role showcase --release-sha "$RELEASE_SHA" --reference "$reference" --output delivery/showcase.json
         env:
           SOURCE_RUN_ID: ${{ needs.ci.outputs.source-run-id }}
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         id: metadata
         with:
           name: production-image-metadata-${{ env.RELEASE_SHA }}-showcase-${{ github.run_attempt }}
@@ -256,7 +256,7 @@ jobs:
           python3 -m scripts.deploy.images.collect --role personal --release-sha "$RELEASE_SHA" --reference "$reference" --output delivery/personal.json
         env:
           SOURCE_RUN_ID: ${{ needs.ci.outputs.source-run-id }}
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         id: metadata
         with:
           name: production-image-metadata-${{ env.RELEASE_SHA }}-personal-${{ github.run_attempt }}
@@ -313,7 +313,7 @@ jobs:
           python3 -m scripts.deploy.images.collect --role workers --release-sha "$RELEASE_SHA" --reference "$reference" --output delivery/workers.json
         env:
           SOURCE_RUN_ID: ${{ needs.ci.outputs.source-run-id }}
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         id: metadata
         with:
           name: production-image-metadata-${{ env.RELEASE_SHA }}-workers-${{ github.run_attempt }}
@@ -345,7 +345,7 @@ jobs:
           with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
               output.write(f"ids={','.join(ids)}\n")
           PY
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           artifact-ids: ${{ steps.receipts.outputs.ids }}
           github-token: ${{ github.token }}
@@ -390,7 +390,7 @@ jobs:
             --output delivery/production-release-metadata.json \
             --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" \
             --source-run-id "$SOURCE_RUN_ID"
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: production-release-${{ env.RELEASE_SHA }}
           overwrite: true
@@ -468,7 +468,7 @@ jobs:
             '${{ runner.temp }}/local-stt-evidence-${{ env.RELEASE_SHA }}'
       - name: Retain public speech qualification evidence
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: local-stt-evidence-${{ env.RELEASE_SHA }}
           path: ${{ runner.temp }}/local-stt-evidence-${{ env.RELEASE_SHA }}

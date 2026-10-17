@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import {
   prepareCredentialRemoval,
   prepareCredentialSave,
@@ -23,6 +23,7 @@ type Pending =
   | { kind: 'save'; command: CredentialSaveDraft; expectedEndpoint?: string }
   | { kind: 'remove'; command: CredentialRemovalRequest };
 export function useCredentialEditor(endpoint: CredentialEndpoint) {
+  const [currentEndpoint, setCurrentEndpoint] = useState(endpoint);
   const [snapshot, setSnapshot] = useState<CredentialSettingsSnapshot | null>(null);
   const [busy, setBusy] = useState(true);
   const [feedback, setFeedback] = useState<{
@@ -35,49 +36,59 @@ export function useCredentialEditor(endpoint: CredentialEndpoint) {
   const pending = useRef<Pending | null>(null);
   const receipts = useRef(new Map<CredentialEndpoint, Pending>());
   const displayed = useRef(new Map<string, CredentialSettingsSnapshot>());
+  const controllerEndpoint = useRef<CredentialEndpoint | null>(null);
+
+  if (currentEndpoint !== endpoint) {
+    setCurrentEndpoint(endpoint);
+    setSnapshot(null);
+    setBusy(true);
+    setFeedback(null);
+  }
 
   const load = useCallback(
-    async (signal: AbortSignal) => {
+    (signal: AbortSignal) => {
       locked.current = true;
-      setBusy(true);
-      try {
-        const next = await loadCredentialSettings(endpoint, signal);
-        signal.throwIfAborted();
-        setSnapshot(next);
-        for (const provider of displayed.current.keys()) displayed.current.set(provider, next);
-        setFeedback(
-          pending.current
-            ? {
-                provider: pending.current.command.provider,
-                message: 'A previous change needs its status checked before editing again.',
-                action: 'reconcile',
-              }
-            : null
-        );
-      } catch (error) {
-        if (!signal.aborted)
-          setFeedback({
-            provider: null,
-            message: error instanceof Error ? error.message : 'Could not load credential settings.',
-            action: 'reload',
-          });
-      } finally {
-        if (!signal.aborted) {
-          locked.current = false;
-          setBusy(false);
-        }
-      }
+      return loadCredentialSettings(endpoint, signal)
+        .then((next) => {
+          signal.throwIfAborted();
+          setSnapshot(next);
+          for (const provider of displayed.current.keys()) displayed.current.set(provider, next);
+          setFeedback(
+            pending.current
+              ? {
+                  provider: pending.current.command.provider,
+                  message: 'A previous change needs its status checked before editing again.',
+                  action: 'reconcile',
+                }
+              : null
+          );
+        })
+        .catch((error: unknown) => {
+          if (!signal.aborted)
+            setFeedback({
+              provider: null,
+              message:
+                error instanceof Error ? error.message : 'Could not load credential settings.',
+              action: 'reload',
+            });
+        })
+        .finally(() => {
+          if (!signal.aborted) {
+            locked.current = false;
+            setBusy(false);
+          }
+        });
     },
     [endpoint]
   );
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const lifetime = new AbortController();
     const lifetimeReceipts = receipts.current;
     controller.current = lifetime;
+    controllerEndpoint.current = endpoint;
     pending.current = receipts.current.get(endpoint) ?? null;
     displayed.current.clear();
-    setSnapshot(null);
     void load(lifetime.signal);
     return () => {
       if (pending.current) lifetimeReceipts.set(endpoint, pending.current);
@@ -87,12 +98,14 @@ export function useCredentialEditor(endpoint: CredentialEndpoint) {
   }, [endpoint, load]);
 
   function begin(provider: string) {
+    if (controllerEndpoint.current !== endpoint) return false;
     if (locked.current || pending.current || !snapshot) return false;
     displayed.current.set(provider, snapshot);
     setFeedback(null);
     return true;
   }
   function edited() {
+    if (controllerEndpoint.current !== endpoint) return;
     if (feedback?.action === 'confirm') {
       pending.current = null;
       setFeedback(null);
@@ -145,6 +158,7 @@ export function useCredentialEditor(endpoint: CredentialEndpoint) {
     });
   }
   async function run(operation: Pending, mode: 'submit' | 'confirm' | 'reconcile') {
+    if (controllerEndpoint.current !== endpoint) return;
     const signal = controller.current?.signal;
     if (!signal || signal.aborted || locked.current) return;
     locked.current = true;
@@ -183,6 +197,7 @@ export function useCredentialEditor(endpoint: CredentialEndpoint) {
     }
   }
   function save(provider: string, edit: CredentialEdit, expectedEndpoint?: string) {
+    if (controllerEndpoint.current !== endpoint) return Promise.resolve(undefined);
     if (pending.current || feedback?.action === 'reload') return Promise.resolve(undefined);
     const captured = displayed.current.get(provider);
     if (!captured) return Promise.resolve(undefined);
@@ -204,14 +219,18 @@ export function useCredentialEditor(endpoint: CredentialEndpoint) {
     }
   }
   function remove(provider: string) {
+    if (controllerEndpoint.current !== endpoint) return Promise.resolve(undefined);
     if (!snapshot || pending.current || feedback?.action === 'reload')
       return Promise.resolve(undefined);
     return run({ kind: 'remove', command: prepareCredentialRemoval(snapshot, provider) }, 'submit');
   }
   function act() {
+    if (controllerEndpoint.current !== endpoint) return Promise.resolve(undefined);
     if (locked.current) return Promise.resolve(undefined);
-    if (feedback?.action === 'reload' && !pending.current && controller.current)
+    if (feedback?.action === 'reload' && !pending.current && controller.current) {
+      setBusy(true);
       return load(controller.current.signal);
+    }
     const operation = pending.current;
     if (!operation) return Promise.resolve(undefined);
     return run(operation, feedback?.action === 'confirm' ? 'confirm' : 'reconcile');

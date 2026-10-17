@@ -34,6 +34,10 @@ function statusText(data: NotesResponse, fallback: string): string {
 }
 
 export function CourseNotesPanel({ courseId }: CourseNotesPanelProps) {
+  return <CourseNotesEditor key={courseId} courseId={courseId} />;
+}
+
+function CourseNotesEditor({ courseId }: CourseNotesPanelProps) {
   const [open, setOpen] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [phase, setPhase] = useState<Phase>('idle');
@@ -47,8 +51,6 @@ export function CourseNotesPanel({ courseId }: CourseNotesPanelProps) {
     if (!open || loaded) return;
 
     let cancelled = false;
-    setPhase('loading');
-    setError('');
 
     void (async () => {
       try {
@@ -141,7 +143,13 @@ export function CourseNotesPanel({ courseId }: CourseNotesPanelProps) {
       <button
         type="button"
         className={styles.opener}
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          if (!loaded) {
+            setPhase('loading');
+            setError('');
+          }
+          setOpen(true);
+        }}
         aria-expanded={false}
       >
         <span className={styles.openerLede}>Course notes</span>

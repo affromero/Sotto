@@ -11,6 +11,38 @@ export interface LocalTtsConnection {
   apiKey?: string;
   model: string;
   voices: readonly ProviderVoice[];
+  /** Optional bounds for short, interactive previews. Normal generation is unchanged. */
+  responseLimits?: Readonly<{ maxAudioBytes: number; maxErrorBytes: number }>;
+}
+
+/** Capture a keyless draft without retaining caller-owned mutable configuration. */
+export function captureDraftLocalTtsConnection(connection: LocalTtsConnection): LocalTtsConnection {
+  const captured = structuredClone(connection);
+  const endpoint = new URL(captured.endpoint);
+  if (
+    !['http:', 'https:'].includes(endpoint.protocol) ||
+    endpoint.username ||
+    endpoint.password ||
+    endpoint.search ||
+    endpoint.hash ||
+    captured.apiKey !== undefined ||
+    !captured.model.trim()
+  )
+    throw new Error(
+      'A draft local connection requires an explicit model and keyless HTTP endpoint.'
+    );
+  if (
+    captured.responseLimits &&
+    Object.values(captured.responseLimits).some(
+      (limit) => !Number.isSafeInteger(limit) || limit < 1
+    )
+  )
+    throw new Error('Local preview response limits must be positive integers.');
+  return Object.freeze({
+    ...captured,
+    voices: Object.freeze(captured.voices.map((voice) => Object.freeze(voice))),
+    ...(captured.responseLimits && { responseLimits: Object.freeze(captured.responseLimits) }),
+  });
 }
 
 /** Capture the sidecar configuration before importing or constructing its client. */

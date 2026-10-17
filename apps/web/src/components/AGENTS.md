@@ -76,8 +76,11 @@ OpenAI-compatible AI endpoint and model and manages its optional encrypted key.
 `settings/LocalSpeechSettings` lets each learner explicitly disable audio or return to
 configured speech. It also appears on Admin's Providers & models page, with recovery
 links from the TTS picker and credit test errors. Owners can select a local endpoint,
-model and distinct voices. Its
-atomic settings route preserves cloud provider configuration and credentials. Returning to configured
+model and distinct voices. `settings/local-speech/LocalSpeechPicker` discovers the
+draft server's voice catalogue and plays bounded previews without saving.
+Connection edits cancel stale results and
+release preview audio; only the parent panel's explicit action saves the selection.
+The atomic settings route preserves cloud provider configuration and credentials. Returning to configured
 speech clears the profile's provider and model preferences together.
 Audio can be explicitly disabled. The panel shows observed selected-provider exhaustion and
 offers an explicit credit check after a top-up without switching speech providers.

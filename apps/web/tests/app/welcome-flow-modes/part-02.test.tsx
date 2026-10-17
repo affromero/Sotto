@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { ImgHTMLAttributes } from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {
   credentialSaveRequestSchema,
@@ -136,14 +136,11 @@ describe('welcome hosted-demo mode', () => {
   });
   it('waits for credential settings before enabling intro navigation', async () => {
     const user = userEvent.setup();
-    let release!: () => void;
-    const pending = new Promise<void>((resolve) => {
-      release = resolve;
-    });
+    const pending = Promise.withResolvers<void>();
     vi.stubGlobal('fetch', async (...args: Parameters<typeof fetch>) => {
       const response = credentialBoundary.handle(...args);
       if (response) {
-        await pending;
+        await pending.promise;
         return response;
       }
       return Response.json({}, { status: 503 });
@@ -154,7 +151,7 @@ describe('welcome hosted-demo mode', () => {
     expect(start).toBeDisabled();
     await user.keyboard('{Enter}');
     expect(screen.queryByText(/How Sotto works/i)).not.toBeInTheDocument();
-    release();
+    await act(async () => pending.resolve());
     await waitFor(() => expect(start).toBeEnabled());
     await user.click(start);
     expect(await screen.findByText(/How Sotto works/i)).toBeInTheDocument();
