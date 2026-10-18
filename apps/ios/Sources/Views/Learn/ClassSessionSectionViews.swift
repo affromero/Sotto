@@ -135,27 +135,20 @@ private struct ClassListeningAudioBlock: View {
                     Text(episode?.title ?? "Listening audio")
                         .font(.headline)
                         .foregroundStyle(SottoTheme.ink)
-                    Text(episode?.audioUrl == nil ? listeningStatus : "Listen first, then answer below.")
+                    Text(episode == nil ? "Listening was not attached to this generated class." : "Listen first, then answer below.")
                         .font(.callout)
                         .foregroundStyle(SottoTheme.muted)
                 }
                 Spacer()
             }
 
-            if let reference = episode?.audioUrl {
-                LearnerAudioPlayer(reference: reference)
+            if let episode {
+                EpisodeListeningPlayer(episodeId: episode.id)
             }
         }
         .padding(16)
         .background(SottoTheme.paper)
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-    }
-
-    private var listeningStatus: String {
-        if episode == nil {
-            return "Listening was not attached to this generated class."
-        }
-        return "Audio is still generating. The comprehension questions are available below."
     }
 
 }

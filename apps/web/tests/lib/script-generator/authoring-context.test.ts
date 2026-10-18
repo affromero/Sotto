@@ -12,6 +12,10 @@ import { formatSourceBlock, generateScript } from '@/lib/script-generator';
 const source = 'Anna hat gestern ihre Schwester besucht.';
 const topic = 'Describe completed activities using the conversational past.';
 const spoken = 'Anna hat gestern ihre Schwester [V1:besucht].';
+const dialogueTurns = [
+  { speaker: 'HOST', text: spoken },
+  { speaker: 'EXPERT', text: 'Wie war der Besuch?' },
+];
 const params = {
   provider: 'anthropic',
   model: 'fixture',
@@ -31,7 +35,7 @@ describe('listening authoring context', () => {
     generateResponse.mockReset();
     generateResponse.mockResolvedValue({
       content: JSON.stringify({
-        turns: [{ speaker: 'HOST', text: spoken }],
+        turns: dialogueTurns,
         soundCues: [],
         references: [],
         vocabulary: [{ number: 1, word: 'besuchen', translation: 'to visit' }],
@@ -54,7 +58,7 @@ describe('listening authoring context', () => {
       expect(request).toContain(formatSourceBlock(source));
       expect(request).toContain(`Depth: ${params.depth}`);
       expect(system).toContain('- besuchen — to visit');
-      expect(result.turns).toEqual([{ speaker: 'HOST', text: spoken }]);
+      expect(result.turns).toEqual(dialogueTurns);
       expect(result.vocabulary).toMatchObject([{ number: 1, word: 'besuchen' }]);
       if (forLearning) {
         expect(request).toContain(`Communicative objective: ${topic}`);
@@ -67,6 +71,8 @@ describe('listening authoring context', () => {
         expect(system).toContain('keep the information load low throughout the passage');
         expect(system).toContain('Make changes of person, place and time explicit');
         expect(system).toContain('excluding speaker labels and nonspoken metadata');
+        expect(system).toContain('at most 60 spoken words');
+        expect(system).toContain('Each turn belongs to exactly one speaker');
         expect(system).not.toContain('Explains complex topics');
       } else {
         expect(request).toBe(`Topic: ${topic}\nDepth: standard\n\n${formatSourceBlock(source)}`);
@@ -139,7 +145,7 @@ describe('listening authoring context', () => {
     expect(messages[0].content).toContain(formatSourceBlock(source));
     expect(messages[0].content).toContain('script_vocabulary_missing_identity');
     expect(system).toContain('- besuchen — to visit');
-    expect(result.turns).toEqual([{ speaker: 'HOST', text: spoken }]);
+    expect(result.turns).toEqual(dialogueTurns);
     expect(result.vocabulary[0].word).toBe('besuchen');
   });
 

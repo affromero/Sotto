@@ -3,9 +3,14 @@ import {
   mapDirectionToExpression,
   getSupportedDirections,
   convertInlineAudioTags,
+  stripInlineAudioTags,
 } from '@/lib/tts-expression-mapper';
 
 describe('tts-expression-mapper', () => {
+  it('keeps spoken text while removing delivery tags and retaining pause punctuation', () => {
+    const spoken = stripInlineAudioTags('[warm] Hallo [pause] Anna [long pause] bis bald.');
+    expect(spoken.trim().replace(/\s+/g, ' ')).toBe('Hallo , Anna ... bis bald.');
+  });
   it('preserves Fish bracket cues and Drama word-level delivery tags', () => {
     expect(mapDirectionToExpression('  calm, clear  ', 'HOST', 'fish').fish).toEqual({
       audioTagPrefix: '[calm, clear] ',

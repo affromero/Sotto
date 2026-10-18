@@ -46,6 +46,14 @@ const duplicate = candidate('Ich habe [V1:besucht].', [
   ...vocabulary,
   { number: 1, word: 'gelesen', translation: 'read' },
 ]);
+const longDialogue = JSON.stringify({
+  ...SAMPLE_SCRIPT_RESULT,
+  turns: [
+    { speaker: 'HOST', text: 'Besuch '.repeat(61) },
+    { speaker: 'EXPERT', text: 'Wie war es?' },
+  ],
+});
+const monologue = candidate('Ich habe Anna besucht.', []);
 
 function scriptRequests() {
   return mockGenerateResponse.mock.calls.filter((call) => call[2].maxTokens === 12288);
@@ -84,7 +92,7 @@ async function failure() {
   throw new Error('Expected generation to fail.');
 }
 
-describe('bounded listening marker correction', () => {
+describe('bounded listening script correction', () => {
   beforeEach(async () => {
     vi.resetAllMocks();
     setupHappyPath();
@@ -101,7 +109,9 @@ describe('bounded listening marker correction', () => {
     [ambiguous, 'script_vocabulary_ambiguous_identity'],
     [missing, 'script_vocabulary_missing_identity'],
     [duplicate, 'script_vocabulary_duplicate_number'],
-  ])('fully reviews a replacement after canonical identity rejection (%s)', async (raw, code) => {
+    [longDialogue, 'script_dialogue_turn_too_long'],
+    [monologue, 'script_dialogue_missing_exchange'],
+  ])('fully reviews a replacement after canonical script rejection (%s)', async (raw, code) => {
     useScripts([raw, valid]);
     await generateClassListening(PARAMS);
     const requests = scriptRequests();

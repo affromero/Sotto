@@ -504,10 +504,14 @@ export function convertInlineAudioTags(text: string, providerId: TtsProviderId):
 
     default:
       // openai, minimax, fal, replicate — no audio tag support
-      // Approximate pauses with punctuation; strip all remaining expression tags
-      return text
-        .replace(/\[long pause\]/gi, '... ')
-        .replace(/\[(?:pause|short pause)\]/gi, ', ')
-        .replace(/\[([^\]]+)\]/g, '');
+      return stripInlineAudioTags(text);
   }
+}
+
+/** Approximate pauses with punctuation and strip all remaining expression tags. */
+export function stripInlineAudioTags(text: string): string {
+  return text
+    .replace(/\[long pause\]/gi, '... ')
+    .replace(/\[(?:pause|short pause)\]/gi, ', ')
+    .replace(/\[([^\]]+)\]/g, '');
 }

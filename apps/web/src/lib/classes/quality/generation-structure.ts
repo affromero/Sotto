@@ -12,6 +12,10 @@ const structureIssueSchema = z
       'script_vocabulary_duplicate_number',
       'script_vocabulary_ambiguous_identity',
       'script_vocabulary_missing_identity',
+      'script_dialogue_unknown_speaker',
+      'script_dialogue_missing_exchange',
+      'script_dialogue_turn_too_long',
+      'script_dialogue_embedded_speaker',
     ]),
     index: z.number().int().min(0).max(4).optional(),
   })

@@ -25,6 +25,18 @@ let supported: boolean;
 let alwaysReject: boolean;
 let scripts: string[];
 const source = 'The supplied trip account.';
+function dialogueTurns(text: string) {
+  return [
+    { speaker: 'HOST', text },
+    { speaker: 'EXPERT', text: 'Wie war die Reise?' },
+  ];
+}
+function largeTurns(text: string) {
+  return Array.from({ length: 30 }, (_, index) => ({
+    speaker: index % 2 === 0 ? 'HOST' : 'EXPERT',
+    text: ((index === 0 ? text : '') + ' Lea erzählt von ihrer Reise.'.repeat(10)).trim(),
+  }));
+}
 function useLargeScript(unchanged = false) {
   const respond = mockGenerateResponse.getMockImplementation()!;
   mockGenerateResponse.mockImplementation(async (...args) => {
@@ -33,9 +45,9 @@ function useLargeScript(unchanged = false) {
     const script = JSON.parse(response.content);
     const turnRepair = args[2].jsonSchema?.name === 'learning_script_turn_repair';
     const text = turnRepair ? script.turnTexts['1'] : script.turns[0].text;
-    const largeText = (unchanged ? original : text) + ' Lea erzählt von ihrer Reise.'.repeat(300);
-    if (turnRepair) script.turnTexts['1'] = largeText;
-    else script.turns[0].text = largeText;
+    const turns = largeTurns(unchanged ? original : text);
+    if (turnRepair) script.turnTexts['1'] = turns[0].text;
+    else script.turns = turns;
     return { ...response, content: JSON.stringify(script) };
   });
 }
@@ -58,8 +70,15 @@ beforeEach(async () => {
       return {
         content: JSON.stringify(
           args[2].jsonSchema?.name === 'learning_script_turn_repair'
-            ? { turnTexts: { '1': text } }
-            : { ...SAMPLE_SCRIPT_RESULT, turns: [{ speaker: 'HOST', text }] }
+            ? {
+                turnTexts: Object.fromEntries(
+                  args[2].jsonSchema.schema.properties.turnTexts.required.map((index: string) => [
+                    index,
+                    index === '1' ? text : 'Wie war die Reise?',
+                  ])
+                ),
+              }
+            : { ...SAMPLE_SCRIPT_RESULT, turns: dialogueTurns(text) }
         ),
         model: 'm',
       };
@@ -142,14 +161,13 @@ describe('canonical listening passage adjudication orchestration', () => {
       if (!(failure instanceof TeachingQualityRejectionError)) throw failure;
       expect(failure.teachingFailure!.reviews).toHaveLength(unchanged ? 1 : 2);
       for (const [index, review] of failure.teachingFailure!.reviews.entries()) {
-        const text =
-          (index === 0 ? original : replacement) + ' Lea erzählt von ihrer Reise.'.repeat(300);
+        const turns = largeTurns(index === 0 ? original : replacement);
         expect(review).not.toHaveProperty('omitted');
         expect(JSON.parse(review.candidate!)).toEqual([
           {
             reviewContract: 'listening_candidate_diagnostic',
             listeningAudit: {
-              turns: [{ turnIndex: 1, speaker: 'HOST', text }],
+              turns: turns.map((turn, turnIndex) => ({ turnIndex: turnIndex + 1, ...turn })),
               addresses: [
                 { kind: 'passage' },
                 { kind: 'question', index: 0 },
@@ -158,7 +176,7 @@ describe('canonical listening passage adjudication orchestration', () => {
                 { kind: 'question', index: 3 },
               ],
               items: [
-                { passageText: `HOST: ${text}` },
+                { passageText: turns.map((turn) => `${turn.speaker}: ${turn.text}`).join('\n') },
                 ...JSON.parse(SAMPLE_QUESTIONS_JSON).questions,
               ],
             },
@@ -222,10 +240,15 @@ describe('canonical listening passage adjudication orchestration', () => {
       const input = JSON.parse(call[1][0].content);
       expect(input.listeningSource).toBe(formatted);
       const passageText = input.items[0].content.passageText;
-      expect([`HOST: ${original}`, `HOST: ${replacement}`]).toContain(passageText);
-      expect(input.listeningTurns).toEqual([
-        { turnIndex: 1, speaker: 'HOST', text: passageText.slice('HOST: '.length) },
-      ]);
+      expect(
+        [original, replacement].map((text) => `HOST: ${text}\nEXPERT: Wie war die Reise?`)
+      ).toContain(passageText);
+      expect(input.listeningTurns).toEqual(
+        dialogueTurns(passageText.split('\n')[0].slice('HOST: '.length)).map((turn, index) => ({
+          turnIndex: index + 1,
+          ...turn,
+        }))
+      );
     }
     expect(generationRequests[1][1][0].content).toContain(
       'The destination differs from the source.'

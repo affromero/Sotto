@@ -399,6 +399,7 @@ struct SottoEpisode: Decodable, Equatable {
     let id: String
     let audioUrl: String?
     let status: String?
+    let segments: [SottoListeningTurn]?
 }
 
 struct SottoClassEpisode: Decodable, Equatable {

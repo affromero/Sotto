@@ -14,6 +14,7 @@ vi.mock('@/lib/logger', () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: 
 
 import { generateSectionQuestions, type GeneratedQuestion } from '@/lib/class-generation';
 import { TeachingQualityRejectionError } from '@/lib/classes/quality/teaching-quality';
+import { captureGenerationFailure } from '@/lib/classes/quality/generation-failure';
 
 const lemmas = ['gemacht', 'gegangen', 'gesehen', 'besucht', 'gestern'];
 const sentences = [
@@ -32,6 +33,7 @@ type BlindItem = { index: number; question: string; options: string[] };
 let generated: boolean;
 let vocabulary: boolean;
 let finalDefect: boolean;
+let finalAmbiguity: boolean;
 let globalBlindDefect: boolean;
 let blindDefect: 'issue' | 'wrong_key' | 'ambiguous';
 let repairPrompt: string;
@@ -68,6 +70,7 @@ beforeEach(() => {
   generated = false;
   vocabulary = true;
   finalDefect = false;
+  finalAmbiguity = false;
   globalBlindDefect = false;
   blindDefect = 'issue';
   repairPrompt = '';
@@ -98,11 +101,13 @@ beforeEach(() => {
             questions: input.questions.map((row: BlindItem) => ({
               index: row.index,
               acceptableOptionIndices:
-                row.question.includes('unmögliche Reise') && blindDefect !== 'issue'
-                  ? blindDefect === 'wrong_key'
-                    ? [1]
-                    : [0, 1]
-                  : [row.options.findIndex((option) => lemmas.includes(option))],
+                finalAmbiguity && blindInputs.length > 1 && row.index === 1
+                  ? [0, 2]
+                  : row.question.includes('unmögliche Reise') && blindDefect !== 'issue'
+                    ? blindDefect === 'wrong_key'
+                      ? [1]
+                      : [0, 1]
+                    : [row.options.findIndex((option) => lemmas.includes(option))],
               issues:
                 row.question.includes('unmögliche Reise') && blindDefect === 'issue'
                   ? ['unnatural']
@@ -191,6 +196,8 @@ describe('question repair from both independent audits', () => {
       expect(repairPrompt).toContain('unmögliche Reise');
       expect(repairPrompt).toContain('Correction: Ich bin zu Fuß nach Hause gegangen.');
       expect(repairPrompt).toContain('acceptableOptionIndices');
+      expect(repairPrompt).toContain('independently insert all four options');
+      expect(repairPrompt).toContain('Repair its context, options and explanation together');
       expect(result[0].question).not.toContain('unmögliche Reise');
       expect(result[1].question).not.toContain('auf meinen Füßen');
       const original = teachingInputs[0];
@@ -213,6 +220,34 @@ describe('question repair from both independent audits', () => {
     expect(repairPrompt).toContain('Correction: Ich bin zu Fuß nach Hause gegangen.');
     expect(teachingInputs.at(-1)![1].content.explanation).toContain('Fahrzeug');
   });
+
+  it.each([false, true])(
+    'retains terminal ambiguity with bounded teaching evidence: terminal teaching rejection=%s',
+    async (teachingRejected) => {
+      finalDefect = teachingRejected;
+      finalAmbiguity = true;
+      const error = await generateSectionQuestions({ ...params, vocabularyReview: true }).catch(
+        (failure: unknown) => failure
+      );
+      const failure = captureGenerationFailure(error);
+      expect(failure.category).toBe(teachingRejected ? 'teaching_rejected' : 'section_quality');
+      expect(failure.teachingFailure?.reviews).toHaveLength(2);
+      const [teaching, blind] = failure.teachingFailure!.reviews;
+      expect(teaching.verdict.items[1].issues).toEqual([
+        teachingRejected ? 'incorrect' : 'unnatural',
+      ]);
+      expect(JSON.parse(teaching.candidate!)[0].items[1].question).toBe(
+        teachingInputs[teachingRejected ? 1 : 0][1].content.question
+      );
+      const retained = JSON.parse(blind.candidate!);
+      expect(retained.reviewType).toBe('blind_section');
+      expect(retained.blindVerdict.questions[1].acceptableOptionIndices).toEqual([0, 2]);
+      expect(retained.questions[1].question).toBe(blindInputs.at(-1)![1].question);
+      expect(retained.questions[1].options).toEqual(blindInputs.at(-1)![1].options);
+      expect(retained.questions[1].question).not.toContain('auf meinen Füßen');
+      expect(blind.verdict.items[1]).toMatchObject({ acceptable: false, issues: ['uncertain'] });
+    }
+  );
 
   it('preserves no rows when the initial blind audit has a global defect', async () => {
     globalBlindDefect = true;
