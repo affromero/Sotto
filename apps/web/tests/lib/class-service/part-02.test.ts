@@ -27,6 +27,7 @@ import {
   mockDueVocabRows,
   mockCourseMaterialRows,
   mockLearnerVocabFindMany,
+  mockTeachingProviderInput,
 } from './fixtures';
 import { authorizedLearnerExecution } from '../../helpers/runtime/provider-execution';
 import { getClassForUser, regenerateCurrentClass, deleteClassForUser } from '@/lib/class-service';
@@ -198,6 +199,113 @@ describe('regenerateCurrentClass', () => {
       else expect(mockGenerateClassListening).not.toHaveBeenCalled();
     }
   );
+
+  it.each([false, true])(
+    'preserves saved answers and existing sections while repairing teaching (already present: %s)',
+    async (hasTeaching) => {
+      const savedAnswers = Object.fromEntries(
+        Array.from({ length: 5 }, (_, index) => [`saved-question-${index}`, index % 4])
+      );
+      const retainedTeaching = { ...sampleTeaching, title: 'Accepted teaching to retain' };
+      const retainedSeed = {
+        intro: { purpose: 'Retained goal' },
+        classTargets: {
+          vocab: [{ lemma: 'hola', gloss: 'hello' }],
+          grammarPoints: ['retained grammar'],
+        },
+        ...(hasTeaching ? { teaching: retainedTeaching } : {}),
+      };
+      const retainedSections = [
+        { id: 'saved-grammar', skill: 'GRAMMAR', attempt: 1, status: 'READY' },
+      ];
+      mockCourseClassFindFirst.mockResolvedValue({
+        id: 'class-1',
+        courseId: 'course-1',
+        status: 'GENERATING',
+        attempt: 2,
+        sourceUrl: null,
+        sourceTitle: null,
+        lesson: SAMPLE_LESSON,
+        course: SAMPLE_COURSE,
+        learnerAnswers: savedAnswers,
+        writingDrafts: {},
+        sections: retainedSections,
+        adaptiveSeed: retainedSeed,
+      });
+
+      await expect(
+        regenerateCurrentClass('class-1', 'u1', authorizedLearnerExecution('u1'), undefined, {
+          repair: true,
+          attempt: 2,
+          skills: [],
+        })
+      ).resolves.toBe(true);
+
+      expect(mockCourseClassUpdate.mock.calls.at(-1)?.[0].data).toMatchObject({
+        status: 'IN_PROGRESS',
+        adaptiveSeed: {
+          intro: retainedSeed.intro,
+          classTargets: retainedSeed.classTargets,
+          teaching: hasTeaching ? retainedTeaching : sampleTeaching,
+        },
+      });
+      for (const [write] of mockCourseClassUpdate.mock.calls) {
+        expect(write.data).not.toHaveProperty('learnerAnswers');
+        expect(write.data).not.toHaveProperty('writingDrafts');
+      }
+      expect(mockClassSectionCreate).not.toHaveBeenCalled();
+      expect(mockClassSectionUpdate).not.toHaveBeenCalled();
+      expect(mockClassSectionDeleteMany).not.toHaveBeenCalled();
+      expect(mockClassSubmissionDeleteMany).not.toHaveBeenCalled();
+      if (hasTeaching) expect(mockTeachingProviderInput).not.toHaveBeenCalled();
+      else
+        expect(
+          mockTeachingProviderInput.mock.calls.map(([, , options]) => options.jsonSchema.name)
+        ).toEqual(
+          expect.arrayContaining([
+            'class_teaching_generation',
+            'class_teaching_critic',
+            'class_teaching_adjudicator',
+          ])
+        );
+    }
+  );
+
+  it('rejects malformed saved teaching before requesting or publishing a replacement', async () => {
+    mockCourseClassFindFirst.mockResolvedValue({
+      id: 'class-1',
+      courseId: 'course-1',
+      status: 'GENERATING',
+      attempt: 2,
+      sourceUrl: null,
+      sourceTitle: null,
+      lesson: SAMPLE_LESSON,
+      course: SAMPLE_COURSE,
+      learnerAnswers: { 'saved-question': 1 },
+      sections: [],
+      adaptiveSeed: {
+        intro: { purpose: 'Retained goal' },
+        teaching: { title: 'Malformed saved unit' },
+        classTargets: {
+          vocab: [{ lemma: 'hola', gloss: 'hello' }],
+          grammarPoints: ['retained grammar'],
+        },
+      },
+    });
+
+    await expect(
+      regenerateCurrentClass('class-1', 'u1', authorizedLearnerExecution('u1'), undefined, {
+        repair: true,
+        attempt: 2,
+        skills: [],
+      })
+    ).rejects.toThrow();
+
+    expect(mockTeachingProviderInput).not.toHaveBeenCalled();
+    expect(mockCourseClassUpdate).not.toHaveBeenCalled();
+    expect(mockClassSectionCreate).not.toHaveBeenCalled();
+    expect(mockClassSectionDeleteMany).not.toHaveBeenCalled();
+  });
 
   it('settles this attempt as failed when the course acquired another active class', async () => {
     mockCourseClassFindFirst.mockResolvedValue({
