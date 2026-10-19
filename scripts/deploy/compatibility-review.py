@@ -48,8 +48,15 @@ def provider_activation(review: Mapping[str, object]) -> dict[str, object]:
     if not isinstance(contracts, dict):
         raise ValueError('Previous worker contracts must map exact image IDs')
     for service, runtime in runtimes.items():
-        if not isinstance(runtime, dict) or set(runtime) != {'containerId', 'imageId'}:
+        identity_fields = {'containerId', 'imageId'}
+        if not isinstance(runtime, dict) or set(runtime) not in (
+            identity_fields, identity_fields | {'activationMode'},
+        ):
             raise ValueError('Exact previous runtime identity required')
+        if runtime.get('activationMode', 'release-record') not in (
+            'release-record', 'implicit-enabled',
+        ):
+            raise ValueError('Exact previous provider activation mode required')
         if not isinstance(runtime['containerId'], str) or not re.fullmatch(
             r'[a-f0-9]{64}', runtime['containerId']
         ) or not isinstance(runtime['imageId'], str) or not re.fullmatch(
@@ -420,7 +427,12 @@ def captured_runtime(path: Path) -> dict[str, tuple[str, str]]:
 def inspect_enabled_runtime(
     identifier: str, image: str, release: str, project: str, service: str,
     directory: Path | None = None,
+    *, activation_mode: str = 'release-record',
 ) -> None:
+    if activation_mode not in {'release-record', 'implicit-enabled'} or (
+        activation_mode == 'implicit-enabled' and directory is not None
+    ):
+        raise ValueError('Reviewed previous provider activation mode required')
     rows: object = json.loads(runtime_command(['inspect', identifier]))
     if not isinstance(rows, list) or len(rows) != 1 or not isinstance(rows[0], dict):
         raise ValueError('Unique actual runtime required')
@@ -442,18 +454,37 @@ def inspect_enabled_runtime(
     entries = config.get('Env')
     if not isinstance(entries, list) or not all(isinstance(item, str) for item in entries):
         raise ValueError('Runtime environment metadata required')
-    for name, expected in {
-        'SOTTO_RELEASE_SHA': release,
-        'SOTTO_PROVIDER_ACTIVATION_FILE': '/run/sotto-provider-activation/fish.json',
-    }.items():
-        values = [entry.partition('=')[2] for entry in entries if entry.startswith(name + '=')]
-        if values != [expected]:
-            raise ValueError('Unique release-bound provider authority required')
+    release_name = 'SOTTO_RELEASE_SHA'
+    releases = [entry for entry in entries
+                if entry == release_name or entry.startswith(release_name + '=')]
+    if releases != [release_name + '=' + release]:
+        raise ValueError('Unique release-bound provider authority required')
     mounts = row.get('Mounts')
     if not isinstance(mounts, list):
         raise ValueError('Actual runtime mounts required')
+    activation_name = 'SOTTO_PROVIDER_ACTIVATION_FILE'
+    activation = [entry for entry in entries if entry == activation_name
+                  or entry.startswith(activation_name + '=')]
+    destination = Path('/run/sotto-provider-activation')
+    if activation_mode == 'implicit-enabled':
+        if activation:
+            raise ValueError('Implicit provider activation must be unconfigured')
+        for mount in mounts:
+            if not isinstance(mount, dict) or not isinstance(
+                mount.get('Destination'), str,
+            ):
+                raise ValueError('Actual runtime mount destination required')
+            target = Path(mount['Destination'])
+            if target.anchor != '/' or '..' in target.parts or (
+                target == destination or target in destination.parents
+                or destination in target.parents
+            ):
+                raise ValueError('Implicit provider activation has a covering mount')
+        return
+    if activation != [activation_name + '=' + str(destination / 'fish.json')]:
+        raise ValueError('Unique release-bound provider authority required')
     selected = [mount for mount in mounts if isinstance(mount, dict)
-                and mount.get('Destination') == '/run/sotto-provider-activation']
+                and mount.get('Destination') == str(destination)]
     if len(selected) != 1 or selected[0].get('Type') != 'bind' or selected[0].get(
         'RW'
     ) is not False or not isinstance(selected[0].get('Source'), str):
@@ -473,10 +504,17 @@ def existing_continuity(bound: Path, old_slot: str) -> None:
     reviewed = cast(dict[str, dict[str, str]], continuity['previousRuntimes'])
     stack = os.environ['SOTTO_STACK']
     for service, (identifier, image) in {**web, **workers}.items():
-        if reviewed[service] != {'containerId': identifier, 'imageId': image}:
+        runtime = reviewed[service]
+        if {key: runtime[key] for key in ('containerId', 'imageId')} != {
+            'containerId': identifier, 'imageId': image,
+        }:
             raise ValueError('Captured previous runtime differs from review')
         project = stack + '-' + old_slot if service == 'web' else stack
-        inspect_enabled_runtime(identifier, image, cast(str, continuity['previousReleaseSha']), project, service)
+        inspect_enabled_runtime(
+            identifier, image, cast(str, continuity['previousReleaseSha']),
+            project, service,
+            activation_mode=runtime.get('activationMode', 'release-record'),
+        )
 
 
 def candidate_continuity(directory: Path, slot: str) -> None:
@@ -504,10 +542,14 @@ def overlap_continuity(bound: Path, directory: Path, old_slot: str, slot: str) -
         raise ValueError('Captured previous web required')
     identifier, image = web['web']
     reviewed = cast(dict[str, dict[str, str]], continuity['previousRuntimes'])
-    if reviewed['web'] != {'containerId': identifier, 'imageId': image}:
+    runtime = reviewed['web']
+    if {key: runtime[key] for key in ('containerId', 'imageId')} != {
+        'containerId': identifier, 'imageId': image,
+    }:
         raise ValueError('Captured previous web differs from review')
     inspect_enabled_runtime(identifier, image, cast(str, continuity['previousReleaseSha']),
-                            os.environ['SOTTO_STACK'] + '-' + old_slot, 'web')
+                            os.environ['SOTTO_STACK'] + '-' + old_slot, 'web',
+                            activation_mode=runtime.get('activationMode', 'release-record'))
     candidate_continuity(directory, slot)
 
 
