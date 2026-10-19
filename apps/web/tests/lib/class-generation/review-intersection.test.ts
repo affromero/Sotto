@@ -1,24 +1,58 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { blockedProviderExecution } from '../../helpers/runtime/provider-execution';
+// @vitest-environment node
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { PrismaClient } from '@/generated/prisma/client';
+import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
+import {
+  createSharedTestInstance,
+  type SharedTestInstance,
+} from '../../helpers/setup/shared-instance';
+import { resolveSottoRequest } from '@/lib/sidedoor/access/core/request-identity';
 
-const boundary = vi.hoisted(() => ({ generate: vi.fn() }));
-vi.mock('@/lib/providers/ai', () => ({
+const boundary = vi.hoisted(() => ({ generate: vi.fn(), database: null as PrismaClient | null }));
+vi.mock('@/lib/prisma', async () => {
+  const { prismaTestBoundary } = await import('../../helpers/setup/shared-instance');
+  const database = prismaTestBoundary(boundary);
+  return { prisma: database, prismaUnfiltered: database };
+});
+vi.mock('@/lib/providers/ai', async (original) => ({
+  ...(await original<typeof import('@/lib/providers/ai')>()),
   createAIProvider: () => ({ generateResponse: boundary.generate }),
 }));
-vi.mock('@/lib/learning-ai', () => ({
-  resolveCapturedLearningAi: async (userId: string) => ({
-    provider: 'fixture',
-    model: 'fixture',
-    execution: blockedProviderExecution(userId),
-  }),
-  capturedLearningAiOptions: async () => ({ model: 'fixture' }),
-}));
-vi.mock('@/lib/usage-logger', () => ({ logUsage: vi.fn() }));
-vi.mock('@/lib/logger', () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 
 import { generateSectionQuestions, type GeneratedQuestion } from '@/lib/class-generation';
 import { TeachingQualityRejectionError } from '@/lib/classes/quality/teaching-quality';
 import { captureGenerationFailure } from '@/lib/classes/quality/generation-failure';
+
+let instance: SharedTestInstance;
+let execution: SottoProviderExecution;
+function initializeInstance() {
+  beforeAll(async () => {
+    instance = await createSharedTestInstance('review_intersection');
+    boundary.database = instance.database;
+    const identity = await instance.reset();
+    await instance.database.user.update({
+      where: { id: identity.ownerId },
+      data: { preferredAiProvider: 'codex', preferredAiModel: 'codex:review-intersection-fixture' },
+    });
+    const request = new Request('http://localhost/api/v1/classes', {
+      headers: { cookie: `sotto_session=${identity.ownerToken}` },
+    });
+    params.userId = identity.ownerId;
+    execution = {
+      userId: identity.ownerId,
+      signal: new AbortController().signal,
+      authorize: async (database) => {
+        const current = await resolveSottoRequest(database, request);
+        if (!current || current.kind !== 'content') throw new Error('Fixture admission expired');
+        return current;
+      },
+    };
+  });
+  afterAll(async () => {
+    boundary.database = null;
+    if (instance) await instance.close();
+  });
+}
 
 const lemmas = ['gemacht', 'gegangen', 'gesehen', 'besucht', 'gestern'];
 const sentences = [
@@ -40,13 +74,21 @@ let finalDefect: boolean;
 let finalAmbiguity: boolean;
 let globalBlindDefect: boolean;
 let lateDefinitionDefect: boolean;
+let durationRecall: boolean;
+let targetLemmas: string[];
 let blindDefect: 'issue' | 'wrong_key' | 'ambiguous';
 let repairPrompt: string;
 let generationPrompts: string[];
 let blindPrompts: string[];
 let teachingInputs: Item[][];
+let pairedInputs: Array<{
+  role: string;
+  exerciseMode?: string;
+  items: Item[];
+}>;
 let blindInputs: BlindItem[][];
 let corroborationInputs: Array<{
+  exerciseMode?: string;
   items: Item[];
   novelFindingProposals: Array<{ itemIndex: number; findingIndex: number }>;
 }>;
@@ -55,10 +97,10 @@ function authored(replacement: boolean) {
   const rows = sentences.map((question, targetIndex) => ({
     targetIndex,
     taskContext:
-      !replacement && targetIndex === 0
+      !replacement && targetIndex === 0 && !durationRecall
         ? 'Wähle das Wort für eine unmögliche Reise.'
         : !replacement && targetIndex === 1
-          ? 'Ich bin auf meinen Füßen nach Hause gelaufen.'
+          ? 'Ich bin zu Füße nach Hause gelaufen.'
           : 'Ergänze das passende Wort.',
     question: replacement && targetIndex > 1 ? question.replace('gestern', 'am Montag') : question,
     distractors: ['getrunken', 'gegessen', 'geschrieben'],
@@ -68,13 +110,25 @@ function authored(replacement: boolean) {
         ? '„Gesehen“ bedeutet immer, einen Film angeschaut zu haben.'
         : replacement && targetIndex === 1 && finalDefect
           ? 'Gehen bedeutet, ein Fahrzeug zu benutzen.'
-          : `Die Situation verlangt „${lemmas[targetIndex]}“.`,
+          : `Die Situation verlangt „${targetLemmas[targetIndex]}“.`,
     passageRef: '',
   }));
+  if (durationRecall) {
+    rows[1] = {
+      ...rows[1],
+      taskContext: replacement
+        ? 'Die Wanderung startet um 9 Uhr und ist für 13 Uhr zu Ende geplant. Wähle das Verb, das angibt, wie lange sie insgesamt ist.'
+        : 'Wähle das Verb, das die Zeitspanne eines Termins bezeichnet; der Termin dauert laut Programm eine Stunde.',
+      question: replacement
+        ? 'Die geplante Wanderung soll insgesamt vier Stunden _____.'
+        : 'Im Programm steht: 10 bis 11 Uhr. Wie viele Minuten soll der Termin _____?',
+      distractors: ['beginnen', 'enden', 'warten'],
+    };
+  }
   if (vocabulary) return rows;
   return rows.map(({ targetIndex, distractors, ...row }) => {
     const options = [...distractors];
-    options.splice(row.correctIndex, 0, lemmas[targetIndex]);
+    options.splice(row.correctIndex, 0, targetLemmas[targetIndex]);
     return { ...row, options };
   });
 }
@@ -86,11 +140,14 @@ beforeEach(() => {
   finalAmbiguity = false;
   globalBlindDefect = false;
   lateDefinitionDefect = false;
+  durationRecall = false;
+  targetLemmas = [...lemmas];
   blindDefect = 'issue';
   repairPrompt = '';
   generationPrompts = [];
   blindPrompts = [];
   teachingInputs = [];
+  pairedInputs = [];
   blindInputs = [];
   corroborationInputs = [];
   boundary.generate.mockReset();
@@ -142,7 +199,7 @@ beforeEach(() => {
                     ? blindDefect === 'wrong_key'
                       ? [1]
                       : [0, 1]
-                    : [row.options.findIndex((option) => lemmas.includes(option))],
+                    : [row.options.findIndex((option) => targetLemmas.includes(option))],
               issues:
                 row.question.includes('unmögliche Reise') && blindDefect === 'issue'
                   ? ['unnatural']
@@ -153,16 +210,23 @@ beforeEach(() => {
         };
       }
       const items = input.items as Item[];
+      pairedInputs.push({ role: name, ...input });
       if (name === 'class_teaching_critic') teachingInputs.push(items);
       return {
         content: JSON.stringify({
           items: items.map((item) => {
             if (name === 'class_teaching_critic') {
-              const unnatural = item.content.question.includes('auf meinen Füßen');
+              const wordingPreference = item.content.question.includes(
+                'wie lange sie insgesamt ist'
+              );
+              const answerLeak = item.content.question.includes('der Termin dauert');
+              const unnatural = item.content.question.includes('zu Füße') || wordingPreference;
               const incorrect =
-                item.content.explanation === 'Gehen bedeutet, ein Fahrzeug zu benutzen.';
+                item.content.explanation === 'Gehen bedeutet, ein Fahrzeug zu benutzen.' ||
+                answerLeak;
               const source = item.sourceParts.find(
-                (part) => part.fieldPath[0] === (incorrect ? 'explanation' : 'question')
+                (part) =>
+                  part.fieldPath[0] === (incorrect && !answerLeak ? 'explanation' : 'question')
               );
               return {
                 index: item.index,
@@ -172,32 +236,59 @@ beforeEach(() => {
                         {
                           sourcePartIndex: source!.index,
                           issue: incorrect ? 'incorrect' : 'unnatural',
-                          rule: incorrect
-                            ? 'Gehen describes travel on foot.'
-                            : 'Use the conventional expression zu Fuß.',
-                          defect: incorrect
-                            ? 'The explanation incorrectly claims vehicle use.'
-                            : 'The task uses an unnatural expression for walking.',
+                          rule: answerLeak
+                            ? 'Public recall clues must not disclose the selected word.'
+                            : wordingPreference
+                              ? 'Prefer a more idiomatic duration question.'
+                              : incorrect
+                                ? 'Gehen describes travel on foot.'
+                                : 'Use the conventional expression zu Fuß.',
+                          defect: answerLeak
+                            ? 'The public task supplies the inflected answer dauert.'
+                            : wordingPreference
+                              ? 'The phrase wie lange sie insgesamt ist sounds awkward.'
+                              : incorrect
+                                ? 'The explanation incorrectly claims vehicle use.'
+                                : 'The task uses an unnatural expression for walking.',
                           remedy: {
                             kind: 'correction',
-                            text: incorrect
-                              ? 'Gehen bedeutet, zu Fuß unterwegs zu sein.'
-                              : 'Ich bin zu Fuß nach Hause gegangen.',
+                            text: answerLeak
+                              ? 'Wähle das Verb für die angegebene Zeitspanne.'
+                              : wordingPreference
+                                ? 'Wähle das Verb, das angibt, wie lange sie dauert.'
+                                : incorrect
+                                  ? 'Gehen bedeutet, zu Fuß unterwegs zu sein.'
+                                  : 'Ich bin zu Fuß nach Hause gegangen.',
                           },
                         },
                       ]
                     : [],
               };
             }
-            const findings: unknown[] = input.criticisms.items.find(
+            const findings: Array<{ issue: string }> = input.criticisms.items.find(
               (row: { index: number }) => row.index === item.index
             ).findings;
             return {
               index: item.index,
               criticDecisions: Array.from(findings.keys(), (findingIndex) => ({
                 findingIndex,
-                decision: 'supported',
-                reason: 'The literal source contains the specified defect.',
+                decision: item.content.question.includes('wie lange sie insgesamt ist')
+                  ? 'dismissed'
+                  : 'supported',
+                reason: item.content.question.includes('wie lange sie insgesamt ist')
+                  ? 'The duration is unambiguous; smoother phrasing is only a preference.'
+                  : 'The literal source contains the specified defect.',
+                ...(input.exerciseMode === 'vocabulary_recall' &&
+                findings[findingIndex].issue === 'unnatural' &&
+                item.content.question.includes('zu Füße')
+                  ? {
+                      wordingEvidence: {
+                        kind: 'language_constraint',
+                        constraint: 'Travel on foot uses the fixed adverbial zu Fuß.',
+                        violation: 'The task substitutes the ungrammatical form zu Füße.',
+                      },
+                    }
+                  : {}),
               })),
               newFindings:
                 lateDefinitionDefect && teachingInputs.length > 1 && item.index === 2
@@ -227,7 +318,9 @@ beforeEach(() => {
 
 const params = {
   userId: 'fixture',
-  execution: blockedProviderExecution('fixture'),
+  get execution() {
+    return execution;
+  },
   skill: 'GRAMMAR' as const,
   level: 'A2',
   nativeLang: 'en',
@@ -238,7 +331,9 @@ const params = {
   seed: 'review-intersection',
 };
 
-describe('question repair from both independent audits', () => {
+const suite = process.env.SIDEDOOR_TEST_DATABASE_URL ? describe : describe.skip;
+suite('question repair from both independent audits', () => {
+  initializeInstance();
   it('sends contextual lexical meaning constraints through both authoring and blind review attempts', async () => {
     const result = await generateSectionQuestions({ ...params, vocabularyReview: true });
     expect(result.map((row) => row.options[row.correctIndex])).toEqual(lemmas);
@@ -277,7 +372,13 @@ describe('question repair from both independent audits', () => {
       expect(repairPrompt).toContain('independently insert all four options');
       expect(repairPrompt).toContain('Repair its context, options and explanation together');
       expect(result[0].question).not.toContain('unmögliche Reise');
-      expect(result[1].question).not.toContain('auf meinen Füßen');
+      expect(result[1].question).not.toContain('zu Füße');
+      expect(pairedInputs.filter(({ role }) => role === 'class_teaching_critic')).toHaveLength(2);
+      expect(pairedInputs.filter(({ role }) => role === 'class_teaching_adjudicator')).toHaveLength(
+        2
+      );
+      for (const input of pairedInputs)
+        expect(input.exerciseMode).toBe(vocabularyReview ? 'vocabulary_recall' : undefined);
       const original = teachingInputs[0];
       const final = teachingInputs.at(-1)!;
       for (const row of original.slice(2)) {
@@ -287,6 +388,32 @@ describe('question repair from both independent audits', () => {
       }
     }
   );
+
+  it('repairs a disclosed duration answer and dismisses a smoother-wording preference without dropping approved rows', async () => {
+    durationRecall = true;
+    targetLemmas[1] = 'dauern';
+    const result = await generateSectionQuestions({
+      ...params,
+      vocabularyReview: true,
+      targetVocab: targetLemmas.map((lemma) => ({ lemma, gloss: lemma })),
+    });
+    expect(generationPrompts).toHaveLength(2);
+    expect(teachingInputs).toHaveLength(2);
+    expect(blindInputs).toHaveLength(2);
+    expect(result).toHaveLength(5);
+    expect(result.map((row) => row.options[row.correctIndex])).toEqual(targetLemmas);
+    expect(teachingInputs[0][1].content.question).toContain('der Termin dauert');
+    expect(repairPrompt).toContain('The public task supplies the inflected answer dauert.');
+    expect(result[1].question).toContain('wie lange sie insgesamt ist');
+    expect(result[1].question).not.toContain('wie lange sie dauert');
+    expect(result[1].question).not.toContain('der Termin dauert');
+    for (const index of [0, 2, 3, 4]) {
+      expect(result[index]).toEqual(teachingInputs[0][index].content);
+      expect(teachingInputs[1][index].content).toEqual(teachingInputs[0][index].content);
+      expect(blindInputs[1][index]).toEqual(blindInputs[0][index]);
+    }
+    for (const input of pairedInputs) expect(input.exerciseMode).toBe('vocabulary_recall');
+  });
 
   it('keeps a genuine second teaching defect terminal after collecting both initial audits', async () => {
     finalDefect = true;
@@ -327,9 +454,11 @@ describe('question repair from both independent audits', () => {
       input.novelFindingProposals.some((proposal) => proposal.itemIndex === 2)
     );
     expect(corroboration?.items[2].content).toEqual(before.items[2]);
+    expect(corroboration?.exerciseMode).toBe('vocabulary_recall');
+    expect(after.exerciseMode).toBe('vocabulary_recall');
     expect(corroboration?.novelFindingProposals).toMatchObject([{ itemIndex: 2, findingIndex: 0 }]);
     expect(after.items[0].question).not.toContain('unmögliche Reise');
-    expect(after.items[1].question).not.toContain('auf meinen Füßen');
+    expect(after.items[1].question).not.toContain('zu Füße');
   });
 
   it.each([false, true])(
@@ -355,7 +484,7 @@ describe('question repair from both independent audits', () => {
       expect(retained.blindVerdict.questions[1].acceptableOptionIndices).toEqual([0, 2]);
       expect(retained.questions[1].question).toBe(blindInputs.at(-1)![1].question);
       expect(retained.questions[1].options).toEqual(blindInputs.at(-1)![1].options);
-      expect(retained.questions[1].question).not.toContain('auf meinen Füßen');
+      expect(retained.questions[1].question).not.toContain('zu Füße');
       expect(blind.verdict.items[1]).toMatchObject({ acceptable: false, issues: ['uncertain'] });
     }
   );

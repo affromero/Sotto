@@ -34,6 +34,8 @@ export async function requestTeachingReview(options: {
   userId: string;
   prompt: string;
   variables: Record<string, string>;
+  sectionSkill?: 'GRAMMAR' | 'READING';
+  exerciseMode?: 'vocabulary_recall';
   items: readonly unknown[];
   lessonContext?: TeachingLessonContext;
   introContext?: Record<string, unknown>;
@@ -50,6 +52,15 @@ export async function requestTeachingReview(options: {
   protocolCorrection?: NonNullable<ReturnType<typeof captureReviewerProtocolEvidence>>;
 }): Promise<string> {
   if (options.items.length < 1 || options.items.length > 5) throw new SectionQualityError();
+  if (
+    options.exerciseMode !== undefined &&
+    (options.exerciseMode !== 'vocabulary_recall' ||
+      options.variables.KIND !== 'explanations' ||
+      options.sectionSkill !== 'GRAMMAR' ||
+      options.introContext !== undefined ||
+      options.listeningTurns !== undefined)
+  )
+    throw new ReviewerProtocolError();
   if (options.criticAssignment)
     resolveTeachingCriticAssignment(
       options.items,

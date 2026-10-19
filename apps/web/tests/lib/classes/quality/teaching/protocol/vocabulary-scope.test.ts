@@ -30,6 +30,7 @@ type Question = {
   passageRef: string;
 };
 type Payload = {
+  exerciseMode?: 'vocabulary_recall';
   items: Array<{
     index: number;
     content: Question;
@@ -67,6 +68,38 @@ const river = {
   passageRef: '',
 };
 const cases: Case[] = [
+  {
+    name: 'rejects a tested word disclosed through an inflected public clue',
+    candidate: {
+      question:
+        'Der Termin dauert vier Stunden. Ergänze das Verb.\nDer Termin soll vier Stunden _____.',
+      options: ['beginnen', 'enden', 'dauern', 'warten'],
+      correctIndex: 2,
+      explanation: 'Dauern beschreibt die Zeitspanne des Termins.',
+      passageRef: '',
+    },
+    field: 'question',
+    defect: 'The public clue discloses dauern through dauert before the learner answers.',
+    correction: 'Give the start and end times without naming the tested verb.',
+    decision: 'supported',
+    reason: 'Dauert is the inflected target and reveals the requested word.',
+  },
+  {
+    name: 'allows the selected word in the private post-answer explanation',
+    candidate: {
+      question:
+        'Der Termin beginnt um neun und endet um dreizehn Uhr.\nEr soll vier Stunden _____.',
+      options: ['beginnen', 'enden', 'dauern', 'warten'],
+      correctIndex: 2,
+      explanation: 'Der Termin dauert vier Stunden; dauern beschreibt hier die Zeitspanne.',
+      passageRef: '',
+    },
+    field: 'explanation',
+    defect: 'The explanation names dauert and therefore reveals the selected word.',
+    correction: 'Remove the tested verb from the explanation.',
+    decision: 'dismissed',
+    reason: 'The explanation is shown after the answer; the public clue does not name the verb.',
+  },
   {
     name: 'dismisses a different activity that could accompany the requested listening action',
     candidate: listening,
@@ -232,6 +265,7 @@ suite('contextual vocabulary meaning across paired review and corroboration', ()
         provider: provider(finding, origin),
         kind: 'explanations',
         sectionSkill: 'GRAMMAR',
+        exerciseMode: 'vocabulary_recall',
         level: 'A2',
         nativeLang: 'en',
         targetLang: 'de',
@@ -257,6 +291,9 @@ suite('contextual vocabulary meaning across paired review and corroboration', ()
       expect(requests.map(({ schema }) => schema)).toEqual(expectedRoles);
       const completions = JSON.parse(sectionReviewInput([before])).questions[0].completedOptions;
       for (const { system, payload } of requests) {
+        expect(payload.exerciseMode).toBe('vocabulary_recall');
+        expect(system).toContain('private');
+        expect(system).toContain('public');
         expect(system).toContain('A different activity that could accompany that action');
         expect(system).toContain('Still retain true synonyms');
         expect(system).toContain('multiple plausible venues');

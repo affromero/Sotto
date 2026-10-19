@@ -20,6 +20,23 @@ import {
 
 export type TeachingSourcePart = { index: number; fieldPath: string[]; quote: string };
 
+export const vocabularyWordingEvidenceSchema = z.discriminatedUnion('kind', [
+  z
+    .object({
+      kind: z.literal('language_constraint'),
+      constraint: z.string().trim().min(1).max(120),
+      violation: z.string().trim().min(1).max(120),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('unresolved_meaning'),
+      competingReading: z.string().trim().min(1).max(120),
+      contextGap: z.string().trim().min(1).max(120),
+    })
+    .strict(),
+]);
+
 export const passageConcernDecisionSchema = z.union([
   z
     .object({
@@ -79,14 +96,52 @@ const findingSchema = z
   })
   .strict();
 
-function findings(parts: readonly TeachingSourcePart[]) {
+function findings(parts: readonly TeachingSourcePart[], vocabularyRecall = false) {
+  const bound = findingSchema.extend({
+    sourcePartIndex: z.literal(parts.length ? parts.map((part) => part.index) : [0]),
+  });
+  const schema = vocabularyRecall
+    ? z.union([
+        bound.extend({ issue: findingSchema.shape.issue.exclude(['unnatural']) }),
+        bound.extend({
+          issue: z.literal('unnatural'),
+          wordingEvidence: vocabularyWordingEvidenceSchema,
+        }),
+      ])
+    : bound;
+  return z.array(schema).max(parts.length ? 3 : 0);
+}
+
+function criticDecisions(criticFindings: readonly TeachingFinding[], vocabularyRecall: boolean) {
+  const decision = z
+    .object({
+      findingIndex: z.literal(
+        criticFindings.length ? criticFindings.map((_, index) => index) : [0]
+      ),
+      decision: z.enum(['supported', 'dismissed']),
+      reason: z.string().trim().min(1).max(120),
+    })
+    .strict();
+  if (!vocabularyRecall || !criticFindings.length)
+    return z.array(decision).length(criticFindings.length);
   return z
     .array(
-      findingSchema.extend({
-        sourcePartIndex: z.literal(parts.length ? parts.map((part) => part.index) : [0]),
-      })
+      z.union(
+        criticFindings.map((finding, index) => {
+          const bound = decision.extend({ findingIndex: z.literal(index) });
+          return finding.issue === 'unnatural'
+            ? z.union([
+                bound.extend({ decision: z.literal('dismissed') }),
+                bound.extend({
+                  decision: z.literal('supported'),
+                  wordingEvidence: vocabularyWordingEvidenceSchema,
+                }),
+              ])
+            : bound;
+        })
+      )
     )
-    .max(parts.length ? 3 : 0);
+    .length(criticFindings.length);
 }
 
 function assertBatch(fields: readonly unknown[]) {
@@ -177,10 +232,13 @@ export function privateTeachingAdjudicatorSchema(
   reading = false,
   listeningTurns?: readonly NormalizedListeningTurn[],
   criticAssignment?: readonly number[],
-  listeningTargetLang?: string
+  listeningTargetLang?: string,
+  vocabularyRecall = false
 ) {
   assertBatch(fields);
   if (reading && listeningTurns) throw new Error('Reading cannot use a listening witness');
+  if (vocabularyRecall && (reading || listeningTurns))
+    throw new Error('Vocabulary recall cannot use another skill audit');
   const assigned = resolveTeachingCriticAssignment(
     fields,
     reading,
@@ -212,10 +270,10 @@ export function privateTeachingAdjudicatorSchema(
         .array(
           z.union(
             fields.map((field, index) => {
-              const count = assigned.includes(index)
-                ? critic.items.find((item) => item.index === index)?.findings.length
-                : 0;
-              if (count === undefined) throw new Error('Teaching critic coverage is incomplete');
+              const criticFindings = assigned.includes(index)
+                ? critic.items.find((item) => item.index === index)?.findings
+                : [];
+              if (!criticFindings) throw new Error('Teaching critic coverage is incomplete');
               return z
                 .object({
                   index: z.literal(index),
@@ -235,20 +293,8 @@ export function privateTeachingAdjudicatorSchema(
                         ),
                       }
                     : {}),
-                  criticDecisions: z
-                    .array(
-                      z
-                        .object({
-                          findingIndex: z.literal(
-                            count ? Array.from({ length: count }, (_, id) => id) : [0]
-                          ),
-                          decision: z.enum(['supported', 'dismissed']),
-                          reason: z.string().trim().min(1).max(120),
-                        })
-                        .strict()
-                    )
-                    .length(count),
-                  newFindings: findings(buildTeachingSourceParts(field)),
+                  criticDecisions: criticDecisions(criticFindings, vocabularyRecall),
+                  newFindings: findings(buildTeachingSourceParts(field), vocabularyRecall),
                 })
                 .strict();
             })
@@ -260,7 +306,9 @@ export function privateTeachingAdjudicatorSchema(
 }
 
 export function deriveTeachingFinding(
-  finding: z.infer<typeof findingSchema>,
+  finding: z.infer<typeof findingSchema> & {
+    wordingEvidence?: z.infer<typeof vocabularyWordingEvidenceSchema>;
+  },
   parts: readonly TeachingSourcePart[]
 ): TeachingFinding {
   const part = parts[finding.sourcePartIndex];
@@ -274,6 +322,7 @@ export function deriveTeachingFinding(
     defect: finding.defect,
     correction: finding.remedy.kind === 'correction' ? finding.remedy.text : null,
     counterexample: finding.remedy.kind === 'counterexample' ? finding.remedy.text : null,
+    ...(finding.wordingEvidence ? { wordingEvidence: finding.wordingEvidence } : {}),
   };
 }
 
@@ -311,9 +360,11 @@ export function buildTeachingAdjudicatorJsonSchema(
   reading = false,
   listeningTurns?: readonly NormalizedListeningTurn[],
   criticAssignment?: readonly number[],
-  listeningTargetLang?: string
+  listeningTargetLang?: string,
+  vocabularyRecall = false
 ) {
   if (intro && listeningTurns) throw new Error('Intro cannot use a listening witness');
+  if (intro && vocabularyRecall) throw new Error('Intro cannot use vocabulary recall');
   return {
     name: intro ? 'class_intro_adjudicator' : 'class_teaching_adjudicator',
     schema: z.toJSONSchema(
@@ -324,7 +375,8 @@ export function buildTeachingAdjudicatorJsonSchema(
         reading,
         listeningTurns,
         criticAssignment,
-        listeningTargetLang
+        listeningTargetLang,
+        vocabularyRecall
       ),
       {
         target: 'draft-7',

@@ -35,6 +35,7 @@ import {
   privateTeachingAdjudicatorSchema,
   passageConcernDecisionSchema,
   resolveTeachingCriticAssignment,
+  vocabularyWordingEvidenceSchema,
 } from './teaching-source/protocol';
 
 /** An inconsistent or malformed review cannot guide a semantic replacement. */
@@ -140,6 +141,7 @@ const teachingFindingSchema = z
     defect: z.string().trim().min(1).max(120),
     correction: z.string().trim().min(1).max(120).nullable(),
     counterexample: z.string().trim().min(1).max(120).nullable(),
+    wordingEvidence: vocabularyWordingEvidenceSchema.optional(),
   })
   .strict();
 
@@ -179,6 +181,7 @@ export const teachingAdjudicatorSchema = z
                   findingIndex: z.number().int().min(0).max(2),
                   decision: z.enum(['supported', 'dismissed']),
                   reason: z.string().trim().min(1).max(120),
+                  wordingEvidence: vocabularyWordingEvidenceSchema.optional(),
                 })
                 .strict()
             )
@@ -736,7 +739,8 @@ export function parseTeachingAdjudicatorResponse(
   reading = false,
   listeningTurns?: readonly NormalizedListeningTurn[],
   criticAssignment?: readonly number[],
-  listeningTargetLang?: string
+  listeningTargetLang?: string,
+  vocabularyRecall = false
 ): TeachingAdjudicator {
   const validatedCritic = parseReview(JSON.stringify(critic), teachingCriticSchema);
   assertCriticCoverage(validatedCritic.items, fields, reading, listeningTurns, criticAssignment);
@@ -762,7 +766,8 @@ export function parseTeachingAdjudicatorResponse(
       reading,
       listeningTurns,
       criticAssignment,
-      listeningTargetLang
+      listeningTargetLang,
+      vocabularyRecall
     )
   );
   assertReviewCoverage(response.items, fields.length);
