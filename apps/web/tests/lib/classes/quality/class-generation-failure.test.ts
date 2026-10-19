@@ -60,7 +60,16 @@ vi.mock('@/lib/logger', () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: 
 
 import { generateSectionQuestions } from '@/lib/class-generation';
 import { SectionQualityError } from '@/lib/classes/section-quality';
-import { TeachingQualityRejectionError } from '@/lib/classes/quality/teaching-quality';
+import {
+  ReviewerProtocolError,
+  TeachingQualityRejectionError,
+} from '@/lib/classes/quality/teaching-quality';
+import {
+  captureTeachingFailure,
+  retainTeachingFailure,
+} from '@/lib/classes/quality/teaching-failure';
+import { captureGenerationFailure } from '@/lib/classes/quality/generation-failure';
+import { logger } from '@/lib/logger';
 import type { SectionGenParams } from '@/lib/class-generation';
 import type { SkillType } from '@sotto/shared';
 import { blockedProviderExecution } from '../../../helpers/runtime/provider-execution';
@@ -124,6 +133,140 @@ beforeEach(() => {
 });
 
 describe('terminal section generation failures', () => {
+  function rejectInitialTeaching() {
+    mockTeachingResponse.mockResolvedValueOnce({
+      content: JSON.stringify({
+        items: SAMPLE_QUESTIONS.map((_, index) => ({
+          index,
+          acceptable: false,
+          issues: ['incorrect'],
+          feedback: ['The explanation contradicts the answer.'],
+        })),
+      }),
+      model: 'm',
+    });
+  }
+
+  it.each(['generation', 'blind review', 'teaching review', 'JSON repair'])(
+    'retains earlier rejected teaching when later %s fails without replaying the provider',
+    async (stage) => {
+      const failure = new Error('Private provider credential and transport body');
+      rejectInitialTeaching();
+      if (stage === 'generation')
+        mockGenerateResponse
+          .mockResolvedValueOnce({ content: SAMPLE })
+          .mockRejectedValueOnce(failure);
+      if (stage === 'blind review')
+        mockReviewResponse
+          .mockImplementationOnce(async (_system, messages) => ({
+            content: JSON.stringify({
+              passageFindings: [],
+              issues: [],
+              questions: JSON.parse(messages[0].content).questions.map((q: { index: number }) => ({
+                index: q.index,
+                acceptableOptionIndices: [q.index === 1 ? 1 : 0],
+                issues: [],
+              })),
+            }),
+            model: 'm',
+          }))
+          .mockRejectedValueOnce(failure);
+      if (stage === 'teaching review') mockTeachingResponse.mockRejectedValueOnce(failure);
+      if (stage === 'JSON repair')
+        mockGenerateResponse
+          .mockResolvedValueOnce({ content: SAMPLE })
+          .mockResolvedValueOnce({ content: '{' })
+          .mockRejectedValueOnce(failure);
+
+      const error = await generateSectionQuestions(BASE).catch((caught: unknown) => caught);
+      expect(error).toBe(failure);
+      const captured = captureGenerationFailure(error);
+      expect(captured).toMatchObject({
+        category: 'generation_failed',
+        teachingFailure: {
+          kind: 'explanations',
+          reviews: [
+            {
+              verdict: {
+                items: expect.arrayContaining([
+                  expect.objectContaining({ index: 0, issues: ['incorrect'] }),
+                ]),
+              },
+            },
+          ],
+        },
+      });
+      expect(captured.teachingFailure?.reviews).toHaveLength(1);
+      const original = JSON.parse(captured.teachingFailure!.reviews[0].candidate!);
+      expect(original[0].items).toEqual(
+        JSON.parse(mockTeachingResponse.mock.calls[0][1][0].content).items.map(
+          (item: { content: unknown }) => item.content
+        )
+      );
+      expect(JSON.stringify(captured)).not.toContain(failure.message);
+      expect(JSON.stringify(error)).not.toContain('The explanation contradicts');
+      expect(vi.mocked(logger.error).mock.calls.at(-1)?.[1]).toMatchObject({
+        skill: 'READING',
+        stage:
+          stage === 'blind review'
+            ? 'blind_review'
+            : stage === 'teaching review'
+              ? 'teaching_review'
+              : stage === 'JSON repair'
+                ? 'json_repair'
+                : 'generation',
+        attempt: 2,
+        category: 'generation_failed',
+        type: 'unknown',
+        code: 'unknown',
+      });
+      expect(JSON.stringify(vi.mocked(logger.error).mock.calls)).not.toContain(failure.message);
+      expect(mockGenerateResponse).toHaveBeenCalledTimes(stage === 'JSON repair' ? 3 : 2);
+    }
+  );
+
+  it.each(['protocol', 'retained'])(
+    'preserves current %s evidence instead of overwriting it with an earlier rejection',
+    async (kind) => {
+      const current = captureTeachingFailure('explanations', [{ question: 'Current candidate' }], {
+        items: [
+          { index: 0, acceptable: false, issues: ['unsupported'], feedback: ['Current defect'] },
+        ],
+      });
+      const failure =
+        kind === 'protocol' ? new ReviewerProtocolError(current) : new Error('Private');
+      if (kind === 'retained') retainTeachingFailure(failure, current);
+      rejectInitialTeaching();
+      mockGenerateResponse
+        .mockResolvedValueOnce({ content: SAMPLE })
+        .mockRejectedValueOnce(failure);
+
+      const error = await generateSectionQuestions(BASE).catch((caught: unknown) => caught);
+      expect(error).toBe(failure);
+      expect(captureGenerationFailure(error)).toEqual({
+        category: kind === 'protocol' ? 'review_protocol' : 'generation_failed',
+        teachingFailure: current,
+      });
+    }
+  );
+
+  it('keeps the replacement blind protocol response beside the earlier rejected teaching', async () => {
+    rejectInitialTeaching();
+    const firstReview = mockReviewResponse.getMockImplementation()!;
+    mockReviewResponse.mockImplementationOnce(firstReview).mockResolvedValueOnce({ content: '{' });
+
+    const error = await generateSectionQuestions(BASE).catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(SectionQualityError);
+    const captured = captureGenerationFailure(error);
+    expect(captured.category).toBe('section_quality');
+    expect(captured.teachingFailure?.reviews[0].verdict.items[0].issues).toEqual(['incorrect']);
+    expect(captured.protocolEvidence).toEqual([
+      expect.objectContaining({ kind: 'reading', role: 'blind_section', reason: 'invalid_json' }),
+    ]);
+    expect(JSON.parse(captured.protocolEvidence![0].payload.json!).response).toBe('{');
+    expect(mockGenerateResponse).toHaveBeenCalledTimes(2);
+  });
+
   it('fails closed after a repaired candidate also fails teaching review', async () => {
     mockGenerateResponse
       .mockResolvedValueOnce({ content: SAMPLE })

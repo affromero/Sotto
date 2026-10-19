@@ -18,8 +18,20 @@ import {
   reviewTeachingContent,
   TeachingQualityRejectionError,
   hasSupportedReadingPassageFailure,
+  ReviewerProtocolError,
 } from './classes/quality/teaching-quality';
-import { combineTeachingFailures, type TeachingFailure } from './classes/quality/teaching-failure';
+import {
+  combineTeachingFailures,
+  retainedTeachingFailure,
+  retainTeachingFailure,
+  type TeachingFailure,
+} from './classes/quality/teaching-failure';
+import { classifyGenerationFailure } from './classes/quality/generation-failure';
+import { generationDiagnostic } from './classes/quality/failure/diagnostic';
+import {
+  assessVocabularyCoverage,
+  type VocabularyCoverageFeedback,
+} from './classes/quality/vocabulary-repair/coverage';
 import { classLanguagePolicy } from './classes/class-language-policy';
 import {
   assessSectionReview,
@@ -436,49 +448,6 @@ function normalizeQuestions(
   };
 }
 
-interface VocabularyCoverageFeedback {
-  missingTargets: string[];
-  duplicateTargets: string[];
-  unexpectedAnswers: Array<{ index: number; answer: string }>;
-  invalidContextIndices: number[];
-}
-
-function assessVocabularyCoverage(
-  questions: GeneratedQuestion[],
-  lemmas: string[]
-): { issues: string[]; feedback?: VocabularyCoverageFeedback } {
-  const issues: string[] = [];
-  const matches = (lemma: string) =>
-    questions.filter((q) => q.options[q.correctIndex] === lemma).length;
-  const missingTargets = lemmas.filter((lemma) => matches(lemma) === 0);
-  const duplicateTargets = lemmas.filter((lemma) => matches(lemma) > 1);
-  const unexpectedAnswers = questions.flatMap((q, index) => {
-    const answer = q.options[q.correctIndex];
-    return lemmas.includes(answer) ? [] : [{ index, answer: answer.slice(0, 300) }];
-  });
-  if (missingTargets.length || duplicateTargets.length) issues.push('vocabulary_target_coverage');
-  const invalidContextIndices = questions.flatMap((q, index) => {
-    const gaps = q.question.match(/_+/g) ?? [];
-    const invalid =
-      gaps.length !== 1 || gaps[0] !== '_____' || q.question.replace(/_+/g, '').trim().length < 8;
-    return invalid ? [index] : [];
-  });
-  if (invalidContextIndices.length) issues.push('vocabulary_context');
-  return {
-    issues,
-    ...(issues.length
-      ? {
-          feedback: {
-            missingTargets: missingTargets.map((lemma) => lemma.slice(0, 300)),
-            duplicateTargets: duplicateTargets.map((lemma) => lemma.slice(0, 300)),
-            unexpectedAnswers,
-            invalidContextIndices,
-          },
-        }
-      : {}),
-  };
-}
-
 export async function generateSectionQuestions(p: SectionGenParams): Promise<GeneratedQuestion[]> {
   if (p.skill !== 'GRAMMAR' && p.skill !== 'READING') throw new SectionQualityError();
   const sectionSkill = p.skill;
@@ -583,6 +552,8 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
   let terminalBlindFailure: TeachingFailure | undefined;
   let sectionFeedback: SectionReviewFeedback | undefined;
   let vocabularyFeedback: VocabularyCoverageFeedback | undefined;
+  let stage = 'generation';
+  let generationAttempt = 0;
   const blindApprovedQuestionIndices = new Set<number>();
   const review = async (
     questions: GeneratedQuestion[],
@@ -598,6 +569,7 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
       : { issues: [] };
     vocabularyFeedback = coverage.feedback;
     if (coverage.issues.length) return coverage.issues;
+    stage = 'blind_review';
     const response = await provider.generateResponse(
       reviewPrompt(questions),
       [
@@ -676,6 +648,7 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
       );
     if ((issues.length === 0 || sectionSkill === 'GRAMMAR') && !duplicateChoices) {
       try {
+        stage = 'teaching_review';
         await reviewTeachingContent({
           ai,
           provider,
@@ -761,239 +734,264 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
     };
   };
 
-  for (let attempt = 1; attempt <= MAX_GENERATION_ATTEMPTS; attempt += 1) {
-    const { systemPrompt, generationSchema, requestCount } = generationSettings();
-    const response = await provider.generateResponse(
-      systemPrompt,
-      [
+  try {
+    for (let attempt = 1; attempt <= MAX_GENERATION_ATTEMPTS; attempt += 1) {
+      generationAttempt = attempt;
+      stage = 'generation';
+      const { systemPrompt, generationSchema, requestCount } = generationSettings();
+      const response = await provider.generateResponse(
+        systemPrompt,
+        [
+          {
+            role: 'user',
+            content: distractorRepair
+              ? 'Return only the required distractor arrays for the fixed original questions.'
+              : buildUserPrompt(
+                  skill,
+                  requestCount,
+                  attempt,
+                  lastError,
+                  rejectedCandidate,
+                  useSourcePassage,
+                  teachingRejection?.feedback,
+                  sectionFeedback,
+                  vocabularyFeedback
+                ),
+          },
+        ],
         {
-          role: 'user',
-          content: distractorRepair
-            ? 'Return only the required distractor arrays for the fixed original questions.'
-            : buildUserPrompt(
-                skill,
-                requestCount,
-                attempt,
-                lastError,
-                rejectedCandidate,
-                useSourcePassage,
-                teachingRejection?.feedback,
-                sectionFeedback,
-                vocabularyFeedback
-              ),
-        },
-      ],
-      {
-        ...(await capturedLearningAiOptions(ai)),
-        maxTokens: 4096,
-        temperature: 0.8,
-        jsonSchema: generationSchema,
-      }
-    );
-
-    logUsage({
-      service: ai.provider,
-      model: response.model,
-      category: 'class-section',
-      inputTokens: response.inputTokens,
-      outputTokens: response.outputTokens,
-      userId: p.userId,
-    });
-
-    terminalTeachingRejection = undefined;
-    terminalBlindFailure = undefined;
-    let candidate: GeneratedQuestion[] | undefined;
-    let candidateTargetOrder: number[] = [];
-    let duplicateTargets: number[] = [];
-    try {
-      repeatedQuestionError = undefined;
-      const compiled = compileCandidate(
-        response.content,
-        requestCount,
-        attempt < MAX_GENERATION_ATTEMPTS
+          ...(await capturedLearningAiOptions(ai)),
+          maxTokens: 4096,
+          temperature: 0.8,
+          jsonSchema: generationSchema,
+        }
       );
-      candidate = compiled.questions;
-      candidateTargetOrder = compiled.targetOrder;
-      duplicateTargets = compiled.duplicateTargets;
-    } catch (err) {
-      if (err instanceof QuizRetryRepetitionError) repeatedQuestionError = err;
-      lastError = err instanceof Error ? err.message : String(err);
-      lastMalformedContent = response.content;
-    }
 
-    if (candidate) {
-      const issues = await review(candidate, duplicateTargets.length > 0);
-      if (issues.length === 0 && !duplicateTargets.length) return candidate;
-      if (sectionSkill === 'GRAMMAR' && teachingRejection && attempt < MAX_GENERATION_ATTEMPTS) {
-        const failure = authenticTeachingFailure(teachingRejection, 'explanations', candidate);
-        const verdict = failure?.reviews.length === 1 ? failure.reviews[0].verdict : undefined;
-        if (
-          !verdict ||
-          verdict.items.length !== candidate.length ||
-          new Set(verdict.items.map((item) => item.index)).size !== candidate.length ||
-          verdict.items.some((item) => item.index < 0 || item.index >= candidate.length) ||
-          verdict.items.every((item) => item.acceptable && item.issues.length === 0)
-        )
-          throw teachingRejection;
-        for (const item of verdict.items)
-          if (
-            item.acceptable &&
-            item.issues.length === 0 &&
-            blindApprovedQuestionIndices.has(item.index)
-          )
-            retainedApprovedQuestions.set(
-              p.vocabularyReview ? candidateTargetOrder[item.index] : item.index,
-              structuredClone(candidate[item.index])
-            );
-      }
-      qualityFailed = true;
-      lastError = `educational quality: ${[...issues, ...(duplicateTargets.length ? ['duplicate_choices'] : [])].join(', ')}`;
-      rejectedCandidate = JSON.stringify({
-        passage: candidate[0]?.passageText ?? '',
-        questions: candidate.map((question, index) => ({
-          index,
-          ...(p.vocabularyReview ? { targetIndex: candidateTargetOrder[index] } : {}),
-          question: question.question,
-          options: question.options,
-          correctIndex: question.correctIndex,
-          explanation: question.explanation,
-          passageRef: question.passageRef,
-        })),
+      logUsage({
+        service: ai.provider,
+        model: response.model,
+        category: 'class-section',
+        inputTokens: response.inputTokens,
+        outputTokens: response.outputTokens,
+        userId: p.userId,
       });
-      lastMalformedContent = '';
-      if (p.vocabularyReview && attempt < MAX_GENERATION_ATTEMPTS) {
-        const duplicatesOnly =
-          !issues.length ||
-          (sectionFeedback &&
-            sectionFeedback.passageAcceptable &&
-            !sectionFeedback.passageFeedback.length &&
-            !sectionFeedback.issues.length &&
-            sectionFeedback.questions.every((row) => {
-              const question = candidate[row.index];
-              if (!duplicateTargets.includes(candidateTargetOrder[row.index]))
+
+      terminalTeachingRejection = undefined;
+      terminalBlindFailure = undefined;
+      stage = 'validation';
+      let candidate: GeneratedQuestion[] | undefined;
+      let candidateTargetOrder: number[] = [];
+      let duplicateTargets: number[] = [];
+      try {
+        repeatedQuestionError = undefined;
+        const compiled = compileCandidate(
+          response.content,
+          requestCount,
+          attempt < MAX_GENERATION_ATTEMPTS
+        );
+        candidate = compiled.questions;
+        candidateTargetOrder = compiled.targetOrder;
+        duplicateTargets = compiled.duplicateTargets;
+      } catch (err) {
+        if (err instanceof QuizRetryRepetitionError) repeatedQuestionError = err;
+        lastError = err instanceof Error ? err.message : String(err);
+        lastMalformedContent = response.content;
+      }
+
+      if (candidate) {
+        const issues = await review(candidate, duplicateTargets.length > 0);
+        stage = 'validation';
+        if (issues.length === 0 && !duplicateTargets.length) return candidate;
+        if (sectionSkill === 'GRAMMAR' && teachingRejection && attempt < MAX_GENERATION_ATTEMPTS) {
+          const failure = authenticTeachingFailure(teachingRejection, 'explanations', candidate);
+          const verdict = failure?.reviews.length === 1 ? failure.reviews[0].verdict : undefined;
+          if (
+            !verdict ||
+            verdict.items.length !== candidate.length ||
+            new Set(verdict.items.map((item) => item.index)).size !== candidate.length ||
+            verdict.items.some((item) => item.index < 0 || item.index >= candidate.length) ||
+            verdict.items.every((item) => item.acceptable && item.issues.length === 0)
+          )
+            throw teachingRejection;
+          for (const item of verdict.items)
+            if (
+              item.acceptable &&
+              item.issues.length === 0 &&
+              blindApprovedQuestionIndices.has(item.index)
+            )
+              retainedApprovedQuestions.set(
+                p.vocabularyReview ? candidateTargetOrder[item.index] : item.index,
+                structuredClone(candidate[item.index])
+              );
+        }
+        qualityFailed = true;
+        lastError = `educational quality: ${[...issues, ...(duplicateTargets.length ? ['duplicate_choices'] : [])].join(', ')}`;
+        rejectedCandidate = JSON.stringify({
+          passage: candidate[0]?.passageText ?? '',
+          questions: candidate.map((question, index) => ({
+            index,
+            ...(p.vocabularyReview ? { targetIndex: candidateTargetOrder[index] } : {}),
+            question: question.question,
+            options: question.options,
+            correctIndex: question.correctIndex,
+            explanation: question.explanation,
+            passageRef: question.passageRef,
+          })),
+        });
+        lastMalformedContent = '';
+        if (p.vocabularyReview && attempt < MAX_GENERATION_ATTEMPTS) {
+          const duplicatesOnly =
+            !issues.length ||
+            (sectionFeedback &&
+              sectionFeedback.passageAcceptable &&
+              !sectionFeedback.passageFeedback.length &&
+              !sectionFeedback.issues.length &&
+              sectionFeedback.questions.every((row) => {
+                const question = candidate[row.index];
+                if (!duplicateTargets.includes(candidateTargetOrder[row.index]))
+                  return (
+                    !row.issues.length &&
+                    row.acceptableOptionIndices.length === 1 &&
+                    row.acceptableOptionIndices[0] === question.correctIndex
+                  );
                 return (
-                  !row.issues.length &&
-                  row.acceptableOptionIndices.length === 1 &&
-                  row.acceptableOptionIndices[0] === question.correctIndex
+                  row.issues.every((issue) => issue === 'ambiguous') &&
+                  row.acceptableOptionIndices.length > 0 &&
+                  row.acceptableOptionIndices.every(
+                    (index) =>
+                      question.options[index].trim().toLowerCase() ===
+                      question.options[question.correctIndex].trim().toLowerCase()
+                  )
                 );
-              return (
-                row.issues.every((issue) => issue === 'ambiguous') &&
-                row.acceptableOptionIndices.length > 0 &&
-                row.acceptableOptionIndices.every(
-                  (index) =>
-                    question.options[index].trim().toLowerCase() ===
-                    question.options[question.correctIndex].trim().toLowerCase()
-                )
-              );
-            }));
-        if (!duplicatesOnly) distractorRepair = undefined;
-        vocabularyRepair =
-          teachingRejection || distractorRepair
-            ? undefined
-            : selectVocabularyRepair(
-                candidate,
-                candidateTargetOrder,
-                sectionFeedback,
-                duplicateTargets
-              );
-        activeVocabularyTargets = vocabularyRepair?.rejectedTargets ?? allVocabularyTargets;
+              }));
+          if (!duplicatesOnly) distractorRepair = undefined;
+          vocabularyRepair =
+            teachingRejection || distractorRepair
+              ? undefined
+              : selectVocabularyRepair(
+                  candidate,
+                  candidateTargetOrder,
+                  sectionFeedback,
+                  duplicateTargets
+                );
+          activeVocabularyTargets = vocabularyRepair?.rejectedTargets ?? allVocabularyTargets;
+        }
+      }
+
+      if (attempt < MAX_GENERATION_ATTEMPTS) {
+        logger.warn('Retrying class-section generation after unusable LLM response', {
+          skill: p.skill,
+          error: lastError,
+          outputSnippet: qualityFailed ? undefined : loggedOutputSnippet(response.content),
+        });
       }
     }
 
-    if (attempt < MAX_GENERATION_ATTEMPTS) {
-      logger.warn('Retrying class-section generation after unusable LLM response', {
+    if (lastMalformedContent) {
+      stage = 'json_repair';
+      const { systemPrompt, generationSchema, requestCount } = generationSettings();
+      logger.warn('Repairing malformed class-section LLM response', {
         skill: p.skill,
         error: lastError,
-        outputSnippet: qualityFailed ? undefined : loggedOutputSnippet(response.content),
+        outputSnippet: loggedOutputSnippet(lastMalformedContent),
       });
-    }
-  }
 
-  if (lastMalformedContent) {
-    const { systemPrompt, generationSchema, requestCount } = generationSettings();
-    logger.warn('Repairing malformed class-section LLM response', {
-      skill: p.skill,
-      error: lastError,
-      outputSnippet: loggedOutputSnippet(lastMalformedContent),
-    });
-
-    const repairResponse = await provider.generateResponse(
-      [
-        systemPrompt,
-        '',
-        'You are repairing malformed JSON. Return ONLY valid JSON matching the provided schema.',
-      ].join('\n'),
-      [
+      const repairResponse = await provider.generateResponse(
+        [
+          systemPrompt,
+          '',
+          'You are repairing malformed JSON. Return ONLY valid JSON matching the provided schema.',
+        ].join('\n'),
+        [
+          {
+            role: 'user',
+            content: distractorRepair
+              ? `Repair the malformed response into ONLY the same indexed distractor patch schema. Original question fields remain fixed. Parser error: ${lastError}\nMalformed response:\n${lastMalformedContent}`
+              : buildRepairPrompt(
+                  lastMalformedContent,
+                  lastError,
+                  requestCount,
+                  !!p.vocabularyReview
+                ),
+          },
+        ],
         {
-          role: 'user',
-          content: distractorRepair
-            ? `Repair the malformed response into ONLY the same indexed distractor patch schema. Original question fields remain fixed. Parser error: ${lastError}\nMalformed response:\n${lastMalformedContent}`
-            : buildRepairPrompt(
-                lastMalformedContent,
-                lastError,
-                requestCount,
-                !!p.vocabularyReview
-              ),
-        },
-      ],
-      {
-        ...(await capturedLearningAiOptions(ai)),
-        maxTokens: 4096,
-        temperature: 0,
-        jsonSchema: generationSchema,
+          ...(await capturedLearningAiOptions(ai)),
+          maxTokens: 4096,
+          temperature: 0,
+          jsonSchema: generationSchema,
+        }
+      );
+
+      logUsage({
+        service: ai.provider,
+        model: repairResponse.model,
+        category: 'class-section-repair',
+        inputTokens: repairResponse.inputTokens,
+        outputTokens: repairResponse.outputTokens,
+        userId: p.userId,
+      });
+
+      terminalTeachingRejection = undefined;
+      terminalBlindFailure = undefined;
+      stage = 'validation';
+      let candidate: GeneratedQuestion[] | undefined;
+      try {
+        repeatedQuestionError = undefined;
+        candidate = compileCandidate(repairResponse.content, requestCount).questions;
+      } catch (err) {
+        if (err instanceof QuizRetryRepetitionError) repeatedQuestionError = err;
+        lastError = err instanceof Error ? err.message : String(err);
       }
-    );
+      if (candidate) {
+        const issues = await review(candidate);
+        stage = 'validation';
+        if (issues.length === 0) return candidate;
+        qualityFailed = true;
+        lastError = `educational quality: ${issues.join(', ')}`;
+      }
+    }
 
-    logUsage({
-      service: ai.provider,
-      model: repairResponse.model,
-      category: 'class-section-repair',
-      inputTokens: repairResponse.inputTokens,
-      outputTokens: repairResponse.outputTokens,
-      userId: p.userId,
+    logger.error('Failed to parse class-section LLM response', {
+      error: lastError,
+      outputSnippet: lastMalformedContent ? loggedOutputSnippet(lastMalformedContent) : undefined,
     });
-
-    terminalTeachingRejection = undefined;
-    terminalBlindFailure = undefined;
-    let candidate: GeneratedQuestion[] | undefined;
-    try {
-      repeatedQuestionError = undefined;
-      candidate = compileCandidate(repairResponse.content, requestCount).questions;
-    } catch (err) {
-      if (err instanceof QuizRetryRepetitionError) repeatedQuestionError = err;
-      lastError = err instanceof Error ? err.message : String(err);
+    if (repeatedQuestionError) throw repeatedQuestionError;
+    if (qualityFailed) {
+      if (terminalBlindFailure)
+        teachingFailure = combineTeachingFailures(
+          teachingFailure && { ...teachingFailure, reviews: teachingFailure.reviews.slice(-1) },
+          terminalBlindFailure
+        );
+      if (terminalTeachingRejection) {
+        throw new TeachingQualityRejectionError(
+          terminalTeachingRejection.issues,
+          terminalTeachingRejection.feedback,
+          teachingFailure
+        );
+      }
+      throw new SectionQualityError(undefined, teachingFailure, sectionFeedback);
     }
-    if (candidate) {
-      const issues = await review(candidate);
-      if (issues.length === 0) return candidate;
-      qualityFailed = true;
-      lastError = `educational quality: ${issues.join(', ')}`;
-    }
+    throw new Error(
+      lastError.includes('no usable questions')
+        ? 'Class generation produced no usable questions.'
+        : 'Class generation returned malformed output.'
+    );
+  } catch (error) {
+    if (
+      !retainedTeachingFailure(error) &&
+      !(error instanceof TeachingQualityRejectionError && error.teachingFailure) &&
+      !(error instanceof ReviewerProtocolError && error.teachingFailure) &&
+      !(error instanceof SectionQualityError && error.blindReviewFailure)
+    )
+      retainTeachingFailure(error, teachingFailure);
+    logger.error('Class-section generation failed', {
+      skill: p.skill,
+      stage,
+      attempt: generationAttempt,
+      category: classifyGenerationFailure(error),
+      ...generationDiagnostic(error),
+    });
+    throw error;
   }
-
-  logger.error('Failed to parse class-section LLM response', {
-    error: lastError,
-    outputSnippet: lastMalformedContent ? loggedOutputSnippet(lastMalformedContent) : undefined,
-  });
-  if (repeatedQuestionError) throw repeatedQuestionError;
-  if (qualityFailed) {
-    if (terminalBlindFailure)
-      teachingFailure = combineTeachingFailures(
-        teachingFailure && { ...teachingFailure, reviews: teachingFailure.reviews.slice(-1) },
-        terminalBlindFailure
-      );
-    if (terminalTeachingRejection) {
-      throw new TeachingQualityRejectionError(
-        terminalTeachingRejection.issues,
-        terminalTeachingRejection.feedback,
-        teachingFailure
-      );
-    }
-    throw new SectionQualityError(undefined, teachingFailure, sectionFeedback);
-  }
-  throw new Error(
-    lastError.includes('no usable questions')
-      ? 'Class generation produced no usable questions.'
-      : 'Class generation returned malformed output.'
-  );
 }
