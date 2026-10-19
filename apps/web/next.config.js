@@ -1,6 +1,5 @@
 const path = require('path');
 const { createRequire } = require('node:module');
-const { withSentryConfig } = require('@sentry/nextjs/config');
 const coreRequire = createRequire(require.resolve('thesidedoor-core/storage'));
 const nativeBinding = coreRequire.resolve('thesidedoor-flock/build/Release/fs_ext.node');
 
@@ -162,14 +161,4 @@ const nextConfig = {
   },
 };
 
-module.exports = withSentryConfig(nextConfig, {
-  telemetry: false,
-  org: process.env.SENTRY_ORG,
-  project: process.env.SENTRY_PROJECT,
-  silent: !process.env.CI,
-  tunnelRoute: '/api/v1/monitoring',
-  widenClientFileUpload: true,
-  sourcemaps: {
-    deleteSourcemapsAfterUpload: true,
-  },
-});
+module.exports = nextConfig;
