@@ -415,6 +415,263 @@ suite('question repair from both independent audits', () => {
     for (const input of pairedInputs) expect(input.exerciseMode).toBe('vocabulary_recall');
   });
 
+  it('repairs real vocabulary defects while retaining meaning clues and immaterial scene details', async () => {
+    const targets = ['zuhören', 'Stadtmuseum', 'spazieren gehen', 'Fluss', 'Picknick'];
+    const initial = [
+      {
+        taskContext:
+          'Wähle das Wort für die Handlung: Mia bleibt ruhig und achtet darauf, was jemand sagt. Ergänze den Satz passend.',
+        question: 'Im Unterricht soll Mia dem Lehrer aufmerksam _____, statt selbst zu sprechen.',
+        options: ['antworten', 'zuhören', 'folgen', 'widersprechen'],
+        correctIndex: 1,
+        explanation: '„Zuhören“ passt, weil Mia auf die Worte des Lehrers achten soll.',
+      },
+      {
+        taskContext:
+          'Wähle den Ort, an dem eine Ausstellung zur Geschichte der Stadt gezeigt wird. Ergänze den Satz passend.',
+        question:
+          'Am Samstag besuchen wir das _____, um alte Gegenstände und Bilder aus der Geschichte unserer Stadt anzusehen.',
+        options: ['Stadtmuseum', 'Rathaus', 'Theater', 'Schwimmbad'],
+        correctIndex: 0,
+        explanation: 'Ein „Stadtmuseum“ zeigt Gegenstände und Bilder aus der Stadtgeschichte.',
+      },
+      {
+        taskContext:
+          'Wähle die Handlung: Die Personen gehen draußen ruhig zu Fuß und sehen sich dabei die Umgebung an. Ergänze den Satz passend.',
+        question:
+          'Nach dem Essen wollen wir noch langsam durch den Park _____ und die Bäume ansehen.',
+        options: ['joggen', 'einkaufen', 'spazieren gehen', 'schwimmen'],
+        correctIndex: 2,
+        explanation: '„Spazieren gehen“ passt zu einem ruhigen Gang durch den Park.',
+      },
+      {
+        taskContext:
+          'Wähle das Wort für ein Gewässer, das durch die Landschaft fließt und unter einer Brücke hindurch weiterzieht. Ergänze den Satz passend.',
+        question:
+          'Das Wasser des _____ fließt unter der alten Brücke hindurch und weiter bis zum Meer.',
+        options: ['Sees', 'Fluss', 'Berges', 'Teiches'],
+        correctIndex: 1,
+        explanation: 'Ein „Fluss“ ist ein Gewässer, dessen Wasser weiterfließt.',
+      },
+      {
+        taskContext:
+          'Wähle das Wort für eine gemeinsame Mahlzeit im Freien, bei der die Gruppe mitgebrachtes Essen auf einer Decke isst.',
+        question:
+          'Im Park breiten wir eine Decke aus, packen Brot und Obst aus und machen zusammen ein _____.',
+        options: ['Konzert', 'Spiel', 'Gespräch', 'Picknick'],
+        correctIndex: 3,
+        explanation:
+          'Ein „Picknick“ passt zu einer gemeinsamen Mahlzeit im Freien mit mitgebrachtem Essen.',
+      },
+    ];
+    const replacement = initial.map((row) => ({
+      ...row,
+      taskContext: 'Ergänze den Satz nach dem überarbeiteten Beispiel.',
+      explanation: 'Neue Erklärung für diese Situation.',
+    }));
+    replacement[0] = {
+      taskContext:
+        'Im Sprachkurs läuft eine Aufnahme, und die Lernenden sollen sie bis zum Ende verfolgen. Wähle das passende Wort und ergänze den Satz.',
+      question:
+        'Beim Hörtest erklärt ein Sprecher den Weg zum Bahnhof. Wir sollen ihm bis zum Ende _____.',
+      options: ['danken', 'zuhören', 'antworten', 'gratulieren'],
+      correctIndex: 1,
+      explanation:
+        '„Zuhören“ passt, weil die Aufnahme keine Frage stellt und niemand dem Sprecher antwortet, dankt oder gratuliert.',
+    };
+    replacement[3] = {
+      ...initial[3],
+      question: 'Der _____ fließt unter der alten Brücke hindurch und weiter bis zum Meer.',
+      options: ['See', 'Fluss', 'Berg', 'Teich'],
+    };
+    const policies: Array<{ role: string; system: string }> = [];
+    let generation = 0;
+    function finding(item: Item, kind: 'clue' | 'ambiguity' | 'genitive' | 'incidental') {
+      const field = kind === 'incidental' ? 'explanation' : 'question';
+      const fragment = kind === 'ambiguity' ? 'dem Lehrer' : kind === 'genitive' ? 'des _____' : '';
+      const source = item.sourceParts.find(
+        (part) => part.fieldPath[0] === field && part.quote.includes(fragment)
+      );
+      if (!source) throw new Error('The fixture finding has no matching source part');
+      return {
+        sourcePartIndex: source.index,
+        issue: kind === 'incidental' ? 'unsupported' : 'incorrect',
+        rule:
+          kind === 'clue'
+            ? 'Meaning clues disclose the vocabulary answer.'
+            : 'Check the complete public task.',
+        defect:
+          kind === 'clue'
+            ? 'The context describes the meaning of the selected word.'
+            : kind === 'ambiguity'
+              ? 'Both zuhören and folgen fit the complete public task.'
+              : kind === 'genitive'
+                ? 'The keyed completion des Fluss has incorrect genitive case.'
+                : 'The public task does not explicitly say that the recording asks no question.',
+        remedy: {
+          kind: 'correction',
+          text:
+            kind === 'ambiguity'
+              ? 'Replace folgen with an incompatible distractor.'
+              : kind === 'genitive'
+                ? 'Use Der Fluss while preserving the exact target lemma.'
+                : kind === 'incidental'
+                  ? 'Wir verfolgen die Erklärung des Sprechers bis zum Ende.'
+                  : 'Remove the description of the intended meaning.',
+        },
+      };
+    }
+    boundary.generate.mockImplementation(
+      async (
+        system: string,
+        messages: Array<{ content: string }>,
+        options: { jsonSchema: { name: string } }
+      ) => {
+        const role = options.jsonSchema.name;
+        policies.push({ role, system });
+        if (role === 'class_section_questions') {
+          if (generation) repairPrompt = messages[0].content;
+          const rows = generation++ ? replacement : initial;
+          return {
+            model: 'fixture',
+            content: JSON.stringify({
+              passage: '',
+              questions: rows.map(({ options: choices, ...row }, targetIndex) => ({
+                ...row,
+                targetIndex,
+                distractors: choices.filter((choice) => choice !== targets[targetIndex]),
+                passageRef: '',
+              })),
+            }),
+          };
+        }
+        const input = JSON.parse(messages[0].content);
+        if (role === 'class_section_quality') {
+          blindInputs.push(input.questions);
+          return {
+            model: 'fixture',
+            content: JSON.stringify({
+              passageFindings: [],
+              issues: [],
+              questions: input.questions.map((row: BlindItem) => ({
+                index: row.index,
+                acceptableOptionIndices:
+                  generation === 1 && row.index === 0
+                    ? [1, 2]
+                    : generation === 1 && row.index === 3
+                      ? []
+                      : [row.options.indexOf(targets[row.index])],
+                issues: generation === 1 && row.index === 3 ? ['incorrect'] : [],
+              })),
+            }),
+          };
+        }
+        if (role === 'class_teaching_novel_finding_corroboration') {
+          corroborationInputs.push(input);
+          return {
+            model: 'fixture',
+            content: JSON.stringify({
+              decisions: input.novelFindingProposals.map(
+                (proposal: { itemIndex: number; findingIndex: number }) => ({
+                  itemIndex: proposal.itemIndex,
+                  findingIndex: proposal.findingIndex,
+                  decision: 'dismissed',
+                  reason: 'Semantic clues are legitimate contextual vocabulary evidence.',
+                })
+              ),
+            }),
+          };
+        }
+        pairedInputs.push({ role, ...input });
+        if (role === 'class_teaching_critic') {
+          teachingInputs.push(input.items);
+          return {
+            model: 'fixture',
+            content: JSON.stringify({
+              items: input.items.map((item: Item) => ({
+                index: item.index,
+                findings:
+                  generation > 1
+                    ? item.index === 0
+                      ? [finding(item, 'incidental')]
+                      : []
+                    : item.index === 4
+                      ? []
+                      : [
+                          finding(item, 'clue'),
+                          ...(item.index === 0
+                            ? [finding(item, 'ambiguity')]
+                            : item.index === 3
+                              ? [finding(item, 'genitive')]
+                              : []),
+                        ],
+              })),
+            }),
+          };
+        }
+        return {
+          model: 'fixture',
+          content: JSON.stringify({
+            items: input.items.map((item: Item) => ({
+              index: item.index,
+              criticDecisions: Array.from(
+                input.criticisms.items[item.index].findings.keys(),
+                (findingIndex: number) => ({
+                  findingIndex,
+                  decision: generation === 1 && findingIndex === 1 ? 'supported' : 'dismissed',
+                  reason:
+                    generation === 1 && findingIndex === 1
+                      ? 'The actual grammar or competing-answer defect remains.'
+                      : generation === 1
+                        ? 'A semantic clue is valid and does not print the answer.'
+                        : 'Removing this incidental detail leaves the public answer and lexical explanation intact.',
+                })
+              ),
+              newFindings: generation === 1 && item.index === 4 ? [finding(item, 'clue')] : [],
+            })),
+          }),
+        };
+      }
+    );
+    const result = await generateSectionQuestions({
+      ...params,
+      vocabularyReview: true,
+      grammarPoints: [],
+      objective: 'Choose words that complete meaningful sentences in context.',
+      targetVocab: targets.map((lemma) => ({ lemma, gloss: lemma })),
+    });
+    expect(result).toHaveLength(5);
+    expect(result.map((row) => row.options[row.correctIndex])).toEqual(targets);
+    expect(teachingInputs).toHaveLength(2);
+    expect(blindInputs).toHaveLength(2);
+    expect(repairPrompt).toContain('Both zuhören and folgen fit');
+    expect(repairPrompt).toContain('des Fluss has incorrect genitive case');
+    expect(repairPrompt).not.toContain('Meaning clues disclose the vocabulary answer');
+    expect(result[0].options).not.toContain('folgen');
+    expect(result[0].explanation).toContain('keine Frage');
+    expect(result[3].question).toContain('Der _____ fließt');
+    for (const index of [1, 2, 4]) {
+      expect(result[index]).toEqual(teachingInputs[0][index].content);
+      expect(teachingInputs[1][index].content).toEqual(teachingInputs[0][index].content);
+      expect(blindInputs[1][index]).toEqual(blindInputs[0][index]);
+      expect(result[index].explanation).not.toContain('Neue Erklärung');
+    }
+    expect(corroborationInputs[0].novelFindingProposals).toMatchObject([
+      { itemIndex: 4, findingIndex: 0 },
+    ]);
+    expect(corroborationInputs[0].items[4].content).toEqual(teachingInputs[0][4].content);
+    for (const input of [...pairedInputs, ...corroborationInputs])
+      expect(input.exerciseMode).toBe('vocabulary_recall');
+    for (const { system } of policies)
+      expect(system).toMatch(/description or paraphrase.*legitimate/i);
+    for (const { role, system } of policies.filter(({ role }) =>
+      role.startsWith('class_teaching_')
+    )) {
+      expect(system, role).toContain('missing public distinction');
+      expect(system, role).toContain('false lexical or grammatical claim');
+    }
+  });
+
   it('keeps a genuine second teaching defect terminal after collecting both initial audits', async () => {
     finalDefect = true;
     const error = await generateSectionQuestions({ ...params, vocabularyReview: true }).catch(
