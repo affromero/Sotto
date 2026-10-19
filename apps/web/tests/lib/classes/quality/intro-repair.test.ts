@@ -853,7 +853,7 @@ describe('field-local A1 intro repair', () => {
       expect(policy).toContain('need not repeat the target’s grammatical tense');
       expect(boundary.generate.mock.calls.every(([system]) => system.includes(policy))).toBe(true);
       expect(classIntroGrammarRulePolicy()).toContain(
-        'A word-order claim must explicitly identify the clause type'
+        'Counterexamples must refute the actual qualified claim'
       );
       expect(
         boundary.generate.mock.calls.every(([system]) =>
