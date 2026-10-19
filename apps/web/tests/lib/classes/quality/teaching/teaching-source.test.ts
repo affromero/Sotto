@@ -315,6 +315,7 @@ describe('canonical teaching source parts', () => {
       true
     );
     expect(JSON.stringify(schema.schema)).toContain('wordingEvidence');
+    expect(JSON.stringify(schema.schema)).not.toContain('"oneOf"');
     expect(
       JSON.stringify(buildTeachingAdjudicatorJsonSchema(vocabularyFields, critic).schema)
     ).not.toContain('wordingEvidence');
