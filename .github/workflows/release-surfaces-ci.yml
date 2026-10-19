@@ -99,6 +99,7 @@ jobs:
           npm run icon
           npm test
           cargo test --locked --manifest-path src-tauri/Cargo.toml
+          cargo test --locked --release --manifest-path src-tauri/Cargo.toml --test glib_variant
           npm run build -- --bundles appimage
       - name: Launch AppImage
         run: |
