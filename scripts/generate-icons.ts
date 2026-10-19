@@ -32,10 +32,20 @@ const IOS_COMPOSER_ASSETS_DIR = join(
 // Every unique pixel size referenced by AppIcon.appiconset/Contents.json.
 const IOS_ICON_SIZES = [20, 29, 40, 58, 60, 80, 87, 120, 152, 167, 180, 1024];
 
-// SottoTheme.paper. Legacy app icon PNGs must be opaque for App Store upload.
-// Icon Composer uses a separate transparent foreground and renders its own
-// backgrounds for the system's default, dark, clear, and tinted appearances.
-const IOS_ICON_BACKGROUND = { r: 245, g: 244, b: 240 };
+// Match the Icon Composer default fill without the paper surround. Legacy
+// PNGs stay opaque; Composer keeps its separate transparent foreground.
+const IOS_ICON_BACKGROUND = Buffer.from(`
+  <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024"
+       viewBox="0 0 100 100">
+    <defs>
+      <linearGradient id="background" x1="0.16" y1="0.04" x2="0.84" y2="0.96">
+        <stop offset="0" stop-color="#6AA0FF"/>
+        <stop offset="1" stop-color="#FF8FB1"/>
+      </linearGradient>
+    </defs>
+    <rect width="100" height="100" fill="url(#background)"/>
+  </svg>
+`);
 
 interface IcoImage {
   size: number;
@@ -86,9 +96,10 @@ async function generatePngIcon(size: number, filename: string): Promise<void> {
 
 async function generateIosIcon(size: number): Promise<void> {
   const filename = `sotto-icon-${size}.png`;
-  await sharp(markSvg)
+  await sharp(IOS_ICON_BACKGROUND)
     .resize(size, size)
-    .flatten({ background: IOS_ICON_BACKGROUND })
+    .composite([{ input: await renderPng(size) }])
+    .removeAlpha()
     .png()
     .toFile(join(IOS_ICON_DIR, filename));
   log(`Generated ios/${filename} (${size}x${size})`);

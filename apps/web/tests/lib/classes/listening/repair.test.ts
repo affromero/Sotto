@@ -27,7 +27,9 @@ import { learningScriptHash } from '@/lib/learning/script-hash';
 import { listeningRepairPlan } from '@/lib/classes/quality/listening-repair';
 import {
   configureSpokenTeachingRejection,
-  singleTurnScriptResponseFixture,
+  dialogueScriptResponseFixture,
+  dialogueTurnsFixture,
+  dialogueTranscriptFixture,
 } from './teaching-repair-fixture';
 import { approved, firstText, finalText, rejected, finalRejected } from './blind-review-fixture';
 import { causalBlindRejection } from './blind-review-fixture';
@@ -100,7 +102,7 @@ describe('bounded canonical listening correction', () => {
       if (options.maxTokens === 12288) {
         const text = scriptIndex++ === 0 ? firstText : finalText;
         return {
-          content: singleTurnScriptResponseFixture(text, options.jsonSchema?.name),
+          content: dialogueScriptResponseFixture(text, options.jsonSchema?.name),
           model: 'm',
           inputTokens: 5,
           outputTokens: 10,
@@ -137,27 +139,25 @@ describe('bounded canonical listening correction', () => {
           order: index + 1,
         }))
       );
-      expect(mockScriptCreate.mock.calls[0][0].data.turns).toEqual([
-        { speaker: 'HOST', text: finalText },
-      ]);
+      expect(mockScriptCreate.mock.calls[0][0].data.turns).toEqual(dialogueTurnsFixture(finalText));
       const requests = scriptRequests();
       const correction = JSON.parse(requests[1][1][0].content.split('\n').at(-1)!);
       expect(correction.verdict.kind).toBe('teaching');
       expect(correction.verdict.findings[0].findings[0]).toMatchObject({
         fieldPath: ['passageText'],
-        quote: `HOST: ${firstText}`,
+        quote: dialogueTranscriptFixture(firstText),
       });
       expect(
         mockBlindResponse.mock.calls.map((call) => JSON.parse(call[1][0].content).passage)
-      ).toEqual([`HOST: ${firstText}`, `HOST: ${finalText}`]);
+      ).toEqual([dialogueTranscriptFixture(firstText), dialogueTranscriptFixture(finalText)]);
       const finalReview = JSON.parse(mockTeachingResponse.mock.calls.at(-1)![1][0].content);
-      expect(finalReview.items[0].content.passageText).toBe(`HOST: ${finalText}`);
+      expect(finalReview.items[0].content.passageText).toBe(dialogueTranscriptFixture(finalText));
       expect(finalReview.items.slice(1).map((item: { content: unknown }) => item.content)).toEqual(
         expectedQuestions
       );
-      expect(mockCreateSegmentsAndQueueAudio.mock.calls[0][1]).toEqual([
-        { speaker: 'HOST', text: finalText },
-      ]);
+      expect(mockCreateSegmentsAndQueueAudio.mock.calls[0][1]).toEqual(
+        dialogueTurnsFixture(finalText)
+      );
     }
   );
 
@@ -178,7 +178,7 @@ describe('bounded canonical listening correction', () => {
       model: 'm',
       content:
         args[2].maxTokens === 12288
-          ? singleTurnScriptResponseFixture(
+          ? dialogueScriptResponseFixture(
               args[2].jsonSchema?.name === 'learning_script_turn_repair' ? corrected : original,
               args[2].jsonSchema?.name
             )
@@ -192,7 +192,7 @@ describe('bounded canonical listening correction', () => {
       });
     await expect(generateClassListening(PARAMS)).rejects.toBeInstanceOf(SectionQualityError);
     const finalBlind = JSON.parse(mockBlindResponse.mock.calls.at(-1)![1][0].content);
-    expect(finalBlind.passage).toBe(`HOST: ${corrected}`);
+    expect(finalBlind.passage).toBe(dialogueTranscriptFixture(corrected));
     expect(finalBlind.questions[0].question).toBe('Wohin ist Ana gegangen?');
     expect(finalBlind.questions[0].options).toEqual(questions[0].options);
     noLearningPublication();
@@ -203,7 +203,7 @@ describe('bounded canonical listening correction', () => {
     mockGenerateResponse.mockImplementation(async (...args) => ({
       content:
         args[2].maxTokens === 12288
-          ? singleTurnScriptResponseFixture(firstText, args[2].jsonSchema?.name)
+          ? dialogueScriptResponseFixture(firstText, args[2].jsonSchema?.name)
           : SAMPLE_QUESTIONS_JSON,
       model: 'm',
     }));
@@ -225,7 +225,7 @@ describe('bounded canonical listening correction', () => {
           args[2].maxTokens === 12288
             ? JSON.stringify({
                 ...SAMPLE_SCRIPT_RESULT,
-                turns: [{ speaker: 'HOST', text: firstText }],
+                turns: dialogueTurnsFixture(firstText),
               })
             : SAMPLE_QUESTIONS_JSON,
       };
@@ -253,10 +253,7 @@ describe('bounded canonical listening correction', () => {
     mockGenerateResponse.mockImplementation(async (...args) => ({
       content:
         args[2].maxTokens === 12288
-          ? singleTurnScriptResponseFixture(
-              firstText + ' Hallo.'.repeat(1500),
-              args[2].jsonSchema?.name
-            )
+          ? dialogueScriptResponseFixture(firstText, args[2].jsonSchema?.name, true)
           : SAMPLE_QUESTIONS_JSON,
       model: 'm',
     }));
@@ -265,7 +262,7 @@ describe('bounded canonical listening correction', () => {
     const diagnostic = error.teachingFailure.reviews[0];
     expect(diagnostic).not.toHaveProperty('omitted');
     expect(JSON.parse(diagnostic.candidate)[0].listeningAudit.items).toEqual([
-      { passageText: `HOST: ${firstText + ' Hallo.'.repeat(1500)}` },
+      { passageText: dialogueTranscriptFixture(firstText, true) },
       ...JSON.parse(SAMPLE_QUESTIONS_JSON).questions,
     ]);
     expect(scriptRequests()).toHaveLength(2);
@@ -470,9 +467,7 @@ describe('bounded canonical listening correction', () => {
       };
     });
     await generateClassListening({ ...PARAMS, targetLang: 'de', level: 'A2' });
-    expect(mockScriptCreate.mock.calls[0][0].data.turns).toEqual([
-      { speaker: 'HOST', text: finalText },
-    ]);
+    expect(mockScriptCreate.mock.calls[0][0].data.turns).toEqual(dialogueTurnsFixture(finalText));
     const correction = mockGenerateResponse.mock.calls.find((call) =>
       call[1][0].content.includes('untrusted correction data')
     );
@@ -481,11 +476,13 @@ describe('bounded canonical listening correction', () => {
     const correctionContext = JSON.parse(correction![1][0].content.split('\n').at(-1)!);
     expect(correctionContext.verdict).toEqual({
       passageAcceptable: false,
-      passageFeedback: [{ quote: 'HOST: ' + firstText, reason: 'Endlich does not mean finite.' }],
+      passageFeedback: [
+        { quote: dialogueTranscriptFixture(firstText), reason: 'Endlich does not mean finite.' },
+      ],
       issues: ['unnatural'],
       questions: rejected.questions,
     });
-    expect(correctionContext.candidate.turns).toEqual([{ speaker: 'HOST', text: firstText }]);
+    expect(correctionContext.candidate.turns).toEqual(dialogueTurnsFixture(firstText));
     expect(correction![1][0].content).toContain(PARAMS.objective);
     expect(correction![2]).toMatchObject({ model: 'm', apiKeyOverride: 'k' });
     expect(correction![0]).toContain('Full Immersion Mode');
@@ -508,13 +505,15 @@ describe('bounded canonical listening correction', () => {
     expect(failure.category).toBe('section_quality');
     const records = failure.teachingFailure!.reviews.map((review) => JSON.parse(review.candidate!));
     expect(records.map((record) => record.transcript)).toEqual([
-      'HOST: ' + firstText,
-      'HOST: ' + finalText,
+      dialogueTranscriptFixture(firstText),
+      dialogueTranscriptFixture(finalText),
     ]);
     expect(records.map((record) => record.blindVerdict)).toEqual([
       {
         passageAcceptable: false,
-        passageFeedback: [{ quote: 'HOST: ' + firstText, reason: 'Endlich does not mean finite.' }],
+        passageFeedback: [
+          { quote: dialogueTranscriptFixture(firstText), reason: 'Endlich does not mean finite.' },
+        ],
         issues: ['unnatural'],
         questions: approved.questions,
       },
@@ -522,7 +521,7 @@ describe('bounded canonical listening correction', () => {
         passageAcceptable: false,
         passageFeedback: [
           {
-            quote: 'HOST: ' + finalText,
+            quote: dialogueTranscriptFixture(finalText),
             reason: 'The replacement still fails the supplied review.',
           },
         ],
@@ -627,7 +626,7 @@ describe('bounded canonical listening correction', () => {
         return {
           content: JSON.stringify({
             ...SAMPLE_SCRIPT_RESULT,
-            turns: [{ speaker: 'HOST', text: texts[nextScript++] }],
+            turns: dialogueTurnsFixture(texts[nextScript++]),
             vocabulary: [{ number: 1, word: 'gemacht', translation: 'made' }],
           }),
           model: 'm',
@@ -661,14 +660,14 @@ describe('bounded canonical listening correction', () => {
       JSON.parse(review.candidate!)
     );
     expect(records.map((record) => record.transcript)).toEqual(
-      texts.map((text) => 'HOST: ' + text.replace('[V1:gemacht]', 'gemacht'))
+      texts.map((text) => dialogueTranscriptFixture(text.replace('[V1:gemacht]', 'gemacht')))
     );
     expect(records.map((record) => record.blindVerdict)).toEqual(
       texts.map((text) => ({
         passageAcceptable: false,
         passageFeedback: [
           {
-            quote: 'HOST: ' + text.replace('[V1:gemacht]', 'gemacht'),
+            quote: dialogueTranscriptFixture(text.replace('[V1:gemacht]', 'gemacht')),
             reason: 'The verb does not fit the intended story question.',
           },
         ],
@@ -793,9 +792,7 @@ describe('bounded canonical listening correction', () => {
       expect(scriptRequests()).toHaveLength(1);
       expect(mockBlindResponse).toHaveBeenCalledTimes(1);
       expect(mockTeachingResponse).toHaveBeenCalledTimes(1);
-      expect(mockScriptCreate.mock.calls[0][0].data.turns).toEqual([
-        { speaker: 'HOST', text: firstText },
-      ]);
+      expect(mockScriptCreate.mock.calls[0][0].data.turns).toEqual(dialogueTurnsFixture(firstText));
       expect(mockCreateSegmentsAndQueueAudio).toHaveBeenCalledTimes(1);
       const correction = quizRequests()[1];
       expect(correction[1][0].content).toContain('untrusted correction data');

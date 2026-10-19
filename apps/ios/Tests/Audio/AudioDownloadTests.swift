@@ -66,14 +66,8 @@ final class AudioDownloadTestProtocol: URLProtocol {
 @MainActor
 final class AudioPlaybackTests: XCTestCase {
     func testStoppingPlaybackRemovesDownloadedAudio() async throws {
-        let file = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).wav")
+        let file = try audioFile()
         defer { try? FileManager.default.removeItem(at: file) }
-        let format = try XCTUnwrap(AVAudioFormat(standardFormatWithSampleRate: 16_000, channels: 1))
-        let buffer = try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 160))
-        buffer.frameLength = 160
-        for index in 0..<160 { buffer.floatChannelData?[0][index] = 0 }
-        let output = try AVAudioFile(forWriting: file, settings: format.settings)
-        try output.write(from: buffer)
         let playback = LearnerAudioPlayback()
         playback.toggle { file }
         let deadline = Date().addingTimeInterval(2)
@@ -117,5 +111,71 @@ final class AudioPlaybackTests: XCTestCase {
         XCTAssertEqual(playback.errorMessage, "Audio unavailable")
         XCTAssertFalse(playback.isPlaying)
         XCTAssertFalse(playback.isLoading)
+    }
+
+    func testSelectingASpeakerTurnReplacesTheLessonAndRemovesItsDownload() async throws {
+        let lesson = try audioFile()
+        let turn = try audioFile()
+        defer {
+            try? FileManager.default.removeItem(at: lesson)
+            try? FileManager.default.removeItem(at: turn)
+        }
+        let playback = LearnerAudioPlayback()
+        defer { playback.stop() }
+        playback.toggle(reference: "lesson") { lesson }
+        let lessonReady = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            !playback.isLoading
+        }, object: nil)
+        await fulfillment(of: [lessonReady], timeout: 2)
+        XCTAssertNil(playback.errorMessage)
+        playback.toggle(reference: "Mia-turn") { turn }
+        let turnReady = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            !playback.isLoading
+        }, object: nil)
+        await fulfillment(of: [turnReady], timeout: 2)
+        XCTAssertNil(playback.errorMessage)
+        XCTAssertEqual(playback.reference, "Mia-turn")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: lesson.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: turn.path))
+    }
+
+    func testSelectingAnotherTurnDuringDownloadKeepsOnlyTheSelectedAudio() async throws {
+        let oldTurn = try audioFile()
+        let nextTurn = try audioFile()
+        defer {
+            try? FileManager.default.removeItem(at: oldTurn)
+            try? FileManager.default.removeItem(at: nextTurn)
+        }
+        let playback = LearnerAudioPlayback()
+        defer { playback.stop() }
+        let started = expectation(description: "First turn download started")
+        var pending: CheckedContinuation<URL, Error>?
+        playback.toggle(reference: "old-turn") {
+            try await withCheckedThrowingContinuation { continuation in
+                pending = continuation
+                started.fulfill()
+            }
+        }
+        await fulfillment(of: [started], timeout: 2)
+        playback.toggle(reference: "next-turn") { nextTurn }
+        try XCTUnwrap(pending).resume(returning: oldTurn)
+        let switched = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            !playback.isLoading && !FileManager.default.fileExists(atPath: oldTurn.path)
+        }, object: nil)
+        await fulfillment(of: [switched], timeout: 2)
+        XCTAssertNil(playback.errorMessage)
+        XCTAssertEqual(playback.reference, "next-turn")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: nextTurn.path))
+    }
+
+    private func audioFile() throws -> URL {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).wav")
+        let format = try XCTUnwrap(AVAudioFormat(standardFormatWithSampleRate: 16_000, channels: 1))
+        let buffer = try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 16_000))
+        buffer.frameLength = 16_000
+        for index in 0..<16_000 { buffer.floatChannelData?[0][index] = 0 }
+        let output = try AVAudioFile(forWriting: file, settings: format.settings)
+        try output.write(from: buffer)
+        return file
     }
 }

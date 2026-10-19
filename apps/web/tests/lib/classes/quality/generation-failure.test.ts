@@ -249,24 +249,27 @@ describe('terminal generation failure classification', () => {
     expect(JSON.stringify(captured)).not.toContain('provider response diagnostic');
   });
 
-  it('omits oversized malformed candidates while retaining static structural issues', () => {
-    const error = new Error('Private response diagnostic.');
-    recordGenerationAttemptFailures(error, [
-      captureStructureAttempt('listening', 1, 'x'.repeat(32 * 1024 + 1), [{ code: 'wrong_count' }]),
-    ]);
+  it.each(['wrong_count', 'script_dialogue_turn_too_long'] as const)(
+    'omits oversized malformed candidates while retaining the static %s issue',
+    (code) => {
+      const error = new Error('Private response diagnostic.');
+      recordGenerationAttemptFailures(error, [
+        captureStructureAttempt('listening', 1, 'x'.repeat(32 * 1024 + 1), [{ code }]),
+      ]);
 
-    expect(captureGenerationFailure(error).attemptFailures).toEqual([
-      {
-        attempt: 1,
-        type: 'structure',
-        kind: 'listening',
-        candidate: null,
-        omitted: 'size_limit',
-        issues: [{ code: 'wrong_count' }],
-      },
-    ]);
-    expect(JSON.stringify(error)).not.toContain('response diagnostic');
-  });
+      expect(captureGenerationFailure(error).attemptFailures).toEqual([
+        {
+          attempt: 1,
+          type: 'structure',
+          kind: 'listening',
+          candidate: null,
+          omitted: 'size_limit',
+          issues: [{ code }],
+        },
+      ]);
+      expect(JSON.stringify(error)).not.toContain('response diagnostic');
+    }
+  );
 
   it('rejects out-of-order, excessive, or unbounded structural attempt evidence', () => {
     const first = captureStructureAttempt('speaking', 1, '{', [{ code: 'invalid_json' }]);

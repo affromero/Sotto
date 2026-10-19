@@ -37,6 +37,7 @@ import {
   type SharedTestInstance,
   type SharedTestIdentity,
 } from '../../../helpers/setup/shared-instance';
+import { sampleTeaching } from '../../../helpers/learning/class-teaching';
 
 const boundary = vi.hoisted(() => ({ database: null as PrismaClient | null }));
 vi.mock('@/lib/prisma', async () => {
@@ -356,6 +357,7 @@ suite('complete class material and retained repair', () => {
       where: { id: cls.id },
       data: {
         adaptiveSeed: {
+          teaching: sampleTeaching,
           intro: {
             purpose: 'Greet someone.',
             about: 'Greetings.',
@@ -415,6 +417,7 @@ suite('complete class material and retained repair', () => {
       attempt: 8,
       learnerAnswers: cls.learnerAnswers,
       writingDrafts: cls.writingDrafts,
+      adaptiveSeed: { teaching: sampleTeaching },
     });
     expect(await instance.database.classSection.count({ where: { classId: cls.id } })).toBe(3);
     expect(

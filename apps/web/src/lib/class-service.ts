@@ -325,21 +325,22 @@ async function buildClassContent(p: ClassContentBuildParams): Promise<Prisma.Inp
     }));
   await assertClassStillGenerating(p.classId, p.attempt);
 
-  const teaching = p.preserveTeaching
-    ? teachingFromSeed(p.existingSeed)
-    : await generateClassTeaching({
-        userId: p.userId,
-        execution: p.execution,
-        level: lessonLevel,
-        nativeLang: p.requirements.nativeLang,
-        targetLang: p.requirements.targetLang,
-        title: p.lesson.title,
-        objective: lessonObjective,
-        grammarPoints,
-        targetVocab,
-        note,
-        sourceContent: p.override?.sourceContent,
-      });
+  const retainedTeaching = p.preserveTeaching ? teachingFromSeed(p.existingSeed) : undefined;
+  const teaching =
+    retainedTeaching ??
+    (await generateClassTeaching({
+      userId: p.userId,
+      execution: p.execution,
+      level: lessonLevel,
+      nativeLang: p.requirements.nativeLang,
+      targetLang: p.requirements.targetLang,
+      title: p.lesson.title,
+      objective: lessonObjective,
+      grammarPoints,
+      targetVocab,
+      note,
+      sourceContent: p.override?.sourceContent,
+    }));
   await assertClassStillGenerating(p.classId, p.attempt);
 
   for (const skill of MC_SKILLS) {

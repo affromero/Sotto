@@ -1,12 +1,10 @@
-// Generates multiple-choice questions for a class's MC sections (GRAMMAR /
-// READING) via the user's AI provider. Mirrors the canonical worker LLM flow.
 import { capturedLearningAiOptions, resolveCapturedLearningAi } from './learning-ai';
 import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import { createAIProvider } from './providers/ai';
 import { loadAndRender } from './prompt-loader';
 import { formatNotesForPrompt } from './course-notes';
 import { orderQuizChoices } from './classes/quiz/choice-order';
-import type { ClassTeaching } from '@sotto/shared';
+import type { ClassTeaching, SkillType } from '@sotto/shared';
 import {
   assertFreshQuizQuestions,
   buildQuizRetryPrompt,
@@ -31,7 +29,6 @@ import {
   captureBlindSectionFailure,
   type SectionReviewFeedback,
 } from './classes/section-quality';
-import type { SkillType } from '@sotto/shared';
 import {
   selectVocabularyRepair,
   mergeVocabularyRepair,
@@ -148,12 +145,7 @@ export interface SectionGenParams {
   note?: string;
   teaching?: ClassTeaching;
   retry?: QuizRetryContext;
-  /**
-   * Optional sourced-class reading passage (CEFR-leveled, target language).
-   * When present for a READING section, MCQs are based on it and each returned
-   * READING question carries it as `passageText`. Absent = the generator must
-   * create a fresh leveled passage for curriculum reading sections.
-   */
+  /** Supplied reading passages remain exact; unsourced reading generates a new passage. */
   sourceContent?: string;
 }
 
@@ -288,7 +280,7 @@ function buildUserPrompt(
               : [
                   'For vocabulary, preserve exact target lemma coverage and rewrite each context and its distractors to distinguish the word by meaning and grammar. Keep passage empty.',
                 ]),
-          'Independently test all four options and provide enough context for exactly one defensible answer. Fix the educational issues, not only JSON formatting. Do not resolve ambiguity merely by changing the answer key.',
+          'For each rejected item, independently insert all four options into its complete public context. Exclude every alternative through stated meaning or grammar; a more specific intended answer does not rule out another true answer. Repair its context, options and explanation together, preserving valid items unchanged. Explain the actual distinction in natural wording and recheck the complete result. Do not resolve ambiguity merely by changing the answer key.',
           `Rejected candidate JSON: ${rejectedCandidate}`,
           ...(vocabularyFeedback
             ? [
@@ -509,9 +501,6 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
   const retainedApprovedQuestions = new Map<number, GeneratedQuestion>();
   const ai = await resolveCapturedLearningAi(p.userId, p.execution);
 
-  // Sourced READING classes: base the MCQs on the leveled passage. The
-  // {{SOURCE}} block is rendered only for a READING section that has source
-  // text; otherwise it is empty and the prompt behaves exactly as before.
   const useSourcePassage = p.skill === 'READING' && !!p.sourceContent;
   const sourceBlock = useSourcePassage
     ? `Source passage (base READING questions on it): ${p.sourceContent}`
@@ -591,6 +580,7 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
   let teachingRejection: TeachingQualityRejectionError | undefined;
   let terminalTeachingRejection: TeachingQualityRejectionError | undefined;
   let teachingFailure: TeachingFailure | undefined;
+  let terminalBlindFailure: TeachingFailure | undefined;
   let sectionFeedback: SectionReviewFeedback | undefined;
   let vocabularyFeedback: VocabularyCoverageFeedback | undefined;
   const blindApprovedQuestionIndices = new Set<number>();
@@ -660,6 +650,10 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
     }
     sectionFeedback = assessment.readingPassageReview ? undefined : assessment.feedback;
     const issues = assessment.questionIssues ?? assessment.issues;
+    terminalBlindFailure =
+      p.skill !== 'READING' && issues.length && assessment.feedback
+        ? captureBlindSectionFailure(questions, assessment.feedback, 'explanations')
+        : undefined;
     if (assessment.issues.length === 0) {
       for (const [index] of questions.entries()) blindApprovedQuestionIndices.add(index);
     } else if (
@@ -807,6 +801,7 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
     });
 
     terminalTeachingRejection = undefined;
+    terminalBlindFailure = undefined;
     let candidate: GeneratedQuestion[] | undefined;
     let candidateTargetOrder: number[] = [];
     let duplicateTargets: number[] = [];
@@ -959,6 +954,7 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
     });
 
     terminalTeachingRejection = undefined;
+    terminalBlindFailure = undefined;
     let candidate: GeneratedQuestion[] | undefined;
     try {
       repeatedQuestionError = undefined;
@@ -981,6 +977,11 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
   });
   if (repeatedQuestionError) throw repeatedQuestionError;
   if (qualityFailed) {
+    if (terminalBlindFailure)
+      teachingFailure = combineTeachingFailures(
+        teachingFailure && { ...teachingFailure, reviews: teachingFailure.reviews.slice(-1) },
+        terminalBlindFailure
+      );
     if (terminalTeachingRejection) {
       throw new TeachingQualityRejectionError(
         terminalTeachingRejection.issues,

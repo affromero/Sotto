@@ -128,6 +128,7 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
     'FOCUS_AREAS',
     'HOST_SPEAKER',
     'LANGUAGE_INSTRUCTION',
+    'MAX_DIALOGUE_TURN_WORDS',
     'SPEAKER_COUNT',
     'SPEAKER_SECTION',
     'TONE',
@@ -141,6 +142,7 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
     'AUDIENCE_LEVEL',
     'CONTENT_SAFETY',
     'LANGUAGE_INSTRUCTION',
+    'MAX_DIALOGUE_TURN_WORDS',
   ],
   'class/review-teaching-novel-findings.md': [
     'EXAMPLE_MEANING_POLICY',

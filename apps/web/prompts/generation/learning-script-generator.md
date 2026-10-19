@@ -6,6 +6,8 @@ Write a {{SPEAKER_COUNT}}-speaker language lesson at CEFR {{AUDIENCE_LEVEL}} for
 
 Use only the supplied speaker names. With one speaker, write a monologue. With multiple speakers, let their questions and answers develop one clear situation. Keep each speaker's experiences and quoted practice examples distinct; an interested listener does not acquire the other speaker's memories. Respect the audience's age and content needs.
 
+With multiple speakers, include at least two supplied speakers and alternate their contributions naturally. Each turn belongs to exactly one speaker and produces its own audio clip. Keep every turn to at most {{MAX_DIALOGUE_TURN_WORDS}} spoken words, ideally one to three short sentences, at every CEFR level. Give the other person room to ask, answer or react before continuing a long explanation. Start a new turn whenever the speaker changes. Never put speaker labels or another person's dialogue inside a turn's text. Preserve the lesson's total target duration through the exchange.
+
 {{LANGUAGE_INSTRUCTION}}
 
 {{VOICE_REALISM}}

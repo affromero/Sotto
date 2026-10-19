@@ -1,7 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// ---- Mocks ----
-
 const mockGenerateResponse = vi.fn();
 
 vi.mock('@/lib/providers/ai', () => ({
@@ -10,7 +8,6 @@ vi.mock('@/lib/providers/ai', () => ({
   }),
 }));
 
-// ---- Import under test ----
 import { generateScript as generateScriptImpl } from '@/lib/script-generator';
 import { VOICE_REALISM_INSTRUCTIONS } from '@/lib/voice-realism-prompts';
 
@@ -23,8 +20,6 @@ function generateScript(
 ) {
   return generateScriptImpl({ ...AI_RUNTIME, ...params });
 }
-
-// ---- Tests ----
 
 describe('generateScript', () => {
   beforeEach(() => {
@@ -40,7 +35,10 @@ describe('generateScript', () => {
           providerInstruction = system;
           return {
             content: JSON.stringify({
-              turns: [{ speaker: 'HOST', text: 'Nora hat Tee gemacht.' }],
+              turns: [
+                { speaker: 'HOST', text: 'Nora hat Tee gemacht.' },
+                { speaker: 'EXPERT', text: 'War der Tee gut?' },
+              ],
               soundCues: [],
               references: [],
             }),
@@ -129,7 +127,10 @@ describe('generateScript', () => {
           providerInstruction = system;
           return {
             content: JSON.stringify({
-              turns: [{ speaker: 'HOST', text: 'Yesterday was busy.' }],
+              turns: [
+                { speaker: 'HOST', text: 'Yesterday was busy.' },
+                { speaker: 'EXPERT', text: 'What did you do?' },
+              ],
               soundCues: [],
               references: [],
             }),
@@ -544,6 +545,7 @@ describe('generateScript', () => {
                     ? spoken
                     : 'Meine [V1:Reise] war kurz. Das Wort [V1:die Reise] nennt den Ausflug.',
               },
+              { speaker: 'EXPERT', text: 'Wohin ging die Reise?' },
             ],
             references: [],
             soundCues: [],

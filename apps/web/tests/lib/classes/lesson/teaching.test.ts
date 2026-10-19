@@ -135,16 +135,53 @@ describe('class teaching', () => {
     expect(boundary.author.mock.calls).toHaveLength(2);
   });
 
-  it('does not publish a rejected explanation and reviews its replacement', async () => {
+  it('repairs coupled teaching fields with indexed feedback and reviews the complete replacement', async () => {
     boundary.adjudicator.mockResolvedValueOnce(rejected);
+    const candidate = {
+      ...sampleTeaching,
+      guidedPractice: {
+        prompt: 'Cuenta que Ana comió en el museo ayer.',
+        hint: 'Usa comió.',
+        answer: 'Ana pidió comida en el museo ayer.',
+        explanation: 'Pedir comida significa comerla.',
+      },
+    };
     const replacement = {
       ...sampleTeaching,
-      explanation: 'Con yo, usa visité para contar una visita terminada.',
+      guidedPractice: {
+        prompt: 'Cuenta que Ana comió en el museo ayer.',
+        hint: 'Relaciona el verbo con Ana y una actividad terminada.',
+        answer: 'Ana comió en el museo ayer.',
+        explanation: 'Comió expresa la actividad terminada de Ana.',
+      },
     };
     boundary.author
-      .mockResolvedValueOnce({ content: JSON.stringify(sampleTeaching), model: 'captured-model' })
+      .mockResolvedValueOnce({ content: JSON.stringify(candidate), model: 'captured-model' })
       .mockResolvedValueOnce({ content: JSON.stringify(replacement), model: 'captured-model' });
     expect(await generateClassTeaching(params)).toEqual(replacement);
+    const [system, messages, options] = boundary.author.mock.calls[1];
+    expect(system).toContain(params.objective);
+    expect(system).toContain('every required fact');
+    expect(messages[0].content).toContain(
+      'Repair the prompt, answer, explanation and hint together'
+    );
+    expect(JSON.parse(messages[0].content.slice(messages[0].content.indexOf('\n') + 1))).toEqual({
+      candidate,
+      issues: ['incorrect'],
+      feedback: [
+        {
+          index: 0,
+          feedback: [
+            'The explanation gives the wrong verb agreement. Correction: Use accurate supported teaching.',
+          ],
+        },
+      ],
+    });
+    expect(options.model).toBe('captured-model');
+    const reviewed = boundary.requests.mock.calls
+      .filter(([, , request]) => request.jsonSchema.name === 'class_teaching_critic')
+      .map(([, request]) => JSON.parse(request[0].content).items[0].content);
+    expect(reviewed).toEqual([candidate, replacement]);
   });
 
   it('shares one replacement budget across structural and teaching rejection', async () => {
