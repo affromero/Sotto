@@ -43,8 +43,6 @@
     "@mozilla/readability": "^0.6.0",
     "@prisma/adapter-pg": "7.10.0",
     "@prisma/client": "7.10.0",
-    "@sentry/nextjs": "^11.6.0",
-    "@sentry/node": "11.6.0",
     "@sotto/learning-model": "*",
     "@sotto/shared": "*",
     "bullmq": "^6.3.13",

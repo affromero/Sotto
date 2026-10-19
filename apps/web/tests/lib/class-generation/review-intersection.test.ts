@@ -6,7 +6,11 @@ vi.mock('@/lib/providers/ai', () => ({
   createAIProvider: () => ({ generateResponse: boundary.generate }),
 }));
 vi.mock('@/lib/learning-ai', () => ({
-  resolveCapturedLearningAi: async () => ({ provider: 'fixture', model: 'fixture' }),
+  resolveCapturedLearningAi: async (userId: string) => ({
+    provider: 'fixture',
+    model: 'fixture',
+    execution: blockedProviderExecution(userId),
+  }),
   capturedLearningAiOptions: async () => ({ model: 'fixture' }),
 }));
 vi.mock('@/lib/usage-logger', () => ({ logUsage: vi.fn() }));
@@ -35,10 +39,17 @@ let vocabulary: boolean;
 let finalDefect: boolean;
 let finalAmbiguity: boolean;
 let globalBlindDefect: boolean;
+let lateDefinitionDefect: boolean;
 let blindDefect: 'issue' | 'wrong_key' | 'ambiguous';
 let repairPrompt: string;
+let generationPrompts: string[];
+let blindPrompts: string[];
 let teachingInputs: Item[][];
 let blindInputs: BlindItem[][];
+let corroborationInputs: Array<{
+  items: Item[];
+  novelFindingProposals: Array<{ itemIndex: number; findingIndex: number }>;
+}>;
 
 function authored(replacement: boolean) {
   const rows = sentences.map((question, targetIndex) => ({
@@ -53,9 +64,11 @@ function authored(replacement: boolean) {
     distractors: ['getrunken', 'gegessen', 'geschrieben'],
     correctIndex: replacement ? 2 : 0,
     explanation:
-      replacement && targetIndex === 1 && finalDefect
-        ? 'Gehen bedeutet, ein Fahrzeug zu benutzen.'
-        : `Die Situation verlangt „${lemmas[targetIndex]}“.`,
+      lateDefinitionDefect && targetIndex === 2
+        ? '„Gesehen“ bedeutet immer, einen Film angeschaut zu haben.'
+        : replacement && targetIndex === 1 && finalDefect
+          ? 'Gehen bedeutet, ein Fahrzeug zu benutzen.'
+          : `Die Situation verlangt „${lemmas[targetIndex]}“.`,
     passageRef: '',
   }));
   if (vocabulary) return rows;
@@ -72,10 +85,14 @@ beforeEach(() => {
   finalDefect = false;
   finalAmbiguity = false;
   globalBlindDefect = false;
+  lateDefinitionDefect = false;
   blindDefect = 'issue';
   repairPrompt = '';
+  generationPrompts = [];
+  blindPrompts = [];
   teachingInputs = [];
   blindInputs = [];
+  corroborationInputs = [];
   boundary.generate.mockReset();
   boundary.generate.mockImplementation(
     async (
@@ -86,13 +103,31 @@ beforeEach(() => {
       const name = options.jsonSchema.name;
       if (name === 'class_section_questions') {
         expect(system).toContain(params.objective);
+        generationPrompts.push(system);
         if (generated) repairPrompt = messages[0].content;
         const questions = authored(generated);
         generated = true;
         return { content: JSON.stringify({ passage: '', questions }), model: 'fixture' };
       }
       const input = JSON.parse(messages[0].content);
+      if (name === 'class_teaching_novel_finding_corroboration') {
+        corroborationInputs.push(input);
+        return {
+          content: JSON.stringify({
+            decisions: input.novelFindingProposals.map(
+              ({ itemIndex, findingIndex }: { itemIndex: number; findingIndex: number }) => ({
+                itemIndex,
+                findingIndex,
+                decision: 'supported',
+                reason: 'Seeing does not necessarily mean watching a film.',
+              })
+            ),
+          }),
+          model: 'fixture',
+        };
+      }
       if (name === 'class_section_quality') {
+        blindPrompts.push(system);
         blindInputs.push(input.questions);
         return {
           content: JSON.stringify({
@@ -164,7 +199,23 @@ beforeEach(() => {
                 decision: 'supported',
                 reason: 'The literal source contains the specified defect.',
               })),
-              newFindings: [],
+              newFindings:
+                lateDefinitionDefect && teachingInputs.length > 1 && item.index === 2
+                  ? [
+                      {
+                        sourcePartIndex: item.sourceParts.find(
+                          (part) => part.fieldPath[0] === 'explanation'
+                        )!.index,
+                        issue: 'incorrect',
+                        rule: 'Incidental scene facts do not define a word.',
+                        defect: 'Seeing does not necessarily mean watching a film.',
+                        remedy: {
+                          kind: 'correction',
+                          text: 'Hier beschreibt „gesehen“, dass Lea einen Film angeschaut hat.',
+                        },
+                      },
+                    ]
+                  : [],
             };
           }),
         }),
@@ -188,6 +239,33 @@ const params = {
 };
 
 describe('question repair from both independent audits', () => {
+  it('sends contextual lexical meaning constraints through both authoring and blind review attempts', async () => {
+    const result = await generateSectionQuestions({ ...params, vocabularyReview: true });
+    expect(result.map((row) => row.options[row.correctIndex])).toEqual(lemmas);
+    expect(generationPrompts).toHaveLength(2);
+    for (const prompt of generationPrompts) {
+      const policy = prompt.split('\n').find((line) => /vocabulary explanations/i.test(line));
+      expect(policy).toEqual(expect.stringMatching(/why.*fits.*scene/i));
+      expect(policy).toEqual(expect.stringMatching(/essential.*meaning.*incidental/i));
+      expect(policy).toEqual(expect.stringMatching(/generic.*definition/i));
+      for (const [index, lemma] of lemmas.entries())
+        expect(prompt).toContain(`[${index}] ${lemma}`);
+    }
+    expect(blindPrompts).toHaveLength(2);
+    for (const prompt of blindPrompts) {
+      const policy = prompt.split('\n').find((line) => /vocabulary.*alternatives/i.test(line));
+      expect(policy).toEqual(expect.stringMatching(/action.*sense/i));
+      expect(policy).toEqual(expect.stringMatching(/accompany.*not.*meaning-preserving/i));
+      expect(policy).toEqual(
+        expect.stringMatching(/true synonyms.*ordinary alternative answers.*satisfy/i)
+      );
+      expect(policy).toEqual(
+        expect.stringMatching(/multiple plausible venues.*public facts.*do not distinguish/i)
+      );
+    }
+    expect(repairPrompt).toContain('acceptableOptionIndices');
+  });
+
   it.each([false, true])(
     'repairs both defects and preserves only jointly approved rows: vocabulary=%s',
     async (vocabularyReview) => {
@@ -219,6 +297,39 @@ describe('question repair from both independent audits', () => {
     expect((error as TeachingQualityRejectionError).issues).toContain('incorrect');
     expect(repairPrompt).toContain('Correction: Ich bin zu Fuß nach Hause gegangen.');
     expect(teachingInputs.at(-1)![1].content.explanation).toContain('Fahrzeug');
+  });
+
+  it('retains a later corroborated definition rejection in an unchanged previously approved row', async () => {
+    lateDefinitionDefect = true;
+    const error = await generateSectionQuestions({ ...params, vocabularyReview: true }).catch(
+      (failure: unknown) => failure
+    );
+    expect(error).toBeInstanceOf(TeachingQualityRejectionError);
+    const failure = captureGenerationFailure(error);
+    expect(failure.category).toBe('teaching_rejected');
+    expect(failure.teachingFailure?.reviews).toHaveLength(2);
+    const [initial, terminal] = failure.teachingFailure!.reviews;
+    expect(initial.verdict.items[2]).toMatchObject({ acceptable: true, issues: [] });
+    expect(terminal.verdict.items[2]).toMatchObject({ acceptable: false, issues: ['incorrect'] });
+    const before = JSON.parse(initial.candidate!)[0];
+    const after = JSON.parse(terminal.candidate!)[0];
+    expect(after.items[2]).toEqual(before.items[2]);
+    expect(after.items[2].explanation).toContain('immer, einen Film');
+    expect(after.reviewPackets[0].critic.items[2].findings).toEqual([]);
+    expect(after.reviewPackets[0].adjudicator.items[2].findings).toEqual([
+      expect.objectContaining({
+        fieldPath: ['explanation'],
+        defect: 'Seeing does not necessarily mean watching a film.',
+      }),
+    ]);
+    expect(after.reviewPackets[0].novelFindingCorroboration).toBeDefined();
+    const corroboration = corroborationInputs.find((input) =>
+      input.novelFindingProposals.some((proposal) => proposal.itemIndex === 2)
+    );
+    expect(corroboration?.items[2].content).toEqual(before.items[2]);
+    expect(corroboration?.novelFindingProposals).toMatchObject([{ itemIndex: 2, findingIndex: 0 }]);
+    expect(after.items[0].question).not.toContain('unmögliche Reise');
+    expect(after.items[1].question).not.toContain('auf meinen Füßen');
   });
 
   it.each([false, true])(

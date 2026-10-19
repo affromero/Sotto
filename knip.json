@@ -18,8 +18,7 @@
         "src/workers/index.ts!",
         "prisma/seed*.ts!",
         "tests/**/*.{ts,tsx}",
-        "e2e/**/*.ts",
-        "sentry.*.config.ts"
+        "e2e/**/*.ts"
       ]
     },
     "packages/mcp": {},
