@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "pricetoken": "^0.13.8",
-    "zod": "^4.6.5"
+    "zod": "^4.6.6"
   },
   "devDependencies": {
     "tsx": "4.23.15",
