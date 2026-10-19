@@ -15,6 +15,7 @@ import { classPreparationGrant } from '@/lib/classes/preparation-grant';
 import { processClassPreparation } from '@/workers/classes/class-preparation.worker';
 import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import type { SharedTestInstance } from '../../../helpers/setup/shared-instance';
+import { sampleTeaching } from '../../../helpers/learning/class-teaching';
 
 export function registerQuizRetryAdmissionTests(
   context: () => {
@@ -40,6 +41,7 @@ export function registerQuizRetryAdmissionTests(
         attempt: 2,
         progressRevision: 7,
         adaptiveSeed: {
+          teaching: sampleTeaching,
           intro: {
             purpose: 'Describe yesterday.',
             about: 'A retained class introduction.',
@@ -284,7 +286,11 @@ export function registerQuizRetryAdmissionTests(
       ).toMatchObject({ id: operation.id, status: 'FAILED' });
       expect(
         await instance.database.courseClass.findUniqueOrThrow({ where: { id: cls.id } })
-      ).toMatchObject({ status: 'IN_PROGRESS', learnerAnswers: answers });
+      ).toMatchObject({
+        status: 'IN_PROGRESS',
+        learnerAnswers: answers,
+        adaptiveSeed: { teaching: sampleTeaching },
+      });
       expect(
         await instance.database.lessonQuestion.findMany({
           where: { sectionId: target.id },
