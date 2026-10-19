@@ -303,25 +303,37 @@ An already-enabled Fish installation can instead use a schema version 2 review.
 It retains every version 1 field and adds `providerActivation` with these exact
 fields:
 
-| Field                  | Required value                                                                                                           |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `mode`                 | `preserve-existing`                                                                                                      |
-| `previousReleaseSha`   | Full source SHA of the currently enabled installation                                                                    |
-| `previousAssetsHash`   | Complete protected asset hash of the previous workers                                                                    |
-| `candidateAssetsHash`  | Complete protected asset hash of the candidate workers                                                                   |
-| `reviewedRuntimeFiles` | Exact changed file paths, each with `previousSha256` and `candidateSha256`; use `null` only for an added or removed file |
-| `previousRuntimes`     | Exact `containerId` and `imageId` for `web`, `workers-heavy`, `workers-pipeline` and `workers-light`                     |
+| Field                  | Required value                                                                                                                       |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `mode`                 | `preserve-existing`                                                                                                                  |
+| `previousReleaseSha`   | Full source SHA of the currently enabled installation                                                                                |
+| `previousAssetsHash`   | Complete protected asset hash of the previous workers                                                                                |
+| `candidateAssetsHash`  | Complete protected asset hash of the candidate workers                                                                               |
+| `reviewedRuntimeFiles` | Exact changed file paths, each with `previousSha256` and `candidateSha256`; use `null` only for an added or removed file             |
+| `previousRuntimes`     | Exact `containerId` and `imageId` for `web`, `workers-heavy`, `workers-pipeline` and `workers-light`, with optional `activationMode` |
 
 Generate both asset inventories with
 `scripts/deploy/runtime/provider-assets.cjs`. Independently review the complete
 changed file set and the resulting behavior. Every changed asset must appear in
-the review; wildcards, missing changes and unrelated entries are rejected. The
-runner verifies each captured runtime's source revision, enabled activation
-record and unique read-only mount. It prepares an enabled candidate record,
+the review; wildcards, missing changes and unrelated entries are rejected. By
+default, the runner verifies each captured runtime's source revision, enabled
+activation record and unique read-only mount. It prepares an enabled candidate record,
 then checks old and candidate mounts again before switching traffic. This
 preserves the existing activation while retaining compatibility, backup, queue,
 capacity and recovery checks. It does not authorize first activation or accept
 provider changes without review.
+
+Each previous runtime defaults to `activationMode: "release-record"`, which
+requires the enabled release-bound record and read-only mount. An independent
+review may explicitly select `activationMode: "implicit-enabled"` when that
+exact previous runtime already permits the provider with its activation variable
+absent. The complete protected inventories bind the reviewed activation code.
+The guard still checks its container, image, release, ownership and running
+state. It rejects any activation environment entry, including an empty or bare
+entry, and any mount covering or inside the activation directory. This mode
+applies only to captured previous runtimes and the old web during overlap.
+Every candidate still requires a new enabled release-bound record and read-only
+mount. First activation retains its separate readiness checks.
 
 After saving original queue flags, a compatibility rollout persists a
 `compatibility-preparation` recovery marker before pausing or replacing

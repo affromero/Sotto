@@ -370,6 +370,254 @@ class CompatibilityReviewTests(unittest.TestCase):
         with self.assertRaises(OSError):
             inspect(row)
 
+    def legacy_continuity_fixture(self):
+        review = self.continuity_review()
+        provider = review['providerActivation']
+        old_assets = {'protectedHash': '1' * 64, 'files': {
+            'apps/web/src/lib/providers/fish.ts': 'a' * 64}}
+        candidate_assets = {'protectedHash': '2' * 64, 'files': {
+            'apps/web/src/lib/providers/fish.ts': 'b' * 64}}
+        rows, candidates = {}, {}
+        previous = provider['previousRuntimes']
+        web_image = 'sha256:' + '9' * 64
+        review['previousWebImage'] = web_image
+        for service, runtime in previous.items():
+            runtime.update(activationMode='implicit-enabled')
+            if service == 'web':
+                runtime['imageId'] = web_image
+            rows[runtime['containerId']] = {
+                'Id': runtime['containerId'], 'Image': runtime['imageId'],
+                'State': {'Running': True, 'OOMKilled': False},
+                'Config': {'Labels': {
+                    'org.opencontainers.image.revision': 'd' * 40,
+                    'com.docker.compose.project': self.environment[
+                        'SOTTO_STACK'] + ('-blue' if service == 'web' else ''),
+                    'com.docker.compose.service': service},
+                    'Env': ['SOTTO_RELEASE_SHA=' + 'd' * 40]}, 'Mounts': []}
+        (self.root / 'web.json').write_text(json.dumps({
+            'services': {'web': {'image': web_image}},
+            'x-captured-container': previous['web']['containerId']}))
+        (self.root / 'workers.json').write_text(json.dumps({
+            'services': {service: {'image': runtime['imageId']}
+                         for service, runtime in previous.items() if service != 'web'},
+            'x-captured-containers': {
+                service: runtime['containerId']
+                for service, runtime in previous.items() if service != 'web'}}))
+        directory = (self.root / 'candidate-activation').resolve()
+        directory.mkdir()
+        (directory / 'fish.json').write_text(json.dumps({
+            'releaseSha': self.environment['SOTTO_RELEASE_SHA'], 'fishEnabled': True}))
+        new_image = 'sha256:' + 'f' * 64
+        for index, service in enumerate(previous):
+            identifier = 'abcd'[index] * 64
+            candidates[service] = identifier
+            row = json.loads(json.dumps(rows[previous[service]['containerId']]))
+            row.update(Id=identifier, Image=new_image)
+            row['Config']['Labels'].update({
+                'org.opencontainers.image.revision': self.environment['SOTTO_RELEASE_SHA'],
+                'com.docker.compose.project': self.environment[
+                    'SOTTO_STACK'] + ('-green' if service == 'web' else '')})
+            row['Config']['Env'] = [
+                'SOTTO_RELEASE_SHA=' + self.environment['SOTTO_RELEASE_SHA'],
+                'SOTTO_PROVIDER_ACTIVATION_FILE='
+                '/run/sotto-provider-activation/fish.json']
+            row['Mounts'] = [{'Type': 'bind', 'Source': str(directory),
+                'Destination': '/run/sotto-provider-activation', 'RW': False}]
+            rows[identifier] = row
+        bound = self.root / 'bound-review.json'
+        def save_review():
+            bound.write_text(json.dumps({'review': json.dumps(review),
+                                         'evidence': self.evidence.decode()}))
+            bound.chmod(0o600)
+        save_review()
+        def docker(arguments, **options):
+            if arguments[:2] == ['docker', 'inspect']:
+                value = [rows[arguments[2]]]
+            elif arguments[:2] == ['docker', 'run']:
+                reference = arguments[-3]
+                if reference == self.image:
+                    value = old_assets
+                elif reference == self.environment['SOTTO_WORKERS_IMAGE_REF']:
+                    value = candidate_assets
+                else:
+                    raise AssertionError(
+                        'Unreviewed inventory probe: ' + reference)
+            elif arguments[:2] == ['docker', 'ps']:
+                service = next(item.split('=', 2)[2] for item in arguments
+                    if item.startswith('label=com.docker.compose.service='))
+                return subprocess.CompletedProcess(
+                    arguments, 0, (candidates[service] + '\n').encode())
+            elif arguments[:3] == ['docker', 'image', 'inspect']:
+                return subprocess.CompletedProcess(
+                    arguments, 0, new_image.encode())
+            else:
+                raise AssertionError(
+                    'Unexpected Docker boundary: ' + repr(arguments))
+            return subprocess.CompletedProcess(
+                arguments, 0, json.dumps(value).encode())
+        return {'review': review, 'rows': rows, 'candidates': candidates,
+                'directory': directory, 'bound': bound,
+                'save_review': save_review, 'docker': docker}
+
+    def test_reviewed_implicit_previous_provider_keeps_candidates_gated(self):
+        fixture = self.legacy_continuity_fixture()
+        with patch.dict(os.environ, self.environment), patch.object(
+            REVIEW.subprocess, 'run', side_effect=fixture['docker']
+        ):
+            REVIEW.existing_continuity(fixture['bound'], 'blue')
+            REVIEW.overlap_continuity(
+                fixture['bound'], fixture['directory'], 'blue', 'green')
+            REVIEW.candidate_continuity(fixture['directory'], 'green')
+
+    def test_previous_mode_is_explicit_closed_and_bound_per_service(self):
+        fixture = self.legacy_continuity_fixture()
+        previous = fixture['review']['providerActivation']['previousRuntimes']
+        directory = (self.root / 'old-activation').resolve()
+        directory.mkdir()
+        (directory / 'fish.json').write_text(json.dumps({
+            'releaseSha': 'd' * 40, 'fishEnabled': True}))
+        with patch.dict(os.environ, self.environment), patch.object(
+            REVIEW.subprocess, 'run', side_effect=fixture['docker']
+        ):
+            for mode in (None, False, 0, 'unknown', {}, []):
+                previous['web']['activationMode'] = mode
+                fixture['save_review']()
+                with self.subTest(mode=mode), self.assertRaises(ValueError):
+                    REVIEW.existing_continuity(fixture['bound'], 'blue')
+            previous['web']['activationMode'] = 'implicit-enabled'
+            for field, value in (('containerId', 'f' * 64),
+                                 ('unreviewed', True)):
+                original = previous['web'].copy()
+                previous['web'][field] = value
+                fixture['save_review']()
+                with self.subTest(field=field), self.assertRaises(ValueError):
+                    REVIEW.existing_continuity(fixture['bound'], 'blue')
+                previous['web'] = original
+            for service, runtime in previous.items():
+                row = fixture['rows'][runtime['containerId']]
+                for mode in (None, 'release-record'):
+                    if mode is None:
+                        runtime.pop('activationMode', None)
+                    else:
+                        runtime['activationMode'] = mode
+                    fixture['save_review']()
+                    with self.subTest(service=service, mode=mode):
+                        with self.assertRaises(ValueError):
+                            REVIEW.existing_continuity(fixture['bound'], 'blue')
+                        row['Config']['Env'].append(
+                            'SOTTO_PROVIDER_ACTIVATION_FILE='
+                            '/run/sotto-provider-activation/fish.json')
+                        row['Mounts'] = [{'Type': 'bind', 'Source': str(directory),
+                            'Destination': '/run/sotto-provider-activation',
+                            'RW': False}]
+                        REVIEW.existing_continuity(fixture['bound'], 'blue')
+                        REVIEW.overlap_continuity(fixture['bound'],
+                            fixture['directory'], 'blue', 'green')
+                        row['Config']['Env'].pop()
+                        row['Mounts'] = []
+                runtime['activationMode'] = 'implicit-enabled'
+                fixture['save_review']()
+
+    def test_implicit_previous_mode_rejects_malformed_or_present_authority(self):
+        fixture = self.legacy_continuity_fixture()
+        row = fixture['rows']['1' * 64]
+        release = 'SOTTO_RELEASE_SHA=' + 'd' * 40
+        activation = 'SOTTO_PROVIDER_ACTIVATION_FILE'
+        environments = [
+            [release, activation], [release, activation + '='],
+            [release, activation + '=/missing'],
+            [release, activation, activation + '=/missing'],
+            [release, activation + '=/first', activation + '=/second'],
+            [release, release], ['SOTTO_RELEASE_SHA'], [],
+            [release, 'SOTTO_RELEASE_SHA'], [release, 42],
+        ]
+        with patch.dict(os.environ, self.environment), patch.object(
+            REVIEW.subprocess, 'run', side_effect=fixture['docker']
+        ):
+            for environment in environments:
+                row['Config']['Env'] = environment
+                with self.subTest(environment=environment):
+                    with self.assertRaises(ValueError):
+                        REVIEW.existing_continuity(fixture['bound'], 'blue')
+            row['Config']['Env'] = [release]
+            row['Mounts'] = [{'Destination':
+                '/run/sotto-provider-activation-sibling'}]
+            REVIEW.existing_continuity(fixture['bound'], 'blue')
+            for destination in ('/', '//', '//run',
+                '//run/sotto-provider-activation', '/run',
+                '/run/sotto-provider-activation',
+                '/run/sotto-provider-activation/fish.json', None, '',
+                'relative/path', '/run/../run/sotto-provider-activation'):
+                row['Mounts'] = [{'Destination': destination}]
+                with self.subTest(destination=destination):
+                    with self.assertRaises(ValueError):
+                        REVIEW.overlap_continuity(fixture['bound'],
+                            fixture['directory'], 'blue', 'green')
+
+    def test_implicit_mode_retains_runtime_identity_and_health_checks(self):
+        fixture = self.legacy_continuity_fixture()
+        previous = fixture['review']['providerActivation']['previousRuntimes']
+        changes = [('Id', 'f' * 64), ('Image', 'sha256:' + 'f' * 64),
+            ('Running', False), ('OOMKilled', True),
+            ('org.opencontainers.image.revision', 'e' * 40),
+            ('com.docker.compose.project', 'foreign'),
+            ('com.docker.compose.service', 'foreign')]
+        with patch.dict(os.environ, self.environment), patch.object(
+            REVIEW.subprocess, 'run', side_effect=fixture['docker']
+        ):
+            for service, runtime in previous.items():
+                row = fixture['rows'][runtime['containerId']]
+                for field, value in changes:
+                    owner = (row['State'] if field in ('Running', 'OOMKilled')
+                        else row['Config']['Labels'] if '.' in field else row)
+                    original = owner[field]
+                    owner[field] = value
+                    with self.subTest(service=service, field=field):
+                        with self.assertRaises(ValueError):
+                            REVIEW.existing_continuity(fixture['bound'], 'blue')
+                    owner[field] = original
+
+    def test_implicit_previous_modes_do_not_weaken_candidate_authority(self):
+        fixture = self.legacy_continuity_fixture()
+        directory = fixture['directory']
+        row = fixture['rows'][fixture['candidates']['web']]
+        with patch.dict(os.environ, self.environment), patch.object(
+            REVIEW.subprocess, 'run', side_effect=fixture['docker']
+        ):
+            with self.assertRaises(ValueError):
+                REVIEW.inspect_enabled_runtime(row['Id'], row['Image'],
+                    'a' * 40, self.environment['SOTTO_STACK'] + '-green',
+                    'web', directory, activation_mode='implicit-enabled')
+            original = json.dumps(row)
+            path = directory / 'fish.json'
+            for failure in ('missing-env', 'missing-mount', 'writable-mount',
+                            'missing-record', 'disabled', 'foreign', 'symlink'):
+                row.clear()
+                row.update(json.loads(original))
+                if path.exists() or path.is_symlink():
+                    path.unlink()
+                record = {'releaseSha': 'a' * 40, 'fishEnabled': True}
+                if failure == 'disabled':
+                    record['fishEnabled'] = False
+                if failure == 'foreign':
+                    record['releaseSha'] = 'b' * 40
+                path.write_text(json.dumps(record))
+                if failure == 'missing-env':
+                    row['Config']['Env'].pop()
+                if failure == 'missing-mount':
+                    row['Mounts'] = []
+                if failure == 'writable-mount':
+                    row['Mounts'][0]['RW'] = True
+                if failure in ('missing-record', 'symlink'):
+                    path.unlink()
+                if failure == 'symlink':
+                    retained = self.root / 'retained-activation.json'
+                    retained.write_text(json.dumps(record))
+                    path.symlink_to(retained)
+                with self.subTest(failure=failure):
+                    with self.assertRaises((ValueError, OSError)):
+                        REVIEW.candidate_continuity(directory, 'green')
+
     def test_duplicate_json_fields_and_public_or_symlinked_files_fail(self):
         with self.assertRaisesRegex(ValueError, 'Duplicate'):
             REVIEW.mapping(b'{"schemaVersion":1,"schemaVersion":1}')
