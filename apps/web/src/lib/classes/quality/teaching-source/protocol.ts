@@ -20,7 +20,7 @@ import {
 
 export type TeachingSourcePart = { index: number; fieldPath: string[]; quote: string };
 
-export const vocabularyWordingEvidenceSchema = z.discriminatedUnion('kind', [
+export const vocabularyWordingEvidenceSchema = z.union([
   z
     .object({
       kind: z.literal('language_constraint'),

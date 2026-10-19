@@ -8,6 +8,7 @@ import {
   buildTeachingAdjudicatorJsonSchema,
   passageConcernDecisionSchema,
 } from '@/lib/classes/quality/teaching-source/protocol';
+import { parseTeachingCriticResponse } from '@/lib/classes/quality/teaching-review-protocol';
 import { usageFromGenerationError } from 'thesidedoor-core/ai/usage';
 import { isolatedFixture } from './isolated-fixture';
 import { isDurableQueueCleanupFailure } from '@/lib/sidedoor/jobs/core/durable-queue';
@@ -305,6 +306,103 @@ describe('Codex CLI execution', () => {
       passageConcernDecisionSchema.safeParse({ ...supported, findingIndex: undefined }).success
     ).toBe(false);
   });
+
+  it.each([false, true])(
+    'delivers supported vocabulary wording evidence through the CLI schema file (critic finding %s)',
+    async (hasCriticism) => {
+      schemaExecutable();
+      const fields = [
+        {
+          question: 'Wir gehen zu Füße.\nDer Ausflug soll vier Stunden _____.',
+          options: ['beginnen', 'enden', 'dauern', 'warten'],
+          correctIndex: 2,
+          explanation: 'Dauern beschreibt die Länge des Ausflugs.',
+        },
+      ];
+      const critic = parseTeachingCriticResponse(
+        JSON.stringify({
+          items: [
+            {
+              index: 0,
+              findings: hasCriticism
+                ? [
+                    {
+                      sourcePartIndex: 0,
+                      issue: 'unnatural',
+                      rule: 'Use the fixed expression zu Fuß.',
+                      defect: 'The public context uses the plural Füße in zu Füße.',
+                      remedy: { kind: 'correction', text: 'Wir gehen zu Fuß.' },
+                    },
+                  ]
+                : [],
+            },
+          ],
+        }),
+        fields
+      );
+      const schema = buildTeachingAdjudicatorJsonSchema(
+        fields,
+        critic,
+        false,
+        0,
+        false,
+        undefined,
+        undefined,
+        undefined,
+        true
+      );
+      const response = await new CodexProvider().generateResponse(
+        'Review vocabulary recall wording',
+        [
+          {
+            role: 'user',
+            content: JSON.stringify({ exerciseMode: 'vocabulary_recall', items: fields }),
+          },
+        ],
+        { jsonSchema: schema }
+      );
+      const delivered = JSON.parse(response.content).schema;
+      expect(delivered).toEqual(schema.schema);
+      const evidenceSchemas: unknown[] = [];
+      function inspect(value: unknown): void {
+        if (!value || typeof value !== 'object') return;
+        expect(Object.hasOwn(value, 'oneOf')).toBe(false);
+        const properties = (value as Record<string, unknown>).properties;
+        if (
+          properties &&
+          typeof properties === 'object' &&
+          Object.hasOwn(properties, 'wordingEvidence')
+        )
+          evidenceSchemas.push((properties as Record<string, unknown>).wordingEvidence);
+        for (const nested of Object.values(value)) inspect(nested);
+      }
+      inspect(delivered);
+      expect(evidenceSchemas).toHaveLength(hasCriticism ? 2 : 1);
+      for (const evidence of evidenceSchemas)
+        expect(evidence).toMatchObject({
+          anyOf: [
+            {
+              additionalProperties: false,
+              required: ['kind', 'constraint', 'violation'],
+              properties: {
+                kind: { const: 'language_constraint' },
+                constraint: { minLength: 1, maxLength: 120 },
+                violation: { minLength: 1, maxLength: 120 },
+              },
+            },
+            {
+              additionalProperties: false,
+              required: ['kind', 'competingReading', 'contextGap'],
+              properties: {
+                kind: { const: 'unresolved_meaning' },
+                competingReading: { minLength: 1, maxLength: 120 },
+                contextGap: { minLength: 1, maxLength: 120 },
+              },
+            },
+          ],
+        });
+    }
+  );
 
   it.each([false, true])(
     'supplies the exact private output schema and cleans it up (SSH %s)',
