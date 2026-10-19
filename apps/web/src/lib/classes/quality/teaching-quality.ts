@@ -261,9 +261,17 @@ export async function reviewTeachingContent(options: {
   listeningSource?: string;
   listeningTurns?: readonly NormalizedListeningTurn[];
   sectionSkill?: 'GRAMMAR' | 'READING';
+  exerciseMode?: 'vocabulary_recall';
   kind: 'intro' | 'teaching' | 'explanations' | 'writing' | 'listening' | 'speaking' | 'vocabulary';
   items: readonly unknown[];
 }): Promise<void> {
+  if (
+    options.exerciseMode !== undefined &&
+    (options.exerciseMode !== 'vocabulary_recall' ||
+      options.kind !== 'explanations' ||
+      options.sectionSkill !== 'GRAMMAR')
+  )
+    throw new ReviewerProtocolError();
   if (
     options.kind === 'explanations' &&
     !['GRAMMAR', 'READING'].includes(options.sectionSkill ?? '')
@@ -557,7 +565,8 @@ export async function reviewTeachingContent(options: {
           reading,
           listeningAudit?.turns,
           criticAssignment,
-          options.targetLang
+          options.targetLang,
+          options.exerciseMode === 'vocabulary_recall'
         );
         let captured:
           { content: string; request: Parameters<typeof requestTeachingReview>[0] } | undefined;
@@ -589,7 +598,8 @@ export async function reviewTeachingContent(options: {
               reading,
               fixed.listeningTurns,
               fixed.criticAssignment,
-              fixed.variables.TARGET
+              fixed.variables.TARGET,
+              fixed.exerciseMode === 'vocabulary_recall'
             ),
           'adjudicator',
           offset,
@@ -612,7 +622,8 @@ export async function reviewTeachingContent(options: {
               reading,
               originalRequest.listeningTurns,
               originalRequest.criticAssignment,
-              originalRequest.variables.TARGET
+              originalRequest.variables.TARGET,
+              originalRequest.exerciseMode === 'vocabulary_recall'
             ),
           request: (request, parse, capture) =>
             requestRole(request, parse, 'corroborator', offset, capture),
@@ -645,6 +656,7 @@ export async function reviewTeachingContent(options: {
         : [
             {
               reviewContract: 'teaching_critic_adjudicator',
+              ...(options.exerciseMode ? { exerciseMode: options.exerciseMode } : {}),
               outerVerdict: 'derived_adjudicated_summary',
               items: listeningAudit ? options.items : reviewedItems,
               ...(listeningAudit ? { listeningAudit } : {}),

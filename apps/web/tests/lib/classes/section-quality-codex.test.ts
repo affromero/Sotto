@@ -1,12 +1,18 @@
 // @vitest-environment node
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { PrismaClient } from '@/generated/prisma/client';
+import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
+import {
+  createSharedTestInstance,
+  type SharedTestInstance,
+} from '../../helpers/setup/shared-instance';
+import { resolveSottoRequest } from '@/lib/sidedoor/access/core/request-identity';
 import { sectionReviewSchema, SectionQualityError } from '@/lib/classes/section-quality';
 import {
   buildTeachingCriticJsonSchema,
   buildTeachingAdjudicatorJsonSchema,
 } from '@/lib/classes/quality/teaching-quality';
 import { generateSectionQuestions } from '@/lib/class-generation';
-import { blockedProviderExecution } from '../../helpers/runtime/provider-execution';
 import {
   GRAMMAR_TASK_CONTEXT,
   VOCABULARY_TASK_CONTEXT,
@@ -26,17 +32,46 @@ function vocabularyWireFixture(question: { options: string[]; correctIndex: numb
   };
 }
 
-const execute = vi.hoisted(() => vi.fn());
-vi.mock('@/lib/codex-client', () => ({ executeCodex: execute }));
-vi.mock('@/lib/learning-ai', () => ({
-  resolveCapturedLearningAi: async () => ({ provider: 'codex', model: 'fixture-model' }),
-  capturedLearningAiOptions: async () => ({ model: 'fixture-model' }),
-}));
-vi.mock('@/lib/prisma', () => ({ prisma: {}, prismaUnfiltered: {} }));
-vi.mock('@/lib/usage-logger', () => ({ logUsage: vi.fn() }));
-vi.mock('@/lib/logger', () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
+const boundary = vi.hoisted(() => ({ execute: vi.fn(), database: null as PrismaClient | null }));
+const execute = boundary.execute;
+vi.mock('@/lib/codex-client', () => ({ executeCodex: boundary.execute }));
+vi.mock('@/lib/prisma', async () => {
+  const { prismaTestBoundary } = await import('../../helpers/setup/shared-instance');
+  const database = prismaTestBoundary(boundary);
+  return { prisma: database, prismaUnfiltered: database };
+});
 
-describe('section review through the Codex provider', () => {
+const suite = process.env.SIDEDOOR_TEST_DATABASE_URL ? describe : describe.skip;
+suite('section review through the Codex provider', () => {
+  let instance: SharedTestInstance;
+  let userId: string;
+  let execution: SottoProviderExecution;
+  beforeAll(async () => {
+    instance = await createSharedTestInstance('section_quality_codex');
+    boundary.database = instance.database;
+    const identity = await instance.reset();
+    userId = identity.ownerId;
+    await instance.database.user.update({
+      where: { id: userId },
+      data: { preferredAiProvider: 'codex', preferredAiModel: 'codex:section-quality-fixture' },
+    });
+    const request = new Request('http://localhost/api/v1/classes', {
+      headers: { cookie: `sotto_session=${identity.ownerToken}` },
+    });
+    execution = {
+      userId,
+      signal: new AbortController().signal,
+      authorize: async (database) => {
+        const current = await resolveSottoRequest(database, request);
+        if (!current || current.kind !== 'content') throw new Error('Fixture admission expired');
+        return current;
+      },
+    };
+  });
+  afterAll(async () => {
+    boundary.database = null;
+    if (instance) await instance.close();
+  });
   beforeEach(() => {
     execute.mockReset();
   });
@@ -55,9 +90,20 @@ describe('section review through the Codex provider', () => {
         expect(JSON.parse(/```json\s*([\s\S]*?)\s*```/.exec(system)![1])).toEqual(
           (system.includes('Teaching review role: critic.')
             ? buildTeachingCriticJsonSchema(fields)
-            : buildTeachingAdjudicatorJsonSchema(fields, input.criticisms)
+            : buildTeachingAdjudicatorJsonSchema(
+                fields,
+                input.criticisms,
+                false,
+                0,
+                false,
+                undefined,
+                undefined,
+                undefined,
+                input.exerciseMode === 'vocabulary_recall'
+              )
           ).schema
         );
+        expect(input.exerciseMode).toBe('vocabulary_recall');
         expect(user).toContain(question.explanation);
         return {
           content: JSON.stringify({
@@ -99,8 +145,8 @@ describe('section review through the Codex provider', () => {
       };
     });
     const result = await generateSectionQuestions({
-      userId: 'learner',
-      execution: blockedProviderExecution('learner'),
+      userId,
+      execution,
       skill: 'GRAMMAR',
       vocabularyReview: true,
       level: 'A1',
@@ -186,8 +232,8 @@ describe('section review through the Codex provider', () => {
       };
     });
     const result = await generateSectionQuestions({
-      userId: 'learner',
-      execution: blockedProviderExecution('learner'),
+      userId,
+      execution,
       skill: 'GRAMMAR',
       vocabularyReview: true,
       level: 'A1',
@@ -283,8 +329,8 @@ describe('section review through the Codex provider', () => {
       };
     });
     const result = await generateSectionQuestions({
-      userId: 'learner',
-      execution: blockedProviderExecution('learner'),
+      userId,
+      execution,
       skill: 'GRAMMAR',
       level: 'A2',
       nativeLang: 'en',
@@ -337,8 +383,8 @@ describe('section review through the Codex provider', () => {
       };
     });
     const error = await generateSectionQuestions({
-      userId: 'learner',
-      execution: blockedProviderExecution('learner'),
+      userId,
+      execution,
       skill: 'GRAMMAR',
       vocabularyReview: true,
       level: 'A1',

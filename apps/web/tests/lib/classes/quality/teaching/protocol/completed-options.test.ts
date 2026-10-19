@@ -1,14 +1,25 @@
-import { describe, expect, it, vi } from 'vitest';
-import { blockedProviderExecution } from '../../../../../helpers/runtime/provider-execution';
+// @vitest-environment node
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { novelFindingCorroborationFixture } from '../../intro-provider-fixture';
 import type { AIProvider } from '@/lib/providers/ai';
-vi.mock('@/lib/learning-ai', () => ({
-  capturedLearningAiOptions: async (ai: { model: string }) => ({ model: ai.model }),
-}));
-vi.mock('@/lib/usage-logger', () => ({ logUsage: vi.fn() }));
+import type { CapturedLearningAi } from '@/lib/learning-ai';
+import type { PrismaClient } from '@/generated/prisma/client';
+import {
+  createSharedTestInstance,
+  type SharedTestInstance,
+} from '../../../../../helpers/setup/shared-instance';
+import { resolveSottoRequest } from '@/lib/sidedoor/access/core/request-identity';
+const binding = vi.hoisted(() => ({ database: null as PrismaClient | null }));
+vi.mock('@/lib/prisma', async () => {
+  const { prismaTestBoundary } = await import('../../../../../helpers/setup/shared-instance');
+  const database = prismaTestBoundary(binding);
+  return { prisma: database, prismaUnfiltered: database };
+});
 import { sectionReviewInput } from '@/lib/classes/section-quality';
+import { ReviewerProtocolError } from '@/lib/classes/quality/teaching-review-protocol';
 import {
   reviewTeachingContent,
+  requestTeachingReview,
   TeachingQualityRejectionError,
 } from '@/lib/classes/quality/teaching-quality';
 import { buildTeachingSourceParts } from '@/lib/classes/quality/teaching-source/protocol';
@@ -22,18 +33,28 @@ const question = {
     '„Gemacht“ passt, weil Lena die Zutaten selbst zu einem fertigen Tee zusammengefügt hat.',
   passageRef: '',
 };
-const base = {
-  ai: {
-    provider: 'fixture',
+let identity: { ownerId: string; ownerToken: string };
+function base() {
+  const request = new Request('http://localhost/api/v1/classes', {
+    headers: { cookie: `sotto_session=${identity.ownerToken}` },
+  });
+  const ai: CapturedLearningAi = {
+    provider: 'codex',
     model: 'captured-model',
-    execution: blockedProviderExecution('fixture'),
-  },
-  userId: 'fixture',
-  level: 'A2',
-  nativeLang: 'en',
-  targetLang: 'de',
-};
+    execution: {
+      userId: identity.ownerId,
+      signal: new AbortController().signal,
+      authorize: async (database) => {
+        const current = await resolveSottoRequest(database, request);
+        if (!current || current.kind !== 'content') throw new Error('Fixture admission expired');
+        return current;
+      },
+    },
+  };
+  return { ai, userId: identity.ownerId, level: 'A2', nativeLang: 'en', targetLang: 'de' };
+}
 type Packet = {
+  exerciseMode?: 'vocabulary_recall';
   items: Array<{
     index: number;
     content: unknown;
@@ -43,7 +64,9 @@ type Packet = {
   priorProtocolOutput?: unknown;
 };
 
-function provider(options: { malformedCritic?: boolean; reject?: boolean } = {}) {
+function provider(
+  options: { malformedCritic?: boolean; reject?: boolean; missingWordingEvidence?: boolean } = {}
+) {
   const packets: Packet[] = [];
   const generateResponse = vi.fn(async (...args: Parameters<AIProvider['generateResponse']>) => {
     const [, messages, ai] = args;
@@ -61,10 +84,31 @@ function provider(options: { malformedCritic?: boolean; reject?: boolean } = {})
       content: JSON.stringify({
         items: packet.items.map(({ index }) =>
           critic
-            ? { index, findings: [] }
+            ? {
+                index,
+                findings: options.missingWordingEvidence
+                  ? [
+                      {
+                        sourcePartIndex: 0,
+                        issue: 'unnatural',
+                        rule: 'Use clear wording.',
+                        defect: 'Another instruction would sound smoother.',
+                        remedy: { kind: 'correction', text: 'Choose the appropriate verb.' },
+                      },
+                    ]
+                  : [],
+              }
             : {
                 index,
-                criticDecisions: [],
+                criticDecisions: options.missingWordingEvidence
+                  ? [
+                      {
+                        findingIndex: 0,
+                        decision: packet.priorProtocolOutput ? 'dismissed' : 'supported',
+                        reason: 'The complete task is clear; only a wording preference remains.',
+                      },
+                    ]
+                  : [],
                 newFindings: options.reject
                   ? [
                       {
@@ -97,17 +141,34 @@ function provider(options: { malformedCritic?: boolean; reject?: boolean } = {})
   return { boundary, packets };
 }
 
-describe('literal completions in paired teaching review', () => {
-  it.each([false, true])(
-    'shares exact blind completions across both roles and protocol correction=%s',
-    async (malformedCritic) => {
+const suite = process.env.SIDEDOOR_TEST_DATABASE_URL ? describe : describe.skip;
+suite('literal completions in paired teaching review', () => {
+  let instance: SharedTestInstance;
+  beforeAll(async () => {
+    instance = await createSharedTestInstance('literal_completions');
+    binding.database = instance.database;
+    identity = await instance.reset();
+  });
+  afterAll(async () => {
+    binding.database = null;
+    if (instance) await instance.close();
+  });
+  it.each([
+    { malformedCritic: false, vocabularyRecall: false },
+    { malformedCritic: true, vocabularyRecall: false },
+    { malformedCritic: false, vocabularyRecall: true },
+    { malformedCritic: true, vocabularyRecall: true },
+  ])(
+    'shares exact completions and task identity: correction=$malformedCritic, vocabulary=$vocabularyRecall',
+    async ({ malformedCritic, vocabularyRecall }) => {
       const { boundary, packets } = provider({ malformedCritic });
       const before = structuredClone(question);
       await reviewTeachingContent({
-        ...base,
+        ...base(),
         provider: boundary,
         kind: 'explanations',
         sectionSkill: 'GRAMMAR',
+        ...(vocabularyRecall ? { exerciseMode: 'vocabulary_recall' as const } : {}),
         items: [question],
       });
       const blind = JSON.parse(sectionReviewInput([question])).questions[0];
@@ -116,6 +177,7 @@ describe('literal completions in paired teaching review', () => {
       );
       expect(packets).toHaveLength(malformedCritic ? 3 : 2);
       for (const packet of packets) {
+        expect(packet.exerciseMode).toBe(vocabularyRecall ? 'vocabulary_recall' : undefined);
         expect(packet.items[0]).toEqual({
           index: 0,
           content: before,
@@ -131,6 +193,66 @@ describe('literal completions in paired teaching review', () => {
     }
   );
 
+  it('corrects missing blocking evidence under the same vocabulary task before accepting dismissal', async () => {
+    const { boundary, packets } = provider({ missingWordingEvidence: true });
+    await expect(
+      reviewTeachingContent({
+        ...base(),
+        provider: boundary,
+        kind: 'explanations',
+        sectionSkill: 'GRAMMAR',
+        exerciseMode: 'vocabulary_recall',
+        items: [question],
+      })
+    ).resolves.toBeUndefined();
+    expect(packets).toHaveLength(3);
+    expect(packets[1].priorProtocolOutput).toBeUndefined();
+    expect(packets[2].priorProtocolOutput).toBeDefined();
+    for (const packet of packets) {
+      expect(packet.exerciseMode).toBe('vocabulary_recall');
+      expect(packet.items[0].content).toEqual(question);
+      expect(packet.items[0].sourceParts).toEqual(buildTeachingSourceParts(question));
+    }
+  });
+
+  it.each([
+    { kind: 'writing' as const, sectionSkill: undefined },
+    { kind: 'explanations' as const, sectionSkill: 'READING' as const },
+  ])('rejects vocabulary task identity on $kind/$sectionSkill before review', async (mode) => {
+    const { boundary, packets } = provider();
+    await expect(
+      reviewTeachingContent({
+        ...base(),
+        ...mode,
+        provider: boundary,
+        exerciseMode: 'vocabulary_recall',
+        items: [question],
+      })
+    ).rejects.toBeInstanceOf(ReviewerProtocolError);
+    expect(packets).toEqual([]);
+  });
+
+  it.each([
+    { kind: 'explanations', sectionSkill: undefined },
+    { kind: 'explanations', sectionSkill: 'READING' as const },
+    { kind: 'writing', sectionSkill: 'GRAMMAR' as const },
+  ])('rejects recall mode on an incompatible request scope: $kind/$sectionSkill', async (scope) => {
+    const { boundary, packets } = provider();
+    await expect(
+      requestTeachingReview({
+        ...base(),
+        provider: boundary,
+        prompt: 'class/review-teaching-content.md',
+        variables: { KIND: scope.kind, TEACHING_REVIEW_ROLE: 'critic' },
+        sectionSkill: scope.sectionSkill,
+        exerciseMode: 'vocabulary_recall',
+        items: [question],
+        jsonSchema: { name: 'class_teaching_critic', schema: { type: 'object' } },
+      })
+    ).rejects.toBeInstanceOf(ReviewerProtocolError);
+    expect(packets).toEqual([]);
+  });
+
   it('preserves literal option text containing replacement-pattern characters in both stages', async () => {
     const literal = {
       ...question,
@@ -139,7 +261,7 @@ describe('literal completions in paired teaching review', () => {
     };
     const { boundary, packets } = provider();
     await reviewTeachingContent({
-      ...base,
+      ...base(),
       provider: boundary,
       kind: 'explanations',
       sectionSkill: 'GRAMMAR',
@@ -172,7 +294,7 @@ describe('literal completions in paired teaching review', () => {
     };
     const { boundary, packets } = provider({ reject: true });
     const failure = await reviewTeachingContent({
-      ...base,
+      ...base(),
       provider: boundary,
       kind: 'explanations',
       sectionSkill: 'GRAMMAR',
@@ -201,7 +323,7 @@ describe('literal completions in paired teaching review', () => {
             ];
       const { boundary, packets } = provider();
       await reviewTeachingContent({
-        ...base,
+        ...base(),
         provider: boundary,
         kind,
         ...(kind === 'explanations' ? { sectionSkill: 'GRAMMAR' as const } : {}),

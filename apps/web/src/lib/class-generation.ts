@@ -658,6 +658,7 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
           targetLang: p.targetLang,
           kind: 'explanations',
           sectionSkill,
+          ...(p.vocabularyReview ? { exerciseMode: 'vocabulary_recall' as const } : {}),
           lessonContext: {
             title: p.objective,
             objective: p.objective,

@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 import {
   buildTeachingSourceParts,
   buildTeachingCriticJsonSchema,
+  buildTeachingAdjudicatorJsonSchema,
 } from '@/lib/classes/quality/teaching-source/protocol';
 import {
   parseTeachingCriticResponse,
+  parseTeachingAdjudicator,
   parseTeachingAdjudicatorResponse,
   teachingAdjudicatorSchema,
   ReviewerProtocolError,
@@ -19,6 +21,338 @@ const finding = (sourcePartIndex: number) => ({
 });
 
 describe('canonical teaching source parts', () => {
+  const vocabularyFields = [
+    {
+      question:
+        'Wähle das Verb, das angibt, wie lange sie insgesamt ist.\nDie Wanderung soll vier Stunden _____.',
+      options: ['beginnen', 'enden', 'dauern', 'warten'],
+      correctIndex: 2,
+      explanation: 'Dauern bezeichnet die Länge der Wanderung.',
+    },
+  ];
+  const wordingFinding = {
+    sourcePartIndex: 0,
+    issue: 'unnatural',
+    rule: 'Use idiomatic wording for duration.',
+    defect: 'The instruction says wie lange sie insgesamt ist.',
+    remedy: {
+      kind: 'correction',
+      text: 'Wähle das Verb, das angibt, wie lange die Wanderung insgesamt dauert.',
+    },
+  };
+  const vocabularyCritic = () =>
+    parseTeachingCriticResponse(
+      JSON.stringify({ items: [{ index: 0, findings: [wordingFinding] }] }),
+      vocabularyFields
+    );
+  const parseVocabulary = (
+    response: unknown,
+    critic = vocabularyCritic(),
+    fields = vocabularyFields
+  ) =>
+    parseTeachingAdjudicatorResponse(
+      JSON.stringify(response),
+      fields,
+      critic,
+      0,
+      false,
+      undefined,
+      undefined,
+      undefined,
+      true
+    );
+
+  it('does not let an unsupported wording preference reject vocabulary recall', () => {
+    const critic = vocabularyCritic();
+    const supported = {
+      findingIndex: 0,
+      decision: 'supported',
+      reason: 'Another duration expression is more conventional.',
+    };
+    const response = {
+      items: [{ index: 0, criticDecisions: [supported], newFindings: [] }],
+    };
+    expect(() => parseVocabulary(response, critic)).toThrow(ReviewerProtocolError);
+    const result = parseVocabulary({
+      items: [
+        {
+          index: 0,
+          criticDecisions: [{ ...supported, decision: 'dismissed' }],
+          newFindings: [],
+        },
+      ],
+    });
+    expect(result.items[0]).toMatchObject({ acceptable: true, issues: [], findings: [] });
+    const historical = parseTeachingAdjudicatorResponse(
+      JSON.stringify(response),
+      vocabularyFields,
+      critic
+    );
+    expect(historical.items[0].acceptable).toBe(false);
+    expect(teachingAdjudicatorSchema.parse(historical)).toEqual(historical);
+    expect(parseTeachingAdjudicator(JSON.stringify(historical), vocabularyFields, critic)).toEqual(
+      historical
+    );
+  });
+
+  const blockingWordingCases = [
+    {
+      question:
+        'Wir gehen zu Füße. Ergänze das Verb für die geplante Zeit.\nDer Ausflug soll vier Stunden _____.',
+      rule: 'Use the fixed expression zu Fuß for walking.',
+      defect: 'The public context uses the plural Füße in zu Füße.',
+      correction: 'Wir gehen zu Fuß.',
+      evidence: {
+        kind: 'language_constraint',
+        constraint: 'The conventional expression for walking is zu Fuß, with singular Fuß.',
+        violation: 'The supplied expression zu Füße uses the plural instead.',
+      },
+    },
+    {
+      question:
+        'Die Wanderung beginnt um neun, die Führung um zehn. Sie endet um elf.\nSie soll eine Stunde _____.',
+      rule: 'Identify the event whose duration is requested.',
+      defect: 'Sie can name either the two-hour Wanderung or the one-hour Führung.',
+      correction: 'Die Führung endet um elf. Die Führung soll eine Stunde _____.',
+      evidence: {
+        kind: 'unresolved_meaning',
+        competingReading:
+          'Sie may refer to either the Wanderung or the Führung, with different start times.',
+        contextGap:
+          'Both events are feminine; the context never identifies which one ends at eleven.',
+      },
+    },
+  ];
+  it.each(blockingWordingCases)(
+    'retains source-bound blocking wording evidence: $evidence.kind',
+    ({ question, rule, defect, correction, evidence }) => {
+      const fields = [{ ...vocabularyFields[0], question }];
+      const critic = parseTeachingCriticResponse(
+        JSON.stringify({
+          items: [
+            {
+              index: 0,
+              findings: [
+                {
+                  ...wordingFinding,
+                  rule,
+                  defect,
+                  remedy: { kind: 'correction', text: correction },
+                },
+              ],
+            },
+          ],
+        }),
+        fields
+      );
+      const result = parseVocabulary(
+        {
+          items: [
+            {
+              index: 0,
+              criticDecisions: [
+                {
+                  findingIndex: 0,
+                  decision: 'supported',
+                  reason: 'The supplied context leaves the stated defect unresolved.',
+                  wordingEvidence: evidence,
+                },
+              ],
+              newFindings: [],
+            },
+          ],
+        },
+        critic,
+        fields
+      );
+      expect(result.items[0]).toMatchObject({ acceptable: false, issues: ['unnatural'] });
+      expect(result.items[0].findings).toEqual(critic.items[0].findings);
+      expect(result.items[0].criticDecisions[0]).toMatchObject({ wordingEvidence: evidence });
+      expect(teachingAdjudicatorSchema.parse(result)).toEqual(result);
+      expect(parseTeachingAdjudicator(JSON.stringify(result), fields, critic)).toEqual(result);
+    }
+  );
+
+  it('keeps novel wording evidence and supported-prefix addressing intact', () => {
+    const source = blockingWordingCases[0];
+    const fields = [
+      {
+        ...vocabularyFields[0],
+        question: source.question,
+        explanation: 'Dauern bedeutet hier, dass der Ausflug beginnt.',
+      },
+    ];
+    const explanation = buildTeachingSourceParts(fields[0]).find(
+      (part) => part.fieldPath[0] === 'explanation'
+    )!;
+    const falseDefinition = {
+      ...finding(explanation.index),
+      rule: 'Keep duration distinct from beginning.',
+      defect: 'The explanation equates dauern with beginnen.',
+      remedy: { kind: 'correction', text: 'Dauern bezeichnet die Länge des Ausflugs.' },
+    };
+    const preference = {
+      ...wordingFinding,
+      defect: 'The instruction uses Ergänze rather than Vervollständige.',
+      remedy: { kind: 'correction', text: 'Vervollständige den Satz.' },
+    };
+    const critic = parseTeachingCriticResponse(
+      JSON.stringify({ items: [{ index: 0, findings: [falseDefinition, preference] }] }),
+      fields
+    );
+    const evidence = source.evidence;
+    const result = parseVocabulary(
+      {
+        items: [
+          {
+            index: 0,
+            criticDecisions: [
+              { findingIndex: 0, decision: 'supported', reason: 'The definition is false.' },
+              { findingIndex: 1, decision: 'dismissed', reason: 'Only a wording preference.' },
+            ],
+            newFindings: [
+              {
+                ...wordingFinding,
+                rule: source.rule,
+                defect: source.defect,
+                remedy: { kind: 'correction', text: source.correction },
+                wordingEvidence: evidence,
+              },
+            ],
+          },
+        ],
+      },
+      critic,
+      fields
+    );
+    expect(result.items[0].findings.map(({ issue }) => issue)).toEqual(['incorrect', 'unnatural']);
+    expect(result.items[0].findings[0]).toEqual(critic.items[0].findings[0]);
+    expect(result.items[0].findings[1]).toMatchObject({ wordingEvidence: evidence });
+    expect(result.items[0].acceptable).toBe(false);
+    expect(teachingAdjudicatorSchema.parse(result)).toEqual(result);
+    expect(() =>
+      parseVocabulary(
+        {
+          items: [{ index: 0, criticDecisions: [], newFindings: [wordingFinding] }],
+        },
+        { items: [{ index: 0, findings: [] }] }
+      )
+    ).toThrow(ReviewerProtocolError);
+  });
+
+  it('rejects incomplete, preference and misaddressed blocking evidence', () => {
+    const critic = parseTeachingCriticResponse(
+      JSON.stringify({ items: [{ index: 0, findings: [finding(0), wordingFinding] }] }),
+      vocabularyFields
+    );
+    for (const wordingEvidence of [
+      { kind: 'language_constraint', constraint: 'Agreement.' },
+      { kind: 'unresolved_meaning', competingReading: 'Another event.' },
+      { kind: 'preference', reason: 'A smoother alternative exists.' },
+      { kind: 'language_constraint', constraint: ' ', violation: 'Wrong agreement.' },
+      { kind: 'language_constraint', constraint: 'x'.repeat(121), violation: 'Wrong agreement.' },
+    ])
+      expect(() =>
+        parseVocabulary(
+          {
+            items: [
+              {
+                index: 0,
+                criticDecisions: [
+                  { findingIndex: 0, decision: 'dismissed', reason: 'No factual error.' },
+                  { findingIndex: 1, decision: 'supported', reason: 'Confirmed.', wordingEvidence },
+                ],
+                newFindings: [],
+              },
+            ],
+          },
+          critic
+        )
+      ).toThrow(ReviewerProtocolError);
+    expect(() =>
+      parseVocabulary(
+        {
+          items: [
+            {
+              index: 0,
+              criticDecisions: [
+                {
+                  findingIndex: 0,
+                  decision: 'supported',
+                  reason: 'Wrong definition.',
+                  wordingEvidence: {
+                    kind: 'language_constraint',
+                    constraint: 'Agreement.',
+                    violation: 'Wrong agreement.',
+                  },
+                },
+                {
+                  findingIndex: 1,
+                  decision: 'supported',
+                  reason: 'A smoother alternative exists.',
+                },
+              ],
+              newFindings: [],
+            },
+          ],
+        },
+        critic
+      )
+    ).toThrow(ReviewerProtocolError);
+  });
+
+  it('requests wording evidence only in vocabulary adjudication and rejects other audit modes', () => {
+    const critic = vocabularyCritic();
+    const schema = buildTeachingAdjudicatorJsonSchema(
+      vocabularyFields,
+      critic,
+      false,
+      0,
+      false,
+      undefined,
+      undefined,
+      undefined,
+      true
+    );
+    expect(JSON.stringify(schema.schema)).toContain('wordingEvidence');
+    expect(
+      JSON.stringify(buildTeachingAdjudicatorJsonSchema(vocabularyFields, critic).schema)
+    ).not.toContain('wordingEvidence');
+    expect(JSON.stringify(buildTeachingCriticJsonSchema(vocabularyFields).schema)).not.toContain(
+      'wordingEvidence'
+    );
+    for (const [intro, reading] of [
+      [true, false],
+      [false, true],
+    ])
+      expect(() =>
+        buildTeachingAdjudicatorJsonSchema(
+          vocabularyFields,
+          critic,
+          intro,
+          0,
+          reading,
+          undefined,
+          undefined,
+          undefined,
+          true
+        )
+      ).toThrow();
+    expect(() =>
+      parseTeachingAdjudicatorResponse(
+        JSON.stringify({ items: [] }),
+        vocabularyFields,
+        critic,
+        0,
+        false,
+        [],
+        undefined,
+        undefined,
+        true
+      )
+    ).toThrow();
+  });
+
   it('requires reading answer evidence only for explicitly selected reading audits', () => {
     const fields = [
       {
