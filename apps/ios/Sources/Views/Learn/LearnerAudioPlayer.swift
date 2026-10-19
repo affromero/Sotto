@@ -78,7 +78,8 @@ final class LearnerAudioPlayback: ObservableObject {
     private var endObserver: NSObjectProtocol?
     private var timeObserver: Any?
 
-    func toggle(reference: String? = nil, download: @escaping @MainActor () async throws -> URL) {
+    @discardableResult
+    func toggle(reference: String? = nil, download: @escaping @MainActor () async throws -> URL) -> Task<Void, Never>? {
         if self.reference != reference {
             stop()
             self.reference = reference
@@ -86,9 +87,9 @@ final class LearnerAudioPlayback: ObservableObject {
         if let player {
             if isPlaying { player.pause(); isPlaying = false }
             else { player.play(); isPlaying = true }
-            return
+            return nil
         }
-        guard !isLoading else { return }
+        guard !isLoading else { return load }
         let request = UUID()
         requestID = request
         isLoading = true
@@ -139,6 +140,7 @@ final class LearnerAudioPlayback: ObservableObject {
                 errorMessage = error.localizedDescription
             }
         }
+        return load
     }
 
     func stop() {

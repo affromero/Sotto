@@ -122,17 +122,13 @@ final class AudioPlaybackTests: XCTestCase {
         }
         let playback = LearnerAudioPlayback()
         defer { playback.stop() }
-        playback.toggle(reference: "lesson") { lesson }
-        let lessonReady = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-            !playback.isLoading
-        }, object: nil)
-        await fulfillment(of: [lessonReady], timeout: 2)
+        let lessonLoad = try XCTUnwrap(playback.toggle(reference: "lesson") { lesson })
+        await lessonLoad.value
+        XCTAssertFalse(playback.isLoading)
         XCTAssertNil(playback.errorMessage)
-        playback.toggle(reference: "Mia-turn") { turn }
-        let turnReady = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-            !playback.isLoading
-        }, object: nil)
-        await fulfillment(of: [turnReady], timeout: 2)
+        let turnLoad = try XCTUnwrap(playback.toggle(reference: "Mia-turn") { turn })
+        await turnLoad.value
+        XCTAssertFalse(playback.isLoading)
         XCTAssertNil(playback.errorMessage)
         XCTAssertEqual(playback.reference, "Mia-turn")
         XCTAssertFalse(FileManager.default.fileExists(atPath: lesson.path))
