@@ -44,6 +44,7 @@ suite('partner play API with canonical admission and real PostgreSQL/Redis', () 
     binding.database = instance.database;
   });
   beforeEach(async () => {
+    vi.stubEnv('BYOK_ENCRYPTION_KEY', 'isolated-play-routes-test-key');
     vi.stubEnv('NEXT_PUBLIC_APP_URL', origin);
     vi.stubEnv('SIDEDOOR_PASSWORD_ORIGINS', '[]');
     identity = await instance.reset();

@@ -29,6 +29,7 @@ suite('invitation requests and canonical owner approval', () => {
     instance = await createSharedTestInstance('play_admission');
   });
   beforeEach(async () => {
+    vi.stubEnv('BYOK_ENCRYPTION_KEY', 'isolated-play-admission-test-key');
     authority = await instance.reset();
   });
   afterEach(() => vi.unstubAllEnvs());

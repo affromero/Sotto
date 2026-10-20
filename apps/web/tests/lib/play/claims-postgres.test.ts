@@ -34,6 +34,7 @@ import {
 
 const suite = process.env.SIDEDOOR_TEST_DATABASE_URL ? describe : describe.skip;
 const settings = { nativeLang: 'es', targetLang: 'de', level: 'A1' } as const;
+const encryptionKey = 'isolated-play-claims-test-key';
 
 suite('atomic guest credentials and exact delivery recovery', () => {
   let instance: SharedTestInstance, authority: SharedTestIdentity;
@@ -41,6 +42,7 @@ suite('atomic guest credentials and exact delivery recovery', () => {
     instance = await createSharedTestInstance('play_claims');
   });
   beforeEach(async () => {
+    vi.stubEnv('BYOK_ENCRYPTION_KEY', encryptionKey);
     authority = await instance.reset();
   });
   afterEach(() => vi.unstubAllEnvs());
@@ -445,7 +447,7 @@ suite('atomic guest credentials and exact delivery recovery', () => {
     await expect(
       claimPlayEntry(instance.database, fixture.requestId, fixture.proof, null)
     ).rejects.toThrow();
-    vi.unstubAllEnvs();
+    vi.stubEnv('BYOK_ENCRYPTION_KEY', encryptionKey);
     expect(await claimPlayEntry(instance.database, fixture.requestId, fixture.proof, null)).toEqual(
       first
     );
@@ -469,7 +471,7 @@ suite('atomic guest credentials and exact delivery recovery', () => {
         where: { id: fixture.requestId },
       })
     ).toMatchObject({ status: 'ACCEPTED', deliveryState: null });
-    vi.unstubAllEnvs();
+    vi.stubEnv('BYOK_ENCRYPTION_KEY', encryptionKey);
     expect(
       (await claimPlayEntry(instance.database, fixture.requestId, fixture.proof, null)).delivery
         .kind
