@@ -259,6 +259,70 @@ class AndroidWorkflowTests(unittest.TestCase):
         self.assertIn('android-process/', upload['with']['path'])
 
 
+class AndroidToolSelectionTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.root = Path(self.directory.name)
+        self.tools = self.root / 'sdk/cmdline-tools'
+        self.latest = self.tools / 'latest'
+        self.pinned = self.tools / '16111833'
+        self.latest.mkdir(parents=True)
+        (self.latest / 'source.properties').write_text('Pkg.Revision=12.0\n')
+        self.scratch = self.root / 'scratch'
+        self.scratch.mkdir()
+        self.environment = {
+            **os.environ,
+            'ANDROID_HOME': str(self.root / 'sdk'),
+            'RUNNER_TEMP': str(self.scratch),
+            'SOTTO_ANDROID_DEVICE_PROFILE': 'pixel_9',
+        }
+
+    def manager(self, inventory: str) -> None:
+        binary = self.pinned / 'bin/avdmanager'
+        binary.parent.mkdir(parents=True)
+        binary.write_text('#!/bin/sh\nprintf "%s\\n" ' + inventory + '\n')
+        binary.chmod(0o755)
+
+    def select(self) -> subprocess.CompletedProcess[str]:
+        return subprocess.run([
+            sys.executable, '-c', python_step(
+                'release-surfaces-ci.yml',
+                'Select pinned Android tools for emulator creation',
+            ),
+        ], env=self.environment, text=True, capture_output=True)
+
+    def test_runner_latest_path_selects_pinned_devices_and_preserves_old_tools(self) -> None:
+        self.manager('pixel_9 pixel_tablet')
+        for profile in ['pixel_9', 'pixel_tablet']:
+            with self.subTest(profile=profile):
+                self.environment['SOTTO_ANDROID_DEVICE_PROFILE'] = profile
+                selected = self.select()
+                self.assertEqual(selected.returncode, 0, selected.stdout + selected.stderr)
+                result = subprocess.run([
+                    str(self.latest / 'bin/avdmanager'), 'list', 'device', '-c',
+                ], text=True, capture_output=True, check=True)
+                self.assertIn(profile, result.stdout.splitlines())
+        retained = list(self.scratch.glob('*/latest/source.properties'))
+        self.assertTrue(any(path.read_text() == 'Pkg.Revision=12.0\n' for path in retained))
+
+    def test_missing_profile_keeps_preinstalled_tools_untouched(self) -> None:
+        self.manager('pixel_8')
+        result = self.select()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('Requested device is absent', result.stdout + result.stderr)
+        self.assertFalse(self.latest.is_symlink())
+        self.assertEqual((self.latest / 'source.properties').read_text(), 'Pkg.Revision=12.0\n')
+        self.assertEqual(list(self.scratch.iterdir()), [])
+
+    def test_missing_pinned_manager_keeps_preinstalled_tools_untouched(self) -> None:
+        result = self.select()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('FileNotFoundError', result.stderr)
+        self.assertFalse(self.latest.is_symlink())
+        self.assertEqual(list(self.scratch.iterdir()), [])
+
+
 class NativeResultBundleTests(unittest.TestCase):
     def test_failed_ios_tests_preserve_their_diagnostic_bundle(self) -> None:
         parsed = subprocess.run([
