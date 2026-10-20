@@ -203,6 +203,8 @@ interface SavedProgress {
   items?: { id: string }[];
   prompts?: { id: string }[];
   writingPrompts?: { id: string }[];
+  cards?: { id: string; feedback: unknown }[];
+  receipt?: unknown;
   sections?: { questions: { id: string }[]; writingPrompts: { id: string }[] }[];
 }
 
@@ -234,6 +236,7 @@ export async function reconcileLearningProgress(
       !Number.isSafeInteger(current.progressRevision) ||
       current.submitted ||
       current.submissionResult ||
+      current.receipt ||
       ![
         'AVAILABLE',
         'IN_PROGRESS',
@@ -241,6 +244,7 @@ export async function reconcileLearningProgress(
         'ready_full',
         'ready_writing',
         'ready_speaking',
+        'ready_vocabulary',
       ].includes(current.status ?? '') ||
       (material && String(current.attempt ?? 1) !== material)
     )
@@ -254,6 +258,7 @@ export async function reconcileLearningProgress(
       current.sections?.flatMap((section) => section.writingPrompts.map((prompt) => prompt.id)) ??
         current.writingPrompts?.map((prompt) => prompt.id) ??
         current.prompts?.map((prompt) => prompt.id) ??
+        current.cards?.filter((card) => !card.feedback).map((card) => card.id) ??
         []
     );
     const pending = queue.pending ?? {};

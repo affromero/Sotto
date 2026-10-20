@@ -159,6 +159,35 @@ class AffectedChecksTests(unittest.TestCase):
         self.assertIn(str(self.root / test), tests)
         self.assertNotIn('--passWithNoTests', tests)
 
+    def test_browser_changes_keep_types_without_running_vitest(self) -> None:
+        self.stage('apps/web/e2e/vocabulary.spec.ts',
+                   'apps/web/e2e/fixtures/source.json')
+        self.assert_passed(self.run_checks())
+        self.assertEqual(self.calls(), [
+            ['run', 'type-check', '--workspace=@sotto/web'],
+        ])
+
+    def test_browser_changes_preserve_real_unit_test_checks(self) -> None:
+        browser = 'apps/web/e2e/vocabulary.spec.ts'
+        unit = 'apps/web/tests/components/Vocabulary.test.tsx'
+        self.stage(browser, unit)
+        self.assert_passed(self.run_checks())
+        tests = next(command for command in self.calls()
+                     if 'related' in command)
+        self.assertIn(str(self.root / unit), tests)
+        self.assertNotIn(str(self.root / browser), tests)
+        self.assertNotIn('--passWithNoTests', tests)
+
+    def test_deleted_browser_changes_do_not_trigger_unit_tests(self) -> None:
+        browser = 'apps/web/e2e/vocabulary.spec.ts'
+        self.stage(browser)
+        self.commit()
+        self.git('rm', browser)
+        self.assert_passed(self.run_checks())
+        self.assertEqual(self.calls(), [
+            ['run', 'type-check', '--workspace=@sotto/web'],
+        ])
+
     def test_deleted_source_runs_the_full_affected_workspace(self) -> None:
         source = 'apps/web/src/lib/removed.ts'
         self.stage(source)

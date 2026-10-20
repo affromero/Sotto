@@ -130,7 +130,11 @@ try {
   await command('npm', ['run', 'build'], { ...env, SOTTO_ENV_FILE: join(directory, 'absent.env') });
   worker = spawn(resolve(root, 'node_modules/.bin/tsx'), ['src/workers/index.ts'], {
     cwd: resolve(root, 'apps/web'),
-    env: { ...env, WORKER_PROFILE: 'pipeline', WORKER_QUEUES: 'speaking-grading' },
+    env: {
+      ...env,
+      WORKER_PROFILE: 'pipeline',
+      WORKER_QUEUES: 'speaking-grading,vocabulary-index,vocabulary-audio',
+    },
     stdio: 'inherit',
     detached: true,
   });
@@ -151,7 +155,7 @@ try {
   if (provider.unexpected.length)
     throw new Error(`Unexpected provider traffic: ${JSON.stringify(provider.unexpected)}`);
   if (worker.exitCode !== null || worker.signalCode !== null)
-    throw new Error('Speaking worker exited before browser tests finished');
+    throw new Error('Learning worker exited before browser tests finished');
 } catch (error) {
   failure = error;
 } finally {

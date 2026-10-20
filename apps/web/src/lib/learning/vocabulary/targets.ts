@@ -1,13 +1,16 @@
-import { prisma } from '../../prisma';
+import { prismaUnfiltered as prisma } from '../../prisma';
 import type { DueItems } from '../../knowledge-graph';
 import { selectVocabularyTargets, type VocabularyTarget } from './selection';
+import { introducedVocabularyWhere, unseenVocabularyWhere } from './memory';
+import type { LearningDatabase } from '../database';
 
 /** Read active learning and the unseen queue separately so a large import cannot hide reviews. */
 export async function getVocabularyTargets(
   courseId: string,
   due: DueItems['vocab'],
   candidates: readonly VocabularyTarget[],
-  limit: number
+  limit: number,
+  database: Pick<LearningDatabase, 'learnerVocab'> = prisma
 ): Promise<VocabularyTarget[]> {
   const select = {
     lemma: true,
@@ -17,31 +20,28 @@ export async function getVocabularyTargets(
     reps: true,
     lastReviewed: true,
     firstSeenClassId: true,
+    introducedAt: true,
     dueAt: true,
   } as const;
   const identities = [...new Set([...due, ...candidates].map((word) => word.lemma))];
   const [active, unseen, ranked] = await Promise.all([
-    prisma.learnerVocab.findMany({
+    database.learnerVocab.findMany({
       where: {
         courseId,
-        OR: [
-          { lastReviewed: { not: null } },
-          { reps: { gt: 0 } },
-          { firstSeenClassId: { not: null } },
-        ],
+        ...introducedVocabularyWhere(),
       },
       select,
       orderBy: [{ mastery: 'asc' }, { dueAt: 'asc' }],
       take: Math.max(64, limit * 4),
     }),
-    prisma.learnerVocab.findMany({
-      where: { courseId, reps: 0, lastReviewed: null, firstSeenClassId: null },
+    database.learnerVocab.findMany({
+      where: { courseId, ...unseenVocabularyWhere() },
       select,
       orderBy: [{ createdAt: 'asc' }, { lemma: 'asc' }],
       take: limit,
     }),
     identities.length
-      ? prisma.learnerVocab.findMany({
+      ? database.learnerVocab.findMany({
           where: { courseId, lemma: { in: identities } },
           select,
         })

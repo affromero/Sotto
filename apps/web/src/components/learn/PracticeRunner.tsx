@@ -7,6 +7,7 @@ import { learningTextGuardProps } from '@/components/ui/learningTextGuard';
 import { ScoreDial } from './ClassWidgets';
 import { LearningSelectionMenu } from './LearningSelectionMenu';
 import { WritingSection } from './WritingSection';
+import { VocabularyStudyRunner } from './vocabulary/VocabularyStudyRunner';
 import { useWritingDrafts } from './writing/useWritingDrafts';
 import type { WritingPromptData } from './classTypes';
 import styles from './PracticeRunner.module.css';
@@ -47,6 +48,7 @@ interface PracticeWritingItem {
 }
 
 type PracticeStartContent =
+  | import('@sotto/shared').VocabularyStudySession
   | {
       status: 'ready';
       sessionId: string;
@@ -799,6 +801,8 @@ function FullRunner({
 }
 
 export function PracticeRunner({ courseId, start, onDone }: PracticeRunnerProps) {
+  if (start.status === 'ready_vocabulary')
+    return <VocabularyStudyRunner start={start} onDone={onDone} />;
   if (start.submissionResult)
     return <ResultPanel result={start.submissionResult} onDone={onDone} />;
   if (start.status === 'ready_full') {

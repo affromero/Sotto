@@ -124,7 +124,8 @@ describe('CourseNotesPanel', () => {
             body: 'Uploaded course note: official-2.md',
             imported: 2,
             failed: 0,
-            addedVocabulary: 4,
+            vocabularyIndexing: 'queued',
+            materials: [{ id: 'document-1', name: 'official-1.md', extractedText: 'ciao' }],
           }),
           { status: 200 }
         )
@@ -150,7 +151,10 @@ describe('CourseNotesPanel', () => {
     expect(fetchMock.mock.calls[1][0]).toBe('/api/v1/courses/c1/notes');
     expect(fetchMock.mock.calls[1][1]).toMatchObject({ method: 'POST', credentials: 'include' });
     expect(fetchMock.mock.calls[1][1]?.body).toBeInstanceOf(FormData);
-    expect(await screen.findByText(/Imported 2 files .* 4 vocab added/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Vocabulary indexing is queued/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'View vocabulary and import progress' })
+    ).toHaveAttribute('href', '/learn/vocabulary?course=c1');
     expect(screen.getByLabelText(/paste notes from an official course/i)).toHaveValue(
       'Unsaved learner draft'
     );

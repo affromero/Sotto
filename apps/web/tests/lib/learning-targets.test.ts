@@ -164,6 +164,25 @@ describe('addVisualCue', () => {
 });
 
 describe('generateTargetPronunciation', () => {
+  it('reuses saved pronunciation without another provider request', async () => {
+    mockLearnerFocusTargetFindFirst.mockResolvedValue({
+      ...TARGET_ROW,
+      pronunciationAudioUrl: 'learning-targets/ft1/saved.mp3',
+      course: {
+        userId: 'u1',
+        targetLang: 'de',
+        user: { preferredTtsProvider: 'local', preferredTtsModel: 'local' },
+      },
+    });
+    const target = await generateTargetPronunciation(
+      'c1',
+      'u1',
+      'ft1',
+      blockedProviderExecution('u1')
+    );
+    expect(target.pronunciationAudioUrl).toBe('learning-targets/ft1/saved.mp3');
+    expect(mockResolveTtsProvider).not.toHaveBeenCalled();
+  });
   it('does not generate pronunciation through the cloud default when audio is explicitly disabled', async () => {
     mockGetConfiguredTtsProviderId.mockReturnValue('cartesia');
     mockLearnerFocusTargetFindFirst.mockResolvedValue({

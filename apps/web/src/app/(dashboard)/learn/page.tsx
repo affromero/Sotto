@@ -202,6 +202,12 @@ export default async function LearnPage() {
                         Practice
                       </Link>
                       <Link
+                        href={`/learn/vocabulary?course=${course.id}`}
+                        className={styles.practiceLink}
+                      >
+                        Vocabulary
+                      </Link>
+                      <Link
                         href={`/learn/live?course=${course.id}`}
                         className={styles.practiceLink}
                         aria-label={`Live conversation for ${courseTitle}`}

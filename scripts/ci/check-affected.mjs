@@ -141,8 +141,12 @@ if (allScriptTests) {
 }
 
 for (const workspace of workspaces) {
+  const isBrowserInput = (file) =>
+    workspace.name === '@sotto/web' && file.startsWith('apps/web/e2e/');
+  const browserInputs = files.filter(isBrowserInput);
   const own = files.filter(
-    (file) => file.startsWith(`${workspace.directory}/`) && source.test(file)
+    (file) =>
+      file.startsWith(`${workspace.directory}/`) && source.test(file) && !isBrowserInput(file)
   );
   const dependencies =
     workspace.name === '@sotto/web'
@@ -158,6 +162,7 @@ for (const workspace of workspaces) {
   const dynamicInputs = files.filter(
     (file) =>
       file.startsWith(`${workspace.directory}/`) &&
+      !isBrowserInput(file) &&
       /\/(?:prompts|fixtures|test-fixtures|__fixtures__|models)\//.test(file)
   );
   if (
@@ -166,6 +171,7 @@ for (const workspace of workspaces) {
     !prisma &&
     !sharedArtifact &&
     !own.length &&
+    !browserInputs.length &&
     !dependencies.length &&
     !dynamicInputs.length
   )
@@ -195,6 +201,12 @@ for (const workspace of workspaces) {
       '--run',
       '--no-file-parallelism',
     ]);
+    continue;
+  }
+  if (!related.length) {
+    console.log(
+      `Affected checks: browser inputs are type-checked; browser CI runs their journeys.`
+    );
     continue;
   }
   const changedTest = related.some((file) => /\.(?:test|spec)\.[cm]?[jt]sx?$/.test(file));

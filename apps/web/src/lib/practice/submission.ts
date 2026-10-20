@@ -50,6 +50,8 @@ export async function submitPractice(
       },
     });
     if (!session) throw new PracticeSessionNotFoundError('Practice session not found');
+    if (session.vocabularyStudy)
+      throw new PracticeIncompleteError('Check vocabulary answers in the saved study session.');
     await tx.$queryRaw`SELECT id FROM "Course" WHERE id = ${session.courseId} FOR UPDATE`;
     if (session.status === 'COMPLETED') {
       const receipt = practiceReceiptSchema.safeParse(session.submissionResult);

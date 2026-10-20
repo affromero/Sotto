@@ -45,6 +45,7 @@ const FULL_DUE_COUNT = 12;
 export class PracticeCourseNotFoundError extends Error {}
 
 type StartPracticeContent =
+  | import('@sotto/shared').VocabularyStudySession
   | import('@sotto/shared').PracticePreparing
   | { status: 'unavailable'; reason: 'not_enough_vocab' | 'nothing_due' | 'no_content' }
   | {

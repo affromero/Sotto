@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import styles from './CourseNotesPanel.module.css';
 
 const MAX_NOTE_LENGTH = 12000;
@@ -13,6 +14,7 @@ interface NotesResponse {
   body?: string;
   addedVocabulary?: number;
   imported?: number;
+  vocabularyIndexing?: 'queued';
   failed?: number;
   error?: string;
   materials?: Array<{ id: string; name: string; fileUrl: string; extractedText: string }>;
@@ -27,7 +29,9 @@ function statusText(data: NotesResponse, fallback: string): string {
 
   if (imported > 0) {
     const failText = failed > 0 ? ` · ${failed} failed` : '';
-    return `Imported ${imported} file${imported === 1 ? '' : 's'} · ${added} vocab added${failText}`;
+    return data.vocabularyIndexing === 'queued'
+      ? `Imported ${imported} file${imported === 1 ? '' : 's'}. Vocabulary indexing is queued.${failText}`
+      : `Imported ${imported} file${imported === 1 ? '' : 's'} · ${added} vocab added${failText}`;
   }
 
   return added > 0 ? `${fallback} · ${added} vocab added` : fallback;
@@ -176,24 +180,29 @@ function CourseNotesEditor({ courseId }: CourseNotesPanelProps) {
         Paste notes from an official course
       </label>
       {materials.length > 0 && (
-        <ul className={styles.materials} aria-label="Uploaded materials">
-          {materials.map((material) => (
-            <li key={material.id}>
-              <a
-                className={styles.materialLink}
-                href={`/api/v1/materials/${encodeURIComponent(material.id)}/file`}
-              >
-                {material.name}
-              </a>
-              {material.extractedText && (
-                <details>
-                  <summary>View imported text</summary>
-                  <pre className={styles.materialText}>{material.extractedText}</pre>
-                </details>
-              )}
-            </li>
-          ))}
-        </ul>
+        <div>
+          <Link href={`/learn/vocabulary?course=${courseId}`}>
+            View vocabulary and import progress
+          </Link>
+          <ul className={styles.materials} aria-label="Uploaded materials">
+            {materials.map((material) => (
+              <li key={material.id}>
+                <a
+                  className={styles.materialLink}
+                  href={`/api/v1/materials/${encodeURIComponent(material.id)}/file`}
+                >
+                  {material.name}
+                </a>
+                {material.extractedText && (
+                  <details>
+                    <summary>View imported text</summary>
+                    <pre className={styles.materialText}>{material.extractedText}</pre>
+                  </details>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
       <p>
         These notes guide future preparation. Your practice results determine mastery. Clearing and

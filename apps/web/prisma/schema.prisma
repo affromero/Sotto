@@ -962,20 +962,22 @@ model Course {
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
 
-  user             User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  curriculum       Curriculum               @relation(fields: [curriculumId], references: [id])
-  placement        PlacementResult?
-  classes          CourseClass[]
-  vocab            LearnerVocab[]
-  grammar          LearnerGrammar[]
-  vocabEdges       VocabEdge[]
-  practiceSessions PracticeSession[]
-  practiceRequests PracticeRequestReceipt[]
-  note             CourseNote?
-  materials        CourseMaterial[]
-  mockExams        MockExam[]
-  focusTargets     LearnerFocusTarget[]
-  reviewEvents     LearnerReviewEvent[]
+  user              User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  curriculum        Curriculum                @relation(fields: [curriculumId], references: [id])
+  placement         PlacementResult?
+  classes           CourseClass[]
+  vocab             LearnerVocab[]
+  grammar           LearnerGrammar[]
+  vocabEdges        VocabEdge[]
+  practiceSessions  PracticeSession[]
+  practiceRequests  PracticeRequestReceipt[]
+  note              CourseNote?
+  materials         CourseMaterial[]
+  mockExams         MockExam[]
+  focusTargets      LearnerFocusTarget[]
+  reviewEvents      LearnerReviewEvent[]
+  pronunciations    VocabularyPronunciation[]
+  vocabularyIndexes MaterialVocabularyIndex[]
 
   @@unique([userId, nativeLang, targetLang]) // one course per user per language pair
   @@index([userId])
@@ -1439,6 +1441,7 @@ model LearnerVocab {
   courseId         String
   lemma            String // canonical target-language form
   translation      String
+  acceptedMeanings String[]   @default([])
   partOfSpeech     String?
   pronunciation    String?
   // SRS state (SM-2)
@@ -1450,15 +1453,17 @@ model LearnerVocab {
   mastery          Float      @default(0) // 0..1 rolled-up strength
   lastReviewed     DateTime?
   // provenance
+  introducedAt     DateTime?
   firstSeenClassId String?
   cefrLevel        CefrLevel?
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
 
-  course       Course               @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  edgesOut     VocabEdge[]          @relation("EdgeSource")
-  edgesIn      VocabEdge[]          @relation("EdgeTarget")
+  course       Course                       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  edgesOut     VocabEdge[]                  @relation("EdgeSource")
+  edgesIn      VocabEdge[]                  @relation("EdgeTarget")
   reviewEvents LearnerReviewEvent[]
+  sources      VocabularySourceOccurrence[]
 
   @@unique([id, courseId])
   @@unique([courseId, lemma])
@@ -1490,6 +1495,87 @@ model LearnerGrammar {
   @@unique([courseId, topicKey])
   @@index([courseId, dueAt])
   @@index([courseId, mastery])
+}
+
+model MaterialVocabularyIndex {
+  id                String                 @id @default(uuid())
+  materialId        String
+  courseId          String
+  sourceFingerprint String
+  textHash          String
+  textLength        Int
+  originalInput     Json
+  materialCreatedAt DateTime
+  nativeLang        String
+  targetLang        String
+  protocol          Int                    @default(1)
+  generation        Int                    @default(1)
+  status            String                 @default("PENDING")
+  error             String?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+  material          CourseMaterial         @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  course            Course                 @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  chunks            VocabularyIndexChunk[]
+
+  @@unique([materialId, sourceFingerprint])
+  @@index([courseId])
+}
+
+model VocabularyIndexChunk {
+  id          String                       @id @default(uuid())
+  indexId     String
+  startOffset Int
+  endOffset   Int
+  generation  Int                          @default(1)
+  status      String                       @default("PENDING")
+  operation   Json?
+  result      Json?
+  error       String?
+  createdAt   DateTime                     @default(now())
+  updatedAt   DateTime                     @updatedAt
+  index       MaterialVocabularyIndex      @relation(fields: [indexId], references: [id], onDelete: Cascade)
+  sources     VocabularySourceOccurrence[]
+
+  @@unique([indexId, startOffset, endOffset])
+  @@index([indexId, status])
+}
+
+model VocabularySourceOccurrence {
+  id          String               @id @default(uuid())
+  wordId      String
+  courseId    String
+  materialId  String
+  chunkId     String
+  startOffset Int
+  endOffset   Int
+  quote       String               @db.Text
+  meaning     String
+  word        LearnerVocab         @relation(fields: [wordId, courseId], references: [id, courseId], onDelete: Cascade)
+  material    CourseMaterial       @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  chunk       VocabularyIndexChunk @relation(fields: [chunkId], references: [id], onDelete: Cascade)
+
+  @@unique([chunkId, wordId, startOffset, endOffset])
+  @@index([wordId])
+  @@index([materialId])
+}
+
+model VocabularyPronunciation {
+  id          String   @id @default(uuid())
+  courseId    String
+  fingerprint String
+  text        String
+  language    String
+  generation  Int      @default(1)
+  status      String   @default("QUEUED")
+  audioUrl    String?
+  error       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, fingerprint])
+  @@index([courseId])
 }
 
 // Append-only observations commit with their source submission and SRS update.
@@ -1557,6 +1643,7 @@ model PracticeRequestReceipt {
 }
 
 model PracticeSession {
+  vocabularyStudy     Json? // private versioned dictionary study and recall snapshot
   listeningScriptHash String? // binds comprehension questions to the preserved listening script
   generationSpec      Json? // captured private context, frozen requirements and source identity
   generationState     Json? // nonsecret durable preparation and delegation metadata
@@ -1649,8 +1736,10 @@ model CourseMaterial {
   extractedText String   @db.Text
   createdAt     DateTime @default(now())
 
-  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  course Course? @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user              User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course            Course?                      @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  vocabularyIndexes MaterialVocabularyIndex[]
+  vocabularySources VocabularySourceOccurrence[]
 
   @@index([userId, courseId])
   @@index([courseId])

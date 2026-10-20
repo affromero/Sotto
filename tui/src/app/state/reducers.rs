@@ -127,6 +127,7 @@ pub(crate) fn reduce_start(view: View, resp: &types::StartPracticeResponse) -> V
     }
 
     match resp {
+        types::StartPracticeResponse::ReadyVocabulary(_) => course_home_notice(course, due, Unavailable::NotInTerminal("Vocabulary study")),
         types::StartPracticeResponse::Ready(ready) => match ReviewKind::from_kind(ready.kind) {
             // VOCAB / GRAMMAR / READING share the multiple-choice review screen.
             Some(review_kind) => match validate_choice_items(&ready.items) {

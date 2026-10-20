@@ -3,6 +3,7 @@ import { prisma } from '../prisma';
 import type { PracticeMcItem } from '../practice/types';
 import { currentClassSections } from './classes/current-sections';
 import { learningProgressRequestSchema } from '@sotto/shared';
+import { assertVocabularyStudyOwner, vocabularyStudyStateSchema } from '../vocabulary/study-state';
 
 export const learningProgressSchema = learningProgressRequestSchema;
 
@@ -35,6 +36,29 @@ export async function saveLearningProgress(
       );
     if (!['ACTIVE', 'AVAILABLE', 'IN_PROGRESS'].includes(parent.status))
       throw new LearningProgressConflict('This session no longer accepts edits.');
+    if ('vocabularyStudy' in parent && parent.vocabularyStudy) {
+      const state = vocabularyStudyStateSchema.parse(parent.vocabularyStudy);
+      assertVocabularyStudyOwner(state, parent, userId);
+      if (
+        Object.keys(progress.answers ?? {}).length ||
+        Object.entries(progress.writingDrafts ?? {}).some(
+          ([id, text]) =>
+            text.length > 1000 ||
+            state.mode === 'FLASHCARDS' ||
+            !state.cards.some((card) => card.id === id && !card.response)
+        )
+      )
+        throw new LearningProgressConflict('A saved answer belongs to different study material.');
+      const drafts = z.record(z.string(), z.string()).safeParse(parent.writingDrafts);
+      await tx.practiceSession.update({
+        where: { id },
+        data: {
+          writingDrafts: { ...(drafts.success ? drafts.data : {}), ...progress.writingDrafts },
+          progressRevision: { increment: 1 },
+        },
+      });
+      return parent.progressRevision + 1;
+    }
     const questions =
       'sections' in parent
         ? currentClassSections(parent.sections).flatMap((section) =>
