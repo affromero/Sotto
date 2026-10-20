@@ -14,7 +14,7 @@ import { getEditableCourseNote, mergeCourseNote, setCourseNote } from '../course
 import { sottoTransaction } from '../sidedoor/access/state/transaction';
 import type { SottoProviderExecution } from '../sidedoor/credentials/runtime/provider-execution';
 
-const MAX_MATERIAL_BYTES = 10 * 1024 * 1024;
+const MAX_MATERIAL_BYTES = 50 * 1024 * 1024;
 const MAX_MATERIAL_FILES = 10;
 export const materialSelect = {
   id: true,
@@ -98,7 +98,9 @@ export async function importCourseMaterials(
     const id = randomUUID();
     const createdAt = new Date();
     const name = file.name.replace(/[\u0000-\u001f\/\\]/g, '_').slice(0, 240) || 'course-material';
-    const mimeType = file.type || 'application/octet-stream';
+    const mimeType = name.toLowerCase().endsWith('.pdf')
+      ? 'application/pdf'
+      : file.type || 'application/octet-stream';
     const extension = extname(name)
       .slice(1)
       .toLowerCase()

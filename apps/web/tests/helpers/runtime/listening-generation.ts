@@ -65,9 +65,17 @@ vi.mock('@/lib/learning-ai', () => ({
       };
     throw new Error('No AI provider available');
   },
-  capturedLearningAiOptions: async (ai: { model: string; apiKey?: string }) => ({
+  capturedLearningAiOptions: async (
+    ai: {
+      model: string;
+      apiKey?: string;
+      execution?: { sourceDocuments?: import('@/lib/providers/ai').SourceDocuments };
+    },
+    scope?: { includeSourceDocuments?: boolean }
+  ) => ({
     model: ai.model,
     apiKeyOverride: ai.apiKey,
+    ...(scope?.includeSourceDocuments ? { sourceDocuments: ai.execution?.sourceDocuments } : {}),
   }),
 }));
 const { mockCreateSegmentsAndQueueAudio } = vi.hoisted(() => ({

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { SourceDocuments } from '@/lib/providers/ai';
 import { sampleTeaching } from '../helpers/learning/class-teaching';
 import {
   mockEpisodeCreate,
@@ -264,6 +265,27 @@ describe('generateClassListening', () => {
   });
 
   describe('happy path', () => {
+    it('supplies original PDFs to the script author while preserving restricted quiz and review inputs', async () => {
+      setupHappyPath();
+      const sourceDocuments: SourceDocuments = {
+        parts: [
+          {
+            type: 'document',
+            mediaType: 'application/pdf',
+            name: 'Workbook.pdf',
+            data: Buffer.from('%PDF-1.7'),
+          },
+        ],
+        validate: async () => {},
+      };
+      await generateClassListening({
+        ...PARAMS,
+        execution: { ...PARAMS.execution, sourceDocuments },
+      });
+      expect(mockGenerateScript.mock.calls[0][0].sourceDocuments).toBe(sourceDocuments);
+      for (const request of mockGenerateResponse.mock.calls)
+        expect(request[2]?.sourceDocuments).toBeUndefined();
+    });
     it('pins the admin model when listening audio is deferred for learner review', async () => {
       setupHappyPath();
       await generateClassListening({ ...PARAMS, deferAudio: true });

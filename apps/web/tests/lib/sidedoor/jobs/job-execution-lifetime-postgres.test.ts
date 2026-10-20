@@ -1,8 +1,8 @@
 // @vitest-environment node
 import { randomUUID } from 'node:crypto';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, realpath, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { prepareJob } from 'thesidedoor-core/runtime/outbox';
 import { AccessError } from 'thesidedoor-core/access';
@@ -10,6 +10,7 @@ import type { Prisma, PrismaClient } from '@/generated/prisma/client';
 import {
   withSottoJobExecution,
   sottoJobExecutions,
+  resolveSottoExecutionDirectory,
 } from '@/lib/sidedoor/jobs/core/job-execution-lifetime';
 import { sottoJobOutbox } from '@/lib/sidedoor/jobs/core/job-delivery';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
@@ -82,7 +83,11 @@ suite('durable execution admission and cleanup', () => {
     await expect(
       withSottoJobExecution({
         ...options,
-        run: async () => {
+        run: async ({ directory }) => {
+          expect((await stat(directory)).mode & 0o777).toBe(0o700);
+          expect(relative(await realpath(resolveSottoExecutionDirectory()), directory)).not.toMatch(
+            /^\.\./
+          );
           expect((await unresolved()).executions).toMatchObject([
             { parentId: options.parentId, status: 'active' },
           ]);

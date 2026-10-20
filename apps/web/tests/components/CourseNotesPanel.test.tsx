@@ -8,6 +8,22 @@ import userEvent from '@testing-library/user-event';
 import { CourseNotesPanel } from '@/components/learn/CourseNotesPanel';
 
 describe('CourseNotesPanel', () => {
+  it('opens an original PDF without presenting an empty transcription', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce(
+      Response.json({
+        body: '',
+        materials: [{ id: 'original-pdf', name: 'Original course.pdf', extractedText: '' }],
+      })
+    );
+    const user = userEvent.setup();
+    render(<CourseNotesPanel courseId="c1" />);
+    await user.click(screen.getByRole('button', { name: /course notes/i }));
+    expect(await screen.findByRole('link', { name: 'Original course.pdf' })).toHaveAttribute(
+      'href',
+      '/api/v1/materials/original-pdf/file'
+    );
+    expect(screen.queryByText('View imported text')).not.toBeInTheDocument();
+  });
   it('starts a different course with a closed clean editor and discards the old pending read', async () => {
     const pending = Promise.withResolvers<Response>();
     vi.spyOn(global, 'fetch')

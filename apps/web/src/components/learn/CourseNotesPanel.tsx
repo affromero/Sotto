@@ -185,10 +185,12 @@ function CourseNotesEditor({ courseId }: CourseNotesPanelProps) {
               >
                 {material.name}
               </a>
-              <details>
-                <summary>View imported text</summary>
-                <pre className={styles.materialText}>{material.extractedText}</pre>
-              </details>
+              {material.extractedText && (
+                <details>
+                  <summary>View imported text</summary>
+                  <pre className={styles.materialText}>{material.extractedText}</pre>
+                </details>
+              )}
             </li>
           ))}
         </ul>

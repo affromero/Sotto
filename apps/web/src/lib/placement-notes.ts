@@ -5,6 +5,7 @@
 import { cache } from '@/lib/redis';
 import { deduceLevelFromNotes, type NotesDeduction } from '@/lib/placement-test';
 import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
+import { captureMaterialDocuments } from './course-materials/documents';
 
 const NOTES_TTL_SECONDS = 3600;
 
@@ -33,7 +34,17 @@ export async function runNotesDeduction(
   content: string,
   materials?: { materialIds: string[]; editableContent: string }
 ): Promise<NotesDeduction> {
-  const { deduction } = await deduceLevelFromNotes(userId, execution, native, target, content);
+  const sourceDocuments = materials?.materialIds.length
+    ? await captureMaterialDocuments(execution, { materialIds: materials.materialIds })
+    : undefined;
+  const { deduction } = await deduceLevelFromNotes(
+    userId,
+    { ...execution, sourceDocuments },
+    native,
+    target,
+    content
+  );
+  await sourceDocuments?.validate();
   const cached: CachedNotesDeduction = { ...deduction, content, ...materials };
   await cache.set(notesCacheKey(userId, native, target), cached, NOTES_TTL_SECONDS);
   return deduction;

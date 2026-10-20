@@ -3,9 +3,10 @@ import { providerCompatibleConnection } from 'thesidedoor-core/providers/catalog
 import { captureCompatibleModel } from 'thesidedoor-core/ai/providers';
 import { captureApiEndpoint, selectedApi } from '@/lib/providers/shared/api-selection';
 import { moderateOrThrow, type ModerationPort } from '../moderation';
-import type { TokenUsage } from 'thesidedoor-core/ai';
+import type { TokenUsage, ContentPart as SharedContentPart } from 'thesidedoor-core/ai';
 import { ProviderCleanupError } from 'thesidedoor-core/ai';
 import { GenerationUsageError } from 'thesidedoor-core/ai/usage';
+import { documentProvider } from './documents/provider';
 import {
   generateSharedApi,
   streamSharedApiWithRetry,
@@ -33,8 +34,14 @@ export interface TextContentPart {
 export interface ImageContentPart {
   type: 'image_url';
   url: string;
+  documentPage?: number;
 }
-export type ContentPart = TextContentPart | ImageContentPart;
+export type DocumentContentPart = Extract<SharedContentPart, { type: 'document' }>;
+export interface SourceDocuments {
+  parts: DocumentContentPart[];
+  validate: () => Promise<void>;
+}
+export type ContentPart = TextContentPart | ImageContentPart | DocumentContentPart;
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -51,10 +58,12 @@ function textOf(content: string | ContentPart[]): string {
 }
 
 export interface AIOptions {
+  sourceDocuments?: SourceDocuments;
   isolated?: import('../agents/isolated/isolated-agent').IsolatedClaudeExecution;
   /** Captured request boundary for authorization and terminal-effect observation. */
   fetch?: typeof fetch;
   signal?: AbortSignal;
+  onCleanupError?: (error: unknown) => void;
   onUsage?: (usage: TokenUsage) => void;
   maxTokens?: number;
   temperature?: number;
@@ -530,7 +539,7 @@ class CodexLazyProvider implements AIProvider {
   }
 }
 
-export function createAIProvider(type: string): AIProvider {
+function createProvider(type: string): AIProvider {
   if (!type) {
     throw new Error(
       'AI provider type is required. Pass an explicit provider from the AI registry.'
@@ -570,4 +579,8 @@ export function createAIProvider(type: string): AIProvider {
         `Unknown AI provider type: "${type}". Registered providers: anthropic, openai, google, meta, claude-code, codex, local, xai, deepseek, mistral, groq, nvidia`
       );
   }
+}
+
+export function createAIProvider(type: string): AIProvider {
+  return documentProvider(type, createProvider(type));
 }

@@ -1,5 +1,6 @@
 /** MCQ generation preserves complete generated or immutable sourced reading passages. */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { SourceDocuments } from '@/lib/providers/ai';
 import {
   emptyTeachingCriticFixture,
   novelFindingCorroborationFixture,
@@ -9,16 +10,21 @@ import {
 const mockResolveLearningAi = vi.fn();
 vi.mock('@/lib/learning-ai', () => ({
   resolveCapturedLearningAi: (...a: unknown[]) => mockResolveLearningAi(...a),
-  capturedLearningAiOptions: async (ai: {
-    model: string;
-    apiKey?: string;
-    signal?: AbortSignal;
-    authenticatedFetch?: typeof fetch;
-  }) => ({
+  capturedLearningAiOptions: async (
+    ai: {
+      model: string;
+      apiKey?: string;
+      signal?: AbortSignal;
+      authenticatedFetch?: typeof fetch;
+      execution?: { sourceDocuments?: SourceDocuments };
+    },
+    scope?: { includeSourceDocuments?: boolean }
+  ) => ({
     model: ai.model,
     apiKeyOverride: ai.apiKey,
     signal: ai.signal,
     fetch: ai.authenticatedFetch,
+    ...(scope?.includeSourceDocuments ? { sourceDocuments: ai.execution?.sourceDocuments } : {}),
   }),
 }));
 
@@ -68,6 +74,7 @@ import type { SectionGenParams } from '@/lib/class-generation';
 import type { SkillType } from '@sotto/shared';
 import { blockedProviderExecution } from '../helpers/runtime/provider-execution';
 import { registerQuizRetryTests } from './class-generation/retry-cases';
+import { registerSourceMaterialTests } from './class-generation/material-cases';
 import {
   GENERATED_PASSAGE,
   SAMPLE_QUESTIONS,
@@ -98,37 +105,7 @@ registerQuizRetryTests(BASE, mockGenerateResponse, mockTeachingResponse);
 
 const PASSAGE = 'Una vez un científico descubrió algo importante en el laboratorio.';
 
-it('requests one contextual vocabulary exercise per target word through the configured provider', async () => {
-  mockGenerateResponse.mockResolvedValue({
-    content: JSON.stringify({
-      passage: '',
-      questions: [
-        {
-          question: 'Mia hat gestern einen Film _____.',
-          options: ['gesehen', 'gelesen', 'geschrieben', 'gehört'],
-          correctIndex: 0,
-          explanation: 'Man sieht einen Film.',
-        },
-      ],
-    }),
-    inputTokens: 1,
-    outputTokens: 1,
-    model: 'm',
-  });
-  const result = await generateSectionQuestions({
-    ...BASE,
-    skill: 'GRAMMAR',
-    vocabularyReview: true,
-    targetLang: 'de',
-    targetVocab: [{ lemma: 'gesehen', gloss: 'seen' }],
-  });
-  expect(result[0]).toMatchObject({
-    question: `${VOCABULARY_TASK_CONTEXT}\nMia hat gestern einen Film _____.`,
-    correctIndex: 0,
-  });
-  const messages = mockGenerateResponse.mock.calls[0][1];
-  expect(messages[0].content).toContain('1 vocabulary');
-});
+registerSourceMaterialTests(BASE, mockResolveLearningAi, mockGenerateResponse, mockReviewResponse);
 
 describe('contextual vocabulary coverage', () => {
   it('reports a final indexed-choice failure rather than an earlier teaching rejection', async () => {

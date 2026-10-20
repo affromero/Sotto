@@ -35,7 +35,8 @@ export function learningPreparationProviderRequest(
     if (outcomeUnknown)
       throw new PreparationConflictError('An earlier provider outcome is unresolved.');
     signal.throwIfAborted();
-    const bytes = await readResponseBytes(request.clone(), { signal, maxBytes: 4 * 1024 * 1024 });
+    // A 50 MiB original expands to 67 MiB of base64, plus bounded prompt text.
+    const bytes = await readResponseBytes(request.clone(), { signal, maxBytes: 72 * 1024 * 1024 });
     const attempt = {
       id: randomUUID(),
       fingerprint: createHash('sha256')
