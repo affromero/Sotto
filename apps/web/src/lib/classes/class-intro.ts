@@ -810,7 +810,7 @@ export async function generateClassIntro(p: ClassIntroParams): Promise<ClassIntr
     systemPrompt,
     [{ role: 'user', content: 'Write the opening class teaching brief.' }],
     {
-      ...(await capturedLearningAiOptions(ai)),
+      ...(await capturedLearningAiOptions(ai, { includeSourceDocuments: true })),
       maxTokens: 1800,
       temperature: 0.5,
       jsonSchema: protocol.generationResponseFormat,
@@ -878,7 +878,7 @@ export async function generateClassIntro(p: ClassIntroParams): Promise<ClassIntr
         },
       ],
       {
-        ...(await capturedLearningAiOptions(ai)),
+        ...(await capturedLearningAiOptions(ai, { includeSourceDocuments: true })),
         maxTokens: 1800,
         temperature: 0,
         jsonSchema: repairSchema,

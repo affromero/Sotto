@@ -367,6 +367,53 @@ describe('dictionary-driven practice', () => {
     ]);
   });
 
+  it('resumes historical vocabulary selections without replacing their frozen context', async () => {
+    setDueItems({
+      vocab: [{ id: 'due', lemma: 'Bahnhof', translation: 'station', mastery: 0.2 }],
+      grammar: [],
+    });
+    const generation = practiceGenerationSchema.parse({
+      course: COURSE,
+      requirements: createSkillRequirements({
+        scope: 'VOCAB',
+        nativeLang: 'en',
+        targetLang: 'es',
+        level: 'A1',
+        ttsProvider: null,
+        sttProvider: null,
+      }),
+      seedToken: 'historical-vocabulary-request',
+      focusTargets: [],
+      note: 'Keep this admitted learner context.',
+      seed: null,
+    });
+    const original = structuredClone(generation);
+    const result = await startPractice('c1', 'u1', 'VOCAB', blockedProviderExecution('u1'), {
+      generation,
+    });
+    expect(result.status).toBe('ready');
+    expect(mockPracticeSessionCreate.mock.calls[0][0].data.vocabLemmas).toEqual(['Bahnhof']);
+    expect(generation).toEqual(original);
+  });
+
+  it('keeps an admitted empty vocabulary selection empty after the dictionary changes', async () => {
+    const captured = await capturePracticeContext(
+      'c1',
+      'u1',
+      'VOCAB',
+      blockedProviderExecution('u1')
+    );
+    const generation = practiceGenerationSchema.parse(JSON.parse(JSON.stringify(captured)));
+    expect(generation.seed?.targetVocab).toEqual([]);
+    setDueItems({
+      vocab: [{ id: 'later', lemma: 'Fahrkarte', translation: 'ticket', mastery: 0.1 }],
+      grammar: [],
+    });
+    expect(
+      await startPractice('c1', 'u1', 'VOCAB', blockedProviderExecution('u1'), { generation })
+    ).toEqual({ status: 'unavailable', reason: 'not_enough_vocab' });
+  });
+
   it('preserves captured meaning support for a focus-only vocabulary session', async () => {
     mockCourseFindFirst.mockResolvedValue({ ...COURSE, vocabularySupport: 'MEANING_RECALL' });
     setDueItems({ vocab: [], grammar: [] });

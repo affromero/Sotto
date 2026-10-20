@@ -34,6 +34,7 @@ export interface StorageDeletionReferencePage {
     | 'prompt'
     | 'recording'
     | 'focus'
+    | 'vocabulary-audio'
     | 'material';
   rows: Array<{ id: string; references: Record<string, string>; episodePrefix?: string }>;
 }
@@ -215,5 +216,15 @@ export async function visitStorageDeletionReferences(
         select: { id: true, visualCueUrl: true, pronunciationAudioUrl: true },
       }),
     ({ visualCueUrl, pronunciationAudioUrl }) => ({ visualCueUrl, pronunciationAudioUrl })
+  );
+  await pages(
+    'vocabulary-audio',
+    (after) =>
+      database.vocabularyPronunciation.findMany({
+        ...page,
+        where: { ...courseWhere, ...afterId(after) },
+        select: { id: true, audioUrl: true },
+      }),
+    ({ audioUrl }) => ({ audioUrl })
   );
 }

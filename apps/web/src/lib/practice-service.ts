@@ -45,6 +45,7 @@ const FULL_DUE_COUNT = 12;
 export class PracticeCourseNotFoundError extends Error {}
 
 type StartPracticeContent =
+  | import('@sotto/shared').VocabularyStudySession
   | import('@sotto/shared').PracticePreparing
   | { status: 'unavailable'; reason: 'not_enough_vocab' | 'nothing_due' | 'no_content' }
   | {
@@ -225,7 +226,7 @@ async function resolveSeed(
     lessonVocab,
     kind === 'FULL' || kind === 'VOCAB' ? VOCAB_COUNT : MC_COUNT
   );
-  if (grammarPoints.length > 0 || targetVocab.length > 0) {
+  if (kind === 'VOCAB' || grammarPoints.length > 0 || targetVocab.length > 0) {
     return { objective, grammarPoints, targetVocab };
   }
   if (!lesson) return null;
@@ -268,9 +269,14 @@ export async function startPractice(
   const context =
     options.generation ??
     (await capturePracticeContext(courseId, userId, kind, execution, options));
-  const { course, requirements, seedToken, focusTargets, note, seed } = context;
+  const { course, requirements, seedToken, focusTargets, note, seed: capturedSeed } = context;
   if (course.id !== courseId || course.userId !== userId || requirements.scope !== kind)
     throw new PracticeIncompleteError('Practice generation context changed.');
+  // Historical vocabulary requests did not capture dictionary selections.
+  const seed =
+    kind === 'VOCAB' && capturedSeed === null
+      ? await resolveSeed(course, await getDueItems(course.id, FULL_DUE_COUNT), kind)
+      : capturedSeed;
   const finish = async (result: StartPracticeResult) => {
     if (result.status === 'unavailable') return result;
     const published = await attachPracticeRequirements(result, requirements);

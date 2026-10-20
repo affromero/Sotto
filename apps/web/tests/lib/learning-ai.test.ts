@@ -314,6 +314,41 @@ describe('resolveLearningAi', () => {
     const init = mockAuthenticatedFetch.mock.calls[0][1] as RequestInit;
     expect(new Headers(init.headers).get('Authorization')).toBe('Bearer sk-moderation');
   });
+  it('attaches original materials only when an author opts in and keeps blind reviewers isolated', async () => {
+    const sourceDocuments = {
+      parts: [
+        {
+          type: 'document' as const,
+          mediaType: 'application/pdf' as const,
+          name: 'Answer key.pdf',
+          data: Buffer.from('%PDF-1.7'),
+        },
+      ],
+      validate: async () => {},
+    };
+    const ai = {
+      provider: 'codex',
+      model: 'codex',
+      execution: {
+        userId: 'user-1',
+        authorize: async () => ({ userId: 'user-1' }),
+        sourceDocuments,
+        onCleanupError: (error: unknown) => {
+          received = error;
+        },
+      },
+    };
+    let received: unknown;
+    expect((await capturedLearningAiOptions(ai)).sourceDocuments).toBeUndefined();
+    expect(
+      (await capturedLearningAiOptions(ai, { includeSourceDocuments: true })).sourceDocuments
+    ).toBe(sourceDocuments);
+    const failure = new Error('Unconfirmed PDF cleanup');
+    (await capturedLearningAiOptions(ai, { includeSourceDocuments: true })).onCleanupError?.(
+      failure
+    );
+    expect(received).toBe(failure);
+  });
 
   it('honors the owner-selected keyless provider over the infra AI_PROVIDER', async () => {
     // Regression: switching to claude-code in Settings writes AutoModelConfig,

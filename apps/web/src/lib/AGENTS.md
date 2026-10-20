@@ -1,5 +1,23 @@
 # src/lib/ — Core Libraries
 
+## Vocabulary lifecycle
+
+`vocabulary/` owns dictionary reads, deterministic study admission and actions,
+material-index admission, and local pronunciation. Keep answer keys in private
+study state. Public cards reveal answers only after an immutable response.
+Apply assessed outcomes through the canonical review journal in the same
+transaction as the saved response. Flashcards only record exposure.
+
+Material indexing extends canonical reading vocabulary extraction and metadata
+review. Exact source offsets, independent coverage review, and bounded recursive
+chunk subdivision establish completeness. Imported words retain existing mastery.
+Use durable queue admission and preparation grants; uncertain provider outcomes
+remain fenced until canonical recovery confirms drainage.
+
+Word audio uses explicit local speech selection and canonical provider identity.
+Read endpoints serve owned cached bytes without synthesis. Revalidate selection,
+ownership, and disabled-speech policy before serving or publishing assets.
+
 `agents/isolated/isolated-agent.ts` is the explicit API-key Claude isolation adapter. It requires
 a local Linux Docker host, a reviewed immutable image with Claude 2.1.283, parent
 credential admission and durable container identity callbacks. Provider keys stay
@@ -30,7 +48,27 @@ fail before dispatch. A paid credit error must never block the free model.
 
 `course-materials/index.ts` retains original uploaded documents through the canonical
 storage writer and stages owned materials before course attachment. Editable
-course notes stay separate. Generation reads their extracts through `getCourseNote()`.
+course notes stay separate. `course-materials/documents.ts` captures original PDFs
+through owned storage inputs and revalidates them before provider dispatch and
+result publication. `getCourseNote()` retains bounded text context for lexical indexing.
+`providers/documents/` sends originals to native PDF transports and complete,
+numbered page images to other selected vision transports. Visual input rejects
+unsupported geometry, more than 100 pages or more than 20 MiB of page images.
+Rendering destroys each page's PDF.js document before opening the next page.
+`scripts/pdf-render/` runs as a supervised Node process with a 64 MiB heap and
+disabled core dumps. Its stdin lifetime and deadline fence parent loss.
+The parent records canonical workspace identities before launch, verifies every
+numbered image after confirmed process exit, and clears ownership after cleanup.
+Original staging uses the canonical owned byte copier. Source and image reads
+use one bounded regular-file descriptor and retain uncertain descriptor closure.
+Uncertain cleanup preserves the workspace and blocks reuse. Operator recovery
+requires stopping the exact supervisor/container and all owned I/O; recorded
+PIDs and timestamps alone do not authorize recovery or directory deletion.
+Each process admits one visual conversion and one waiting conversion; excess
+requests fail explicitly and require retry. Native PDF transports skip rendering.
+Authors explicitly opt in through `capturedLearningAiOptions`; blind and masked
+quality reviews keep their restricted inputs. No provider switch or text-only
+substitution is automatic. Material uploads accept up to 50 MiB in total.
 Material scopes stay stable during attachment and storage migration; course
 deletion retires their references and revokes their material scopes.
 
@@ -70,7 +108,9 @@ retain their complete extract; oversized extracts fail explicitly.
 from every attached document. `course-materials/vocabulary-context.ts` selects
 source-backed candidates through the canonical lexical extraction and review
 protocol. Source text and document names remain untrusted educational context.
-Placement uses the same excerpt planner for staged uploads before deduction.
+Placement sends staged original PDFs directly and uses the excerpt planner for
+other staged text materials. Embedded PDF text remains an optional lexical index;
+image-only PDFs remain available as original model input.
 There is no episode
 subtitle parser or automatic speaker diarization contract. Onboarding readiness
 comes from the live credential session and local speech checks in `/welcome`,

@@ -1,3 +1,5 @@
+import { isVocabularyIntroduced } from './memory';
+
 export interface VocabularyTarget {
   lemma: string;
   gloss: string;
@@ -12,16 +14,13 @@ export interface VocabularyMemory {
   reps: number;
   lastReviewed: Date | null;
   firstSeenClassId: string | null;
+  introducedAt?: Date | null;
   dueAt: Date;
 }
 
 type RankedWord = { lemma: string; translation: string; mastery: number };
 const SOLID_MASTERY = 0.85;
 const WEAK_MASTERY = 0.5;
-
-function isIntroducedWord(word: VocabularyMemory): boolean {
-  return word.reps > 0 || word.lastReviewed !== null || word.firstSeenClassId !== null;
-}
 
 /** Weak active words set the pace; an unassessed import is only a new-word candidate. */
 export function selectVocabularyTargets(
@@ -32,7 +31,7 @@ export function selectVocabularyTargets(
   now: Date
 ): VocabularyTarget[] {
   const previous = new Map(memory.map((word) => [word.lemma, word]));
-  const active = memory.filter(isIntroducedWord);
+  const active = memory.filter(isVocabularyIntroduced);
   const frontier = [...active].sort((a, b) => a.mastery - b.mastery).slice(0, limit);
   const readiness = frontier.length
     ? frontier.reduce((sum, word) => sum + word.mastery, 0) / frontier.length
@@ -49,7 +48,7 @@ export function selectVocabularyTargets(
   const review = new Map<string, VocabularyTarget>();
   for (const due of rankedDue) {
     const word = previous.get(due.lemma);
-    if (word && isIntroducedWord(word)) review.set(word.lemma, toTarget(word));
+    if (word && isVocabularyIntroduced(word)) review.set(word.lemma, toTarget(word));
   }
   for (const word of frontier)
     if (
@@ -60,11 +59,11 @@ export function selectVocabularyTargets(
 
   const fresh = new Map<string, VocabularyTarget>();
   for (const word of [
-    ...memory.filter((word) => !isIntroducedWord(word)).map(toTarget),
+    ...memory.filter((word) => !isVocabularyIntroduced(word)).map(toTarget),
     ...candidates,
   ]) {
     const stored = previous.get(word.lemma);
-    if (word.lemma.trim() && !fresh.has(word.lemma) && (!stored || !isIntroducedWord(stored)))
+    if (word.lemma.trim() && !fresh.has(word.lemma) && (!stored || !isVocabularyIntroduced(stored)))
       fresh.set(word.lemma, word);
   }
   const newWords = [...fresh.values()].slice(0, allowance);

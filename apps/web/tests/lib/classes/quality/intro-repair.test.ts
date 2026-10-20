@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { SourceDocuments } from '@/lib/providers/ai';
 import { blockedProviderExecution } from '../../../helpers/runtime/provider-execution';
 import {
   novelFindingCorroborationFixture,
@@ -26,9 +27,13 @@ vi.mock('@/lib/providers/ai', () => ({
 }));
 vi.mock('@/lib/learning-ai', () => ({
   resolveCapturedLearningAi: boundary.resolve,
-  capturedLearningAiOptions: async (ai: { model: string; signal: AbortSignal }) => ({
+  capturedLearningAiOptions: async (
+    ai: { model: string; signal: AbortSignal; execution?: { sourceDocuments?: SourceDocuments } },
+    scope?: { includeSourceDocuments?: boolean }
+  ) => ({
     model: ai.model,
     signal: ai.signal,
+    ...(scope?.includeSourceDocuments ? { sourceDocuments: ai.execution?.sourceDocuments } : {}),
   }),
 }));
 vi.mock('@/lib/usage-logger', () => ({ logUsage: vi.fn() }));
@@ -222,6 +227,22 @@ beforeEach(() => {
 
 describe('field-local A1 intro repair', () => {
   it('derives the overview from the selected example meaning before either review role', async () => {
+    const sourceDocuments: SourceDocuments = {
+      parts: [
+        {
+          type: 'document',
+          mediaType: 'application/pdf',
+          name: 'Workbook.pdf',
+          data: Buffer.from('%PDF-1.7'),
+        },
+      ],
+      validate: async () => {},
+    };
+    boundary.resolve.mockResolvedValue({
+      provider: 'fixture',
+      model: 'captured-model',
+      execution: { ...params.execution, sourceDocuments },
+    });
     const raw = {
       ...scopedIntroFixture(candidate),
       about: { exampleIndex: 1 },
@@ -235,11 +256,14 @@ describe('field-local A1 intro repair', () => {
     queueReview(framed);
 
     await expect(generateClassIntro(params)).resolves.toEqual(framed);
+    expect(boundary.generate.mock.calls[0][2].sourceDocuments).toBe(sourceDocuments);
     const reviews = boundary.generate.mock.calls.filter(([, , options]) =>
       ['class_intro_critic', 'class_intro_adjudicator'].includes(options.jsonSchema?.name)
     );
-    for (const [, messages] of reviews)
+    for (const [, messages, options] of reviews) {
+      expect(options.sourceDocuments).toBeUndefined();
       expect(JSON.parse(messages[0].content).introContext.about).toBe(framed.about);
+    }
   });
 
   it.each([false, true])(

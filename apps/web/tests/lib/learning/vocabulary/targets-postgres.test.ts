@@ -103,6 +103,17 @@ suite('dictionary selection against PostgreSQL', () => {
     ).toBe(200);
   });
 
+  it('keeps a studied but unassessed word active before introducing more words', async () => {
+    await instance.database.learnerVocab.createMany({
+      data: [
+        { courseId, lemma: 'Bahnhof', translation: 'station', introducedAt: new Date() },
+        { courseId, lemma: 'Zug', translation: 'train' },
+      ],
+    });
+    const selected = await getVocabularyTargets(courseId, [], [], 8);
+    expect(selected).toEqual([{ lemma: 'Bahnhof', gloss: 'station' }]);
+  });
+
   it('opens the imported queue after actual review mastery becomes solid', async () => {
     const active = await instance.database.learnerVocab.create({
       data: {

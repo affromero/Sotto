@@ -598,8 +598,8 @@ ${opts.mustIncludeVocabulary.map((v) => `- ${v.word} — ${v.translation}`).join
     vocabularyInstruction: vocabularyInstruction + requiredItems,
   };
 }
-
 export async function generateScript(params: {
+  sourceDocuments?: AIOptions['sourceDocuments'];
   isolated?: AIOptions['isolated'];
   endpoint?: string;
   moderation?: AIOptions['moderation'];
@@ -777,6 +777,7 @@ export async function generateScript(params: {
     [{ role: 'user', content: userMessage }],
     {
       maxTokens: 12288,
+      sourceDocuments: params.sourceDocuments,
       apiKeyOverride: params.apiKeyOverride,
       fetch: params.fetch,
       endpoint: params.endpoint,

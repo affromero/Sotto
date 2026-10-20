@@ -783,6 +783,25 @@ class RollingContractTests(unittest.TestCase):
         self.assertNotEqual(subprocess.run(
             ['node', '-e', source], capture_output=True).returncode, 0)
 
+    def test_pdf_renderer_changes_are_bound_to_contract_and_inventory(self):
+        before = self.digest()
+        self.write('apps/web/src/lib/providers/documents/process.ts',
+                   'owned renderer process\n')
+        helper = 'apps/web/scripts/pdf-render/render-worker.mjs'
+        self.write(helper, 'original renderer\n')
+        added = self.digest()
+        self.assertNotEqual(added, before)
+        source = (ROOT / 'scripts/deploy/runtime/provider-assets.cjs').read_text()
+        source = source.replace("'/app'", json.dumps(str(self.root)))
+        self.write('apps/web/prisma/schema.prisma', 'unchanged schema\n')
+        inventory = subprocess.run(['node', '-e', source],
+                                   capture_output=True, text=True)
+        self.assertEqual(inventory.returncode, 0, inventory.stderr)
+        self.assertEqual(json.loads(inventory.stdout)['files'][helper],
+                         hashlib.sha256(b'original renderer\n').hexdigest())
+        self.write(helper, 'changed renderer\n')
+        self.assertNotEqual(self.digest(), added)
+
     def test_changed_payload_or_added_authority_changes_the_contract(self):
         before = self.digest()
         self.write('apps/web/src/lib/queue.ts', 'changed queue contract\n')

@@ -63,7 +63,7 @@ async function upload(request: NextRequest) {
       ...materials.map((material) => ({
         id: material.id,
         name: material.name,
-        text: material.extractedText,
+        text: material.mimeType === 'application/pdf' ? '' : material.extractedText,
       })),
     ];
     if (!documents.length) return errorResponse('No readable materials uploaded', 422);
@@ -89,7 +89,7 @@ async function upload(request: NextRequest) {
     });
   } catch (error: unknown) {
     if (error instanceof RequestBodyTooLargeError)
-      return errorResponse('Materials must total 10MB or less.', 413);
+      return errorResponse('Materials must total 50MB or less.', 413);
     if (isAccessError(error)) throw error;
     const message = error instanceof Error ? error.message : 'Level deduction failed';
     logger.error('Notes upload deduction failed', { error: message });

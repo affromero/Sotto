@@ -14,7 +14,14 @@ export const reviewSnapshotSchema = z
   })
   .strict();
 
-export const assessmentSchema = z.enum(['VOCAB_CHOICE', 'READING_VOCABULARY', 'SECTION_AGGREGATE']);
+export const assessmentSchema = z.enum([
+  'VOCAB_CHOICE',
+  'READING_VOCABULARY',
+  'SECTION_AGGREGATE',
+  'MEANING_RECALL',
+  'WORD_RECALL',
+  'LISTENING_RECALL',
+]);
 
 export type ReviewSource =
   | { classId: string; attempt: number; practiceSessionId?: never }

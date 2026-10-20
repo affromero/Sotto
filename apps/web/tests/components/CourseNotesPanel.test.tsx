@@ -8,6 +8,22 @@ import userEvent from '@testing-library/user-event';
 import { CourseNotesPanel } from '@/components/learn/CourseNotesPanel';
 
 describe('CourseNotesPanel', () => {
+  it('opens an original PDF without presenting an empty transcription', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce(
+      Response.json({
+        body: '',
+        materials: [{ id: 'original-pdf', name: 'Original course.pdf', extractedText: '' }],
+      })
+    );
+    const user = userEvent.setup();
+    render(<CourseNotesPanel courseId="c1" />);
+    await user.click(screen.getByRole('button', { name: /course notes/i }));
+    expect(await screen.findByRole('link', { name: 'Original course.pdf' })).toHaveAttribute(
+      'href',
+      '/api/v1/materials/original-pdf/file'
+    );
+    expect(screen.queryByText('View imported text')).not.toBeInTheDocument();
+  });
   it('starts a different course with a closed clean editor and discards the old pending read', async () => {
     const pending = Promise.withResolvers<Response>();
     vi.spyOn(global, 'fetch')
@@ -108,7 +124,8 @@ describe('CourseNotesPanel', () => {
             body: 'Uploaded course note: official-2.md',
             imported: 2,
             failed: 0,
-            addedVocabulary: 4,
+            vocabularyIndexing: 'queued',
+            materials: [{ id: 'document-1', name: 'official-1.md', extractedText: 'ciao' }],
           }),
           { status: 200 }
         )
@@ -134,7 +151,10 @@ describe('CourseNotesPanel', () => {
     expect(fetchMock.mock.calls[1][0]).toBe('/api/v1/courses/c1/notes');
     expect(fetchMock.mock.calls[1][1]).toMatchObject({ method: 'POST', credentials: 'include' });
     expect(fetchMock.mock.calls[1][1]?.body).toBeInstanceOf(FormData);
-    expect(await screen.findByText(/Imported 2 files .* 4 vocab added/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Vocabulary indexing is queued/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'View vocabulary and import progress' })
+    ).toHaveAttribute('href', '/learn/vocabulary?course=c1');
     expect(screen.getByLabelText(/paste notes from an official course/i)).toHaveValue(
       'Unsaved learner draft'
     );

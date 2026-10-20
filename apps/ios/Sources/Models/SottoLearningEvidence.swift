@@ -42,6 +42,7 @@ struct SottoPracticeStart: Decodable, Identifiable, Equatable {
     let status: String
     var sessionId: String
     var kind: String?
+    let courseId: String?
     let reason: String?
     let episodeId: String?
     let items: [SottoPracticeItem]?
@@ -80,6 +81,15 @@ struct SottoPracticeStart: Decodable, Identifiable, Equatable {
         status == "preparing" && ["QUEUED", "RUNNING", "CANCELLING"].contains(preparationStatus ?? "")
     }
 
+    var requiresWebVocabulary: Bool { status == "ready_vocabulary" }
+
+    func vocabularyStudyURL(serverURL: URL) -> URL? {
+        guard requiresWebVocabulary, let courseId else { return nil }
+        var url = URLComponents(url: serverURL.appending(path: "learn/vocabulary"), resolvingAgainstBaseURL: false)
+        url?.queryItems = [URLQueryItem(name: "course", value: courseId), URLQueryItem(name: "session", value: sessionId)]
+        return url?.url
+    }
+
     var preparationTitle: String {
         switch preparationStatus {
         case "QUEUED": return "Waiting to prepare"
@@ -104,7 +114,7 @@ struct SottoPracticeStart: Decodable, Identifiable, Equatable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case status, sessionId, kind, reason, episodeId, items, prompts
+        case status, sessionId, kind, courseId, reason, episodeId, items, prompts
         case speakingPrompts, writingPrompts, skillRequirements
         case learnerAnswers, writingDrafts, progressRevision, submissionResult
         case preparationStatus, message, canRecover
@@ -115,6 +125,7 @@ struct SottoPracticeStart: Decodable, Identifiable, Equatable {
         status = try values.decode(String.self, forKey: .status)
         sessionId = try values.decodeIfPresent(String.self, forKey: .sessionId) ?? "unavailable"
         kind = try values.decodeIfPresent(String.self, forKey: .kind)
+        courseId = try values.decodeIfPresent(String.self, forKey: .courseId)
         reason = try values.decodeIfPresent(String.self, forKey: .reason)
         episodeId = try values.decodeIfPresent(String.self, forKey: .episodeId)
         items = try values.decodeIfPresent([SottoPracticeItem].self, forKey: .items)

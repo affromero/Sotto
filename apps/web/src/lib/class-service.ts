@@ -28,6 +28,7 @@ import { classTargetsFromSeed } from './classes/lesson/class-targets';
 import { getVocabularyTargets } from './learning/vocabulary/targets';
 import { getVocabularySupportContext } from './learning/vocabulary/support';
 import { getCourseVocabularyTargets } from './course-materials/vocabulary-context';
+import { captureMaterialDocuments } from './course-materials/documents';
 import { logger } from './logger';
 import { resolveSkillRequirements, readSkillRequirements } from './learning/skill-requirements';
 import { extractReadingVocabulary } from './learning/reading-vocabulary';
@@ -262,6 +263,13 @@ interface ClassContentBuildParams {
 
 async function buildClassContent(p: ClassContentBuildParams): Promise<Prisma.InputJsonObject> {
   await assertClassStillGenerating(p.classId, p.attempt);
+  p = {
+    ...p,
+    execution: {
+      ...p.execution,
+      sourceDocuments: await captureMaterialDocuments(p.execution, { courseId: p.courseId }),
+    },
+  };
   const due = await getDueItems(p.courseId);
   const corpus = p.preserveTeaching
     ? undefined
@@ -481,6 +489,7 @@ async function buildClassContent(p: ClassContentBuildParams): Promise<Prisma.Inp
     }
 
   await assertClassStillGenerating(p.classId, p.attempt);
+  await p.execution.sourceDocuments?.validate();
   return {
     ...p.existingSeed,
     vocabIds: due.vocab.map((v) => v.id),

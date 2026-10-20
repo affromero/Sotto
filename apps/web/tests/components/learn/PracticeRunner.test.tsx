@@ -47,6 +47,31 @@ function openSection(title: string) {
 }
 
 describe('practice sections', () => {
+  it('renders deterministic dictionary recall without exposing the answer or a multiple-choice form', () => {
+    render(
+      <PracticeRunner
+        courseId="course"
+        onDone={vi.fn()}
+        start={{
+          status: 'ready_vocabulary',
+          kind: 'VOCAB',
+          sessionId: crypto.randomUUID(),
+          courseId: 'course',
+          mode: 'MEANING_RECALL',
+          nativeLang: 'en',
+          targetLang: 'de',
+          progressRevision: 0,
+          writingDrafts: {},
+          receipt: null,
+          cards: [{ id: crypto.randomUUID(), prompt: 'Bahnhof', feedback: null }],
+        }}
+      />
+    );
+    expect(screen.getByRole('heading', { name: 'Bahnhof' })).toBeVisible();
+    expect(screen.getByRole('textbox', { name: 'Its meaning' })).toBeVisible();
+    expect(screen.queryByText('station')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Option 1/ })).not.toBeInTheDocument();
+  });
   it('keeps answers while paging and collapsing, and displays reading source text', async () => {
     render(<PracticeRunner courseId="course" start={full} onDone={vi.fn()} />);
     await waitFor(() =>

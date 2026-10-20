@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { SourceDocuments } from '@/lib/providers/ai';
 
 // generatePlacement / deduceLevelFromNotes reach out to the resolved AI
 // provider; mock the seams so the tests stay hermetic. The provider's
@@ -9,9 +10,13 @@ vi.mock('@/lib/learning-ai', () => ({
   resolveCapturedLearningAi: vi
     .fn()
     .mockResolvedValue({ provider: 'test', model: 'test-model', apiKey: undefined }),
-  capturedLearningAiOptions: async (ai: { model: string; apiKey?: string }) => ({
+  capturedLearningAiOptions: async (
+    ai: { model: string; apiKey?: string; execution?: { sourceDocuments?: SourceDocuments } },
+    scope?: { includeSourceDocuments?: boolean }
+  ) => ({
     model: ai.model,
     apiKeyOverride: ai.apiKey,
+    ...(scope?.includeSourceDocuments ? { sourceDocuments: ai.execution?.sourceDocuments } : {}),
   }),
 }));
 vi.mock('@/lib/providers/ai', () => ({
@@ -162,6 +167,37 @@ describe('generatePlacement option shaping', () => {
 });
 
 describe('deduceLevelFromNotes', () => {
+  it('assesses the attached original PDF through the selected provider', async () => {
+    const sourceDocuments: SourceDocuments = {
+      parts: [
+        {
+          type: 'document',
+          mediaType: 'application/pdf',
+          name: 'Workbook.pdf',
+          data: Buffer.from('%PDF-1.7'),
+        },
+      ],
+      validate: async () => {},
+    };
+    const { resolveCapturedLearningAi } = await import('@/lib/learning-ai');
+    vi.mocked(resolveCapturedLearningAi).mockResolvedValueOnce({
+      provider: 'test',
+      model: 'test-model',
+      execution: { ...execution, sourceDocuments },
+    });
+    mockGenerateResponse.mockResolvedValue(
+      llmResponse('{"level":"B1","rationale":"Subordinate clauses on page 2.","confidence":0.7}')
+    );
+    const result = await deduceLevelFromNotes(
+      'user-1',
+      { ...execution, sourceDocuments },
+      'en',
+      'de',
+      ''
+    );
+    expect(result.deduction.level).toBe('B1');
+    expect(mockGenerateResponse.mock.calls.at(-1)![2].sourceDocuments).toBe(sourceDocuments);
+  });
   it('parses the deduced level, rationale, and confidence', async () => {
     mockGenerateResponse.mockResolvedValue(
       llmResponse(

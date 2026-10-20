@@ -61,6 +61,12 @@ struct PracticeStartView: View {
                         preparationControls
                     } else if currentStart.status == "unavailable" {
                         UnavailablePractice(reason: currentStart.reason)
+                    } else if currentStart.requiresWebVocabulary {
+                        if let server = model.credentials?.serverURL,
+                           let url = currentStart.vocabularyStudyURL(serverURL: server) {
+                            Link("Continue vocabulary study on the web", destination: url)
+                                .buttonStyle(.borderedProminent)
+                        }
                     } else if model.practiceResult == nil && currentStart.submissionResult == nil {
                         if let episodeId = currentStart.episodeId {
                             PracticeListeningPlayer(episodeId: episodeId)
@@ -87,7 +93,7 @@ struct PracticeStartView: View {
                             return
                         }
                     }
-                } else if !hydrated {
+                } else if !hydrated && !currentStart.requiresWebVocabulary {
                     progress.configure(client: model.makeClient(), path: "/api/v1/practice/\(start.sessionId)",
                         revision: currentStart.progressRevision ?? 0)
                     answers = progress.answers ?? currentStart.learnerAnswers ?? [:]
@@ -240,6 +246,7 @@ struct PracticeStartView: View {
     }
 
     private var statusCopy: String {
+        if currentStart.requiresWebVocabulary { return "Your saved flashcards and recall answers are available in the web app." }
         if currentStart.status == "preparing" { return currentStart.preparationDetail }
         if currentStart.status == "unavailable" {
             return "Sotto does not have enough due material for this practice type yet."

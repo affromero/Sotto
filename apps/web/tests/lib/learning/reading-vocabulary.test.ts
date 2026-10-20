@@ -18,6 +18,13 @@ import {
 import { captureGenerationFailure } from '@/lib/classes/quality/generation-failure';
 
 const generate = vi.hoisted(() => vi.fn());
+it('keeps the reading limit while explicitly segmenting complete source documents', () => {
+  const text = 'Bahnhof '.repeat(2000);
+  expect(() => buildReadingVocabularyWordTable(text, 'de')).toThrow('exceeds');
+  const words = buildReadingVocabularyWordTable(text, 'de', text.length);
+  expect(words).toHaveLength(2000);
+  expect(words.at(-1)!.end).toBe(text.length - 1);
+});
 const logError = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/logger', () => ({ logger: { error: logError, warn: vi.fn(), info: vi.fn() } }));
 vi.mock('@/lib/learning-ai', () => ({

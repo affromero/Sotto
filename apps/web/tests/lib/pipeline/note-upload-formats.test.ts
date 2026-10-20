@@ -1,8 +1,29 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
 import { extractUploadTexts, MAX_IMPORTED_FILE_CHARS } from '@/lib/note-upload';
+import { originalPdf } from '../../helpers/learning/pdf';
 
 describe('learner note text imports', () => {
+  it('retains the original PDF and keeps embedded text only as a lexical index', async () => {
+    const bytes = originalPdf();
+    const result = await extractUploadTexts([
+      new File([new Uint8Array(bytes)], 'lesson.PDF', { type: 'application/pdf' }),
+    ]);
+    expect(result.failed).toBe(0);
+    expect(result.uploads[0]?.sourceText).toContain('Original page 1');
+    expect(result.texts).toHaveLength(1);
+    expect(result.texts[0]).toContain('lesson.PDF');
+    expect(result.texts[0]).not.toContain('Original page 1');
+    expect(Buffer.from(await result.uploads[0]!.file.arrayBuffer())).toEqual(bytes);
+  });
+  it('retains image-only PDF pages even when there is no lexical text index', async () => {
+    const bytes = originalPdf(1, { text: false });
+    const result = await extractUploadTexts([
+      new File([new Uint8Array(bytes)], 'scanned.pdf', { type: 'application/pdf' }),
+    ]);
+    expect(result).toMatchObject({ failed: 0, uploads: [{ sourceText: '' }] });
+    expect(Buffer.from(await result.uploads[0]!.file.arrayBuffer())).toEqual(bytes);
+  });
   it('retains the final exercise instructions beyond the former 3000-character prefix', async () => {
     const text = `${'Wort vocabulary\n'.repeat(1000)}END: Explain the contrast, then translate the supplied phrases.`;
     const result = await extractUploadTexts([
