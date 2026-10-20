@@ -689,8 +689,9 @@ describe('reading vocabulary extraction', () => {
         dueAt: new Date('2026-10-01T00:00:00Z'),
         lastReviewed: null,
       }));
+      const persistReview = vi.fn().mockResolvedValue({});
       const database = {
-        learnerReviewEvent: { create: async () => ({}) },
+        learnerReviewEvent: { create: persistReview },
         learnerVocab: {
           findMany: async ({ where }: { where: { lemma: { in: string[] } } }) =>
             states.filter((state) => where.lemma.in.includes(state.lemma)),
@@ -712,6 +713,16 @@ describe('reading vocabulary extraction', () => {
           { practiceSessionId: 'practice-1', attempt: 1 }
         )
       ).toEqual(new Set(['bestellen']));
+      expect(persistReview).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          vocabId: 'word-0',
+          practiceSessionId: 'practice-1',
+          sourceAttempt: 1,
+          assessment: 'READING_VOCABULARY',
+          questionIds: [question.id],
+          quality: 1,
+        }),
+      });
       expect(states[0]).toMatchObject({ lemma: 'bestellen', reps: 1 });
       expect(states[1]).toEqual({
         id: 'word-1',

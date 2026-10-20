@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { execFile } from 'node:child_process';
-import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
+import { mkdtemp, open, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
@@ -14,6 +14,16 @@ import type { ReviewEvidence } from '@/lib/learning/review/events';
 import { comparisonEventSchema } from '@/lib/learning/review/comparison';
 
 const execute = promisify(execFile);
+
+async function readPrivateSnapshot(filePath: string): Promise<string> {
+  const file = await open(filePath, 'r');
+  try {
+    expect((await file.stat()).mode & 0o777).toBe(0o600);
+    return await file.readFile('utf8');
+  } finally {
+    await file.close();
+  }
+}
 
 const suite = process.env.SIDEDOOR_TEST_DATABASE_URL ? describe : describe.skip;
 suite('review observations committed with scheduler state', () => {
@@ -168,10 +178,9 @@ suite('review observations committed with scheduler state', () => {
       ],
       options
     );
-    const content = await readFile(file, 'utf8');
+    const content = await readPrivateSnapshot(file);
     const events = comparisonEventSchema.array().parse(JSON.parse(content));
     expect(events[0]!.reviewedAt).toBe(now.toISOString());
-    expect((await stat(file)).mode & 0o777).toBe(0o600);
     expect(JSON.parse(exported.stdout).coverage).toMatchObject({
       sm2ReplayMatches: 1,
       sm2ReplayMismatches: 0,
@@ -185,11 +194,18 @@ suite('review observations committed with scheduler state', () => {
     await expect(
       execute(
         process.execPath,
+        ['--import', 'tsx', script, '--input', file, '--test-after', 'invalid'],
+        options
+      )
+    ).rejects.toMatchObject({ code: 1, stdout: '' });
+    await expect(
+      execute(
+        process.execPath,
         ['--import', 'tsx', script, '--input', file, '--export', file, ...cutoff],
         options
       )
     ).rejects.toMatchObject({ code: 1 });
-    expect(await readFile(file, 'utf8')).toBe(content);
+    expect(await readPrivateSnapshot(file)).toBe(content);
   });
 
   it('refuses to export another learner’s course', async () => {

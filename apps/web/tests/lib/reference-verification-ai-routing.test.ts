@@ -4,9 +4,8 @@ import { useProviderCredentialDatabase } from '../helpers/runtime/provider-crede
 import type { PrismaClient } from '@/generated/prisma/client';
 import { ProviderCleanupError } from 'thesidedoor-core/ai';
 import { aiEvaluateWithDomainContext } from '@/lib/reference-verification/ai-layer';
-import { groundFailedReferences } from '@/lib/reference-verification/grounding';
 import { runReferenceVerification } from '@/lib/reference-verification/pipeline';
-import type { ReferenceInput, VerificationCheck } from '@/lib/reference-validator';
+import type { ReferenceInput } from '@/lib/reference-validator';
 
 const { generateResponse } = vi.hoisted(() => ({ generateResponse: vi.fn() }));
 
@@ -53,13 +52,6 @@ const claimContext = {
   speakerTurns: ['HOST'],
 };
 
-const failedCheck: VerificationCheck = {
-  layer: 'url',
-  passed: false,
-  confidence: 0,
-  detail: 'URL failed',
-};
-
 const capturedAi = (signal?: AbortSignal) => ({
   provider: 'codex',
   model: 'gpt-6-luna',
@@ -96,23 +88,6 @@ describe('reference verification AI routing', () => {
         null as never
       )
     ).rejects.toThrow();
-  });
-
-  it('returns no grounded references when captured AI selection is missing', async () => {
-    await expect(
-      groundFailedReferences(
-        [
-          {
-            ref: reference,
-            domain: 'GENERAL',
-            claimContext,
-            allChecks: [failedCheck],
-          },
-        ],
-        'Source grounding topic',
-        null as never
-      )
-    ).resolves.toEqual(new Map());
   });
 
   it('waits for the selected Codex response beyond 60 seconds and admits it once', async () => {

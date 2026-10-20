@@ -1,6 +1,5 @@
 import { parseArgs } from 'node:util';
 import { readFile, writeFile } from 'node:fs/promises';
-import { z } from 'zod';
 import { Client } from 'pg';
 import {
   compareReviewEvents,
@@ -48,7 +47,7 @@ async function readJournal(): Promise<ComparisonEvent[]> {
       reviewedAt: row.reviewedAt instanceof Date ? row.reviewedAt.toISOString() : row.reviewedAt,
     }));
     await database.query('COMMIT');
-    return z.array(comparisonEventSchema).parse(events);
+    return comparisonEventSchema.array().parse(events);
   } finally {
     await database.end();
   }
@@ -56,11 +55,11 @@ async function readJournal(): Promise<ComparisonEvent[]> {
 
 async function main() {
   if (!values['test-after']) throw new Error('Supply --test-after with a fixed ISO timestamp.');
-  const cutoff = new Date(z.iso.datetime().parse(values['test-after']));
+  const cutoff = new Date(comparisonEventSchema.shape.reviewedAt.parse(values['test-after']));
   if (values.input && (values['course-id'] || values['user-id']))
     throw new Error('Choose an input file or an owned database course.');
   const events = values.input
-    ? z.array(comparisonEventSchema).parse(JSON.parse(await readFile(values.input, 'utf8')))
+    ? comparisonEventSchema.array().parse(JSON.parse(await readFile(values.input, 'utf8')))
     : await readJournal();
   if (values.export)
     await writeFile(values.export, JSON.stringify(events, null, 2) + '\n', {

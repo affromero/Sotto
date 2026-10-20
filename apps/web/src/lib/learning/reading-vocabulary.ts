@@ -8,6 +8,7 @@ import { reviewReadingVocabularyContent } from '../classes/quality/reading-vocab
 import { combineTeachingFailures } from '../classes/quality/teaching-failure';
 import type { SottoProviderExecution } from '../sidedoor/credentials/runtime/provider-execution';
 import type { LearningDatabase } from './database';
+import type { ReviewSource } from './review/events';
 import { LearningIncompleteError } from './session-evaluation';
 import { applyReviewOutcome } from '../knowledge-graph';
 import { logger } from '../logger';
@@ -289,7 +290,7 @@ export async function reviewReadingVocabulary(
   snapshot: unknown,
   answers: ReadonlyMap<string, boolean>,
   now: Date,
-  source: import('./review/events').ReviewSource
+  source: ReviewSource
 ): Promise<Set<string>> {
   if (snapshot == null) return new Set();
   const vocabulary = readingVocabularySchema.parse(snapshot);

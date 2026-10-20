@@ -119,7 +119,6 @@ describe('no hardcoded anthropic in logUsage service fields', () => {
   // The discovery route uses a type cast (runtime value is correct).
   const SERVICE_ALLOWLIST = new Set([
     'lib/reference-verification/ai-layer.ts',
-    'lib/reference-verification/grounding.ts',
     'app/api/v1/discovery/route.ts',
   ]);
 
