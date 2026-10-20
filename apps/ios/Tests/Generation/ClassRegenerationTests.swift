@@ -184,13 +184,26 @@ final class ClassRegenerationTests: XCTestCase {
 
     @MainActor
     func testClearingProfileDuringAdmissionRemovesOverlayAndRejectsLateCompletion() async throws {
-        let model = model()
+        let session = makeSession()
+        let model = model(session: session)
         await model.loadCourses(showLoading: false)
         await model.openClass("class")
         let serverHost = host(model)
-        await ClassRegenerationServer.shared.holdAdmission(host: serverHost)
+        let arrival = expectation(description: "Regeneration POST reaches its held response")
+        await ClassRegenerationServer.shared.holdAdmission(host: serverHost, arrival: arrival)
+        addTeardownBlock {
+            await ClassRegenerationServer.shared.releaseAdmission(host: serverHost)
+            session.invalidateAndCancel()
+        }
         model.run { await model.regenerateSelectedClass() }
-        await ClassRegenerationServer.shared.waitForAdmission(host: serverHost)
+        guard await XCTWaiter.fulfillment(of: [arrival], timeout: 5) == .completed else {
+            await ClassRegenerationServer.shared.releaseAdmission(host: serverHost)
+            await model.cancelWork()
+            model.applyCourseRefresh([])
+            session.invalidateAndCancel()
+            XCTFail("Regeneration POST did not arrive within five seconds.")
+            return
+        }
         model.clearSelectedProfile()
         XCTAssertFalse(model.isLoading)
         XCTAssertNil(model.loadingOperation)
@@ -204,13 +217,26 @@ final class ClassRegenerationTests: XCTestCase {
 
     @MainActor
     func testStoppingAdmissionWaitCanRecoverWithGetOnlyAfterLostAcknowledgement() async throws {
-        let model = model()
+        let session = makeSession()
+        let model = model(session: session)
         await model.loadCourses(showLoading: false)
         await model.openClass("class")
         let serverHost = host(model)
-        await ClassRegenerationServer.shared.holdAdmission(host: serverHost)
+        let arrival = expectation(description: "Regeneration POST reaches its held response")
+        await ClassRegenerationServer.shared.holdAdmission(host: serverHost, arrival: arrival)
+        addTeardownBlock {
+            await ClassRegenerationServer.shared.releaseAdmission(host: serverHost)
+            session.invalidateAndCancel()
+        }
         model.run { await model.regenerateSelectedClass() }
-        await ClassRegenerationServer.shared.waitForAdmission(host: serverHost)
+        guard await XCTWaiter.fulfillment(of: [arrival], timeout: 5) == .completed else {
+            await ClassRegenerationServer.shared.releaseAdmission(host: serverHost)
+            await model.cancelWork()
+            model.applyCourseRefresh([])
+            session.invalidateAndCancel()
+            XCTFail("Regeneration POST did not arrive within five seconds.")
+            return
+        }
         await model.cancelWork()
         await ClassRegenerationServer.shared.releaseAdmission(host: serverHost)
         await waitForState(model) { $1["course"]?.contains("could not be confirmed") == true }
@@ -226,13 +252,26 @@ final class ClassRegenerationTests: XCTestCase {
 
     @MainActor
     func testCancelledAdmissionCannotDismissANewerForegroundClass() async throws {
-        let model = model()
+        let session = makeSession()
+        let model = model(session: session)
         await model.loadCourses(showLoading: false)
         await model.openClass("class")
         let serverHost = host(model)
-        await ClassRegenerationServer.shared.holdAdmission(host: serverHost)
+        let arrival = expectation(description: "Regeneration POST reaches its held response")
+        await ClassRegenerationServer.shared.holdAdmission(host: serverHost, arrival: arrival)
+        addTeardownBlock {
+            await ClassRegenerationServer.shared.releaseAdmission(host: serverHost)
+            session.invalidateAndCancel()
+        }
         model.run { await model.regenerateSelectedClass() }
-        await ClassRegenerationServer.shared.waitForAdmission(host: serverHost)
+        guard await XCTWaiter.fulfillment(of: [arrival], timeout: 5) == .completed else {
+            await ClassRegenerationServer.shared.releaseAdmission(host: serverHost)
+            await model.cancelWork()
+            model.applyCourseRefresh([])
+            session.invalidateAndCancel()
+            XCTFail("Regeneration POST did not arrive within five seconds.")
+            return
+        }
         await model.cancelWork()
         await model.openClass("other-class")
         XCTAssertEqual(model.selectedClass?.id, "other-class")
@@ -279,15 +318,19 @@ final class ClassRegenerationTests: XCTestCase {
     private func host(_ model: SottoAppModel) -> String { model.credentials!.serverURL.host! }
 
     @MainActor
-    private func model(host: String = UUID().uuidString.lowercased() + ".example") -> SottoAppModel {
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.protocolClasses = [ClassRegenerationHTTP.self]
-        return SottoAppModel(credentials: SottoCredentials(
+    private func model(host: String = UUID().uuidString.lowercased() + ".example", session: URLSession? = nil) -> SottoAppModel {
+        SottoAppModel(credentials: SottoCredentials(
             serverURL: URL(string: "https://\(host)")!,
             apiKey: "synthetic-key", user: nil, selectedProfile: SottoProfile(
                 id: "learner", name: "Learner", avatarUrl: "", isOwner: true,
                 role: "ADMIN", courseCount: nil, primaryCourse: nil, isActive: nil)),
-            session: URLSession(configuration: configuration), credentialStore: RegenerationCredentials())
+            session: session ?? makeSession(), credentialStore: RegenerationCredentials())
+    }
+
+    private func makeSession() -> URLSession {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [ClassRegenerationHTTP.self]
+        return URLSession(configuration: configuration)
     }
 }
 
@@ -312,8 +355,7 @@ private actor ClassRegenerationServer {
     private var nextResponses = Set<String>()
     private var methods: [String: [String]] = [:]
     private var payloads: [String: [PostPayload]] = [:]
-    private var holding = Set<String>()
-    private var admissionWaiters: [String: CheckedContinuation<Void, Never>] = [:]
+    private var admissionArrivals: [String: XCTestExpectation] = [:]
     private var admissionReleases: [String: CheckedContinuation<Void, Never>] = [:]
 
     func set(_ phase: String, host: String) { phases[host] = phase }
@@ -323,12 +365,11 @@ private actor ClassRegenerationServer {
     }
     func requests(host: String) -> [String] { methods[host] ?? [] }
     func postPayloads(host: String) -> [PostPayload] { payloads[host] ?? [] }
-    func holdAdmission(host: String) { holding.insert(host) }
-    func waitForAdmission(host: String) async {
-        if admissionReleases[host] != nil { return }
-        await withCheckedContinuation { admissionWaiters[host] = $0 }
+    func holdAdmission(host: String, arrival: XCTestExpectation) { admissionArrivals[host] = arrival }
+    func releaseAdmission(host: String) {
+        admissionArrivals[host] = nil
+        admissionReleases.removeValue(forKey: host)?.resume()
     }
-    func releaseAdmission(host: String) { admissionReleases.removeValue(forKey: host)?.resume() }
 
     func respond(_ request: URLRequest) async -> (Int, String) {
         let host = request.url!.host!
@@ -343,10 +384,10 @@ private actor ClassRegenerationServer {
             admitted.insert(host)
             attempts[host] = (attempts[host] ?? 4) + 1
             phases[host] = "RUNNING"
-            if holding.contains(host) {
+            if let arrival = admissionArrivals.removeValue(forKey: host) {
                 await withCheckedContinuation { continuation in
                     admissionReleases[host] = continuation
-                    admissionWaiters.removeValue(forKey: host)?.resume()
+                    arrival.fulfill()
                 }
             }
             if responseStatus != 202 { return (responseStatus, #"{"error":"Acknowledgement unavailable."}"#) }
