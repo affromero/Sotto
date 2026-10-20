@@ -191,6 +191,7 @@ function OwnedMaterialProcessing({ materialId, name, mimeType }: Props) {
       setNotice(
         `Recognition admitted as processing revision ${receipt.processingRevision}. Request ${receipt.requestId}.`
       );
+      setRecognitionRequest(null);
       setOptions(null);
       setConsent(false);
       await read();

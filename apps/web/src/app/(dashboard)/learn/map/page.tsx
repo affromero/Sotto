@@ -67,6 +67,10 @@ export default async function LearningMapPage({
             selected.targetLang
           }
           initialLevel={parsedLevel.success ? parsedLevel.data : undefined}
+          sourceCourse={{
+            targetLang: selected.targetLang,
+            currentLevel: learningLevelSchema.parse(selected.currentLevel),
+          }}
         />
       ) : (
         <section>

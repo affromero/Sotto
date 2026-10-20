@@ -15,6 +15,11 @@ import { ObjectiveHistory } from './ObjectiveHistory';
 import { MapFilters } from './discovery/MapFilters';
 import { defaultMapView, filterMap, writeMapView, type MapViewState } from './discovery/state';
 import discoveryStyles from './discovery/MapFilters.module.css';
+import {
+  SourceExposure,
+  sourceExposureKey,
+  type SourceExposureScope,
+} from './discovery/SourceExposure';
 
 export interface LearningMapProps {
   map: LearningMapResponse;
@@ -25,6 +30,8 @@ export interface LearningMapProps {
   error: string | null;
   viewState?: MapViewState;
   onViewStateChange?: (view: MapViewState) => void;
+  sourceExposure?: SourceExposureScope | null;
+  onClearSourceExposure?: () => void;
 }
 
 type NodeView = LearningMapResponse['nodes'][number];
@@ -63,12 +70,15 @@ function LearningMapView({
   error,
   viewState,
   onViewStateChange,
+  sourceExposure,
+  onClearSourceExposure,
 }: LearningMapProps) {
   const id = useId();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [format, setFormat] = useState<PracticeKind>('FULL');
   const [pending, setPending] = useState<'practice' | 'advance' | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [sourceOnlyKey, setSourceOnlyKey] = useState<string | null>(null);
   const [localView, setLocalView] = useState<MapViewState>({
     ...defaultMapView,
   });
@@ -77,7 +87,22 @@ function LearningMapView({
     if (onViewStateChange) onViewStateChange(next);
     else setLocalView(next);
   };
-  const discovery = filterMap(map, view);
+  const sourceScope =
+    sourceExposure?.courseId === map.courseId && sourceExposure.level === map.viewedLevel
+      ? sourceExposure
+      : null;
+  const sourceKey = sourceScope ? sourceExposureKey(sourceScope) : null;
+  const sourceIds = new Set(
+    sourceScope
+      ? map.nodes
+          .filter(
+            ({ node }) => node.kind === 'OBJECTIVE' && sourceScope.objectiveIds.includes(node.id)
+          )
+          .map(({ node }) => node.id)
+      : []
+  );
+  const onlySource = sourceKey !== null && sourceOnlyKey === sourceKey;
+  const discovery = filterMap(map, view, onlySource ? sourceIds : undefined);
   const working = busy || pending !== null;
   const shownError = error ?? actionError;
   const objectives = map.nodes.filter((item) => item.node.kind === 'OBJECTIVE');
@@ -177,6 +202,9 @@ function LearningMapView({
                   {progress ? statusLabels[progress.status] : 'Evidence unavailable'}
                 </span>
                 {progress?.reviewDue && <span className={styles.due}>Review due</span>}
+                {sourceIds.has(node.id) && (
+                  <span className={styles.badge}>Seen in selected source class</span>
+                )}
               </span>
             )}
           </summary>
@@ -249,6 +277,7 @@ function LearningMapView({
                     {progress.skills.map((skill) => (
                       <li key={skill.skill}>
                         <span className={styles.skillName}>{formatLabels[skill.skill]}</span>
+                        <p>{node.skillCriteria[skill.skill]}</p>
                         <span>
                           {skill.exempt ? 'Exempt, unassessed' : statusLabels[skill.status]}
                         </span>
@@ -401,6 +430,23 @@ function LearningMapView({
         )}
       </section>
 
+      {sourceScope && (
+        <SourceExposure
+          scope={sourceScope}
+          mappedCount={sourceIds.size}
+          onlyMapped={onlySource}
+          onOnlyMapped={(enabled) => setSourceOnlyKey(enabled ? sourceKey : null)}
+          onClear={
+            onClearSourceExposure
+              ? () => {
+                  setSourceOnlyKey(null);
+                  onClearSourceExposure();
+                }
+              : undefined
+          }
+          disabled={working}
+        />
+      )}
       <MapFilters
         value={view}
         onChange={changeView}

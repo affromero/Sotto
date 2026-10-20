@@ -15,7 +15,10 @@ import { materialAnalysisProjectionSchema } from '@/lib/course-materials/client/
 import { MaterialCoverage } from '@/components/placement/MaterialCoverage';
 import { MaterialAnalysisRetry } from '@/components/placement/MaterialAnalysisRetry';
 import styles from './SourceFocusLibrary.module.css';
+import discoveryStyles from './discovery/MapFilters.module.css';
 import { SourceObjectiveLinks } from './discovery/SourceObjectiveLinks';
+import { sourceObjectiveIds, type SourceExposureScope } from './discovery/SourceExposure';
+import type { PrivateSourceContext } from './discovery/private-source';
 
 const projectionSchema = materialAnalysisProjectionSchema.extend({
   focuses: z.array(sourceFocusSummarySchema),
@@ -26,10 +29,12 @@ type SourceList = z.infer<typeof courseAnalysisListSchema>;
 type Focus = z.infer<typeof sourceFocusSummarySchema>;
 type FocusDetail = z.infer<typeof sourceFocusDetailSchema>;
 type Preview = z.infer<typeof learningSelectionPreviewSchema>;
-interface Props {
-  map: LearningMapResponse;
+interface SharedProps {
   onPractice: (selection: LearningSelectionRequest, kind: PracticeKind) => Promise<void>;
+  onVerifiedFocus?: (focus: SourceExposureScope | null) => void;
 }
+type Props = SharedProps &
+  ({ map: LearningMapResponse; source?: never } | { map?: never; source: PrivateSourceContext });
 async function body(response: Response): Promise<unknown> {
   const result: unknown = await response.json();
   if (!response.ok) {
@@ -40,15 +45,17 @@ async function body(response: Response): Promise<unknown> {
 }
 
 export function SourceFocusLibrary(props: Props) {
+  const course = props.map ?? props.source;
   return (
     <CourseSourceFocusLibrary
-      key={`${props.map.courseId}:${props.map.viewedLevel}:${props.map.catalogHash}`}
+      key={`${course.courseId}:${course.viewedLevel}:${props.map?.catalogHash ?? 'private'}`}
       {...props}
     />
   );
 }
 
-function CourseSourceFocusLibrary({ map, onPractice }: Props) {
+function CourseSourceFocusLibrary({ map, source, onPractice, onVerifiedFocus }: Props) {
+  const course = map ?? source;
   const [analyses, setAnalyses] = useState<SourceList | null>(null);
   const [selectedAnalysisId, setSelectedAnalysisId] = useState<string | null>(null);
   const [projection, setProjection] = useState<Projection | null>(null);
@@ -63,25 +70,26 @@ function CourseSourceFocusLibrary({ map, onPractice }: Props) {
   const focusRequest = useRef<AbortController | null>(null);
   const detailRequest = useRef<AbortController | null>(null);
   const actionRequest = useRef<AbortController | null>(null);
-  const objectives = map.nodes.filter((entry) => entry.node.kind === 'OBJECTIVE');
+  const objectives = map?.nodes.filter((entry) => entry.node.kind === 'OBJECTIVE') ?? [];
   const future =
-    ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'].indexOf(map.viewedLevel) >
-    ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'].indexOf(map.currentLevel);
+    ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'].indexOf(course.viewedLevel) >
+    ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'].indexOf(course.currentLevel);
 
   const loadAnalyses = useCallback(
     async (cursor?: string) => {
       listRequest.current?.abort();
       const current = new AbortController();
       listRequest.current = current;
+      if (!cursor) onVerifiedFocus?.(null);
       setError('');
       try {
         const response = await fetch(
-          `/api/v1/courses/${encodeURIComponent(map.courseId)}/material-analyses${cursor ? `?after=${encodeURIComponent(cursor)}` : ''}`,
+          `/api/v1/courses/${encodeURIComponent(course.courseId)}/material-analyses${cursor ? `?after=${encodeURIComponent(cursor)}` : ''}`,
           { signal: current.signal, cache: 'no-store' }
         );
         const result = courseAnalysisListSchema.parse(await body(response));
         if (current.signal.aborted || listRequest.current !== current) return;
-        if (result.courseId !== map.courseId)
+        if (result.courseId !== course.courseId)
           throw new Error('The source library belongs to another course.');
         setAnalyses((previous) =>
           cursor && previous ? { ...result, items: [...previous.items, ...result.items] } : result
@@ -93,7 +101,7 @@ function CourseSourceFocusLibrary({ map, onPractice }: Props) {
         if (listRequest.current === current) listRequest.current = null;
       }
     },
-    [map.courseId]
+    [course.courseId, onVerifiedFocus]
   );
 
   useEffect(() => {
@@ -104,10 +112,12 @@ function CourseSourceFocusLibrary({ map, onPractice }: Props) {
       focusRequest.current?.abort();
       detailRequest.current?.abort();
       actionRequest.current?.abort();
+      onVerifiedFocus?.(null);
     };
-  }, [loadAnalyses]);
+  }, [loadAnalyses, onVerifiedFocus]);
 
   async function loadFocuses(analysisId: string, cursor?: string) {
+    onVerifiedFocus?.(null);
     focusRequest.current?.abort();
     const previousDetail = detailRequest.current;
     detailRequest.current = null;
@@ -151,6 +161,7 @@ function CourseSourceFocusLibrary({ map, onPractice }: Props) {
 
   async function loadDetail(focus: Focus) {
     if (!projection) return;
+    onVerifiedFocus?.(null);
     detailRequest.current?.abort();
     const previousAction = actionRequest.current;
     actionRequest.current = null;
@@ -178,6 +189,17 @@ function CourseSourceFocusLibrary({ map, onPractice }: Props) {
       )
         throw new Error('This source class changed. Reload its saved analysis.');
       setDetail(result);
+      onVerifiedFocus?.({
+        courseId: course.courseId,
+        level: course.viewedLevel,
+        analysisId: result.analysisId,
+        analysisRevision: result.analysisRevision,
+        resultDigest: result.resultDigest,
+        focusId: focus.id,
+        focusDigest: result.focusDigest,
+        title: result.focus.title,
+        objectiveIds: sourceObjectiveIds(map, result.focus.objectiveCandidates),
+      });
     } catch (cause) {
       if (!current.signal.aborted)
         setError(cause instanceof Error ? cause.message : 'Could not inspect this source class.');
@@ -199,14 +221,14 @@ function CourseSourceFocusLibrary({ map, onPractice }: Props) {
     setPreview(null);
     try {
       const response = await fetch(
-        `/api/v1/courses/${encodeURIComponent(map.courseId)}/learning-map/selection`,
+        `/api/v1/courses/${encodeURIComponent(course.courseId)}/learning-map/selection`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           signal: current.signal,
           body: JSON.stringify({
-            catalogVersion: map.catalogVersion,
-            level: map.viewedLevel,
+            catalogVersion: map?.catalogVersion ?? null,
+            level: course.viewedLevel,
             nodeIds: objectiveIds,
             materialFocusId: selectedFocus.id,
           }),
@@ -216,8 +238,11 @@ function CourseSourceFocusLibrary({ map, onPractice }: Props) {
       if (current.signal.aborted || actionRequest.current !== current) return;
       if (
         result.selection.materialFocusId !== selectedFocus.id ||
-        result.selection.level !== map.viewedLevel ||
-        result.selection.catalogHash !== map.catalogHash
+        result.selection.level !== course.viewedLevel ||
+        result.selection.targetLang !== course.targetLang ||
+        result.selection.catalogHash !== (map?.catalogHash ?? null) ||
+        (!map &&
+          (result.selection.catalogVersion !== null || result.selection.objectives.length > 0))
       )
         throw new Error('The class preview no longer matches the selected source and level.');
       setPreview(result);
@@ -363,7 +388,12 @@ function CourseSourceFocusLibrary({ map, onPractice }: Props) {
       {detail && selectedFocus && (
         <article className={styles.detail}>
           <h3>{detail.focus.title}</h3>
-          <SourceObjectiveLinks map={map} objectiveIds={selectedFocus.objectiveIds} />
+          {map && (
+            <SourceObjectiveLinks
+              map={map}
+              objectiveIds={sourceObjectiveIds(map, detail.focus.objectiveCandidates)}
+            />
+          )}
           {detail.focus.fragments.map((fragment) => (
             <p key={fragment.id}>{fragment.candidate.description}</p>
           ))}
@@ -379,43 +409,71 @@ function CourseSourceFocusLibrary({ map, onPractice }: Props) {
               <blockquote key={index}>
                 <p>{citation.quote}</p>
                 <footer>
-                  Page {citation.pageNumber} · {citation.origin.toLowerCase()}
+                  {citation.sourceKind === 'PASTE'
+                    ? 'Pasted text'
+                    : citation.sourceKind === 'COURSE_NOTE'
+                      ? 'Course note'
+                      : citation.origin === 'SOURCE_TEXT'
+                        ? 'Source text'
+                        : `Page ${citation.pageNumber} · ${citation.origin.toLowerCase()}`}
+                  {citation.sourceKind === 'MATERIAL' && citation.materialId && (
+                    <>
+                      {' '}
+                      <a
+                        className={discoveryStyles.objectiveLink}
+                        href={`/api/v1/materials/${encodeURIComponent(citation.materialId)}/file?variant=original${citation.origin === 'SOURCE_TEXT' ? '' : `&disposition=inline#page=${citation.pageNumber}`}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {citation.origin === 'SOURCE_TEXT'
+                          ? 'Download original'
+                          : `Open original at page ${citation.pageNumber}`}
+                      </a>
+                    </>
+                  )}
                 </footer>
               </blockquote>
             ))}
           </details>
-          <fieldset disabled={busy || future} className={styles.objectives}>
-            <legend>Include assessed objectives (optional, up to four)</legend>
+          {map ? (
+            <fieldset disabled={busy || future} className={styles.objectives}>
+              <legend>Include assessed objectives (optional, up to four)</legend>
+              <p>
+                Choose grammar, situations, or both. Leaving this empty generates private practice
+                without awarding catalog mastery.
+              </p>
+              {objectives.map((entry) => (
+                <label key={entry.node.id}>
+                  <input
+                    type="checkbox"
+                    checked={objectiveIds.includes(entry.node.id)}
+                    disabled={!objectiveIds.includes(entry.node.id) && objectiveIds.length >= 4}
+                    onChange={() => {
+                      setObjectiveIds((previous) =>
+                        previous.includes(entry.node.id)
+                          ? previous.filter((id) => id !== entry.node.id)
+                          : [...previous, entry.node.id]
+                      );
+                      setPreview(null);
+                    }}
+                  />
+                  <span>{entry.node.title}</span>
+                </label>
+              ))}
+            </fieldset>
+          ) : (
             <p>
-              Choose grammar, situations, or both. Leaving this empty generates private practice
-              without awarding catalog mastery.
+              No catalog is published for this language. Practice this private source focus without
+              canonical objective credit.
             </p>
-            {objectives.map((entry) => (
-              <label key={entry.node.id}>
-                <input
-                  type="checkbox"
-                  checked={objectiveIds.includes(entry.node.id)}
-                  disabled={!objectiveIds.includes(entry.node.id) && objectiveIds.length >= 4}
-                  onChange={() => {
-                    setObjectiveIds((previous) =>
-                      previous.includes(entry.node.id)
-                        ? previous.filter((id) => id !== entry.node.id)
-                        : [...previous, entry.node.id]
-                    );
-                    setPreview(null);
-                  }}
-                />
-                <span>{entry.node.title}</span>
-              </label>
-            ))}
-          </fieldset>
+          )}
           <button
             className={styles.secondary}
             type="button"
             disabled={busy || future || projection?.stale}
             onClick={() => void previewClass()}
           >
-            Preview practice at {map.viewedLevel}
+            Preview practice at {course.viewedLevel}
           </button>
           {preview && (
             <div className={styles.preview}>

@@ -57,11 +57,16 @@ export function writeMapView(url: URL, view: MapViewState, courseId: string, lev
   }
   return result;
 }
-export function filterMap(map: LearningMapResponse, view: MapViewState) {
+export function filterMap(
+  map: LearningMapResponse,
+  view: MapViewState,
+  sourceIds?: ReadonlySet<string>
+) {
   const byId = new Map(map.nodes.map((item) => [item.node.id, item]));
   const words = normalize(view.search).trim().split(/\s+/u).filter(Boolean);
   const matches = map.nodes.filter(({ node, progress }) => {
     if (node.kind !== 'OBJECTIVE') return false;
+    if (sourceIds && !sourceIds.has(node.id)) return false;
     if (view.branch !== 'ALL' && node.branch !== view.branch) return false;
     if (view.requirement !== 'ALL' && node.required !== (view.requirement === 'REQUIRED'))
       return false;
@@ -94,6 +99,7 @@ export function filterMap(map: LearningMapResponse, view: MapViewState) {
     id = byId.get(id)?.node.parentId ?? null;
   }
   const active =
+    sourceIds !== undefined ||
     view.search.trim() !== '' ||
     view.branch !== 'ALL' ||
     view.requirement !== 'ALL' ||

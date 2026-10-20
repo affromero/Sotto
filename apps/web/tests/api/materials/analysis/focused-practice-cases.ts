@@ -2,8 +2,14 @@ import { randomUUID } from 'node:crypto';
 import { NextRequest } from 'next/server';
 import { expect, it } from 'vitest';
 import { POST as practice } from '@/app/api/v1/courses/[courseId]/practice/route';
+import { POST as preview } from '@/app/api/v1/courses/[courseId]/learning-map/selection/route';
+import { GET as map } from '@/app/api/v1/courses/[courseId]/learning-map/route';
 import { GET as resume, DELETE as discardPractice } from '@/app/api/v1/practice/[sessionId]/route';
-import { learningSelectionSnapshotSchema, skillRequirementsSchema } from '@sotto/shared';
+import {
+  learningSelectionSnapshotSchema,
+  learningSelectionPreviewSchema,
+  skillRequirementsSchema,
+} from '@sotto/shared';
 import { readFrozenLearningSourceFocus } from '@/lib/learning-map/selection';
 import { captureObjectiveAssessmentScope } from '@/lib/learning-map/evidence/scope';
 import { practicePreparationSchema } from '@/lib/practice/preparation-state';
@@ -37,6 +43,107 @@ interface Fixture {
   sha: (value: Buffer) => string;
 }
 export function registerFocusedMaterialPracticeCases(fixture: () => Fixture) {
+  it('admits owned private source practice without a published language map and creates no mastery', async () => {
+    const { instance, identity, courseId, admitted, input, delivered, request, requests } =
+      fixture();
+    const curriculum = await instance.database.curriculum.upsert({
+      where: { nativeLang_targetLang: { nativeLang: 'en', targetLang: 'nl' } },
+      create: { nativeLang: 'en', targetLang: 'nl', title: 'Private Dutch source fixture' },
+      update: {},
+    });
+    await instance.database.course.update({
+      where: { id: courseId },
+      data: { curriculumId: curriculum.id, targetLang: 'nl' },
+    });
+    const receipt = await admitted({ ...input('Ik kom morgen.'), target: 'nl' });
+    await processMaterialAnalysis(await delivered(receipt.analysisId));
+    const focus = await instance.database.materialSourceFocus.findFirstOrThrow({
+      where: { analysisId: receipt.analysisId },
+    });
+    const params = { params: Promise.resolve({ courseId }) };
+    const unavailable = await map(request(`courses/${courseId}/learning-map`), params);
+    expect(unavailable.status).toBe(422);
+    expect(await unavailable.json()).toMatchObject({ status: 'UNAVAILABLE', targetLang: 'nl' });
+    const learningSelection = {
+      catalogVersion: null,
+      nodeIds: [],
+      level: 'A1',
+      materialFocusId: focus.id,
+    };
+    const beforeCalls = requests.length;
+    const selected = await preview(
+      request(`courses/${courseId}/learning-map/selection`, learningSelection),
+      params
+    );
+    expect(selected.status).toBe(200);
+    const resolved = learningSelectionPreviewSchema.parse(await selected.json());
+    expect(resolved.selection).toMatchObject({
+      targetLang: 'nl',
+      level: 'A1',
+      catalogVersion: null,
+      catalogHash: null,
+      nodeIds: [],
+      objectives: [],
+      materialFocusId: focus.id,
+    });
+    expect(resolved.availableKinds).toContain('GRAMMAR');
+    const requestId = randomUUID();
+    const body = { requestId, kind: 'GRAMMAR', learningSelection };
+    expect((await practice(request(`courses/${courseId}/practice`, body), params)).status).toBe(
+      202
+    );
+    expect((await practice(request(`courses/${courseId}/practice`, body), params)).status).toBe(
+      202
+    );
+    const saved = await instance.database.practiceSession.findUniqueOrThrow({
+      where: { id: requestId },
+    });
+    expect(saved.practiceLevel).toBe('A1');
+    const frozen = learningSelectionSnapshotSchema.parse(saved.learningSelection);
+    expect(frozen.catalogHash).toBeNull();
+    expect(frozen.objectives).toEqual([]);
+    expect(frozen.sourceFocus?.focusDigest).toBe(focus.detailsSha256);
+    expect(await instance.database.learningObservation.count({ where: { courseId } })).toBe(0);
+    expect(await instance.database.learningLevelBinding.count({ where: { courseId } })).toBe(0);
+    expect(
+      await instance.database.course.findUniqueOrThrow({
+        where: { id: courseId },
+        select: { currentLevel: true, startLevel: true },
+      })
+    ).toEqual({ currentLevel: 'A2', startLevel: 'A2' });
+    const foreign = await identity.household('Foreign private source reader');
+    expect(
+      (
+        await preview(
+          request(`courses/${courseId}/learning-map/selection`, learningSelection, foreign.token),
+          params
+        )
+      ).status
+    ).toBe(404);
+    expect(
+      (
+        await preview(
+          request(`courses/${courseId}/learning-map/selection`, {
+            ...learningSelection,
+            level: 'B1',
+          }),
+          params
+        )
+      ).status
+    ).toBe(409);
+    expect(
+      (
+        await preview(
+          request(`courses/${courseId}/learning-map/selection`, {
+            ...learningSelection,
+            nodeIds: ['nl.g.guessed'],
+          }),
+          params
+        )
+      ).status
+    ).toBe(400);
+    expect(requests).toHaveLength(beforeCalls);
+  });
   it('freezes an unmatched source focus byte receipt for repeatable practice without unrelated objective credit', async () => {
     const { instance, identity, courseId, admitted, delivered, request, requests } = fixture();
     const receipt = await admitted();

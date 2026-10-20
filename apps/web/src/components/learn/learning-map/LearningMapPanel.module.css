@@ -44,3 +44,26 @@
   opacity: 0.55;
   cursor: not-allowed;
 }
+.privateSource {
+  display: grid;
+  gap: 16px;
+  padding-bottom: 120px;
+}
+.privateSource > label {
+  display: grid;
+  gap: 8px;
+}
+.privateSource select {
+  min-height: 44px;
+  width: 100%;
+  padding: 10px 12px;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r);
+  font: inherit;
+}
+.privateSource select:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}

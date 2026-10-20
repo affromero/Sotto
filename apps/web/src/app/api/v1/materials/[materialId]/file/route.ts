@@ -33,6 +33,10 @@ export async function GET(
     .enum(['original', 'optimized'])
     .safeParse(request.nextUrl.searchParams.get('variant') ?? 'original');
   if (!variant.success) return errorResponse('Unknown material file variant.', 400);
+  const disposition = z
+    .enum(['attachment', 'inline'])
+    .safeParse(request.nextUrl.searchParams.get('disposition') ?? 'attachment');
+  if (!disposition.success) return errorResponse('Unknown material file disposition.', 400);
   const captured = await sottoTransaction(
     prismaUnfiltered,
     async (database) => {
@@ -59,6 +63,9 @@ export async function GET(
     { signal: request.signal }
   );
   if (!captured) return errorResponse('Material not found', 404);
+  const contentType = variant.data === 'optimized' ? 'application/pdf' : captured.material.mimeType;
+  if (disposition.data === 'inline' && contentType !== 'application/pdf')
+    return errorResponse('Inline display is available only for PDF materials.', 415);
   const directory = await mkdtemp(join(tmpdir(), 'sotto-material-'));
   let cleanupUnconfirmed = false;
   let responseOwnsDirectory = false;
@@ -83,9 +90,9 @@ export async function GET(
       { signal: request.signal }
     );
     const headers = new Headers({
-      'Content-Type': variant.data === 'optimized' ? 'application/pdf' : captured.material.mimeType,
+      'Content-Type': contentType,
       'Content-Length': String(metadata.size),
-      'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent((variant.data === 'optimized' ? 'optimized-' : '') + captured.material.name)}`,
+      'Content-Disposition': `${disposition.data}; filename*=UTF-8''${encodeURIComponent((variant.data === 'optimized' ? 'optimized-' : '') + captured.material.name)}`,
       'Cache-Control': 'private, no-store',
       'X-Content-Type-Options': 'nosniff',
     });

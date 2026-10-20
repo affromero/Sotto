@@ -215,6 +215,60 @@ suite('optional owned PDF optimization publication', () => {
     });
   }
 
+  it('serves only an explicitly requested owned PDF inline while retaining exact original bytes and default attachment', async () => {
+    const value = await fixture();
+    const params = { params: Promise.resolve({ materialId: value.material.id }) };
+    const original = await file(value.material.id);
+    expect(original.status).toBe(200);
+    expect(original.headers.get('content-disposition')).toMatch(/^attachment;/);
+    expect(Buffer.from(await original.arrayBuffer())).toEqual(value.bytes);
+    const inline = await download(
+      request(value.material.id, 'file?variant=original&disposition=inline'),
+      params
+    );
+    expect(inline.status).toBe(200);
+    expect(inline.headers.get('content-type')).toBe('application/pdf');
+    expect(inline.headers.get('content-disposition')).toMatch(/^inline;/);
+    expect(inline.headers.get('x-content-type-options')).toBe('nosniff');
+    expect(inline.headers.get('cache-control')).toBe('private, no-store');
+    expect(Buffer.from(await inline.arrayBuffer())).toEqual(value.bytes);
+    const foreign = await identity.household('Foreign source page reader');
+    expect(
+      (await download(request(value.material.id, 'file?disposition=inline', foreign.token), params))
+        .status
+    ).toBe(404);
+    expect(
+      (await download(request(value.material.id, 'file?disposition=html'), params)).status
+    ).toBe(400);
+    const saved = await instance.database.courseMaterial.findUniqueOrThrow({
+      where: { id: value.material.id },
+    });
+    expect(saved.originalSha256).toBe(value.originalSha256);
+    expect(saved.originalUrl).toBe(value.originalUrl);
+  });
+
+  it.each(['text/html', 'text/plain', 'application/octet-stream'])(
+    'refuses inline %s while leaving its original available as an attachment',
+    async (mimeType) => {
+      const value = await fixture();
+      await instance.database.courseMaterial.update({
+        where: { id: value.material.id },
+        data: { mimeType },
+      });
+      const params = { params: Promise.resolve({ materialId: value.material.id }) };
+      const rejected = await download(
+        request(value.material.id, 'file?disposition=inline'),
+        params
+      );
+      expect(rejected.status).toBe(415);
+      const attached = await file(value.material.id);
+      expect(attached.status).toBe(200);
+      expect(attached.headers.get('content-disposition')).toMatch(/^attachment;/);
+      expect(attached.headers.get('x-content-type-options')).toBe('nosniff');
+      expect(Buffer.from(await attached.arrayBuffer())).toEqual(value.bytes);
+    }
+  );
+
   it('publishes a real qpdf derivative while keeping the original reference and bytes unchanged', async () => {
     const value = await fixture();
     expect((await file(value.material.id, 'optimized')).status).toBe(404);

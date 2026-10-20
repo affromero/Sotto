@@ -325,6 +325,43 @@ describe('private material processing ledger', () => {
     expect(await screen.findByText(/Recognition admitted as processing revision 2/)).toBeVisible();
   });
 
+  it('starts a newly reviewed revision with a fresh request only after the prior acknowledgement was verified', async () => {
+    let revision = 1;
+    const submitted: Array<{ requestId: string; expectedProcessingRevision: number }> = [];
+    vi.stubGlobal('fetch', async (resource: string, init?: RequestInit) => {
+      if (resource.endsWith('/recognize') && init?.method === 'POST') {
+        const input = JSON.parse(String(init.body));
+        submitted.push(input);
+        revision = input.expectedProcessingRevision + 1;
+        return json(
+          {
+            materialId,
+            runId,
+            processingRevision: revision,
+            requestId: input.requestId,
+            status: 'PENDING',
+          },
+          202
+        );
+      }
+      if (resource.endsWith('/recognize'))
+        return json({ ...options, expectedProcessingRevision: revision });
+      return json(processing({ processingRevision: revision }));
+    });
+    panel();
+    for (const expected of [1, 2]) {
+      fireEvent.click(await screen.findByRole('button', { name: 'Review configured recognition' }));
+      await screen.findByText('owned-provider / owned-configured-model');
+      fireEvent.click(screen.getByRole('checkbox', { name: /authorize recognition/ }));
+      fireEvent.click(screen.getByRole('button', { name: 'Start reviewed page recognition' }));
+      await screen.findByText(
+        new RegExp(`Recognition admitted as processing revision ${expected + 1}`)
+      );
+    }
+    expect(submitted.map((request) => request.expectedProcessingRevision)).toEqual([1, 2]);
+    expect(submitted[0]!.requestId).not.toBe(submitted[1]!.requestId);
+  });
+
   it('surfaces unavailable recognition without selecting another model or making a POST', async () => {
     const fetch = vi
       .fn()
