@@ -1,6 +1,6 @@
 # Contributing to Sotto
 
-Sotto is open-source language-learning infrastructure released under the GNU Affero General Public License v3.0. Contributions are welcome.
+Sotto is source-available language-learning infrastructure released under PolyForm Noncommercial 1.0.0, subject to THIRD_PARTY_NOTICES.md. New first-party contributions follow the contribution licensing terms below.
 
 ## Development Setup
 
@@ -69,13 +69,35 @@ If the hook blocks your commit:
 2. Fix the test (or the source) before re-staging.
 3. Never use `--no-verify` to bypass the hook.
 
-## AGPLv3 Network-Use Disclosure
+## Contribution licensing
 
-Sotto is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0-only). The AGPL's network-use clause (Section 13) means:
+This policy applies prospectively to new first-party contributions submitted
+after its adoption. It grants no rights to existing contributions and does not
+change the contribution terms of separately licensed components.
 
-> If you run a **modified version** of Sotto and let users interact with it over a network, you must make the **complete corresponding source code** of your modified version available to those users under the same license.
+Before accepting a new contribution, maintainers require the contributor's
+affirmative acceptance of an additional MIT license for the identified work.
+The contributor keeps copyright. The grant permits incorporation in future
+PolyForm Noncommercial releases and separate commercial licensing. It is not
+a copyright assignment. Provide the copyright holder's name and retain the
+applicable MIT copyright and permission notice with the contribution.
 
-Running the unmodified source from this repository is fully compliant. If you fork and deploy a customised instance, publish your changes.
+Confirm in the pull request that you own the work or are authorized by its
+copyright owner, and that you additionally license the identified contribution
+under the MIT License at https://opensource.org/license/mit. Identify third-party
+material separately. If an employer owns the work, obtain its authorization.
+Maintainers must resolve absent or conflicting permission before acceptance.
+
+The repository's outbound license remains the root LICENSE with the exceptions
+in THIRD_PARTY_NOTICES.md. No grant is inferred from an earlier contribution, an
+unchecked checkbox, silence or a Git author identity.
+
+The additional MIT grant and its notices remain effective for the contribution
+they cover. The combined release's outbound terms do not erase those component
+rights. Preserve the applicable MIT notices when incorporating that work.
+
+Existing AGPL releases keep their original grants. Separately licensed components
+keep their own contribution terms.
 
 ## Code of Conduct
 

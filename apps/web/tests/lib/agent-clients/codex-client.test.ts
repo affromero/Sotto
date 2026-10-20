@@ -3,7 +3,7 @@ import { mkdtempSync, writeFileSync, readFileSync, rmSync, existsSync } from 'no
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createHash } from 'node:crypto';
-import { beforeEach, afterEach, describe, expect, it } from 'vitest';
+import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { captureCodexMaterialInvocation, executeCodex, streamCodex } from '@/lib/codex-client';
 import { CodexProvider } from '@/lib/providers/codex';
 import {
@@ -31,13 +31,16 @@ describe('Codex CLI execution', () => {
     type: 'item.completed',
     item: { id, type: 'agent_message', text },
   });
-  function executable(body: string, name = 'codex') {
+  function executable(body: string, name = 'codex', version = '0.160.0') {
     writeFileSync(
       join(directory, name),
       '#!' +
         process.execPath +
         '\n' +
         'const fs=require("node:fs"); const args=process.argv.slice(2); const output=args.includes("-o") ? args[args.indexOf("-o")+1] : undefined;\n' +
+        (name === 'codex'
+          ? `if(args[0]==="--version"){console.log(${JSON.stringify('codex-cli ' + version)});process.exit(0);}\n`
+          : '') +
         'let input="";process.stdin.on("data",b=>input+=b);process.stdin.on("end",()=>{\n' +
         body +
         '\n});',
@@ -103,6 +106,7 @@ describe('Codex CLI execution', () => {
       ])
     );
     expectApplicationRequest(request, 'System', 'Prompt');
+    expect(request.args.some((arg: string) => arg.startsWith('model_provider='))).toBe(false);
     expect(request.key).toBe('fixture-key');
     expect(request.database).toBeUndefined();
     expect(response).toMatchObject({
@@ -126,6 +130,22 @@ describe('Codex CLI execution', () => {
     );
     args.splice(args.indexOf('-o'), 2);
     expect(createHash('sha256').update(JSON.stringify(args)).digest('hex')).toBe(
+      selected.configurationSha256
+    );
+    const imageArgs: string[] = JSON.parse(
+      (
+        await executeCodex('', 'Recognize the page tile', {
+          model: 'codex:chosen#effort=high',
+          maxOutputBytes: 4096,
+          images: [{ type: 'image_url', url: 'data:image/png;base64,aW5r' }],
+        })
+      ).content
+    );
+    imageArgs.splice(imageArgs.indexOf('-o'), 2);
+    imageArgs.splice(imageArgs.indexOf('--image'), 2);
+    imageArgs.splice(imageArgs.lastIndexOf('--'), 1);
+    expect(imageArgs.some((arg) => arg.startsWith('model_provider='))).toBe(false);
+    expect(createHash('sha256').update(JSON.stringify(imageArgs)).digest('hex')).toBe(
       selected.configurationSha256
     );
     process.env.CODEX_MODEL = 'unrelated';
@@ -251,24 +271,137 @@ describe('Codex CLI execution', () => {
       expect(delivered.mode).toBe(0o600);
       expect(delivered.args.slice(-2)).toEqual(['--', '-']);
       expect(delivered.args.join(' ')).not.toContain(encoded);
+      expect(delivered.args.some((arg: string) => arg.startsWith('model_provider='))).toBe(false);
       expect(existsSync(delivered.file)).toBe(false);
     }
   );
 
-  it('removes attached images after a measured CLI failure', async () => {
-    const receipt = join(directory, 'attachment-receipt');
-    executable(
-      `fs.writeFileSync(${JSON.stringify(receipt)},args[args.indexOf("--image")+1]);` +
-        event(done) +
-        'process.exitCode=1;'
-    );
+  it.each([false, true])(
+    'delivers every original document page over explicit HTTP before dispatch (SSH %s)',
+    async (remote) => {
+      process.env.PATH = directory + ':/usr/bin:/bin';
+      if (remote) {
+        process.env.CODEX_SSH_HOST = 'fixture-host';
+        executable(
+          'const child=require("node:child_process").spawn("/bin/sh",["-c",args.at(-1)],{stdio:["pipe","inherit","inherit"]});child.stdin.end(input);child.on("exit",code=>{process.exitCode=code});',
+          'ssh'
+        );
+      }
+      executable(
+        'const files=args.flatMap((arg,index)=>arg==="--image"?[args[index+1]]:[]);' +
+          'const info={args,files,images:files.map(file=>fs.readFileSync(file).toString("base64"))};' +
+          'if(output)fs.writeFileSync(output,JSON.stringify(info));else console.log(JSON.stringify({type:"item.completed",item:{id:"answer",type:"agent_message",text:JSON.stringify(info)}}));' +
+          event(done)
+      );
+      const images = Array.from({ length: 65 }, (_, index) => ({
+        type: 'image_url' as const,
+        url:
+          'data:image/jpeg;base64,' + Buffer.from(`Original page ${index + 1}`).toString('base64'),
+        documentPage: index + 1,
+      }));
+      const opts = { images, model: 'codex:chosen#effort=high', useWebSearch: true };
+      const response = await executeCodex('Read every original page', 'Assess the material', opts);
+      const delivered = JSON.parse(response.content);
+      expect(delivered.images).toEqual(images.map((image) => image.url.split(',')[1]));
+      expect(delivered.files.every((file: string) => !existsSync(file))).toBe(true);
+      const selected = (args: string[]) =>
+        JSON.parse(args.find((arg) => arg.startsWith('model_provider='))!.split('=')[1]!);
+      const provider = selected(delivered.args);
+      const table = delivered.args.find((arg: string) =>
+        arg.startsWith(`model_providers.${provider}=`)
+      );
+      for (const setting of [
+        'name="OpenAI"',
+        'wire_api="responses"',
+        'requires_openai_auth=true',
+        'supports_websockets=false',
+        'supports_standalone_web_search=true',
+        'http_headers={version="0.160.0"}',
+        '"OpenAI-Organization"="OPENAI_ORGANIZATION"',
+        '"OpenAI-Project"="OPENAI_PROJECT"',
+      ])
+        expect(table).toContain(setting);
+      expect(table).not.toMatch(
+        /(?:[{,])(?:base_url|env_key|experimental_bearer_token|auth|gateway_oauth|aws|model_catalog_url|query_params)\s*=/
+      );
+      expect(delivered.args).toEqual(
+        expect.arrayContaining([
+          '-m',
+          'chosen',
+          'model_reasoning_effort="high"',
+          'web_search="live"',
+          '-s',
+          'read-only',
+        ])
+      );
+      expect(response.model).toBe('codex:chosen#effort=high');
+      const next = JSON.parse((await executeCodex('Read', 'Again', opts)).content);
+      expect(selected(next.args)).not.toBe(provider);
+    }
+  );
+
+  it('rejects an unreviewed document CLI version before inference', async () => {
+    const unexpected = join(directory, 'unexpected-inference');
+    executable(`fs.writeFileSync(${JSON.stringify(unexpected)},'started');`, 'codex', '0.159.0');
     await expect(
-      executeCodex('Read', 'Marks', {
-        images: [{ type: 'image_url', url: 'data:image/png;base64,aW5r' }],
+      executeCodex('Read', 'PDF', {
+        images: [{ type: 'image_url', url: 'data:image/jpeg;base64,aW5r', documentPage: 1 }],
       })
-    ).rejects.toThrow();
-    expect(existsSync(readFileSync(receipt, 'utf8'))).toBe(false);
+    ).rejects.toThrow('reviewed Codex CLI 0.160.0');
+    expect(existsSync(unexpected)).toBe(false);
   });
+
+  it('cancels during the document version probe before writing attachments or running inference', async () => {
+    const ready = join(directory, 'version-started');
+    const release = join(directory, 'version-release');
+    const unexpected = join(directory, 'unexpected-inference');
+    writeFileSync(
+      join(directory, 'codex'),
+      '#!' +
+        process.execPath +
+        '\n' +
+        'const fs=require("node:fs");if(process.argv[2]==="--version"){' +
+        `fs.writeFileSync(${JSON.stringify(ready)},'ready');` +
+        `const timer=setInterval(()=>{if(fs.existsSync(${JSON.stringify(release)})){clearInterval(timer);console.log("codex-cli 0.160.0");}},10);` +
+        `}else{fs.writeFileSync(${JSON.stringify(unexpected)},'started');}`,
+      { mode: 0o700 }
+    );
+    const controller = new AbortController();
+    const pending = executeCodex('Read', 'PDF', {
+      signal: controller.signal,
+      images: [{ type: 'image_url', url: 'data:image/jpeg;base64,aW5r', documentPage: 1 }],
+    });
+    await vi.waitFor(() => expect(existsSync(ready)).toBe(true));
+    controller.abort(new Error('Document request cancelled'));
+    writeFileSync(release, 'continue');
+    await expect(pending).rejects.toThrow('Document request cancelled');
+    expect(existsSync(unexpected)).toBe(false);
+  });
+
+  it.each([false, true])(
+    'removes attachments and surfaces failure without retry (document %s)',
+    async (document) => {
+      const receipt = join(directory, 'attachment-receipt');
+      executable(
+        `if(fs.existsSync(${JSON.stringify(receipt)})){if(output)fs.writeFileSync(output,'Unexpected retry');${event(done)}process.exit(0);}` +
+          `fs.writeFileSync(${JSON.stringify(receipt)},args[args.indexOf("--image")+1]);` +
+          event(done) +
+          'process.exitCode=1;'
+      );
+      await expect(
+        executeCodex('Read', 'Marks', {
+          images: [
+            {
+              type: 'image_url',
+              url: 'data:image/png;base64,aW5r',
+              ...(document ? { documentPage: 1 } : {}),
+            },
+          ],
+        })
+      ).rejects.toThrow();
+      expect(existsSync(readFileSync(receipt, 'utf8'))).toBe(false);
+    }
+  );
 
   it('refuses external images before starting the CLI', async () => {
     const spawned = join(directory, 'unexpected-spawn');

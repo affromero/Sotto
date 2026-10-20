@@ -60,9 +60,11 @@ function providerConfig(provider: AgentProvider): {
 
 function probe(
   provider: AgentProvider,
-  args: string[]
+  args: string[],
+  capturedSshHost?: string | null
 ): Promise<{ ok: boolean; output: string; error: string }> {
   const config = providerConfig(provider);
+  if (capturedSshHost !== undefined) config.sshHost = capturedSshHost ?? undefined;
   const invocation = buildAgentInvocation(config.cli, args, config.sshHost, {
     remoteEnvKeys: config.envKeys,
   });
@@ -96,6 +98,16 @@ function probe(
     });
     child.on('close', (code) => finish(code === 0));
   });
+}
+
+/** Inspect the exact execution target without using the readiness cache. */
+export async function getAgentVersion(
+  provider: AgentProvider,
+  capturedSshHost: string | null
+): Promise<string> {
+  const result = await probe(provider, ['--version'], capturedSshHost);
+  if (!result.ok) throw new Error(`${provider} CLI version could not be verified.`);
+  return result.output;
 }
 
 export function getAgentStatus(provider: AgentProvider): Promise<AgentStatus> {

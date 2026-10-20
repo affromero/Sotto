@@ -2,7 +2,7 @@
 
 > Single source of agent instructions for every coding agent.
 
-> Open-source, self-hostable language-learning infrastructure. Learn a language with the agent that already knows you. Canonical brand copy lives in `packages/shared/src/brand.ts`.
+> Source-available, self-hostable language-learning infrastructure. Learn a language with the agent that already knows you. Canonical brand copy lives in `packages/shared/src/brand.ts`.
 
 ## Pull request workflow
 
@@ -22,7 +22,7 @@
 
 ## What Is Sotto?
 
-Sotto is open-source, self-hostable language-learning infrastructure. Learners work through mastery-gated CEFR courses across four skills — grammar, reading, adaptive listening, and speaking — on a stack they fully control, connected to their own AI agent and API keys (BYOK).
+Sotto is source-available, self-hostable language-learning infrastructure. Learners work through mastery-gated CEFR courses across four skills — grammar, reading, adaptive listening, and speaking — on a stack they fully control, connected to their own AI agent and API keys (BYOK).
 
 1. Learners are placed at the right CEFR level and progress through grammar, reading, adaptive listening, and speaking modules gated by demonstrated mastery.
 2. The adaptive listening backbone delivers AI-generated audio lessons; learners can pause, ask contextual questions, and receive spoken clarifications.

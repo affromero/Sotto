@@ -7,7 +7,7 @@ version = "0.1.0"
 edition = "2024"
 rust-version = "1.88"
 description = "Headless terminal client for the Sotto language-learning platform: CEFR courses, vocab SRS, listening/speaking, and native audio in your terminal."
-license = "AGPL-3.0-only"
+license = "PolyForm-Noncommercial-1.0.0"
 repository = "https://github.com/affromero/Sotto"
 homepage = "https://github.com/affromero/Sotto"
 readme = "README.md"
@@ -19,6 +19,8 @@ include = [
     "src/**/*.rs",
     "openapi.codegen.json",
     "README.md",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md",
     "Cargo.toml",
 ]
 

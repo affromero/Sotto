@@ -4,7 +4,7 @@ import styles from './page.module.css';
 
 export const metadata = {
   title: 'Terms. Sotto',
-  description: 'Terms for the Sotto open-source software and self-hosted instances.',
+  description: 'Terms for the Sotto source-available software and self-hosted instances.',
 };
 
 export default function TermsPage() {
@@ -15,22 +15,26 @@ export default function TermsPage() {
         <div className={styles.container}>
           <header className={styles.header}>
             <h1 className={styles.title}>Terms</h1>
-            <p className={styles.subtitle}>Terms for open-source, self-hosted Sotto.</p>
-            <p className={styles.lastUpdated}>Last updated: July 19, 2026</p>
+            <p className={styles.subtitle}>Terms for source-available, self-hosted Sotto.</p>
+            <p className={styles.lastUpdated}>
+              The repository license for your version governs use.
+            </p>
           </header>
 
           <div className={styles.content}>
-            <h2>1. Open-source software</h2>
+            <h2>1. Source-available software</h2>
             <p>
-              Sotto&apos;s source code is provided under the GNU Affero General Public License
-              version 3. The license in the repository governs copying, modification, and
-              distribution of the software.
+              Sotto&apos;s first-party application is provided under PolyForm Noncommercial 1.0.0,
+              subject to the component exceptions in THIRD_PARTY_NOTICES.md. The license permits its
+              stated noncommercial, personal and institutional uses. Other commercial use requires
+              separate permission from the rights holders. The repository license governs use,
+              copying, modification and distribution.
             </p>
 
             <h2>2. Self-hosted instances</h2>
             <p>
               Each Sotto deployment is operated independently. The instance operator, not the
-              open-source project, is responsible for availability, user access, data handling,
+              source-available project, is responsible for availability, user access, data handling,
               provider accounts, generated content, backups, moderation, and compliance with
               applicable law. An operator may publish additional terms for their instance.
             </p>
@@ -59,9 +63,9 @@ export default function TermsPage() {
 
             <h2>6. No warranty</h2>
             <p>
-              The software is provided without warranty, as described in the AGPL-3.0 license. To
-              the extent permitted by law, contributors are not liable for losses arising from
-              operating or using an independently deployed instance.
+              The software is provided without warranty, as described in the applicable component
+              license. To the extent permitted by law, contributors are not liable for losses
+              arising from operating or using an independently deployed instance.
             </p>
 
             <h2>7. Questions</h2>

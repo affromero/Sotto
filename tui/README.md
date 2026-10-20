@@ -241,5 +241,5 @@ The vendored spec is kept byte-for-byte in sync with the canonical
 
 ## License
 
-[AGPL-3.0-only](https://github.com/affromero/Sotto/blob/main/LICENSE), matching
+[PolyForm Noncommercial 1.0.0](https://github.com/affromero/Sotto/blob/main/LICENSE), matching
 the Sotto platform.

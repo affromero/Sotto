@@ -4,7 +4,7 @@
 >
 > **Diagrams**: [07-architecture-diagrams.md](./07-architecture-diagrams.md) renders every flow below as Mermaid.
 >
-> **Summary**: Sotto is free, open-source, self-hostable language-learning infrastructure built around a Next.js web app, PostgreSQL/Prisma, Redis/BullMQ workers, explicit BYOK/local provider routing, and local or S3-compatible storage. Heavy generation and grading work stays in workers. API routes stay thin. The active product is CEFR language learning with courses, classes, practice, exams, memory, and a reused audio engine for listening.
+> **Summary**: Sotto is free, source-available, self-hostable language-learning infrastructure built around a Next.js web app, PostgreSQL/Prisma, Redis/BullMQ workers, explicit BYOK/local provider routing, and local or S3-compatible storage. Heavy generation and grading work stays in workers. API routes stay thin. The active product is CEFR language learning with courses, classes, practice, exams, memory, and a reused audio engine for listening.
 
 ---
 

@@ -44,6 +44,8 @@ RUN mkdir -p /home/sotto/.codex /home/sotto/.claude /home/sotto/.ssh \
 
 ENV HOME=/home/sotto
 
+COPY LICENSE THIRD_PARTY_NOTICES.md ./
+
 # Copy dependencies with Prisma client (root + workspace-specific node_modules)
 COPY --from=deps --chown=${RUNTIME_UID}:${RUNTIME_UID} /app/node_modules ./node_modules
 COPY --from=deps --chown=${RUNTIME_UID}:${RUNTIME_UID} /app/vendor ./vendor/

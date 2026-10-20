@@ -22,7 +22,7 @@ struct PrivacyPolicyView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     Text("Your server and your data").font(.title2.bold())
-                    Text("Sotto connects to the server you choose. Its operator controls learner profiles, photos, courses, recordings, answers, transcripts, progress, logs, and backups. The open-source project does not receive data from independently operated servers.")
+                    Text("Sotto connects to the server you choose. Its operator controls learner profiles, photos, courses, recordings, answers, transcripts, progress, logs, and backups. The source-available project does not receive data from independently operated servers.")
                     Text("On this device").font(.headline)
                     Text("Pairing codes are scanned locally. Server credentials are stored in the iOS Keychain. Workbook and answer handwriting are saved on this device. Convert to text runs on this device. Read my marks sends the exercise and ink as an image to your server and its selected AI provider for interpretation. You review the answer before submitting it for feedback. Photos you choose are uploaded to your server as your profile image. Sotto does not include advertising or tracking SDKs.")
                     Text("AI and speech processing").font(.headline)

@@ -207,6 +207,9 @@ material's difficulty; workbook answers alone do not establish learner mastery.
 Visual conversion admits one active and one waiting request per process. If it
 is busy, retry after the current documents finish.
 
+Codex PDF page requests use HTTP and require the reviewed Codex CLI 0.160.0 on
+the local or SSH execution host. Other CLI versions fail explicitly until reviewed.
+
 ### Course creation sequence
 
 ```mermaid

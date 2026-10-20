@@ -462,7 +462,22 @@ def inspect_enabled_runtime(
     releases = [entry for entry in entries
                 if entry == release_name or entry.startswith(release_name + '=')]
     if releases != [release_name + '=' + release]:
-        raise ValueError('Unique release-bound provider authority required')
+        if activation_mode != 'implicit-enabled' or releases:
+            raise ValueError('Unique release-bound provider authority required')
+        images: object = json.loads(runtime_command(['image', 'inspect', image]))
+        if (not isinstance(images, list) or len(images) != 1
+                or not isinstance(images[0], dict)):
+            raise ValueError('Unique immutable previous image required')
+        image_config = images[0].get('Config')
+        image_labels = (
+            image_config.get('Labels')
+            if isinstance(image_config, dict) else None
+        )
+        if (images[0].get('Id') != image or not isinstance(image_labels, dict)
+                or image_labels.get('org.opencontainers.image.revision') != release
+                or image_labels.get('org.opencontainers.image.source')
+                != 'https://github.com/affromero/Sotto'):
+            raise ValueError('Immutable previous image release provenance differs')
     mounts = row.get('Mounts')
     if not isinstance(mounts, list):
         raise ValueError('Actual runtime mounts required')
