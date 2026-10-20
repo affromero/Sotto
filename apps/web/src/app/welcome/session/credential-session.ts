@@ -5,7 +5,7 @@ import {
   type CredentialSaveDraft,
   type CredentialSettingsSnapshot,
 } from 'thesidedoor-core/configuration/credential-client';
-import { providerCredentials, providerIdentity } from 'thesidedoor-core/providers/catalog';
+import { planCredentialWrites, type PlannedCredentialEdit } from './credential-plan';
 import { CredentialDraftDigest } from '@/lib/sidedoor/credentials/config/credential-digest';
 import {
   CredentialReconciliationError,
@@ -41,59 +41,6 @@ export type WelcomeCredentialResult =
 
 export class WelcomeCredentialContextError extends Error {}
 
-/** Merge aliases before any write. A physical credential slot cannot contain two different keys. */
-function groupedEdits(posts: readonly KeyPost[]) {
-  const grouped = new Map<
-    string,
-    {
-      endpoint: CredentialEndpoint;
-      provider: string;
-      baseUrl?: string;
-      values: Record<string, string | number | boolean>;
-    }
-  >();
-  for (const post of posts) {
-    const modality =
-      post.endpoint === 'ai-keys'
-        ? providerIdentity(post.provider).modalities.includes('text')
-          ? 'text'
-          : 'transcription'
-        : post.endpoint === 'visual-cues'
-          ? 'visual'
-          : post.provider === 'suno'
-            ? 'music'
-            : 'speech';
-    const metadata = providerCredentials(post.provider, modality);
-    const fields = [...metadata.fields, ...metadata.configurationFields];
-    const slot = `${post.endpoint}:${post.provider}`;
-    const edit = grouped.get(slot) ?? {
-      endpoint: post.endpoint,
-      provider: post.provider,
-      baseUrl: post.baseUrl,
-      values: {},
-    };
-    if (edit.baseUrl !== post.baseUrl)
-      throw new Error(
-        `The ${post.provider} selections contain different endpoints. Review them before saving.`
-      );
-    for (const [name, raw] of Object.entries({ apiKey: post.apiKey, ...post.extra })) {
-      const field = fields.find((candidate) => candidate.id === name);
-      if (!field) throw new Error(`Unknown credential field for ${post.provider}`);
-      if (field.kind === 'boolean' && raw !== 'true' && raw !== 'false')
-        throw new Error(`Check ${field.label} for ${post.provider}.`);
-      const value =
-        field.kind === 'number' ? Number(raw) : field.kind === 'boolean' ? raw === 'true' : raw;
-      if (Object.hasOwn(edit.values, name) && edit.values[name] !== value)
-        throw new Error(
-          `The ${post.provider} selections contain different ${field.label} values. Review them before saving.`
-        );
-      edit.values[name] = value;
-    }
-    grouped.set(slot, edit);
-  }
-  return grouped;
-}
-
 /** One wizard lifetime owns displayed revisions and receipts, including placement and final retries. */
 export class WelcomeCredentialSession {
   private readonly snapshots = new Map<CredentialEndpoint, CredentialSettingsSnapshot>();
@@ -103,12 +50,7 @@ export class WelcomeCredentialSession {
   private editVersion = 0;
   private readonly drafts = new CredentialDraftDigest();
 
-  private signature(edit: {
-    endpoint: CredentialEndpoint;
-    provider: string;
-    baseUrl?: string;
-    values: Record<string, string | number | boolean>;
-  }): string {
+  private signature(edit: PlannedCredentialEdit): string {
     return this.drafts.digest([
       edit.endpoint,
       edit.provider,
@@ -135,7 +77,7 @@ export class WelcomeCredentialSession {
   receiptStatus(post: KeyPost): 'verified' | 'saved' | null {
     const slot = `${post.endpoint}:${post.provider}`;
     const entry = this.entries.get(slot);
-    const edit = groupedEdits([post]).get(slot);
+    const edit = planCredentialWrites([post]).get(slot);
     if (
       !edit ||
       entry?.state !== 'saved' ||
@@ -340,7 +282,7 @@ export class WelcomeCredentialSession {
       return { status: 'review', message: 'Wait for the current credential change to finish.' };
     this.busy = true;
     try {
-      const edits = groupedEdits(posts);
+      const edits = planCredentialWrites(posts);
       for (const [slot, entry] of this.entries) {
         if (entry.state !== 'uncertain') continue;
         const result = await this.reconcile(entry, signal);
@@ -411,13 +353,11 @@ export class WelcomeCredentialSession {
     delete entry.draft;
     entry.state = 'uncertain';
     try {
-      const result = await saveCredentialSettings(
-        entry.endpoint,
-        draft,
-        confirmed,
+      const result = await saveCredentialSettings(entry.endpoint, draft, {
+        allowUnverified: confirmed,
+        reviewedEndpoint: entry.expectedEndpoint,
         signal,
-        entry.expectedEndpoint
-      );
+      });
       signal.throwIfAborted();
       if (result.status === 'needs_confirmation' && version === this.editVersion)
         entry.draft = draft;

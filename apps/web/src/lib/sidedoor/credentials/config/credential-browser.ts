@@ -110,14 +110,17 @@ export async function reconcileCredentialSettings(
 }
 
 /** Uncertain writes are reconciled with their receipt, without resubmitting values. */
-async function mutate(
-  endpoint: CredentialEndpoint,
-  command: CredentialRemovalRequest,
-  body: unknown,
-  kind: 'save' | 'remove',
-  signal?: AbortSignal,
-  extraHeaders?: Record<string, string>
-): Promise<CredentialMutationResult> {
+interface MutationSubmission {
+  endpoint: CredentialEndpoint;
+  command: CredentialRemovalRequest;
+  body: unknown;
+  kind: 'save' | 'remove';
+  signal?: AbortSignal;
+  headers: Headers;
+}
+
+async function mutate(submission: MutationSubmission): Promise<CredentialMutationResult> {
+  const { endpoint, command, body, kind, signal, headers } = submission;
   if (command.context.scope !== endpoint) throw new Error('Credential edit context changed');
   signal?.throwIfAborted();
   let acknowledged = false;
@@ -126,7 +129,7 @@ async function mutate(
       method: kind === 'save' ? 'POST' : 'DELETE',
       credentials: 'same-origin',
       cache: 'no-store',
-      headers: { 'content-type': 'application/json', ...extraHeaders },
+      headers,
       body: JSON.stringify(body),
       signal,
     });
@@ -164,25 +167,28 @@ async function mutate(
   }
 }
 
+export interface CredentialSaveOptions {
+  signal?: AbortSignal;
+  allowUnverified?: boolean;
+  reviewedEndpoint?: string;
+}
+
 export function saveCredentialSettings(
   endpoint: CredentialEndpoint,
   draft: CredentialSaveDraft,
-  allowUnverified = false,
-  signal?: AbortSignal,
-  expectedEndpoint?: string
+  options: CredentialSaveOptions = {}
 ) {
-  const extraHeaders =
-    endpoint === 'ai-keys' && draft.provider === 'local' && expectedEndpoint
-      ? { 'x-sotto-reviewed-ai-endpoint': expectedEndpoint }
-      : undefined;
-  return mutate(
+  const headers = new Headers({ 'content-type': 'application/json' });
+  if (options.reviewedEndpoint && endpoint === 'ai-keys' && draft.provider === 'local')
+    headers.set('x-sotto-reviewed-ai-endpoint', options.reviewedEndpoint);
+  return mutate({
+    kind: 'save',
     endpoint,
-    draft,
-    credentialSaveRequest(draft, allowUnverified),
-    'save',
-    signal,
-    extraHeaders
-  );
+    headers,
+    command: captureCredentialReceipt(draft),
+    body: credentialSaveRequest(draft, options.allowUnverified ?? false),
+    signal: options.signal,
+  });
 }
 
 export function removeCredentialSettings(
@@ -190,5 +196,12 @@ export function removeCredentialSettings(
   command: CredentialRemovalRequest,
   signal?: AbortSignal
 ) {
-  return mutate(endpoint, command, command, 'remove', signal);
+  return mutate({
+    kind: 'remove',
+    endpoint,
+    command: captureCredentialReceipt(command),
+    body: command,
+    signal,
+    headers: new Headers({ 'content-type': 'application/json' }),
+  });
 }

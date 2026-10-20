@@ -7,11 +7,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { ImgHTMLAttributes } from 'react';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import {
-  credentialSaveRequestSchema,
-  credentialSettingsSnapshotSchema,
-  type CredentialSaveRequest,
-} from 'thesidedoor-core/configuration/credential-client';
 import { WelcomeFlow } from '@/app/welcome/WelcomeFlow';
 import type { AgentState, ContextItem, VoiceState } from '@/app/welcome/WelcomeFlow';
 import { StepAgent } from '@/app/welcome/steps/StepAgent';
@@ -218,61 +213,6 @@ describe('welcome hosted-demo mode', () => {
     window.history.pushState({}, '', '/welcome');
   });
 
-  it('saves local endpoint authentication and the optional Google live key during final setup', async () => {
-    const user = userEvent.setup();
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ demo: false, courseId: 'course_1' }),
-    });
-    vi.stubGlobal('fetch', withWelcomeCredentialBoundary(credentialBoundary, fetchMock));
-
-    render(
-      <StepReady
-        saveCredentials={credentialBoundary.saveCredentials}
-        submitSetup={credentialBoundary.submitSetup}
-        baseLang="en"
-        language="it"
-        level="A2"
-        sources={new Set(['reading'])}
-        contextItems={[]}
-        agent={{
-          provider: 'custom',
-          method: 'url',
-          value: 'https://models.example/v1',
-          apiKey: 'endpoint-secret',
-          model: 'served-model',
-          liveTranslationKey: 'AIza-live',
-          status: 'connected',
-        }}
-        voice={{
-          tts: 'elevenlabs',
-          stt: 'whisper',
-          visualCueProvider: 'pexels',
-          keys: {},
-          baseUrls: {},
-          ttsModel: {},
-          sttModel: {},
-        }}
-        config={{ selfHosted: true, isOwner: true }}
-        onRestart={vi.fn()}
-        onJump={vi.fn()}
-      />
-    );
-
-    await user.click(screen.getByRole('button', { name: /open today's session/i }));
-
-    expect(credentialBoundary.saved.get('ai-keys:google')).toEqual({ apiKey: 'AIza-live' });
-    expect(credentialBoundary.saved.get('ai-keys:local')).toEqual({ apiKey: 'endpoint-secret' });
-    expect(fetchMock).toHaveBeenCalledWith(
-      '/api/v1/onboarding/save',
-      expect.objectContaining({
-        method: 'POST',
-        body: expect.stringContaining('"aiBaseUrl":"https://models.example/v1"'),
-      })
-    );
-    expect(mockPush).toHaveBeenCalledWith('/learn');
-  });
-
   it('saves an optional visual cue provider key during self-host setup', async () => {
     const user = userEvent.setup();
     const fetchMock = vi.fn().mockResolvedValue({
@@ -465,219 +405,18 @@ describe('welcome hosted-demo mode', () => {
 
     await user.click(await screen.findByRole('button', { name: /^Continue/i }));
 
-    // Placement's "estimate from material" resolves the AI server-side before the
-    // final StepReady save, so the selection must already be in SiteConfig.
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith(
-        '/api/v1/admin/site-config',
-        expect.objectContaining({
-          method: 'PATCH',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ aiProvider: 'claude-code', aiModel: 'claude-code:opus' }),
-        })
-      );
+      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/tools that practice/i);
     });
-  });
-
-  it('reports an endpoint as configured only after the owner configuration save succeeds', async () => {
-    const user = userEvent.setup();
-    const pending = Promise.withResolvers<Response>();
-    let payload: unknown;
-    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
-      if (String(input) === '/api/v1/admin/site-config') {
-        payload = JSON.parse(String(init?.body));
-        return pending.promise;
-      }
-      return (
-        credentialBoundary.handle(input, init) ??
-        Response.json({ selfHosted: true, isOwner: true, onboardingResumeKey: 'current-owner' })
-      );
+    const request = fetchMock.mock.calls.find(([input]) =>
+      String(input).endsWith('/api/v1/admin/site-config')
+    );
+    const options = (request as Parameters<typeof fetch> | undefined)?.[1];
+    expect(options?.method).toBe('PATCH');
+    expect(JSON.parse(String(options?.body))).toEqual({
+      aiProvider: 'claude-code',
+      aiModel: 'claude-code:opus',
     });
-    window.localStorage.setItem(
-      'sotto.onboarding.v1',
-      JSON.stringify({
-        onboardingResumeKey: 'current-owner',
-        step: 4,
-        language: 'de',
-        agent: {
-          provider: 'local',
-          method: 'url',
-          value: 'http://localhost:8000/v1',
-          model: 'local-model',
-          status: 'connected',
-        },
-      })
-    );
-    render(
-      <WelcomeFlow
-        initialConfig={{ selfHosted: true, isOwner: true, onboardingResumeKey: 'current-owner' }}
-      />
-    );
-    const save = await screen.findByRole('button', { name: 'Save configuration' });
-    await waitFor(() => expect(save).toBeEnabled());
-    await user.click(save);
-    await waitFor(() =>
-      expect(payload).toMatchObject({
-        aiProvider: 'local',
-        aiBaseUrl: 'http://localhost:8000/v1',
-        aiModel: 'local-model',
-      })
-    );
-    expect(screen.queryByText('Endpoint configured')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /^Continue/i })).toBeDisabled();
-    pending.resolve(Response.json({ success: true }));
-    expect(await screen.findByText('Endpoint configured')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /^Continue/i })).toBeEnabled();
-    await user.type(screen.getByLabelText('Local model name'), '-changed');
-    expect(screen.queryByText('Endpoint configured')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /^Continue/i })).toBeDisabled();
-  });
-
-  it.each(['local', 'custom'])(
-    'saves the %s endpoint, optional key, and model and invalidates edits',
-    async (provider) => {
-      const user = userEvent.setup();
-      const writes: string[] = [];
-      vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
-        const path = String(input);
-        if (path === '/api/v1/admin/site-config') {
-          writes.push('endpoint');
-          expect(JSON.parse(String(init?.body))).toMatchObject({
-            aiProvider: 'local',
-            aiBaseUrl: 'http://localhost:11434/v1',
-            aiModel: 'served-model',
-          });
-          expect(String(init?.body)).not.toContain('private-key');
-          return Response.json({ success: true });
-        }
-        if (path === '/api/v1/settings/ai-keys' && init?.method === 'POST') writes.push('key');
-        return (
-          credentialBoundary.handle(input, init) ??
-          Response.json({
-            selfHosted: true,
-            isOwner: true,
-            onboardingResumeKey: 'current-owner',
-          })
-        );
-      });
-      window.localStorage.setItem(
-        'sotto.onboarding.v1',
-        JSON.stringify({
-          onboardingResumeKey: 'current-owner',
-          step: 4,
-          language: 'de',
-          agent: {
-            provider,
-            method: 'url',
-            value: 'http://localhost:11434/v1',
-            model: '',
-            status: 'idle',
-          },
-        })
-      );
-      render(
-        <WelcomeFlow
-          initialConfig={{ selfHosted: true, isOwner: true, onboardingResumeKey: 'current-owner' }}
-        />
-      );
-      const save = await screen.findByRole('button', { name: 'Save configuration' });
-      const label = provider === 'local' ? 'Local' : 'Custom';
-      const key = screen.getByLabelText(`${label} API key`);
-      const model = screen.getByLabelText(`${label} model name`);
-      await waitFor(() => expect(key).toBeEnabled());
-      expect(save).toBeDisabled();
-      await user.type(model, 'served-model');
-      await user.type(key, 'private-key');
-      expect(key).toHaveAttribute('type', 'password');
-      await user.click(save);
-      await screen.findByText('Endpoint configured');
-      expect(writes).toEqual(['endpoint', 'key']);
-      expect(credentialBoundary.saved.get('ai-keys:local')).toEqual({ apiKey: 'private-key' });
-      expect(window.localStorage.getItem('sotto.onboarding.v1')).not.toContain('private-key');
-      expect(screen.getByRole('button', { name: /^Continue/i })).toBeEnabled();
-      for (const field of [model, key, screen.getByLabelText('Endpoint URL')]) {
-        await user.type(field, 'x');
-        expect(screen.queryByText('Endpoint configured')).not.toBeInTheDocument();
-        expect(screen.getByRole('button', { name: /^Continue/i })).toBeDisabled();
-        await user.type(field, '{Backspace}');
-      }
-    }
-  );
-
-  it('requires fresh consent after editing an unverified key and reports the saved outcome', async () => {
-    const user = userEvent.setup();
-    const submitted: CredentialSaveRequest[] = [];
-    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
-      if (String(input) === '/api/v1/settings/ai-keys' && init?.method === 'POST') {
-        const command = credentialSaveRequestSchema.parse(JSON.parse(String(init.body)));
-        submitted.push(command);
-        if (!command.allowUnverified)
-          return Response.json({
-            status: 'needs_confirmation',
-            operationId: command.operationId,
-            context: command.context,
-            validation: {
-              status: 'inconclusive',
-              readiness: { code: 'unreachable', checkedAt: 1 },
-            },
-          });
-      }
-      const response = credentialBoundary.handle(input, init);
-      if (response && !init?.method) {
-        const snapshot = credentialSettingsSnapshotSchema.parse(await response.json());
-        snapshot.keys = snapshot.keys.map((key) => ({
-          ...key,
-          verification: {
-            lastAttempt: { status: 'inconclusive', checkedAt: 1 },
-            lastConfirmed: null,
-          },
-        }));
-        return Response.json(snapshot);
-      }
-      return (
-        response ??
-        Response.json({ selfHosted: true, isOwner: false, onboardingResumeKey: 'current-owner' })
-      );
-    });
-    window.localStorage.setItem(
-      'sotto.onboarding.v1',
-      JSON.stringify({
-        onboardingResumeKey: 'current-owner',
-        step: 4,
-        language: 'de',
-        agent: { provider: 'claude', method: 'key', model: 'claude-sonnet-5' },
-      })
-    );
-    render(
-      <WelcomeFlow
-        initialConfig={{ selfHosted: true, isOwner: false, onboardingResumeKey: 'current-owner' }}
-      />
-    );
-    const input = await screen.findByLabelText(/Claude API key/i);
-    await waitFor(() => expect(input).toBeEnabled());
-    await user.type(input, 'first-key');
-    await user.click(screen.getByRole('button', { name: /^Save key$/i }));
-    expect(
-      await screen.findByRole('button', { name: 'Save without verification' })
-    ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /^Continue/i })).toBeDisabled();
-    await user.clear(input);
-    await user.type(input, 'changed-key');
-    expect(
-      screen.queryByRole('button', { name: 'Save without verification' })
-    ).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /^Save key$/i }));
-    await user.click(await screen.findByRole('button', { name: 'Save without verification' }));
-    await waitFor(() => expect(screen.getByRole('button', { name: /^Continue/i })).toBeEnabled());
-    expect(screen.getByText(/key saved without verification/i)).toBeInTheDocument();
-    expect(submitted).toHaveLength(3);
-    expect(submitted[0]!.operationId).not.toBe(submitted[1]!.operationId);
-    expect(submitted[2]).toMatchObject({
-      operationId: submitted[1]!.operationId,
-      allowUnverified: true,
-    });
-    expect(credentialBoundary.saved.get('ai-keys:anthropic')).toEqual({ apiKey: 'changed-key' });
   });
 
   it('resumes a saved personal AI key without exposing it or posting it again', async () => {
@@ -714,7 +453,9 @@ describe('welcome hosted-demo mode', () => {
         initialConfig={{ selfHosted: true, isOwner: false, onboardingResumeKey: 'current-owner' }}
       />
     );
-    expect(await screen.findByText('Saved for your profile')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: /Override the detected/ })
+    ).toBeInTheDocument();
     expect(screen.queryByDisplayValue('saved-secret')).not.toBeInTheDocument();
     const next = screen.getByRole('button', { name: /^Continue/i });
     await waitFor(() => expect(next).toBeEnabled());

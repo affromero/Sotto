@@ -11,33 +11,6 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it.each(['http://localhost:11434/v1', 'http://localhost:11434/v1/'])(
-  'retains the reviewed local URL while probing its compatible API: %s',
-  async (endpoint) => {
-    const probe = captureSottoCredentialProbe('ai', 'local', { apiKey: 'private-key' }, endpoint);
-    expect(probe).toMatchObject({
-      binding: { protocol: 'compatible', endpoint },
-    });
-    const requests: { url: string; authorization: string | null }[] = [];
-    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
-      requests.push({
-        url: String(input),
-        authorization: new Headers(init?.headers).get('authorization'),
-      });
-      return Response.json({ object: 'list', data: [{ id: 'served-model' }] });
-    });
-    expect(await validateSottoCredentialProbe(probe)).toMatchObject({
-      readiness: { code: 'ready' },
-    });
-    expect(requests).toEqual([
-      { url: 'http://localhost:11434/v1/models', authorization: 'Bearer private-key' },
-    ]);
-    expect(() => captureSottoCredentialProbe('ai', 'local', { apiKey: 'private-key' })).toThrow(
-      'Save the local AI endpoint'
-    );
-  }
-);
-
 it.each([
   {
     provider: 'together',

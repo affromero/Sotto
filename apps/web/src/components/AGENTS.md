@@ -77,8 +77,9 @@ explicit unverified consent, cancellation, and uncertain-outcome reconciliation.
 Form edits invalidate pending confirmation. A pending uncertain write blocks edits
 until the user checks its status.
 
-`settings/LocalAiSettings` is shown to admins on `/settings`; it updates the shared
-OpenAI-compatible AI endpoint and model and manages its optional encrypted key.
+Admin model-server settings use `settings/local-ai/useLocalAiController.ts` to
+coordinate configuration and credentials. Save the address and model before
+binding an optional key. Keep receipt handling in the shared credential editor.
 
 `settings/LocalSpeechSettings` lets each learner explicitly disable audio or return to
 configured speech. It also appears on Admin's Providers & models page, with recovery

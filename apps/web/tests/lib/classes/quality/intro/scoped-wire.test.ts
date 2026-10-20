@@ -206,65 +206,94 @@ beforeEach(() => {
 });
 
 describe('strict scoped A1 intro wire', () => {
-  it.each(['A1', 'A2'])(
-    'preserves observation bodies and index identity through a complete %s repair',
-    async (level) => {
-      const example = {
-        target: 'Vous prenez le tram.',
-        note: 'Le sujet vous demande une terminaison en ez.',
-        ...(level === 'A1' ? { meaning: 'You take the tram.' } : {}),
+  it.each([
+    { level: 'A1', index: 0 },
+    { level: 'A1', index: 2 },
+    { level: 'A1', index: 4 },
+    { level: 'A2', index: 0 },
+    { level: 'A2', index: 2 },
+    { level: 'A2', index: 4 },
+  ])(
+    'repairs occurrence $index without confusing equal targets at $level',
+    async ({ level, index }) => {
+      const original = {
+        target: 'Nous arrivons ensemble.',
+        note: 'Le sujet accompagne le verbe.',
+        ...(level === 'A1' ? { meaning: 'We arrive together.' } : {}),
       };
-      const observation = 'Repérez la terminaison du verbe.';
-      const initial = {
-        ...wire,
-        purpose: 'Préparer un déplacement.',
-        examples: [example, example],
-        about: { exampleIndex: 1 },
-        focus: [0, 1].map((exampleIndex) => ({ text: observation, exampleIndex })),
-        tips: [{ text: 'Adressez-vous à votre groupe.', exampleIndex: 0 }],
+      const changed = {
+        ...original,
+        target: 'Nous repartons ensemble.',
+        ...(level === 'A1' ? { meaning: 'We depart together.' } : {}),
       };
-      const replacement = {
-        ...example,
-        target: 'Vous prenez le métro.',
-        ...(level === 'A1' ? { meaning: 'You take the metro.' } : {}),
+      const focusOrder = [4, 0];
+      const tipOrder = [2];
+      const draft = {
+        purpose: 'Préparer une arrivée ensemble.',
+        examples: Array.from({ length: 5 }, () => ({ ...original })),
+        about: { exampleIndex: index },
+        focus: focusOrder.map((exampleIndex) => ({ exampleIndex, text: 'Repérez le sujet.' })),
+        tips: tipOrder.map((exampleIndex) => ({
+          exampleIndex,
+          text: 'Prononcez la terminaison.',
+        })),
+        visuals: null,
       };
-      respond(initial, { examples: { 1: replacement } }, ['examples:1']);
-      const result = await generateClassIntro({ ...params, level, targetLang: 'fr' });
-      expect(result.focus).toEqual([
-        `„${example.target}“: ${observation}`,
-        `„${replacement.target}“: ${observation}`,
-      ]);
-      expect(result.about).toBe(
-        level === 'A1' ? `„${replacement.target}“: You take the metro.` : replacement.target
+      respond(draft, { examples: { [index]: changed } }, ['examples:' + index]);
+      const published = await generateClassIntro({ ...params, level, targetLang: 'fr' });
+      expect(published.examples.map((example) => example.target)).toEqual(
+        draft.examples.map((example, occurrence) =>
+          occurrence === index ? changed.target : example.target
+        )
       );
-      expect(result.tips).toEqual([`„${example.target}“: Adressez-vous à votre groupe.`]);
-      expect(result.examples[0].target).toBe(example.target);
-      for (const reviewed of reviewContexts().slice(2)) expect(reviewed).toEqual(result);
+      for (const [field, positions, body] of [
+        ['focus', focusOrder, 'Repérez le sujet.'],
+        ['tips', tipOrder, 'Prononcez la terminaison.'],
+      ] as const) {
+        expect(published[field]).toEqual(
+          positions.map(
+            (position) =>
+              '„' + (position === index ? changed.target : original.target) + '“: ' + body
+          )
+        );
+      }
+      expect(published.about).toContain(changed.target);
+      const audited = reviewContexts().slice(2);
+      expect(audited.length).toBeGreaterThan(0);
+      for (const context of audited) expect(context).toEqual(published);
     }
   );
 
-  it('blocks publication when a preserved observation fails review after its example changes', async () => {
-    const example = {
-      target: 'Wir werden morgen gehen.',
-      meaning: 'We will go tomorrow.',
-      note: 'Werden bildet hier die Zukunft.',
-    };
-    respond(wire, { examples: { 1: example } }, ['examples:1'], ({ content }, intro) => {
-      if (
-        content.address.field === 'focus' &&
-        content.address.index === 1 &&
-        intro.examples[1].target === example.target
-      )
-        return {
-          defect: 'The retained observation describes a different auxiliary.',
-          correction: 'Explain the future auxiliary shown in this example.',
-        };
-    });
-    await expect(generateClassIntro(params)).rejects.toMatchObject({
-      name: 'TeachingQualityRejectionError',
-      issues: ['incorrect'],
-    });
-  });
+  it.each(['focus', 'tips'] as const)(
+    'withholds the whole intro when a retained %s observation becomes false',
+    async (field) => {
+      const draft = {
+        ...wire,
+        focus: [{ text: 'Das Beispiel ist im Perfekt.', exampleIndex: 1 }],
+        tips: [{ text: 'Achte auf das Partizip.', exampleIndex: 1 }],
+      };
+      const changed = {
+        target: 'Wir gehen morgen ins Kino.',
+        meaning: 'We go to the cinema tomorrow.',
+        note: 'Das Beispiel steht im Präsens.',
+      };
+      const finalAudits: string[] = [];
+      respond(draft, { examples: { 1: changed } }, ['examples:1'], (item, intro) => {
+        if (intro.examples[1].target !== changed.target) return;
+        finalAudits.push(item.content.address.field);
+        if (item.content.address.field === field)
+          return {
+            defect: 'The observation describes a tense absent from the replacement.',
+            correction: 'Describe the present tense example accurately.',
+          };
+      });
+      await expect(generateClassIntro(params)).rejects.toMatchObject({
+        name: 'TeachingQualityRejectionError',
+        issues: ['incorrect'],
+      });
+      expect(finalAudits).toContain(field);
+    }
+  );
 
   it('repairs teaching after a size repair and re-audits the complete merged intro', async () => {
     const example = { ...wire.examples[1]!, meaning: 'The group went.' };

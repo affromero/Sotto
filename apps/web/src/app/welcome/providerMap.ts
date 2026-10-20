@@ -39,7 +39,7 @@ export interface KeyPost {
   endpoint: 'ai-keys' | 'byok' | 'visual-cues';
   provider: string;
   apiKey: string;
-  /** Local URL participates in receipt reuse without becoming a credential field. */
+  /** Reviewed server URL carried separately from the credential's saved fields. */
   baseUrl?: string;
   extra?: Record<string, string>;
 }
@@ -146,45 +146,58 @@ export function resolveAi(
   model: string,
   apiKey?: string
 ): AiResolution {
-  const v = clean(value);
-  const m = clean(model);
-
-  if (method === 'key') {
-    // claude → anthropic, codex → openai, cloud LLM cards → their registry id.
-    const byokProvider = aiModelProviderId(provider) ?? 'openai';
-    return {
-      keyPost: v ? { endpoint: 'ai-keys', provider: byokProvider, apiKey: v } : null,
-      preferredAiProvider: byokProvider,
-      // Bare registry model id picked in the wizard (no "local:" prefix). Drives
-      // generation via AutoModelConfig once persisted; null falls back to default.
-      preferredAiModel: m || null,
-      infra: {},
-    };
+  const selectedModel = clean(model);
+  const suppliedValue = clean(value);
+  const empty: AiResolution = {
+    infra: {},
+    preferredAiModel: null,
+    preferredAiProvider: null,
+    keyPost: null,
+  };
+  switch (method) {
+    case 'url': {
+      if (!suppliedValue) return empty;
+      const secret = clean(apiKey);
+      const configuration: AiResolution['infra'] = {
+        aiProvider: 'local',
+        aiBaseUrl: suppliedValue,
+      };
+      if (selectedModel) configuration.aiModel = selectedModel;
+      return {
+        ...empty,
+        infra: configuration,
+        preferredAiProvider: 'local',
+        preferredAiModel: selectedModel ? ['local', selectedModel].join(':') : null,
+        keyPost: secret
+          ? { apiKey: secret, baseUrl: suppliedValue, provider: 'local', endpoint: 'ai-keys' }
+          : null,
+      };
+    }
+    case 'cli': {
+      const backend = provider === 'codex' ? 'codex' : 'claude-code';
+      const configuration: AiResolution['infra'] = { aiProvider: backend };
+      if (selectedModel) configuration.aiModel = selectedModel;
+      return {
+        ...empty,
+        infra: configuration,
+        preferredAiProvider: backend,
+        preferredAiModel: selectedModel || (backend === 'codex' ? backend : null),
+      };
+    }
+    case 'key': {
+      const account = aiModelProviderId(provider) ?? 'openai';
+      return {
+        ...empty,
+        preferredAiProvider: account,
+        preferredAiModel: selectedModel || null,
+        keyPost: suppliedValue
+          ? { provider: account, apiKey: suppliedValue, endpoint: 'ai-keys' }
+          : null,
+      };
+    }
+    default:
+      return empty;
   }
-
-  if (method === 'cli') {
-    // The CLI backend is the keyless local agent. The picked model is already a
-    // routable agent model id (for example claude-code:sonnet or codex:gpt-5.5).
-    const cliProvider = provider === 'codex' ? 'codex' : 'claude-code';
-    return {
-      keyPost: null,
-      preferredAiProvider: cliProvider,
-      preferredAiModel: m || (cliProvider === 'codex' ? 'codex' : null),
-      infra: { aiProvider: cliProvider, ...(m && { aiModel: m }) },
-    };
-  }
-
-  if (method === 'url' && v) {
-    const key = clean(apiKey);
-    return {
-      keyPost: key ? { endpoint: 'ai-keys', provider: 'local', apiKey: key, baseUrl: v } : null,
-      preferredAiProvider: 'local',
-      preferredAiModel: m ? `local:${m}` : null,
-      infra: { aiProvider: 'local', aiBaseUrl: v, ...(m && { aiModel: m }) },
-    };
-  }
-
-  return { keyPost: null, preferredAiProvider: null, preferredAiModel: null, infra: {} };
 }
 
 /** Optional Google key used only to unlock Gemini Live translation. */

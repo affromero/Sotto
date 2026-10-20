@@ -69,49 +69,77 @@ test('a learner configures local providers and creates a persistent course', asy
   expect(course.note?.body).toContain('greet Spanish-speaking friends');
 });
 
-test('Local and Custom save URL, key, and model and use them for a real compatible request', async ({
+test('compatible connections keep credentials bound through consent, model checks, and edits', async ({
   page,
 }) => {
+  const provider = process.env.SOTTO_BROWSER_PROVIDER!;
   await page.goto('/access');
   await page.getByLabel(/password/i).fill('browser test household password');
-  await page.getByRole('button', { name: /sign in|continue|enter/i }).click();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await page.getByRole('button', { name: /Browser learner/ }).click();
   await expect(page).toHaveURL(/\/(welcome|dashboard|learn)$/);
   await page.goto('/welcome?step=4');
-  for (const [provider, width, key] of [
-    ['Local', 1280, 'browser-local-key'],
-    ['Custom', 375, 'browser-custom-key'],
-  ] as const) {
-    await page.setViewportSize({ width, height: 812 });
-    await page.getByRole('button', { name: new RegExp(`^${provider}`) }).click();
-    const endpoint = page.getByLabel('Endpoint URL');
-    const apiKey = page.getByLabel(`${provider} API key`);
-    const model = page.getByLabel(`${provider} model name`);
-    await endpoint.fill(`${process.env.SOTTO_BROWSER_PROVIDER}/v1`);
-    await apiKey.fill(key);
-    await expect(apiKey).toHaveAttribute('type', 'password');
-    await expect(
-      page.getByRole('button', { name: 'Save configuration', exact: true })
-    ).toBeDisabled();
+
+  for (const connection of [
+    { card: 'Local', width: 1280, token: 'browser-connection-alpha' },
+    { card: 'Custom', width: 375, token: 'browser-connection-beta' },
+  ]) {
+    const expected = await page.request.post(provider + '/fixture/connection', {
+      data: { token: connection.token, model: 'browser-fixture' },
+    });
+    expect(expected.ok()).toBe(true);
+    await page.setViewportSize({ width: connection.width, height: 812 });
+    await page.getByRole('button', { name: new RegExp('^' + connection.card) }).click();
+    const save = page.getByRole('button', { name: 'Save configuration', exact: true });
+    const secret = page.getByLabel(connection.card + ' API key');
+    await page.getByLabel('Endpoint URL').fill(provider + '/v1');
+    await secret.fill(connection.token);
+    await expect(secret).toHaveAttribute('type', 'password');
+    await expect(save).toBeDisabled();
+    const model = page.getByLabel(connection.card + ' model name');
     await model.fill('browser-fixture');
-    await page.getByRole('button', { name: 'Save configuration', exact: true }).click();
-    await page.getByRole('button', { name: 'Save without verification', exact: true }).click();
-    await expect(
-      page.getByRole('button', { name: 'Save configuration', exact: true })
-    ).toBeEnabled();
-    await page.getByRole('button', { name: 'Save configuration', exact: true }).click();
+    const configuration = page.waitForRequest(
+      (request) =>
+        request.method() === 'PATCH' && request.url().endsWith('/api/v1/admin/site-config')
+    );
+    await save.click();
+    expect((await configuration).postDataJSON()).toEqual({
+      aiProvider: 'local',
+      aiBaseUrl: provider + '/v1',
+      aiModel: 'browser-fixture',
+    });
+    const consent = page.getByRole('button', { name: 'Save without verification', exact: true });
+    await expect(consent).toBeVisible();
+    const authenticatedSave = page.waitForRequest(
+      (request) =>
+        request.method() === 'POST' &&
+        request.url().endsWith('/api/v1/settings/ai-keys') &&
+        request.postDataJSON().allowUnverified === true
+    );
+    await consent.click();
+    const mutation = await authenticatedSave;
+    expect(mutation.headers()['x-sotto-reviewed-ai-endpoint']).toBe(provider + '/v1');
+    const command = mutation.postDataJSON();
+    expect(command).toMatchObject({ provider: 'local', allowUnverified: true });
+    expect(command.values ?? command.patch).toMatchObject({ apiKey: connection.token });
+    await expect(save).toBeEnabled();
+    await save.click();
     await expect(page.getByText('Endpoint configured', { exact: true })).toBeVisible();
-    expect(
-      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
-    ).toBe(true);
-    const response = await page.request.post('/api/v1/admin/test-model', {
+    const generated = await page.request.post('/api/v1/admin/test-model', {
       headers: { origin: process.env.NEXT_PUBLIC_APP_URL! },
       data: { type: 'ai', provider: 'local', model: 'browser-fixture' },
     });
-    expect(await response.json()).toMatchObject({ success: true, response: 'Hello!' });
-    await model.fill('another-model');
+    expect(await generated.json()).toMatchObject({ success: true, response: 'Hello!' });
+    expect(await page.evaluate(() => JSON.stringify(localStorage))).not.toContain(connection.token);
+    await page.screenshot({
+      path: test.info().outputPath('connection-' + connection.width + '.png'),
+    });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      connection.width
+    );
+    await model.fill('changed-after-proof');
     await expect(page.getByRole('button', { name: /^Continue/ })).toBeDisabled();
-    await model.fill('browser-fixture');
+    await expect(page.getByText('Endpoint configured', { exact: true })).toHaveCount(0);
   }
 });
 

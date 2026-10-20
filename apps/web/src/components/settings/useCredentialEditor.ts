@@ -185,13 +185,11 @@ export function useCredentialEditor(endpoint: CredentialEndpoint) {
     pending.current = retained;
     try {
       const result = submission
-        ? await saveCredentialSettings(
-            endpoint,
-            submission.draft,
-            submission.confirmed,
+        ? await saveCredentialSettings(endpoint, submission.draft, {
             signal,
-            submission.expectedEndpoint
-          )
+            allowUnverified: submission.confirmed,
+            reviewedEndpoint: submission.expectedEndpoint,
+          })
         : removing
           ? await removeCredentialSettings(endpoint, operation.receipt, signal)
           : await reconcileCredentialSettings(endpoint, operation.receipt, operation.kind, signal);

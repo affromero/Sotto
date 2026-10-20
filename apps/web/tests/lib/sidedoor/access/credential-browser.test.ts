@@ -20,10 +20,6 @@ const displayed = {
 };
 const draft = () =>
   prepareCredentialSave(displayed, 'openai', { values: { apiKey: 'private-test-key' } });
-const localDraft = () =>
-  prepareCredentialSave({ ...displayed, heads: { local: null } }, 'local', {
-    values: { apiKey: 'private-local-test-key' },
-  });
 afterEach(() => vi.unstubAllGlobals());
 
 describe('credential browser transport', () => {
@@ -37,7 +33,7 @@ describe('credential browser transport', () => {
     expect(captured).not.toContain('test-secret');
   });
   it('projects an immutable receipt without submitted credential values', () => {
-    const command = localDraft();
+    const command = draft();
     const captured = captureCredentialReceipt(command);
     expect(captured).toEqual({
       context: command.context,
@@ -45,7 +41,7 @@ describe('credential browser transport', () => {
       expectedRevision: command.expectedRevision,
       operationId: command.operationId,
     });
-    expect(JSON.stringify(captured)).not.toContain('private-local-test-key');
+    expect(JSON.stringify(captured)).not.toContain('private-test-key');
     expect(() => {
       captured.context.owner.subjectId = 'another-owner';
     }).toThrow();
@@ -93,28 +89,40 @@ describe('credential browser transport', () => {
       status: 'needs_confirmation',
     });
   });
-  it('sends the reviewed local endpoint on the initial save and confirmation retry', async () => {
-    const command = localDraft();
-    const reviewedEndpoints: Array<string | null> = [];
-    vi.stubGlobal('fetch', async (_url: string, init: RequestInit) => {
-      reviewedEndpoints.push(new Headers(init.headers).get('x-sotto-reviewed-ai-endpoint'));
-      return Response.json({
-        status: 'needs_confirmation',
-        operationId: command.operationId,
-        context: command.context,
-        validation: { status: 'inconclusive', readiness: { code: 'unreachable', checkedAt: 1 } },
+  it.each(['local', 'openai'])(
+    'limits endpoint-review metadata to the compatible slot rather than %s credentials generally',
+    async (provider) => {
+      const submitted = prepareCredentialSave(
+        { ...displayed, heads: { [provider]: null } },
+        provider,
+        { values: { apiKey: 'endpoint-review-fixture' } }
+      );
+      const exchanges: Array<{ headers: Headers; body: Record<string, unknown> }> = [];
+      vi.stubGlobal('fetch', async (_input: RequestInfo | URL, options: RequestInit) => {
+        exchanges.push({
+          headers: new Headers(options.headers),
+          body: JSON.parse(String(options.body)),
+        });
+        return Response.json({
+          status: 'needs_confirmation',
+          context: submitted.context,
+          operationId: submitted.operationId,
+          validation: { status: 'inconclusive', readiness: { code: 'unreachable', checkedAt: 4 } },
+        });
       });
-    });
-
-    const endpoint = 'http://localhost:11434/v1';
-    expect(await saveCredentialSettings('ai-keys', command, false, undefined, endpoint)).toEqual({
-      status: 'needs_confirmation',
-    });
-    expect(await saveCredentialSettings('ai-keys', command, true, undefined, endpoint)).toEqual({
-      status: 'needs_confirmation',
-    });
-    expect(reviewedEndpoints).toEqual([endpoint, endpoint]);
-  });
+      const reviewedEndpoint = 'https://reviewed.example/deployment/v1';
+      for (const allowUnverified of [false, true]) {
+        expect(
+          await saveCredentialSettings('ai-keys', submitted, { reviewedEndpoint, allowUnverified })
+        ).toMatchObject({ status: 'needs_confirmation' });
+      }
+      expect(
+        exchanges.map((exchange) => exchange.headers.get('x-sotto-reviewed-ai-endpoint'))
+      ).toEqual(provider === 'local' ? [reviewedEndpoint, reviewedEndpoint] : [null, null]);
+      expect(exchanges[0].body.allowUnverified).toBe(false);
+      expect(exchanges[1].body).toEqual({ ...exchanges[0].body, allowUnverified: true });
+    }
+  );
   it('distinguishes a saved receipt from an unknown outcome when the follow-up read fails', async () => {
     const command = draft();
     vi.stubGlobal('fetch', async (_url: string, init: RequestInit) => {
@@ -156,7 +164,7 @@ describe('credential browser transport', () => {
       return Response.json(displayed);
     });
     await expect(
-      saveCredentialSettings('ai-keys', draft(), false, controller.signal)
+      saveCredentialSettings('ai-keys', draft(), { signal: controller.signal })
     ).rejects.toMatchObject({ name: 'AbortError' });
   });
 });

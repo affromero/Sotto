@@ -7,6 +7,18 @@ export interface LearningAiRequest {
   isolatedImage?: string;
 }
 
+/** Capture a setup choice without reading the learner's previous defaults. */
+export function learningAiSetupSelection(
+  choice: { aiProvider?: string; aiModel?: string } | undefined,
+  configuration: { aiBaseUrl?: string | null } | undefined
+): LearningAiRequest | undefined {
+  if (!choice?.aiModel || !choice.aiProvider) return;
+  const captured: LearningAiRequest = { model: choice.aiModel, provider: choice.aiProvider };
+  if (captured.provider !== 'local') return captured;
+  if (configuration?.aiBaseUrl) captured.endpoint = configuration.aiBaseUrl;
+  return captured;
+}
+
 /** A pending choice must be valid. An obsolete saved preference uses the existing default policy. */
 export function selectLearningAi(
   pending: LearningAiRequest | undefined,
