@@ -14,7 +14,7 @@ import {
 import type { SottoProviderExecution } from '../sidedoor/credentials/runtime/provider-execution';
 import type { SourceDocuments, DocumentContentPart } from '../providers/ai';
 import { validatePdfDocument } from '../providers/documents/pdf-input';
-import { readPdfFile } from '../providers/documents/files';
+import { readBoundedRegularFile } from '../providers/documents/files';
 import { logger } from '../logger';
 
 /** Capture and read immutable originals through their owned storage references. */
@@ -121,7 +121,10 @@ export async function captureMaterialDocuments(
         type: 'document',
         name: row.name,
         mediaType: 'application/pdf',
-        data: await readPdfFile(path, { maximum: row.byteSize, expectedBytes: row.byteSize }),
+        data: await readBoundedRegularFile(path, {
+          maximum: row.byteSize,
+          expectedBytes: row.byteSize,
+        }),
       };
       validatePdfDocument(part);
       parts.push(part);

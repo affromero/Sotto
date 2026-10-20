@@ -15,6 +15,7 @@ from typing import Mapping, cast
 
 
 LIMIT = 262144
+MAX_REVIEWED_RUNTIME_FILES = 1024
 FIELDS = {
     'schemaVersion', 'procedure', 'stack', 'releaseSha',
     'candidateWebImage', 'candidateWorkersImage', 'previousWebImage',
@@ -67,7 +68,7 @@ def provider_activation(review: Mapping[str, object]) -> dict[str, object]:
         if runtime['imageId'] not in allowed:
             raise ValueError('Previous runtime differs from reviewed images')
     files = value['reviewedRuntimeFiles']
-    if not isinstance(files, dict) or len(files) > 512:
+    if not isinstance(files, dict) or len(files) > MAX_REVIEWED_RUNTIME_FILES:
         raise ValueError('Bounded exact runtime file review required')
     for path, pair in files.items():
         if not isinstance(path, str) or not re.fullmatch(

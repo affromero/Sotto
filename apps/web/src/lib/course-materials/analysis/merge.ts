@@ -112,7 +112,7 @@ function overlaps(left: MaterialFocusCitation, right: MaterialFocusCitation) {
 }
 
 /** Database display columns cannot retain control characters. Exact headings remain in the byte receipt. */
-export function materialFocusDisplayTitle(text: string) {
+function materialFocusDisplayTitle(text: string) {
   let title = '';
   for (const point of text) {
     const clean = point.codePointAt(0)! < 32 || point === '\u007f' ? ' ' : point;

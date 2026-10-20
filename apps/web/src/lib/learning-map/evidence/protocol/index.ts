@@ -5,7 +5,7 @@ import { learningAudioIdentitySchema } from '../media-protocol';
 
 const sha = z.string().regex(/^[a-f0-9]{64}$/);
 const text = z.string().min(1).max(100_000);
-export const objectiveCriterionSchema = z
+const objectiveCriterionSchema = z
   .object({
     objectiveId: z.string().min(1),
     criterionVersion: z.number().int().positive(),

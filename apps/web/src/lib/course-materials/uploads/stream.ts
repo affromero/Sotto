@@ -14,7 +14,7 @@ export class MaterialUploadStreamError extends Error {
   }
 }
 
-export interface VerifiedMaterialUploadPart extends MaterialUploadPlannedPart {
+interface VerifiedMaterialUploadPart extends MaterialUploadPlannedPart {
   sha256: string;
 }
 

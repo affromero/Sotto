@@ -61,16 +61,13 @@ const documentationUrlSchema = z
   .refine((url) => credentialFreeUrl(url, true), {
     message: 'Use HTTPS documentation without credentials or query parameters.',
   });
-export const materialRecognitionCapabilityRecordSchema = z
+const materialRecognitionCapabilityRecordSchema = z
   .object({
     capability: reviewedCapabilitySchema,
     documentationUrl: documentationUrlSchema,
     active: z.boolean(),
   })
   .strict();
-export type MaterialRecognitionCapabilityRecord = z.infer<
-  typeof materialRecognitionCapabilityRecordSchema
->;
 
 function selectionKey(selection: { provider: string; model: string; endpoint?: string | null }) {
   return JSON.stringify([selection.provider, selection.model, selection.endpoint ?? null]);
@@ -100,9 +97,6 @@ export const materialRecognitionCapabilitiesStateSchema = z
       if (record.active) active.add(selection);
     }
   });
-export type MaterialRecognitionCapabilitiesState = z.infer<
-  typeof materialRecognitionCapabilitiesStateSchema
->;
 
 export const reviewMaterialRecognitionCapabilitySchema = z
   .object({

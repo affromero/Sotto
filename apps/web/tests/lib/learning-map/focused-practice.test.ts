@@ -738,7 +738,9 @@ suite('repeatable focused practice with immutable owned difficulty', () => {
         } catch (error) {
           failures.push(String(error));
           response.writeHead(500, { 'content-type': 'application/json' });
-          response.end(JSON.stringify({ error: { message: String(error) } }));
+          response.end(
+            JSON.stringify({ error: { message: 'Synthetic practice provider failed.' } })
+          );
         }
       });
       await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));

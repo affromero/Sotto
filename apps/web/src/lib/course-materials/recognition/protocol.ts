@@ -106,7 +106,7 @@ const uncertaintySchema = z
     codePointEnd: position.nullable(),
   })
   .strict();
-export const materialTranscriptionSchema = z
+const materialTranscriptionSchema = z
   .object({
     schemaVersion: z.literal(1),
     inputDigest: sha,

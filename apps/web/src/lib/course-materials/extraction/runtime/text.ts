@@ -1,5 +1,5 @@
-import { readFile, lstat } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
+import { readBoundedRegularFile } from '../../../providers/documents/files';
 import { prepareMaterialPageText } from '../chunks';
 
 /** Text files have no visual layer. Exact UTF-8 validation preserves their complete original content. */
@@ -8,14 +8,12 @@ export async function extractMaterialText(
   originalSha256: string,
   signal: AbortSignal
 ) {
-  const metadata = await lstat(path);
-  if (!metadata.isFile() || metadata.isSymbolicLink() || metadata.size > 64 * 1024 * 1024)
-    throw new Error('This text original exceeds the explicit complete-text processing budget.');
-  const bytes = await readFile(path, { signal });
-  if (
-    bytes.length !== metadata.size ||
-    createHash('sha256').update(bytes).digest('hex') !== originalSha256
-  )
+  const bytes = await readBoundedRegularFile(path, {
+    maximum: 64 * 1024 * 1024,
+    allowEmpty: true,
+    signal,
+  });
+  if (createHash('sha256').update(bytes).digest('hex') !== originalSha256)
     throw new Error('The complete original text checksum changed.');
   const text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes);
   const prepared = prepareMaterialPageText({

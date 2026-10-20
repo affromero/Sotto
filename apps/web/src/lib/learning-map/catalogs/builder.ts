@@ -7,7 +7,7 @@ import {
   type LearningObjective,
 } from '@sotto/shared';
 
-export type GrammarRow = readonly [
+type GrammarRow = readonly [
   level: LearningLevel,
   key: string,
   group: string,

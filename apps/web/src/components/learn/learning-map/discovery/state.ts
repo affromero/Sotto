@@ -1,7 +1,7 @@
 import type { LearningMapResponse } from '@sotto/shared';
 
-export const branches = ['ALL', 'GRAMMAR', 'SITUATIONS'] as const;
-export const requirements = ['ALL', 'REQUIRED', 'OPTIONAL'] as const;
+const branches = ['ALL', 'GRAMMAR', 'SITUATIONS'] as const;
+const requirements = ['ALL', 'REQUIRED', 'OPTIONAL'] as const;
 export const statuses = ['ALL', 'NOT_ASSESSED', 'PRACTISING', 'CONFIDENT', 'NEEDS_WORK'] as const;
 export const skills = ['ALL', 'GRAMMAR', 'READING', 'LISTENING', 'SPEAKING', 'WRITING'] as const;
 export interface MapViewState {

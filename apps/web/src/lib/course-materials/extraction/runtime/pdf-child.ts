@@ -1,8 +1,9 @@
 import { createHash } from 'node:crypto';
-import { lstat, open, readFile, realpath } from 'node:fs/promises';
+import { open, realpath } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { dirname, join, resolve, sep } from 'node:path';
 import { z } from 'zod';
+import { readBoundedRegularFile } from '../../../providers/documents/files';
 import { prepareMaterialPageText } from '../chunks';
 import { MaterialPdfWarnings } from './warnings';
 import {
@@ -34,29 +35,25 @@ for (const method of ['log', 'warn', 'error'])
 async function readRequest(): Promise<MaterialPdfRequest> {
   const path = process.argv[2];
   if (!path || process.argv.length !== 3) throw new Error('Invalid PDF child invocation.');
-  const requestStat = await lstat(path);
-  if (!requestStat.isFile() || requestStat.isSymbolicLink() || requestStat.size > 32768)
-    throw new Error('Invalid PDF child request.');
-  const request = materialPdfRequestSchema.parse(JSON.parse(await readFile(path, 'utf8')));
+  const request = materialPdfRequestSchema.parse(
+    JSON.parse((await readBoundedRegularFile(path, { maximum: 32768 })).toString('utf8'))
+  );
   const directory = await realpath(request.directory);
   if (dirname(await realpath(path)) !== directory || directory !== request.directory)
     throw new Error('Invalid PDF child execution directory.');
-  const original = await lstat(request.pdfPath);
   const pdfPath = await realpath(request.pdfPath);
   if (
-    !original.isFile() ||
-    original.isSymbolicLink() ||
     !pdfPath.startsWith(`${dirname(directory)}${sep}`) ||
-    pdfPath.startsWith(`${directory}${sep}`) ||
-    original.size < 1 ||
-    original.size > request.limits.maxFileBytes
+    pdfPath.startsWith(`${directory}${sep}`)
   )
     throw new Error('Invalid PDF child input.');
   return request;
 }
 
 async function extract(request: MaterialPdfRequest) {
-  const original = await readFile(request.pdfPath);
+  const original = await readBoundedRegularFile(request.pdfPath, {
+    maximum: request.limits.maxFileBytes,
+  });
   if (
     original.byteLength > request.limits.maxFileBytes ||
     createHash('sha256').update(original).digest('hex') !== request.expectedSha256

@@ -116,7 +116,7 @@ export function onboardingPlacementAnalysis(
   });
 }
 
-export class MaterialAnalysisProcessingError extends Error {
+class MaterialAnalysisProcessingError extends Error {
   constructor(readonly analysis: MaterialAnalysisProjection) {
     super(
       analysis.failureReason ??

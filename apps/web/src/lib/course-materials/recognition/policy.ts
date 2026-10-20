@@ -43,7 +43,7 @@ export const materialRecognitionPolicySchema = z
   .strict();
 export type MaterialRecognitionPolicy = z.infer<typeof materialRecognitionPolicySchema>;
 
-export function materialRecognitionRuntimeRevision() {
+function materialRecognitionRuntimeRevision() {
   const source = process.env.COMMIT_SHA;
   return source && /^[a-f0-9]{40,64}$/.test(source)
     ? source

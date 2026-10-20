@@ -76,33 +76,6 @@ function renderCourseContext(
   return { text, fragments };
 }
 
-/** Onboarding uses the same bounded source plan while retaining complete originals. */
-export function buildCourseSourceContext(
-  documents: readonly { id: string; name: string; text: string }[],
-  seed: string
-) {
-  const planned = planCourseContext(
-    documents
-      .filter((document) => document.text.trim())
-      .map((document) => ({
-        id: document.id,
-        name: document.name,
-        length: [...document.text].length,
-      })),
-    seed
-  );
-  const fragments = planned.flatMap((document) => {
-    const source = [...documents.find((item) => item.id === document.id)!.text];
-    return document.ranges.map((range) => ({
-      documentId: document.id,
-      start: range.start,
-      end: range.end,
-      text: source.slice(range.start, range.end).join(''),
-    }));
-  });
-  return renderCourseContext(planned, fragments);
-}
-
 /** Ownership, metadata and exact ranges stay in the caller's existing transaction. */
 export async function readCourseMaterialContext(
   database: LearningDatabase,

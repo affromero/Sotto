@@ -1,6 +1,16 @@
 // @vitest-environment node
 import { createHash } from 'node:crypto';
-import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import {
+  appendFile,
+  mkdtemp,
+  readFile,
+  readdir,
+  rename,
+  rm,
+  symlink,
+  truncate,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
@@ -12,7 +22,34 @@ import { materialPdfPageSchema } from '@/lib/course-materials/extraction/pdf-pro
 import { compareMaterialPdfSemantics } from '@/lib/course-materials/optimization/verification';
 
 const directories: string[] = [];
+const boundary = vi.hoisted(() => ({
+  afterStat: null as ((path: string, source: 'path' | 'descriptor') => Promise<void>) | null,
+}));
+vi.mock('node:fs/promises', async (original) => {
+  const actual = await original<typeof import('node:fs/promises')>();
+  return {
+    ...actual,
+    lstat: async (...parameters: Parameters<typeof actual.lstat>) => {
+      const metadata = await actual.lstat(...parameters);
+      await boundary.afterStat?.(String(parameters[0]), 'path');
+      return metadata;
+    },
+    open: async (...parameters: Parameters<typeof actual.open>) => {
+      const file = await actual.open(...parameters);
+      const stat = file.stat.bind(file);
+      Object.defineProperty(file, 'stat', {
+        value: async () => {
+          const metadata = await stat();
+          await boundary.afterStat?.(String(parameters[0]), 'descriptor');
+          return metadata;
+        },
+      });
+      return file;
+    },
+  };
+});
 afterEach(async () => {
+  boundary.afterStat = null;
   vi.restoreAllMocks();
   for (const directory of directories.splice(0))
     await rm(directory, { recursive: true, force: true });
@@ -45,6 +82,66 @@ async function loadPage(directory: string, file: string) {
 }
 
 describe('isolated complete material PDF parsing', () => {
+  it('rejects a symbolic-link original before creating any parser artifacts', async () => {
+    const bytes = pdf(['']);
+    const input = await fixture(bytes);
+    const link = join(input.executionDirectory, 'linked.pdf');
+    await symlink(input.pdfPath, link);
+    await expect(extractMaterialPdf({ ...input, pdfPath: link })).rejects.toThrow();
+    expect((await readdir(input.executionDirectory)).sort()).toEqual([
+      'linked.pdf',
+      'original.pdf',
+    ]);
+    expect(await readFile(input.pdfPath)).toEqual(bytes);
+  });
+  it.each(['growth', 'truncation'])(
+    'rejects source %s during descriptor admission before creating parser artifacts',
+    async (change) => {
+      const input = await fixture(pdf(['']));
+      boundary.afterStat = async (path, source) => {
+        if (path !== input.pdfPath || source !== 'descriptor') return;
+        boundary.afterStat = null;
+        if (change === 'growth') await appendFile(path, 'extra');
+        else await truncate(path, 3);
+      };
+      await expect(extractMaterialPdf(input)).rejects.toThrow(/changed|truncated|checksum/);
+      expect(await readdir(input.executionDirectory)).toEqual(['original.pdf']);
+    }
+  );
+  it('reads the opened parser result when its pathname is replaced after validation', async () => {
+    const input = await fixture(pdf(['']));
+    boundary.afterStat = async (path) => {
+      if (!path.endsWith('result.json')) return;
+      boundary.afterStat = null;
+      await rename(path, `${path}.retained`);
+      await writeFile(path, 'replacement metadata');
+    };
+    const output = await extractMaterialPdf(input);
+    expect(output.result.pageCount).toBe(1);
+    expect(output.result.originalSha256).toBe(input.expectedSha256);
+    expect(await readFile(join(output.directory, 'result.json'), 'utf8')).toBe(
+      'replacement metadata'
+    );
+  });
+  it('verifies the opened page receipt when its pathname changes before reading', async () => {
+    const input = await fixture(pdf(['']));
+    const original = await extractMaterialPdf(input);
+    const candidate = await extractMaterialPdf(input);
+    const pagePath = join(original.directory, original.result.pages[0]!.file);
+    boundary.afterStat = async (path) => {
+      if (path !== pagePath) return;
+      boundary.afterStat = null;
+      await rename(path, `${path}.retained`);
+      await writeFile(path, 'replacement page');
+    };
+    const proof = await compareMaterialPdfSemantics(
+      original,
+      candidate,
+      new AbortController().signal
+    );
+    expect(proof).toMatchObject({ verified: true, proof: { pageCount: 1 } });
+    expect(await readFile(pagePath, 'utf8')).toBe('replacement page');
+  });
   it.each(['web', 'root'])(
     'runs through the actual CommonJS tsx worker entry from the %s cwd',
     async (context) => {
@@ -242,7 +339,7 @@ describe('isolated complete material PDF parsing', () => {
   it('rejects oversized or changed originals before launching a parser', async () => {
     const input = await fixture(pdf(['']));
     await expect(extractMaterialPdf({ ...input, limits: { maxFileBytes: 1 } })).rejects.toThrow(
-      'byte admission'
+      'processing budget'
     );
     await expect(extractMaterialPdf({ ...input, expectedSha256: '0'.repeat(64) })).rejects.toThrow(
       'checksum changed'

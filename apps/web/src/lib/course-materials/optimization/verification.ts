@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
-import { lstat, readFile, realpath } from 'node:fs/promises';
+import { realpath } from 'node:fs/promises';
 import { join } from 'node:path';
+import { readBoundedRegularFile } from '../../providers/documents/files';
 import {
   materialPdfPageSchema,
   materialPdfResultSchema,
@@ -26,20 +27,16 @@ export type PdfSemanticVerification =
     };
 
 /** Verify owned parser receipts before using their evidence in derivative admission. */
-async function readPage(parsed: ParsedMaterialPdf, index: number) {
+async function readPage(parsed: ParsedMaterialPdf, index: number, signal: AbortSignal) {
   const receipt = parsed.result.pages[index];
   if (!receipt) throw new Error('PDF verification page receipt is missing.');
   const directory = await realpath(parsed.directory);
   const path = join(directory, receipt.file);
-  const metadata = await lstat(path);
-  if (
-    !metadata.isFile() ||
-    metadata.isSymbolicLink() ||
-    metadata.size > 2 * 1024 * 1024 ||
-    metadata.size !== receipt.byteSize
-  )
-    throw new Error('PDF verification page receipt is not a bounded regular artifact.');
-  const bytes = await readFile(path);
+  const bytes = await readBoundedRegularFile(path, {
+    maximum: 2 * 1024 * 1024,
+    expectedBytes: receipt.byteSize,
+    signal,
+  });
   if (createHash('sha256').update(bytes).digest('hex') !== receipt.sha256)
     throw new Error('PDF verification page artifact checksum changed.');
   return materialPdfPageSchema.parse(JSON.parse(bytes.toString('utf8')));
@@ -89,8 +86,8 @@ export async function compareMaterialPdfSemantics(
   const evidence = createHash('sha256');
   for (let index = 0; index < original.result.pageCount; index += 1) {
     signal.throwIfAborted();
-    const before = await readPage(original, index);
-    const after = await readPage(candidate, index);
+    const before = await readPage(original, index, signal);
+    const after = await readPage(candidate, index, signal);
     if (
       [before, after].some(
         (page) =>

@@ -40,7 +40,7 @@ export const MATERIAL_FOCUS_ANALYSIS_SYSTEM = [
 ].join('\n');
 export const MATERIAL_FOCUS_CHUNK_JSON_SCHEMA = z.toJSONSchema(materialFocusChunkResultSchema);
 
-export class MaterialFocusAnalysisUnsupported extends Error {
+class MaterialFocusAnalysisUnsupported extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'MaterialFocusAnalysisUnsupported';

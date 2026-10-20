@@ -3,7 +3,7 @@ import { prismaUnfiltered } from '@/lib/prisma';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 import { SIDEDOOR_STATE_ID } from '@/lib/sidedoor/access/state/store';
 
-export class MaterialStorageOutcomeUnknown extends Error {
+class MaterialStorageOutcomeUnknown extends Error {
   constructor() {
     super('Material storage writes have an unresolved outcome.');
     this.name = 'MaterialStorageOutcomeUnknown';

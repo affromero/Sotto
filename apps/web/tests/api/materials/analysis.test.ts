@@ -104,6 +104,7 @@ suite('durable owned material focus analysis', () => {
   let endpoint: string;
   let mode: Mode;
   const requests: z.infer<typeof unitInput>[] = [];
+  const fixtureErrors: unknown[] = [];
   const responseGate = createMaterialAnalysisResponseGate();
   const jobs = new Set<string>();
   beforeAll(async () => {
@@ -197,8 +198,9 @@ suite('durable owned material focus analysis', () => {
           })
         );
       } catch (error) {
+        fixtureErrors.push(error);
         response.writeHead(500);
-        response.end(String(error));
+        response.end('Synthetic analysis provider failed.');
       }
     });
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -265,6 +267,7 @@ suite('durable owned material focus analysis', () => {
     boundary.database = null;
     await instance?.close();
     if (directory) await rm(directory, { recursive: true, force: true });
+    expect(fixtureErrors).toEqual([]);
   });
   function request(
     path: string,

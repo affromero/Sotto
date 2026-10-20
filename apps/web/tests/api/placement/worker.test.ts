@@ -48,6 +48,7 @@ suite('queued private placement with real HTTP and Redis', () => {
   let providerRequests = 0,
     unknown = false;
   const jobs = new Set<string>();
+  const fixtureErrors: unknown[] = [];
   beforeAll(async () => {
     instance = await createSharedTestInstance('placement_worker_http');
     boundary.database = instance.database;
@@ -94,8 +95,9 @@ suite('queued private placement with real HTTP and Redis', () => {
           })
         );
       } catch (error) {
+        fixtureErrors.push(error);
         response.writeHead(500);
-        response.end(String(error));
+        response.end('Synthetic placement provider failed.');
       }
     });
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -150,6 +152,7 @@ suite('queued private placement with real HTTP and Redis', () => {
     boundary.database = null;
     await instance?.close();
     if (directory) await rm(directory, { recursive: true, force: true });
+    expect(fixtureErrors).toEqual([]);
   });
   function request(query = '', body?: unknown, token = identity.ownerToken) {
     return new NextRequest(`http://localhost:3000/api/v1/placement${query}`, {

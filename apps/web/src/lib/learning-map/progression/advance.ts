@@ -19,14 +19,14 @@ import {
   learningTransitionBlockers,
 } from '../read';
 
-export const advanceLearningLevelSchema = z
+const advanceLearningLevelSchema = z
   .object({
     requestId: z.uuid(),
     expectedLevel: learningLevelSchema,
     catalogHash: z.string().regex(/^[a-f0-9]{64}$/),
   })
   .strict();
-export const learningLevelCompletionSchema = z
+const learningLevelCompletionSchema = z
   .object({
     completed: z.literal(true),
     courseId: z.string(),
@@ -41,7 +41,7 @@ export const learningLevelCompletionSchema = z
 type AdvanceRequest = z.infer<typeof advanceLearningLevelSchema>;
 const digest = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 
-export async function advanceLearningLevelInTransaction(
+async function advanceLearningLevelInTransaction(
   database: Prisma.TransactionClient,
   courseId: string,
   userId: string,

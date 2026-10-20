@@ -1,9 +1,9 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { createReadStream } from 'node:fs';
-import { lstat, mkdir, readFile, realpath, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, realpath, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { dirname, isAbsolute, join, relative, sep } from 'node:path';
 import { ProcessRunner } from 'thesidedoor-core/runtime/process';
+import { readBoundedRegularFile, withBoundedRegularFile } from '../../providers/documents/files';
 import {
   materialPdfDefaultLimits,
   materialPdfLimitsSchema,
@@ -47,9 +47,6 @@ export async function extractMaterialPdf(input: {
   const limits = materialPdfLimitsSchema.parse({ ...materialPdfDefaultLimits, ...input.limits });
   const executionDirectory = await realpath(input.executionDirectory);
   if (!isAbsolute(input.pdfPath)) throw new Error('Material PDF input must be an absolute path.');
-  const source = await lstat(input.pdfPath);
-  if (!source.isFile() || source.isSymbolicLink())
-    throw new Error('Material PDF input must be a regular file.');
   const pdfPath = await realpath(input.pdfPath);
   const sourceRelative = relative(executionDirectory, pdfPath);
   if (
@@ -59,20 +56,31 @@ export async function extractMaterialPdf(input: {
     isAbsolute(sourceRelative)
   )
     throw new Error('Material PDF input must belong to its execution directory.');
-  if (source.size < 1 || source.size > limits.maxFileBytes)
-    throw new Error('Material PDF input exceeds its byte admission limit.');
-  const hash = createHash('sha256');
-  let verifiedBytes = 0;
-  for await (const chunk of createReadStream(pdfPath, { signal: input.signal })) {
-    verifiedBytes += chunk.byteLength;
-    if (verifiedBytes > limits.maxFileBytes)
-      throw new Error('Material PDF input exceeds its byte admission limit.');
-    hash.update(chunk);
-  }
-  if (verifiedBytes !== source.size)
-    throw new Error('Material PDF input changed during admission.');
-  if (hash.digest('hex') !== input.expectedSha256)
-    throw new Error('Material PDF original checksum changed.');
+  const sourceSize = await withBoundedRegularFile(
+    input.pdfPath,
+    { maximum: limits.maxFileBytes, signal: input.signal },
+    async (file, size) => {
+      const hash = createHash('sha256');
+      const buffer = Buffer.alloc(Math.min(size, 65536));
+      let verifiedBytes = 0;
+      while (verifiedBytes < size) {
+        input.signal?.throwIfAborted();
+        const { bytesRead } = await file.read(
+          buffer,
+          0,
+          Math.min(buffer.length, size - verifiedBytes)
+        );
+        if (!bytesRead) throw new Error('Material PDF input was truncated during admission.');
+        verifiedBytes += bytesRead;
+        hash.update(buffer.subarray(0, bytesRead));
+      }
+      if ((await file.read(Buffer.alloc(1))).bytesRead)
+        throw new Error('Material PDF input changed during admission.');
+      if (hash.digest('hex') !== input.expectedSha256)
+        throw new Error('Material PDF original checksum changed.');
+      return size;
+    }
+  );
   const directory = join(executionDirectory, `pdf-${randomUUID()}`);
   await mkdir(directory, { mode: 0o700 });
   const requestPath = join(directory, 'request.json');
@@ -114,11 +122,17 @@ export async function extractMaterialPdf(input: {
     maxOutputBytesPerChannel: limits.maxProcessOutputBytes,
   });
   const resultPath = join(directory, 'result.json');
-  const metadata = await lstat(resultPath);
-  if (!metadata.isFile() || metadata.isSymbolicLink() || metadata.size > 2 * 1024 * 1024)
-    throw new Error('Material PDF result exceeds its metadata bounds.');
-  const result = materialPdfResultSchema.parse(JSON.parse(await readFile(resultPath, 'utf8')));
-  if (result.originalSha256 !== input.expectedSha256 || result.originalBytes !== source.size)
+  const result = materialPdfResultSchema.parse(
+    JSON.parse(
+      (
+        await readBoundedRegularFile(resultPath, {
+          maximum: 2 * 1024 * 1024,
+          signal: input.signal,
+        })
+      ).toString('utf8')
+    )
+  );
+  if (result.originalSha256 !== input.expectedSha256 || result.originalBytes !== sourceSize)
     throw new Error('Material PDF result belongs to a different original.');
   return { directory, result };
 }

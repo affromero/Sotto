@@ -28,7 +28,7 @@ import {
   placementInputSchema,
 } from './journal';
 
-export const placementGenerationPayload = (userId: string, placementSessionId: string) => ({
+const placementGenerationPayload = (userId: string, placementSessionId: string) => ({
   userId,
   placementSessionId,
 });

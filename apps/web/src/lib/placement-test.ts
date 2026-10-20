@@ -2,12 +2,8 @@
 // user's AI provider (BYOK or local Claude/Codex), render a prompt, call the
 // model, parse JSON. A single batch of questions spans A1..C2; the learner's
 // level is the highest band they clear on a staircase.
-import { capturedLearningAiOptions, resolveCapturedLearningAi } from './learning-ai';
-import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
-import { createAIProvider } from './providers/ai';
 import { loadAndRender } from './prompt-loader';
 import { formatNotesForPrompt } from './course-notes';
-import { logUsage } from './usage-logger';
 import { z } from 'zod';
 import type { CefrLevel } from '@sotto/shared';
 
@@ -60,7 +56,7 @@ const generatedQuestionSchema = placementPrivateQuestionSchema
   })
   .strict()
   .refine((question) => new Set(question.options).size === 4, 'Question options must be distinct.');
-export const PLACEMENT_RESPONSE_SCHEMA = z.toJSONSchema(
+const PLACEMENT_RESPONSE_SCHEMA = z.toJSONSchema(
   z.object({ questions: z.array(generatedQuestionSchema).min(6).max(24) }).strict()
 );
 
@@ -184,41 +180,6 @@ export type PlacementQuestionPublic = Pick<
 
 export function toPublic(q: PlacementQuestion): PlacementQuestionPublic {
   return { id: q.id, cefr: q.cefr, skill: q.skill, prompt: q.prompt, options: q.options };
-}
-
-export async function generatePlacement(
-  userId: string,
-  execution: SottoProviderExecution,
-  nativeLang: string,
-  targetLang: string,
-  note = '',
-  // Questions per CEFR band. Defaults to the full test; the "verify with a few
-  // questions" path passes a smaller value for a shorter run. Clamped 1..PER_BAND.
-  perBand: number = PER_BAND
-): Promise<{ questions: PlacementQuestion[]; provider: string; model: string }> {
-  const ai = await resolveCapturedLearningAi(userId, execution);
-  const prepared = preparePlacementQuestionBatch(nativeLang, targetLang, note, perBand);
-  const provider = createAIProvider(ai.provider);
-  const response = await provider.generateResponse(prepared.system, prepared.messages, {
-    ...(await capturedLearningAiOptions(ai)),
-    maxTokens: prepared.maxOutputTokens,
-    maxOutputBytes: 512 * 1024,
-    temperature: 0,
-    jsonSchema: prepared.jsonSchema,
-    useWebSearch: false,
-  });
-
-  logUsage({
-    service: ai.provider,
-    model: response.model,
-    category: 'placement',
-    inputTokens: response.inputTokens,
-    outputTokens: response.outputTokens,
-    userId,
-  });
-
-  const questions = parsePlacementQuestionBatch(response.content, nativeLang, perBand);
-  return { questions, provider: ai.provider, model: response.model };
 }
 
 export interface PlacementOutcome {

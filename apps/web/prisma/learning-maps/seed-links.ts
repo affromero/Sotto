@@ -8,7 +8,7 @@ export interface SeedLessonReviewScope {
   canDoSummary?: string;
 }
 
-export interface ReviewedSeedObjective {
+interface ReviewedSeedObjective {
   objectiveId: string;
   criterionVersion: 1;
   criterionMeaningHash: string;

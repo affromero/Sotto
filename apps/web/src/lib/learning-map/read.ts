@@ -22,7 +22,7 @@ export class LearningMapError extends Error {
   }
 }
 
-export const learningCourseSelect = {
+const learningCourseSelect = {
   id: true,
   userId: true,
   nativeLang: true,

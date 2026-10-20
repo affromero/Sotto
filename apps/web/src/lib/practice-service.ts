@@ -37,7 +37,6 @@ import {
   type PracticeContextOptions,
 } from './practice/context';
 export { capturePracticeContext, PracticeCourseNotFoundError } from './practice/context';
-export type { PracticeGenerationContext } from './practice/context';
 import { extractReadingVocabulary } from './learning/reading-vocabulary';
 import { buildVocabItems } from './practice/vocabulary';
 import type {

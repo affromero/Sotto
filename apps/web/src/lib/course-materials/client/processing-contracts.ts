@@ -23,7 +23,7 @@ export const optimizationReceiptSchema = z.object({
   optimizedBytes: count.optional(),
   savedBytes: count.optional(),
 });
-export const processingPageSchema = z.object({
+const processingPageSchema = z.object({
   pageNumber: count.positive(),
   embeddedText: materialEmbeddedTextStateSchema,
   visual: materialVisualCoverageSchema,

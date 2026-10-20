@@ -95,6 +95,7 @@ suite('explicit reviewed full-page material recognition', () => {
   let mode: Mode = 'TRANSCRIBED';
   const requests: { image: Buffer; inputDigest: string; imageSha256: string }[] = [];
   const jobs = new Set<string>();
+  const fixtureErrors: unknown[] = [];
   beforeAll(async () => {
     instance = await createSharedTestInstance('material_recognize_http');
     boundary.database = instance.database;
@@ -169,8 +170,9 @@ suite('explicit reviewed full-page material recognition', () => {
           })
         );
       } catch (error) {
+        fixtureErrors.push(error);
         response.writeHead(500);
-        response.end(String(error));
+        response.end('Synthetic recognition provider failed.');
       }
     });
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -217,6 +219,7 @@ suite('explicit reviewed full-page material recognition', () => {
     boundary.database = null;
     await instance?.close();
     if (directory) await rm(directory, { recursive: true, force: true });
+    expect(fixtureErrors).toEqual([]);
   });
   function request(path: string, body?: unknown, token = identity.ownerToken) {
     return new NextRequest(`http://localhost:3000/api/v1/${path}`, {

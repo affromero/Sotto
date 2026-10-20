@@ -70,7 +70,7 @@ export class MaterialRecognitionExecutionError extends Error {
   }
 }
 
-export function materialRecognitionAttemptSelection(prepared: PreparedMaterialRecognition) {
+function materialRecognitionAttemptSelection(prepared: PreparedMaterialRecognition) {
   return {
     kind: 'material-page-recognition',
     inputDigest: prepared.inputDigest,
