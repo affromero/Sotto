@@ -179,17 +179,55 @@ export async function submitPractice(
         ? mc.score
         : scores.reduce((sum, part) => sum + part, 0) / scores.length;
     const now = new Date();
+    const source = { practiceSessionId: sessionId, attempt: 1 as const };
+    const choiceEvidence = (correct: boolean) => ({
+      source,
+      assessment: 'VOCAB_CHOICE' as const,
+      questionIdsByTarget: new Map(
+        [...new Set(items.flatMap((item) => (item.vocabLemma ? [item.vocabLemma] : [])))].map(
+          (lemma) => [
+            `vocab:${lemma}`,
+            items
+              .filter(
+                (item) =>
+                  item.vocabLemma === lemma &&
+                  (submitted.get(item.id) === item.correctIndex) === correct
+              )
+              .map((item) => item.id),
+          ]
+        )
+      ),
+    });
     if (mc.correctLemmas.length)
-      await applyReviewOutcome(session.courseId, mc.correctLemmas, [], 1, 0, now, tx);
+      await applyReviewOutcome(
+        session.courseId,
+        mc.correctLemmas,
+        [],
+        1,
+        0,
+        now,
+        tx,
+        choiceEvidence(true)
+      );
     if (mc.incorrectLemmas.length)
-      await applyReviewOutcome(session.courseId, mc.incorrectLemmas, [], 0, 0, now, tx);
+      await applyReviewOutcome(
+        session.courseId,
+        mc.incorrectLemmas,
+        [],
+        0,
+        0,
+        now,
+        tx,
+        choiceEvidence(false)
+      );
     const assessed = new Set([...mc.correctLemmas, ...mc.incorrectLemmas]);
     const readingReviewed = await reviewReadingVocabulary(
       tx,
       session.courseId,
       session.readingVocabulary,
       new Map(items.map((item) => [item.id, submitted.get(item.id) === item.correctIndex])),
-      now
+      now,
+      source
     );
     for (const lemma of readingReviewed) assessed.add(lemma);
     const aggregateVocab = session.readingVocabulary
@@ -203,7 +241,27 @@ export async function submitPractice(
         work.find((section) => section.skill === 'READING')?.score ?? score,
         work.find((section) => section.skill === 'GRAMMAR')?.score ?? score,
         now,
-        tx
+        tx,
+        {
+          source,
+          assessment: 'SECTION_AGGREGATE',
+          questionIdsByTarget: new Map([
+            ...aggregateVocab.map(
+              (lemma) =>
+                [
+                  `vocab:${lemma}`,
+                  items.filter((item) => item.id.startsWith('r')).map((item) => item.id),
+                ] as const
+            ),
+            ...session.grammarKeys.map(
+              (key) =>
+                [
+                  `grammar:${key}`,
+                  items.filter((item) => item.id.startsWith('g')).map((item) => item.id),
+                ] as const
+            ),
+          ]),
+        }
       );
     await markFocusTargetsPracticed(session.courseId, session.focusTargetIds, score, now, tx);
     const result: SubmitPracticeResult = {

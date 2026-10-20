@@ -3,6 +3,7 @@ import { sampleTeaching } from '../helpers/learning/class-teaching';
 import {
   mockEpisodeCreate,
   mockEpisodeUpdate,
+  mockEpisodeUpdateMany,
   mockScriptCreate,
   mockVocabEntryCreateMany,
   mockLearnerVocabUpsert,
@@ -36,6 +37,7 @@ import {
 
 import {
   generateClassListening,
+  prepareClassListening,
   composeListeningContent,
   minimumVerifiedReferences,
   queueListeningAudio,
@@ -460,6 +462,36 @@ describe('generateClassListening', () => {
       mockLessonQuestionCreateMany.mockRejectedValueOnce(new Error('Question persistence failed'));
       await expect(generateClassListening(PARAMS)).rejects.toThrow('Question persistence failed');
       expect(mockCreateSegmentsAndQueueAudio).not.toHaveBeenCalled();
+    });
+
+    it('prepares a class script and questions without admitting audio', async () => {
+      setupHappyPath();
+      const prepared = await prepareClassListening(PARAMS);
+      expect(prepared).toMatchObject({
+        sectionId: 'section-1',
+        episodeId: 'episode-1',
+        content: { turns: SAMPLE_TURNS },
+      });
+      expect(mockClassSectionCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ status: 'READY' }) })
+      );
+      expect(mockCreateSegmentsAndQueueAudio).not.toHaveBeenCalled();
+    });
+
+    it('marks a prepared episode failed when admitting its audio fails', async () => {
+      setupHappyPath();
+      mockCreateSegmentsAndQueueAudio.mockRejectedValueOnce(new Error('Audio admission failed'));
+      await expect(generateClassListening(PARAMS)).rejects.toThrow('Audio admission failed');
+      expect(mockEpisodeUpdateMany).toHaveBeenCalledWith({
+        where: {
+          id: 'episode-1',
+          userId: PARAMS.userId,
+          source: 'CLASS',
+          status: 'SCRIPT_READY',
+          audioGenerationKey: null,
+        },
+        data: { status: 'FAILED' },
+      });
     });
 
     it('retains episode vocabulary without adding unseen course memory before class publication', async () => {

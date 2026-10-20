@@ -48,6 +48,32 @@ suite('listening audio ownership at durable admission', () => {
     vi.unstubAllEnvs();
   });
 
+  it.each(['unqueued', 'admitted', 'unknown', 'other-owner'] as const)(
+    'retires only unqueued class audio after failure (%s)',
+    async (kind) => {
+      const episode = await instance.database.episode.create({
+        data: {
+          userId: identity.ownerId,
+          title: 'Prepared class',
+          topic: 'Greetings',
+          source: 'CLASS',
+          status: kind === 'admitted' ? 'GENERATING_AUDIO' : 'SCRIPT_READY',
+          audioGenerationKey:
+            kind === 'admitted' || kind === 'unknown' ? 'retained-audio-key' : null,
+        },
+      });
+      await listening.failUnqueuedClassListening(
+        episode.id,
+        kind === 'other-owner' ? 'another-owner' : identity.ownerId
+      );
+      const saved = await instance.database.episode.findUniqueOrThrow({
+        where: { id: episode.id },
+      });
+      expect(saved.status).toBe(kind === 'unqueued' ? 'FAILED' : episode.status);
+      expect(saved.audioGenerationKey).toBe(episode.audioGenerationKey);
+    }
+  );
+
   it.each(['class', 'practice', 'exam'] as const)(
     'captures the final %s association before delivering audio',
     async (kind) => {

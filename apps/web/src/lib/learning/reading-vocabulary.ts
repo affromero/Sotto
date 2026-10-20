@@ -8,6 +8,7 @@ import { reviewReadingVocabularyContent } from '../classes/quality/reading-vocab
 import { combineTeachingFailures } from '../classes/quality/teaching-failure';
 import type { SottoProviderExecution } from '../sidedoor/credentials/runtime/provider-execution';
 import type { LearningDatabase } from './database';
+import type { ReviewSource } from './review/events';
 import { LearningIncompleteError } from './session-evaluation';
 import { applyReviewOutcome } from '../knowledge-graph';
 import { logger } from '../logger';
@@ -288,7 +289,8 @@ export async function reviewReadingVocabulary(
   courseId: string,
   snapshot: unknown,
   answers: ReadonlyMap<string, boolean>,
-  now: Date
+  now: Date,
+  source: ReviewSource
 ): Promise<Set<string>> {
   if (snapshot == null) return new Set();
   const vocabulary = readingVocabularySchema.parse(snapshot);
@@ -296,7 +298,11 @@ export async function reviewReadingVocabulary(
   for (const word of vocabulary.words) {
     if (!word.questionIds.length || word.questionIds.some((id) => !answers.has(id))) continue;
     const score = word.questionIds.filter((id) => answers.get(id)).length / word.questionIds.length;
-    await applyReviewOutcome(courseId, [word.lemma], [], score, 0, now, database);
+    await applyReviewOutcome(courseId, [word.lemma], [], score, 0, now, database, {
+      source,
+      assessment: 'READING_VOCABULARY',
+      questionIdsByTarget: new Map([[`vocab:${word.lemma}`, word.questionIds]]),
+    });
     assessed.add(word.lemma);
   }
   return assessed;

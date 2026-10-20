@@ -19,7 +19,10 @@ import { classPreparationGrant } from '@/lib/classes/preparation-grant';
 import { preparationProviderRequest } from '@/lib/classes/preparation-provider';
 import { registerPreparationAudio } from '@/lib/classes/preparation-audio';
 import { publishClassGeneration } from '@/lib/learning/classes/class-generation-state';
-import { captureGenerationFailure } from '@/lib/classes/quality/generation-failure';
+import {
+  captureGenerationFailure,
+  generationCleanupUnconfirmed,
+} from '@/lib/classes/quality/generation-failure';
 
 /** A crashed generation is fenced as unresolved; replay never repeats unproven external work. */
 export async function processClassPreparation(job: Job<unknown>, workerSignal?: AbortSignal) {
@@ -44,7 +47,8 @@ export async function processClassPreparation(job: Job<unknown>, workerSignal?: 
     parentId: work.operationId,
     fingerprint: work.fingerprint,
     signal,
-    isCleanupFailure: (error) => outcomeUnknown || isDurableQueueCleanupFailure(error),
+    isCleanupFailure: (error) =>
+      outcomeUnknown || generationCleanupUnconfirmed(error) || isDurableQueueCleanupFailure(error),
     validate: async (database) => {
       const current = await readSottoWorkerJob(database, job, {
         handler: CLASS_PREPARATION_QUEUE,
@@ -240,7 +244,10 @@ export async function processClassPreparation(job: Job<unknown>, workerSignal?: 
         }
       } catch (error) {
         const uncertain =
-          outcomeUnknown || isDurableQueueCleanupFailure(error) || workerSignal?.aborted;
+          outcomeUnknown ||
+          generationCleanupUnconfirmed(error) ||
+          isDurableQueueCleanupFailure(error) ||
+          workerSignal?.aborted;
         if (isDurableQueueCleanupFailure(error)) markCleanupUnconfirmed();
         await sottoTransaction(prisma, (database) =>
           recordClassPreparationFailure(

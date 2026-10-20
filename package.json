@@ -23,6 +23,7 @@
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,jsonc,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,jsonc,md}\"",
     "gen:openapi": "npm run -w @sotto/shared gen:openapi",
+    "learning:compare": "scripts/run-with-env.sh tsx --tsconfig apps/web/tsconfig.json scripts/learning/compare-schedulers.ts",
     "lint": "npm run lint --workspace=@sotto/web",
     "lint:fix": "npm run lint:fix --workspace=@sotto/web",
     "release:check": "python3 scripts/release/check.py",
