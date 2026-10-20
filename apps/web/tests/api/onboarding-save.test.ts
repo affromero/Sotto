@@ -10,7 +10,6 @@ import {
   type SharedTestIdentity,
 } from '../helpers/setup/shared-instance';
 import { POST } from '@/app/api/v1/onboarding/save/route';
-import * as curriculumGenerator from '@/lib/curriculum-generator';
 import { getAiProviderMeta } from '@/lib/providers/ai-registry';
 import { getProviderMeta } from '@/lib/providers/tts-registry';
 import { getSttProviderMeta } from '@/lib/providers/stt-registry';
@@ -140,6 +139,7 @@ suite('Atomic onboarding with shared authority', () => {
   afterEach(() => {
     binding.curriculumRead = null;
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
     vi.unstubAllEnvs();
   });
   afterAll(async () => {
@@ -452,7 +452,12 @@ suite('Atomic onboarding with shared authority', () => {
     await noLearnerChanges();
   });
   it('saves placement, notes and preferences while preserving existing course progress on retry', async () => {
-    const first = await POST(await request(base, identity.ownerToken));
+    const first = await POST(
+      await request(
+        { ...base, course: { ...base.course, vocabularySupport: 'MEANING_RECALL' } },
+        identity.ownerToken
+      )
+    );
     expect(first.status).toBe(200);
     const { courseId } = await first.json();
     expect(
@@ -462,6 +467,7 @@ suite('Atomic onboarding with shared authority', () => {
       currentLevel: 'B1',
       startLevel: 'B1',
       placementSource: 'MANUAL',
+      vocabularySupport: 'MEANING_RECALL',
     });
     expect(
       await instance.database.courseNote.findUniqueOrThrow({ where: { courseId } })
@@ -486,11 +492,21 @@ suite('Atomic onboarding with shared authority', () => {
     expect(retry.status).toBe(200);
     expect(
       await instance.database.course.findUniqueOrThrow({ where: { id: courseId } })
-    ).toMatchObject({ currentLevel: 'C1', startLevel: 'B1' });
+    ).toMatchObject({ currentLevel: 'C1', startLevel: 'B1', vocabularySupport: 'MEANING_RECALL' });
     expect(
       await instance.database.courseNote.findUniqueOrThrow({ where: { courseId } })
     ).toMatchObject({ body: base.note });
     expect(await instance.database.course.count()).toBe(1);
+    const cleared = await POST(
+      await request(
+        { ...base, course: { ...base.course, vocabularySupport: null } },
+        identity.ownerToken
+      )
+    );
+    expect(cleared.status).toBe(200);
+    expect(
+      await instance.database.course.findUniqueOrThrow({ where: { id: courseId } })
+    ).toMatchObject({ currentLevel: 'C1', vocabularySupport: null });
   });
   it('rejects household server configuration before creating a course', async () => {
     const initialConfiguration = await getSiteConfig();
@@ -511,50 +527,97 @@ suite('Atomic onboarding with shared authority', () => {
     expect(await getSiteConfig()).toMatchObject({ ttsProvider: preferred.ttsProvider });
     expect(await getAutoModelConfig()).toMatchObject({ model: preferred });
   });
-  it('passes the wizard AI choice to curriculum generation before saving preferences', async () => {
-    const selection = { aiProvider: 'codex', aiModel: 'codex' };
-    const curriculum = await instance.database.curriculum.findUniqueOrThrow({
-      where: { nativeLang_targetLang: { nativeLang: 'en', targetLang: 'de' } },
-    });
-    const generate = vi
-      .spyOn(curriculumGenerator, 'getOrCreateCurriculum')
-      .mockResolvedValue({ id: curriculum.id });
-
-    const response = await POST(
-      await request({ ...base, preferred: selection }, identity.ownerToken)
-    );
-
-    expect(response.status).toBe(200);
-    expect(generate).toHaveBeenCalledWith(identity.ownerId, expect.any(Object), 'en', 'de', {
-      provider: 'codex',
-      model: 'codex',
-    });
-  });
-  it('passes the new local endpoint to curriculum generation', async () => {
-    const curriculum = await instance.database.curriculum.findUniqueOrThrow({
-      where: { nativeLang_targetLang: { nativeLang: 'en', targetLang: 'de' } },
-    });
-    const generate = vi
-      .spyOn(curriculumGenerator, 'getOrCreateCurriculum')
-      .mockResolvedValue({ id: curriculum.id });
-
-    const response = await POST(
-      await request(
-        {
-          ...base,
-          infra: { aiProvider: 'local', aiModel: 'qwen3', aiBaseUrl: 'http://localhost:11434/v1' },
+  it.each(['cloud', 'compatible'])(
+    'builds a new curriculum with the pending %s selection before committing learner preferences',
+    async (connection) => {
+      const compatible = connection === 'compatible';
+      const provider = compatible ? 'local' : 'groq';
+      const native = compatible ? 'it' : 'es';
+      const model = compatible ? 'local:curriculum-tutor' : getAiProviderMeta('groq').defaultModel;
+      await instance.database.user.update({
+        where: { id: identity.ownerId },
+        data: { preferredAiProvider: 'codex', preferredAiModel: 'codex' },
+      });
+      if (!compatible) await instance.seedAiCredential(identity.ownerId, 'groq', 'curriculum-key');
+      const calls: Request[] = [];
+      vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+        const outgoing = new Request(input, init);
+        calls.push(outgoing);
+        if (outgoing.url.endsWith('/moderations'))
+          return Response.json({ results: [{ flagged: false }] });
+        expect(
+          (await instance.database.user.findUniqueOrThrow({ where: { id: identity.ownerId } }))
+            .preferredAiProvider
+        ).toBe('codex');
+        const content = JSON.stringify({
+          title: 'French conversation',
+          lessons: [
+            {
+              slug: 'first-greeting',
+              level: 'A1',
+              order: 1,
+              title: 'A first meeting',
+              objective: 'Introduce yourself',
+              grammarPoints: ['Subject pronouns'],
+              vocabThemes: ['Greetings'],
+              targetVocab: [{ lemma: 'bonjour', gloss: 'hello' }],
+            },
+          ],
+        });
+        return Response.json({
+          id: 'curriculum-fixture',
+          choices: [{ index: 0, message: { role: 'assistant', content }, finish_reason: 'stop' }],
+          usage: { prompt_tokens: 10, completion_tokens: 12, total_tokens: 22 },
+        });
+      });
+      const result = await POST(
+        await request(
+          {
+            course: { native, target: 'fr', level: 'A1' },
+            preferred: { aiProvider: provider, aiModel: model },
+            ...(compatible
+              ? {
+                  infra: {
+                    aiProvider: 'local',
+                    aiBaseUrl: 'http://localhost:18192/v1',
+                    aiModel: 'curriculum-tutor',
+                  },
+                }
+              : {}),
+          },
+          identity.ownerToken
+        )
+      );
+      expect(result.status).toBe(200);
+      const generation = calls.find((call) => call.url.endsWith('/chat/completions'))!;
+      expect(generation.url).toBe(
+        compatible
+          ? 'http://localhost:18192/v1/chat/completions'
+          : 'https://api.groq.com/openai/v1/chat/completions'
+      );
+      expect(generation.headers.get('authorization')).toBe(
+        compatible ? 'Bearer local' : 'Bearer curriculum-key'
+      );
+      expect(await generation.json()).toMatchObject({
+        model: compatible ? 'curriculum-tutor' : model,
+      });
+      const created = await instance.database.course.findUniqueOrThrow({
+        where: {
+          userId_nativeLang_targetLang: {
+            userId: identity.ownerId,
+            nativeLang: native,
+            targetLang: 'fr',
+          },
         },
-        identity.ownerToken
-      )
-    );
-
-    expect(response.status).toBe(200);
-    expect(generate).toHaveBeenCalledWith(identity.ownerId, expect.any(Object), 'en', 'de', {
-      provider: 'local',
-      model: 'local:test-model',
-      endpoint: 'http://localhost:11434/v1',
-    });
-  });
+        include: { curriculum: { include: { lessons: true } } },
+      });
+      expect(created.curriculum.lessons).toMatchObject([{ slug: 'first-greeting' }]);
+      expect(
+        (await instance.database.user.findUniqueOrThrow({ where: { id: identity.ownerId } }))
+          .preferredAiProvider
+      ).toBe(provider);
+    }
+  );
   it('does not complete a save after the issuing session signs out during curriculum lookup', async () => {
     duringCurriculumRead(() => identity.access.logout(identity.ownerToken));
     expect((await POST(await request(base, identity.ownerToken))).status).toBe(401);

@@ -1,4 +1,5 @@
 import { ANIMAL_AVATARS } from '@/lib/avatars';
+import { vocabularySupportSchema, type VocabularySupport } from '@sotto/shared';
 import { STEPS, LEVELS, type CefrLevel } from '@/app/welcome/data';
 import type {
   AgentState,
@@ -49,6 +50,7 @@ export interface WelcomeSnapshot {
   timezone: string;
   baseLang: string;
   language: string;
+  vocabularySupport?: VocabularySupport | null;
   agent: AgentState;
   voice: VoiceState;
   storage: StorageState;
@@ -223,6 +225,10 @@ export function parseStoredSnapshot(raw: string): WelcomeSnapshot | null {
       timezone: typeof record.timezone === 'string' ? record.timezone : '',
       baseLang: typeof record.baseLang === 'string' ? record.baseLang : 'en',
       language: typeof record.language === 'string' ? record.language : '',
+      vocabularySupport:
+        record.vocabularySupport === null
+          ? null
+          : vocabularySupportSchema.safeParse(record.vocabularySupport).data,
       agent: parseAgent(record.agent),
       voice: parseVoice(record.voice),
       storage: parseStorage(record.storage),

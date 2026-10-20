@@ -16,6 +16,7 @@ import {
 } from '@/lib/sidedoor/jobs/core/job-contracts';
 import { sidedoorStateStore, sottoStorageInstance } from '@/lib/sidedoor/access/state/store';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
+import { reconcileDurableQueueFailure } from './durable-queue';
 
 interface ReconciliationOptions {
   database: PrismaClient;
@@ -95,6 +96,32 @@ export async function reconcileSottoJobs(options: ReconciliationOptions) {
           ? options.withQueue(receipt.handler, signal, deliver)
           : deliver(queue));
       } catch (error) {
+        if (
+          error instanceof SottoTerminalDeliveryError &&
+          error.observation.state === 'failed' &&
+          ['vocabulary-audio', 'vocabulary-index'].includes(error.observation.handler)
+        ) {
+          const recover = async (target: Queue) => {
+            const failed = await target.getJob(error.observation.operationId);
+            if (!failed || (await failed.getState()) !== 'failed') throw error;
+            await reconcileDurableQueueFailure({
+              database,
+              job: failed,
+              handler: error.observation.handler,
+              version: error.observation.version,
+              failedReason: failed.failedReason,
+            });
+          };
+          await (options.withQueue
+            ? options.withQueue(receipt.handler, signal, recover)
+            : recover(queue));
+          const complete = await sottoTransaction(
+            database,
+            async (tx) => (await sottoJobOutbox(tx).read(error.observation.operationId))?.complete
+          );
+          if (complete) return 'complete';
+          throw error;
+        }
         if (
           !(error instanceof SottoTerminalDeliveryError) ||
           error.observation.state !== 'failed' ||

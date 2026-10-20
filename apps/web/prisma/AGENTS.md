@@ -2,6 +2,15 @@
 
 ## Schema Overview
 
+Vocabulary imports use `MaterialVocabularyIndex`, `VocabularyIndexChunk`, and
+`VocabularySourceOccurrence` for durable coverage and exact source offsets.
+Imported words start unassessed. `introducedAt` records exposure separately
+from review evidence; `acceptedMeanings` contains explicit answer aliases.
+`PracticeSession.vocabularyStudy` stores private immutable study keys and
+receipts. Flashcard exposure never creates a mastery review event.
+`VocabularyPronunciation` owns cached local audio by course and fingerprint;
+register its storage references in migration and erasure inventories.
+
 The schema is organized into logical sections:
 
 | Section           | Models                                                                                                                                                                                                                                                                                                                                                   | Purpose                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
@@ -72,7 +81,7 @@ npx prisma studio      # Visual database browser
 ## Modifying the Schema
 
 1. Edit `schema.prisma`
-2. Run `npx prisma db push` (dev) or `npx prisma migrate dev` (production)
+2. Use `npx prisma db push` or `npx prisma migrate dev` for development. Production uses `npx prisma migrate deploy` through the reviewed fenced schema-transition procedure in `docs/03-self-host-deployment.md`.
 3. Run `npx prisma generate`
 4. Update this AGENTS.md if models/enums changed
 5. Update `src/types/` if API response shapes changed
@@ -90,6 +99,11 @@ Released host-view leases retain a tombstone until the room ends. An old nonce
 cannot renew after release, including a delayed first heartbeat. New enrollment
 requests keep every profile/approval field null until canonical owner approval
 commits the prepared profile and all approval metadata together.
+
+`Course.vocabularySupport` is an optional `VocabularySupport` enum:
+`MEANING_RECALL`, `WORD_RECALL`, or `LISTENING_RECOGNITION`. It records
+learner-reported support for future generation, separately from assessed mastery.
+Null means no preference. Onboarding preserves the stored choice when omitted.
 
 `LearnerReviewEvent` records each committed vocabulary or grammar SRS update with
 its assessment mode, source attempt, question identities, timestamp and scheduler

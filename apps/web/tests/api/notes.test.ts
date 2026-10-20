@@ -188,49 +188,6 @@ describe('PUT /api/v1/courses/[courseId]/notes', () => {
 });
 
 describe('POST /api/v1/courses/[courseId]/notes', () => {
-  it('retains original files separately from editable notes and updates vocabulary', async () => {
-    mockGetCourseNote.mockResolvedValue('existing official course notes');
-    mockGetEditableNote.mockResolvedValue('editable note');
-    mockExtractAndStoreNoteVocab.mockResolvedValue(3);
-
-    const file = {
-      content: 'capitolo uno: buongiorno e arrivederci',
-      name: 'official.md',
-      type: 'text/markdown',
-    };
-    const res = await POST(postReq([file]), PARAMS);
-    const body = await res.json();
-
-    expect(res.status).toBe(200);
-    expect(mockSetCourseNote).not.toHaveBeenCalled();
-    expect(body.body).toBe('editable note');
-    expect(body.materials[0]).toMatchObject({
-      name: 'official.md',
-      extractedText: expect.stringContaining('buongiorno'),
-    });
-    expect(body.materials[0]).not.toHaveProperty('originalUrl');
-    expect(Buffer.from(mockWriteReference.mock.calls[0][0].body).toString()).toBe(file.content);
-    expect(mockExtractAndStoreNoteVocab).toHaveBeenCalledWith(
-      expect.objectContaining({ courseId: 'course-1', note: 'existing official course notes' })
-    );
-    expect(body).toMatchObject({ imported: 1, failed: 0, addedVocabulary: 3 });
-  });
-
-  it('uses Markit for document uploads', async () => {
-    mockGetCourseNote.mockResolvedValue('');
-    mockExtractViaMarkit.mockResolvedValue({ markdown: '# Capitolo\nciao', text: 'Capitolo ciao' });
-
-    const file = { content: 'pdf bytes', name: 'course.pdf', type: 'application/pdf' };
-    const res = await POST(postReq([file]), PARAMS);
-
-    expect(res.status).toBe(200);
-    expect(mockExtractViaMarkit).toHaveBeenCalledWith(
-      expect.any(Buffer),
-      expect.objectContaining({ extension: '.pdf', url: 'upload://course.pdf' })
-    );
-    expect((await res.json()).materials[0].extractedText).toContain('# Capitolo');
-  });
-
   it('400s when no files are uploaded', async () => {
     const res = await POST(postReq([]), PARAMS);
     expect(res.status).toBe(400);

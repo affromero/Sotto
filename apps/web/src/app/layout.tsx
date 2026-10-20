@@ -34,7 +34,7 @@ export const metadata: Metadata = {
     'language learning',
     'CEFR',
     'self hosted',
-    'open source',
+    'source available',
     'BYOK',
     'grammar',
     'speaking',

@@ -88,3 +88,14 @@ Scope, acceptance criteria, and files or behavior that should stay unchanged:
 
 If the choice is blank or conflicting, maintainers will ask before preparing changes.
 This choice does not approve merging the PR.
+
+## Contribution licensing
+
+Applies only to new work covered by the contribution licensing section of
+CONTRIBUTING.md. Separately licensed components retain their own terms. Identify
+third-party work and its license.
+
+- [ ] I own, or am authorized by the copyright owner to contribute, the new
+      first-party work in this PR under PolyForm Noncommercial 1.0.0 in the root
+      LICENSE. I have read the contribution licensing section of CONTRIBUTING.md
+      and identified any third-party or separately licensed material and its terms.

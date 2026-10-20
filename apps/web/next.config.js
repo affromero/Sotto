@@ -2,13 +2,38 @@ const path = require('path');
 const { createRequire } = require('node:module');
 const coreRequire = createRequire(require.resolve('thesidedoor-core/storage'));
 const nativeBinding = coreRequire.resolve('thesidedoor-flock/build/Release/fs_ext.node');
+const coreZodFiles = path.join(path.dirname(coreRequire.resolve('zod/package.json')), '**/*');
+const parserEntry = require.resolve('pdf-parse');
+const parserRequire = createRequire(parserEntry);
+const pdfAssets = path.dirname(parserRequire.resolve('pdfjs-dist/package.json'));
+const pdfRequire = createRequire(path.join(pdfAssets, 'package.json'));
+const canvasEntry = pdfRequire.resolve('@napi-rs/canvas');
+pdfRequire('@napi-rs/canvas');
+const canvasBindings = Object.keys(require.cache).filter(
+  (file) => file.endsWith('.node') && file.includes(`${path.sep}@napi-rs${path.sep}canvas-`)
+);
+if (canvasBindings.length === 0) throw new Error('The PDF canvas native binding is missing.');
+const pdfRuntimeFiles = [
+  ...['canvas.mjs', 'runtime.mjs', 'render-worker.mjs'].map((file) =>
+    path.join(__dirname, 'scripts/pdf-render', file)
+  ),
+  path.join(path.dirname(parserEntry), '../..', '**/*'),
+  path.join(pdfAssets, 'package.json'),
+  ...['legacy/build', 'standard_fonts', 'cmaps', 'wasm'].map((dir) =>
+    path.join(pdfAssets, dir, '**/*')
+  ),
+  path.join(path.dirname(canvasEntry), '**/*'),
+  ...canvasBindings.map((file) => path.join(path.dirname(file), '**/*')),
+];
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
   outputFileTracingRoot: path.resolve(__dirname, '../..'),
   outputFileTracingIncludes: {
-    '/*': [path.relative(__dirname, nativeBinding).split(path.sep).join('/')],
+    '/*': [nativeBinding, coreZodFiles, ...pdfRuntimeFiles].map((file) =>
+      path.relative(__dirname, file).split(path.sep).join('/')
+    ),
   },
   // Prisma 7's runtime + pg driver adapter must not be bundled by Turbopack/
   // webpack in server code — they load native/generated modules at runtime.
@@ -20,6 +45,7 @@ const nextConfig = {
     '@shiftlabs/markit',
     'thesidedoor-core',
     'thesidedoor-flock',
+    'pdf-parse',
   ],
   // Per-instance build dir, so two dev servers (e.g. the self-hosted instance and
   // the SELF_HOSTED=false mock) can run side by side without fighting over .next.

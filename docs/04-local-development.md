@@ -217,6 +217,49 @@ See `docs/05-provider-extension-guide.md` for the exact LLM/STT/TTS contracts an
 
 ---
 
+### 5.5 Vocabulary study and materials
+
+Open a course's **Vocabulary** page to search its dictionary, inspect source
+quotes, edit accepted meanings, and practice selected words. Course notes files
+start a durable background vocabulary index after attachment to a course. Use
+**Import vocabulary** for older materials. Progress distinguishes queued work,
+reviewed coverage, failures, and sources that need readable text. Image-only
+documents need a reviewed transcription before vocabulary can be indexed.
+
+Indexing processes the complete extracted text in bounded chunks, checks entry
+coverage independently, and preserves existing mastery. Importing a word does
+not demonstrate knowledge. New words remain unseen until studied or assessed.
+Class and practice selection reuse due and weak dictionary words and pace new
+introductions using demonstrated recall.
+
+Flashcards reveal meanings without increasing mastery. Meaning, word, and
+listening recall record each first response once, with feedback and spaced
+review. Answers use dictionary meanings and explicitly saved aliases; editing
+them affects future sessions. Recall estimates describe the current scheduler,
+and one correct answer does not mean a word is mastered. Learners can optionally
+describe vocabulary difficulties during onboarding and change that preference
+in course settings. This guides practice support, rather than diagnosing a
+fixed learning style.
+
+Spaced practice and retrieval with feedback inform this approach. See the
+[second-language spacing meta-analysis](https://doi.org/10.1111/lang.12479) and
+[retrieval-practice experiment](https://doi.org/10.1126/science.1152408).
+Sotto's exact pacing thresholds are product heuristics, not validated individual
+memory measurements.
+
+Pronunciation requires explicitly configured local speech. The first request
+creates a course-owned cached asset; repeated playback reuses it. Changing the
+local model, endpoint, voice, or word creates a different cache identity.
+Disabled or unavailable local speech reports its configuration error. No paid
+speech provider is selected automatically. Uncertain indexing or audio outcomes
+remain visible and fenced until execution recovery confirms they can be retried.
+
+Apply the vocabulary study, pronunciation, and material-index Prisma migrations
+and regenerate Prisma when upgrading. No new environment variables are required.
+iOS links these study sessions to the web; the terminal reports web continuation.
+
+---
+
 ## 6. Live Provider Checks
 
 Use the test action on each saved provider card in Admin. The request uses the same captured Sidedoor credential and endpoint policy as production work and reports the provider error directly.

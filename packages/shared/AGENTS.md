@@ -2,6 +2,13 @@
 
 Prisma-free package consumed by `apps/web/`.
 
+Vocabulary contracts live in `learning/dictionary.ts` and
+`learning/vocabulary-study.ts`. `ready_vocabulary` is a separate public practice
+variant, with opaque card identifiers and feedback released after responding.
+Private study answer snapshots never belong in shared public schemas. Regenerate
+all three OpenAPI specs after contract changes and keep native clients explicit
+about web continuation for unsupported study modes.
+
 ## Structure
 
 ```

@@ -11,7 +11,7 @@ import { GenerationUsageError } from 'thesidedoor-core/ai/usage';
 import type { TokenUsage } from 'thesidedoor-core/ai';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { getCodexSshHost, isCodexAvailable } from './agent-availability';
+import { getAgentVersion, getCodexSshHost, isCodexAvailable } from './agent-availability';
 import { buildAgentInvocation, minimalAgentEnvironment } from './agent-invocation';
 import { formatAgentModelId, parseAgentModelId, type AgentEffortLevel } from './agent-models/id';
 import { installCurrentProviderCredentialSnapshot } from './agent-credentials';
@@ -77,7 +77,8 @@ function codexArgs(
   opts?: CodexOptions,
   outFile?: string,
   selection = resolveSelection(opts),
-  outputSchema?: string
+  outputSchema?: string,
+  documentArgs: readonly string[] = []
 ): {
   args: string[];
   model: string;
@@ -94,6 +95,7 @@ function codexArgs(
     'project_doc_max_bytes=0',
     '-c',
     `developer_instructions=${JSON.stringify(APPLICATION_CONTRACT)}`,
+    ...documentArgs,
     ...NO_MCP,
     '-c',
     `web_search=${JSON.stringify(opts?.useWebSearch ? 'live' : 'disabled')}`,
@@ -111,6 +113,25 @@ function codexArgs(
   if (effort) args.push('-c', `model_reasoning_effort="${effort}"`);
   args.push('-');
   return effort ? { args, model, effort } : { args, model };
+}
+
+/** Select HTTP before dispatch while retaining complete original PDF pages. */
+async function documentTransportArgs(opts: CodexOptions, host?: string): Promise<string[]> {
+  if (!opts.images?.some((image) => image.documentPage !== undefined)) return [];
+  const installed = await getAgentVersion('codex', host ?? null);
+  opts.signal?.throwIfAborted();
+  const version = /^codex-cli (0\.160\.0)$/.exec(installed)?.[1];
+  if (!version) throw new Error('Original PDF input requires the reviewed Codex CLI 0.160.0.');
+  // A new namespace cannot inherit a configured endpoint or credential source.
+  // The OpenAI name and omitted base URL preserve Codex's auth-based destination.
+  const provider = `sotto-document-http-${randomUUID()}`;
+  const table = `{name="OpenAI",wire_api="responses",requires_openai_auth=true,supports_websockets=false,supports_standalone_web_search=true,http_headers={version=${JSON.stringify(version)}},env_http_headers={"OpenAI-Organization"="OPENAI_ORGANIZATION","OpenAI-Project"="OPENAI_PROJECT"}}`;
+  return [
+    '-c',
+    `model_provider=${JSON.stringify(provider)}`,
+    '-c',
+    `model_providers.${provider}=${table}`,
+  ];
 }
 
 /**
@@ -279,6 +300,8 @@ async function* runCodex(
   let primary: { error: unknown } | undefined;
   let usage: TokenUsage = { inputTokens: null, outputTokens: null };
   const images = decodeCodexImages(opts.images ?? []);
+  const documentArgs = await documentTransportArgs(opts, host);
+  opts.signal?.throwIfAborted();
   const cleanupToken = randomUUID();
   try {
     if (!host) {
@@ -306,7 +329,8 @@ async function* runCodex(
       schemaPath,
       host && json ? { json, cleanupToken } : undefined,
       images.map((image) => (directory ? join(directory, image.name) : image.name)),
-      host && images.length ? { images, cleanupToken } : undefined
+      host && images.length ? { images, cleanupToken } : undefined,
+      documentArgs
     );
   } catch (error) {
     primary = { error };
@@ -326,12 +350,13 @@ async function* runCodexProcess(
   schemaPath?: string,
   remoteOutputSchema?: { json: string; cleanupToken: string },
   imagePaths: string[] = [],
-  remoteImages?: { images: ReturnType<typeof decodeCodexImages>; cleanupToken: string }
+  remoteImages?: { images: ReturnType<typeof decodeCodexImages>; cleanupToken: string },
+  documentArgs: readonly string[] = []
 ): AsyncGenerator<string> {
   opts.signal?.throwIfAborted();
   if (opts.isolated)
     throw new Error('Isolated Codex execution is not supported by the reviewed broker protocol');
-  const { args } = codexArgs(opts, output, selection, schemaPath);
+  const { args } = codexArgs(opts, output, selection, schemaPath, documentArgs);
   if (!host && imagePaths.length)
     args.splice(args.length - 1, 1, ...imagePaths.flatMap((path) => ['--image', path]), '--', '-');
   const invocation = buildAgentInvocation('codex', args, host, {

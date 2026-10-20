@@ -386,7 +386,7 @@ export function StepContext({ contextItems, setContextItems, demoMode, onNext, o
           <span className={c.contextUploadHint}>
             {demoMode
               ? 'Demo files stay in this browser.'
-              : 'Original documents are saved separately from editable notes. Maximum 10MB per upload.'}
+              : 'Original documents are saved separately from editable notes. Maximum 50MB per upload.'}
           </span>
         </div>
 

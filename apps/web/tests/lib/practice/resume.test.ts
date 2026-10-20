@@ -51,6 +51,39 @@ beforeEach(() => {
 });
 
 describe('resumePractice', () => {
+  it('rejects a study snapshot bound to a different learner', async () => {
+    const requestId = crypto.randomUUID();
+    mockSessionFindFirst.mockResolvedValue({
+      id: requestId,
+      courseId: 'course',
+      kind: 'VOCAB',
+      status: 'ACTIVE',
+      vocabularyStudy: {
+        version: 1,
+        normalization: 'unicode-v1',
+        requestId,
+        courseId: 'course',
+        userId: 'another-learner',
+        mode: 'MEANING_RECALL',
+        support: null,
+        nativeLang: 'en',
+        targetLang: 'de',
+        requestedWordIds: [],
+        cards: [
+          {
+            id: crypto.randomUUID(),
+            wordId: 'word',
+            lemma: 'Bahnhof',
+            meaning: 'station',
+            acceptedMeanings: [],
+            response: null,
+            listeningPresentedAt: null,
+          },
+        ],
+      },
+    });
+    await expect(resumePractice(requestId, 'user')).rejects.toThrow('Vocabulary study not found');
+  });
   function completedDuringRead(priorStatus: 'RUNNING' | 'CANCELLING' = 'RUNNING') {
     const sessionId = '9b8dbe9c-4caa-4432-af65-1f842c5dbca5';
     const instanceId = '339fd159-2637-41c6-bfba-bbed11f0e78b';

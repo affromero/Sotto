@@ -102,6 +102,14 @@ describe('DELETE /api/v1/practice/[sessionId]', () => {
 });
 
 describe('DELETE /api/v1/practice/[sessionId] — memory graph cleanup', () => {
+  it('preserves existing dictionary words when discarding an unanswered study', async () => {
+    mockFindFirst.mockResolvedValue(session({ vocabularyStudy: { version: 1 } }));
+    const response = await DELETE(request(), PARAMS);
+    expect(await response.json()).toEqual({ deleted: true, pruned: { vocab: 0, grammar: 0 } });
+    expect(mockVocabDeleteMany).not.toHaveBeenCalled();
+    expect(mockGrammarDeleteMany).not.toHaveBeenCalled();
+  });
+
   it('removes only targets never reviewed and never taught by a class', async () => {
     await DELETE(request(), PARAMS);
 
@@ -110,6 +118,8 @@ describe('DELETE /api/v1/practice/[sessionId] — memory graph cleanup', () => {
         courseId: 'c1',
         lemma: { in: ['gestern', 'die Reise'] },
         firstSeenClassId: null,
+        introducedAt: null,
+        sources: { none: {} },
         reps: 0,
         lastReviewed: null,
       },

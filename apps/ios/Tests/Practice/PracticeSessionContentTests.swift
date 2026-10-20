@@ -5,6 +5,13 @@ import XCTest
 /// Practice sessions carry speaking prompts and a listening episode; both were
 /// decoded and then ignored by the iPad practice sheet.
 final class PracticeSessionContentTests: XCTestCase {
+    func testVocabularyStudyContinuesAtItsSavedWebSession() throws {
+        let session = try start(#"{"status":"ready_vocabulary","sessionId":"saved-study","courseId":"german-course","kind":"VOCAB","mode":"MEANING_RECALL","cards":[]}"#)
+        XCTAssertTrue(session.requiresWebVocabulary)
+        let url = try XCTUnwrap(session.vocabularyStudyURL(serverURL: URL(string: "https://sotto.example")!))
+        XCTAssertEqual(url.absoluteString, "https://sotto.example/learn/vocabulary?course=german-course&session=saved-study")
+        XCTAssertNil(session.submissionResult)
+    }
     func testReadingPracticePreservesTheSourceAndAcceptsHistoricalQuestions() throws {
         let item = try JSONDecoder().decode(SottoPracticeItem.self, from: Data(
             #"{"id":"r0","prompt":"Wo ist Mia?","options":["Berlin","Bonn"],"passageText":"Mia ist in Berlin."}"#.utf8

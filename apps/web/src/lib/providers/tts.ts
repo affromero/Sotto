@@ -194,6 +194,15 @@ function createTtsMediaTransport(execution: SottoProviderExecution, domains?: re
 /**
  * Create a TTS provider instance asynchronously — supports all providers.
  */
+const ttsCacheIdentities = new WeakMap<TtsProvider, string>();
+
+/** Opaque identity of the factory's actual endpoint and credential account. */
+export function ttsCacheIdentity(provider: TtsProvider): string {
+  const identity = ttsCacheIdentities.get(provider);
+  if (!identity) throw new Error('TTS cache identity requires the canonical provider factory.');
+  return identity;
+}
+
 export async function createTtsProviderAsync(
   providerId: TtsProviderId,
   execution: SottoProviderExecution,
@@ -279,11 +288,18 @@ export async function createTtsProviderAsync(
           : (params.signal ?? execution.signal)
       );
   }
-  return decorateTtsProvider(provider, {
+  const decorated = decorateTtsProvider(provider, {
     resource,
     signal: execution.signal,
     onCleanupError: (error) => execution.onCleanupError?.(error),
   });
+  ttsCacheIdentities.set(
+    decorated,
+    createHash('sha256')
+      .update(JSON.stringify([providerId, endpoint, resource, provider.getModelId()]))
+      .digest('hex')
+  );
+  return decorated;
 }
 
 async function createTtsProviderBare(

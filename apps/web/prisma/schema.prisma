@@ -308,7 +308,7 @@ model Episode {
   pipelineGeneration     String?
 
   // PDF export
-  pdfUrl String?
+  pdfUrl                String?
   transcriptPublication Json?
 
   // Waveform visualization
@@ -1046,6 +1046,12 @@ enum PedagogyStyle {
   INTENSIVE // retrieval practice + spaced repetition (the testing effect)
 }
 
+enum VocabularySupport {
+  MEANING_RECALL
+  WORD_RECALL
+  LISTENING_RECOGNITION
+}
+
 // Global curriculum: one per native→target language pair.
 // source: 'seeded' = hand-authored JSON; 'generated' = agent-composed on demand.
 model Curriculum {
@@ -1097,33 +1103,36 @@ model Lesson {
 // A learner's enrollment in one language pair. CEFR level lives here (a user
 // can hold several courses at several levels).
 model Course {
-  id              String           @id @default(cuid())
-  userId          String
-  nativeLang      String
-  targetLang      String
-  curriculumId    String
-  currentLevel    CefrLevel        @default(A1) // "you are here"; assigned by placement, advances with mastery
-  startLevel      CefrLevel        @default(A1) // immutable placement result
-  placementSource PlacementSource? // how the level was set (null = unknown/legacy)
-  pedagogy        PedagogyStyle    @default(BALANCED) // teaching approach; shapes generation
-  activeClassId   String? // current in-flight class (gating convenience cache)
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  id                String             @id @default(cuid())
+  userId            String
+  nativeLang        String
+  targetLang        String
+  curriculumId      String
+  currentLevel      CefrLevel          @default(A1) // "you are here"; assigned by placement, advances with mastery
+  startLevel        CefrLevel          @default(A1) // immutable placement result
+  placementSource   PlacementSource? // how the level was set (null = unknown/legacy)
+  pedagogy          PedagogyStyle      @default(BALANCED) // teaching approach; shapes generation
+  vocabularySupport VocabularySupport? // learner-reported starting support, editable per course
+  activeClassId     String? // current in-flight class (gating convenience cache)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
 
-  user             User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  curriculum       Curriculum               @relation(fields: [curriculumId], references: [id])
-  placement        PlacementResult?
-  classes          CourseClass[]
-  vocab            LearnerVocab[]
-  grammar          LearnerGrammar[]
-  vocabEdges       VocabEdge[]
-  practiceSessions PracticeSession[]
-  practiceRequests PracticeRequestReceipt[]
-  note             CourseNote?
-  materials        CourseMaterial[]
-  mockExams        MockExam[]
-  focusTargets     LearnerFocusTarget[]
-  reviewEvents     LearnerReviewEvent[]
+  user              User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  curriculum        Curriculum                @relation(fields: [curriculumId], references: [id])
+  placement         PlacementResult?
+  classes           CourseClass[]
+  vocab             LearnerVocab[]
+  grammar           LearnerGrammar[]
+  vocabEdges        VocabEdge[]
+  practiceSessions  PracticeSession[]
+  practiceRequests  PracticeRequestReceipt[]
+  note              CourseNote?
+  materials         CourseMaterial[]
+  mockExams         MockExam[]
+  focusTargets      LearnerFocusTarget[]
+  reviewEvents      LearnerReviewEvent[]
+  pronunciations    VocabularyPronunciation[]
+  vocabularyIndexes MaterialVocabularyIndex[]
 
   @@unique([userId, nativeLang, targetLang]) // one course per user per language pair
   @@index([userId])
@@ -1213,26 +1222,26 @@ enum FocusTargetSource {
 // the next class only unlocks once this one is PASSED.
 model CourseClass {
   readingVocabulary Json? // exact reading source and assessed vocabulary provenance
-  id              String      @id @default(cuid())
-  courseId        String
-  lessonId        String
-  order           Int // mirrors Lesson.order; stable user-facing sequence
-  status          ClassStatus @default(LOCKED)
-  attempt         Int         @default(1) // whole-class retry counter
-  adaptiveSeed    Json? // { vocabIds, grammarKeys, dueCount } that seeded this class
+  id                String      @id @default(cuid())
+  courseId          String
+  lessonId          String
+  order             Int // mirrors Lesson.order; stable user-facing sequence
+  status            ClassStatus @default(LOCKED)
+  attempt           Int         @default(1) // whole-class retry counter
+  adaptiveSeed      Json? // { vocabIds, grammarKeys, dueCount } that seeded this class
   skillRequirements Json? // versioned required skills and genuine provider exemptions
-  learnerAnswers Json? // selections saved before final submission
-  writingDrafts Json? // learner drafts saved independently of grades
-  progressRevision Int @default(0) // rejects stale saves across tabs
-  passThreshold   Float       @default(0.7) // fraction of sections that must pass
-  worksheetPdfUrl String?
-  sourceUrl       String? // sourced class: the real article/paper/link it was built from (null = curriculum class)
-  sourceTitle     String? // human-readable source title for display
-  submittedAt     DateTime?
-  passedAt        DateTime?
-  failedAt        DateTime?
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  learnerAnswers    Json? // selections saved before final submission
+  writingDrafts     Json? // learner drafts saved independently of grades
+  progressRevision  Int         @default(0) // rejects stale saves across tabs
+  passThreshold     Float       @default(0.7) // fraction of sections that must pass
+  worksheetPdfUrl   String?
+  sourceUrl         String? // sourced class: the real article/paper/link it was built from (null = curriculum class)
+  sourceTitle       String? // human-readable source title for display
+  submittedAt       DateTime?
+  passedAt          DateTime?
+  failedAt          DateTime?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
 
   course       Course               @relation(fields: [courseId], references: [id], onDelete: Cascade)
   lesson       Lesson               @relation(fields: [lessonId], references: [id])
@@ -1371,7 +1380,7 @@ model SpeakingPrompt {
 model SpeakingRecording {
   attempt           Int                 @default(1)
   sttProvider       String? // provider selected by the immutable learning contract
-  sttSelection      Json?   // immutable model, endpoint and credential revision metadata, never secrets
+  sttSelection      Json? // immutable model, endpoint and credential revision metadata, never secrets
   id                String              @id @default(cuid())
   sectionId         String?
   practiceSessionId String?
@@ -1587,6 +1596,7 @@ model LearnerVocab {
   courseId         String
   lemma            String // canonical target-language form
   translation      String
+  acceptedMeanings String[]   @default([])
   partOfSpeech     String?
   pronunciation    String?
   // SRS state (SM-2)
@@ -1598,15 +1608,17 @@ model LearnerVocab {
   mastery          Float      @default(0) // 0..1 rolled-up strength
   lastReviewed     DateTime?
   // provenance
+  introducedAt     DateTime?
   firstSeenClassId String?
   cefrLevel        CefrLevel?
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
 
-  course       Course               @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  edgesOut     VocabEdge[]          @relation("EdgeSource")
-  edgesIn      VocabEdge[]          @relation("EdgeTarget")
+  course       Course                       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  edgesOut     VocabEdge[]                  @relation("EdgeSource")
+  edgesIn      VocabEdge[]                  @relation("EdgeTarget")
   reviewEvents LearnerReviewEvent[]
+  sources      VocabularySourceOccurrence[]
 
   @@unique([id, courseId])
   @@unique([courseId, lemma])
@@ -1638,6 +1650,87 @@ model LearnerGrammar {
   @@unique([courseId, topicKey])
   @@index([courseId, dueAt])
   @@index([courseId, mastery])
+}
+
+model MaterialVocabularyIndex {
+  id                String                 @id @default(uuid())
+  materialId        String
+  courseId          String
+  sourceFingerprint String
+  textHash          String
+  textLength        Int
+  originalInput     Json
+  materialCreatedAt DateTime
+  nativeLang        String
+  targetLang        String
+  protocol          Int                    @default(1)
+  generation        Int                    @default(1)
+  status            String                 @default("PENDING")
+  error             String?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+  material          CourseMaterial         @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  course            Course                 @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  chunks            VocabularyIndexChunk[]
+
+  @@unique([materialId, sourceFingerprint])
+  @@index([courseId])
+}
+
+model VocabularyIndexChunk {
+  id          String                       @id @default(uuid())
+  indexId     String
+  startOffset Int
+  endOffset   Int
+  generation  Int                          @default(1)
+  status      String                       @default("PENDING")
+  operation   Json?
+  result      Json?
+  error       String?
+  createdAt   DateTime                     @default(now())
+  updatedAt   DateTime                     @updatedAt
+  index       MaterialVocabularyIndex      @relation(fields: [indexId], references: [id], onDelete: Cascade)
+  sources     VocabularySourceOccurrence[]
+
+  @@unique([indexId, startOffset, endOffset])
+  @@index([indexId, status])
+}
+
+model VocabularySourceOccurrence {
+  id          String               @id @default(uuid())
+  wordId      String
+  courseId    String
+  materialId  String
+  chunkId     String
+  startOffset Int
+  endOffset   Int
+  quote       String               @db.Text
+  meaning     String
+  word        LearnerVocab         @relation(fields: [wordId, courseId], references: [id, courseId], onDelete: Cascade)
+  material    CourseMaterial       @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  chunk       VocabularyIndexChunk @relation(fields: [chunkId], references: [id], onDelete: Cascade)
+
+  @@unique([chunkId, wordId, startOffset, endOffset])
+  @@index([wordId])
+  @@index([materialId])
+}
+
+model VocabularyPronunciation {
+  id          String   @id @default(uuid())
+  courseId    String
+  fingerprint String
+  text        String
+  language    String
+  generation  Int      @default(1)
+  status      String   @default("QUEUED")
+  audioUrl    String?
+  error       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, fingerprint])
+  @@index([courseId])
 }
 
 // Append-only observations commit with their source submission and SRS update.
@@ -1705,28 +1798,29 @@ model PracticeRequestReceipt {
 }
 
 model PracticeSession {
+  vocabularyStudy     Json? // private versioned dictionary study and recall snapshot
   listeningScriptHash String? // binds comprehension questions to the preserved listening script
-  generationSpec    Json? // captured private context, frozen requirements and source identity
-  generationState   Json? // nonsecret durable preparation and delegation metadata
-  readingVocabulary Json? // exact reading source and assessed vocabulary provenance
-  id             String         @id @default(cuid())
-  courseId       String
-  kind           PracticeKind
-  status         PracticeStatus @default(ACTIVE)
-  items          Json // generated practice items (recall cards / questions / prompt refs)
-  seed           String
-  skillRequirements Json? // immutable skill coverage, language and CEFR contract
-  learnerAnswers Json? // resumable multiple-choice selections, without answer keys
-  writingDrafts Json? // learner drafts saved independently of grades
-  progressRevision Int @default(0) // rejects stale saves across tabs
-  submissionResult Json? // stable completion receipt for idempotent submissions
-  score          Float? // 0..1, set on submit
-  vocabLemmas    String[]       @default([]) // lemmas this session reviews (SRS targets)
-  grammarKeys    String[]       @default([]) // grammar topicKeys this session reviews
-  focusTargetIds String[]       @default([]) // selected difficult words/sentences reviewed
-  episodeId      String?        @unique // LISTENING practice audio (one episode per session)
-  startedAt      DateTime       @default(now())
-  completedAt    DateTime?
+  generationSpec      Json? // captured private context, frozen requirements and source identity
+  generationState     Json? // nonsecret durable preparation and delegation metadata
+  readingVocabulary   Json? // exact reading source and assessed vocabulary provenance
+  id                  String         @id @default(cuid())
+  courseId            String
+  kind                PracticeKind
+  status              PracticeStatus @default(ACTIVE)
+  items               Json // generated practice items (recall cards / questions / prompt refs)
+  seed                String
+  skillRequirements   Json? // immutable skill coverage, language and CEFR contract
+  learnerAnswers      Json? // resumable multiple-choice selections, without answer keys
+  writingDrafts       Json? // learner drafts saved independently of grades
+  progressRevision    Int            @default(0) // rejects stale saves across tabs
+  submissionResult    Json? // stable completion receipt for idempotent submissions
+  score               Float? // 0..1, set on submit
+  vocabLemmas         String[]       @default([]) // lemmas this session reviews (SRS targets)
+  grammarKeys         String[]       @default([]) // grammar topicKeys this session reviews
+  focusTargetIds      String[]       @default([]) // selected difficult words/sentences reviewed
+  episodeId           String?        @unique // LISTENING practice audio (one episode per session)
+  startedAt           DateTime       @default(now())
+  completedAt         DateTime?
 
   course           Course               @relation(fields: [courseId], references: [id], onDelete: Cascade)
   episode          Episode?             @relation(fields: [episodeId], references: [id], onDelete: SetNull)
@@ -1797,8 +1891,10 @@ model CourseMaterial {
   extractedText String   @db.Text
   createdAt     DateTime @default(now())
 
-  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  course Course? @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user              User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course            Course?                      @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  vocabularyIndexes MaterialVocabularyIndex[]
+  vocabularySources VocabularySourceOccurrence[]
 
   @@index([userId, courseId])
   @@index([courseId])

@@ -13,6 +13,101 @@ import { createWelcomeCredentialBoundary } from '../helpers/setup/welcome-creden
 afterEach(() => vi.unstubAllGlobals());
 const google = { endpoint: 'ai-keys' as const, provider: 'google', apiKey: 'test-google-key' };
 
+it('requires resubmission of unsaved batch slots after confirming a partial save', async () => {
+  const boundary = createWelcomeCredentialBoundary();
+  const writes: string[] = [];
+  vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+    if (init?.method !== 'POST') return boundary.handle(input, init);
+    const command = credentialSaveRequestSchema.parse(JSON.parse(String(init.body)));
+    writes.push(command.provider);
+    if (command.provider !== 'openai' || command.allowUnverified)
+      return boundary.handle(input, init);
+    return Response.json({
+      status: 'needs_confirmation',
+      operationId: command.operationId,
+      context: command.context,
+      validation: { status: 'inconclusive', readiness: { code: 'unreachable', checkedAt: 1 } },
+    });
+  });
+  const session = new WelcomeCredentialSession();
+  const signal = new AbortController().signal;
+  const batch = [
+    google,
+    { ...google, provider: 'openai', apiKey: 'second' },
+    { ...google, provider: 'anthropic', apiKey: 'third' },
+  ];
+  await session.load(signal);
+  const first = await session.save(batch, signal);
+  if (first.status !== 'confirmation') throw new Error('Expected confirmation');
+  expect(await session.continuePending(signal, first.operationId)).toMatchObject({
+    status: 'review',
+  });
+  expect(boundary.saved.has('ai-keys:anthropic')).toBe(false);
+  expect(await session.save(batch, signal)).toEqual({ status: 'ready' });
+  expect(writes).toEqual(['google', 'openai', 'openai', 'anthropic']);
+  expect(boundary.saved.get('ai-keys:anthropic')).toEqual({ apiKey: 'third' });
+});
+
+it('retains no plaintext credential in settled or uncertain session state', async () => {
+  const boundary = createWelcomeCredentialBoundary();
+  let offline = false;
+  vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+    if (offline) throw new TypeError('Offline');
+    const response = boundary.handle(input, init);
+    if (init?.method === 'POST' && String(init.body).includes('uncertain-key')) {
+      offline = true;
+      throw new TypeError('Response lost');
+    }
+    return response;
+  });
+  const session = new WelcomeCredentialSession();
+  const signal = new AbortController().signal;
+  await session.load(signal);
+  expect(await session.save([google], signal)).toEqual({ status: 'ready' });
+  expect(session.receiptStatus(google)).toBe('verified');
+  expect(session.receiptStatus({ ...google, apiKey: 'other-key' })).toBeNull();
+  expect(
+    await session.save([{ ...google, provider: 'openai', apiKey: 'uncertain-key' }], signal)
+  ).toMatchObject({ status: 'uncertain' });
+  const retained = JSON.stringify(structuredClone(session), (_name, value: unknown) =>
+    value instanceof Map ? [...value] : value
+  );
+  expect(retained).not.toContain(google.apiKey);
+  expect(retained).not.toContain('uncertain-key');
+  offline = false;
+  expect(await session.continuePending(signal)).toEqual({ status: 'ready' });
+  expect(session.savedProviders('ai-keys')).toContain('openai');
+});
+
+it('confirms only the active operation without requiring another copy of its key', async () => {
+  const boundary = createWelcomeCredentialBoundary();
+  const writes: CredentialSaveRequest[] = [];
+  vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+    if (init?.method !== 'POST') return boundary.handle(input, init);
+    const command = credentialSaveRequestSchema.parse(JSON.parse(String(init.body)));
+    writes.push(command);
+    if (command.allowUnverified) return boundary.handle(input, init);
+    return Response.json({
+      status: 'needs_confirmation',
+      operationId: command.operationId,
+      context: command.context,
+      validation: { status: 'inconclusive', readiness: { code: 'unreachable', checkedAt: 1 } },
+    });
+  });
+  const session = new WelcomeCredentialSession();
+  const signal = new AbortController().signal;
+  await session.load(signal);
+  const pending = await session.save([google], signal);
+  expect(pending.status).toBe('confirmation');
+  expect(await session.continuePending(signal, 'stale-operation')).toMatchObject({
+    status: 'confirmation',
+  });
+  expect(writes).toHaveLength(1);
+  if (pending.status === 'ready') throw new Error('Expected confirmation');
+  expect(await session.continuePending(signal, pending.operationId)).toEqual({ status: 'ready' });
+  expect(writes[1]).toEqual({ ...writes[0], allowUnverified: true });
+});
+
 it('rejects a provider omitted from the displayed settings instead of assuming its slot is empty', async () => {
   const boundary = createWelcomeCredentialBoundary();
   vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) =>
@@ -103,37 +198,41 @@ it('reuses a saved receipt across placement and final retries without reposting 
   expect(boundary.saved.get('ai-keys:google')).toEqual({ apiKey: google.apiKey });
 });
 
-it('rebinds the same local key when its URL changes and reuses only matching receipts', async () => {
-  const boundary = createWelcomeCredentialBoundary();
-  let writes = 0;
-  const reviewedEndpoints: Array<string | null> = [];
-  vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
-    if (init?.method === 'POST') {
-      writes++;
-      reviewedEndpoints.push(new Headers(init.headers).get('x-sotto-reviewed-ai-endpoint'));
-    }
-    return boundary.handle(input, init);
+it('requires a new revision when returning to a previously used destination', async () => {
+  const server = createWelcomeCredentialBoundary();
+  const submissions: Array<{ endpoint: string | null; body: CredentialSaveRequest }> = [];
+  vi.stubGlobal('fetch', (input: RequestInfo | URL, options?: RequestInit) => {
+    if (options?.method === 'POST')
+      submissions.push({
+        endpoint: new Headers(options.headers).get('x-sotto-reviewed-ai-endpoint'),
+        body: credentialSaveRequestSchema.parse(JSON.parse(String(options.body))),
+      });
+    return server.handle(input, options);
   });
-  const session = new WelcomeCredentialSession();
-  const signal = new AbortController().signal;
-  const first = {
+  const active = new WelcomeCredentialSession();
+  const cancellation = new AbortController();
+  await active.load(cancellation.signal);
+  const connection = {
     endpoint: 'ai-keys' as const,
     provider: 'local',
-    apiKey: 'same-key',
-    baseUrl: 'http://localhost:11434/v1',
+    apiKey: 'retained-input',
+    baseUrl: 'https://first.example/v1',
   };
-  const second = { ...first, baseUrl: 'https://models.example/v1' };
-  await session.load(signal);
-  expect(await session.save([first], signal)).toEqual({ status: 'ready' });
-  expect(session.receiptStatus(second)).toBeNull();
-  expect(await session.save([second], signal)).toEqual({ status: 'ready' });
-  expect(await session.save([second], signal)).toEqual({ status: 'ready' });
-  expect(writes).toBe(2);
-  expect(reviewedEndpoints).toEqual([
-    'http://localhost:11434/v1',
-    'https://models.example/v1',
+  const other = { ...connection, baseUrl: 'https://second.example/v1' };
+  for (const selection of [connection, other, connection]) {
+    expect(active.receiptStatus(selection)).toBeNull();
+    expect(await active.save([selection], cancellation.signal)).toEqual({ status: 'ready' });
+    expect(active.receiptStatus(selection)).toBe('verified');
+    await active.save([selection], cancellation.signal);
+  }
+  expect(submissions.map((entry) => entry.endpoint)).toEqual([
+    connection.baseUrl,
+    other.baseUrl,
+    connection.baseUrl,
   ]);
-  expect(boundary.saved.get('ai-keys:local')).toEqual({ apiKey: 'same-key' });
+  expect(submissions[1].body.expectedRevision).toBe(submissions[0].body.operationId);
+  expect(submissions[2].body.expectedRevision).toBe(submissions[1].body.operationId);
+  expect(new Set(submissions.map((entry) => entry.body.operationId)).size).toBe(3);
 });
 
 it('resolves an omitted uncertain operation before accepting empty or changed selections', async () => {

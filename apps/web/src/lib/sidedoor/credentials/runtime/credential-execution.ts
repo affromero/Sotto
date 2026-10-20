@@ -1,7 +1,7 @@
 import { isDeepStrictEqual } from 'node:util';
 import { AccessError } from 'thesidedoor-core/access';
 import type { Prisma } from '@/generated/prisma/client';
-import { captureConfiguredSottoCredentialProbe } from '@/lib/providers/shared/credential-validation';
+import { captureConfiguredSottoCredentialDestination } from '@/lib/providers/shared/credential-validation';
 import {
   captureSottoCredentialOwner,
   inspectSottoProfileCredential,
@@ -17,15 +17,35 @@ export type CredentialExecutionAuthority = (
   database: Prisma.TransactionClient
 ) => Promise<{ userId: string }>;
 
-async function transportBinding(
+async function executionDestinations(
   database: Prisma.TransactionClient,
   scope: CredentialScope,
   provider: string
 ) {
-  const probe = await captureConfiguredSottoCredentialProbe(database, scope, provider, {});
-  if (probe.kind === 'unsupported')
+  const invocation = await captureConfiguredSottoCredentialDestination(database, scope, provider);
+  const slot = sottoCredentialSlot(scope, provider);
+  const physical =
+    slot.modality === scope
+      ? invocation
+      : await captureConfiguredSottoCredentialDestination(database, slot.modality, provider);
+  if (invocation.kind === 'unsupported' || physical.kind === 'unsupported')
     throw new AccessError('invalid', 'The selected provider has no credential transport');
-  return probe.binding;
+  return { invocation: invocation.binding, physical: physical.binding };
+}
+
+function credentialIdentity(
+  selected: NonNullable<Awaited<ReturnType<typeof inspectSottoProfileCredential>>>
+) {
+  return {
+    instanceId: selected.instanceId,
+    ownerUserId: selected.ownerUserId,
+    shared: selected.shared,
+    sharingRevision: selected.sharingRevision,
+    slot: { modality: selected.credential.modality, provider: selected.credential.provider },
+    owner: selected.credential.owner,
+    revision: selected.credential.credentialRevision,
+    destination: selected.credential.binding,
+  };
 }
 
 function freezeSnapshot<T>(value: T): T {
@@ -57,10 +77,8 @@ export async function captureSottoExecutionCredential(
   );
   signal?.throwIfAborted();
   if (!selected) return null;
-  const binding = await transportBinding(database, scope, provider);
-  const slot = sottoCredentialSlot(scope, provider);
-  const slotBinding = await transportBinding(database, slot.modality, provider);
-  if (!isDeepStrictEqual(selected.credential.binding, slotBinding))
+  const destinations = await executionDestinations(database, scope, provider);
+  if (!isDeepStrictEqual(destinations.physical, selected.credential.binding))
     throw new AccessError('conflict', 'The credential endpoint changed; review the saved key');
   return freezeSnapshot(
     structuredClone({
@@ -68,7 +86,7 @@ export async function captureSottoExecutionCredential(
       scope,
       provider,
       allowSharing,
-      binding,
+      binding: destinations.invocation,
       selected,
     })
   );
@@ -146,31 +164,15 @@ export async function validateSottoExecutionCredential(
     captured.provider,
     captured.allowSharing
   );
-  const expected = captured.selected;
+  const sameCredential =
+    current?.credential.availability === 'enabled' &&
+    isDeepStrictEqual(credentialIdentity(current), credentialIdentity(captured.selected));
+  if (!sameCredential)
+    throw new AccessError('conflict', 'The selected credential or endpoint changed');
+  const destinations = await executionDestinations(database, captured.scope, captured.provider);
   if (
-    !current ||
-    current.instanceId !== expected.instanceId ||
-    current.ownerUserId !== expected.ownerUserId ||
-    current.shared !== expected.shared ||
-    current.sharingRevision !== expected.sharingRevision ||
-    current.credential.modality !== expected.credential.modality ||
-    current.credential.provider !== expected.credential.provider ||
-    !isDeepStrictEqual(current.credential.owner, expected.credential.owner) ||
-    current.credential.credentialRevision !== expected.credential.credentialRevision ||
-    current.credential.availability !== 'enabled' ||
-    !isDeepStrictEqual(current.credential.binding, expected.credential.binding) ||
-    !isDeepStrictEqual(
-      await transportBinding(
-        database,
-        sottoCredentialSlot(captured.scope, captured.provider).modality,
-        captured.provider
-      ),
-      expected.credential.binding
-    ) ||
-    !isDeepStrictEqual(
-      await transportBinding(database, captured.scope, captured.provider),
-      captured.binding
-    )
+    !isDeepStrictEqual(destinations.physical, captured.selected.credential.binding) ||
+    !isDeepStrictEqual(destinations.invocation, captured.binding)
   )
     throw new AccessError('conflict', 'The selected credential or endpoint changed');
   signal?.throwIfAborted();

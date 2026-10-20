@@ -1,66 +1,76 @@
-.card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-lg);
-  padding: var(--spacing-lg);
-  background: var(--color-surface);
+.root {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
+  background-color: var(--color-surface);
+  padding: var(--spacing-lg);
+  display: grid;
+  row-gap: var(--spacing-lg);
 }
 
-.header,
-.keySection,
-.fields {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-sm);
+.heading,
+.group,
+.feedback {
+  display: grid;
+  row-gap: var(--spacing-sm);
+  min-inline-size: 0;
 }
 
-.title {
-  margin: 0;
-  color: var(--color-text-primary);
+.root :is(h2, h3, p) {
+  margin-block: 0;
+}
+
+.root h2 {
   font: var(--text-h3);
+  color: var(--color-text-primary);
 }
 
-.keyTitle {
-  margin: 0 0 var(--spacing-xs);
-  color: var(--color-text-primary);
+.root :is(h3, legend) {
   font: var(--text-body);
   font-weight: 600;
 }
 
-.description {
-  margin: 0;
-  color: var(--color-text-secondary);
+.root p {
   font: var(--text-body-sm);
+  color: var(--color-text-secondary);
 }
 
-.keySection {
-  padding-top: var(--spacing-md);
-  border-top: 1px solid var(--color-border);
+.group {
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+
+.group legend {
+  margin-block-end: var(--spacing-md);
+  padding: 0;
+}
+
+.fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--spacing-md);
 }
 
 .actions {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--spacing-sm);
 }
 
-.actions span,
-.credentialFeedback p {
-  margin: 0;
-  color: var(--color-text-secondary);
-  font: var(--text-body-sm);
+.key {
+  display: grid;
+  gap: var(--spacing-md);
+  padding-block-start: var(--spacing-lg);
+  border-block-start: 1px solid var(--color-border);
 }
 
-.error {
-  color: var(--color-error) !important;
+.root .error {
+  color: var(--color-error);
 }
 
-.credentialFeedback {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--spacing-sm);
+@media (max-width: 600px) {
+  .fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }

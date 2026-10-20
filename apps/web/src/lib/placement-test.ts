@@ -257,7 +257,11 @@ export async function deduceLevelFromNotes(
   const response = await provider.generateResponse(
     systemPrompt,
     [{ role: 'user', content: 'Assess the CEFR level shown by these materials.' }],
-    { ...(await capturedLearningAiOptions(ai)), maxTokens: 800, temperature: 0.2 }
+    {
+      ...(await capturedLearningAiOptions(ai, { includeSourceDocuments: true })),
+      maxTokens: 800,
+      temperature: 0.2,
+    }
   );
 
   logUsage({

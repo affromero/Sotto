@@ -73,7 +73,14 @@ async function pruneUntouchedTargets(
   const [vocab, grammar] = await Promise.all([
     orphanLemmas.length > 0
       ? prisma.learnerVocab.deleteMany({
-          where: { courseId, lemma: { in: orphanLemmas }, firstSeenClassId: null, ...untouched },
+          where: {
+            courseId,
+            lemma: { in: orphanLemmas },
+            firstSeenClassId: null,
+            introducedAt: null,
+            sources: { none: {} },
+            ...untouched,
+          },
         })
       : Promise.resolve({ count: 0 }),
     orphanKeys.length > 0
@@ -110,6 +117,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
         grammarKeys: true,
         readingVocabulary: true,
         generationState: true,
+        vocabularyStudy: true,
       },
     });
     if (!session) return errorResponse('Practice session not found', 404);
@@ -129,16 +137,20 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
 
     await prisma.practiceSession.delete({ where: { id: session.id } });
 
-    const pruned = await pruneUntouchedTargets(
-      session.courseId,
-      [
-        ...session.vocabLemmas,
-        ...(session.readingVocabulary
-          ? readingVocabularySchema.parse(session.readingVocabulary).words.map((word) => word.lemma)
-          : []),
-      ],
-      session.grammarKeys
-    );
+    const pruned = session.vocabularyStudy
+      ? { vocab: 0, grammar: 0 }
+      : await pruneUntouchedTargets(
+          session.courseId,
+          [
+            ...session.vocabLemmas,
+            ...(session.readingVocabulary
+              ? readingVocabularySchema
+                  .parse(session.readingVocabulary)
+                  .words.map((word) => word.lemma)
+              : []),
+          ],
+          session.grammarKeys
+        );
     if (pruned.vocab > 0 || pruned.grammar > 0) {
       logger.info('Pruned memory-graph targets with a discarded practice session', {
         sessionId: session.id,

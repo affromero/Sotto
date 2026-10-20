@@ -159,6 +159,35 @@ class AffectedChecksTests(unittest.TestCase):
         self.assertIn(str(self.root / test), tests)
         self.assertNotIn('--passWithNoTests', tests)
 
+    def test_browser_changes_keep_types_without_running_vitest(self) -> None:
+        self.stage('apps/web/e2e/vocabulary.spec.ts',
+                   'apps/web/e2e/fixtures/source.json')
+        self.assert_passed(self.run_checks())
+        self.assertEqual(self.calls(), [
+            ['run', 'type-check', '--workspace=@sotto/web'],
+        ])
+
+    def test_browser_changes_preserve_real_unit_test_checks(self) -> None:
+        browser = 'apps/web/e2e/vocabulary.spec.ts'
+        unit = 'apps/web/tests/components/Vocabulary.test.tsx'
+        self.stage(browser, unit)
+        self.assert_passed(self.run_checks())
+        tests = next(command for command in self.calls()
+                     if 'related' in command)
+        self.assertIn(str(self.root / unit), tests)
+        self.assertNotIn(str(self.root / browser), tests)
+        self.assertNotIn('--passWithNoTests', tests)
+
+    def test_deleted_browser_changes_do_not_trigger_unit_tests(self) -> None:
+        browser = 'apps/web/e2e/vocabulary.spec.ts'
+        self.stage(browser)
+        self.commit()
+        self.git('rm', browser)
+        self.assert_passed(self.run_checks())
+        self.assertEqual(self.calls(), [
+            ['run', 'type-check', '--workspace=@sotto/web'],
+        ])
+
     def test_deleted_source_runs_the_full_affected_workspace(self) -> None:
         source = 'apps/web/src/lib/removed.ts'
         self.stage(source)
@@ -234,6 +263,23 @@ class AffectedChecksTests(unittest.TestCase):
         self.assertIn('Ran 1 test', result.stderr)
         self.assertEqual(self.calls(), [])
 
+    def test_packaged_python_test_imports_its_sibling_fixture(self) -> None:
+        selected = 'scripts/tests/images/test_selected.py'
+        self.write('scripts/tests/images/__init__.py', '')
+        self.write('scripts/tests/images/fixtures.py', 'EXPECTED = "ready"\n')
+        self.write(selected,
+                   'import unittest\nfrom images.fixtures import EXPECTED\n'
+                   'class Selected(unittest.TestCase):\n'
+                   '    def test_delivery(self):\n'
+                   '        self.assertEqual(EXPECTED, "ready")\n')
+        self.git('add', selected)
+        self.write('scripts/tests/test_unrelated.py',
+                   'raise RuntimeError("Unrelated suite must not run")\n')
+        result = self.run_checks()
+        self.assert_passed(result)
+        self.assertIn('Ran 1 test', result.stderr)
+        self.assertEqual(self.calls(), [])
+
     def test_changed_python_failure_blocks_the_local_gate(self) -> None:
         selected = 'scripts/tests/test_selected.py'
         self.write(selected, 'import unittest\n'
@@ -248,6 +294,7 @@ class AffectedChecksTests(unittest.TestCase):
 
     def test_hook_configuration_runs_its_own_behavior_tests(self) -> None:
         selected = 'scripts/tests/delivery/test_affected_checks.py'
+        self.write('scripts/tests/delivery/__init__.py', '')
         self.write(selected, 'import unittest\n'
                    'class HookBehavior(unittest.TestCase):\n'
                    '    def test_delivery(self):\n'

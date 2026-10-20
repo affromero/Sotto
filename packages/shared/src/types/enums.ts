@@ -1,5 +1,7 @@
 // String union equivalents of Prisma enums — Prisma-free for mobile consumption
 
+export type { VocabularySupport } from '../learning/vocabulary-support';
+
 export type UserRole = 'USER' | 'ADMIN';
 
 export type EpisodeStatus =

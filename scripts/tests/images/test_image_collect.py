@@ -68,6 +68,10 @@ class ImageCollectorTests(ReceiptFixture):
             elif args[0] == 'run':
                 assert args[args.index('--network')+1] == 'none'
                 assert '--read-only' in args and '--pull' in args
+                if (args[args.index('--tmpfs')+1] != '/tmp'
+                        or 'TSX_DISABLE_CACHE=1' not in args
+                        or args[args.index('--workdir')+1] != '/app/apps/web'):
+                    raise RuntimeError('Read-only probe cannot initialize')
                 source = args[-1]
                 if 'ALL_QUEUE_NAMES' in source:
                     if os.environ.get('FAIL_QUEUE_PROBE') == '1':

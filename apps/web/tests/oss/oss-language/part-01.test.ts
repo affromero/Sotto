@@ -11,7 +11,7 @@ function readSource(relativePath: string): string {
   return readFileSync(resolve(webRoot, relativePath), 'utf8');
 }
 
-describe('open-source language-learning OSS surfaces', () => {
+describe('self-hosted language-learning surfaces', () => {
   const primarySurfaceFiles = [
     'src/components/layout/Sidebar.tsx',
     'src/components/layout/MobileNav.tsx',
@@ -36,13 +36,18 @@ describe('open-source language-learning OSS surfaces', () => {
     }
   });
 
-  it('ships with an AGPL-3.0 LICENSE file', () => {
+  it('ships with the PolyForm Noncommercial license and component notices', () => {
     const licenseSource = readFileSync(resolve(repoRoot, 'LICENSE'), 'utf8');
     expect(existsSync(resolve(repoRoot, 'LICENSE'))).toBe(true);
-    expect(licenseSource).toContain('GNU AFFERO GENERAL PUBLIC LICENSE');
+    expect(licenseSource).toContain('PolyForm Noncommercial License 1.0.0');
+    const noticesSource = readFileSync(resolve(repoRoot, 'THIRD_PARTY_NOTICES.md'), 'utf8');
+    expect(noticesSource).toContain('services/local-tts/');
+    expect(noticesSource).toContain('AGPL-3.0-only');
+    expect(noticesSource).toContain('packages/groundcheck/');
+    expect(noticesSource).toContain('MIT License');
   });
 
-  it('positions the product as open-source language-learning infrastructure, not a social episode network', () => {
+  it('positions the product around private language-learning infrastructure', () => {
     const landingSource = [
       'src/app/page.tsx',
       'src/components/landing/LandingHeader.tsx',

@@ -26,6 +26,11 @@ import {
 } from '../classes/quality/teaching-failure-store';
 import { sottoTransaction } from '../sidedoor/access/state/transaction';
 import {
+  assertVocabularyStudyOwner,
+  publicVocabularyStudy,
+  vocabularyStudyStateSchema,
+} from '../vocabulary/study-state';
+import {
   PracticeSessionNotFoundError,
   type PracticeMcItemPublic,
   type StartPracticeResult,
@@ -54,6 +59,8 @@ export async function resumePractice(
       where: { id: sessionId, course: { userId } },
       select: {
         id: true,
+        courseId: true,
+        vocabularyStudy: true,
         kind: true,
         status: true,
         items: true,
@@ -68,6 +75,13 @@ export async function resumePractice(
     });
   let session = await readSession();
   if (!session) throw new PracticeSessionNotFoundError('Practice session not found');
+  if (session.vocabularyStudy) {
+    const state = vocabularyStudyStateSchema.parse(session.vocabularyStudy);
+    assertVocabularyStudyOwner(state, session, userId);
+    if (!['ACTIVE', 'COMPLETED'].includes(session.status))
+      throw new PracticeSessionNotFoundError('Vocabulary study is unavailable');
+    return publicVocabularyStudy(state, session);
+  }
   if (session.generationState) {
     const stored = practicePreparationSchema.parse(session.generationState);
     const operation = ['CANCELLING', 'RUNNING'].includes(stored.status)

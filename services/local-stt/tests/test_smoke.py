@@ -1,7 +1,10 @@
 """Behavioral checks for whole-utterance transcription qualification."""
 
 import copy
+import hashlib
 import importlib.util
+import json
+import shutil
 from pathlib import Path
 
 import pytest
@@ -12,6 +15,110 @@ SPEC = importlib.util.spec_from_file_location(
 assert SPEC is not None and SPEC.loader is not None
 SMOKE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(SMOKE)
+
+
+@pytest.fixture
+def recordings(tmp_path):
+    source = Path(__file__).parents[1] / "fixtures"
+    shutil.copytree(source, tmp_path / "recordings")
+    return tmp_path / "recordings"
+
+
+def edit_manifest(directory, edit):
+    path = directory / "manifest.json"
+    manifest = json.loads(path.read_bytes())
+    edit(manifest)
+    path.write_text(json.dumps(manifest))
+
+
+def test_public_recordings_match_their_declared_audio_and_speakers(recordings):
+    samples = SMOKE.load_samples(recordings)
+    assert {sample["speaker"] for sample in samples} == {"kerstin", "thorsten"}
+    assert len({sample["referenceText"] for sample in samples}) == len(samples)
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("id", "../outside"),
+        ("id", ""),
+        ("speaker", ""),
+        ("referenceText", ""),
+        ("referenceText", "___"),
+        ("referenceText", "a" * 1001),
+        ("sha256", "0" * 64),
+        ("sourceSha256", "invalid"),
+        ("sampleRate", True),
+        ("sampleRate", 1),
+        ("audioSeconds", True),
+        ("audioSeconds", float("nan")),
+        ("audioSeconds", float("inf")),
+        ("audioSeconds", -1),
+        ("license", "unknown"),
+        ("source", "https://example.com/latest.wav"),
+    ],
+)
+def test_invalid_manifest_entries_fail_before_transcription(recordings, field, value):
+    edit_manifest(recordings, lambda data: data["samples"][0].update({field: value}))
+    with pytest.raises(ValueError):
+        SMOKE.load_samples(recordings)
+
+
+def test_recordings_require_distinct_speakers(recordings):
+    edit_manifest(recordings, lambda data: data["samples"][1].update(speaker="kerstin"))
+    with pytest.raises(ValueError, match="two speakers"):
+        SMOKE.load_samples(recordings)
+
+
+def test_duplicate_identifiers_fail(recordings):
+    edit_manifest(recordings, lambda data: data["samples"].append(data["samples"][0]))
+    with pytest.raises(ValueError, match="unique"):
+        SMOKE.load_samples(recordings)
+
+
+def test_symlinked_recordings_fail(recordings):
+    path = recordings / "kerstin-weather.wav"
+    path.rename(recordings / "original.wav")
+    path.symlink_to(recordings / "original.wav")
+    with pytest.raises(ValueError, match="regular"):
+        SMOKE.load_samples(recordings)
+
+
+def test_truncated_pcm_fails_even_when_the_declared_file_hash_matches(recordings):
+    path = recordings / "kerstin-weather.wav"
+    path.write_bytes(path.read_bytes()[:-100])
+    edit_manifest(
+        recordings,
+        lambda data: data["samples"][0].update(
+            sha256=hashlib.sha256(path.read_bytes()).hexdigest()
+        ),
+    )
+    with pytest.raises(ValueError, match="truncated"):
+        SMOKE.load_samples(recordings)
+
+
+def test_duplicate_pcm_with_different_container_bytes_fails(recordings):
+    first = recordings / "kerstin-weather.wav"
+    second = recordings / "thorsten-geography.wav"
+    second.write_bytes(first.read_bytes() + b"JUNK\x00\x00\x00\x00")
+    first_entry = SMOKE.load_samples(Path(__file__).parents[1] / "fixtures")[0]
+    edit_manifest(
+        recordings,
+        lambda data: data["samples"][1].update(
+            sha256=hashlib.sha256(second.read_bytes()).hexdigest(),
+            sampleRate=first_entry["sampleRate"],
+            audioSeconds=first_entry["audioSeconds"],
+        ),
+    )
+    with pytest.raises(ValueError, match="decoded recording"):
+        SMOKE.load_samples(recordings)
+
+
+def test_transcript_of_another_recording_cannot_satisfy_its_reference():
+    samples = SMOKE.load_samples(Path(__file__).parents[1] / "fixtures")
+    response = transcript(samples[0]["referenceText"])
+    assert SMOKE.response_errors(response, samples[1]["referenceText"], 60)
+
 
 REFERENCE = "Gestern bin ich zu Fuß zum Markt gegangen."
 DURATION = 2.4

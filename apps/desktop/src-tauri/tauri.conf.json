@@ -38,6 +38,10 @@
     ],
     "category": "Education",
     "shortDescription": "Run your self-hosted Sotto in one click",
-    "longDescription": "Sotto Host starts, stops, and opens your self-hosted Sotto stack with no terminal."
+    "longDescription": "Sotto Host starts, stops, and opens your self-hosted Sotto stack with no terminal.",
+    "resources": {
+      "../../../LICENSE": "notices/LICENSE",
+      "../../../THIRD_PARTY_NOTICES.md": "notices/THIRD_PARTY_NOTICES.md"
+    }
   }
 }

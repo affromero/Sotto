@@ -11,6 +11,7 @@ import { resolveSottoRequest } from '@/lib/sidedoor/access/core/request-identity
 import { validateSottoCredentialSelection } from '@/lib/sidedoor/credentials/config/credential-selection';
 import { onboardingSaveSchema } from '@/lib/validations';
 import { getOrCreateCurriculum } from '@/lib/curriculum-generator';
+import { learningAiSetupSelection } from '@/lib/learning/ai/selection';
 import { setCourseNote } from '@/lib/course-notes';
 import { attachCourseMaterials } from '@/lib/course-materials';
 import { setSiteConfig } from '@/lib/site-config';
@@ -188,15 +189,7 @@ async function save(request: NextRequest) {
     { userId: authed.userId, authorize, signal: request.signal },
     course.native,
     course.target,
-    preferred?.aiProvider && preferred.aiModel
-      ? {
-          provider: preferred.aiProvider,
-          model: preferred.aiModel,
-          ...(preferred.aiProvider === 'local' && infra?.aiBaseUrl
-            ? { endpoint: infra.aiBaseUrl }
-            : {}),
-        }
-      : undefined
+    learningAiSetupSelection(preferred, infra)
   );
   const courseId = await sottoTransaction(prismaUnfiltered, async (database) => {
     const current = await authorize(database);
@@ -220,8 +213,14 @@ async function save(request: NextRequest) {
         curriculumId: curriculum.id,
         placementSource: 'MANUAL',
         ...(course.level && { currentLevel: course.level, startLevel: course.level }),
+        ...(course.vocabularySupport !== undefined && {
+          vocabularySupport: course.vocabularySupport,
+        }),
       },
-      update: {},
+      update:
+        course.vocabularySupport !== undefined
+          ? { vocabularySupport: course.vocabularySupport }
+          : {},
       select: { id: true },
     });
     if (note?.trim()) await setCourseNote(created.id, note, database);

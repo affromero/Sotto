@@ -2,7 +2,7 @@
   "name": "@sotto/shared",
   "version": "0.1.0",
   "private": true,
-  "license": "AGPL-3.0-only",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "exports": {
     ".": "./src/index.ts",
     "./*": "./src/*"

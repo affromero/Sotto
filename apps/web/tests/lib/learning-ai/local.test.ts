@@ -115,16 +115,23 @@ suite('Local learning generation', () => {
     await saveLocalPreference();
     await generate(await resolveCapturedLearningAi(identity.ownerId, execution()));
   });
-  it('uses the saved local API key for normal learning generation', async () => {
-    await instance.configureInfrastructure({
-      aiProvider: 'local',
-      aiModel: 'qwen3',
-      aiBaseUrl: endpoint,
+  it('dispatches captured personal authentication even after the learner chooses a CLI for later work', async () => {
+    await instance.configureInfrastructure({ aiBaseUrl: endpoint });
+    await instance.seedAiCredential(identity.ownerId, 'local', 'captured-personal-key');
+    const selected = await resolveCapturedLearningAi(identity.ownerId, execution(), {
+      provider: 'local',
+      model: 'local:qwen3',
+      endpoint,
     });
-    await instance.seedAiCredential(identity.ownerId, 'local', 'local-learning-secret');
-    await saveLocalPreference();
-    const ai = await resolveCapturedLearningAi(identity.ownerId, execution());
-    await generate(ai, endpoint, 'local-learning-secret');
+    await instance.database.user.update({
+      where: { id: identity.ownerId },
+      data: { preferredAiProvider: 'codex', preferredAiModel: 'codex' },
+    });
+    await generate(selected, endpoint, 'captured-personal-key');
+    expect(
+      (await instance.database.user.findUniqueOrThrow({ where: { id: identity.ownerId } }))
+        .preferredAiProvider
+    ).toBe('codex');
   });
   it('transcribes on a separate local speech server without sending the saved AI key', async () => {
     const speechEndpoint = 'http://localhost:8000/v1';

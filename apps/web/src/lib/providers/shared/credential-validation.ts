@@ -11,41 +11,59 @@ import {
   validateServiceCredentials,
   type ServiceCredentialSelection,
 } from 'thesidedoor-core/providers/service-validation';
-import type { CredentialScope } from '@/lib/sidedoor/access/state/state';
 import type { Prisma } from '@/generated/prisma/client';
+import type { CredentialScope } from '@/lib/sidedoor/access/state/state';
 import { sidedoorStateStore } from '@/lib/sidedoor/access/state/store';
-import { captureApiEndpoint, selectedApi } from '@/lib/providers/shared/api-selection';
-import { CARTESIA_TTS_API_VERSION } from '@/lib/providers/shared/speech-contracts';
+import { captureApiEndpoint, selectedApi } from './api-selection';
+import { CARTESIA_TTS_API_VERSION } from './speech-contracts';
 
 type Binding = { protocol: string; endpoint: string };
+export type SottoCredentialDestination =
+  | { kind: 'unsupported' }
+  | {
+      kind: 'api';
+      binding: Binding;
+      requiresEndpointReview: boolean;
+      api: Omit<Parameters<typeof selectedApi>[0], 'apiKey'>;
+    }
+  | {
+      kind: 'service';
+      binding: Binding;
+      service: Omit<ServiceCredentialSelection, 'credentials'>;
+    };
 export type SottoCredentialProbe =
+  | { kind: 'unsupported' }
   | { kind: 'api'; binding: Binding; selection: SelectedApi }
-  | { kind: 'service'; binding: Binding; selection: ServiceCredentialSelection }
-  | { kind: 'unsupported' };
+  | { kind: 'service'; binding: Binding; selection: ServiceCredentialSelection };
 
-/** Capture product transport configuration once; provider keys never come from the environment. */
-export function captureSottoCredentialProbe(
+const modalities = {
+  tts: 'speech',
+  stt: 'transcription',
+  music: 'music',
+  visual: 'visual',
+  storage: 'storage',
+  pricing: 'pricing',
+} as const satisfies Record<Exclude<CredentialScope, 'ai'>, ProviderModality>;
+
+/** Resolve the non-secret route before constructing a credential-bearing probe. */
+export function captureSottoCredentialDestination(
   scope: CredentialScope,
   provider: string,
-  values: CredentialValues,
   configuredEndpoint?: string
-): SottoCredentialProbe {
+): SottoCredentialDestination {
   const identity = providerIdentity(provider);
   const modality: ProviderModality =
     scope === 'ai'
       ? identity.modalities.includes('text')
         ? 'text'
         : 'transcription'
-      : scope === 'tts'
-        ? 'speech'
-        : scope === 'stt'
-          ? 'transcription'
-          : scope;
-  const metadata = providerCredentials(provider, modality);
-  if (!metadata.fields.length) return { kind: 'unsupported' };
+      : modalities[scope];
+  if (providerCredentials(provider, modality).fields.length === 0) return { kind: 'unsupported' };
+
   const protocol = providerServiceProtocol(provider, modality);
-  if (protocol && !(scope === 'ai' && modality === 'text')) {
-    const endpoint = serviceCredentialOrigin(protocol);
+  const usesService = protocol !== null && !(scope === 'ai' && modality === 'text');
+  if (usesService && protocol) {
+    const origin = serviceCredentialOrigin(protocol);
     const apiVersion =
       protocol === 'cartesia'
         ? scope === 'stt'
@@ -54,55 +72,88 @@ export function captureSottoCredentialProbe(
         : undefined;
     return {
       kind: 'service',
-      binding: { protocol: apiVersion ? `${protocol}:${apiVersion}` : protocol, endpoint },
-      selection: {
-        protocol,
-        origin: endpoint,
-        credentials: {
-          apiKey: typeof values.apiKey === 'string' ? values.apiKey : undefined,
-          userId: typeof values.userId === 'string' ? values.userId : undefined,
-        },
-        apiVersion,
-      },
+      binding: { endpoint: origin, protocol: apiVersion ? `${protocol}:${apiVersion}` : protocol },
+      service: { origin, protocol, apiVersion },
     };
   }
-  const endpoint =
-    provider === 'local' && scope === 'ai'
-      ? configuredEndpoint?.trim()
-      : captureApiEndpoint(provider);
+
+  const requiresEndpointReview = scope === 'ai' && provider === 'local';
+  const endpoint = requiresEndpointReview
+    ? configuredEndpoint?.trim()
+    : captureApiEndpoint(provider);
   if (!endpoint) throw new Error('Save the local AI endpoint before adding its API key.');
-  const transport =
+  const transport: SelectedApi['transport'] =
     provider === 'anthropic' ? 'anthropic' : provider === 'openai' ? 'responses' : 'compatible';
   return {
     kind: 'api',
-    binding: { protocol: transport, endpoint },
-    selection: selectedApi({
-      provider,
-      label: identity.label,
-      transport,
-      endpoint,
-      apiKey: typeof values.apiKey === 'string' ? values.apiKey : '',
-    }),
+    requiresEndpointReview,
+    binding: { endpoint, protocol: transport },
+    api: { endpoint, provider, transport, label: identity.label },
   };
 }
 
-/** Local credentials bind to the authoritative URL in the caller's transaction. */
+/** Local destinations come from the caller's transaction, never an environment hint. */
+export async function captureConfiguredSottoCredentialDestination(
+  database: Prisma.TransactionClient,
+  scope: CredentialScope,
+  provider: string
+): Promise<SottoCredentialDestination> {
+  if (scope !== 'ai' || provider !== 'local')
+    return captureSottoCredentialDestination(scope, provider);
+  const state = await sidedoorStateStore(database).read();
+  const setting = state.configuration.site?.aiBaseUrl;
+  const endpoint = typeof setting === 'string' ? setting : undefined;
+  return captureSottoCredentialDestination(scope, provider, endpoint);
+}
+
+/** Only this boundary adds captured credential values to an already selected route. */
+export function bindSottoCredentialProbe(
+  destination: SottoCredentialDestination,
+  values: CredentialValues
+): SottoCredentialProbe {
+  if (destination.kind === 'unsupported') return { kind: 'unsupported' };
+  const apiKey = typeof values.apiKey === 'string' ? values.apiKey : undefined;
+  const binding = { ...destination.binding };
+  if (destination.kind === 'api')
+    return {
+      kind: 'api',
+      binding,
+      selection: selectedApi({ ...destination.api, apiKey: apiKey ?? '' }),
+    };
+  return {
+    kind: 'service',
+    binding,
+    selection: {
+      ...destination.service,
+      credentials: {
+        apiKey,
+        userId: typeof values.userId === 'string' ? values.userId : undefined,
+      },
+    },
+  };
+}
+
+export function captureSottoCredentialProbe(
+  scope: CredentialScope,
+  provider: string,
+  values: CredentialValues,
+  configuredEndpoint?: string
+): SottoCredentialProbe {
+  return bindSottoCredentialProbe(
+    captureSottoCredentialDestination(scope, provider, configuredEndpoint),
+    values
+  );
+}
+
 export async function captureConfiguredSottoCredentialProbe(
   database: Prisma.TransactionClient,
   scope: CredentialScope,
   provider: string,
   values: CredentialValues
 ): Promise<SottoCredentialProbe> {
-  const endpoint =
-    provider === 'local' && scope === 'ai'
-      ? (await sidedoorStateStore(database).read()).configuration.site?.aiBaseUrl
-      : undefined;
-  return captureSottoCredentialProbe(
-    scope,
-    provider,
-    values,
-    typeof endpoint === 'string' ? endpoint : undefined
-  );
+  const fields = { ...values };
+  const destination = await captureConfiguredSottoCredentialDestination(database, scope, provider);
+  return bindSottoCredentialProbe(destination, fields);
 }
 
 export async function validateSottoCredentialProbe(
@@ -110,14 +161,18 @@ export async function validateSottoCredentialProbe(
   signal?: AbortSignal
 ): Promise<CredentialValidation> {
   signal?.throwIfAborted();
-  if (probe.kind === 'unsupported')
-    return {
-      status: 'inconclusive',
-      readiness: { code: 'unsupported', checkedAt: Date.now(), action: 'configure' },
-    };
-  if (probe.kind === 'service') return validateServiceCredentials(probe.selection, signal);
-  return createSelectedApiRegistry(probe.selection, { maxRetries: 0 }).validateCredentials(
-    probe.selection.descriptor.id,
-    signal
-  );
+  switch (probe.kind) {
+    case 'unsupported':
+      return {
+        status: 'inconclusive',
+        readiness: { action: 'configure', code: 'unsupported', checkedAt: Date.now() },
+      };
+    case 'service':
+      return validateServiceCredentials(probe.selection, signal);
+    case 'api':
+      return createSelectedApiRegistry(probe.selection, { maxRetries: 0 }).validateCredentials(
+        probe.selection.descriptor.id,
+        signal
+      );
+  }
 }

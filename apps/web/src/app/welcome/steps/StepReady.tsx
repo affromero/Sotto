@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import type { VocabularySupport } from '@sotto/shared';
 import {
   LANGUAGES,
   BASE_LANGS,
@@ -76,6 +77,7 @@ interface Props {
   baseLang: string;
   language: string;
   level: CefrLevel | null;
+  vocabularySupport?: VocabularySupport | null;
   sources: Set<string>;
   contextItems: ContextItem[];
   agent: AgentState;
@@ -92,6 +94,7 @@ export function StepReady({
   baseLang,
   language,
   level,
+  vocabularySupport,
   sources,
   contextItems,
   agent,
@@ -211,7 +214,12 @@ export function StepReady({
 
     try {
       const res = await submitSetup({
-        course: { native: baseLang, target: language, ...(level && { level }) },
+        course: {
+          native: baseLang,
+          target: language,
+          ...(level && { level }),
+          ...(vocabularySupport !== undefined && { vocabularySupport }),
+        },
         ...(note && { note }),
         materialIds: contextItems.flatMap((item) => (item.materialId ? [item.materialId] : [])),
         preferred: {

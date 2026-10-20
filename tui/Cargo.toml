@@ -7,7 +7,7 @@ version = "0.1.0"
 edition = "2024"
 rust-version = "1.88"
 description = "Headless terminal client for the Sotto language-learning platform: CEFR courses, vocab SRS, listening/speaking, and native audio in your terminal."
-license = "AGPL-3.0-only"
+license = "PolyForm-Noncommercial-1.0.0"
 repository = "https://github.com/affromero/Sotto"
 homepage = "https://github.com/affromero/Sotto"
 readme = "README.md"
@@ -19,6 +19,8 @@ include = [
     "src/**/*.rs",
     "openapi.codegen.json",
     "README.md",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md",
     "Cargo.toml",
 ]
 
@@ -30,9 +32,9 @@ path = "src/main.rs"
 rustdoc-args = ["--deny", "warnings"]
 
 [package.metadata.cargo-machete]
-# progenitor emits regress::Regex for OpenAPI patterns inside generate_api!.
+# progenitor emits regress::Regex patterns and chrono timestamps in generate_api!.
 # cargo-machete scans source before macro expansion and cannot see these uses.
-ignored = ["regress"]
+ignored = ["chrono", "regress"]
 
 [dependencies]
 ratatui = { version = "0.30", features = ["serde"] }
@@ -63,6 +65,7 @@ async-trait = "0.1.92"
 # Generated API client + its runtime requirements.
 progenitor = "0.14"
 regress = "0.11"
+chrono = { version = "0.4", default-features = false, features = ["serde", "std"] }
 
 # Audio: playback (rodio), capture (cpal), and WAV encoding (hound).
 rodio = "0.22"

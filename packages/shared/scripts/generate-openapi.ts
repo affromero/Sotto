@@ -10,6 +10,19 @@ import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
 import { playContractSchemas } from '../src/contracts/play';
 import {
+  vocabularyStudySessionSchema,
+  vocabularyStudyRequestSchema,
+  vocabularyStudyActionSchema,
+} from '../src/learning/vocabulary-study';
+import {
+  dictionaryResponseSchema,
+  dictionaryMeaningSchema,
+  dictionaryMeaningResponseSchema,
+  vocabularyWorkRequestSchema,
+  vocabularyIndexResponseSchema,
+  vocabularyAudioResponseSchema,
+} from '../src/learning/dictionary';
+import {
   pencilHomeworkRequestSchema,
   pencilHomeworkResponseSchema,
 } from '../src/contracts/pencil-homework';
@@ -124,12 +137,21 @@ const startPracticeVariants: Record<string, string> = {
   ready_speaking: 'StartPracticeReadySpeaking',
   ready_writing: 'StartPracticeReadyWriting',
   ready_full: 'StartPracticeReadyFull',
+  ready_vocabulary: 'StartPracticeReadyVocabulary',
 };
 
 // Named component schemas. Reusable leaves are registered so they emit `$ref`
 // pointers instead of being inlined — this keeps the document DRY and gives the
 // Rust codegen clean, named types. Order is irrelevant; refs resolve by id.
 const namedSchemas: Record<string, z.ZodType> = {
+  DictionaryResponse: dictionaryResponseSchema,
+  DictionaryMeaningRequest: dictionaryMeaningSchema,
+  DictionaryMeaningResponse: dictionaryMeaningResponseSchema,
+  VocabularyWorkRequest: vocabularyWorkRequestSchema,
+  VocabularyIndexResponse: vocabularyIndexResponseSchema,
+  VocabularyAudioResponse: vocabularyAudioResponseSchema,
+  VocabularyStudyRequest: vocabularyStudyRequestSchema,
+  VocabularyStudyAction: vocabularyStudyActionSchema,
   PencilHomeworkRequest: pencilHomeworkRequestSchema,
   PencilHomeworkResponse: pencilHomeworkResponseSchema,
   ClassRegenerationRequest: classRegenerationRequestSchema,
@@ -159,6 +181,7 @@ const namedSchemas: Record<string, z.ZodType> = {
   StartPracticeReadySpeaking: startPracticeReadySpeakingSchema,
   StartPracticeReadyWriting: startPracticeReadyWritingSchema,
   StartPracticeReadyFull: startPracticeReadyFullSchema,
+  StartPracticeReadyVocabulary: vocabularyStudySessionSchema,
   [START_PRACTICE_RESPONSE_NAME]: startPracticeResponseSchema,
   SubmitPracticeRequest: submitPracticeRequestSchema,
   SubmitPracticeResponse: submitPracticeResponseSchema,

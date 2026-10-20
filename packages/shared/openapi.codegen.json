@@ -20,6 +20,398 @@
       }
     },
     "schemas": {
+      "DictionaryResponse": {
+        "type": "object",
+        "properties": {
+          "words": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "lemma": {
+                  "type": "string"
+                },
+                "translation": {
+                  "type": "string"
+                },
+                "acceptedMeanings": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "partOfSpeech": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "pronunciation": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "mastery": {
+                  "type": "number"
+                },
+                "state": {
+                  "type": "string",
+                  "enum": ["unseen", "introduced", "learning", "due", "strong"]
+                },
+                "dueAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                  "nullable": true
+                },
+                "lastReviewed": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                  "nullable": true
+                },
+                "reviews": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "sourceCount": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "sources": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "materialId": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "startOffset": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "endOffset": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "exclusiveMinimum": true,
+                        "maximum": 9007199254740991
+                      },
+                      "quote": {
+                        "type": "string"
+                      },
+                      "meaning": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "materialId",
+                      "name",
+                      "startOffset",
+                      "endOffset",
+                      "quote",
+                      "meaning"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "lemma",
+                "translation",
+                "acceptedMeanings",
+                "partOfSpeech",
+                "pronunciation",
+                "mastery",
+                "state",
+                "dueAt",
+                "lastReviewed",
+                "reviews",
+                "sourceCount",
+                "sources"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "maximum": 9007199254740991
+          },
+          "pages": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "maximum": 9007199254740991
+          },
+          "counts": {
+            "type": "object",
+            "properties": {
+              "unseen": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "due": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "strong": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": ["unseen", "due", "strong"],
+            "additionalProperties": false
+          },
+          "vocabularySupport": {
+            "type": "string",
+            "enum": ["MEANING_RECALL", "WORD_RECALL", "LISTENING_RECOGNITION"],
+            "nullable": true
+          },
+          "materials": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "NOT_INDEXED",
+                    "PENDING",
+                    "ACTIVE",
+                    "COMPLETE",
+                    "FAILED",
+                    "NEEDS_TEXT",
+                    "UNRESOLVED"
+                  ]
+                },
+                "error": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "processedChunks": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "totalChunks": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "entries": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "status",
+                "error",
+                "processedChunks",
+                "totalChunks",
+                "entries"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["words", "total", "page", "pages", "counts", "vocabularySupport", "materials"],
+        "additionalProperties": false
+      },
+      "DictionaryMeaningRequest": {
+        "type": "object",
+        "properties": {
+          "translation": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "acceptedMeanings": {
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000
+            }
+          }
+        },
+        "required": ["translation", "acceptedMeanings"],
+        "additionalProperties": false
+      },
+      "DictionaryMeaningResponse": {
+        "type": "object",
+        "properties": {
+          "saved": {
+            "type": "boolean",
+            "enum": [true]
+          }
+        },
+        "required": ["saved"],
+        "additionalProperties": false
+      },
+      "VocabularyWorkRequest": {
+        "type": "object",
+        "properties": {
+          "retry": {
+            "default": false,
+            "type": "boolean"
+          }
+        },
+        "required": ["retry"],
+        "additionalProperties": false
+      },
+      "VocabularyIndexResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["PENDING", "ACTIVE", "COMPLETE", "FAILED", "NEEDS_TEXT", "UNRESOLVED"]
+          },
+          "error": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": ["id", "status", "error"],
+        "additionalProperties": false
+      },
+      "VocabularyAudioResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["QUEUED", "RUNNING", "READY", "FAILED", "UNRESOLVED"]
+          },
+          "error": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": ["status", "error"],
+        "additionalProperties": false
+      },
+      "VocabularyStudyRequest": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "mode": {
+            "type": "string",
+            "enum": ["FLASHCARDS", "MEANING_RECALL", "WORD_RECALL", "LISTENING_RECALL"]
+          },
+          "wordIds": {
+            "minItems": 1,
+            "maxItems": 24,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "required": ["requestId"],
+        "additionalProperties": false
+      },
+      "VocabularyStudyAction": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "expectedRevision": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "action": {
+                "type": "string",
+                "enum": ["ANSWER"]
+              },
+              "itemId": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "answer": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1000
+              }
+            },
+            "required": ["expectedRevision", "action", "itemId", "answer"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "expectedRevision": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "action": {
+                "type": "string",
+                "enum": ["REVEAL"]
+              },
+              "itemId": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              }
+            },
+            "required": ["expectedRevision", "action", "itemId"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "expectedRevision": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "action": {
+                "type": "string",
+                "enum": ["COMPLETE"]
+              }
+            },
+            "required": ["expectedRevision", "action"],
+            "additionalProperties": false
+          }
+        ]
+      },
       "PencilHomeworkRequest": {
         "type": "object",
         "properties": {
@@ -2114,6 +2506,188 @@
         "required": ["status", "sessionId", "kind", "items", "speakingPrompts", "writingPrompts"],
         "additionalProperties": false
       },
+      "StartPracticeReadyVocabulary": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["ready_vocabulary"]
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["VOCAB"]
+          },
+          "sessionId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "courseId": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string",
+            "enum": ["FLASHCARDS", "MEANING_RECALL", "WORD_RECALL", "LISTENING_RECALL"]
+          },
+          "nativeLang": {
+            "type": "string"
+          },
+          "targetLang": {
+            "type": "string"
+          },
+          "progressRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "writingDrafts": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "cards": {
+            "minItems": 1,
+            "maxItems": 24,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "prompt": {
+                  "type": "string"
+                },
+                "feedback": {
+                  "type": "object",
+                  "properties": {
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["STUDIED", "ANSWERED", "REVEALED"]
+                    },
+                    "lemma": {
+                      "type": "string"
+                    },
+                    "meaning": {
+                      "type": "string"
+                    },
+                    "acceptedMeanings": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "answer": {
+                      "type": "string"
+                    },
+                    "correct": {
+                      "type": "boolean",
+                      "nullable": true
+                    },
+                    "reviewedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                    }
+                  },
+                  "required": [
+                    "outcome",
+                    "lemma",
+                    "meaning",
+                    "acceptedMeanings",
+                    "answer",
+                    "correct",
+                    "reviewedAt"
+                  ],
+                  "additionalProperties": false,
+                  "nullable": true
+                }
+              },
+              "required": ["id", "prompt", "feedback"],
+              "additionalProperties": false
+            }
+          },
+          "receipt": {
+            "type": "object",
+            "properties": {
+              "version": {
+                "type": "number",
+                "enum": [1]
+              },
+              "type": {
+                "type": "string",
+                "enum": ["VOCABULARY_STUDY"]
+              },
+              "mode": {
+                "type": "string",
+                "enum": ["FLASHCARDS", "MEANING_RECALL", "WORD_RECALL", "LISTENING_RECALL"]
+              },
+              "score": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "nullable": true
+              },
+              "correct": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "total": {
+                "type": "integer",
+                "minimum": 0,
+                "exclusiveMinimum": true,
+                "maximum": 9007199254740991
+              },
+              "reviewed": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "studied": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "completedAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              }
+            },
+            "required": [
+              "version",
+              "type",
+              "mode",
+              "score",
+              "correct",
+              "total",
+              "reviewed",
+              "studied",
+              "completedAt"
+            ],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": [
+          "status",
+          "kind",
+          "sessionId",
+          "courseId",
+          "mode",
+          "nativeLang",
+          "targetLang",
+          "progressRevision",
+          "writingDrafts",
+          "cards",
+          "receipt"
+        ],
+        "additionalProperties": false
+      },
       "StartPracticeResponse": {
         "oneOf": [
           {
@@ -2133,6 +2707,9 @@
           },
           {
             "$ref": "#/components/schemas/StartPracticeReadyFull"
+          },
+          {
+            "$ref": "#/components/schemas/StartPracticeReadyVocabulary"
           }
         ],
         "discriminator": {
@@ -2143,7 +2720,8 @@
             "ready": "#/components/schemas/StartPracticeReady",
             "ready_speaking": "#/components/schemas/StartPracticeReadySpeaking",
             "ready_writing": "#/components/schemas/StartPracticeReadyWriting",
-            "ready_full": "#/components/schemas/StartPracticeReadyFull"
+            "ready_full": "#/components/schemas/StartPracticeReadyFull",
+            "ready_vocabulary": "#/components/schemas/StartPracticeReadyVocabulary"
           }
         }
       },
@@ -4574,6 +5152,345 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/StartPracticeRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/courses/{courseId}/vocabulary": {
+      "get": {
+        "operationId": "getVocabulary",
+        "summary": "Read the owned dictionary, assessed recall, source provenance, and complete import progress.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DictionaryResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "courseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/courses/{courseId}/vocabulary/{wordId}": {
+      "patch": {
+        "operationId": "updateVocabularyMeaning",
+        "summary": "Save dictionary meanings for future recall sessions without changing mastery.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DictionaryMeaningResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "courseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "wordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DictionaryMeaningRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/courses/{courseId}/vocabulary/study": {
+      "post": {
+        "operationId": "startVocabularyStudy",
+        "summary": "Start deterministic flashcards or recall from dictionary words without an LLM call.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartPracticeReadyVocabulary"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "courseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VocabularyStudyRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/practice/{sessionId}/vocabulary": {
+      "post": {
+        "operationId": "answerVocabularyStudy",
+        "summary": "Check or reveal the first response once, or finish a saved vocabulary study.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartPracticeReadyVocabulary"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VocabularyStudyAction"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/materials/{materialId}/vocabulary-index": {
+      "post": {
+        "operationId": "indexMaterialVocabulary",
+        "summary": "Queue complete vocabulary indexing or retry verified failed source sections.",
+        "responses": {
+          "202": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VocabularyIndexResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "materialId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VocabularyWorkRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/courses/{courseId}/vocabulary/{wordId}/audio": {
+      "post": {
+        "operationId": "prepareVocabularyPronunciation",
+        "summary": "Prepare or reuse persistent local pronunciation for an owned dictionary word.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VocabularyAudioResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "courseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "wordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VocabularyWorkRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/practice/{sessionId}/vocabulary/{cardId}/audio": {
+      "post": {
+        "operationId": "prepareStudyPronunciation",
+        "summary": "Prepare or reuse local pronunciation without disclosing a listening answer.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VocabularyAudioResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cardId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VocabularyWorkRequest"
               }
             }
           }

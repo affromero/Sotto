@@ -5,6 +5,7 @@ import { prepareJob } from 'thesidedoor-core/runtime/outbox';
 import type { Prisma, PrismaClient } from '@/generated/prisma/client';
 import {
   captureConfiguredSottoCredentialProbe,
+  captureConfiguredSottoCredentialDestination,
   validateSottoCredentialProbe,
 } from '@/lib/providers/shared/credential-validation';
 import {
@@ -210,11 +211,10 @@ export async function processCredentialValidation(
         if (current.complete) return;
         if (!isDeepStrictEqual(current.payload, captured.payload))
           throw new Error('Credential validation payload changed');
-        const endpoint = await captureConfiguredSottoCredentialProbe(
+        const endpoint = await captureConfiguredSottoCredentialDestination(
           tx,
           current.payload.modality,
-          current.payload.provider,
-          {}
+          current.payload.provider
         );
         const settled: CredentialValidation =
           endpoint.kind !== 'unsupported' &&

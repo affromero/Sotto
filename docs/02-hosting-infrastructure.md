@@ -2,13 +2,13 @@
 
 **Date:** 2026-09-08
 
-**Summary:** Self-hosting options, the recommended single-VPS topology, and the production services Sotto expects when released as private-first open source software.
+**Summary:** Self-hosting options, the recommended single-VPS topology, and the production services Sotto expects when released as private-first source available software.
 
 ---
 
 ## Goals
 
-The open source deployment should be boring to operate:
+The source available deployment should be boring to operate:
 
 - one Linux server is enough for an initial private deployment;
 - operators bring their own domain, AI provider, TTS provider, and storage choice;

@@ -120,7 +120,7 @@ const TENETS: Tenet[] = [
   {
     label: 'Your stack',
     title: 'Open, run it yourself',
-    body: 'The whole thing is open source and runs on infrastructure you control. Read it, audit it, host it.',
+    body: 'The whole thing is source available and runs on infrastructure you control. Read it, audit it, host it.',
     icon: 'repo',
   },
 ];
@@ -468,7 +468,7 @@ export default async function LandingPage() {
         <section className={styles.hero} aria-labelledby="hero-title">
           <p className={styles.eyebrow}>
             <span className={styles.eyebrowDash} aria-hidden="true" />
-            Open source · run it yourself
+            Source available · run it yourself
           </p>
           <h1 id="hero-title" className={styles.heroTitle}>
             Practice a language before <em>the pressure of speaking.</em>
@@ -790,12 +790,12 @@ export default async function LandingPage() {
               GitHub
             </a>
             <a
-              href="https://www.gnu.org/licenses/agpl-3.0.html"
+              href="https://polyformproject.org/licenses/noncommercial/1.0.0"
               className={styles.footerLink}
               target="_blank"
               rel="noopener noreferrer"
             >
-              AGPL-3.0
+              PolyForm Noncommercial
             </a>
           </nav>
           <p className={styles.footerNote}>

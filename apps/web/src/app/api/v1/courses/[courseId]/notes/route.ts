@@ -152,14 +152,6 @@ async function importNotes(request: NextRequest, { params }: RouteParams) {
     const { materials, failed } = await importCourseMaterials(request, authed, files, courseId);
     if (materials.length === 0) return errorResponse('No readable note files uploaded', 422);
     const body = await getEditableCourseNote(courseId);
-    const addedVocabulary = await updateVocabularyFromNote(
-      authed.userId,
-      courseId,
-      course,
-      await getCourseNote(courseId),
-      sottoRequestExecution(request, authed)
-    );
-
     return NextResponse.json({
       body,
       imported: materials.length,
@@ -171,11 +163,11 @@ async function importNotes(request: NextRequest, { params }: RouteParams) {
         })
       ).map(materialResponse),
       failed,
-      addedVocabulary,
+      vocabularyIndexing: 'queued',
     });
   } catch (error: unknown) {
     if (error instanceof RequestBodyTooLargeError)
-      return errorResponse('Materials must total 10MB or less.', 413);
+      return errorResponse('Materials must total 50MB or less.', 413);
     if (isAccessError(error)) throw error;
     logger.error('Failed to import course notes', {
       error: error instanceof Error ? error.message : String(error),
