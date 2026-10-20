@@ -18,6 +18,12 @@ All shared business logic and external service integrations live here.
 builds the personalized client view and excludes unrevealed partner information.
 `play/private-state.ts` validates server-private saved rounds; never return these
 records directly. `play/catalogue.ts` contains curated scenarios and level guidance.
+
+`play/storage/rooms.ts` commits room lifecycle, round transitions, revisions and
+action receipts through `sottoTransaction`. Revalidate original admission before
+receipt replay. `room-view.ts` loads participant-only personalized projections;
+round IDs support explicit phrase provenance. Presence visibility compares the
+complete canonical access fingerprint, without retaining host credentials.
 Game points do not update language mastery or spaced-repetition state.
 
 `classes/generation/stages.ts` runs at most two class text branches and drains

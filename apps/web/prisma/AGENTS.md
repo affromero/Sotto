@@ -80,6 +80,13 @@ npx prisma studio      # Visual database browser
 
 ## Scope
 
+Partner play uses `PlayRoom`, `PlayPresenceLease`, `PlayJoinRequest`, `PlayRound`,
+`PlayActionReceipt`, and `PlayPhrase`. Its migration adds state checks and a
+partial unique index permitting one accepted entrant per room. These SQL rules
+must survive subsequent migrations. Both participant relations cascade shared
+rooms and admission secrets on profile deletion. Phrase provenance uses a
+composite round/room foreign key. Courses have no dependency on game records.
+
 `LearnerReviewEvent` records each committed vocabulary or grammar SRS update with
 its assessment mode, source attempt, question identities, timestamp and scheduler
 snapshots. Composite foreign keys bind both the target and source to the same

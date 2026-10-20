@@ -97,8 +97,159 @@ model User {
   speakingRecordings SpeakingRecording[]
   writingResponses   WritingResponse[]
   mockExams          MockExam[]
+  hostedPlayRooms    PlayRoom[]          @relation("PlayHost")
+  joinedPlayRooms    PlayRoom[]          @relation("PlayGuest")
+  playJoinRequests   PlayJoinRequest[]   @relation("PlayCandidate")
+  playEnrollments    PlayJoinRequest[]   @relation("PlayEnrollment")
+  playApprovals      PlayJoinRequest[]   @relation("PlayApprover")
+  playActionReceipts PlayActionReceipt[]
+  playPhrases        PlayPhrase[]
 
   @@index([role])
+}
+
+// ============ PARTNER PLAY ============
+
+model PlayRoom {
+  id                   String   @id @default(uuid())
+  hostUserId           String
+  guestUserId          String?
+  status               String   @default("WAITING")
+  kind                 String
+  theme                String
+  questionStyle        String   @default("CHOICES")
+  hostSettings         Json
+  guestSettings        Json?
+  revision             Int      @default(0)
+  currentRound         Int      @default(0)
+  invitationHash       String?  @unique
+  invitationGeneration Int      @default(0)
+  rematchRoomId        String?  @unique
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  expiresAt            DateTime
+
+  host           User                @relation("PlayHost", fields: [hostUserId], references: [id], onDelete: Cascade)
+  guest          User?               @relation("PlayGuest", fields: [guestUserId], references: [id], onDelete: Cascade)
+  presenceLeases PlayPresenceLease[]
+  joinRequests   PlayJoinRequest[]
+  rounds         PlayRound[]
+  receipts       PlayActionReceipt[]
+  phrases        PlayPhrase[]
+  rematch        PlayRoom?           @relation("PlayRematch", fields: [rematchRoomId], references: [id], onDelete: SetNull)
+  previousRoom   PlayRoom?           @relation("PlayRematch")
+
+  @@index([hostUserId, createdAt])
+  @@index([guestUserId, createdAt])
+  @@index([status, expiresAt])
+}
+
+model PlayPresenceLease {
+  id                  String   @id @default(uuid())
+  roomId              String
+  credentialId        String
+  credentialKind      String
+  viewHash            String
+  accessFingerprint   String
+  credentialExpiresAt DateTime
+  renewedAt           DateTime
+  expiresAt           DateTime
+
+  room PlayRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, credentialKind, credentialId, viewHash])
+  @@index([roomId, expiresAt])
+}
+
+model PlayJoinRequest {
+  id                   String    @id
+  roomId               String
+  generation           Int
+  candidateKind        String
+  candidateUserId      String?
+  proposedName         String?
+  settings             Json
+  client               String
+  deviceName           String
+  proofHash            String    @unique
+  fingerprint          String
+  status               String
+  plannedProfileId     String?
+  provisionedUserId    String?
+  approvedByUserId     String?
+  approvedAt           DateTime?
+  acceptedAt           DateTime?
+  enrollmentGeneration Int       @default(1)
+  deliveryId           String?   @unique
+  deliveryState        Json?
+  deliveryExpiresAt    DateTime?
+  acknowledgedAt       DateTime?
+  createdAt            DateTime  @default(now())
+  expiresAt            DateTime
+
+  room        PlayRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  candidate   User?    @relation("PlayCandidate", fields: [candidateUserId], references: [id], onDelete: Cascade)
+  provisioned User?    @relation("PlayEnrollment", fields: [provisionedUserId], references: [id], onDelete: Cascade)
+  approver    User?    @relation("PlayApprover", fields: [approvedByUserId], references: [id], onDelete: Cascade)
+
+  @@index([roomId, status, expiresAt])
+  @@index([candidateUserId])
+  @@index([provisionedUserId])
+  @@index([approvedByUserId])
+}
+
+model PlayRound {
+  id           String   @id @default(uuid())
+  roomId       String
+  order        Int
+  privateState Json
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  room    PlayRoom     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  phrases PlayPhrase[]
+
+  @@unique([roomId, order])
+  @@unique([id, roomId])
+}
+
+model PlayActionReceipt {
+  id          String   @id @default(uuid())
+  roomId      String
+  actorUserId String
+  actionId    String
+  operation   String
+  fingerprint String
+  revision    Int
+  result      Json
+  createdAt   DateTime @default(now())
+
+  room  PlayRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  actor User     @relation(fields: [actorUserId], references: [id], onDelete: Cascade)
+
+  @@unique([actorUserId, actionId])
+  @@index([roomId])
+}
+
+model PlayPhrase {
+  id          String   @id @default(uuid())
+  userId      String
+  roomId      String
+  roundId     String
+  kind        String
+  text        String
+  targetLang  String
+  contextText String?
+  fingerprint String
+  createdAt   DateTime @default(now())
+
+  user  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  room  PlayRoom  @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  round PlayRound @relation(fields: [roundId, roomId], references: [id, roomId], onDelete: Cascade)
+
+  @@unique([userId, roundId, fingerprint])
+  @@index([userId, createdAt])
+  @@index([roomId])
 }
 
 // ============ EPISODES ============

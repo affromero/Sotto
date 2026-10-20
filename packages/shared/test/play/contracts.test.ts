@@ -3,6 +3,7 @@ import {
   createPlayRoomSchema,
   playRoundActionRequestSchema,
   playRoundCommandSchema,
+  playStoredRoundViewSchema,
   requestPlayJoinSchema,
 } from '../../src';
 
@@ -74,6 +75,35 @@ describe('cross-client play inputs', () => {
         ...request,
         candidate: { kind: 'EXISTING', userId: 'someone-else', settings },
       }).success
+    ).toBe(false);
+  });
+
+  it('requires server round provenance while preserving strict hidden-answer projections', () => {
+    const round = {
+      id: 'server-round-id',
+      order: 0,
+      learner: 'HOST',
+      targetLang: 'de',
+      supportLang: 'en',
+      level: 'A1',
+      prompt: 'Describe something nearby.',
+      guidance: 'Use a short clue.',
+      phase: 'GUESS',
+      role: 'PARTNER',
+      instruction: 'Guess the secret word.',
+      revealed: false,
+      allowedActions: ['GUESS', 'SKIP', 'HINT'],
+      hints: [],
+      result: null,
+      mode: 'DESCRIBE',
+      target: null,
+      clue: 'It keeps the rain away.',
+      guess: null,
+    };
+    expect(playStoredRoundViewSchema.parse(round)).toEqual(round);
+    expect(playStoredRoundViewSchema.safeParse({ ...round, id: undefined }).success).toBe(false);
+    expect(
+      playStoredRoundViewSchema.safeParse({ ...round, privateState: { target: 'Schirm' } }).success
     ).toBe(false);
   });
 });

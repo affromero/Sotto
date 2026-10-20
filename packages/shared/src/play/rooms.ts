@@ -6,6 +6,8 @@ import {
   playSettingsSchema,
   playQuestionStyleSchema,
   playThemeSchema,
+  playPhraseInputSchema,
+  playLanguageSchema,
 } from './contracts';
 import { playInviteCodeSchema } from './links';
 
@@ -37,10 +39,16 @@ export const playRoomActionSchema = z.strictObject({
   expectedRevision: revision,
   type: z.enum(['START', 'NEXT_ROUND', 'REMATCH', 'LEAVE', 'CANCEL']),
 });
+export const playStoredRoundViewSchema = z.discriminatedUnion('mode', [
+  playRoundViewSchema.options[0].extend({ id }),
+  playRoundViewSchema.options[1].extend({ id }),
+  playRoundViewSchema.options[2].extend({ id }),
+]);
 export const playRoomViewSchema = z.strictObject({
   id,
   status: playRoomStatusSchema,
   revision,
+  rematchRoomId: id.nullable(),
   kind: playSessionKindSchema,
   theme: playThemeSchema,
   questionStyle: playQuestionStyleSchema,
@@ -49,8 +57,8 @@ export const playRoomViewSchema = z.strictObject({
   guest: playMemberSchema.nullable(),
   hostWaiting: z.boolean(),
   allowedActions: z.array(playRoomActionSchema.shape.type).max(5),
-  round: playRoundViewSchema.nullable(),
-  completedRounds: z.array(playRoundViewSchema).max(6),
+  round: playStoredRoundViewSchema.nullable(),
+  completedRounds: z.array(playStoredRoundViewSchema).max(6),
   points: z.number().int().min(0).max(12),
   serverTime: instant,
 });
@@ -112,3 +120,11 @@ export const playDeliverySchema = z.discriminatedUnion('kind', [
 export type PlayRoomView = z.infer<typeof playRoomViewSchema>;
 export type PlayJoinStatusView = z.infer<typeof playJoinStatusViewSchema>;
 export type PlayDelivery = z.infer<typeof playDeliverySchema>;
+
+export const playPhraseViewSchema = playPhraseInputSchema.extend({
+  id,
+  roomId: id,
+  targetLang: playLanguageSchema,
+  createdAt: instant,
+});
+export type PlayPhraseView = z.infer<typeof playPhraseViewSchema>;
