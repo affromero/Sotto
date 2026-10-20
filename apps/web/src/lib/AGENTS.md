@@ -14,6 +14,12 @@ acknowledges them separately. A missing attached workspace fails closed.
 
 All shared business logic and external service integrations live here.
 
+`play/engine.ts` owns deterministic two-player round transitions. `play/projection.ts`
+builds the personalized client view and excludes unrevealed partner information.
+`play/private-state.ts` validates server-private saved rounds; never return these
+records directly. `play/catalogue.ts` contains curated scenarios and level guidance.
+Game points do not update language mastery or spaced-repetition state.
+
 `classes/generation/stages.ts` runs at most two class text branches and drains
 admitted work before returning a failure. Listening preparation persists the script
 and questions before audio admission. Failed text or speaking generation retires

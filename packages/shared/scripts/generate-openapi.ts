@@ -376,7 +376,7 @@ function queryParameters(endpoint: EndpointDef): JsonValue[] {
   }));
 }
 
-function operationFor(endpoint: EndpointDef): JsonValue {
+export function buildEndpointOperation(endpoint: EndpointDef): JsonValue {
   const responses: JsonSchema = {};
   if (endpoint.responses) {
     // Distinct schema per status code.
@@ -417,6 +417,7 @@ function operationFor(endpoint: EndpointDef): JsonValue {
   }
 
   if (endpoint.auth === 'bearer') operation.security = [{ bearerAuth: [] }];
+  if (endpoint.auth === 'claimant') operation.security = [{ playClaimantProof: [] }];
 
   return operation;
 }
@@ -428,7 +429,7 @@ function buildPaths(opts: { codegen: boolean }): Record<string, JsonValue> {
     // in the truthful spec and are hand-rolled in the Rust client.
     if (opts.codegen && endpoint.codegenExclude) continue;
     const entry = (paths[endpoint.path] ??= {});
-    entry[endpoint.method.toLowerCase()] = operationFor(endpoint);
+    entry[endpoint.method.toLowerCase()] = buildEndpointOperation(endpoint);
   }
   return paths;
 }
@@ -457,6 +458,13 @@ export function buildOpenApiDocument(opts: { codegen?: boolean } = {}): JsonSche
           scheme: 'bearer',
           description:
             'A long-lived Sotto API key (sk_sotto_...) minted via /api/v1/auth/pair/redeem.',
+        },
+        playClaimantProof: {
+          type: 'apiKey',
+          in: 'header',
+          name: 'X-Sotto-Play-Proof',
+          description:
+            'A private proof for one pending game invitation and credential delivery. A room code or request ID is not this proof.',
         },
       },
       schemas: buildComponentsSchemas(),

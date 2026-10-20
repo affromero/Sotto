@@ -29,6 +29,10 @@ src/
 
 ## Rules
 
+`src/play/` defines browser-safe game commands, personalized round views and
+versioned invitation links. Server-private round state and scoring live in the
+web library. Native clients consume the same API contracts and allowed actions.
+
 - **No Prisma imports** — use string union types from `enums.ts` instead
 - **No React imports** — types only, no components or hooks
 - **No Node.js APIs** — must stay browser-safe

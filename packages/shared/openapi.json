@@ -11,6 +11,12 @@
         "type": "http",
         "scheme": "bearer",
         "description": "A long-lived Sotto API key (sk_sotto_...) minted via /api/v1/auth/pair/redeem."
+      },
+      "playClaimantProof": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Sotto-Play-Proof",
+        "description": "A private proof for one pending game invitation and credential delivery. A room code or request ID is not this proof."
       }
     },
     "schemas": {

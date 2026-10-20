@@ -69,7 +69,7 @@ export interface EndpointDef {
   method: 'GET' | 'POST' | 'PATCH' | 'DELETE';
   path: string;
   summary: string;
-  auth: 'bearer' | 'none';
+  auth: 'bearer' | 'claimant' | 'none';
   request?: z.ZodType;
   // A response schema. Use ONE of:
   //   - `response` + optional `successStatuses`: the same schema for every
