@@ -216,6 +216,9 @@ class AndroidWorkflowTests(unittest.TestCase):
                                 or 'android-emulator-runner@'
                                 in step.get('uses', ''))
                 self.assertLess(setup, consumer)
+                packages = steps[setup]['with']['packages'].split()
+                self.assertIn('platform-tools', packages)
+                self.assertNotIn('tools', packages)
 
     def test_android_build_produces_both_unsigned_distribution_formats(self) -> None:
         steps = self.workflow['jobs']['android']['steps']

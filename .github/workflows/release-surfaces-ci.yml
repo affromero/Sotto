@@ -141,6 +141,8 @@ jobs:
           java-version: '21'
       - name: Set up Android SDK
         uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
+        with:
+          packages: platform-tools
       - name: Install Android compile SDK
         run: sdkmanager 'platforms;android-37.0' 'build-tools;36.0.0'
       - name: Validate Android and build unsigned distributions
@@ -184,6 +186,8 @@ jobs:
           java-version: '21'
       - name: Set up Android SDK
         uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
+        with:
+          packages: platform-tools
       - name: Enable emulator acceleration
         run: sudo chmod a+rw /dev/kvm
       - name: Run native Android behavior and process recovery
