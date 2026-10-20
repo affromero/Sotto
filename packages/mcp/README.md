@@ -133,15 +133,55 @@ Point at your local dev server:
 
 ## Tools
 
-| Tool                  | Description                                      |
-| --------------------- | ------------------------------------------------ |
-| `create_episode`      | Create an AI episode from a topic                |
-| `ingest_agent_output` | Create a private episode from local agent output |
-| `get_episode`         | Get episode details + generation status          |
-| `list_episodes`       | List your episodes                               |
-| `update_episode`      | Update title, topic, or visibility               |
-| `delete_episode`      | Delete a episode                                 |
-| `get_me`              | Get your Sotto profile                           |
+| Tool                       | Description                                                         |
+| -------------------------- | ------------------------------------------------------------------- |
+| `create_episode`           | Create an AI episode from a topic                                   |
+| `ingest_agent_output`      | Create a private episode from local agent output                    |
+| `get_episode`              | Get episode details + generation status                             |
+| `list_episodes`            | List your episodes                                                  |
+| `update_episode`           | Update title, topic, or visibility                                  |
+| `delete_episode`           | Delete a episode                                                    |
+| `get_me`                   | Get your Sotto profile                                              |
+| `list_courses`             | List the active learner's courses and current levels                |
+| `get_learning_map`         | Read Situations, Grammar and exact requirements for a selected band |
+| `get_learning_objective`   | Read an objective's criteria and qualified progress                 |
+| `get_learning_evidence`    | Page the exact objective's assessment history                       |
+| `list_source_analyses`     | List retained analyses of uploaded course materials                 |
+| `list_source_focuses`      | Page an analysis's saved teaching focuses                           |
+| `get_source_focus`         | Read a private focus with verified citations and coverage           |
+| `preview_focused_practice` | Resolve groups or objectives and available practice formats         |
+| `start_focused_practice`   | Generate another class for the explicit selected focuses            |
+| `get_practice_session`     | Read retained preparation, material or results                      |
+| `advance_learning_level`   | Explicitly request one-band advancement through the server gate     |
+
+### Learning maps and practice
+
+Read the course map before choosing practice. `level` selects a band to inspect;
+lower-level review preserves the current band and active class. Grammar and
+Situations are independent branches. A saved source focus can be practised alone
+or combined with exact canonical objectives. Source exposure establishes no
+mastery. Only eligible assessments contribute objective evidence.
+
+Call `preview_focused_practice` with `course_id` and `selection`:
+
+```json
+{
+  "catalogVersion": 1,
+  "level": "A2",
+  "nodeIds": ["de.g.als-wenn-past"]
+}
+```
+
+Use the preview's concrete objective IDs and an available `kind` when starting
+practice. Preserve `request_id` and the exact selection after a lost response.
+A new class requires a new request ID. Read `get_practice_session` to resume its
+saved preparation or material. The configured providers may incur costs.
+
+Ask for advancement only when the learner requests it. Supply a stable
+`request_id`, the observed `expected_level` and `catalog_hash`. The server
+rechecks pinned requirements and pending work before advancing exactly one
+band. Completing C2 keeps C2. Tools return the server's readiness, refusals and
+receipts directly.
 
 ### Local Agent Ingestion
 

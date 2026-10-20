@@ -2,6 +2,18 @@
 /// inherent progenitor-backed method above.
 #[async_trait]
 impl Api for SottoClient {
+    async fn learning_map(&self, course_id: &str, level: Option<&str>) -> Result<types::LearningMapResponse> {
+        SottoClient::learning_map(self, course_id, level).await
+    }
+    async fn preview_learning_selection(&self, course_id: &str, selection: types::LearningSelectionRequest) -> Result<types::LearningSelectionPreview> {
+        SottoClient::preview_learning_selection(self, course_id, selection).await
+    }
+    async fn start_selected_practice(&self, course_id: &str, kind: types::PracticeKind, request_id: uuid::Uuid, selection: types::LearningSelectionRequest) -> Result<types::StartPracticeResponse> {
+        SottoClient::start_selected_practice(self, course_id, kind, request_id, selection).await
+    }
+    async fn advance_learning_level(&self, course_id: &str, request: types::AdvanceLearningLevelRequest) -> Result<types::LearningLevelCompletion> {
+        SottoClient::advance_learning_level(self, course_id, request).await
+    }
     async fn courses(&self) -> Result<types::CoursesListResponse> {
         SottoClient::courses(self).await
     }
@@ -23,15 +35,29 @@ impl Api for SottoClient {
         SottoClient::resume_practice(self, session_id).await
     }
 
-    async fn practice_generation_action(&self, session_id: &str, recover: bool) -> Result<types::StartPracticePreparing> {
+    async fn practice_generation_action(
+        &self,
+        session_id: &str,
+        recover: bool,
+    ) -> Result<types::StartPracticePreparing> {
         SottoClient::practice_generation_action(self, session_id, recover).await
     }
 
-    async fn save_learning_progress(&self, class: bool, id: &str, progress: types::LearningProgressRequest) -> Result<types::LearningProgressResponse> {
+    async fn save_learning_progress(
+        &self,
+        class: bool,
+        id: &str,
+        progress: types::LearningProgressRequest,
+    ) -> Result<types::LearningProgressResponse> {
         SottoClient::save_learning_progress(self, class, id, progress).await
     }
 
-    async fn submit_practice_writing(&self, session_id: &str, prompt_id: &str, text: String) -> Result<WritingGradeResponse> {
+    async fn submit_practice_writing(
+        &self,
+        session_id: &str,
+        prompt_id: &str,
+        text: String,
+    ) -> Result<WritingGradeResponse> {
         SottoClient::submit_practice_writing(self, session_id, prompt_id, text).await
     }
 
@@ -69,7 +95,11 @@ impl Api for SottoClient {
         SottoClient::download(self, url).await
     }
 
-    async fn repair_class(&self, class_id: &str, expected_attempt: i64) -> Result<NextClassOutcome> {
+    async fn repair_class(
+        &self,
+        class_id: &str,
+        expected_attempt: i64,
+    ) -> Result<NextClassOutcome> {
         SottoClient::repair_class(self, class_id, expected_attempt).await
     }
 
@@ -167,17 +197,22 @@ impl Api for SottoClient {
         &self,
         native: &str,
         target: &str,
+        request_id: uuid::Uuid,
+        source: Option<PlacementAnalysisReference>,
+        accept_partial: bool,
     ) -> Result<types::GeneratePlacementResponse> {
-        SottoClient::generate_placement(self, native, target).await
+        SottoClient::generate_placement(self, native, target, request_id, source, accept_partial)
+            .await
     }
 
     async fn submit_placement(
         &self,
-        native: &str,
-        target: &str,
+        batch: types::GeneratePlacementResponse,
+        request_id: uuid::Uuid,
         answers: Vec<types::SubmitPlacementRequestAnswersItem>,
+        accept_partial: bool,
     ) -> Result<types::SubmitPlacementResponse> {
-        SottoClient::submit_placement(self, native, target, answers).await
+        SottoClient::submit_placement(self, batch, request_id, answers, accept_partial).await
     }
 
     async fn deduce_from_notes(
@@ -185,16 +220,21 @@ impl Api for SottoClient {
         native: &str,
         target: &str,
         content: &str,
-    ) -> Result<types::DeduceFromNotesResponse> {
-        SottoClient::deduce_from_notes(self, native, target, content).await
+        request_id: uuid::Uuid,
+    ) -> Result<PlacementAnalysisStatus> {
+        SottoClient::deduce_from_notes(self, native, target, content, request_id).await
     }
 
     async fn confirm_from_notes(
         &self,
         native: &str,
         target: &str,
+        source: PlacementAnalysisReference,
+        request_id: uuid::Uuid,
+        accept_partial: bool,
     ) -> Result<types::ConfirmFromNotesResponse> {
-        SottoClient::confirm_from_notes(self, native, target).await
+        SottoClient::confirm_from_notes(self, native, target, source, request_id, accept_partial)
+            .await
     }
 
     async fn manual_placement(

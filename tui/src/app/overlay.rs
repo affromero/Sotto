@@ -614,6 +614,7 @@ pub(crate) fn help_rows(view: &View) -> Vec<(&'static str, &'static str)> {
             ("s", "settings"),
         ],
         View::CourseHome { .. } => vec![
+            ("l", "learning map and requirements"),
             ("↑/↓ j/k", "choose skill"),
             ("enter", "practice skill"),
             ("c", "next class"),
@@ -679,6 +680,19 @@ pub(crate) fn help_rows(view: &View) -> Vec<(&'static str, &'static str)> {
             NotesPhase::Deducing | NotesPhase::Confirming => vec![],
         },
         View::Memory { .. } => vec![("↑/↓", "scroll")],
+        View::LearningMap { .. } => vec![
+            ("↑/↓ j/k", "browse nodes or formats"),
+            ("/", "search"),
+            ("enter", "details or start reviewed format"),
+            ("space", "select group or objective"),
+            ("p", "preview exact selection"),
+            ("[ / ]", "browse bands; future is read-only"),
+            ("c", "current band"),
+            ("v", "requirements and blockers"),
+            ("r", "refresh authoritative state"),
+            ("a, a", "confirm server-cleared advancement"),
+            ("PgUp/PgDn", "scroll details"),
+        ],
         View::Settings { .. } => vec![],
     }
 }

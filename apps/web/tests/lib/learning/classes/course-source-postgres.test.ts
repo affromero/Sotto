@@ -6,6 +6,16 @@ import { getCourseVocabularyTargets } from '@/lib/course-materials/vocabulary-co
 import { formatNotesForPrompt, getCourseNote } from '@/lib/course-notes';
 import { buildLearnerContext } from '@/lib/pedagogy';
 import { planCourseContext } from '@/lib/course-materials/context';
+import {
+  materialTextInventory,
+  readMaterialTextRange,
+} from '@/lib/course-materials/extraction/readers';
+import { prepareMaterialPageText } from '@/lib/course-materials/extraction/chunks';
+import {
+  initializeMaterialPages,
+  publishMaterialPageText,
+  finishMaterialExtraction,
+} from '@/lib/course-materials/extraction/persistence';
 import { materialStorageScopes } from '@/lib/course-materials';
 import { writeStorageReference } from '@/lib/sidedoor/storage/core/storage-write';
 import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
@@ -151,6 +161,94 @@ suite('owned imported course source against PostgreSQL', () => {
     return id;
   }
 
+  async function canonicalPage(text: string) {
+    const id = await material('Retained original.pdf', '');
+    const originalSha256 = 'b'.repeat(64);
+    await instance.database.courseMaterial.update({
+      where: { id },
+      data: { originalSha256, processingStatus: 'EXTRACTING', mimeType: 'application/pdf' },
+    });
+    const run = await instance.database.materialExtractionRun.create({
+      data: {
+        materialId: id,
+        processingRevision: 1,
+        runKey: randomUUID(),
+        originalSha256,
+        extractorVersion: 'fixture-1',
+        rendererVersion: 'fixture-1',
+        recognitionPolicy: {},
+      },
+    });
+    const input = { materialId: id, userId, runId: run.id, processingRevision: 1, originalSha256 };
+    const prepared = prepareMaterialPageText({
+      text,
+      pageNumber: 1,
+      source: { origin: 'EMBEDDED_TEXT', method: 'FIXTURE', version: '1' },
+    });
+    await instance.database.$transaction(
+      async (database) => {
+        await initializeMaterialPages(database, input, 1);
+        await publishMaterialPageText(database, input, prepared.manifest, prepared.chunks);
+        await database.materialPage.updateMany({
+          where: { runId: run.id },
+          data: {
+            visualCoverage: {
+              state: 'UNAVAILABLE',
+              diagnostic: 'No recognition provider selected.',
+            },
+          },
+        });
+        await finishMaterialExtraction(database, input);
+      },
+      { timeout: 60000 }
+    );
+    return { id, run };
+  }
+
+  it('keeps an image-only canonical PDF available as original context without inventing lexical targets', async () => {
+    await canonicalPage('');
+    const context = await getCourseNote(courseId, params().seed);
+    expect(context).toContain('Retained original.pdf');
+    expect(await getCourseVocabularyTargets(params())).toEqual({
+      imported: false,
+      vocab: [],
+      context,
+    });
+    expect(boundary.generate).not.toHaveBeenCalled();
+    expect(await instance.database.learnerVocab.count({ where: { courseId } })).toBe(0);
+  });
+
+  it('persists a visible source NUL in JSONB generation context while the canonical page bytes remain exact', async () => {
+    const text = 'Mia ist nach Hause gegangen.\u0000\ufeff😀 SOURCE END';
+    const { id } = await canonicalPage(text);
+    const context = await getCourseNote(courseId, params().seed);
+    expect(context).toContain(text);
+    const note = buildLearnerContext(context, 'BALANCED');
+    const session = await instance.database.practiceSession.create({
+      data: {
+        courseId,
+        kind: 'GRAMMAR',
+        seed: 'source-jsonb-boundary',
+        items: [],
+        generationSpec: { note },
+      },
+    });
+    expect(session.generationSpec).toEqual({
+      note: expect.stringContaining('\\u0000\ufeff😀 SOURCE END'),
+    });
+    expect(note).not.toContain('\u0000');
+    const inventory = await materialTextInventory(instance.database, {
+      userId,
+      materialId: id,
+      processingRevision: 1,
+    });
+    expect(await readMaterialTextRange(instance.database, inventory, 0, inventory.length)).toBe(
+      text + '\n'
+    );
+    expect(boundary.generate).not.toHaveBeenCalled();
+    expect(await instance.database.learnerVocab.count({ where: { courseId } })).toBe(0);
+  });
+
   it('gives teaching and vocabulary identical bounded excerpts from every file including their endings', async () => {
     const sourceA =
       'Wort und Beispiel. '.repeat(4000) +
@@ -188,6 +286,68 @@ suite('owned imported course source against PostgreSQL', () => {
       (await instance.database.courseMaterial.findUniqueOrThrow({ where: { id: second } }))
         .extractedText
     ).toBe(sourceB);
+  });
+
+  it('reads complete chunk-backed source endings while the legacy preview stays empty', async () => {
+    const id = await material('Complete pages.pdf', '');
+    const originalSha256 = 'a'.repeat(64);
+    await instance.database.courseMaterial.update({
+      where: { id },
+      data: {
+        originalSha256,
+        processingStatus: 'EXTRACTING',
+      },
+    });
+    const run = await instance.database.materialExtractionRun.create({
+      data: {
+        materialId: id,
+        processingRevision: 1,
+        runKey: randomUUID(),
+        originalSha256,
+        extractorVersion: 'fixture-1',
+        rendererVersion: 'fixture-1',
+        recognitionPolicy: {},
+      },
+    });
+    const input = { materialId: id, userId, runId: run.id, processingRevision: 1, originalSha256 };
+    const source = 'complete page text '.repeat(60000) + 'FINAL_CHUNK_EXPLAINS_OBWOHL_TROTZDEM';
+    const prepared = prepareMaterialPageText({
+      text: source,
+      pageNumber: 1,
+      source: { origin: 'EMBEDDED_TEXT', method: 'FIXTURE', version: '1' },
+    });
+    await instance.database.$transaction(
+      async (database) => {
+        await initializeMaterialPages(database, input, 1);
+        await publishMaterialPageText(database, input, prepared.manifest, prepared.chunks);
+        const uncertain = prepareMaterialPageText({
+          text: '',
+          pageNumber: 1,
+          source: { origin: 'VISUAL_RECOGNITION', method: 'UNRESOLVED_FIXTURE', version: '1' },
+        });
+        await publishMaterialPageText(database, input, uncertain.manifest, uncertain.chunks);
+        await database.materialPage.updateMany({
+          where: { runId: run.id },
+          data: {
+            visualCoverage: {
+              state: 'UNAVAILABLE',
+              diagnostic: 'No recognition provider selected.',
+            },
+          },
+        });
+        await finishMaterialExtraction(database, input);
+      },
+      { timeout: 60000 }
+    );
+    const context = await getCourseNote(courseId, 'chunk-reader');
+    expect(context).toContain('FINAL_CHUNK_EXPLAINS_OBWOHL_TROTZDEM');
+    expect(context.length).toBeLessThanOrEqual(12000);
+    expect(
+      await instance.database.courseMaterial.findUniqueOrThrow({ where: { id } })
+    ).toMatchObject({
+      extractedText: '',
+      processingStatus: 'PARTIAL',
+    });
   });
 
   it('does not invent PDF content from a historical filename placeholder', async () => {

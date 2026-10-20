@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { memoryGraphResponseSchema, type LearningObjectiveMemory } from '@sotto/shared';
 import { MemoryGraph } from '@/components/memory/MemoryGraph';
+import { ObjectiveMemorySummary } from '@/components/memory/ObjectiveMemorySummary';
 import { SottoSpinner } from '@/components/ui/SottoSpinner';
 import type { MemoryGraphData } from '@/components/memory/MemoryGraph';
 import styles from './memory.module.css';
@@ -48,7 +50,7 @@ export default function MemoryPage() {
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
   const [graphResult, setGraphResult] = useState<{
     courseId: string;
-    graph: MemoryGraphData | null;
+    graph: (MemoryGraphData & { objectives: LearningObjectiveMemory[] }) | null;
     state: LoadState;
   } | null>(null);
   const graph = graphResult?.courseId === selectedCourseId ? graphResult?.graph : null;
@@ -80,7 +82,7 @@ export default function MemoryPage() {
     void fetch(`/api/v1/courses/${courseId}/graph`, { signal: controller.signal })
       .then(async (res) => {
         if (!res.ok) throw new Error('Failed to load graph');
-        const data = (await res.json()) as MemoryGraphData;
+        const data = memoryGraphResponseSchema.parse(await res.json());
         if (!controller.signal.aborted) setGraphResult({ courseId, graph: data, state: 'idle' });
       })
       .catch(() => {
@@ -95,7 +97,9 @@ export default function MemoryPage() {
     <main className={styles.root}>
       <header className={styles.header}>
         <h1 className={styles.title}>Memory Graph</h1>
-        <p className={styles.subtitle}>Your vocabulary and grammar connections, visualised.</p>
+        <p className={styles.subtitle}>
+          Objective progress and your vocabulary and grammar review network.
+        </p>
       </header>
 
       {/* Course states */}
@@ -140,35 +144,46 @@ export default function MemoryPage() {
               >
                 {courses.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {courseLabel(c)} — {c.currentLevel}
+                    {courseLabel(c)}, {c.currentLevel}
                   </option>
                 ))}
               </select>
             </div>
           )}
 
-          {/* Graph area */}
-          <div className={styles.graphWrapper}>
-            {graphState === 'loading' && (
-              <div className={styles.graphOverlay} role="status" aria-live="polite">
-                <SottoSpinner size="medium" label="Loading graph" />
-              </div>
-            )}
+          {graphState === 'idle' && graph && selectedCourseId && (
+            <ObjectiveMemorySummary courseId={selectedCourseId} objectives={graph.objectives} />
+          )}
 
-            {graphState === 'error' && (
-              <div className={styles.errorBox} role="alert">
-                Could not load the memory graph. Please try again.
-              </div>
-            )}
+          <section aria-labelledby="review-network-heading">
+            <h2 id="review-network-heading">Vocabulary and grammar review network</h2>
+            <p className={styles.subtitle}>
+              Graph strengths summarize vocabulary and broad grammar reviews. See the learning map
+              for assessed objectives and level requirements.
+            </p>
+            {/* Graph area */}
+            <div className={styles.graphWrapper}>
+              {graphState === 'loading' && (
+                <div className={styles.graphOverlay} role="status" aria-live="polite">
+                  <SottoSpinner size="medium" label="Loading graph" />
+                </div>
+              )}
 
-            {graphState === 'idle' && graph && (
-              <MemoryGraph
-                graph={graph}
-                courseId={selectedCourseId ?? undefined}
-                courseTitle={selectedCourse ? courseLabel(selectedCourse) : undefined}
-              />
-            )}
-          </div>
+              {graphState === 'error' && (
+                <div className={styles.errorBox} role="alert">
+                  Could not load the memory graph. Please try again.
+                </div>
+              )}
+
+              {graphState === 'idle' && graph && (
+                <MemoryGraph
+                  graph={graph}
+                  courseId={selectedCourseId ?? undefined}
+                  courseTitle={selectedCourse ? courseLabel(selectedCourse) : undefined}
+                />
+              )}
+            </div>
+          </section>
         </div>
       )}
     </main>

@@ -24,6 +24,8 @@ impl From<&types::PracticeItem> for VocabItem {
 pub(crate) struct DueCounts {
     pub vocab: u32,
     pub grammar: u32,
+    pub objectives: u32,
+    pub by_skill: std::collections::BTreeMap<String, u32>,
     pub total_vocab: u32,
     pub recent: Vec<RecentPractice>,
 }
@@ -43,8 +45,25 @@ impl From<&types::PracticeOverviewResponse> for DueCounts {
         Self {
             vocab: count(overview.due.vocab),
             grammar: count(overview.due.grammar),
+            objectives: overview.due.objectives.map(|value| count(value as f64)).unwrap_or(0),
+            by_skill: overview.due.by_skill.iter().map(|(key, value)| (key.clone(), count(*value as f64))).collect(),
             total_vocab: count(overview.total_vocab),
             recent: overview.recent.iter().map(|session| RecentPractice { id: session.id.clone(), kind: session.kind, status: session.status.to_string() }).collect(),
+        }
+    }
+}
+
+impl DueCounts {
+    pub fn total_due(&self) -> u32 {
+        self.vocab.saturating_add(self.grammar).saturating_add(self.objectives)
+    }
+
+    pub fn skill_due(&self, skill: SkillChoice) -> Option<u32> {
+        match skill {
+            SkillChoice::Full => Some(self.total_due()),
+            SkillChoice::Vocab => Some(self.vocab),
+            SkillChoice::Grammar => Some(self.grammar.saturating_add(self.by_skill.get("GRAMMAR").copied().unwrap_or(0))),
+            _ => self.by_skill.get(&skill.kind().to_string()).copied(),
         }
     }
 }

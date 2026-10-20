@@ -65,6 +65,9 @@ async function readOwnedWriting(
     practiceSessionId: prompt.practiceSessionId,
     attempt: prompt.section?.attempt ?? 1,
     task: prompt.task,
+    guidance: prompt.guidance,
+    ideas: prompt.ideas,
+    learningObjectives: prompt.learningObjectives,
     nativeLang: requirements?.nativeLang ?? parent.course.nativeLang,
     targetLang: requirements?.targetLang ?? parent.course.targetLang,
     level: requirements?.level ?? prompt.section?.class.lesson.level ?? parent.course.currentLevel,
@@ -211,6 +214,9 @@ export async function submitLearningWriting(options: {
         targetLang: admission.captured.targetLang,
         level: admission.captured.level,
         task: admission.captured.task,
+        learningObjectives: admission.captured.learningObjectives,
+        guidance: admission.captured.guidance,
+        ideas: admission.captured.ideas,
         text,
       }),
     publish: async (database, grade) => {
@@ -232,6 +238,8 @@ export async function submitLearningWriting(options: {
           overallScore: grade.overallScore,
           corrections: grade.corrections as unknown as Prisma.InputJsonValue,
           feedback: grade.feedback,
+          objectiveEvidence: grade.objectiveEvidence as unknown as
+            Prisma.InputJsonValue | undefined,
         },
       });
     },

@@ -134,7 +134,8 @@ try {
     env: {
       ...env,
       WORKER_PROFILE: 'pipeline',
-      WORKER_QUEUES: 'speaking-grading,vocabulary-index,vocabulary-audio',
+      WORKER_QUEUES:
+        'speaking-grading,vocabulary-index,vocabulary-audio,material-finalization,material-extraction',
     },
     stdio: 'inherit',
     detached: true,

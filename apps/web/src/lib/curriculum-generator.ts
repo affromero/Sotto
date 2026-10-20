@@ -4,7 +4,7 @@
 // (shared across users). This is the design's "Compose" step.
 import { z } from 'zod';
 import { Prisma } from '@/generated/prisma/client';
-import { prisma } from './prisma';
+import { prismaUnfiltered as prisma } from './prisma';
 import { capturedLearningAiOptions, resolveCapturedLearningAi } from './learning-ai';
 import type { LearningAiRequest } from '@/lib/learning/ai/selection';
 import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
@@ -12,6 +12,10 @@ import { createAIProvider } from './providers/ai';
 import { loadAndRender } from './prompt-loader';
 import { logUsage } from './usage-logger';
 import { logger } from './logger';
+import {
+  lessonCatalogInstructions,
+  publishCurriculumLearningMappings,
+} from './learning-map/lessons';
 
 const CEFR = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'] as const;
 type CefrLevel = (typeof CEFR)[number];
@@ -24,6 +28,7 @@ const genLessonSchema = z.object({
   title: z.string().min(1),
   objective: z.string().min(1),
   grammarPoints: z.array(z.string().min(1)).min(1),
+  learningObjectiveIds: z.array(z.string().min(1)).max(8).optional(),
   vocabThemes: z.array(z.string().min(1)).min(1),
   targetVocab: z
     .array(
@@ -93,10 +98,13 @@ export async function getOrCreateCurriculum(
 
   const ai = await resolveCapturedLearningAi(userId, execution, pendingSelection);
 
-  const systemPrompt = loadAndRender('curriculum/generate-curriculum.md', {
-    NATIVE: langName(nativeLang),
-    TARGET: langName(targetLang),
-  });
+  const systemPrompt = [
+    loadAndRender('curriculum/generate-curriculum.md', {
+      NATIVE: langName(nativeLang),
+      TARGET: langName(targetLang),
+    }),
+    lessonCatalogInstructions(targetLang),
+  ].join('\n\n');
   const client = createAIProvider(ai.provider);
   const res = await client.generateResponse(
     systemPrompt,
@@ -151,6 +159,7 @@ export async function getOrCreateCurriculum(
           estMinutes: l.estMinutes,
         })),
       });
+      await publishCurriculumLearningMappings(tx, cur.id, targetLang, lessons);
       return cur;
     });
     logger.info('Composed curriculum', { nativeLang, targetLang, lessons: String(lessons.length) });
@@ -187,11 +196,14 @@ export async function ensureCurriculumHasLevelLessons(p: {
   if (existingCount > 0) return;
 
   const ai = await resolveCapturedLearningAi(p.userId, p.execution);
-  const systemPrompt = loadAndRender('curriculum/generate-level-lessons.md', {
-    NATIVE: langName(p.nativeLang),
-    TARGET: langName(p.targetLang),
-    LEVEL: p.level,
-  });
+  const systemPrompt = [
+    loadAndRender('curriculum/generate-level-lessons.md', {
+      NATIVE: langName(p.nativeLang),
+      TARGET: langName(p.targetLang),
+      LEVEL: p.level,
+    }),
+    lessonCatalogInstructions(p.targetLang, p.level),
+  ].join('\n\n');
 
   const client = createAIProvider(ai.provider);
   const res = await client.generateResponse(
@@ -253,20 +265,23 @@ export async function ensureCurriculumHasLevelLessons(p: {
   const startOrder = maxOrder._max.order ?? 0;
 
   try {
-    await prisma.lesson.createMany({
-      data: lessons.map((lesson, index) => ({
-        curriculumId: p.curriculumId,
-        level: lesson.level,
-        order: startOrder + index + 1,
-        slug: lesson.slug,
-        title: lesson.title,
-        objective: lesson.objective,
-        grammarPoints: lesson.grammarPoints,
-        vocabThemes: lesson.vocabThemes,
-        targetVocab: lesson.targetVocab,
-        canDoSummary: lesson.canDoSummary ?? null,
-        estMinutes: lesson.estMinutes,
-      })),
+    await prisma.$transaction(async (database) => {
+      await database.lesson.createMany({
+        data: lessons.map((lesson, index) => ({
+          curriculumId: p.curriculumId,
+          level: lesson.level,
+          order: startOrder + index + 1,
+          slug: lesson.slug,
+          title: lesson.title,
+          objective: lesson.objective,
+          grammarPoints: lesson.grammarPoints,
+          vocabThemes: lesson.vocabThemes,
+          targetVocab: lesson.targetVocab,
+          canDoSummary: lesson.canDoSummary ?? null,
+          estMinutes: lesson.estMinutes,
+        })),
+      });
+      await publishCurriculumLearningMappings(database, p.curriculumId, p.targetLang, lessons);
     });
     logger.info('Extended curriculum level', {
       nativeLang: p.nativeLang,

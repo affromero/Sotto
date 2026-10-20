@@ -2,6 +2,11 @@
 
 ## Schema Overview
 
+`MaterialExtractionRun` and its page/text children retain complete source
+provenance independently of legacy text previews. Text chunks use bytea so UTF-8
+BOM and NUL remain intact. Recognition operations and bounded response receipts
+share the material deletion cascade. Canonical recognition grants are retired
+through the learning deletion manifest before that cascade.
 Vocabulary imports use `MaterialVocabularyIndex`, `VocabularyIndexChunk`, and
 `VocabularySourceOccurrence` for durable coverage and exact source offsets.
 Imported words start unassessed. `introducedAt` records exposure separately
@@ -100,6 +105,21 @@ cannot renew after release, including a delayed first heartbeat. New enrollment
 requests keep every profile/approval field null until canonical owner approval
 commits the prepared profile and all approval metadata together.
 
+MaterialUploadBatch reserves an owned declaration set by request identity.
+MaterialUpload binds each transfer to its stable CourseMaterial. Immutable
+MaterialUploadPart receipts record exact ranges and SHA-256 checksums. Complete
+original publication and durable finalizer completion commit together. Cleanup
+job identities survive cancellation, expiration and interrupted part retirement.
+
+LearningMapRevision stores immutable shared target-language catalogs. LearningNodeIdentity
+keeps stable identities across releases. LearningLevelBinding pins each course band's
+catalog and legitimate skill coverage; LearningLevelCompletion records earned transitions.
+LearningObservation contains deduplicated criterion-bound assessment evidence, and
+LearnerObjectiveState is its rebuildable per-skill projection. LessonLearningObjective
+links curricula to precise objectives. Private uploads never enter shared catalog content.
+The curriculum seeder publishes lesson links in its curriculum transaction.
+Reviewed seed associations are version-bound teaching metadata and confer no
+learner mastery. Unreviewed and partial scopes remain explicitly unresolved.
 `Course.vocabularySupport` is an optional `VocabularySupport` enum:
 `MEANING_RECALL`, `WORD_RECALL`, or `LISTENING_RECOGNITION`. It records
 learner-reported support for future generation, separately from assessed mastery.

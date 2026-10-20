@@ -48,6 +48,10 @@ import { CredentialReconciliationError } from '@/lib/sidedoor/credentials/config
 import { Button } from '@/components/ui/Button';
 import t from './theme.module.css';
 import type { AgentStatus } from '@/lib/agent-availability';
+import {
+  onboardingPlacementAnalysis,
+  type MaterialPlacementChoice,
+} from '@/lib/course-materials/client/analysis';
 
 export interface AgentState {
   provider: string;
@@ -204,6 +208,8 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
   const [storage, setStorage] = useState<StorageState>({ ...DEFAULT_STORAGE });
   const [sources, setSources] = useState<Set<string>>(new Set());
   const [contextItems, setContextItems] = useState<ContextItem[]>([]);
+  const [placementAnalysis, setPlacementAnalysis] = useState<MaterialPlacementChoice | undefined>();
+  const [placementPending, setPlacementPending] = useState(false);
   const [understood, setUnderstood] = useState<Set<CefrLevel>>(new Set());
   const [storageReady, setStorageReady] = useState(false);
   const [deepLinkMode, setDeepLinkMode] = useState(false);
@@ -313,7 +319,8 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
 
   async function submitSetup(payload: Record<string, unknown>): Promise<Response | null> {
     const signal = credentialLifetime.current?.signal;
-    if (!signal || signal.aborted || credentialLock.current || !credentialReady) return null;
+    if (!signal || signal.aborted || credentialLock.current || !credentialReady || placementPending)
+      return null;
     credentialLock.current = true;
     setCredentialBusy(true);
     try {
@@ -325,7 +332,11 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
         credentials: 'include',
         signal,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...payload, credentials }),
+        body: JSON.stringify({
+          ...payload,
+          credentials,
+          placementAnalysis: onboardingPlacementAnalysis(placementAnalysis, payload.course),
+        }),
       });
       const body = await response.text();
       signal.throwIfAborted();
@@ -381,12 +392,12 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
 
   const go = useCallback(
     (n: number) => {
-      if (credentialLock.current) return;
+      if (credentialLock.current || (placementPending && step === 8 && n > 8)) return;
       credentialSession.invalidateConfirmations();
       setCredentialFeedback((previous) => (previous?.status === 'confirmation' ? null : previous));
       setStep(clampStep(n));
     },
-    [credentialSession]
+    [credentialSession, placementPending, step]
   );
 
   function applySnapshot(snapshot: WelcomeSnapshot) {
@@ -403,6 +414,7 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
     setSources(snapshot.sources);
     setContextItems(snapshot.contextItems);
     setUnderstood(toSingleUnderstoodSet(snapshot.understood));
+    setPlacementAnalysis(snapshot.placementAnalysis);
   }
 
   useEffect(() => {
@@ -486,6 +498,7 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
         storage: { ...storage, accessKeyId: '', secretAccessKey: '' },
         sources: [...sources],
         contextItems,
+        placementAnalysis,
         understood: [...understood],
       })
     );
@@ -496,6 +509,7 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
     config.selfHosted,
     config.onboardingResumeKey,
     contextItems,
+    placementAnalysis,
     deepLinkMode,
     language,
     vocabularySupport,
@@ -533,7 +547,7 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
                         : step === 7
                           ? contextItems.length > 0
                           : step === 8
-                            ? !!level
+                            ? false
                             : step === 9
                               ? contextItems.length > 0 && !!level
                               : false;
@@ -553,12 +567,14 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
   }, [agent.status, contextItems.length, go, language, level, step]);
 
   function chooseBaseLang(code: string) {
+    setPlacementAnalysis(undefined);
     setBaseLang(code);
     setLanguage((prev) => (prev === code ? '' : prev));
   }
 
   function reset() {
     if (credentialLock.current) return;
+    setPlacementAnalysis(undefined);
     setStep(0);
     setProfileName('Learner');
     setAvatarSlug(ANIMAL_AVATARS[0].slug);
@@ -578,6 +594,7 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
   }
 
   function toggleUnderstood(lvl: CefrLevel) {
+    setPlacementAnalysis(undefined);
     setUnderstood((prev) => {
       if (prev.has(lvl)) return new Set();
       return new Set([lvl]);
@@ -585,6 +602,7 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
   }
 
   function selectPlacementLevel(lvl: CefrLevel) {
+    setPlacementAnalysis(undefined);
     setUnderstood(new Set([lvl]));
   }
 
@@ -694,7 +712,10 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
           state={flowState}
           demoMode={demoMode}
           setBaseLang={chooseBaseLang}
-          setLanguage={setLanguage}
+          setLanguage={(value) => {
+            setPlacementAnalysis(undefined);
+            setLanguage(value);
+          }}
           onNext={() => go(4)}
           onBack={() => go(2)}
         />
@@ -774,6 +795,8 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
     case 7:
       stepView = (
         <StepContext
+          key={`${config.onboardingResumeKey}:${baseLang}:${language}`}
+          uploadScope={`welcome:${config.onboardingResumeKey ?? 'new'}:${baseLang}:${language}`}
           contextItems={contextItems}
           setContextItems={setContextItems}
           demoMode={demoMode}
@@ -785,12 +808,21 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
     case 8:
       stepView = (
         <StepPlacement
+          key={`${baseLang}:${language}`}
           baseLang={baseLang}
           language={language}
           understood={understood}
           toggleUnderstood={toggleUnderstood}
           selectPlacementLevel={selectPlacementLevel}
           onAddContextItems={addContextItems}
+          onAnalysisPending={setPlacementPending}
+          onAnalysis={(value) =>
+            setPlacementAnalysis(
+              value
+                ? { ...value, native: baseLang, target: language, requestId: crypto.randomUUID() }
+                : undefined
+            )
+          }
           level={level}
           demoMode={demoMode}
           onNext={() => go(9)}

@@ -1,8 +1,16 @@
 import { createHash } from 'node:crypto';
 import type { LearningDatabase } from '../learning/database';
+import { materialTextInventory, readMaterialTextRange } from './extraction/readers';
 
 const COURSE_CONTEXT_LIMIT = 12000;
-type DocumentMetadata = { id: string; name: string; length: number; originalUrl: string };
+type DocumentMetadata = {
+  id: string;
+  name: string;
+  length: number;
+  originalUrl: string;
+  processingStatus?: string;
+  processingRevision?: number;
+};
 export type CourseSourceFragment = { documentId: string; start: number; end: number; text: string };
 type Range = { label: string; start: number; end: number };
 
@@ -68,33 +76,6 @@ function renderCourseContext(
   return { text, fragments };
 }
 
-/** Onboarding uses the same bounded source plan while retaining complete originals. */
-export function buildCourseSourceContext(
-  documents: readonly { id: string; name: string; text: string }[],
-  seed: string
-) {
-  const planned = planCourseContext(
-    documents
-      .filter((document) => document.text.trim())
-      .map((document) => ({
-        id: document.id,
-        name: document.name,
-        length: [...document.text].length,
-      })),
-    seed
-  );
-  const fragments = planned.flatMap((document) => {
-    const source = [...documents.find((item) => item.id === document.id)!.text];
-    return document.ranges.map((range) => ({
-      documentId: document.id,
-      start: range.start,
-      end: range.end,
-      text: source.slice(range.start, range.end).join(''),
-    }));
-  });
-  return renderCourseContext(planned, fragments);
-}
-
 /** Ownership, metadata and exact ranges stay in the caller's existing transaction. */
 export async function readCourseMaterialContext(
   database: LearningDatabase,
@@ -104,13 +85,27 @@ export async function readCourseMaterialContext(
   editableNote = ''
 ) {
   const materials = await database.$queryRaw<DocumentMetadata[]>`
-    SELECT m.id, m.name, m."originalUrl", char_length(m."extractedText")::int AS length
+    SELECT m.id, m.name, m."originalUrl", m."processingStatus", m."processingRevision",
+      char_length(m."extractedText")::int AS length
     FROM "CourseMaterial" m
     JOIN "Course" c ON c.id = m."courseId" AND c."userId" = m."userId"
     WHERE m."courseId" = ${courseId} AND m."userId" = ${userId}
       AND m."originalUrl" IS NOT NULL
     ORDER BY m."createdAt", m.id
   `;
+  const inventories = new Map<string, Awaited<ReturnType<typeof materialTextInventory>>>();
+  for (const material of materials) {
+    if (!material.processingStatus || material.processingStatus === 'LEGACY') continue;
+    if (!material.processingRevision)
+      throw new Error('Material processing identity is unavailable.');
+    const inventory = await materialTextInventory(database, {
+      materialId: material.id,
+      userId,
+      processingRevision: material.processingRevision,
+    });
+    material.length = inventory.length;
+    inventories.set(material.id, inventory);
+  }
   if (!materials.length && editableNote.length <= COURSE_CONTEXT_LIMIT - 2000)
     return { text: editableNote, fragments: [], materials };
   const noteId = 'editable-course-note';
@@ -128,6 +123,12 @@ export async function readCourseMaterialContext(
       if (document.id === noteId) text = [...editableNote].slice(range.start, range.end).join('');
       else {
         const material = materials.find((item) => item.id === document.id)!;
+        const inventory = inventories.get(material.id);
+        if (inventory) {
+          text = await readMaterialTextRange(database, inventory, range.start, range.end);
+          fragments.push({ documentId: document.id, start: range.start, end: range.end, text });
+          continue;
+        }
         const rows = await database.$queryRaw<Array<{ text: string }>>`
           SELECT substring("extractedText", ${range.start + 1}::int, ${range.end - range.start}::int) AS text
           FROM "CourseMaterial"

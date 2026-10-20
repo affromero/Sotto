@@ -11,7 +11,8 @@
                 "nodes": [
                     { "id": "v0", "kind": "vocab", "label": "casa", "translation": "house", "strength": 0.6, "due": true }
                 ],
-                "edges": []
+                "edges": [],
+                "objectives": []
             }),
         )
         .expect("valid")));
@@ -62,7 +63,7 @@
         app.enter_course_home(course("B")); // navigate away (bumps gen)
 
         let graph: ApiResult<types::MemoryGraphResponse> = Arc::new(Ok(serde_json::from_value(
-            serde_json::json!({ "nodes": [{ "id": "x", "kind": "vocab", "label": "stale", "strength": 1.0, "due": false }], "edges": [] }),
+            serde_json::json!({ "nodes": [{ "id": "x", "kind": "vocab", "label": "stale", "strength": 1.0, "due": false }], "edges": [], "objectives": [] }),
         )
         .expect("valid")));
         app.on_graph_loaded(stale_gen, graph);

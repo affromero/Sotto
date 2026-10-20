@@ -27,12 +27,23 @@ import { speakingGradingPayloadSchema } from '@/lib/sidedoor/jobs/stitch/speakin
 import { captureSpeakingRecordingStorage } from '@/lib/sidedoor/storage/core/speaking-storage';
 import { readSkillRequirements } from '@/lib/learning/skill-requirements';
 import { sttSelectionSchema } from '@/lib/learning/speech-selection';
+import { speakingTaskMode } from '@/lib/learning-map/evidence/communicative-speaking';
+import {
+  objectiveEvidenceHash,
+  reviewedObjectiveAssessmentSchema,
+} from '@/lib/learning-map/evidence/protocol';
+import { gradeProductiveObjective } from '@/lib/learning-map/evidence/productive';
+import {
+  assertPrivateSpeakingSession,
+  isPrivateSpeakingAssessment,
+} from '@/lib/learning-map/evidence/private-speaking/protocol';
+import { gradePrivateSourceSpeaking } from '@/lib/learning-map/evidence/private-speaking/grade';
 
 async function readSpeakingWork(database: Prisma.TransactionClient, recordingId: string) {
   const recording = await database.speakingRecording.findUnique({
     where: { id: recordingId },
     include: {
-      prompt: { select: { targetPhrase: true } },
+      prompt: { select: { targetPhrase: true, translation: true, learningObjectives: true } },
       user: { select: { id: true, preferredSttModel: true } },
     },
   });
@@ -41,12 +52,21 @@ async function readSpeakingWork(database: Prisma.TransactionClient, recordingId:
     return { complete: true as const, status: recording.status };
 
   let targetLang: string;
+  let criterionCourseId: string | undefined;
+  let criterionLevel: string | undefined;
+  let privateSelection: unknown;
   if (recording.sectionId) {
     const section = await database.classSection.findUnique({
       where: { id: recording.sectionId },
       select: {
         attempt: true,
-        class: { select: { skillRequirements: true, course: { select: { targetLang: true } } } },
+        class: {
+          select: {
+            courseId: true,
+            skillRequirements: true,
+            course: { select: { targetLang: true } },
+          },
+        },
       },
     });
     if (!section) throw new Error(`ClassSection not found for sectionId: ${recording.sectionId}`);
@@ -55,10 +75,17 @@ async function readSpeakingWork(database: Prisma.TransactionClient, recordingId:
     targetLang =
       readSkillRequirements(section.class.skillRequirements)?.targetLang ??
       section.class.course.targetLang;
+    criterionCourseId = section.class.courseId;
+    criterionLevel = readSkillRequirements(section.class.skillRequirements)?.level;
   } else if (recording.practiceSessionId) {
     const session = await database.practiceSession.findUnique({
       where: { id: recording.practiceSessionId },
-      select: { skillRequirements: true, course: { select: { targetLang: true } } },
+      select: {
+        courseId: true,
+        skillRequirements: true,
+        learningSelection: true,
+        course: { select: { targetLang: true } },
+      },
     });
     if (!session)
       throw new Error(
@@ -66,6 +93,9 @@ async function readSpeakingWork(database: Prisma.TransactionClient, recordingId:
       );
     targetLang =
       readSkillRequirements(session.skillRequirements)?.targetLang ?? session.course.targetLang;
+    criterionCourseId = session.courseId;
+    criterionLevel = readSkillRequirements(session.skillRequirements)?.level;
+    privateSelection = session.learningSelection;
   } else if (recording.examSectionId) {
     const section = await database.examSection.findUnique({
       where: { id: recording.examSectionId },
@@ -78,6 +108,40 @@ async function readSpeakingWork(database: Prisma.TransactionClient, recordingId:
     throw new Error(
       `SpeakingRecording ${recordingId} has no parent section, practice session, or exam section`
     );
+  }
+  if (speakingTaskMode(recording.prompt.learningObjectives) === 'COMMUNICATIVE') {
+    if (isPrivateSpeakingAssessment(recording.prompt.learningObjectives)) {
+      if (!recording.practiceSessionId || !criterionCourseId)
+        throw new Error('Private speaking feedback requires its owned practice session.');
+      assertPrivateSpeakingSession({
+        assessment: recording.prompt.learningObjectives,
+        userId: recording.userId,
+        courseId: criterionCourseId,
+        targetLang,
+        level: criterionLevel,
+        selection: privateSelection,
+        task: recording.prompt.targetPhrase,
+        guidance: recording.prompt.translation ?? null,
+      });
+    } else {
+      const assessment = reviewedObjectiveAssessmentSchema.parse(
+        recording.prompt.learningObjectives
+      );
+      if (
+        assessment.scope.userId !== recording.userId ||
+        assessment.scope.courseId !== criterionCourseId ||
+        assessment.scope.targetLang !== targetLang ||
+        assessment.scope.level !== criterionLevel ||
+        objectiveEvidenceHash(assessment.task) !==
+          objectiveEvidenceHash({
+            kind: 'COMMUNICATIVE_SPEAKING',
+            task: recording.prompt.targetPhrase,
+            guidance: recording.prompt.translation,
+            suppliedSupport: [],
+          })
+      )
+        throw new Error('The communicative speaking criterion changed its actual task or session.');
+    }
   }
   const [source, ownership] = await Promise.all([
     resolveStorageInput(database, {
@@ -96,6 +160,8 @@ async function readSpeakingWork(database: Prisma.TransactionClient, recordingId:
     userId: recording.userId,
     audioUrl: recording.audioUrl,
     targetPhrase: recording.prompt.targetPhrase,
+    translation: recording.prompt.translation ?? null,
+    learningObjectives: recording.prompt.learningObjectives ?? null,
     preferredSttModel: recording.sttSelection ? null : recording.user.preferredSttModel,
     sttProvider: recording.sttProvider,
     sttSelection: recording.sttSelection ? sttSelectionSchema.parse(recording.sttSelection) : null,
@@ -252,28 +318,71 @@ async function executeSpeakingGrading(
     const aiTransport = rules.length
       ? await createSottoProviderTransport(ai.execution, rules)
       : undefined;
-    const score = await resolvePronunciationScorer({}).score({
-      targetPhrase: inputs.targetPhrase,
-      transcript: sttResult.text,
-      wordTimings: sttResult.words,
-      targetLang: inputs.targetLang,
-      aiOptions: await capturedLearningAiOptions(ai),
-      aiProvider: ai.provider,
-      aiModel: ai.model,
-      aiApiKey: ai.apiKey,
-      aiEndpoint: ai.endpoint,
-      userId: inputs.userId,
-      signal,
-      fetch: aiTransport
-        ? (request, init) =>
-            aiTransport.authenticatedFetch(request, init, {
-              onDispatch,
-              onConsumed: ({ status }) => {
-                if (status < 500) onSettled();
-              },
-            })
-        : undefined,
-    });
+    const observedFetch: typeof fetch | undefined = aiTransport
+      ? (request, init) =>
+          aiTransport.authenticatedFetch(request, init, {
+            onDispatch,
+            onConsumed: ({ status }) => {
+              if (status < 500) onSettled();
+            },
+          })
+      : undefined;
+    let objectiveEvidence:
+      import('@/lib/learning-map/evidence/protocol').ProductiveCriterionFinding | undefined;
+    const score =
+      speakingTaskMode(inputs.learningObjectives) === 'COMMUNICATIVE'
+        ? await (async () => {
+            const cli = !observedFetch;
+            if (cli) onDispatch();
+            const privateAssessment = isPrivateSpeakingAssessment(inputs.learningObjectives);
+            const grading = {
+              userId: inputs.userId,
+              execution,
+              ai,
+              text: sttResult.text,
+              fetch: observedFetch,
+            };
+            const qualified = privateAssessment
+              ? await gradePrivateSourceSpeaking({
+                  ...grading,
+                  assessment: inputs.learningObjectives,
+                })
+              : await gradeProductiveObjective({
+                  ...grading,
+                  assessment: reviewedObjectiveAssessmentSchema.parse(inputs.learningObjectives),
+                });
+            if (cli) onSettled();
+            if (!privateAssessment) objectiveEvidence = qualified.finding;
+            return {
+              transcript: sttResult.text,
+              overallScore: qualified.finding.quality ?? 0,
+              rubricScores: { communicative: qualified.finding.quality ?? 0 },
+              phonemeScores: [],
+              feedback: qualified.feedback,
+            };
+          })()
+        : await resolvePronunciationScorer({}).score({
+            targetPhrase: inputs.targetPhrase,
+            transcript: sttResult.text,
+            wordTimings: sttResult.words,
+            targetLang: inputs.targetLang,
+            aiOptions: await capturedLearningAiOptions(ai),
+            aiProvider: ai.provider,
+            aiModel: ai.model,
+            aiApiKey: ai.apiKey,
+            aiEndpoint: ai.endpoint,
+            userId: inputs.userId,
+            signal,
+            fetch: aiTransport
+              ? (request, init) =>
+                  aiTransport.authenticatedFetch(request, init, {
+                    onDispatch,
+                    onConsumed: ({ status }) => {
+                      if (status < 500) onSettled();
+                    },
+                  })
+              : undefined,
+          });
     if (dispatches !== settlements) {
       markCleanupUnconfirmed();
       throw new Error('Speaking provider request has no terminal response proof');
@@ -293,6 +402,7 @@ async function executeSpeakingGrading(
             rubricScores: score.rubricScores as unknown as Prisma.InputJsonValue,
             phonemeScores: score.phonemeScores as unknown as Prisma.InputJsonValue,
             feedback: score.feedback,
+            objectiveEvidence: objectiveEvidence as unknown as Prisma.InputJsonValue | undefined,
             status: 'SCORED',
           },
         });

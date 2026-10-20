@@ -141,6 +141,13 @@ export class SottoClient {
   async getMe(): Promise<UserProfile> {
     return this.request('/api/v1/users/me');
   }
+
+  async learningRequest(method: 'GET' | 'POST', path: string, body?: unknown): Promise<unknown> {
+    return this.request(path, {
+      method,
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    });
+  }
 }
 
 function normalizeBaseUrl(baseUrl: string): string {

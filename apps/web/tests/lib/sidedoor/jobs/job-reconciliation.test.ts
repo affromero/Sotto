@@ -13,6 +13,7 @@ import {
   validateSottoQueueContract,
 } from '@/lib/sidedoor/jobs/core/job-contracts';
 import { SIDEDOOR_STATE_ID } from '@/lib/sidedoor/access/state/store';
+import { materialStorageScopes } from '@/lib/course-materials';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 import {
   createSharedTestInstance,
@@ -166,6 +167,120 @@ suite('durable reconciliation with PostgreSQL and Redis', () => {
         await sottoTransaction(instance.database, (tx) => sottoJobOutbox(tx).receipt(record.job.id))
       ).toMatchObject({ status: 'pending', fingerprint: record.fingerprint });
       expect((await queue.getJob(record.job.id))?.name).toBe('notifications.v4');
+    } finally {
+      await worker.close();
+    }
+  });
+
+  it('records material recovery when a terminal queue failure event was missed', async () => {
+    await queue.close();
+    queue = new Queue('material-finalization', { connection, prefix: `reconcile-${randomUUID()}` });
+    const user = await instance.database.user.findFirstOrThrow({ where: { role: 'ADMIN' } });
+    const material = await instance.database.courseMaterial.create({
+      data: {
+        userId: user.id,
+        name: 'retained-parts.pdf',
+        mimeType: 'application/pdf',
+        byteSize: 12,
+        extractedText: '',
+      },
+    });
+    const batch = await instance.database.materialUploadBatch.create({
+      data: {
+        userId: user.id,
+        requestId: randomUUID(),
+        fingerprint: 'a'.repeat(64),
+        expiresAt: new Date(Date.now() + 60000),
+      },
+    });
+    const operationId = randomUUID();
+    const upload = await instance.database.materialUpload.create({
+      data: {
+        batchId: batch.id,
+        materialId: material.id,
+        clientId: randomUUID(),
+        status: 'FINALIZING',
+        finalizationOperationId: operationId,
+        expiresAt: batch.expiresAt,
+      },
+    });
+    const record = await sottoTransaction(instance.database, async (database) => {
+      const storage = await materialStorageScopes(database, material);
+      const scopes = [
+        ...storage.scopes,
+        { subjectId: `material-upload:${upload.id}`, generation: upload.createdAt.getTime() },
+      ].sort((left, right) => left.subjectId.localeCompare(right.subjectId));
+      return sottoJobOutbox(database).enqueue(
+        prepareJob({
+          id: operationId,
+          namespace: SIDEDOOR_STATE_ID,
+          handler: queue.name,
+          version: 1,
+          payload: {
+            type: 'finalize_material_upload',
+            payload: {
+              userId: user.id,
+              materialId: material.id,
+              uploadId: upload.id,
+              processingRevision: 1,
+            },
+            authority: {
+              kind: 'material',
+              materialId: material.id,
+              userId: user.id,
+              materialCreatedAt: material.createdAt.getTime(),
+              processingRevision: 1,
+              instanceId: storage.instanceId,
+              inputSha256: null,
+              scopes,
+              upload: {
+                id: upload.id,
+                createdAt: upload.createdAt.getTime(),
+                finalizationOperationId: operationId,
+                expectedSha256: null,
+              },
+            },
+          },
+          scopes,
+          delivery: { attempts: 1, priority: 0, availableAt: 0 },
+        })
+      );
+    });
+    await deliverSottoJob({ database: instance.database, queue, operationId, version: 1 });
+    const worker = new Worker(
+      queue.name,
+      async () => {
+        throw new Error('Synthetic finalization failure.');
+      },
+      { connection, prefix: queue.opts.prefix, autorun: false }
+    );
+    try {
+      const exhausted = new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('Material job did not exhaust')), 5000);
+        worker.on('failed', async (job) => {
+          if (job?.id !== operationId || (await job.getState()) !== 'failed') return;
+          clearTimeout(timer);
+          resolve();
+        });
+      });
+      void worker.run();
+      await worker.waitUntilReady();
+      await exhausted;
+      expect((await reconcileSottoJobs(options())).results).toMatchObject([
+        { id: operationId, status: 'complete' },
+      ]);
+      expect(
+        await instance.database.materialUpload.findUniqueOrThrow({ where: { id: upload.id } })
+      ).toMatchObject({
+        status: 'FAILED',
+        failureReason: expect.stringContaining('parts are retained'),
+      });
+      expect(
+        await sottoTransaction(instance.database, (database) =>
+          sottoJobOutbox(database).receipt(operationId)
+        )
+      ).toMatchObject({ status: 'complete', fingerprint: record.fingerprint });
+      expect((await reconcileSottoJobs(options())).results).toEqual([]);
     } finally {
       await worker.close();
     }

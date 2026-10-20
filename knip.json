@@ -16,6 +16,7 @@
         "scripts/**/*.{ts,mjs}!",
         "public/**/*.js!",
         "src/workers/index.ts!",
+        "src/lib/course-materials/extraction/runtime/pdf-child.ts!",
         "prisma/seed*.ts!",
         "tests/**/*.{ts,tsx}",
         "e2e/**/*.ts"

@@ -24,14 +24,14 @@ pub(crate) struct PlacementQuestion {
     pub options: Vec<String>,
 }
 
-impl From<&types::PlacementQuestion> for PlacementQuestion {
-    fn from(q: &types::PlacementQuestion) -> Self {
+impl From<&types::GeneratePlacementResponseQuestionsItem> for PlacementQuestion {
+    fn from(q: &types::GeneratePlacementResponseQuestionsItem) -> Self {
         // Surface the CEFR band + skill in the prompt for context.
         let prompt = format!("[{} · {}] {}", q.cefr, q.skill, q.prompt);
         Self {
             id: q.id.clone(),
             prompt,
-            options: q.options.clone(),
+            options: q.options.to_vec(),
         }
     }
 }
@@ -41,10 +41,20 @@ impl From<&types::PlacementQuestion> for PlacementQuestion {
 pub(crate) fn placement_questions(
     resp: &types::GeneratePlacementResponse,
 ) -> Option<Vec<PlacementQuestion>> {
-    if resp.questions.is_empty() {
+    if !matches!(resp.status.to_string().as_str(), "READY" | "ACCEPTED")
+        || !(6..=24).contains(&resp.questions.len())
+    {
         return None;
     }
-    if resp.questions.iter().any(|q| q.options.is_empty()) {
+    if resp.questions.iter().any(|q| q.options.len() != 5)
+        || resp
+            .questions
+            .iter()
+            .map(|q| &q.id)
+            .collect::<std::collections::BTreeSet<_>>()
+            .len()
+            != resp.questions.len()
+    {
         return None;
     }
     Some(resp.questions.iter().map(PlacementQuestion::from).collect())
@@ -65,7 +75,11 @@ pub(crate) fn build_placement_answers(
                 return Err("a placement answer has an empty question id".to_string());
             }
             answers.push(types::SubmitPlacementRequestAnswersItem {
-                id: q.id.clone(),
+                id: q
+                    .id
+                    .clone()
+                    .try_into()
+                    .map_err(|_| "The saved placement question ID is invalid.".to_string())?,
                 selected_index: *idx as i64,
             });
         }
@@ -199,6 +213,8 @@ pub(crate) enum NotesPhase {
         rationale: String,
         /// Confidence as a whole percentage (0..100).
         confidence: u8,
+        partial: bool,
+        accepted_partial: bool,
     },
     /// The confirm (course creation) request is in flight.
     Confirming,

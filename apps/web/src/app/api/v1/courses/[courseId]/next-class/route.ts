@@ -54,6 +54,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       if (!current || current.id !== admitted.id) return errorResponse('Preparation changed.', 409);
       if (current.status === 'COMPLETED') {
         if (current.result === 'done') return NextResponse.json({ done: true });
+        if (current.result === 'requirements')
+          return NextResponse.json({ requirementsRemaining: true });
         if (current.result === 'gated')
           return errorResponse('Finish the current class before starting a new one.', 409, {
             activeClassId: current.classId,

@@ -1,4 +1,6 @@
 import type { Job } from 'bullmq';
+import { isDeepStrictEqual } from 'node:util';
+import { Prisma } from '@/generated/prisma/client';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { startPractice } from '@/lib/practice-service';
 import { startPreparation, PreparationConflictError } from '@/lib/classes/preparation-state';
@@ -198,6 +200,19 @@ export async function processPracticePreparation(job: Job<unknown>, workerSignal
                       if (generatedId || startedAt)
                         throw new PreparationConflictError(
                           'Practice generation cannot replace its admitted identity.'
+                        );
+                      if (
+                        generation.schemaVersion === 2 &&
+                        (content.practiceLevel !== generation.practiceLevel ||
+                          !isDeepStrictEqual(
+                            content.learningSelection === Prisma.JsonNull
+                              ? null
+                              : content.learningSelection,
+                            generation.learningSelection
+                          ))
+                      )
+                        throw new PreparationConflictError(
+                          'Practice generation cannot replace its captured difficulty or learning selection.'
                         );
                       return database.practiceSession.update({
                         where: { id: sessionId },

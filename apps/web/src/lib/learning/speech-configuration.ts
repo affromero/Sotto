@@ -12,6 +12,32 @@ import { isSpeechDisabled, selectedTtsModel } from '../providers/tts';
 import { getAutoModelConfig } from '../auto-model-config';
 import { getProviderMeta, isValidProviderId } from '../providers/tts-registry';
 
+/** Compare admitted speech identity without adding channels absent from the frozen attempt. */
+export async function matchesLearningSpeechFingerprint(
+  database: Prisma.TransactionClient,
+  authorize: CredentialExecutionAuthority,
+  requirements: SkillRequirements,
+  expected: string | undefined,
+  signal?: AbortSignal
+): Promise<boolean> {
+  signal?.throwIfAborted();
+  if (
+    requirements.ttsProvider === null &&
+    requirements.sttProvider === null &&
+    requirements.skills.LISTENING.state !== 'REQUIRED' &&
+    requirements.skills.SPEAKING.state !== 'REQUIRED' &&
+    !requirements.referenceAudioRequired &&
+    ['{}', '{"audioDisabled":true}'].some(
+      (marker) => createHash('sha256').update(marker).digest('hex') === expected
+    )
+  ) {
+    await authorize(database);
+    signal?.throwIfAborted();
+    return true;
+  }
+  return (await learningSpeechFingerprint(database, authorize, requirements, signal)) === expected;
+}
+
 /** Hash selected speech configuration and immutable credential metadata without secrets. */
 export async function learningSpeechFingerprint(
   database: Prisma.TransactionClient,
@@ -29,6 +55,7 @@ export async function learningSpeechFingerprint(
   const selected = await resolveSkillRequirementsInTransaction(
     database,
     { userId: actor.userId, authorize, signal },
+    requirements,
     requirements
   );
   if (

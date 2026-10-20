@@ -5,6 +5,7 @@ import { useEffect } from 'react';
 import { useRef } from 'react';
 import type { ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { SottoSpinner } from '@/components/ui/SottoSpinner';
 import styles from './StartNextClass.module.css';
 
@@ -14,7 +15,7 @@ interface StartNextClassProps {
   children?: ReactNode;
 }
 
-type Phase = 'idle' | 'generating' | 'done';
+type Phase = 'idle' | 'generating' | 'done' | 'requirements';
 
 interface GenerationProgress {
   status: string;
@@ -170,7 +171,12 @@ function CourseClassPreparation({ courseId, activeClassId, children }: StartNext
       }
 
       if (res.status === 200) {
-        const data = (await res.json()) as { done?: boolean };
+        const data = (await res.json()) as { done?: boolean; requirementsRemaining?: boolean };
+        if (data.requirementsRemaining) {
+          stopPolling(controller);
+          setPhase('requirements');
+          return;
+        }
         if (data.done) {
           stopPolling(controller);
           setPhase('done');
@@ -351,6 +357,11 @@ function CourseClassPreparation({ courseId, activeClassId, children }: StartNext
           setPhase('done');
           return;
         }
+        if (progress?.result === 'requirements') {
+          if (activeController.current) stopPolling(activeController.current);
+          setPhase('requirements');
+          return;
+        }
         if (progress && ['FAILED', 'UNRESOLVED', 'CANCELLED'].includes(progress.status)) {
           activeController.current?.abort();
           activeController.current = null;
@@ -433,6 +444,20 @@ function CourseClassPreparation({ courseId, activeClassId, children }: StartNext
     </div>
   );
 
+  if (phase === 'requirements') {
+    return (
+      <div className={styles.root}>
+        <p className={styles.done} role="status">
+          Sequential lessons for this level are complete. Review its objectives and readiness before
+          advancing.
+        </p>
+        <Link href={`/learn/map?course=${encodeURIComponent(courseId)}`} className={styles.button}>
+          View level requirements
+        </Link>
+        {children}
+      </div>
+    );
+  }
   if (phase === 'done') {
     return (
       <div className={styles.root}>

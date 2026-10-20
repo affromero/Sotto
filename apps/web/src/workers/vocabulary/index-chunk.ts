@@ -20,6 +20,12 @@ import {
 } from '@/lib/vocabulary/index-state';
 import { splitVocabularyChunk, vocabularyChunkContext } from '@/lib/vocabulary/index-chunks';
 import { updateVocabularyIndexProgress } from '@/lib/vocabulary/index-progress';
+import {
+  canonicalVocabularyContext,
+  canonicalVocabularyWordOffsets,
+  splitCanonicalVocabularyChunk,
+} from '@/lib/vocabulary/source/ranges';
+import { requireVocabularyTextMetadata } from '@/lib/vocabulary/source/publication';
 
 /** Each reviewed chunk publishes once. Interrupted model calls never resume by replaying generation. */
 export async function processVocabularyIndexChunk(job: Job<unknown>, workerSignal?: AbortSignal) {
@@ -117,35 +123,63 @@ export async function processVocabularyIndexChunk(job: Job<unknown>, workerSigna
       });
   }, 5000);
   try {
-    const context = vocabularyChunkContext(
-      admitted.index.material.extractedText,
-      admitted.chunk.startOffset,
-      admitted.chunk.endOffset,
-      admitted.index.targetLang
-    );
-    const words = await extractSourceVocabularyInventory({
-      userId: payload.userId,
-      execution,
-      nativeLang: admitted.index.nativeLang,
-      targetLang: admitted.index.targetLang,
-      level: 'all source vocabulary levels, without CEFR filtering',
-      text: context.text,
-      requiredSpan: {
-        start: Math.max(0, admitted.chunk.startOffset - context.startOffset),
-        end: Math.min(context.text.length, admitted.chunk.endOffset - context.startOffset),
-      },
-    });
+    const canonicalContext = admitted.sourceSnapshot
+      ? await sottoTransaction(prisma, (database) =>
+          canonicalVocabularyContext(
+            database,
+            admitted.sourceSnapshot!,
+            admitted.chunk.startOffset,
+            admitted.chunk.endOffset,
+            admitted.index.targetLang
+          )
+        )
+      : null;
+    const context =
+      canonicalContext ??
+      vocabularyChunkContext(
+        admitted.index.material.extractedText,
+        admitted.chunk.startOffset,
+        admitted.chunk.endOffset,
+        admitted.index.targetLang
+      );
+    const words =
+      canonicalContext?.hasWords === false
+        ? []
+        : await extractSourceVocabularyInventory({
+            userId: payload.userId,
+            execution,
+            nativeLang: admitted.index.nativeLang,
+            targetLang: admitted.index.targetLang,
+            level: 'all source vocabulary levels, without CEFR filtering',
+            text: context.text,
+            requiredSpan: {
+              start:
+                canonicalContext?.coreStart ??
+                Math.max(0, admitted.chunk.startOffset - context.startOffset),
+              end:
+                canonicalContext?.coreEnd ??
+                Math.min(context.text.length, admitted.chunk.endOffset - context.startOffset),
+            },
+          });
     await sottoTransaction(prisma, async (database) => {
       await database.$queryRaw`SELECT id FROM "Course" WHERE id = ${admitted.index.courseId} FOR UPDATE`;
       const current = await validate(database);
       for (const word of words) {
-        const startOffset = context.startOffset + word.sourceStart;
-        const endOffset = context.startOffset + word.sourceEnd;
+        requireVocabularyTextMetadata(word);
+        const { startOffset, endOffset } = current.sourceSnapshot
+          ? canonicalVocabularyWordOffsets(context, word.sourceStart, word.sourceEnd)
+          : {
+              startOffset: context.startOffset + word.sourceStart,
+              endOffset: context.startOffset + word.sourceEnd,
+            };
         if (startOffset < current.chunk.startOffset || startOffset >= current.chunk.endOffset)
           continue;
         if (
           endOffset > context.endOffset ||
-          current.index.material.extractedText.slice(startOffset, endOffset) !== word.sourceForm
+          (current.sourceSnapshot
+            ? context.text.slice(word.sourceStart, word.sourceEnd)
+            : current.index.material.extractedText.slice(startOffset, endOffset)) !==
+            word.sourceForm
         )
           throw new Error('Indexed vocabulary no longer matches the exact source bytes.');
         await database.learnerVocab.createMany({
@@ -168,7 +202,8 @@ export async function processVocabularyIndexChunk(job: Job<unknown>, workerSigna
             chunkId: current.chunk.id,
             startOffset,
             endOffset,
-            quote: word.sourceForm,
+            quote: current.sourceSnapshot ? null : word.sourceForm,
+            ...(current.sourceSnapshot ? { quoteBytes: Buffer.from(word.sourceForm, 'utf8') } : {}),
             meaning: word.gloss,
           },
           skipDuplicates: true,
@@ -177,7 +212,13 @@ export async function processVocabularyIndexChunk(job: Job<unknown>, workerSigna
       await vocabularyIndexGrant(database, current.operation).complete(current.operation.grant);
       await database.vocabularyIndexChunk.update({
         where: { id: payload.chunkId },
-        data: { status: 'COMPLETE', result: words, error: null },
+        data: {
+          status: 'COMPLETE',
+          ...(current.sourceSnapshot
+            ? { resultBytes: Buffer.from(JSON.stringify(words), 'utf8') }
+            : { result: words }),
+          error: null,
+        },
       });
       await updateVocabularyIndexProgress(database, current.index.id);
     });
@@ -194,12 +235,25 @@ export async function processVocabularyIndexChunk(job: Job<unknown>, workerSigna
           parentJob: job,
           prepare: async (database) => {
             const current = await validate(database);
-            const ranges = splitVocabularyChunk(
-              current.index.material.extractedText,
-              current.chunk.startOffset,
-              current.chunk.endOffset,
-              current.index.targetLang
-            );
+            const ranges = current.sourceSnapshot
+              ? splitCanonicalVocabularyChunk(
+                  await canonicalVocabularyContext(
+                    database,
+                    current.sourceSnapshot,
+                    current.chunk.startOffset,
+                    current.chunk.endOffset,
+                    current.index.targetLang
+                  ),
+                  current.chunk.startOffset,
+                  current.chunk.endOffset,
+                  current.index.targetLang
+                )
+              : splitVocabularyChunk(
+                  current.index.material.extractedText,
+                  current.chunk.startOffset,
+                  current.chunk.endOffset,
+                  current.index.targetLang
+                );
             await vocabularyIndexGrant(database, current.operation).complete(
               current.operation.grant
             );

@@ -6,6 +6,10 @@ import { storageInputSchema, validateStorageInputs } from '../sidedoor/storage/c
 import { learningPreparationGrant } from '../learning/preparation/preparation-grant';
 import type { LearningDatabase } from '../learning/database';
 import { VocabularyStudyNotFound, VocabularyStudyUnavailable } from './study-state';
+import {
+  validateCanonicalVocabularySource,
+  canonicalVocabularySourceHash,
+} from './source/snapshot';
 
 export const vocabularyIndexPayloadSchema = z.discriminatedUnion('phase', [
   z
@@ -78,11 +82,18 @@ export async function validateVocabularyIndex(
   )
     throw new VocabularyStudyNotFound('Vocabulary source is no longer attached to this course.');
   const reference = z.object({ reference: z.string().min(1) }).parse(index.originalInput).reference;
+  const sourceSnapshot =
+    index.protocol === 2
+      ? await validateCanonicalVocabularySource(database, index.material, index.sourceSnapshot)
+      : null;
   if (
-    index.protocol !== 1 ||
+    ![1, 2].includes(index.protocol) ||
     index.material.originalUrl !== reference ||
-    index.material.extractedText.length !== index.textLength ||
-    sourceTextHash(index.material.extractedText) !== index.textHash ||
+    (sourceSnapshot
+      ? sourceSnapshot.inventory.length !== index.textLength ||
+        canonicalVocabularySourceHash(sourceSnapshot) !== index.textHash
+      : index.material.extractedText.length !== index.textLength ||
+        sourceTextHash(index.material.extractedText) !== index.textHash) ||
     index.course.nativeLang !== index.nativeLang ||
     index.course.targetLang !== index.targetLang
   )
@@ -92,7 +103,7 @@ export async function validateVocabularyIndex(
   const ownership = await captureCourseStorage(database, index.courseId);
   const input = storageInputSchema.safeParse(index.originalInput);
   if (input.success) await validateStorageInputs(database, [input.data]);
-  return { index, ownership, originalInput: input.success ? input.data : null };
+  return { index, ownership, sourceSnapshot, originalInput: input.success ? input.data : null };
 }
 
 export async function validateVocabularyChunk(

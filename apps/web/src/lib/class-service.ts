@@ -8,6 +8,7 @@ import {
   validatePristineRegeneration,
 } from './classes/regeneration/pristine';
 import { getDueItems } from './knowledge-graph';
+import { objectiveReviewContext } from './learning-map/adaptation/review';
 import {
   prepareClassListening,
   queueListeningAudio,
@@ -21,7 +22,6 @@ import { getCourseNote } from './course-notes';
 import { buildLearnerContext } from './pedagogy';
 import { Prisma } from '@/generated/prisma/client';
 import { ensureCurriculumHasLevelLessons } from './curriculum-generator';
-import { cefrRank } from './cefr-levels';
 import { generateClassIntro } from './classes/class-intro';
 import { generateClassTeaching, teachingFromSeed } from './classes/lesson/teaching';
 import { classTargetsFromSeed } from './classes/lesson/class-targets';
@@ -42,6 +42,10 @@ import {
   publishClassGeneration,
 } from './learning/classes/class-generation-state';
 import type { SkillType, CefrLevel, SkillRequirements, ClassTeaching } from '@sotto/shared';
+import {
+  captureClassAssessmentScope,
+  reviewMultipleChoiceAssessments,
+} from './learning-map/evidence/producers';
 
 const MC_SKILLS: SkillType[] = ['GRAMMAR', 'READING'];
 
@@ -74,21 +78,7 @@ function selectNextLesson(
   currentLevel: CefrLevel,
   passedSet: Set<string>
 ): LessonLike | undefined {
-  const currentRank = cefrRank(currentLevel);
-  return lessons.find(
-    (lesson) => !passedSet.has(lesson.id) && cefrRank(lesson.level as CefrLevel) >= currentRank
-  );
-}
-
-function isBelowCourseLevel(lessonLevel: string, currentLevel: string): boolean {
-  return cefrRank(lessonLevel as CefrLevel) < cefrRank(currentLevel as CefrLevel);
-}
-
-async function clearActiveClassGate(classId: string, courseId: string): Promise<void> {
-  await prisma.$transaction([
-    prisma.courseClass.delete({ where: { id: classId } }),
-    prisma.course.update({ where: { id: courseId }, data: { activeClassId: null } }),
-  ]);
+  return lessons.find((lesson) => !passedSet.has(lesson.id) && lesson.level === currentLevel);
 }
 
 async function assertClassStillGenerating(classId: string, attempt: number) {
@@ -154,7 +144,7 @@ async function buildSection(
     })
   );
   await assertClassStillGenerating(classId, attempt);
-  const questions = await generateSectionQuestions({
+  const generatedQuestions = await generateSectionQuestions({
     userId,
     execution,
     skill,
@@ -170,6 +160,14 @@ async function buildSection(
     sourceContent: over?.sourceContent,
     retry,
   });
+  const scope = await captureClassAssessmentScope({ classId, userId, execution });
+  const questions = await reviewMultipleChoiceAssessments({
+    userId,
+    execution,
+    scope,
+    skill: skill as 'GRAMMAR' | 'READING',
+    questions: generatedQuestions,
+  });
   await assertClassStillGenerating(classId, attempt);
   await withClassGeneration(execution, classId, attempt, async (database) => {
     for (const [i, q] of questions.entries())
@@ -184,6 +182,9 @@ async function buildSection(
           explanation: q.explanation,
           passageRef: q.passageRef ?? null,
           passageText: q.passageText ?? null,
+          ...(q.learningAssessment
+            ? { learningAssessment: q.learningAssessment as unknown as Prisma.InputJsonValue }
+            : {}),
         },
       });
     await database.classSection.update({
@@ -221,6 +222,7 @@ function noteForAttempt(note: string, classId: string, attempt: number): string 
 export type NextClassResult =
   | { kind: 'gated'; activeClassId: string; status: string }
   | { kind: 'done' }
+  | { kind: 'requirements' }
   | { kind: 'created'; classId: string };
 
 /** Sourced class: build the next class around a real link/paper or an interest topic. */
@@ -270,7 +272,13 @@ async function buildClassContent(p: ClassContentBuildParams): Promise<Prisma.Inp
       sourceDocuments: await captureMaterialDocuments(p.execution, { courseId: p.courseId }),
     },
   };
-  const due = await getDueItems(p.courseId);
+  const reviewScope = {
+    level: p.requirements.level,
+    targetLang: p.requirements.targetLang,
+    kind: 'FULL' as const,
+  };
+  const due = await getDueItems(p.courseId, 8, reviewScope);
+  const objectiveReview = objectiveReviewContext(due.objectives, reviewScope, new Date());
   const corpus = p.preserveTeaching
     ? undefined
     : await getCourseVocabularyTargets({
@@ -287,12 +295,17 @@ async function buildClassContent(p: ClassContentBuildParams): Promise<Prisma.Inp
       ? await getCourseNote(p.courseId, `${p.classId}:${p.attempt}`)
       : corpus.context;
   const note = noteForAttempt(
-    buildLearnerContext(
-      [await getVocabularySupportContext(p.courseId, p.userId), capturedContext]
-        .filter(Boolean)
-        .join('\n\n'),
-      p.course.pedagogy as Parameters<typeof buildLearnerContext>[1]
-    ),
+    [
+      buildLearnerContext(
+        [await getVocabularySupportContext(p.courseId, p.userId), capturedContext]
+          .filter(Boolean)
+          .join('\n\n'),
+        p.course.pedagogy as Parameters<typeof buildLearnerContext>[1]
+      ),
+      objectiveReview.text,
+    ]
+      .filter(Boolean)
+      .join('\n\n'),
     p.classId,
     p.attempt
   );
@@ -494,7 +507,8 @@ async function buildClassContent(p: ClassContentBuildParams): Promise<Prisma.Inp
     ...p.existingSeed,
     vocabIds: due.vocab.map((v) => v.id),
     grammarKeys: due.grammar.map((g) => g.topicKey),
-    dueCount: due.vocab.length + due.grammar.length,
+    dueCount: due.vocab.length + due.grammar.length + objectiveReview.entries.length,
+    objectiveReviewContext: objectiveReview.text,
     intro: intro as unknown as Prisma.InputJsonObject,
     ...(!p.preserveTeaching || p.existingSeed?.classTargets
       ? { classTargets: targets as unknown as Prisma.InputJsonObject }
@@ -529,11 +543,7 @@ export async function createNextClass(
     orderBy: { order: 'asc' },
   });
   if (active) {
-    if (isBelowCourseLevel(active.lesson.level, course.currentLevel)) {
-      await clearActiveClassGate(active.id, courseId);
-    } else {
-      return { kind: 'gated', activeClassId: active.id, status: active.status };
-    }
+    return { kind: 'gated', activeClassId: active.id, status: active.status };
   }
 
   const passed = await prisma.courseClass.findMany({
@@ -559,7 +569,7 @@ export async function createNextClass(
   }
 
   const lesson = selectNextLesson(course.curriculum.lessons, course.currentLevel, passedSet);
-  if (!lesson) return { kind: 'done' };
+  if (!lesson) return { kind: 'requirements' };
 
   // Sourced mode: prepare the source BEFORE creating the class so a failed
   // extraction never leaves a half-built class. Authentic content levels to the

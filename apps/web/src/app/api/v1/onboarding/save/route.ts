@@ -11,8 +11,12 @@ import { resolveSottoRequest } from '@/lib/sidedoor/access/core/request-identity
 import { validateSottoCredentialSelection } from '@/lib/sidedoor/credentials/config/credential-selection';
 import { onboardingSaveSchema } from '@/lib/validations';
 import { getOrCreateCurriculum } from '@/lib/curriculum-generator';
+import { createInitialCourse } from '@/lib/placement-course';
+import { acceptPlacementInTransaction } from '@/lib/placement/confirmation';
+import { readPlacementAnalysis } from '@/lib/placement/analysis';
+import { MaterialAnalysisConflict } from '@/lib/course-materials/analysis/inventory';
+import { normalizeCourseNote, setCourseNote } from '@/lib/course-notes';
 import { learningAiSetupSelection } from '@/lib/learning/ai/selection';
-import { setCourseNote } from '@/lib/course-notes';
 import { attachCourseMaterials } from '@/lib/course-materials';
 import { setSiteConfig } from '@/lib/site-config';
 import { invalidateServerInfra } from '@/lib/server-config';
@@ -90,6 +94,8 @@ export async function POST(request: NextRequest) {
     try {
       return await save(request);
     } catch (error) {
+      if (error instanceof MaterialAnalysisConflict)
+        return errorResponse(error.message, error.status);
       if (isAccessError(error) && error.code === 'conflict')
         return errorResponse(
           'Setup changed while this request was running. Reload setup and try again.',
@@ -105,10 +111,23 @@ async function save(request: NextRequest) {
   if (!authed) throw new AccessError('unauthorized');
   const parsed = onboardingSaveSchema.safeParse(await readAccessJson(request));
   if (!parsed.success) return errorResponse(parsed.error.issues[0].message, 400);
-  const { course, note, materialIds, preferred, infra, credentials, storageCredential } =
-    parsed.data;
+  const {
+    course,
+    note,
+    materialIds,
+    preferred,
+    infra,
+    credentials,
+    storageCredential,
+    placementAnalysis,
+  } = parsed.data;
   if (course.native === course.target)
     return errorResponse('Native and target languages must differ.', 400);
+  if (
+    placementAnalysis &&
+    (placementAnalysis.native !== course.native || placementAnalysis.target !== course.target)
+  )
+    return errorResponse('The accepted material analysis belongs to another language pair.', 400);
   if ((infra || storageCredential) && !authed.isOwner) throw new AccessError('forbidden');
   if (
     storageCredential &&
@@ -180,6 +199,22 @@ async function save(request: NextRequest) {
   }
   const expected = await sottoTransaction(prismaUnfiltered, async (database) => {
     await authorize(database);
+    if (placementAnalysis) {
+      const analysis = await readPlacementAnalysis(database, {
+        userId: authed.userId,
+        native: course.native,
+        target: course.target,
+        reference: placementAnalysis,
+        acceptPartial: placementAnalysis.acceptPartial,
+      });
+      if (
+        !analysis.result.inference ||
+        (course.level && course.level !== analysis.result.inference.level)
+      )
+        throw new MaterialAnalysisConflict(
+          'The selected starting level does not match the accepted source estimate.'
+        );
+    }
     return revisions(database);
   });
 
@@ -198,33 +233,6 @@ async function save(request: NextRequest) {
         'conflict',
         'Server configuration changed. Reload setup and try again.'
       );
-    const created = await database.course.upsert({
-      where: {
-        userId_nativeLang_targetLang: {
-          userId: current.userId,
-          nativeLang: course.native,
-          targetLang: course.target,
-        },
-      },
-      create: {
-        userId: current.userId,
-        nativeLang: course.native,
-        targetLang: course.target,
-        curriculumId: curriculum.id,
-        placementSource: 'MANUAL',
-        ...(course.level && { currentLevel: course.level, startLevel: course.level }),
-        ...(course.vocabularySupport !== undefined && {
-          vocabularySupport: course.vocabularySupport,
-        }),
-      },
-      update:
-        course.vocabularySupport !== undefined
-          ? { vocabularySupport: course.vocabularySupport }
-          : {},
-      select: { id: true },
-    });
-    if (note?.trim()) await setCourseNote(created.id, note, database);
-    await attachCourseMaterials(database, current.userId, created.id, materialIds ?? []);
     await database.user.update({
       where: { id: current.userId },
       data: {
@@ -253,7 +261,53 @@ async function save(request: NextRequest) {
       await getAutoModelConfig(database);
       await setAutoModelConfig({ model: modelUpdate }, current.userId, database);
     }
-    return created.id;
+    const execution = { userId: current.userId, authorize, signal: request.signal };
+    const createdId = placementAnalysis
+      ? (
+          await acceptPlacementInTransaction(
+            database,
+            execution,
+            { kind: 'SOURCE', input: placementAnalysis },
+            curriculum.id
+          )
+        ).courseId
+      : (
+          await createInitialCourse(
+            database,
+            {
+              userId: current.userId,
+              native: course.native,
+              target: course.target,
+              level: course.level ?? 'A1',
+              source: 'MANUAL',
+              curriculumId: curriculum.id,
+            },
+            execution
+          )
+        ).id;
+    if (course.vocabularySupport !== undefined)
+      await database.course.update({
+        where: { id: createdId },
+        data: { vocabularySupport: course.vocabularySupport },
+      });
+    if (note?.trim()) {
+      const currentNote = await database.courseNote.findUnique({ where: { courseId: createdId } });
+      if (currentNote?.body !== normalizeCourseNote(note)) {
+        if (
+          placementAnalysis &&
+          (await database.materialAnalysisSource.findFirst({
+            where: { analysisId: placementAnalysis.analysisId, kind: 'COURSE_NOTE' },
+            select: { id: true },
+          }))
+        )
+          throw new MaterialAnalysisConflict(
+            'The accepted analysis includes the current course note. Analyze a changed note before confirming it.'
+          );
+        await setCourseNote(createdId, note, database);
+      }
+    }
+    await attachCourseMaterials(database, current.userId, createdId, materialIds ?? []);
+    return createdId;
   });
   if (infra) invalidateServerInfra();
   return NextResponse.json({ demo: false, courseId });

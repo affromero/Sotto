@@ -1,0 +1,130 @@
+.root {
+  color: var(--color-text-primary);
+  border-top: 2px solid var(--color-primary);
+  padding: 1.25rem 0;
+}
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.header h3 {
+  font-family: var(--font-heading);
+  font-size: 1.65rem;
+  overflow-wrap: anywhere;
+}
+.kicker,
+.meta {
+  color: var(--color-text-secondary);
+  font-size: 0.82rem;
+}
+.kicker {
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.root p {
+  margin: 0.65rem 0;
+  overflow-wrap: anywhere;
+}
+.note {
+  color: var(--color-text-secondary);
+  font-size: 0.9rem;
+}
+.root button,
+.root a {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0.55rem 0.8rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.3rem;
+  color: var(--color-primary);
+  background: var(--color-surface);
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+.root button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+.root button:focus-visible,
+.root a:focus-visible,
+.root input:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin: 0.8rem 0;
+}
+.ledger {
+  list-style: none;
+  margin: 1rem 0;
+  padding: 0;
+}
+.ledger > li {
+  padding: 1.1rem 0;
+  border-top: 1px solid var(--color-border);
+}
+.pageHeading {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.pageHeading > span {
+  color: var(--color-text-secondary);
+}
+.pageText {
+  margin-top: 0.75rem;
+}
+.transcript {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  max-height: 28rem;
+  overflow: auto;
+  padding: 1rem;
+  background: var(--color-surface-nested);
+  border-left: 2px solid var(--color-primary);
+  font: inherit;
+}
+.recognition {
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-border);
+}
+.recognition h4 {
+  font-family: var(--font-heading);
+  font-size: 1.3rem;
+}
+.recognition > button {
+  margin: 0.65rem 0;
+}
+.consent {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 44px;
+  margin: 0.8rem 0;
+}
+.consent input {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+.error {
+  border-left: 3px solid var(--color-primary);
+  padding-left: 0.75rem;
+}
+@media (max-width: 480px) {
+  .actions > *,
+  .header > button {
+    width: 100%;
+    justify-content: center;
+  }
+}

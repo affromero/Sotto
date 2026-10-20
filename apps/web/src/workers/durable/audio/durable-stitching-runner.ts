@@ -1,4 +1,5 @@
 import { isDeepStrictEqual } from 'node:util';
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Job } from 'bullmq';
@@ -31,6 +32,7 @@ import { isMediaCleanupFailure, rethrowMediaInterruption } from '@/lib/audio/med
 import { withSottoJobExecution } from '@/lib/sidedoor/jobs/core/job-execution-lifetime';
 import { prepareStitchFailureEffects } from '@/lib/sidedoor/jobs/stitch/stitch-failure-effects';
 import { logger } from '@/lib/logger';
+import { publishLearningAudioIdentity } from '@/lib/learning-map/evidence/audio';
 import type { InitialStitchOutputs } from '@/lib/sidedoor/jobs/initial/initial-stitch-contract';
 import {
   readInitialStitchOutcome,
@@ -241,6 +243,7 @@ async function executeDurableStitching(
     return;
   }
   const audio = await readFile(outputPath, { signal });
+  const audioContentSha256 = createHash('sha256').update(audio).digest('hex');
   const audioFingerprint = await generateFingerprint(outputPath, signal).catch((error: unknown) => {
     rethrowMediaInterruption(error, signal);
     logger.warn('Failed to generate audio fingerprint', {
@@ -409,6 +412,13 @@ async function executeDurableStitching(
             activeStitchKey: null,
             activeStitchOwner: null,
           },
+        });
+        await publishLearningAudioIdentity(tx, {
+          episodeId: episode.id,
+          audioUrl,
+          contentSha256: audioContentSha256,
+          contentBytes: audio.length,
+          version,
         });
         await tx.pipelineEvent.create({
           data: {

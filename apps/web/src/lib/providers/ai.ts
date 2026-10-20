@@ -66,6 +66,8 @@ export interface AIOptions {
   onCleanupError?: (error: unknown) => void;
   onUsage?: (usage: TokenUsage) => void;
   maxTokens?: number;
+  /** Optional Codex protocol/final-answer byte ceiling; other providers do not consume it. */
+  maxOutputBytes?: number;
   temperature?: number;
   model?: string;
   skipModeration?: boolean;

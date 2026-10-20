@@ -40,8 +40,11 @@ class NativeUIActions(private val compose: ComposeTestRule) {
     fun visible(text: String, absent: Boolean = false) {
         try {
             compose.waitUntil(15_000) {
-                val nodes = compose.onAllNodesWithText(text, substring = false).fetchSemanticsNodes()
-                if (absent) nodes.isEmpty() else nodes.isNotEmpty()
+                val nodes = compose.onAllNodesWithText(text, substring = false)
+                    .fetchSemanticsNodes(atLeastOneRootRequired = false)
+                if (absent) nodes.isEmpty() && compose.onAllNodes(isRoot())
+                    .fetchSemanticsNodes(atLeastOneRootRequired = false).isNotEmpty()
+                else nodes.isNotEmpty()
             }
         } catch (error: ComposeTimeoutException) {
             throw AssertionError("Expected ${if (absent) "absent" else "visible"} text: $text\n${compose.onRoot().printToString()}", error)
@@ -50,12 +53,14 @@ class NativeUIActions(private val compose: ComposeTestRule) {
     }
     fun click(text: String, timeoutMillis: Long = 15_000) {
         val matcher = hasText(text) and hasClickAction() and isEnabled()
-        compose.waitUntil(timeoutMillis) { compose.onAllNodes(matcher).fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(timeoutMillis) { compose.onAllNodes(matcher)
+            .fetchSemanticsNodes(atLeastOneRootRequired = false).isNotEmpty() }
         compose.onAllNodes(matcher).onFirst().performScrollTo().assertIsDisplayed().performClick()
     }
     fun fill(label: String, text: String) {
         val matcher = hasText(label) and hasSetTextAction() and isEnabled()
-        compose.waitUntil(15_000) { compose.onAllNodes(matcher).fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(15_000) { compose.onAllNodes(matcher)
+            .fetchSemanticsNodes(atLeastOneRootRequired = false).isNotEmpty() }
         compose.onNode(matcher).performScrollTo().assertIsDisplayed().performTextReplacement(text)
         Espresso.closeSoftKeyboard()
     }

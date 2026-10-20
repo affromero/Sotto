@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ---- Hoisted mock handles ----
@@ -14,6 +15,12 @@ const mockReviewEventCreate = vi.fn();
 
 vi.mock('@/lib/prisma', () => {
   const database = {
+    course: {
+      findUnique: vi
+        .fn()
+        .mockResolvedValue({ nativeLang: 'en', targetLang: 'es', currentLevel: 'A1' }),
+    },
+    learningLevelBinding: { findMany: vi.fn().mockResolvedValue([]) },
     learnerReviewEvent: { create: (...args: unknown[]) => mockReviewEventCreate(...args) },
     learnerVocab: {
       upsert: (...args: unknown[]) => mockLearnerVocabUpsert(...args),
@@ -385,6 +392,29 @@ describe('getDueItems', () => {
 
     expect(result.vocab).toEqual([]);
     expect(result.grammar).toEqual([]);
+  });
+
+  it('reads lexical review from the supplied transaction while retaining the qualified objective projection', async () => {
+    const transaction = {
+      ...prismaUnfiltered,
+      learnerVocab: {
+        ...prismaUnfiltered.learnerVocab,
+        findMany: vi
+          .fn()
+          .mockResolvedValue([makeFreshVocabRow({ id: 'owned-transaction-word', lemma: 'hola' })]),
+      },
+      learnerGrammar: {
+        ...prismaUnfiltered.learnerGrammar,
+        findMany: vi.fn().mockResolvedValue([]),
+      },
+      learnerFocusTarget: {
+        ...prismaUnfiltered.learnerFocusTarget,
+        findMany: vi.fn().mockResolvedValue([]),
+      },
+    };
+    const result = await getDueItems('course-1', 8, transaction);
+    expect(result.vocab.map((item) => item.id)).toEqual(['owned-transaction-word']);
+    expect(result.objectives).toEqual([]);
   });
 
   it('passes the limit to the findMany take option', async () => {

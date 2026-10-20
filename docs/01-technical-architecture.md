@@ -1,6 +1,6 @@
 # Technical Architecture - Sotto
 
-> **Date**: 2026-06-13
+> **Date**: 2026-10-20
 >
 > **Diagrams**: [07-architecture-diagrams.md](./07-architecture-diagrams.md) renders every flow below as Mermaid.
 >
@@ -76,20 +76,23 @@ fingerprint of the resolved provider, model, voice, language, and text.
 
 The active data model is learner and course oriented. Important groups:
 
-| Group               | Models                                                                                              |
-| ------------------- | --------------------------------------------------------------------------------------------------- |
-| Identity            | `User`, `ApiKey`, `PairingToken` (single-learner build; no NextAuth `Account`/`Session`)            |
-| Curriculum          | `Curriculum`, `Lesson`, `CefrLevel`, `PedagogyStyle`                                                |
-| Enrollment          | `Course`, `CourseNote`, `PlacementResult`                                                           |
-| Classes             | `CourseClass`, `ClassSection`, `LessonQuestion`, `ClassSubmission`, `SectionAnswer`                 |
-| Speaking            | `SpeakingPrompt`, `SpeakingRecording`, `SpeakingGradeStatus`                                        |
-| Writing             | `WritingPrompt`, `WritingResponse`                                                                  |
-| Practice            | `PracticeSession`, `PracticeKind`, `PracticeStatus`                                                 |
-| Mock exams          | `MockExam`, `ExamSection`, `ExamQuestion`, `ExamSubmission`, `ExamSectionResult`, `ExamInstitution` |
-| Memory graph        | `LearnerVocab`, `LearnerGrammar`, `VocabEdge`, `EdgeType`                                           |
-| Reused audio engine | `Episode`, `EpisodeSegment`, `EpisodeVersion`, interaction/reference models used by listening audio |
-| Shared platform     | Sidedoor credentials, model config, provider settings, storage config, access policy                |
-| Operations          | queue/job metadata, reports, audit/admin records, usage and cost records                            |
+| Group               | Models                                                                                                                                |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Identity            | `User`, `ApiKey`, `PairingToken` (single-learner build; no NextAuth `Account`/`Session`)                                              |
+| Curriculum          | `Curriculum`, `Lesson`, `CefrLevel`, `PedagogyStyle`                                                                                  |
+| Enrollment          | `Course`, `CourseNote`, `PlacementResult`                                                                                             |
+| Classes             | `CourseClass`, `ClassSection`, `LessonQuestion`, `ClassSubmission`, `SectionAnswer`                                                   |
+| Speaking            | `SpeakingPrompt`, `SpeakingRecording`, `SpeakingGradeStatus`                                                                          |
+| Writing             | `WritingPrompt`, `WritingResponse`                                                                                                    |
+| Practice            | `PracticeSession`, `PracticeKind`, `PracticeStatus`                                                                                   |
+| Mock exams          | `MockExam`, `ExamSection`, `ExamQuestion`, `ExamSubmission`, `ExamSectionResult`, `ExamInstitution`                                   |
+| Memory graph        | `LearnerVocab`, `LearnerGrammar`, `VocabEdge`, `EdgeType`                                                                             |
+| Learning map        | `LearningMapRevision`, `LearningNodeIdentity`, `LearningLevelBinding`, `LearningObservation`, `LearningLevelCompletion`               |
+| Source materials    | `CourseMaterial`, upload batch/part receipts, extraction/page/chunk ledgers, recognition and analysis receipts, `MaterialSourceFocus` |
+| Retained placement  | `PlacementSession`, `PlacementConfirmationReceipt`                                                                                    |
+| Reused audio engine | `Episode`, `EpisodeSegment`, `EpisodeVersion`, interaction/reference models used by listening audio                                   |
+| Shared platform     | Sidedoor credentials, model config, provider settings, storage config, access policy                                                  |
+| Operations          | queue/job metadata, reports, audit/admin records, usage and cost records                                                              |
 
 `Episode` is the audio engine the listening skill reuses — script generation, verification, TTS, stitching, playback, and references — backing listening sections, listening practice, and exam listening.
 
@@ -107,7 +110,14 @@ authenticateRequest()        # Bearer sk_sotto_... first, then the local session
   -> return NextResponse.json()
 ```
 
-Most `/api/v1` routes authenticate with `authenticateRequest()`, which accepts a Bearer `sk_sotto_` API key first — used by the `sotto` CLI, local agents, and connected devices — and falls back to the web session. In the single-learner build `auth()` resolves to the local owner without session verification, so the API trusts the local owner by construction: a remotely exposed instance must be gated at the proxy/deploy layer, and admin-only routes resolve the authenticated user's role with `isUserAdmin(userId)` rather than the ambient session.
+Most `/api/v1` routes authenticate with `authenticateRequest()`. A supplied
+Authorization header is exclusive: an invalid device key cannot use browser
+cookies instead. Browser requests require the shared Sidedoor session and an
+active learner profile. Canonical execution guards recheck that identity inside
+mutating transactions. Upload and source clients can additionally assert the
+profile captured when work began with `x-sotto-expected-profile-id`. Admin-only
+routes require owner authorization. Course, source and generated work remain
+scoped to the active learner.
 
 Routes should not run LLM calls, TTS calls, transcription, video work, or audio stitching directly. They enqueue jobs or call narrow synchronous helpers only when the work is intentionally lightweight, such as scoring a writing response.
 
@@ -271,6 +281,71 @@ Do not describe meeting recap, news briefing, public feed, or bot workflow surfa
 
 ---
 
+### Learning map and level requirements
+
+`/learn/map?course=...` reads independent Situations and Grammar hierarchies.
+Groups organize precise assessable objectives. German A2, for example, includes
+"Choose als or wenn for past events" under Time relationships. The German B1
+tree has a separate objective for sequencing past events using nachdem.
+English, German, Spanish, French, Italian, Portuguese, Japanese, Korean and
+Chinese have language-specific catalogs across A1 through C2. Catalogs describe
+Sotto's published CEFR alignment and link their references.
+
+Catalog publication validates language ownership, hierarchy, exact criterion and
+per-skill rubric versions. A course pins its band's catalog and configured oral
+coverage. Later catalog publication preserves those pinned requirements. The
+upgrade API previews a newer catalog without rewriting earned evidence or
+replacing the current binding.
+
+Enabling oral providers later allows optional assessment in an exempt band.
+New attempts capture their own provider requirements. Optional evidence remains
+visible while the original completion exemptions and earned receipts stay
+unchanged. Queued classes and practice retain their captured audio requirements.
+
+Placement establishes the starting band. It creates no lower-band mastery.
+Class and practice submissions can contribute exact criterion-bound
+observations. Qualified tasks retain response, task fingerprint, skill,
+difficulty and source provenance. Reusing a task cannot manufacture additional
+independent tasks or sessions. Reading supplied text aloud does not establish
+independent communicative speaking. Source-only classes provide private feedback
+without canonical objective credit.
+
+The read projection shows assessment status and review due separately. It also
+lists every missing required objective. Explicit advancement locks the course,
+checks its pinned requirements and pending work, and records a replayable
+one-band completion receipt. Completing C2 keeps the course at C2. Reviewing a
+lower band preserves current level, active class and prior results. Sequential
+class selection stays within the current band.
+
+### Retained documents and paid work
+
+`SOTTO_PARTS` uploads use bounded checksum-verified parts and durable completion
+receipts. The original remains retained independently of editable notes. PDF
+extraction accounts for every page and preserves complete UTF-8 text in paged
+chunks. Embedded text and explicitly admitted visual recognition have distinct
+provenance. Unreadable, unsupported and unresolved pages remain visible in
+coverage. Analysis consumes the complete retained chunk inventory and records
+precise source focuses with verified citations. These focuses describe exposure.
+
+Recognition requires a reviewed exact provider/model capability. Recognition
+and analysis persist response receipts before parsing; retries can reuse saved
+responses without another provider call. Unknown provider outcomes stop further
+dispatch. Cancellation first fences future chunks, then verifies bounded cleanup
+proofs. An admitted remote request may finish; a cancellation request alone does
+not prove its outcome.
+
+Optional qpdf compression publishes a derivative only if all pages pass semantic
+verification of text, rendered pixels, geometry, rotation and annotations.
+Unsupported semantics or unknown parser warnings prevent publication. The
+original remains the default download.
+
+Web, iOS, TUI and MCP use the same owned API contracts and server gates. Browser
+resume records contain identities and hashes, with profile assertions on upload
+and source admission. Source bytes and pasted text are excluded from browser
+checkpoints. iOS stages protected file-backed uploads. Deletion uses canonical
+scope revocation and drain proofs for originals, derivatives and retained source
+receipts.
+
 ## 9. Classroom and Teacher-Mode Boundary
 
 The shipped data model supports isolated learner profiles on one self-hosted instance. That is enough for household switching and is the base for a future teacher-run mode, but it is not yet a homework or classroom-management system.
@@ -291,30 +366,39 @@ The design boundary is important: Sotto may capture practice evidence and sugges
 
 The current learning API surface is under `/api/v1`:
 
-| Endpoint                                           | Purpose                                                              |
-| -------------------------------------------------- | -------------------------------------------------------------------- |
-| `/api/v1/placement`                                | Generate and submit placement, then create a course                  |
-| `/api/v1/courses`                                  | List and create learner courses                                      |
-| `/api/v1/courses/[courseId]/next-class`            | Generate the next gated class, optionally from a source URL or topic |
-| `/api/v1/courses/[courseId]/graph`                 | Fetch memory graph vocabulary, grammar, and edges                    |
-| `/api/v1/courses/[courseId]/topics`                | Suggest sourced-class topics from learner interests                  |
-| `/api/v1/courses/[courseId]/notes`                 | Read and update course-scoped learner notes                          |
-| `/api/v1/courses/[courseId]/practice`              | Inspect due counts and start ungated practice                        |
-| `/api/v1/classes/[classId]`                        | Fetch or regenerate class sections                                   |
-| `/api/v1/classes/[classId]/submit`                 | Submit a class and advance on mastery                                |
-| `/api/v1/classes/[classId]/speaking/[promptId]`    | Upload a class speaking recording                                    |
-| `/api/v1/classes/[classId]/writing/[promptId]`     | Submit and score class writing                                       |
-| `/api/v1/classes/[classId]/worksheet`              | Fetch or generate worksheet PDF                                      |
-| `/api/v1/practice/[sessionId]/submit`              | Submit ungated practice and update SRS                               |
-| `/api/v1/practice/[sessionId]/speaking/[promptId]` | Upload/poll practice speaking                                        |
-| `/api/v1/practice/[sessionId]/writing/[promptId]`  | Submit and score practice writing                                    |
-| `/api/v1/exams`                                    | Start a mock exam                                                    |
-| `/api/v1/exams/[examId]`                           | Fetch exam sections                                                  |
-| `/api/v1/exams/[examId]/submit`                    | Submit and score exam answers                                        |
-| `/api/v1/exams/[examId]/speaking/[promptId]`       | Upload/poll exam speaking                                            |
-| `/api/v1/exams/[examId]/writing/[promptId]`        | Submit and score exam writing                                        |
-| `/api/v1/live-translate/token`                     | Mint a BYOK Google Live token without exposing the key               |
-| `/api/v1/live-translate/session`                   | Store live conversation transcript and extract vocabulary            |
+| Endpoint                                              | Purpose                                                                                        |
+| ----------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `/api/v1/placement/generate`                          | Admit a retained quiz with a request UUID; poll GET /placement by placementSessionId           |
+| `/api/v1/placement`                                   | Read retained questions or submit exact answers; preserve existing course levels               |
+| `/api/v1/courses`                                     | List and create learner courses                                                                |
+| `/api/v1/courses/[courseId]/next-class`               | Generate the next gated class, optionally from a source URL or topic                           |
+| `/api/v1/courses/[courseId]/graph`                    | Fetch memory graph vocabulary, grammar, and edges                                              |
+| `/api/v1/courses/[courseId]/topics`                   | Suggest sourced-class topics from learner interests                                            |
+| `/api/v1/courses/[courseId]/notes`                    | Read and update course-scoped learner notes                                                    |
+| `/api/v1/courses/[courseId]/practice`                 | Inspect due counts and start ungated practice                                                  |
+| `/api/v1/classes/[classId]`                           | Fetch or regenerate class sections                                                             |
+| `/api/v1/classes/[classId]/submit`                    | Submit a class and qualify assessment evidence within the current band                         |
+| `/api/v1/courses/[courseId]/learning-map`             | Read the hierarchy and requirements; optional level query selects a band                       |
+| `/api/v1/courses/[courseId]/learning-map/selection`   | Preview exact focused practice objectives and available formats                                |
+| `/api/v1/courses/[courseId]/learning-map/advance`     | Explicitly complete a cleared band using its observed level and catalog hash                   |
+| `/api/v1/courses/[courseId]/learning-map/upgrade`     | Preview bounded maintenance pages (GET cursor); apply missing bindings and lesson links (POST) |
+| `/api/v1/materials/uploads`                           | Read upload limits or reserve an original-file batch                                           |
+| `/api/v1/courses/[courseId]/material-analyses`        | Admit source analysis or page retained analyses with the after query                           |
+| `/api/v1/material-analyses/[analysisId]/cancellation` | Stop future analysis chunks and verify known outcomes in bounded pages                         |
+| `/api/v1/materials/[materialId]/legacy-text`          | Read older retained text through bounded offset and limit queries                              |
+| `/api/v1/classes/[classId]/speaking/[promptId]`       | Upload a class speaking recording                                                              |
+| `/api/v1/classes/[classId]/writing/[promptId]`        | Submit and score class writing                                                                 |
+| `/api/v1/classes/[classId]/worksheet`                 | Fetch or generate worksheet PDF                                                                |
+| `/api/v1/practice/[sessionId]/submit`                 | Submit ungated practice and update SRS                                                         |
+| `/api/v1/practice/[sessionId]/speaking/[promptId]`    | Upload/poll practice speaking                                                                  |
+| `/api/v1/practice/[sessionId]/writing/[promptId]`     | Submit and score practice writing                                                              |
+| `/api/v1/exams`                                       | Start a mock exam                                                                              |
+| `/api/v1/exams/[examId]`                              | Fetch exam sections                                                                            |
+| `/api/v1/exams/[examId]/submit`                       | Submit and score exam answers                                                                  |
+| `/api/v1/exams/[examId]/speaking/[promptId]`          | Upload/poll exam speaking                                                                      |
+| `/api/v1/exams/[examId]/writing/[promptId]`           | Submit and score exam writing                                                                  |
+| `/api/v1/live-translate/token`                        | Mint a BYOK Google Live token without exposing the key                                         |
+| `/api/v1/live-translate/session`                      | Store live conversation transcript and extract vocabulary                                      |
 
 Existing `/api/v1/episodes/*` routes may still be used by the reused audio engine and player components. They should not be documented as the primary product surface.
 

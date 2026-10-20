@@ -56,6 +56,7 @@ impl App {
             _ => return,
         };
         let client = Arc::clone(&self.client);
+        let selection = self.pending_selections.get(&request_id).cloned();
         self.dispatch(
             self.request_gen,
             async move {
@@ -64,7 +65,16 @@ impl App {
                         tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
                     }
                     if retry_admission && unknown {
-                        client.start_practice(&course_id, kind, request_id).await
+                        match selection {
+                            Some(selection) => {
+                                client
+                                    .start_selected_practice(
+                                        &course_id, kind, request_id, selection,
+                                    )
+                                    .await
+                            }
+                            None => client.start_practice(&course_id, kind, request_id).await,
+                        }
                     } else {
                         client.resume_practice(&request_id.to_string()).await
                     }

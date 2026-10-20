@@ -1,12 +1,23 @@
-// Zod schemas for the core /api/v1 endpoints the terminal client consumes.
-// Request schemas reuse the canonical web validators where one already exists;
-// response schemas are authored here to mirror the actual route behavior
-// (read against the routes + practice-service, not invented).
+// Zod contracts mirror canonical API routes, validators and practice services.
+// They are also used by the terminal client.
 import { z } from 'zod';
 import { vocabularyStudySessionSchema } from '../learning/vocabulary-study';
 import { readingVocabularySchema } from '../reading-vocabulary';
 import { skillRequirementsSchema } from '../learning-requirements';
+import { learningObjectiveMemorySchema } from '../learning-map/contracts';
+import { learningSkillSchema } from '../learning-map/catalog';
 import { classTeachingSchema } from './class-teaching';
+import {
+  placementSessionPublicSchema,
+  placementSubmitRequestSchema,
+  placementConfirmRequestSchema,
+  placementSourceRequestSchema,
+  placementSourceAdmissionSchema,
+} from '../placement/contracts';
+import {
+  learningSelectionRequestSchema,
+  learningSelectionSnapshotSchema,
+} from '../learning-map/selection';
 import {
   practicePreparingSchema,
   practiceReceiptSchema,
@@ -106,6 +117,7 @@ export const coursesListResponseSchema = z.object({
 // ---------------------------------------------------------------------------
 
 export const practiceRecentSessionSchema = z.object({
+  practiceLevel: cefrLevelSchema.nullable().optional(),
   id: z.string(),
   kind: practiceKindSchema,
   status: practiceStatusSchema,
@@ -115,7 +127,12 @@ export const practiceRecentSessionSchema = z.object({
 });
 
 export const practiceOverviewResponseSchema = z.object({
-  due: z.object({ vocab: z.number(), grammar: z.number() }),
+  due: z.object({
+    vocab: z.number(),
+    grammar: z.number(),
+    objectives: z.number().int().nonnegative().optional(),
+    bySkill: z.partialRecord(learningSkillSchema, z.number().int().nonnegative()).optional(),
+  }),
   totalVocab: z.number(),
   recent: z.array(practiceRecentSessionSchema),
 });
@@ -126,11 +143,14 @@ export const practiceOverviewResponseSchema = z.object({
 // apps/web/src/lib/practice-service.ts (discriminated on `status`).
 // ---------------------------------------------------------------------------
 
-export const startPracticeRequestSchema = z.object({
-  kind: practiceKindSchema,
-  focusTargetId: z.string().min(1).optional(),
-  requestId: z.uuid().optional(),
-});
+export const startPracticeRequestSchema = z
+  .object({
+    kind: practiceKindSchema,
+    focusTargetId: z.string().min(1).optional(),
+    requestId: z.uuid().optional(),
+    learningSelection: learningSelectionRequestSchema.optional(),
+  })
+  .strict();
 
 // Public projection of a multiple-choice item (toPublic drops the answer).
 export const practiceItemSchema = z.object({
@@ -141,6 +161,8 @@ export const practiceItemSchema = z.object({
 });
 
 export const practiceSpeakingPromptSchema = z.object({
+  taskMode: z.enum(['READ_ALOUD', 'COMMUNICATIVE']).optional(),
+  assessmentScope: z.enum(['PRIVATE_SOURCE', 'CANONICAL']).optional(),
   id: z.string(),
   targetPhrase: z.string(),
   translation: z.string(),
@@ -158,6 +180,8 @@ export const practiceWritingPromptSchema = z.object({
 });
 
 const learningProgressFields = {
+  practiceLevel: cefrLevelSchema.nullable().optional(),
+  learningSelection: learningSelectionSnapshotSchema.nullable().optional(),
   progressRevision: z.number().int().nonnegative().optional(),
   learnerAnswers: z.record(z.string(), z.number().int().min(0).max(3)).optional(),
   writingDrafts: z.record(z.string(), z.string()).optional(),
@@ -419,6 +443,8 @@ export const classQuestionSchema = z
   .loose();
 
 export const classSpeakingPromptSchema = z.object({
+  taskMode: z.enum(['READ_ALOUD', 'COMMUNICATIVE']).optional(),
+  assessmentScope: z.enum(['PRIVATE_SOURCE', 'CANONICAL']).optional(),
   id: z.string(),
   order: z.number().int(),
   targetPhrase: z.string(),
@@ -690,33 +716,20 @@ export const placementQuestionSchema = z.object({
   options: z.array(z.string()),
 });
 
-export const generatePlacementResponseSchema = z.object({
-  native: z.string(),
-  target: z.string(),
-  questions: z.array(placementQuestionSchema),
-});
+export const generatePlacementResponseSchema = placementSessionPublicSchema;
 
 // POST body: the answered questions for the (native, target) pair. selectedIndex
 // is 0..3 for a content option and 4 for the "I don't know" option; at least one
 // answer is required (`.min(1)`).
-export const submitPlacementRequestSchema = z.object({
-  native: z.string().length(2),
-  target: z.string().length(2),
-  answers: z
-    .array(
-      z.object({
-        id: z.string(),
-        selectedIndex: z.number().int().min(0).max(4),
-      })
-    )
-    .min(1),
-});
+export const submitPlacementRequestSchema = placementSubmitRequestSchema;
 
 export const submitPlacementResponseSchema = z.object({
   courseId: z.string(),
   level: cefrLevelSchema,
   // Per-skill ratios (0..1), keyed by skill name.
   scoreBySkill: z.record(z.string(), z.number()),
+  assessedLevel: cefrLevelSchema,
+  confirmationReceiptId: z.uuid(),
 });
 
 // ---------------------------------------------------------------------------
@@ -725,31 +738,18 @@ export const submitPlacementResponseSchema = z.object({
 // file uploads use a separate multipart route (not in the contract).
 // ---------------------------------------------------------------------------
 
-export const deduceFromNotesRequestSchema = z.object({
-  native: z.string().length(2),
-  target: z.string().length(2),
-  content: z.string().min(1),
-});
-
-export const deduceFromNotesResponseSchema = z.object({
-  native: z.string(),
-  target: z.string(),
-  deducedLevel: cefrLevelSchema,
-  rationale: z.string(),
-  confidence: z.number(),
-});
+export const deduceFromNotesRequestSchema = placementSourceRequestSchema;
+export const deduceFromNotesResponseSchema = placementSourceAdmissionSchema;
 
 // POST /api/v1/placement/from-notes/confirm — accept the deduced level, create
 // the course, and seed the note + vocabulary. Mirrors the confirm route.
-export const confirmFromNotesRequestSchema = z.object({
-  native: z.string().length(2),
-  target: z.string().length(2),
-});
+export const confirmFromNotesRequestSchema = placementConfirmRequestSchema;
 
 export const confirmFromNotesResponseSchema = z.object({
   courseId: z.string(),
   level: cefrLevelSchema,
   addedVocabulary: z.number(),
+  confirmationReceiptId: z.uuid(),
 });
 
 // ---------------------------------------------------------------------------
@@ -790,8 +790,8 @@ export const deleteCourseResponseSchema = z.object({
 // ---------------------------------------------------------------------------
 // GET /api/v1/courses/{courseId}/graph — the vocabulary/grammar memory graph.
 // Mirrors apps/web/src/lib/knowledge-graph.ts (getMemoryGraph). The route
-// returns exactly `{ nodes, edges }`; `.loose()` on the node tolerates any
-// extra fields a future projection adds.
+// returns legacy nodes/edges plus separate pinned objective projections.
+// `.loose()` on a legacy node tolerates additional display metadata.
 // ---------------------------------------------------------------------------
 
 export const memoryNodeSchema = z
@@ -818,6 +818,7 @@ export const memoryEdgeSchema = z
 
 export const memoryGraphResponseSchema = z
   .object({
+    objectives: z.array(learningObjectiveMemorySchema),
     nodes: z.array(memoryNodeSchema),
     edges: z.array(memoryEdgeSchema),
   })

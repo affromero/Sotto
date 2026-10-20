@@ -2,6 +2,7 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createHash, randomUUID } from 'node:crypto';
 import type { Worker } from 'bullmq';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PrismaClient } from '@/generated/prisma/client';
@@ -9,13 +10,29 @@ import type { AIOptions, AIResponse, ChatMessage } from '@/lib/providers/ai';
 import { getAiProviderMeta } from '@/lib/providers/ai-registry';
 import { createQueue, createWorker } from '@/lib/queue';
 import { closeRedis } from '@/lib/redis';
-import { importCourseMaterials, attachCourseMaterials } from '@/lib/course-materials';
+import {
+  importCourseMaterials,
+  attachCourseMaterials,
+  materialStorageScopes,
+} from '@/lib/course-materials';
+import { writeStorageReference } from '@/lib/sidedoor/storage/core/storage-write';
+import { requireOriginalSottoAdmission } from '@/lib/sidedoor/access/core/request-identity';
+import { prepareMaterialPageText } from '@/lib/course-materials/extraction/chunks';
+import {
+  initializeMaterialPages,
+  publishMaterialPageText,
+  finishMaterialExtraction,
+} from '@/lib/course-materials/extraction/persistence';
+import { canonicalVocabularySourceSchema } from '@/lib/vocabulary/source/snapshot';
+import { readMaterialTextRange } from '@/lib/course-materials/extraction/readers';
 import { authenticateRequest } from '@/lib/api-keys';
 import { sottoRequestExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import { requestMaterialVocabularyIndex } from '@/lib/vocabulary/index-admission';
 import { readDictionary } from '@/lib/vocabulary/dictionary';
 import { processVocabularyIndex } from '@/workers/vocabulary/index.worker';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
+import { durableQueueOperationId } from '@/lib/sidedoor/jobs/core/durable-queue';
+import { sottoJobOutbox } from '@/lib/sidedoor/jobs/core/job-delivery';
 import {
   vocabularyIndexPayloadSchema,
   vocabularyIndexOperationSchema,
@@ -101,6 +118,7 @@ suite('complete material vocabulary with durable source coverage', () => {
   let rejectLargeCoverage: boolean;
   let rejectMetadata: boolean;
   let beforeModel: (() => Promise<void>) | null;
+  let canonicalPhraseInventory: boolean;
   const queue = () => createQueue('vocabulary-index');
   const incoming = () =>
     new Request('http://localhost/api/v1/materials', {
@@ -197,6 +215,7 @@ suite('complete material vocabulary with durable source coverage', () => {
     rejectLargeCoverage = false;
     rejectMetadata = false;
     beforeModel = null;
+    canonicalPhraseInventory = false;
     await instance.seedAiCredential(identity.ownerId, 'openai', 'fixture-index-key');
     await instance.database.user.update({
       where: { id: identity.ownerId },
@@ -232,6 +251,12 @@ suite('complete material vocabulary with durable source coverage', () => {
       let result: unknown;
       if (body.name === 'source_vocabulary_inventory') {
         const words = payload.passageWords.flatMap((token: { surface: string }, index: number) => {
+          if (
+            canonicalPhraseInventory &&
+            token.surface === 'Fahrkarte' &&
+            payload.passageWords[index - 1]?.surface === 'Bahnhof'
+          )
+            return [];
           const gloss = meanings.get(token.surface);
           if (!gloss) return [];
           const start = payload.passageText.indexOf(
@@ -251,10 +276,18 @@ suite('complete material vocabulary with durable source coverage', () => {
             return [];
           return [
             {
-              lemma: token.surface,
-              gloss,
+              lemma:
+                canonicalPhraseInventory && token.surface === 'Bahnhof'
+                  ? 'Bahnhof Fahrkarte'
+                  : token.surface,
+              gloss:
+                canonicalPhraseInventory && token.surface === 'Bahnhof' ? 'station ticket' : gloss,
               pos: 'noun',
-              sourceSpan: { startWordIndex: index, endWordIndex: index },
+              sourceSpan: {
+                startWordIndex: index,
+                endWordIndex:
+                  canonicalPhraseInventory && token.surface === 'Bahnhof' ? index + 1 : index,
+              },
               questionIndices: [],
             },
           ];
@@ -385,10 +418,7 @@ suite('complete material vocabulary with durable source coverage', () => {
       new Set(entries.map(([lemma]) => lemma))
     );
     expect(
-      sources.every(
-        (source) =>
-          material.extractedText.slice(source.startOffset, source.endOffset) === source.quote
-      )
+      sources.every((source) => text.slice(source.startOffset, source.endOffset) === source.quote)
     ).toBe(true);
     expect(sources.some((source) => source.startOffset > 12000)).toBe(true);
     const count = requests.length;
@@ -399,6 +429,189 @@ suite('complete material vocabulary with durable source coverage', () => {
       status: 'COMPLETE',
     });
   }, 60000);
+
+  it.each([true, false])(
+    'indexes canonical retained text through the real worker with exact byte receipts and original coverage=%s',
+    async (complete) => {
+      canonicalPhraseInventory = true;
+      const text = '\uFEFF𠮷 Bahnhof\u0000 Fahrkarte\nWohnung = apartment';
+      const originalSha256 = createHash('sha256').update(text, 'utf8').digest('hex');
+      const id = randomUUID(),
+        createdAt = new Date();
+      const { request, actor } = await authority();
+      await instance.database.courseMaterial.create({
+        data: {
+          id,
+          userId: actor.userId,
+          name: 'Canonical Unicode source.txt',
+          mimeType: 'text/plain',
+          byteSize: Buffer.byteLength(text),
+          originalSha256,
+          extractedText: '',
+          createdAt,
+          processingStatus: 'RETAINED',
+        },
+      });
+      await writeStorageReference({
+        database: instance.database,
+        signal: request.signal,
+        prefix: `materials/${actor.userId}/${id}`,
+        extension: 'txt',
+        body: Buffer.from(text, 'utf8'),
+        contentType: 'text/plain',
+        previousReference: () => null,
+        captureAdmission: async (database) => {
+          await requireOriginalSottoAdmission(database, request, actor);
+          return {
+            ...(await materialStorageScopes(database, { id, userId: actor.userId, createdAt })),
+            consumer: `material:${id}:original`,
+            snapshot: null,
+          };
+        },
+        validateAdmission: async (database, captured, reference) => {
+          await requireOriginalSottoAdmission(database, request, actor);
+          const current = await materialStorageScopes(database, {
+            id,
+            userId: actor.userId,
+            createdAt,
+          });
+          if (
+            current.instanceId !== captured.instanceId ||
+            JSON.stringify(current.scopes) !== JSON.stringify(captured.scopes) ||
+            !(await database.courseMaterial.findFirst({
+              where: { id, userId: actor.userId, originalUrl: reference ?? null },
+            }))
+          )
+            throw new Error('Owned synthetic source changed.');
+        },
+        commit: async (database, originalUrl) => {
+          await database.courseMaterial.update({ where: { id }, data: { originalUrl } });
+        },
+      });
+      const run = await instance.database.materialExtractionRun.create({
+        data: {
+          materialId: id,
+          processingRevision: 1,
+          runKey: randomUUID(),
+          originalSha256,
+          extractorVersion: 'sotto-complete-utf8-extraction-1',
+          rendererVersion: 'NO_VISUAL_LAYER:1',
+          recognitionPolicy: { method: 'FIXTURE_COMPLETE_TEXT' },
+        },
+      });
+      const identity = {
+        userId: actor.userId,
+        materialId: id,
+        runId: run.id,
+        processingRevision: 1,
+        originalSha256,
+      };
+      const prepared = prepareMaterialPageText({
+        pageNumber: 1,
+        source: { origin: 'EMBEDDED_TEXT', method: 'FIXTURE_COMPLETE_TEXT', version: '1' },
+        text,
+      });
+      await sottoTransaction(instance.database, async (database) => {
+        await attachCourseMaterials(database, actor.userId, courseId, [id]);
+        expect(await database.materialVocabularyIndex.count({ where: { materialId: id } })).toBe(0);
+        await initializeMaterialPages(database, identity, 1);
+        await publishMaterialPageText(database, identity, prepared.manifest, prepared.chunks);
+        await database.materialPage.updateMany({
+          where: { runId: run.id },
+          data: {
+            visualCoverage: complete
+              ? {
+                  state: 'TEXT_SOURCE',
+                  originalSha256,
+                  diagnostic: 'Complete retained text fixture',
+                }
+              : { state: 'UNAVAILABLE', diagnostic: 'Original handwriting remains unresolved.' },
+          },
+        });
+        const coverage = await finishMaterialExtraction(database, identity);
+        expect(coverage.coverageComplete).toBe(complete);
+        expect(
+          await database.materialVocabularyIndex.count({ where: { materialId: id, protocol: 2 } })
+        ).toBe(1);
+        const pendingIndex = await database.materialVocabularyIndex.findFirstOrThrow({
+          where: { materialId: id },
+        });
+        const outbox = await sottoJobOutbox(database).read(
+          durableQueueOperationId(
+            'vocabulary-index',
+            `prepare-${pendingIndex.id}-${pendingIndex.generation}`
+          )
+        );
+        expect(outbox?.job.handler).toBe('vocabulary-index');
+      });
+      expect(requests).toEqual([]);
+      await startWorker();
+      await index(id);
+      await waitForIndex(id, complete ? 'COMPLETE' : 'NEEDS_TEXT');
+      const indexed = await instance.database.materialVocabularyIndex.findFirstOrThrow({
+        where: { materialId: id },
+      });
+      const snapshot = canonicalVocabularySourceSchema.parse(indexed.sourceSnapshot);
+      expect(snapshot.inventory.runId).toBe(run.id);
+      expect(snapshot.inventory.originalSha256).toBe(originalSha256);
+      expect(
+        await instance.database.$transaction((database) =>
+          readMaterialTextRange(database, snapshot.inventory, 0, snapshot.inventory.length)
+        )
+      ).toBe(`${text}\n`);
+      expect(
+        (await instance.database.courseMaterial.findUniqueOrThrow({ where: { id } })).extractedText
+      ).toBe('');
+      const chunks = await instance.database.vocabularyIndexChunk.findMany({
+        where: { indexId: indexed.id, status: 'COMPLETE' },
+      });
+      expect(chunks.length).toBeGreaterThan(0);
+      expect(chunks.every((chunk) => chunk.resultBytes !== null && chunk.result === null)).toBe(
+        true
+      );
+      expect(
+        chunks
+          .flatMap((chunk) => JSON.parse(Buffer.from(chunk.resultBytes!).toString('utf8')))
+          .some((word: { sourceForm: string }) => word.sourceForm === 'Bahnhof\u0000 Fahrkarte')
+      ).toBe(true);
+      const sources = await instance.database.vocabularySourceOccurrence.findMany({
+        where: { materialId: id },
+        include: { word: true },
+      });
+      const phrase = sources.find((source) => source.word.lemma === 'Bahnhof Fahrkarte');
+      expect(phrase).toBeDefined();
+      expect(phrase!.quote).toBeNull();
+      expect(Buffer.from(phrase!.quoteBytes!).toString('utf8')).toBe('Bahnhof\u0000 Fahrkarte');
+      const pointStart = [...text.slice(0, text.indexOf('Bahnhof'))].length;
+      expect(phrase!.startOffset).toBe(pointStart);
+      expect(phrase!.startOffset).not.toBe(text.indexOf('Bahnhof'));
+      expect([...`${text}\n`].slice(phrase!.startOffset, phrase!.endOffset).join('')).toBe(
+        'Bahnhof\u0000 Fahrkarte'
+      );
+      expect(
+        sources.every(
+          (source) =>
+            source.word.mastery === 0 &&
+            source.word.reps === 0 &&
+            source.word.lastReviewed === null &&
+            source.word.introducedAt === null
+        )
+      ).toBe(true);
+      expect(await instance.database.learningObservation.count({ where: { courseId } })).toBe(0);
+      expect(await instance.database.learnerReviewEvent.count({ where: { courseId } })).toBe(0);
+      expect(requests).toContain('source_vocabulary_inventory');
+      expect(requests).toContain('source_inventory_coverage');
+      const dictionary = await readDictionary(courseId, actor.userId, {});
+      expect(dictionary.materials[0]!.status).toBe(complete ? 'COMPLETE' : 'NEEDS_TEXT');
+      expect(
+        dictionary.words.find((word) => word.lemma === 'Bahnhof Fahrkarte')?.sources[0]
+      ).toMatchObject({
+        quote: 'Bahnhof\u0000 Fahrkarte',
+        coordinateSystem: 'MATERIAL_CODEPOINTS',
+      });
+    },
+    60000
+  );
 
   it('creates an atomic indexing intent only when staged material is attached and retains multiple source origins', async () => {
     const first = await upload('Bahnhof = station', false);

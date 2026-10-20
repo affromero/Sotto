@@ -23,6 +23,35 @@ import {
   vocabularyAudioResponseSchema,
 } from '../src/learning/dictionary';
 import {
+  applyLearningUpgradeRequestSchema,
+  learningUpgradeReportSchema,
+  learningUpgradeCoursesSchema,
+} from '../src/learning-map/upgrade';
+import { courseNotesPageSchema, legacyMaterialTextSchema } from '../src/course-materials/legacy';
+import {
+  learningMapResponseSchema,
+  advanceLearningLevelSchema,
+  learningLevelCompletionSchema,
+  learningSelectionPreviewSchema,
+  learningObjectiveMemorySchema,
+  learningObjectiveDetailSchema,
+  learningObjectiveHistorySchema,
+} from '../src/learning-map/contracts';
+import { courseAnalysisListSchema, sourceFocusDetailSchema } from '../src/learning-map/library';
+import { learningSelectionRequestSchema } from '../src/learning-map/selection';
+import {
+  placementGenerateRequestSchema,
+  placementSourceStatusSchema,
+} from '../src/placement/contracts';
+import {
+  materialFocusAnalysisRetryRequestSchema,
+  materialFocusAnalysisRetryResponseSchema,
+} from '../src/course-materials/analysis';
+import {
+  materialAnalysisCancellationRequestSchema,
+  materialAnalysisCancellationResponseSchema,
+} from '../src/course-materials/cancellation';
+import {
   pencilHomeworkRequestSchema,
   pencilHomeworkResponseSchema,
 } from '../src/contracts/pencil-homework';
@@ -144,6 +173,23 @@ const startPracticeVariants: Record<string, string> = {
 // pointers instead of being inlined — this keeps the document DRY and gives the
 // Rust codegen clean, named types. Order is irrelevant; refs resolve by id.
 const namedSchemas: Record<string, z.ZodType> = {
+  ApplyLearningUpgradeRequest: applyLearningUpgradeRequestSchema,
+  LearningUpgradeReport: learningUpgradeReportSchema,
+  LearningUpgradeCourses: learningUpgradeCoursesSchema,
+  CourseNotesPage: courseNotesPageSchema,
+  LegacyMaterialText: legacyMaterialTextSchema,
+  LearningMapResponse: learningMapResponseSchema,
+  AdvanceLearningLevelRequest: advanceLearningLevelSchema,
+  LearningLevelCompletion: learningLevelCompletionSchema,
+  LearningSelectionPreview: learningSelectionPreviewSchema,
+  LearningSelectionRequest: learningSelectionRequestSchema,
+  LearningObjectiveMemory: learningObjectiveMemorySchema,
+  LearningObjectiveDetail: learningObjectiveDetailSchema,
+  LearningObjectiveHistory: learningObjectiveHistorySchema,
+  CourseAnalysisList: courseAnalysisListSchema,
+  SourceFocusDetail: sourceFocusDetailSchema,
+  AdmitPlacementRequest: placementGenerateRequestSchema,
+  MaterialAnalysisStatusResponse: placementSourceStatusSchema,
   DictionaryResponse: dictionaryResponseSchema,
   DictionaryMeaningRequest: dictionaryMeaningSchema,
   DictionaryMeaningResponse: dictionaryMeaningResponseSchema,
@@ -160,6 +206,10 @@ const namedSchemas: Record<string, z.ZodType> = {
   LearningProgressRequest: learningProgressRequestSchema,
   LearningProgressResponse: learningProgressResponseSchema,
   PracticeGenerationAction: practiceGenerationActionSchema,
+  MaterialAnalysisRetryRequest: materialFocusAnalysisRetryRequestSchema,
+  MaterialAnalysisRetryResponse: materialFocusAnalysisRetryResponseSchema,
+  MaterialAnalysisCancellationRequest: materialAnalysisCancellationRequestSchema,
+  MaterialAnalysisCancellationResponse: materialAnalysisCancellationResponseSchema,
   CefrLevel: cefrLevelSchema,
   PracticeKind: practiceKindSchema,
   PracticeStatus: practiceStatusSchema,
