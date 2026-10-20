@@ -16,6 +16,8 @@ const PIPELINE_WORKERS = new Set([
   'material-finalization',
   'material-extraction',
   'material-optimization',
+  'material-analysis',
+  'placement-generation',
   'class-preparation',
   'practice-preparation',
   'content-extraction',

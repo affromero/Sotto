@@ -14,6 +14,196 @@
       }
     },
     "schemas": {
+      "AdmitPlacementRequest": {
+        "type": "object",
+        "properties": {
+          "schemaVersion": {
+            "default": 1,
+            "type": "number",
+            "enum": [1]
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "native": {
+            "type": "string",
+            "pattern": "^[a-z]{2}$"
+          },
+          "target": {
+            "type": "string",
+            "pattern": "^[a-z]{2}$"
+          },
+          "analysisId": {
+            "default": null,
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+            "nullable": true
+          },
+          "analysisRevision": {
+            "default": null,
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "maximum": 9007199254740991,
+            "nullable": true
+          },
+          "resultDigest": {
+            "default": null,
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "nullable": true
+          },
+          "acceptPartial": {
+            "default": false,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "requestId",
+          "native",
+          "target",
+          "analysisId",
+          "analysisRevision",
+          "resultDigest",
+          "acceptPartial"
+        ],
+        "additionalProperties": false
+      },
+      "MaterialAnalysisStatusResponse": {
+        "type": "object",
+        "properties": {
+          "analysisId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "analysisRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "maximum": 9007199254740991
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "WAITING_SOURCE",
+              "RUNNING",
+              "COMPLETE",
+              "PARTIAL",
+              "INSUFFICIENT_SOURCE",
+              "RECOVERY_REQUIRED",
+              "FAILED",
+              "CANCELLED"
+            ]
+          },
+          "identityDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "nullable": true
+          },
+          "resultDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "nullable": true
+          },
+          "statusUrl": {
+            "type": "string",
+            "minLength": 1
+          },
+          "native": {
+            "type": "string",
+            "pattern": "^[a-z]{2}$"
+          },
+          "target": {
+            "type": "string",
+            "pattern": "^[a-z]{2}$"
+          },
+          "stale": {
+            "type": "boolean"
+          },
+          "summary": {
+            "type": "object",
+            "properties": {
+              "inference": {
+                "type": "object",
+                "properties": {
+                  "level": {
+                    "type": "string",
+                    "enum": ["A1", "A2", "B1", "B2", "C1", "C2"]
+                  },
+                  "confidence": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "rationale": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4000
+                  },
+                  "levelRange": {
+                    "type": "object",
+                    "properties": {
+                      "from": {
+                        "type": "string",
+                        "enum": ["A1", "A2", "B1", "B2", "C1", "C2"]
+                      },
+                      "to": {
+                        "type": "string",
+                        "enum": ["A1", "A2", "B1", "B2", "C1", "C2"]
+                      }
+                    },
+                    "required": ["from", "to"],
+                    "additionalProperties": false
+                  },
+                  "source": {
+                    "type": "string",
+                    "enum": ["MATERIAL_FOCUS_INFERENCE"]
+                  },
+                  "originalContentComplete": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "level",
+                  "confidence",
+                  "rationale",
+                  "levelRange",
+                  "source",
+                  "originalContentComplete"
+                ],
+                "additionalProperties": false,
+                "nullable": true
+              }
+            },
+            "required": ["inference"],
+            "additionalProperties": {},
+            "nullable": true
+          },
+          "failureReason": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "analysisId",
+          "analysisRevision",
+          "status",
+          "identityDigest",
+          "resultDigest",
+          "statusUrl",
+          "native",
+          "target",
+          "stale",
+          "summary",
+          "failureReason"
+        ],
+        "additionalProperties": {}
+      },
       "PencilHomeworkRequest": {
         "type": "object",
         "properties": {
@@ -283,6 +473,135 @@
           }
         },
         "required": ["action"],
+        "additionalProperties": false
+      },
+      "MaterialAnalysisRetryRequest": {
+        "type": "object",
+        "properties": {
+          "schemaVersion": {
+            "type": "number",
+            "enum": [1]
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "analysisRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "maximum": 9007199254740991
+          },
+          "identityDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "nullable": true
+          },
+          "resultDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "nullable": true
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "requestId",
+          "analysisRevision",
+          "identityDigest",
+          "resultDigest"
+        ],
+        "additionalProperties": false
+      },
+      "MaterialAnalysisRetryResponse": {
+        "type": "object",
+        "properties": {
+          "analysisId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "analysisRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "maximum": 9007199254740991
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "WAITING_SOURCE",
+              "RUNNING",
+              "COMPLETE",
+              "PARTIAL",
+              "INSUFFICIENT_SOURCE",
+              "RECOVERY_REQUIRED",
+              "FAILED",
+              "CANCELLED"
+            ]
+          },
+          "identityDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "nullable": true
+          },
+          "resultDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "nullable": true
+          },
+          "statusUrl": {
+            "type": "string",
+            "minLength": 1
+          },
+          "retryOfAnalysisId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "counts": {
+            "type": "object",
+            "properties": {
+              "inherited": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "analyzed": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "offlineReplay": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "failed": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "unstarted": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": ["inherited", "analyzed", "offlineReplay", "failed", "unstarted"],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "analysisId",
+          "analysisRevision",
+          "status",
+          "identityDigest",
+          "resultDigest",
+          "statusUrl",
+          "retryOfAnalysisId",
+          "counts"
+        ],
         "additionalProperties": false
       },
       "CefrLevel": {
@@ -3925,42 +4244,176 @@
         "type": "object",
         "properties": {
           "native": {
-            "type": "string"
+            "type": "string",
+            "pattern": "^[a-z]{2}$"
           },
           "target": {
+            "type": "string",
+            "pattern": "^[a-z]{2}$"
+          },
+          "placementSessionId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "GENERATING",
+              "DISPATCHING",
+              "SUCCEEDED",
+              "READY",
+              "FAILED",
+              "OUTPUT_INVALID",
+              "RECOVERY_REQUIRED",
+              "EXPIRED",
+              "ACCEPTED"
+            ]
+          },
+          "questionsDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "analysisId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+            "nullable": true
+          },
+          "analysisRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "maximum": 9007199254740991,
+            "nullable": true
+          },
+          "resultDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "nullable": true
+          },
+          "expiresAt": {
             "type": "string"
+          },
+          "failureReason": {
+            "type": "string",
+            "nullable": true
           },
           "questions": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PlacementQuestion"
-            }
-          }
-        },
-        "required": ["native", "target", "questions"],
-        "additionalProperties": false
-      },
-      "SubmitPlacementRequest": {
-        "type": "object",
-        "properties": {
-          "native": {
-            "type": "string",
-            "minLength": 2,
-            "maxLength": 2
-          },
-          "target": {
-            "type": "string",
-            "minLength": 2,
-            "maxLength": 2
-          },
-          "answers": {
-            "minItems": 1,
+            "maxItems": 24,
             "type": "array",
             "items": {
               "type": "object",
               "properties": {
                 "id": {
                   "type": "string"
+                },
+                "cefr": {
+                  "type": "string",
+                  "enum": ["A1", "A2", "B1", "B2", "C1", "C2"]
+                },
+                "skill": {
+                  "type": "string",
+                  "enum": ["grammar", "vocab", "reading"]
+                },
+                "prompt": {
+                  "type": "string"
+                },
+                "options": {
+                  "minItems": 5,
+                  "maxItems": 5,
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": ["id", "cefr", "skill", "prompt", "options"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "native",
+          "target",
+          "placementSessionId",
+          "status",
+          "questionsDigest",
+          "analysisId",
+          "analysisRevision",
+          "resultDigest",
+          "expiresAt",
+          "failureReason",
+          "questions"
+        ],
+        "additionalProperties": false
+      },
+      "SubmitPlacementRequest": {
+        "type": "object",
+        "properties": {
+          "schemaVersion": {
+            "default": 1,
+            "type": "number",
+            "enum": [1]
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "native": {
+            "type": "string",
+            "pattern": "^[a-z]{2}$"
+          },
+          "target": {
+            "type": "string",
+            "pattern": "^[a-z]{2}$"
+          },
+          "analysisId": {
+            "default": null,
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+            "nullable": true
+          },
+          "analysisRevision": {
+            "default": null,
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "maximum": 9007199254740991,
+            "nullable": true
+          },
+          "resultDigest": {
+            "default": null,
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "nullable": true
+          },
+          "placementSessionId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "questionsDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "acceptPartial": {
+            "default": false,
+            "type": "boolean"
+          },
+          "answers": {
+            "minItems": 6,
+            "maxItems": 24,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "pattern": "^pq_\\d+$"
                 },
                 "selectedIndex": {
                   "type": "integer",
@@ -3973,7 +4426,19 @@
             }
           }
         },
-        "required": ["native", "target", "answers"],
+        "required": [
+          "schemaVersion",
+          "requestId",
+          "native",
+          "target",
+          "analysisId",
+          "analysisRevision",
+          "resultDigest",
+          "placementSessionId",
+          "questionsDigest",
+          "acceptPartial",
+          "answers"
+        ],
         "additionalProperties": false
       },
       "SubmitPlacementResponse": {
@@ -3990,69 +4455,173 @@
             "additionalProperties": {
               "type": "number"
             }
+          },
+          "assessedLevel": {
+            "$ref": "#/components/schemas/CefrLevel"
+          },
+          "confirmationReceiptId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
           }
         },
-        "required": ["courseId", "level", "scoreBySkill"],
+        "required": ["courseId", "level", "scoreBySkill", "assessedLevel", "confirmationReceiptId"],
         "additionalProperties": false
       },
       "DeduceFromNotesRequest": {
         "type": "object",
         "properties": {
+          "schemaVersion": {
+            "type": "number",
+            "enum": [1]
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
           "native": {
             "type": "string",
-            "minLength": 2,
-            "maxLength": 2
+            "pattern": "^[a-z]{2}$"
           },
           "target": {
             "type": "string",
-            "minLength": 2,
-            "maxLength": 2
+            "pattern": "^[a-z]{2}$"
+          },
+          "materialIds": {
+            "default": [],
+            "maxItems": 10,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
           },
           "content": {
+            "default": "",
             "type": "string",
-            "minLength": 1
+            "maxLength": 20000
+          },
+          "includeCourseNote": {
+            "default": false,
+            "type": "boolean"
           }
         },
-        "required": ["native", "target", "content"],
+        "required": [
+          "schemaVersion",
+          "requestId",
+          "native",
+          "target",
+          "materialIds",
+          "content",
+          "includeCourseNote"
+        ],
         "additionalProperties": false
       },
       "DeduceFromNotesResponse": {
         "type": "object",
         "properties": {
-          "native": {
-            "type": "string"
+          "analysisId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
           },
-          "target": {
-            "type": "string"
+          "analysisRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "maximum": 9007199254740991
           },
-          "deducedLevel": {
-            "$ref": "#/components/schemas/CefrLevel"
+          "status": {
+            "type": "string",
+            "enum": [
+              "WAITING_SOURCE",
+              "RUNNING",
+              "COMPLETE",
+              "PARTIAL",
+              "INSUFFICIENT_SOURCE",
+              "RECOVERY_REQUIRED",
+              "FAILED",
+              "CANCELLED"
+            ]
           },
-          "rationale": {
-            "type": "string"
+          "identityDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "nullable": true
           },
-          "confidence": {
-            "type": "number"
+          "resultDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "nullable": true
+          },
+          "statusUrl": {
+            "type": "string",
+            "minLength": 1
           }
         },
-        "required": ["native", "target", "deducedLevel", "rationale", "confidence"],
+        "required": [
+          "analysisId",
+          "analysisRevision",
+          "status",
+          "identityDigest",
+          "resultDigest",
+          "statusUrl"
+        ],
         "additionalProperties": false
       },
       "ConfirmFromNotesRequest": {
         "type": "object",
         "properties": {
+          "schemaVersion": {
+            "default": 1,
+            "type": "number",
+            "enum": [1]
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
           "native": {
             "type": "string",
-            "minLength": 2,
-            "maxLength": 2
+            "pattern": "^[a-z]{2}$"
           },
           "target": {
             "type": "string",
-            "minLength": 2,
-            "maxLength": 2
+            "pattern": "^[a-z]{2}$"
+          },
+          "analysisId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "analysisRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "maximum": 9007199254740991
+          },
+          "resultDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "acceptPartial": {
+            "default": false,
+            "type": "boolean"
           }
         },
-        "required": ["native", "target"],
+        "required": [
+          "schemaVersion",
+          "requestId",
+          "native",
+          "target",
+          "analysisId",
+          "analysisRevision",
+          "resultDigest",
+          "acceptPartial"
+        ],
         "additionalProperties": false
       },
       "ConfirmFromNotesResponse": {
@@ -4066,9 +4635,14 @@
           },
           "addedVocabulary": {
             "type": "number"
+          },
+          "confirmationReceiptId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
           }
         },
-        "required": ["courseId", "level", "addedVocabulary"],
+        "required": ["courseId", "level", "addedVocabulary", "confirmationReceiptId"],
         "additionalProperties": false
       },
       "ManualPlacementRequest": {
@@ -5331,9 +5905,19 @@
     "/api/v1/placement": {
       "get": {
         "operationId": "generatePlacement",
-        "summary": "Generate an adaptive placement batch for a native/target pair.",
+        "summary": "Admit or poll an immutable private placement session.",
         "responses": {
           "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GeneratePlacementResponse"
+                }
+              }
+            }
+          },
+          "202": {
             "description": "Success",
             "content": {
               "application/json": {
@@ -5348,7 +5932,7 @@
           {
             "name": "native",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -5356,13 +5940,53 @@
           {
             "name": "target",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string"
             }
           },
           {
-            "name": "focusLevel",
+            "name": "requestId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "placementSessionId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "analysisId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "analysisRevision",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "resultDigest",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "acceptPartial",
             "in": "query",
             "required": false,
             "schema": {
@@ -5378,7 +6002,7 @@
       },
       "post": {
         "operationId": "submitPlacement",
-        "summary": "Submit placement answers; assign a CEFR level and create the course.",
+        "summary": "Accept exact preserved diagnostic answers without advancing an existing course.",
         "responses": {
           "200": {
             "description": "Success",
@@ -5408,12 +6032,65 @@
         ]
       }
     },
+    "/api/v1/placement/generate": {
+      "post": {
+        "operationId": "admitPlacement",
+        "summary": "Admit an immutable private placement quiz.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GeneratePlacementResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GeneratePlacementResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdmitPlacementRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
     "/api/v1/placement/from-notes": {
       "post": {
         "operationId": "deducePlacementFromNotes",
-        "summary": "Deduce a CEFR level from pasted materials (creates no course).",
+        "summary": "Admit complete retained-source analysis for placement.",
         "responses": {
           "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeduceFromNotesResponse"
+                }
+              }
+            }
+          },
+          "202": {
             "description": "Success",
             "content": {
               "application/json": {
@@ -5444,7 +6121,7 @@
     "/api/v1/placement/from-notes/confirm": {
       "post": {
         "operationId": "confirmPlacementFromNotes",
-        "summary": "Accept the deduced level; create the course and seed note + vocab.",
+        "summary": "Accept an exact source-analysis receipt and attach retained materials atomically.",
         "responses": {
           "201": {
             "description": "Success",
@@ -5474,10 +6151,96 @@
         ]
       }
     },
+    "/api/v1/material-analyses/{analysisId}": {
+      "get": {
+        "operationId": "getMaterialAnalysis",
+        "summary": "Read the owned source analysis, exact revision and placement inference.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MaterialAnalysisStatusResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "analysisId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/material-analyses/{analysisId}/retry": {
+      "post": {
+        "operationId": "retryMaterialAnalysis",
+        "summary": "Explicitly fork recoverable source analysis while retaining successful immutable work.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MaterialAnalysisRetryResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MaterialAnalysisRetryResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "analysisId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MaterialAnalysisRetryRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
     "/api/v1/placement/manual": {
       "post": {
         "operationId": "manualPlacement",
-        "summary": "Declare a CEFR level manually; create the course or raise to it.",
+        "summary": "Declare an initial CEFR level while preserving an existing course level.",
         "responses": {
           "201": {
             "description": "Success",

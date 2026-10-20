@@ -473,6 +473,13 @@ suite('Atomic onboarding with shared authority', () => {
       preferredLanguage: 'de',
       preferredAiModel: 'local:test-model',
     });
+    expect(
+      await instance.database.learningLevelBinding.findUniqueOrThrow({
+        where: { courseId_level: { courseId, level: 'B1' } },
+      })
+    ).toMatchObject({ coverage: { level: 'B1', scope: 'CLASS' } });
+    expect(await instance.database.learningObservation.count()).toBe(0);
+    expect(await instance.database.learningLevelCompletion.count()).toBe(0);
     await instance.database.course.update({
       where: { id: courseId },
       data: { currentLevel: 'C1' },
@@ -491,6 +498,38 @@ suite('Atomic onboarding with shared authority', () => {
       await instance.database.courseNote.findUniqueOrThrow({ where: { courseId } })
     ).toMatchObject({ body: base.note });
     expect(await instance.database.course.count()).toBe(1);
+  });
+  it('captures initial requirements after the setup speech preferences and endpoints are saved', async () => {
+    const response = await POST(
+      await request(
+        {
+          ...base,
+          preferred: {
+            ...base.preferred,
+            ttsProvider: 'local',
+            ttsModel: 'local:synthetic-speech',
+          },
+          infra: {
+            ttsProvider: 'local',
+            ttsBaseUrl: 'http://localhost:8001/tts',
+            sttProvider: 'local',
+            sttBaseUrl: 'http://localhost:8002/stt',
+          },
+        },
+        identity.ownerToken
+      )
+    );
+    expect(response.status).toBe(200);
+    const result = await response.json();
+    const binding = await instance.database.learningLevelBinding.findUniqueOrThrow({
+      where: {
+        courseId_level: { courseId: result.courseId, level: 'B1' },
+      },
+    });
+    expect(binding.coverage).toMatchObject({
+      skills: { LISTENING: { state: 'REQUIRED' }, SPEAKING: { state: 'REQUIRED' } },
+    });
+    expect(await instance.database.learningLevelCompletion.count()).toBe(0);
   });
   it('rejects household server configuration before creating a course', async () => {
     const initialConfiguration = await getSiteConfig();

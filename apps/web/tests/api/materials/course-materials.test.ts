@@ -5,7 +5,6 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import type { PrismaClient } from '@/generated/prisma/client';
 import { POST as upload } from '@/app/api/v1/materials/route';
 import { POST as placementUpload } from '@/app/api/v1/placement/from-notes/upload/route';
-import { getCachedNotesDeduction } from '@/lib/placement-notes';
 import { closeRedis } from '@/lib/redis';
 import { GET as download } from '@/app/api/v1/materials/[materialId]/file/route';
 import { GET as notes, PUT as saveNotes } from '@/app/api/v1/courses/[courseId]/notes/route';
@@ -163,43 +162,22 @@ suite('owned original course materials', () => {
       ).status
     ).toBe(404);
   });
-  it('bounds placement input and cached excerpts while retaining all uploaded endings and originals', async () => {
-    const first =
-      'Anfang A. '.repeat(10000) + 'FINAL A: Explain the contrast before translation exercises.';
-    const second = 'Anfang B. '.repeat(10000) + 'FINAL B: Mia ist gestern nach Hause gegangen.';
+  it('rejects obsolete multipart placement before retaining files or starting analysis', async () => {
     const form = new FormData();
     form.append('native', 'en');
     form.append('target', 'de');
-    form.append('content', 'Personal goals: '.repeat(1000));
-    form.append('files', new File([first], 'Vocab Deutsch.txt', { type: 'text/plain' }));
-    form.append('files', new File([second], 'Newer notes.txt', { type: 'text/plain' }));
+    form.append('content', 'Untrimmed source text');
+    form.append(
+      'files',
+      new File(['Complete source ending'], 'Vocab Deutsch.txt', { type: 'text/plain' })
+    );
     const response = await placementUpload(
       request('placement/from-notes/upload', identity.ownerToken, { method: 'POST', body: form })
     );
-    expect(response.status).toBe(200);
-    const body = await response.json();
-    expect(
-      body.materials.map((material: { extractedText: string }) => material.extractedText)
-    ).toEqual([first, second]);
-    const cached = await getCachedNotesDeduction(identity.ownerId, 'en', 'de');
-    expect(cached?.content.length).toBeLessThanOrEqual(12000);
-    expect(cached?.content).toContain('Vocab Deutsch.txt');
-    expect(cached?.content).toContain('Newer notes.txt');
-    expect(cached?.content).toContain(
-      'FINAL A: Explain the contrast before translation exercises.'
-    );
-    expect(cached?.content).toContain('FINAL B: Mia ist gestern nach Hause gegangen.');
-    expect(cached?.materialIds).toEqual(
-      body.materials.map((material: { id: string }) => material.id)
-    );
-    const prompt = boundary.generate.mock.calls.at(-1)![0];
-    expect(prompt.length).toBeLessThan(16000);
-    expect(prompt).toContain(cached?.content);
-    expect(
-      (await instance.database.courseMaterial.findMany({ where: { userId: identity.ownerId } }))
-        .map((material) => material.extractedText)
-        .sort()
-    ).toEqual([first, second].sort());
+    expect(response.status).toBe(415);
+    expect((await response.json()).error).toContain('resumable material uploader');
+    expect(await instance.database.courseMaterial.count()).toBe(0);
+    expect(await instance.database.materialAnalysis.count()).toBe(0);
   });
   it('rejects oversized originals before retaining files or extracting content', async () => {
     const form = new FormData();

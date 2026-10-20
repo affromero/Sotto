@@ -744,20 +744,6 @@ struct SottoMemoryNode: Decodable, Identifiable, Equatable {
 
 // MARK: - Placement
 
-struct SottoPlacementBatch: Decodable, Equatable {
-    let native: String
-    let target: String
-    let questions: [SottoPlacementQuestion]
-}
-
-struct SottoPlacementQuestion: Decodable, Identifiable, Equatable {
-    let id: String
-    let cefr: String
-    let skill: String
-    let prompt: String
-    let options: [String]
-}
-
 struct SottoPlacementAnswer: Encodable, Equatable {
     let id: String
     /// 0-3 pick an option; 4 is the "I don't know" answer the scorer expects.
@@ -769,6 +755,8 @@ struct SottoPlacementAnswer: Encodable, Equatable {
 struct SottoPlacementResult: Decodable, Equatable {
     let courseId: String
     let level: String
+    let assessedLevel: String
+    let confirmationReceiptId: UUID
     let scoreBySkill: [String: Double]?
 }
 

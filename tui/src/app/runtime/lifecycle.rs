@@ -70,6 +70,8 @@ impl App {
             pending_admissions: Default::default(),
             practice_cache: Default::default(),
             progress_sequence: 0,
+            placement_transport: Default::default(),
+            placement_task: None,
             theme,
             theme_picker: ThemePicker::closed(),
             help_open: false,
@@ -81,6 +83,9 @@ impl App {
 
     /// Invalidate any in-flight request and return the new current generation.
     pub(super) fn bump_gen(&mut self) -> u64 {
+        if let Some(task) = self.placement_task.take() {
+            task.abort();
+        }
         self.request_gen += 1;
         self.request_gen
     }
@@ -222,6 +227,7 @@ impl App {
             Action::NotesInputBackspace => self.notes_input_backspace(),
             Action::NotesSubmit => self.notes_submit(),
             Action::NotesConfirm => self.notes_confirm(),
+            Action::NotesAcceptPartial => self.notes_accept_partial(),
             Action::NotesTakeTest => self.notes_take_test(),
             Action::NotesCancel => self.notes_cancel(),
             Action::GraphLoaded(req_gen, result) => self.on_graph_loaded(req_gen, result),

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { placementConfirmRequestSchema } from '@sotto/shared';
 import { isAnimalSlug } from './avatars';
 import { credentialSelectionEnvelopeSchema } from '@/lib/sidedoor/credentials/config/credential-selection-contract';
 
@@ -454,6 +455,7 @@ const cefrLevel = z.enum(['A1', 'A2', 'B1', 'B2', 'C1', 'C2']);
 
 export const onboardingSaveSchema = z.object({
   credentials: credentialSelectionEnvelopeSchema,
+  placementAnalysis: placementConfirmRequestSchema.optional(),
   course: z.object({
     native: langCode2,
     target: langCode2,

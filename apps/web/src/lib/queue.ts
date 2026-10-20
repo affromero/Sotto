@@ -15,6 +15,7 @@ import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 import { sottoStateWriteTransaction } from '@/lib/sidedoor/access/state/write-transaction';
 import { withSottoJobExecution } from '@/lib/sidedoor/jobs/core/job-execution-lifetime';
 import { settleFailedMaterialJob } from '@/lib/course-materials/jobs/failure';
+import { settleFailedAnalysisJob } from '@/lib/course-materials/jobs/analysis-failure';
 import { createRedisConnection, getSharedQueueRedisClient } from './redis';
 import { logger } from './logger';
 import { prismaUnfiltered as prisma } from './prisma';
@@ -195,6 +196,8 @@ const QUEUE_DEFINITIONS: Record<string, QueueDefinition> = {
   'material-finalization': { attempts: 3, skipEvents: true },
   'material-extraction': { attempts: 2, skipEvents: true },
   'material-optimization': { attempts: 2, skipEvents: true },
+  'material-analysis': { attempts: 2, skipEvents: true },
+  'placement-generation': { attempts: 2, skipEvents: true },
 };
 
 const queueInstances = new Map<string, Queue>();
@@ -438,6 +441,17 @@ export function createWorker<T>(
   worker.on('failed', (job, err) => {
     logWorkerJobFailure(queueName, job as Job<unknown> | undefined, err);
     if (!job || job.attemptsMade < (job.opts.attempts ?? queueDefinition.attempts ?? 1)) return;
+    if (queueName === 'material-analysis' || queueName === 'placement-generation') {
+      void sottoTransaction(prisma, (database) =>
+        settleFailedAnalysisJob(database, job as Job<unknown>, queueName)
+      ).catch((error) =>
+        logger.error('Analysis failure settlement remains pending', {
+          jobId: job.id,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      );
+      return;
+    }
     if (
       queueName === 'material-finalization' ||
       queueName === 'material-extraction' ||
@@ -501,6 +515,8 @@ export const pricingFetchQueue = createQueueReference('pricing-fetch');
 export const materialFinalizationQueue = createQueueReference('material-finalization');
 export const materialExtractionQueue = createQueueReference('material-extraction');
 export const materialOptimizationQueue = createQueueReference('material-optimization');
+export const materialAnalysisQueue = createQueueReference('material-analysis');
+export const placementGenerationQueue = createQueueReference('placement-generation');
 
 export interface SpeakingGradingPayload {
   recordingId: string;

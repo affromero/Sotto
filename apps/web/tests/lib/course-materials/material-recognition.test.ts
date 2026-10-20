@@ -812,7 +812,18 @@ describe('recognition canonical identities', () => {
     );
   });
   it('rejects values that cannot survive a JSON identity round trip', () => {
-    for (const value of [undefined, NaN, Infinity, 1n, new Date(), { missing: undefined }])
+    for (const value of [
+      undefined,
+      NaN,
+      Infinity,
+      1n,
+      new Date(),
+      { missing: undefined },
+      new Map(),
+      new Set(),
+      { nested: { value: -Infinity } },
+      [undefined],
+    ])
       expect(() => materialRecognitionHash(value)).toThrow('finite JSON');
     const cycle: unknown[] = [];
     cycle.push(cycle);

@@ -1,0 +1,6 @@
+.root {
+  composes: root from './MaterialCoverage.module.css';
+}
+.action {
+  composes: action from './MaterialCoverage.module.css';
+}

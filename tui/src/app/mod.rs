@@ -7,6 +7,8 @@ mod input;
 mod lifecycle;
 mod onboard;
 mod overlay;
+#[path = "placement-transport.rs"]
+mod placement_transport;
 #[path = "runtime/practice.rs"]
 mod practice;
 #[path = "runtime/practice-lifecycle.rs"]
@@ -88,6 +90,8 @@ pub(crate) struct App {
     pending_admissions: std::collections::BTreeMap<uuid::Uuid, (String, types::PracticeKind)>,
     practice_cache: std::collections::BTreeMap<String, View>,
     progress_sequence: u64,
+    placement_transport: placement_transport::PlacementTransport,
+    placement_task: Option<tokio::task::AbortHandle>,
     /// The active theme, resolved from `config.theme` at startup and mutated
     /// live by the theme picker. Its [`Palette`] is threaded into rendering.
     theme: Theme,

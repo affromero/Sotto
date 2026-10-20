@@ -9,6 +9,14 @@ import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
 import {
+  placementGenerateRequestSchema,
+  placementSourceStatusSchema,
+} from '../src/placement/contracts';
+import {
+  materialFocusAnalysisRetryRequestSchema,
+  materialFocusAnalysisRetryResponseSchema,
+} from '../src/course-materials/analysis';
+import {
   pencilHomeworkRequestSchema,
   pencilHomeworkResponseSchema,
 } from '../src/contracts/pencil-homework';
@@ -129,6 +137,8 @@ const startPracticeVariants: Record<string, string> = {
 // pointers instead of being inlined — this keeps the document DRY and gives the
 // Rust codegen clean, named types. Order is irrelevant; refs resolve by id.
 const namedSchemas: Record<string, z.ZodType> = {
+  AdmitPlacementRequest: placementGenerateRequestSchema,
+  MaterialAnalysisStatusResponse: placementSourceStatusSchema,
   PencilHomeworkRequest: pencilHomeworkRequestSchema,
   PencilHomeworkResponse: pencilHomeworkResponseSchema,
   ClassRegenerationRequest: classRegenerationRequestSchema,
@@ -137,6 +147,8 @@ const namedSchemas: Record<string, z.ZodType> = {
   LearningProgressRequest: learningProgressRequestSchema,
   LearningProgressResponse: learningProgressResponseSchema,
   PracticeGenerationAction: practiceGenerationActionSchema,
+  MaterialAnalysisRetryRequest: materialFocusAnalysisRetryRequestSchema,
+  MaterialAnalysisRetryResponse: materialFocusAnalysisRetryResponseSchema,
   CefrLevel: cefrLevelSchema,
   PracticeKind: practiceKindSchema,
   PracticeStatus: practiceStatusSchema,

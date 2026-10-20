@@ -1,9 +1,9 @@
-import { randomUUID } from 'node:crypto';
 import { readResponseBytes } from 'thesidedoor-core/runtime/stream';
 import type { Prisma } from '@/generated/prisma/client';
-import { prismaUnfiltered as prisma } from '@/lib/prisma';
-import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
-import { captureSottoProviderAdmission } from '@/lib/sidedoor/credentials/runtime/provider-execution';
+import {
+  executeLearningCliOnce,
+  LearningProviderInvocationError,
+} from '@/lib/learning/preparation/provider-invocation';
 import { capturedLearningAiOptions, type CapturedLearningAi } from '@/lib/learning-ai';
 import { createAIProvider, type AIResponse, type ImageContentPart } from '@/lib/providers/ai';
 import { decodeCodexImages } from '@/lib/providers/agents/codex-images';
@@ -297,85 +297,34 @@ export async function executeMaterialRecognitionCli(options: {
     throw new MaterialRecognitionUnsupported(
       'Local CLI recognition requires an explicit model and persistent local account/config binding.'
     );
-  const attempt = {
-    id: randomUUID(),
-    fingerprint: materialRecognitionHash({
+  let response: AIResponse;
+  try {
+    response = await executeLearningCliOnce({
+      ai: options.ai,
       inputDigest: prepared.inputDigest,
       selection: prepared.selection,
+      system: prepared.system,
+      messages: prepared.messages,
+      options: outputOptions(prepared),
+      responseLimit: MATERIAL_RECOGNITION_LIMITS.responseBytes,
       binding,
-    }),
-  };
-  const admission = await captureSottoProviderAdmission({
-    ...options.ai.execution,
-    signal: options.signal,
-  });
-  await admission.validate(options.signal);
-  const admitted = await sottoTransaction(
-    prisma,
-    async (database) => {
-      await options.operation.validateBinding(database, binding);
-      await options.ai.execution.authorize(database);
-      return options.operation.admit(database, attempt);
-    },
-    { signal: options.signal }
-  );
-  if (!admitted.dispatch)
-    throw new Error('The recognition invocation already exists and cannot be redispatched.');
-  let dispatched = false;
-  let saved = false;
-  try {
-    const aiOptions = await capturedLearningAiOptions({
-      ...options.ai,
-      execution: { ...options.ai.execution, signal: options.signal },
+      operation: options.operation,
+      signal: options.signal,
+      unresolved: options.unresolved,
     });
-    await admission.validate(options.signal);
-    if (getCodexSshHost())
-      throw new MaterialRecognitionUnsupported(
-        'Remote CLI recognition has no captured remote account binding.'
-      );
-    options.signal.throwIfAborted();
-    dispatched = true;
-    const response = await createAIProvider(options.ai.provider).generateResponse(
-      prepared.system,
-      prepared.messages,
-      { ...aiOptions, ...outputOptions(prepared), signal: options.signal }
-    );
-    if (
-      Buffer.byteLength(JSON.stringify(response), 'utf8') >
-      MATERIAL_RECOGNITION_LIMITS.responseBytes
-    )
-      throw new Error('The CLI response exceeds its receipt byte limit.');
-    await admission.validate(options.signal);
-    if (getCodexSshHost()) throw new Error('The CLI backend changed during recognition.');
-    const receipt = { inputDigest: prepared.inputDigest, attempt, binding, response };
-    await sottoTransaction(prisma, async (database) => {
-      await options.operation.validateBinding(database, binding);
-      await options.ai.execution.authorize(database);
-      await options.operation.settle(database, attempt, 'succeeded', receipt);
-    });
-    saved = true;
-    return parseMaterialTranscription(prepared, response.content);
   } catch (error) {
-    if (saved)
-      throw new MaterialRecognitionExecutionError('OUTPUT_INVALID', prepared.inputDigest, {
+    if (error instanceof LearningProviderInvocationError)
+      throw new MaterialRecognitionExecutionError(error.outcome, prepared.inputDigest, {
         cause: error,
       });
-    if (dispatched) options.unresolved();
-    try {
-      await sottoTransaction(prisma, (database) =>
-        options.operation.settle(database, attempt, dispatched ? 'unknown' : 'failed')
-      );
-    } catch (settlement) {
-      options.unresolved();
-      throw new MaterialRecognitionExecutionError('UNKNOWN', prepared.inputDigest, {
-        cause: new AggregateError([error, settlement]),
-      });
-    }
-    throw new MaterialRecognitionExecutionError(
-      dispatched ? 'UNKNOWN' : 'NOT_DISPATCHED',
-      prepared.inputDigest,
-      { cause: error }
-    );
+    throw error;
+  }
+  try {
+    return parseMaterialTranscription(prepared, response.content);
+  } catch (error) {
+    throw new MaterialRecognitionExecutionError('OUTPUT_INVALID', prepared.inputDigest, {
+      cause: error,
+    });
   }
 }
 

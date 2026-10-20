@@ -1,203 +1,106 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-
-// generatePlacement / deduceLevelFromNotes reach out to the resolved AI
-// provider; mock the seams so the tests stay hermetic. The provider's
-// generateResponse is a shared mock each test drives with its own LLM output.
-const { mockGenerateResponse } = vi.hoisted(() => ({ mockGenerateResponse: vi.fn() }));
-
-vi.mock('@/lib/learning-ai', () => ({
-  resolveCapturedLearningAi: vi
-    .fn()
-    .mockResolvedValue({ provider: 'test', model: 'test-model', apiKey: undefined }),
-  capturedLearningAiOptions: async (ai: { model: string; apiKey?: string }) => ({
-    model: ai.model,
-    apiKeyOverride: ai.apiKey,
-  }),
-}));
-vi.mock('@/lib/providers/ai', () => ({
-  createAIProvider: vi.fn(() => ({ generateResponse: mockGenerateResponse })),
-}));
-vi.mock('@/lib/prompt-loader', () => ({ loadAndRender: vi.fn(() => '') }));
-vi.mock('@/lib/usage-logger', () => ({ logUsage: vi.fn() }));
-vi.mock('@/lib/course-notes', () => ({ formatNotesForPrompt: vi.fn(() => '') }));
-
-function llmResponse(content: string) {
-  return { content, model: 'test-model', inputTokens: 0, outputTokens: 0 };
-}
-
+// @vitest-environment node
+import { describe, expect, it } from 'vitest';
 import {
+  parsePlacementQuestionBatch,
+  preparePlacementQuestionBatch,
   scorePlacement,
+  toPublic,
   idkLabel,
-  generatePlacement,
-  deduceLevelFromNotes,
-  type PlacementQuestion,
 } from '@/lib/placement-test';
-import { blockedProviderExecution } from '../helpers/runtime/provider-execution';
 
-const execution = blockedProviderExecution('user-1');
-
-function q(id: string, cefr: string, skill: string): PlacementQuestion {
-  return {
-    id,
-    cefr: cefr as PlacementQuestion['cefr'],
-    skill: skill as PlacementQuestion['skill'],
-    prompt: id,
-    options: ['a', 'b', 'c', 'd', "I don't know"],
-    correctIndex: 0,
-    explanation: '',
-  };
-}
-
-// Two questions per band A1..C2 (>=70% ⇒ both correct to pass a band).
-const questions: PlacementQuestion[] = [
-  q('a1-1', 'A1', 'grammar'),
-  q('a1-2', 'A1', 'vocab'),
-  q('a2-1', 'A2', 'grammar'),
-  q('a2-2', 'A2', 'vocab'),
-  q('b1-1', 'B1', 'grammar'),
-  q('b1-2', 'B1', 'reading'),
-  q('b2-1', 'B2', 'grammar'),
-  q('b2-2', 'B2', 'reading'),
-  q('c1-1', 'C1', 'grammar'),
-  q('c1-2', 'C1', 'reading'),
-  q('c2-1', 'C2', 'grammar'),
-  q('c2-2', 'C2', 'vocab'),
-];
-const allCorrect = questions.map((x) => ({ id: x.id, selectedIndex: 0 }));
-
-const IDK_INDEX = 4;
-
-describe('scorePlacement staircase', () => {
-  it('assigns the highest fully-passed band (reaches C2)', () => {
-    expect(scorePlacement(questions, allCorrect).level).toBe('C2');
+const levels = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'] as const;
+const raw = () => ({
+  questions: levels.flatMap((cefr) =>
+    Array.from({ length: 2 }, (_, index) => ({
+      cefr,
+      skill: index ? 'reading' : 'grammar',
+      prompt: `A distinct ${cefr} question ${index}: 😀`,
+      options: ['alpha', 'beta', 'gamma', 'delta'],
+      correctIndex: 0,
+      explanation: 'A precise explanation.',
+    }))
+  ),
+});
+const questions = () => parsePlacementQuestionBatch(JSON.stringify(raw()), 'es', 2);
+describe('complete immutable diagnostic questions', () => {
+  it('retains every band and strips answer keys from the public projection', () => {
+    const parsed = questions();
+    expect(parsed).toHaveLength(12);
+    expect(parsed.map((question) => question.cefr)).toEqual(
+      levels.flatMap((level) => [level, level])
+    );
+    expect(parsed.every((question) => question.options[4] === 'No lo sé')).toBe(true);
+    expect(toPublic(parsed[0]!)).not.toHaveProperty('correctIndex');
+    expect(toPublic(parsed[0]!)).not.toHaveProperty('explanation');
   });
-
-  it('stops one band below the first failed band', () => {
-    const answers = questions.map((x) => ({ id: x.id, selectedIndex: x.cefr === 'B1' ? 3 : 0 }));
-    expect(scorePlacement(questions, answers).level).toBe('A2');
+  it('rejects a missing band, missing question and malformed answer instead of publishing a partial quiz', () => {
+    const missing = raw();
+    missing.questions.pop();
+    expect(() => parsePlacementQuestionBatch(JSON.stringify(missing), 'en', 2)).toThrow(
+      'every requested'
+    );
+    const malformed = raw();
+    malformed.questions[0]!.correctIndex = 4;
+    expect(() => parsePlacementQuestionBatch(JSON.stringify(malformed), 'en', 2)).toThrow();
+    const wrongBand = raw();
+    wrongBand.questions[0]!.cefr = 'C2';
+    expect(() => parsePlacementQuestionBatch(JSON.stringify(wrongBand), 'en', 2)).toThrow(
+      'every requested'
+    );
   });
-
-  it('floors at A1 when A1 is failed', () => {
-    const answers = questions.map((x) => ({ id: x.id, selectedIndex: x.cefr === 'A1' ? 3 : 0 }));
-    expect(scorePlacement(questions, answers).level).toBe('A1');
+  it('rejects duplicate content choices, a misleading native uncertainty choice and malformed Unicode', () => {
+    const duplicated = raw();
+    duplicated.questions[0]!.options[1] = 'alpha';
+    expect(() => parsePlacementQuestionBatch(JSON.stringify(duplicated), 'en', 2)).toThrow(
+      'distinct'
+    );
+    const uncertainty = raw();
+    uncertainty.questions[0]!.options[0] = idkLabel('es');
+    expect(() => parsePlacementQuestionBatch(JSON.stringify(uncertainty), 'es', 2)).toThrow();
+    const malformed = raw();
+    malformed.questions[0]!.prompt = 'broken\uD800';
+    expect(() => parsePlacementQuestionBatch(JSON.stringify(malformed), 'en', 2)).toThrow();
   });
-
-  it('reports per-skill scores and a response per question', () => {
-    const out = scorePlacement(questions, allCorrect);
-    expect(out.scoreBySkill.grammar).toBe(1);
-    expect(out.responses).toHaveLength(questions.length);
-    expect(out.responses.every((r) => r.correct)).toBe(true);
+  it('rejects malformed JSON, invented skill defaults and oversized output', () => {
+    expect(() => parsePlacementQuestionBatch('{', 'en', 2)).toThrow();
+    const output = raw();
+    Reflect.set(output.questions[0]!, 'skill', 'invented');
+    expect(() => parsePlacementQuestionBatch(JSON.stringify(output), 'en', 2)).toThrow();
+    expect(() => parsePlacementQuestionBatch('x'.repeat(524289), 'en', 2)).toThrow('budget');
   });
-
-  it('scores the "I don\'t know" option as not mastered', () => {
-    // Choosing index 4 (the appended IDK option) is never the correct index, so
-    // every band fails and the learner floors at A1.
-    const idkEverywhere = questions.map((x) => ({ id: x.id, selectedIndex: IDK_INDEX }));
-    const out = scorePlacement(questions, idkEverywhere);
-    expect(out.level).toBe('A1');
-    expect(out.responses.every((r) => !r.correct)).toBe(true);
+  it('uses the canonical bounded prompt without accepting an invalid per-band budget', () => {
+    const input = preparePlacementQuestionBatch('en', 'de', 'Owned learner context', 2);
+    expect(input.system).toContain('Owned learner context');
+    expect(input.system).toContain('not learner mastery');
+    expect(input.messages[0]!.content).toContain('12 placement questions');
+    expect(input.jsonSchema.name).toBe('placement_questions');
+    expect(() => preparePlacementQuestionBatch('en', 'de', '', 0)).toThrow('Invalid');
   });
 });
-
-describe('idkLabel', () => {
-  it('returns the native-language phrase for supported languages', () => {
-    expect(idkLabel('en')).toBe("I don't know");
-    expect(idkLabel('es')).toBe('No lo sé');
-    expect(idkLabel('de')).toBe('Ich weiß nicht');
+describe('diagnostic score without earned mastery', () => {
+  it('walks the complete band staircase and stops at the first failed band', () => {
+    const items = questions(),
+      all = items.map((question) => ({ id: question.id, selectedIndex: 0 }));
+    expect(scorePlacement(items, all).level).toBe('C2');
+    expect(
+      scorePlacement(
+        items,
+        items.map((question) => ({
+          id: question.id,
+          selectedIndex: question.cefr === 'B1' ? 3 : 0,
+        }))
+      ).level
+    ).toBe('A2');
   });
-
-  it('normalizes case/whitespace', () => {
-    expect(idkLabel(' ES ')).toBe('No lo sé');
-  });
-
-  it('falls back to English for unknown codes', () => {
-    expect(idkLabel('xx')).toBe("I don't know");
-  });
-});
-
-describe('generatePlacement option shaping', () => {
-  beforeEach(() => {
-    mockGenerateResponse.mockResolvedValue(
-      llmResponse(
-        JSON.stringify([
-          {
-            cefr: 'A1',
-            skill: 'grammar',
-            prompt: 'q1',
-            options: ['a', 'b', 'c', 'd'],
-            correctIndex: 0,
-            explanation: '',
-          },
-          {
-            cefr: 'B1',
-            skill: 'reading',
-            prompt: 'q2',
-            options: ['w', 'x', 'y', 'z'],
-            correctIndex: 2,
-            explanation: '',
-          },
-        ])
-      )
-    );
-  });
-
-  it('appends the native-language "I don\'t know" as the last option', async () => {
-    const { questions: out } = await generatePlacement('user-1', execution, 'es', 'en');
-    expect(out.length).toBeGreaterThan(0);
-    for (const question of out) {
-      expect(question.options).toHaveLength(5);
-      expect(question.options[4]).toBe('No lo sé');
-      // correctIndex always points at a content option, never the IDK option.
-      expect(question.correctIndex).toBeLessThan(4);
-    }
-  });
-
-  it('honors a smaller perBand for a shorter verification run', async () => {
-    await generatePlacement('user-1', execution, 'en', 'es', '', 2);
-    const messages = mockGenerateResponse.mock.calls.at(-1)?.[1] as Array<{ content: string }>;
-    // 6 CEFR bands (A1..C2) * 2 per band = 12 questions.
-    expect(messages[0].content).toContain('2 per CEFR level');
-    expect(messages[0].content).toContain('12');
-  });
-});
-
-describe('deduceLevelFromNotes', () => {
-  it('parses the deduced level, rationale, and confidence', async () => {
-    mockGenerateResponse.mockResolvedValue(
-      llmResponse(
-        '{"level":"B1","rationale":"Uses past tense and subordinate clauses.","confidence":0.8}'
-      )
-    );
-
-    const { deduction } = await deduceLevelFromNotes(
-      'user-1',
-      execution,
-      'en',
-      'es',
-      'mi cuaderno'
-    );
-
-    expect(deduction.level).toBe('B1');
-    expect(deduction.rationale).toContain('subordinate');
-    expect(deduction.confidence).toBe(0.8);
-  });
-
-  it('clamps confidence to 0..1 and floors an unknown level to A1', async () => {
-    mockGenerateResponse.mockResolvedValue(
-      llmResponse('{"level":"Z9","rationale":"","confidence":4}')
-    );
-
-    const { deduction } = await deduceLevelFromNotes('user-1', execution, 'en', 'es', 'x');
-
-    expect(deduction.level).toBe('A1');
-    expect(deduction.confidence).toBe(1);
-  });
-
-  it('throws on malformed LLM output', async () => {
-    mockGenerateResponse.mockResolvedValue(llmResponse('not json'));
-
-    await expect(deduceLevelFromNotes('user-1', execution, 'en', 'es', 'x')).rejects.toThrow(
-      /malformed/i
-    );
+  it('scores uncertainty and missing answers as incorrect and exposes no objective mastery state', () => {
+    const items = questions(),
+      score = scorePlacement(
+        items,
+        items.map((question) => ({ id: question.id, selectedIndex: 4 }))
+      );
+    expect(score.level).toBe('A1');
+    expect(score.responses.every((answer) => !answer.correct)).toBe(true);
+    expect(scorePlacement(items, []).responses.every((answer) => !answer.correct)).toBe(true);
+    expect(score).not.toHaveProperty('masteredObjectiveIds');
   });
 });

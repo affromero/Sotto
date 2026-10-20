@@ -1,172 +1,132 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @vitest-environment node
+import { randomUUID } from 'node:crypto';
 import { NextRequest } from 'next/server';
-
-const mockAuthenticateRequest = vi.fn();
-const mockCheckRateLimit = vi.fn();
-const mockRunNotesDeduction = vi.fn();
-const mockGetCachedNotesDeduction = vi.fn();
-const mockClearNotesDeduction = vi.fn();
-const mockCreateOrRaiseCourse = vi.fn();
-const mockGetCourseNote = vi.fn();
-const mockMergeCourseNote = vi.fn();
-const mockSetCourseNote = vi.fn();
-const mockExtractAndStoreNoteVocab = vi.fn();
-
-vi.mock('@/lib/api-keys', () => ({
-  authenticateRequest: (...a: unknown[]) => mockAuthenticateRequest(...a),
-}));
-vi.mock('@/lib/redis', () => ({
-  checkRateLimit: (...a: unknown[]) => mockCheckRateLimit(...a),
-}));
-vi.mock('@/lib/placement-notes', () => ({
-  runNotesDeduction: (...a: unknown[]) => mockRunNotesDeduction(...a),
-  getCachedNotesDeduction: (...a: unknown[]) => mockGetCachedNotesDeduction(...a),
-  clearNotesDeduction: (...a: unknown[]) => mockClearNotesDeduction(...a),
-}));
-vi.mock('@/lib/placement-course', () => ({
-  createOrRaiseCourse: (...a: unknown[]) => mockCreateOrRaiseCourse(...a),
-}));
-vi.mock('@/lib/course-notes', () => ({
-  getCourseNote: (...a: unknown[]) => mockGetCourseNote(...a),
-  getEditableCourseNote: vi.fn().mockResolvedValue(''),
-  mergeCourseNote: (...a: unknown[]) => mockMergeCourseNote(...a),
-  setCourseNote: (...a: unknown[]) => mockSetCourseNote(...a),
-}));
-vi.mock('@/lib/live-vocab', () => ({
-  extractAndStoreNoteVocab: (...a: unknown[]) => mockExtractAndStoreNoteVocab(...a),
-}));
-vi.mock('@/lib/logger', () => ({
-  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
-}));
-
-import { POST as DEDUCE } from '@/app/api/v1/placement/from-notes/route';
-import { POST as CONFIRM } from '@/app/api/v1/placement/from-notes/confirm/route';
-
-function jsonPost(url: string, body: unknown): NextRequest {
-  return new NextRequest(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-}
-
-describe('POST /api/v1/placement/from-notes (deduce)', () => {
-  const url = 'http://localhost:3000/api/v1/placement/from-notes';
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockAuthenticateRequest.mockResolvedValue({ userId: 'u1' });
-    mockCheckRateLimit.mockResolvedValue({ allowed: true, resetAt: Date.now() + 3600000 });
-    mockRunNotesDeduction.mockResolvedValue({
-      level: 'B1',
-      rationale: 'Subordinate clauses.',
-      confidence: 0.8,
-    });
-  });
-
-  it('returns 401 when unauthenticated', async () => {
-    mockAuthenticateRequest.mockResolvedValue(null);
-    const res = await DEDUCE(jsonPost(url, { native: 'en', target: 'es', content: 'hola' }));
-    expect(res.status).toBe(401);
-    expect(mockRunNotesDeduction).not.toHaveBeenCalled();
-  });
-
-  it('returns 400 when native and target are the same', async () => {
-    const res = await DEDUCE(jsonPost(url, { native: 'en', target: 'en', content: 'x' }));
-    expect(res.status).toBe(400);
-    expect(mockRunNotesDeduction).not.toHaveBeenCalled();
-  });
-
-  it('returns 400 when content is empty', async () => {
-    const res = await DEDUCE(jsonPost(url, { native: 'en', target: 'es', content: '' }));
-    expect(res.status).toBe(400);
-  });
-
-  it('returns 429 when rate limited', async () => {
-    mockCheckRateLimit.mockResolvedValue({ allowed: false, resetAt: Date.now() + 3600000 });
-    const res = await DEDUCE(jsonPost(url, { native: 'en', target: 'es', content: 'hola' }));
-    expect(res.status).toBe(429);
-    expect(mockRunNotesDeduction).not.toHaveBeenCalled();
-  });
-
-  it('deduces a level and returns it without creating a course', async () => {
-    const res = await DEDUCE(jsonPost(url, { native: 'en', target: 'es', content: 'mi cuaderno' }));
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body).toEqual({
-      native: 'en',
-      target: 'es',
-      deducedLevel: 'B1',
-      rationale: 'Subordinate clauses.',
-      confidence: 0.8,
-    });
-    expect(mockRunNotesDeduction).toHaveBeenCalledWith(
-      'u1',
-      expect.objectContaining({ userId: 'u1', authorize: expect.any(Function) }),
-      'en',
-      'es',
-      'mi cuaderno'
-    );
-  });
+import { beforeAll, beforeEach, afterAll, afterEach, describe, expect, it, vi } from 'vitest';
+import type { PrismaClient } from '@/generated/prisma/client';
+import {
+  createSharedTestInstance,
+  type SharedTestInstance,
+} from '../helpers/setup/shared-instance';
+import { POST as start } from '@/app/api/v1/placement/from-notes/route';
+import { POST as upload } from '@/app/api/v1/placement/from-notes/upload/route';
+import { POST as confirm } from '@/app/api/v1/placement/from-notes/confirm/route';
+const boundary = vi.hoisted(() => ({ database: null as PrismaClient | null }));
+vi.mock('@/lib/prisma', async () => {
+  const { prismaTestBoundary } = await import('../helpers/setup/shared-instance');
+  const database = prismaTestBoundary(boundary);
+  return { prisma: database, prismaUnfiltered: database };
 });
-
-describe('POST /api/v1/placement/from-notes/confirm', () => {
-  const url = 'http://localhost:3000/api/v1/placement/from-notes/confirm';
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockAuthenticateRequest.mockResolvedValue({ userId: 'u1' });
-    mockGetCachedNotesDeduction.mockResolvedValue({
-      level: 'B1',
-      rationale: 'r',
-      confidence: 0.8,
-      content: 'mis materiales',
+const suite = process.env.SIDEDOOR_TEST_DATABASE_URL ? describe : describe.skip;
+suite('exact source-analysis placement entries', () => {
+  let instance: SharedTestInstance, owner: Awaited<ReturnType<SharedTestInstance['reset']>>;
+  const origin = 'https://selfhost.example.com';
+  beforeAll(async () => {
+    vi.stubEnv('BYOK_ENCRYPTION_KEY', 'a'.repeat(64));
+    instance = await createSharedTestInstance('source_placement_http');
+    boundary.database = instance.database;
+  });
+  beforeEach(async () => {
+    owner = await instance.reset();
+    await instance.configureInfrastructure({
+      aiProvider: 'local',
+      aiModel: 'local:owned-quiz-fixture',
+      aiBaseUrl: 'http://127.0.0.1:9999/v1',
     });
-    mockCreateOrRaiseCourse.mockResolvedValue({ id: 'course-1', currentLevel: 'B1' });
-    mockGetCourseNote.mockResolvedValue('mis materiales');
-    mockMergeCourseNote.mockReturnValue('mis materiales');
-    mockSetCourseNote.mockResolvedValue(undefined);
-    mockExtractAndStoreNoteVocab.mockResolvedValue(7);
-    mockClearNotesDeduction.mockResolvedValue(undefined);
+    await instance.database.user.update({
+      where: { id: owner.ownerId },
+      data: { preferredAiProvider: 'local', preferredAiModel: 'local:owned-quiz-fixture' },
+    });
+    vi.stubGlobal('fetch', () => {
+      throw new Error('Source admission must not invoke a paid or external provider');
+    });
   });
-
-  it('returns 401 when unauthenticated', async () => {
-    mockAuthenticateRequest.mockResolvedValue(null);
-    const res = await CONFIRM(jsonPost(url, { native: 'en', target: 'es' }));
-    expect(res.status).toBe(401);
-    expect(mockCreateOrRaiseCourse).not.toHaveBeenCalled();
+  afterEach(() => vi.unstubAllGlobals());
+  afterAll(async () => {
+    boundary.database = null;
+    await instance?.close();
+    vi.unstubAllEnvs();
   });
-
-  it('returns 409 when the deduction has expired (no cache)', async () => {
-    mockGetCachedNotesDeduction.mockResolvedValue(null);
-    const res = await CONFIRM(jsonPost(url, { native: 'en', target: 'es' }));
-    expect(res.status).toBe(409);
-    expect(mockCreateOrRaiseCourse).not.toHaveBeenCalled();
+  const input = () => ({
+    schemaVersion: 1,
+    requestId: randomUUID(),
+    native: 'en',
+    target: 'de',
+    content: 'Owned source class',
   });
-
-  it('creates the course at the deduced level and seeds note + vocab', async () => {
-    const res = await CONFIRM(jsonPost(url, { native: 'en', target: 'es' }));
-    expect(res.status).toBe(201);
-    const body = await res.json();
-    expect(body).toEqual({ courseId: 'course-1', level: 'B1', addedVocabulary: 7 });
-
-    expect(mockCreateOrRaiseCourse).toHaveBeenCalledWith(
-      'u1',
-      expect.objectContaining({ userId: 'u1', authorize: expect.any(Function) }),
-      'en',
-      'es',
-      'B1',
-      'NOTES'
+  function request(
+    path: string,
+    body: unknown,
+    token: string | null = owner.ownerToken,
+    requestOrigin = origin
+  ) {
+    return new NextRequest(`${origin}/api/v1/placement/from-notes${path}`, {
+      method: 'POST',
+      headers: {
+        ...(token ? { cookie: `sotto_session=${token}` } : {}),
+        origin: requestOrigin,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+  }
+  it('retains exact pasted Unicode and queues complete source analysis instead of deducing from a language-pair cache', async () => {
+    const value = { ...input(), content: '\uFEFF😀 source\0' + 'x'.repeat(19980) };
+    const response = await start(request('', value)),
+      body = await response.json();
+    expect(response.status).toBe(202);
+    expect(body.status).toBe('WAITING_SOURCE');
+    expect(body).not.toHaveProperty('deducedLevel');
+    const stored = await instance.database.materialAnalysis.findUniqueOrThrow({
+      where: { id: body.analysisId },
+      include: { sources: true },
+    });
+    expect(Buffer.from(stored.sources[0]!.snapshotBytes!).toString('utf8')).toBe(value.content);
+    expect(await (await start(request('', value))).json()).toEqual(body);
+    expect((await start(request('', { ...value, content: 'Different exact source' }))).status).toBe(
+      409
     );
-    expect(mockSetCourseNote).toHaveBeenCalledWith('course-1', 'mis materiales');
-    expect(mockExtractAndStoreNoteVocab).toHaveBeenCalledWith(
-      expect.objectContaining({
-        courseId: 'course-1',
-        userId: 'u1',
-        level: 'B1',
-        note: 'mis materiales',
-      })
-    );
-    expect(mockClearNotesDeduction).toHaveBeenCalledWith('u1', 'en', 'es');
+    expect(await instance.database.course.count()).toBe(0);
+  });
+  it('shares the retained-material JSON entry and explicitly rejects legacy multipart extraction', async () => {
+    const response = await upload(request('/upload', input()));
+    expect(response.status).toBe(202);
+    const legacy = new NextRequest(`${origin}/api/v1/placement/from-notes/upload`, {
+      method: 'POST',
+      headers: {
+        cookie: `sotto_session=${owner.ownerToken}`,
+        origin,
+        'content-type': 'multipart/form-data; boundary=owned',
+      },
+      body: '--owned--',
+    });
+    expect((await upload(legacy)).status).toBe(415);
+  });
+  it('requires the exact completed result receipt and never confirms the most recent pair result', async () => {
+    expect((await confirm(request('/confirm', { native: 'en', target: 'de' }))).status).toBe(400);
+    const started = await (await start(request('', input()))).json();
+    expect(
+      (
+        await confirm(
+          request('/confirm', {
+            schemaVersion: 1,
+            requestId: randomUUID(),
+            native: 'en',
+            target: 'de',
+            analysisId: started.analysisId,
+            analysisRevision: 1,
+            resultDigest: 'a'.repeat(64),
+            acceptPartial: false,
+          })
+        )
+      ).status
+    ).toBe(409);
+    expect(await instance.database.course.count()).toBe(0);
+  });
+  it('enforces authenticated ownership and CSRF before source admission', async () => {
+    expect((await start(request('', input(), null))).status).toBe(401);
+    expect(
+      (await start(request('', input(), owner.ownerToken, 'https://untrusted.invalid'))).status
+    ).toBe(403);
+    expect(await instance.database.materialAnalysis.count()).toBe(0);
   });
 });

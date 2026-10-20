@@ -21,6 +21,13 @@ import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/
 import { classifyError, userMessage } from '@/lib/byok-errors';
 import { validatePreparationAudio } from '@/lib/classes/preparation-audio';
 import { materialStorageScopes } from '@/lib/course-materials';
+import {
+  materialAnalysisJobAuthoritySchema,
+  placementSessionJobAuthoritySchema,
+  captureMaterialAnalysisJobAuthority,
+  capturePlacementSessionJobAuthority,
+  validateMaterialAnalysisJobAuthority,
+} from '@/lib/course-materials/jobs/analysis-authority';
 
 const sha256Schema = z.string().regex(/^[a-f0-9]{64}$/);
 const materialWorkInputSchema = z
@@ -34,6 +41,8 @@ const materialWorkInputSchema = z
   .passthrough();
 
 const authoritySchema = z.discriminatedUnion('kind', [
+  materialAnalysisJobAuthoritySchema,
+  placementSessionJobAuthoritySchema,
   z
     .object({
       kind: z.literal('episode'),
@@ -238,6 +247,20 @@ async function captureAuthority(
       scopes,
     };
   }
+  if ('analysisId' in input) {
+    const selected = z
+      .object({ userId: z.string().min(1), analysisId: z.uuid() })
+      .passthrough()
+      .parse(input);
+    return captureMaterialAnalysisJobAuthority(database, selected);
+  }
+  if ('placementSessionId' in input) {
+    const selected = z
+      .object({ userId: z.string().min(1), placementSessionId: z.uuid() })
+      .passthrough()
+      .parse(input);
+    return capturePlacementSessionJobAuthority(database, selected);
+  }
   const instance = await sottoStorageInstance(database).read();
   if (requestedUserId) {
     const profile = await database.user.findUnique({
@@ -271,6 +294,8 @@ export async function validateDurableAuthority(
   database: Prisma.TransactionClient,
   authority: DurableAuthority
 ): Promise<{ userId: string } | null> {
+  if (authority.kind === 'material-analysis' || authority.kind === 'placement-session')
+    return validateMaterialAnalysisJobAuthority(database, authority);
   if (authority.kind === 'episode') {
     if (authority.preparationAudioGenerationKey)
       await validatePreparationAudio(
@@ -640,7 +665,10 @@ export async function loadDurableQueueJob<Payload>(
     payload: durableEnvelopeSchema,
   });
   if (work.complete) return work;
-  if (work.payload.authority.kind === 'material' && (await completeErasedJob(database, work)))
+  if (
+    ['material', 'material-analysis', 'placement-session'].includes(work.payload.authority.kind) &&
+    (await completeErasedJob(database, work))
+  )
     return { complete: true as const, erased: true as const };
   await validateDurableAuthority(database, work.payload.authority);
   return {

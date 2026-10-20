@@ -131,3 +131,6 @@ export {
 export * from './contracts';
 export * from './course-materials/uploads';
 export * from './course-materials/extraction';
+
+export * from './course-materials/analysis';
+export * from './placement/contracts';

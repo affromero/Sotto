@@ -21,6 +21,10 @@ import { captureStorageBackend } from '@/lib/r2';
 import { getSiteConfig } from '@/lib/site-config';
 import { consumerForStorageField } from '@/lib/sidedoor/storage/core/storage-consumers';
 import { SIDEDOOR_STATE_ID } from '@/lib/sidedoor/access/state/store';
+import {
+  eraseMaterialAnalysisState,
+  materialAnalysisDeletionSubjects,
+} from '@/lib/course-materials/jobs/analysis-erasure';
 
 type Subject = { subjectId: string; generation: number };
 
@@ -115,6 +119,12 @@ export async function admitLearningStorageDeletion(options: {
   const subjects = new Map(options.subjects.map((subject) => [subject.subjectId, subject]));
   if (subjects.size !== options.subjects.length || !subjects.size)
     throw new Error('Learning deletion requires unique storage subjects');
+  for (const subject of await materialAnalysisDeletionSubjects(database, options.scope)) {
+    const previous = subjects.get(subject.subjectId);
+    if (previous && previous.generation !== subject.generation)
+      throw new Error('Derived source deletion generation changed');
+    subjects.set(subject.subjectId, subject);
+  }
   const jobs = new Map<string, StorageCleanupJob>();
   for (const subject of subjects.values()) {
     const job = prepareStorageCleanup({
@@ -252,5 +262,6 @@ export async function admitLearningStorageDeletion(options: {
   // Tombstones and complete reference manifests already exist. The caller's cascade
   // shares this transaction, so any failure restores both grant metadata and rows.
   await eraseMaterialRecognitionGrants(database, options.scope);
+  await eraseMaterialAnalysisState(database, options.scope);
   return admitted;
 }

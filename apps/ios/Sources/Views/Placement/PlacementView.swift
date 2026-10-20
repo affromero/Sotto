@@ -3,8 +3,7 @@ import SwiftUI
 /// The CEFR placement test, and the "I already know my level" shortcut.
 /// Replaces the hand-off that used to open /learn/placement in the browser.
 ///
-/// Both paths create or raise the course on the server. Neither lowers a
-/// level: the server keeps the higher of the two, so retaking is safe.
+/// Placement establishes an initial course level. Existing courses keep their earned band.
 struct PlacementView: View {
     @EnvironmentObject private var model: SottoAppModel
     @Environment(\.dismiss) private var dismiss
@@ -19,6 +18,9 @@ struct PlacementView: View {
     @State private var errorMessage: String?
     @State private var isWorking = false
     @State private var manualLevel = "A1"
+    @State private var placementRequestId = UUID()
+    @State private var submissionRequestId = UUID()
+    @State private var placementTask: Task<Void, Never>?
 
     private static let levels = ["A1", "A2", "B1", "B2", "C1", "C2"]
 
@@ -70,6 +72,7 @@ struct PlacementView: View {
                     Button(outcome == nil ? "Cancel" : "Done") { dismiss() }
                 }
             }
+            .onDisappear { placementTask?.cancel() }
         }
     }
 
@@ -85,7 +88,8 @@ struct PlacementView: View {
                 .fixedSize(horizontal: false, vertical: true)
 
             Button {
-                Task { await loadBatch() }
+                placementTask?.cancel()
+                placementTask = Task { await loadBatch() }
             } label: {
                 Label("Start placement test", systemImage: "checkmark.seal")
             }
@@ -116,7 +120,7 @@ struct PlacementView: View {
                         .foregroundStyle(SottoTheme.ink)
                         .fixedSize(horizontal: false, vertical: true)
 
-                    ForEach(Array(question.options.enumerated()), id: \.offset) { index, option in
+                    ForEach(Array(question.options.prefix(SottoPlacementAnswer.dontKnowIndex).enumerated()), id: \.offset) { index, option in
                         placementOption(
                             question: question,
                             index: index,
@@ -149,6 +153,7 @@ struct PlacementView: View {
     ) -> some View {
         Button {
             answers[question.id] = index
+            submissionRequestId = UUID()
         } label: {
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: answers[question.id] == index ? "largecircle.fill.circle" : "circle")
@@ -206,7 +211,7 @@ struct PlacementView: View {
             .buttonStyle(SottoSecondaryButtonStyle())
             .disabled(isWorking)
 
-            Text("Setting a level never lowers an existing course; Sotto keeps the higher of the two so progress is not lost.")
+            Text("Initial placement sets a new course level. An existing course keeps its earned level.")
                 .font(.caption)
                 .foregroundStyle(SottoTheme.muted)
                 .fixedSize(horizontal: false, vertical: true)
@@ -226,7 +231,9 @@ struct PlacementView: View {
         errorMessage = nil
         defer { isWorking = false }
         do {
-            batch = try await model.fetchPlacement(native: nativeLang, target: targetLang)
+            batch = try await model.fetchPlacement(native: nativeLang, target: targetLang, requestId: placementRequestId)
+        } catch is CancellationError {
+            return
         } catch {
             errorMessage = SottoPlacementFailure.message(for: error)
         }
@@ -237,12 +244,15 @@ struct PlacementView: View {
         errorMessage = nil
         defer { isWorking = false }
         do {
+            guard let batch else { throw SottoAPIError.message("Load the preserved placement questions first.") }
             let result = try await model.submitPlacement(
-                native: nativeLang,
-                target: targetLang,
+                batch: batch,
+                requestId: submissionRequestId,
                 answers: answers.map { SottoPlacementAnswer(id: $0.key, selectedIndex: $0.value) }
             )
-            outcome = "Sotto placed you at \(result.level)."
+            outcome = result.assessedLevel == result.level
+                ? "Your course starts at \(result.level)."
+                : "Diagnostic result: \(result.assessedLevel). Your course stays at \(result.level)."
         } catch {
             errorMessage = SottoPlacementFailure.message(for: error)
         }

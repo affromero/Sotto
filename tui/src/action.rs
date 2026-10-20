@@ -62,6 +62,7 @@ pub(crate) enum Action {
     NotesSubmit,
     /// Accept the deduced level and create the course ("start here").
     NotesConfirm,
+    NotesAcceptPartial,
     /// Take the MC test instead of accepting the deduced level (`t`).
     NotesTakeTest,
     /// Back out of notes placement (Esc).
@@ -141,7 +142,7 @@ pub(crate) enum Action {
     /// `POST /placement` returned (or failed) — the assessed level + course id.
     PlacementSubmitted(u64, ApiResult<types::SubmitPlacementResponse>),
     /// `POST /placement/from-notes` returned (or failed) — the deduced level.
-    NotesDeduced(u64, ApiResult<types::DeduceFromNotesResponse>),
+    NotesDeduced(u64, ApiResult<crate::api::PlacementAnalysisStatus>),
     /// `POST /placement/from-notes/confirm` returned (or failed) — created course.
     NotesConfirmed(u64, ApiResult<types::ConfirmFromNotesResponse>),
     /// `GET /courses/{id}/graph` returned (or failed) — the memory graph.

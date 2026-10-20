@@ -528,26 +528,6 @@ struct SottoAPIClient {
 
     // MARK: - Placement
 
-    /// Generates the adaptive question batch, so this runs against a model.
-    func fetchPlacement(native: String, target: String) async throws -> SottoPlacementBatch {
-        try await get(
-            "/api/v1/placement?native=\(native)&target=\(target)",
-            timeout: SottoAPIClient.generationTimeout
-        )
-    }
-
-    func submitPlacement(
-        native: String,
-        target: String,
-        answers: [SottoPlacementAnswer]
-    ) async throws -> SottoPlacementResult {
-        try await post(
-            "/api/v1/placement",
-            body: SubmitPlacementRequest(native: native, target: target, answers: answers),
-            timeout: SottoAPIClient.generationTimeout
-        )
-    }
-
     /// Declaring a level skips the test but still creates the course, which
     /// builds a curriculum on the server, so it gets the long timeout too.
     func submitManualPlacement(
@@ -662,12 +642,13 @@ struct SottoAPIClient {
         )
     }
 
-    private func get<Response: Decodable>(
+    func get<Response: Decodable>(
         _ path: String,
+        acceptedStatuses: Set<Int> = [200],
         timeout: TimeInterval = SottoAPIClient.defaultTimeout
     ) async throws -> Response {
         let request = try makeRequest(path: path, method: "GET", authorized: true, timeout: timeout)
-        return try await send(request, acceptedStatuses: [200])
+        return try await send(request, acceptedStatuses: acceptedStatuses)
     }
 
     private func delete<Response: Decodable>(_ path: String) async throws -> Response {
@@ -675,7 +656,7 @@ struct SottoAPIClient {
         return try await send(request, acceptedStatuses: [200])
     }
 
-    private func post<Body: Encodable, Response: Decodable>(
+    func post<Body: Encodable, Response: Decodable>(
         _ path: String,
         body: Body,
         authorized: Bool = true,
@@ -946,12 +927,6 @@ private struct LiveSessionRequest: Encodable {
 }
 
 private struct LiveSessionSaveResponse: Decodable {}
-
-private struct SubmitPlacementRequest: Encodable {
-    let native: String
-    let target: String
-    let answers: [SottoPlacementAnswer]
-}
 
 private struct ManualPlacementRequest: Encodable {
     let native: String

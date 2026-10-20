@@ -218,13 +218,17 @@ pub(crate) trait Api: Send + Sync {
         &self,
         native: &str,
         target: &str,
+        request_id: uuid::Uuid,
+        source: Option<PlacementAnalysisReference>,
+        accept_partial: bool,
     ) -> Result<types::GeneratePlacementResponse>;
     /// Submit placement answers; assigns a CEFR level and creates the course.
     async fn submit_placement(
         &self,
-        native: &str,
-        target: &str,
+        batch: types::GeneratePlacementResponse,
+        request_id: uuid::Uuid,
         answers: Vec<types::SubmitPlacementRequestAnswersItem>,
+        accept_partial: bool,
     ) -> Result<types::SubmitPlacementResponse>;
     /// Deduce a CEFR level from pasted materials (creates no course).
     async fn deduce_from_notes(
@@ -232,14 +236,18 @@ pub(crate) trait Api: Send + Sync {
         native: &str,
         target: &str,
         content: &str,
-    ) -> Result<types::DeduceFromNotesResponse>;
+        request_id: uuid::Uuid,
+    ) -> Result<PlacementAnalysisStatus>;
     /// Accept a deduced level: create the course and seed note + vocabulary.
     async fn confirm_from_notes(
         &self,
         native: &str,
         target: &str,
+        source: PlacementAnalysisReference,
+        request_id: uuid::Uuid,
+        accept_partial: bool,
     ) -> Result<types::ConfirmFromNotesResponse>;
-    /// Declare a CEFR level manually; creates the course or raises to it.
+    /// Declare a CEFR level manually; creates an initial course and preserves an existing course level.
     async fn manual_placement(
         &self,
         native: &str,
@@ -300,10 +308,12 @@ pub(crate) struct SottoClient {
     base_url: String,
 }
 
+include!("api/placement.rs");
 include!("api/client.rs");
 include!("api/impl.rs");
 
 #[cfg(test)]
 mod tests {
     include!("api/tests.rs");
+    include!("api/placement_tests.rs");
 }

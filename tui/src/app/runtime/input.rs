@@ -176,11 +176,18 @@ impl App {
                 NotesPhase::Result { .. } => match key.code {
                     KeyCode::Enter => Some(Action::NotesConfirm),
                     KeyCode::Char('t') => Some(Action::NotesTakeTest),
+                    KeyCode::Char('p') => Some(Action::NotesAcceptPartial),
                     KeyCode::Esc => Some(Action::NotesCancel),
                     _ => None,
                 },
                 // Deducing / Confirming: a request is in flight; swallow keys.
-                NotesPhase::Deducing | NotesPhase::Confirming => None,
+                NotesPhase::Deducing | NotesPhase::Confirming => {
+                    if key.code == KeyCode::Esc {
+                        Some(Action::NotesCancel)
+                    } else {
+                        None
+                    }
+                }
             };
         }
 
@@ -638,6 +645,7 @@ impl App {
         self.cache_practice();
         self.client = client;
         self.pending_admissions.clear();
+        self.placement_transport = Default::default();
         self.practice_cache.clear();
         let user = profile
             .name

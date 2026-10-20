@@ -31,6 +31,10 @@ model SidedoorState {
 }
 
 model User {
+  materialAnalyses MaterialAnalysis[]
+  materialAnalysisRequests MaterialAnalysisRequest[]
+  placementSessions PlacementSession[]
+  placementConfirmations PlacementConfirmationReceipt[]
   id        String   @id @default(cuid())
   email     String   @unique
   name      String?
@@ -944,6 +948,9 @@ model Lesson {
 // A learner's enrollment in one language pair. CEFR level lives here (a user
 // can hold several courses at several levels).
 model Course {
+  intendedMaterialAnalyses MaterialAnalysis[] @relation("IntendedMaterialAnalysis")
+  attachedMaterialAnalyses MaterialAnalysis[] @relation("AttachedMaterialAnalysis")
+  placementConfirmations PlacementConfirmationReceipt[]
   id              String           @id @default(cuid())
   userId          String
   nativeLang      String
@@ -1606,6 +1613,7 @@ model CourseNote {
 }
 
 model CourseMaterial {
+  analysisSources MaterialAnalysisSource[]
   id                 String   @id @default(uuid())
   userId             String
   courseId           String?
@@ -1632,6 +1640,7 @@ model CourseMaterial {
 }
 
 model MaterialExtractionRun {
+  analysisSources MaterialAnalysisSource[]
   id                 String   @id @default(uuid())
   materialId         String
   processingRevision Int
@@ -1763,6 +1772,7 @@ model MaterialUploadPart {
 
 // Shared immutable target-language catalog releases. No uploaded learner text belongs here.
 model LearningMapRevision {
+  materialAnalyses MaterialAnalysis[]
   id          String   @id @default(cuid())
   targetLang  String
   version     Int
@@ -1934,4 +1944,209 @@ model MaterialRecognitionResponse {
   createdAt   DateTime @default(now())
 
   operation MaterialRecognitionOperation @relation(fields: [operationId], references: [id], onDelete: Cascade)
+}
+
+model MaterialAnalysis {
+  id                String    @id @default(uuid())
+  userId            String
+  userGeneration    BigInt
+  nativeLang        String
+  targetLang        String
+  intendedCourseId  String?
+  attachedCourseId  String?
+  purpose           String
+  requestId         String
+  revision          Int       @default(1)
+  admissionDigest   String
+  sourceSetDigest   String
+  retryOfAnalysisId String?
+  retryCounts       Json?
+  catalogRevisionId String?
+  policy            Json
+  identity          Json?
+  identityDigest    String?
+  status            String    @default("WAITING_SOURCE")
+  coverage          Json?
+  summary           Json?
+  resultBytes       Bytes?
+  resultDigest      String?
+  acceptedReceiptId String?   @unique
+  failureReason     String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  completedAt       DateTime?
+
+  user            User                           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  intendedCourse  Course?                        @relation("IntendedMaterialAnalysis", fields: [intendedCourseId], references: [id], onDelete: Cascade)
+  attachedCourse  Course?                        @relation("AttachedMaterialAnalysis", fields: [attachedCourseId], references: [id], onDelete: Cascade)
+  catalogRevision LearningMapRevision?           @relation(fields: [catalogRevisionId], references: [id], onDelete: Restrict)
+  sources         MaterialAnalysisSource[]
+  units           MaterialAnalysisUnit[]
+  focuses         MaterialSourceFocus[]
+  sessions        PlacementSession[]
+  confirmations   PlacementConfirmationReceipt[]
+  requests        MaterialAnalysisRequest[]
+  retryOf         MaterialAnalysis?              @relation("MaterialAnalysisRetry", fields: [retryOfAnalysisId], references: [id], onDelete: Cascade)
+  retries         MaterialAnalysis[]             @relation("MaterialAnalysisRetry")
+
+  @@unique([userId, requestId])
+  @@unique([userId, admissionDigest])
+  @@index([userId, identityDigest])
+  @@index([userId, nativeLang, targetLang, status])
+  @@index([status, updatedAt])
+  @@index([userId, sourceSetDigest])
+}
+
+model MaterialAnalysisRequest {
+  userId       String
+  requestId    String
+  analysisId   String
+  intentDigest String
+
+  user     User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  analysis MaterialAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@id([userId, requestId])
+}
+
+model MaterialAnalysisSource {
+  id                 String  @id @default(uuid())
+  analysisId         String
+  sourceId           String  @default(uuid())
+  order              Int
+  kind               String
+  name               String
+  materialId         String?
+  materialGeneration BigInt?
+  runId              String?
+  processingRevision Int?
+  originalSha256     String?
+  snapshotBytes      Bytes?
+  snapshotSha256     String?
+  noteId             String?
+  noteGeneration     BigInt?
+  revision           Int     @default(1)
+  inventory          Json?
+  inventoryDigest    String?
+
+  analysis MaterialAnalysis       @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  material CourseMaterial?        @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  run      MaterialExtractionRun? @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([analysisId, order])
+  @@unique([analysisId, materialId])
+  @@unique([analysisId, sourceId])
+  @@index([materialId])
+}
+
+model MaterialAnalysisUnit {
+  id                 String    @id @default(uuid())
+  analysisId         String
+  stage              String
+  unitKey            String
+  identity           Json
+  identityDigest     String
+  inputDigest        String
+  grant              Json?
+  reuse              Json?
+  mode               String
+  status             String    @default("READY")
+  attemptId          String?   @unique
+  attemptFingerprint String?
+  responseKind       String?
+  responseMetadata   Json?
+  responseBytes      Bytes?
+  responseSha256     String?
+  outputBytes        Bytes?
+  outputSha256       String?
+  admittedAt         DateTime?
+  settledAt          DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  analysis MaterialAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@unique([analysisId, stage, unitKey])
+  @@index([status, updatedAt])
+}
+
+model MaterialSourceFocus {
+  id           String @id @default(uuid())
+  analysisId   String
+  localKey     String
+  order        Int
+  title        String
+  kind         String
+  level        CefrLevel?
+  objectiveIds Json
+  detailsBytes Bytes
+  detailsSha256 String
+  createdAt    DateTime @default(now())
+
+  analysis MaterialAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@unique([analysisId, localKey])
+  @@index([analysisId, order, id])
+}
+
+model PlacementSession {
+  id                 String @id @default(uuid())
+  requestId          String
+  semanticDigest     String
+  policy             Json
+  input              Json
+  inputDigest        String
+  grant              Json
+  mode               String
+  attemptId          String? @unique
+  attemptFingerprint String?
+  responseKind       String?
+  responseMetadata   Json?
+  responseBytes      Bytes?
+  responseSha256     String?
+  admittedAt         DateTime?
+  settledAt          DateTime?
+  failureReason      String?
+  userId             String
+  userGeneration     BigInt
+  nativeLang         String
+  targetLang         String
+  analysisId         String?
+  analysisRevision   Int?
+  analysisDigest     String?
+  questionsBytes     Bytes
+  questionsDigest    String
+  scoringVersion     Int @default(1)
+  status             String @default("READY")
+  acceptedReceiptId  String? @unique
+  expiresAt          DateTime
+  createdAt          DateTime @default(now())
+
+  user          User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  analysis      MaterialAnalysis? @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  confirmations PlacementConfirmationReceipt[]
+
+  @@index([userId, createdAt])
+  @@unique([userId, requestId])
+  @@index([userId, semanticDigest, status])
+}
+
+model PlacementConfirmationReceipt {
+  id           String @id @default(uuid())
+  requestId    String
+  userId       String
+  courseId     String
+  analysisId   String?
+  sessionId    String?
+  intentDigest String
+  response     Json
+  createdAt    DateTime @default(now())
+
+  user     User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  analysis MaterialAnalysis? @relation(fields: [analysisId], references: [id], onDelete: SetNull)
+  session  PlacementSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, requestId])
+  @@index([courseId])
 }

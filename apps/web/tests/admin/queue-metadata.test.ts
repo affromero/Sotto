@@ -3,6 +3,13 @@ import { ALL_QUEUE_NAMES } from '@/lib/queue';
 import { QUEUE_METADATA, PIPELINE_STAGE_ORDER } from '@/app/(admin)/admin/queues/queue-metadata';
 
 describe('queue-metadata', () => {
+  it('identifies complete source analysis and private placement preparation', () => {
+    expect(QUEUE_METADATA['material-analysis']).toMatchObject({ stage: 'Content Pipeline' });
+    expect(QUEUE_METADATA['material-analysis'].description).toMatch(/every retained text chunk/);
+    expect(QUEUE_METADATA['placement-generation'].description).toMatch(
+      /private placement.*exact source analyses/
+    );
+  });
   it('explains complete page extraction and unresolved visual content', () => {
     expect(QUEUE_METADATA['material-extraction'].stage).toBe('Content Pipeline');
     expect(QUEUE_METADATA['material-extraction'].description).toMatch(

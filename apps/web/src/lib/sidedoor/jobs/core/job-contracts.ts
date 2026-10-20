@@ -46,6 +46,8 @@ const SOTTO_DURABLE_JOB_VERSIONS: ReadonlyMap<string, readonly number[]> = new M
   ['material-finalization', [1]],
   ['material-extraction', [1]],
   ['material-optimization', [1]],
+  ['material-analysis', [1]],
+  ['placement-generation', [1]],
 ]);
 
 export function requireSottoJobVersion(handler: string, version: number): void {

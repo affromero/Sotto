@@ -7,6 +7,13 @@ import { readingVocabularySchema } from '../reading-vocabulary';
 import { skillRequirementsSchema } from '../learning-requirements';
 import { classTeachingSchema } from './class-teaching';
 import {
+  placementSessionPublicSchema,
+  placementSubmitRequestSchema,
+  placementConfirmRequestSchema,
+  placementSourceRequestSchema,
+  placementSourceAdmissionSchema,
+} from '../placement/contracts';
+import {
   practicePreparingSchema,
   practiceReceiptSchema,
   speakingEvidenceSchema,
@@ -688,33 +695,20 @@ export const placementQuestionSchema = z.object({
   options: z.array(z.string()),
 });
 
-export const generatePlacementResponseSchema = z.object({
-  native: z.string(),
-  target: z.string(),
-  questions: z.array(placementQuestionSchema),
-});
+export const generatePlacementResponseSchema = placementSessionPublicSchema;
 
 // POST body: the answered questions for the (native, target) pair. selectedIndex
 // is 0..3 for a content option and 4 for the "I don't know" option; at least one
 // answer is required (`.min(1)`).
-export const submitPlacementRequestSchema = z.object({
-  native: z.string().length(2),
-  target: z.string().length(2),
-  answers: z
-    .array(
-      z.object({
-        id: z.string(),
-        selectedIndex: z.number().int().min(0).max(4),
-      })
-    )
-    .min(1),
-});
+export const submitPlacementRequestSchema = placementSubmitRequestSchema;
 
 export const submitPlacementResponseSchema = z.object({
   courseId: z.string(),
   level: cefrLevelSchema,
   // Per-skill ratios (0..1), keyed by skill name.
   scoreBySkill: z.record(z.string(), z.number()),
+  assessedLevel: cefrLevelSchema,
+  confirmationReceiptId: z.uuid(),
 });
 
 // ---------------------------------------------------------------------------
@@ -723,31 +717,18 @@ export const submitPlacementResponseSchema = z.object({
 // file uploads use a separate multipart route (not in the contract).
 // ---------------------------------------------------------------------------
 
-export const deduceFromNotesRequestSchema = z.object({
-  native: z.string().length(2),
-  target: z.string().length(2),
-  content: z.string().min(1),
-});
-
-export const deduceFromNotesResponseSchema = z.object({
-  native: z.string(),
-  target: z.string(),
-  deducedLevel: cefrLevelSchema,
-  rationale: z.string(),
-  confidence: z.number(),
-});
+export const deduceFromNotesRequestSchema = placementSourceRequestSchema;
+export const deduceFromNotesResponseSchema = placementSourceAdmissionSchema;
 
 // POST /api/v1/placement/from-notes/confirm — accept the deduced level, create
 // the course, and seed the note + vocabulary. Mirrors the confirm route.
-export const confirmFromNotesRequestSchema = z.object({
-  native: z.string().length(2),
-  target: z.string().length(2),
-});
+export const confirmFromNotesRequestSchema = placementConfirmRequestSchema;
 
 export const confirmFromNotesResponseSchema = z.object({
   courseId: z.string(),
   level: cefrLevelSchema,
   addedVocabulary: z.number(),
+  confirmationReceiptId: z.uuid(),
 });
 
 // ---------------------------------------------------------------------------

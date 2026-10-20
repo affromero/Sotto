@@ -38,6 +38,8 @@ import { startPricingRefreshInterval } from '@/lib/pricing';
 import { processMaterialFinalization } from '@/lib/course-materials/uploads/finalization';
 import { processMaterialExtraction } from '@/lib/course-materials/extraction/processing';
 import { processMaterialOptimization } from '@/lib/course-materials/optimization/processing';
+import { processMaterialAnalysis } from '@/lib/course-materials/analysis/processing';
+import { processPlacementGeneration } from '@/lib/placement/processing';
 import { maintainMaterialUploads } from '@/lib/course-materials/uploads/cleanup';
 import { runTaskLoop } from 'thesidedoor-core/runtime/task-loop';
 
@@ -85,6 +87,16 @@ logger.info('Starting Sotto workers...', {
 
 // Create workers filtered by WORKER_PROFILE
 const workers = [
+  shouldRun('material-analysis') &&
+    createWorker('material-analysis', processMaterialAnalysis, {
+      concurrency: 1,
+      lockDuration: 1_200_000,
+    }),
+  shouldRun('placement-generation') &&
+    createWorker('placement-generation', processPlacementGeneration, {
+      concurrency: 1,
+      lockDuration: 1_200_000,
+    }),
   shouldRun('material-optimization') &&
     createWorker('material-optimization', processMaterialOptimization, {
       concurrency: 1,

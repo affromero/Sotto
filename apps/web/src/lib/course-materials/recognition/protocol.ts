@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { learningProviderInputHash } from '@/lib/learning/preparation/identity';
 import { z } from 'zod';
 import { learningCredentialFingerprint } from '@/lib/classes/preparation-selection';
 import type { CapturedLearningAi } from '@/lib/learning-ai';
@@ -141,33 +142,7 @@ export const MATERIAL_RECOGNITION_SYSTEM = [
 export const MATERIAL_TRANSCRIPTION_JSON_SCHEMA = z.toJSONSchema(materialTranscriptionSchema);
 
 /** JSONB may reorder object keys. Hash JSON meaning while retaining array order. */
-export function materialRecognitionHash(value: unknown): string {
-  const ancestors = new Set<object>();
-  const encode = (item: unknown): string => {
-    if (item === null || typeof item === 'string' || typeof item === 'boolean')
-      return JSON.stringify(item);
-    if (typeof item === 'number' && Number.isFinite(item)) return JSON.stringify(item);
-    if (
-      typeof item !== 'object' ||
-      item === null ||
-      (!Array.isArray(item) &&
-        Object.getPrototypeOf(item) !== Object.prototype &&
-        Object.getPrototypeOf(item) !== null)
-    )
-      throw new Error('Recognition identities require finite JSON values.');
-    if (ancestors.has(item)) throw new Error('Recognition identities cannot contain cycles.');
-    ancestors.add(item);
-    const encoded = Array.isArray(item)
-      ? `[${item.map(encode).join(',')}]`
-      : `{${Object.keys(item)
-          .sort()
-          .map((key) => `${JSON.stringify(key)}:${encode(Reflect.get(item, key))}`)
-          .join(',')}}`;
-    ancestors.delete(item);
-    return encoded;
-  };
-  return createHash('sha256').update(encode(value)).digest('hex');
-}
+export const materialRecognitionHash = learningProviderInputHash;
 
 /** Requires a reviewed capability for exactly the captured configured model. No model defaults. */
 export function materialRecognitionSelection(

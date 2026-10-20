@@ -3,8 +3,7 @@ import Foundation
 /// Assessment calls — memory graph, placement, exams, and writing — split out
 /// of SottoAppModel to keep that file under the repo's 1000-line limit. These
 /// are thin pass-throughs: they resolve the paired client and forward. The two
-/// placement calls additionally refresh the course list, because both create
-/// or raise a course server-side.
+/// Placement confirmation refreshes the course list after initial enrollment.
 extension SottoAppModel {
     // MARK: - Activity
 
@@ -26,24 +25,24 @@ extension SottoAppModel {
 
     // MARK: - Placement
 
-    func fetchPlacement(native: String, target: String) async throws -> SottoPlacementBatch {
+    func fetchPlacement(native: String, target: String, requestId: UUID) async throws -> SottoPlacementBatch {
         guard let client = makeClient() else {
             throw SottoAPIError.message("Pair this device before taking a placement test.")
         }
-        return try await client.fetchPlacement(native: native, target: target)
+        return try await client.fetchPlacement(native: native, target: target, requestId: requestId)
     }
 
     func submitPlacement(
-        native: String,
-        target: String,
+        batch: SottoPlacementBatch,
+        requestId: UUID,
         answers: [SottoPlacementAnswer]
     ) async throws -> SottoPlacementResult {
         guard let client = makeClient() else {
             throw SottoAPIError.message("Pair this device before taking a placement test.")
         }
         let result = try await client.submitPlacement(
-            native: native,
-            target: target,
+            batch: batch,
+            requestId: requestId,
             answers: answers
         )
         await loadCourses()

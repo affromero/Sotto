@@ -2,6 +2,34 @@ import { expect, it } from 'vitest';
 import { resumeEndpoint, resumeEndpoints } from '@/app/welcome/session/resume-security';
 import { parseStoredSnapshot } from '@/app/welcome/session/welcome-snapshot';
 
+it('retains the exact accepted placement analysis without restoring private source text', () => {
+  const placementAnalysis = {
+    native: 'en',
+    target: 'de',
+    level: 'A2',
+    requestId: '115b485b-fbf2-4475-94d3-bbb8dd336877',
+    reference: {
+      analysisId: 'cd559f5c-a46e-43e1-9b4e-bf0a3eaab735',
+      analysisRevision: 1,
+      resultDigest: 'a'.repeat(64),
+      acceptPartial: true,
+    },
+  };
+  expect(parseStoredSnapshot(JSON.stringify({ placementAnalysis }))?.placementAnalysis).toEqual(
+    placementAnalysis
+  );
+  expect(
+    parseStoredSnapshot(
+      JSON.stringify({
+        placementAnalysis: {
+          ...placementAnalysis,
+          reference: { ...placementAnalysis.reference, resultDigest: 'changed' },
+        },
+      })
+    )?.placementAnalysis
+  ).toBeUndefined();
+});
+
 it('preserves owned attachment identifiers when resuming onboarding', () => {
   const materialId = 'a604f52a-d011-4a21-9c6c-23de4930eeed';
   const snapshot = parseStoredSnapshot(

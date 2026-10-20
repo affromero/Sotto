@@ -406,6 +406,29 @@ suite('explicit reviewed full-page material recognition', () => {
     ).toBe(3);
     expect(requests).toHaveLength(1);
   });
+  it('reads reviewed recognition options through a browser GET without Origin and keeps mutation CSRF protected', async () => {
+    const { material } = await fixture();
+    await reviewed();
+    const browser = new NextRequest(
+      `http://localhost:3000/api/v1/materials/${material.id}/recognize`,
+      {
+        headers: {
+          cookie: `sotto_session=${identity.ownerToken}`,
+          'sec-fetch-site': 'same-origin',
+        },
+      }
+    );
+    expect(
+      (await options(browser, { params: Promise.resolve({ materialId: material.id }) })).status
+    ).toBe(200);
+    const input = await admission(material.id);
+    const forged = request(`materials/${material.id}/recognize`, input);
+    forged.headers.set('origin', 'https://untrusted.example');
+    expect(
+      (await recognize(forged, { params: Promise.resolve({ materialId: material.id }) })).status
+    ).toBe(403);
+    expect(requests).toHaveLength(0);
+  });
   it('rejects a foreign profile, stale revision, changed capability and replay identity before any dispatch', async () => {
     const { material } = await fixture();
     await reviewed();

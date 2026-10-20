@@ -18,9 +18,10 @@ import {
 
 function operation(
   request: NextRequest,
+  mutation: boolean,
   work: (admission: AuthenticatedRequest) => Promise<NextResponse>
 ) {
-  return accessOperation(request, !request.headers.has('authorization'), async () => {
+  return accessOperation(request, mutation && !request.headers.has('authorization'), async () => {
     const admission = await authenticateRequest(request);
     if (!admission) return errorResponse('Unauthorized', 401);
     try {
@@ -38,7 +39,7 @@ function operation(
 }
 
 export function GET(request: NextRequest, { params }: { params: Promise<{ materialId: string }> }) {
-  return operation(request, async (admission) => {
+  return operation(request, false, async (admission) => {
     const { materialId } = await params;
     if (!z.uuid().safeParse(materialId).success) return errorResponse('Material not found', 404);
     const material = await sottoTransaction(
@@ -81,7 +82,7 @@ export function POST(
   request: NextRequest,
   { params }: { params: Promise<{ materialId: string }> }
 ) {
-  return operation(request, async (admission) => {
+  return operation(request, true, async (admission) => {
     const { materialId } = await params;
     if (!z.uuid().safeParse(materialId).success) return errorResponse('Material not found', 404);
     const bytes = await readRequestBytes(request, 32768);
