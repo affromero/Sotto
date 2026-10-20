@@ -108,6 +108,7 @@ const EXPECTED_FILES = [
   'live/extract-vocab.md',
   'live/extract-reading-vocab.md',
   'live/extract-source-vocab.md',
+  'live/index-source-vocab.md',
   'live/extract-learning-targets.md',
   'exams/exam-feedback.md',
 ];
@@ -229,6 +230,7 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
   'live/extract-vocab.md': ['LEVEL', 'MAX', 'NATIVE', 'TARGET'],
   'live/extract-reading-vocab.md': ['LEVEL', 'MAX', 'MAX_QUESTION_INDEX', 'NATIVE', 'TARGET'],
   'live/extract-source-vocab.md': ['LEVEL', 'MAX', 'NATIVE', 'TARGET'],
+  'live/index-source-vocab.md': ['MAX', 'NATIVE', 'TARGET'],
   'live/extract-learning-targets.md': ['LEVEL', 'MAX_GRAMMAR', 'MAX_VOCAB', 'NATIVE', 'TARGET'],
   'exams/exam-feedback.md': ['EXAM_NAME', 'LEVEL', 'OVERALL', 'SECTIONS'],
   'generation/script-generator.md': [

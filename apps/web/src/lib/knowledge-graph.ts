@@ -8,6 +8,7 @@ import { normalizeLearningTargetText } from './learning-targets';
 import { rankLearningTargets } from '@sotto/learning-model';
 import type { CefrLevel } from '@sotto/shared';
 import type { LearningDatabase } from './learning/database';
+import { introducedVocabularyWhere } from './learning/vocabulary/memory';
 
 export interface VocabItem {
   lemma: string;
@@ -222,19 +223,26 @@ export interface DueItems {
 }
 
 /** Adaptive due-or-weak items, used to seed practice, classes, and listening. */
-export async function getDueItems(courseId: string, limit = 8): Promise<DueItems> {
+export async function getDueItems(
+  courseId: string,
+  limit = 8,
+  database: Pick<
+    LearningDatabase,
+    'learnerFocusTarget' | 'learnerVocab' | 'learnerGrammar'
+  > = prismaUnfiltered
+): Promise<DueItems> {
   const now = new Date();
   const dueOrWeak = { OR: [{ dueAt: { lte: now } }, { mastery: { lt: 0.5 } }] };
   const candidateLimit = Math.max(limit, limit * 4);
   const [focusTargets, vocab, grammar] = await Promise.all([
-    prisma.learnerFocusTarget.findMany({
+    database.learnerFocusTarget.findMany({
       where: { courseId, kind: { in: ['WORD', 'PHRASE'] } },
       orderBy: [{ priorityBoost: 'desc' }, { lastSelectedAt: 'desc' }],
       take: candidateLimit,
       select: { normalizedText: true, priorityBoost: true },
     }),
-    prisma.learnerVocab.findMany({
-      where: { courseId, ...dueOrWeak },
+    database.learnerVocab.findMany({
+      where: { courseId, AND: [dueOrWeak, introducedVocabularyWhere()] },
       orderBy: [{ dueAt: 'asc' }, { mastery: 'asc' }],
       take: candidateLimit,
       select: {
@@ -248,7 +256,7 @@ export async function getDueItems(courseId: string, limit = 8): Promise<DueItems
         lastReviewed: true,
       },
     }),
-    prisma.learnerGrammar.findMany({
+    database.learnerGrammar.findMany({
       where: { courseId, ...dueOrWeak },
       orderBy: [{ dueAt: 'asc' }, { mastery: 'asc' }],
       take: candidateLimit,

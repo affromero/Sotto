@@ -244,6 +244,21 @@
     }
 
     #[test]
+    fn saved_dictionary_study_continues_on_web_without_entering_choice_review() {
+        let response = start_response(serde_json::json!({
+            "status": "ready_vocabulary", "kind": "VOCAB",
+            "sessionId": "17675585-41c5-43cb-9a16-fc5122b747f0", "courseId": "course-1",
+            "mode": "MEANING_RECALL", "nativeLang": "en", "targetLang": "de",
+            "progressRevision": 0, "writingDrafts": {}, "receipt": null,
+            "cards": [{"id": "bac2848d-d95d-478c-8ca4-11f9f75cc805", "prompt": "Bahnhof", "feedback": null}]
+        }));
+        match reduce_start(course_home(), &response) {
+            View::CourseHome { notice, .. } => assert_eq!(notice, Some(Unavailable::NotInTerminal("Vocabulary study"))),
+            other => panic!("expected saved web study notice, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn unavailable_start_response_stays_on_course_home_with_reason() {
         let resp = start_response(serde_json::json!({
             "status": "unavailable",

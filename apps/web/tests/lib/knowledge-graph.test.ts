@@ -400,14 +400,26 @@ describe('getDueItems', () => {
     expect(mockLearnerGrammarFindMany).toHaveBeenCalledWith(expect.objectContaining({ take: 16 }));
   });
 
-  it('uses courseId in the where clause', async () => {
+  it('scopes due vocabulary to the course and previously introduced words', async () => {
     mockLearnerVocabFindMany.mockResolvedValue([]);
     mockLearnerGrammarFindMany.mockResolvedValue([]);
 
     await getDueItems('course-xyz');
 
     expect(mockLearnerVocabFindMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: expect.objectContaining({ courseId: 'course-xyz' }) })
+      expect.objectContaining({
+        where: expect.objectContaining({
+          courseId: 'course-xyz',
+          AND: expect.arrayContaining([
+            expect.objectContaining({
+              OR: expect.arrayContaining([
+                { introducedAt: { not: null } },
+                { lastReviewed: { not: null } },
+              ]),
+            }),
+          ]),
+        }),
+      })
     );
   });
 

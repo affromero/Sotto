@@ -394,6 +394,7 @@ export async function generateTargetPronunciation(
 ): Promise<LearningTargetDto> {
   const target = await findTargetForUser(courseId, userId, targetId);
   const routing = await resolvePronunciationRouting(target);
+  if (target.pronunciationAudioUrl) return toDto(target);
   const episodeId = `focus-${target.id}`;
   let provider: Awaited<ReturnType<typeof resolveTtsProvider>>['provider'];
   try {

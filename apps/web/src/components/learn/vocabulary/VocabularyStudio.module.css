@@ -1,0 +1,253 @@
+.root {
+  max-width: 68rem;
+  margin: 0 auto;
+  padding: 2rem 1rem 8rem;
+  display: grid;
+  gap: 2rem;
+  color: var(--color-text-primary);
+}
+.header {
+  max-width: 42rem;
+}
+.eyebrow {
+  font: 500 0.7rem var(--font-mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+  margin: 0 0 1rem;
+}
+.header h1 {
+  font: 400 clamp(2.5rem, 7vw, 4.5rem)/1.05 var(--font-heading);
+  margin: 0 0 1.5rem;
+  letter-spacing: -0.025em;
+}
+.header h1 span {
+  color: var(--color-primary);
+}
+.intro {
+  max-width: 36rem;
+  line-height: 1.7;
+  color: var(--color-text-secondary);
+}
+.practice {
+  display: grid;
+  gap: 1.5rem;
+  padding: 1.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 1rem;
+  background: var(--color-surface);
+}
+.practice h2,
+.editor h2,
+.empty h2 {
+  font: 400 2rem/1.15 var(--font-heading);
+  margin: 0;
+}
+.practice p {
+  color: var(--color-text-secondary);
+  max-width: 34rem;
+}
+.startControls,
+.editor {
+  display: grid;
+  gap: 0.75rem;
+}
+.startControls label,
+.tools label,
+.editor label {
+  display: grid;
+  gap: 0.4rem;
+  color: var(--color-text-secondary);
+  font-size: 0.8rem;
+}
+.root button,
+.root select,
+.root input,
+.root textarea {
+  min-height: 44px;
+  font: inherit;
+}
+.root select,
+.search input,
+.editor input,
+.editor textarea {
+  min-width: 0;
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  padding: 0.65rem;
+}
+.root button {
+  border-radius: 0.5rem;
+  cursor: pointer;
+  padding: 0.6rem 0.9rem;
+  background: transparent;
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
+}
+.root button.primary {
+  background: var(--color-primary);
+  color: #fff;
+  border-color: var(--color-primary);
+}
+.root button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+}
+.stats strong {
+  display: block;
+  font: 400 2rem var(--font-heading);
+  color: var(--color-text-primary);
+}
+.dictionary {
+  min-width: 0;
+}
+.tools {
+  display: flex;
+  align-items: end;
+  gap: 0.75rem;
+  padding-bottom: 1rem;
+}
+.search {
+  flex: 1;
+  min-width: 0;
+}
+.tools > label:last-child {
+  max-width: 9rem;
+}
+.selection,
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0.75rem 0;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+}
+.words {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  border-top: 1px solid var(--color-border);
+}
+.row {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 0.25rem 0.5rem;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--color-border);
+  align-items: start;
+}
+.check {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  min-height: 44px;
+  cursor: pointer;
+  grid-row: span 3;
+}
+.check input {
+  accent-color: var(--color-primary);
+  width: 18px;
+}
+.lexeme {
+  display: grid;
+  gap: 0.1rem;
+  overflow-wrap: anywhere;
+}
+.lexeme strong {
+  font: 500 1.5rem var(--font-heading);
+}
+.lexeme span {
+  font-size: 0.95rem;
+}
+.lexeme small,
+.memory small {
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+}
+.memory {
+  display: grid;
+  gap: 0.15rem;
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+}
+.memory > span {
+  color: var(--color-primary);
+}
+.row .edit {
+  justify-self: start;
+  padding-left: 0;
+  border: 0;
+  font-size: 0.75rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.empty {
+  padding: 2rem 0;
+  color: var(--color-text-secondary);
+}
+.editor {
+  border: 1px solid var(--color-border);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  background: var(--color-surface);
+}
+.editor p,
+.help {
+  color: var(--color-text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.7;
+}
+.help summary,
+.row summary,
+.row details a {
+  min-height: 44px;
+  cursor: pointer;
+  color: var(--color-text-primary);
+}
+.row details a {
+  display: inline-flex;
+  align-items: center;
+}
+.error {
+  color: var(--color-error);
+}
+.root :focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+}
+@media (min-width: 1024px) {
+  .root {
+    padding-top: 3.5rem;
+  }
+  .practice {
+    grid-template-columns: minmax(0, 1fr) 16rem;
+    padding: 2rem;
+    align-items: center;
+  }
+  .stats {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  .row {
+    grid-template-columns: 44px minmax(0, 1fr) minmax(10rem, 0.75fr) auto;
+    gap: 1rem;
+    align-items: center;
+  }
+  .check {
+    grid-row: auto;
+  }
+  .memory {
+    margin: 0;
+  }
+}

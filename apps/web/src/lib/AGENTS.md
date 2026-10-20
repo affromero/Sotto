@@ -1,5 +1,23 @@
 # src/lib/ — Core Libraries
 
+## Vocabulary lifecycle
+
+`vocabulary/` owns dictionary reads, deterministic study admission and actions,
+material-index admission, and local pronunciation. Keep answer keys in private
+study state. Public cards reveal answers only after an immutable response.
+Apply assessed outcomes through the canonical review journal in the same
+transaction as the saved response. Flashcards only record exposure.
+
+Material indexing extends canonical reading vocabulary extraction and metadata
+review. Exact source offsets, independent coverage review, and bounded recursive
+chunk subdivision establish completeness. Imported words retain existing mastery.
+Use durable queue admission and preparation grants; uncertain provider outcomes
+remain fenced until canonical recovery confirms drainage.
+
+Word audio uses explicit local speech selection and canonical provider identity.
+Read endpoints serve owned cached bytes without synthesis. Revalidate selection,
+ownership, and disabled-speech policy before serving or publishing assets.
+
 `agents/isolated/isolated-agent.ts` is the explicit API-key Claude isolation adapter. It requires
 a local Linux Docker host, a reviewed immutable image with Claude 2.1.283, parent
 credential admission and durable container identity callbacks. Provider keys stay

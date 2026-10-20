@@ -75,6 +75,7 @@ describe('adaptive vocabulary selection', () => {
     { reps: 1, lastReviewed: null, firstSeenClassId: null },
     { reps: 0, lastReviewed: now, firstSeenClassId: null },
     { reps: 0, lastReviewed: null, firstSeenClassId: 'class-1' },
+    { reps: 0, lastReviewed: null, firstSeenClassId: null, introducedAt: now },
   ])('keeps introduced words active until recall is solid: %j', (provenance) => {
     const memory = [
       word('taught', {

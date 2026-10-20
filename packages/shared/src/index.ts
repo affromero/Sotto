@@ -127,3 +127,5 @@ export {
 // API contracts (Zod schemas + endpoint registry for OpenAPI/Rust codegen)
 export * from './contracts';
 export * from './learning/vocabulary-support';
+export * from './learning/vocabulary-study';
+export * from './learning/dictionary';

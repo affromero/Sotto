@@ -1,0 +1,127 @@
+.root {
+  width: min(100%, 42rem);
+  margin: 0 auto;
+  display: grid;
+  gap: 1.25rem;
+}
+.topline,
+.actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.topline {
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+}
+.eyebrow {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font: 500 0.7rem var(--font-mono);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.progress {
+  width: 100%;
+  height: 0.3rem;
+  accent-color: var(--color-primary);
+  border: 0;
+}
+.hint,
+.summary {
+  color: var(--color-text-secondary);
+  line-height: 1.7;
+  margin: 0;
+}
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 1.25rem;
+  padding: clamp(1.5rem, 5vw, 3rem);
+  display: grid;
+  gap: 1.5rem;
+  min-height: 21rem;
+  align-content: center;
+}
+.word,
+.title {
+  font-family: var(--font-heading);
+  font-weight: 400;
+  font-size: clamp(2rem, 8vw, 3.5rem);
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+  margin: 0;
+}
+.answer {
+  display: grid;
+  gap: 0.75rem;
+}
+.answer label {
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+}
+.answer input {
+  min-width: 0;
+  width: 100%;
+  min-height: 3rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  font: inherit;
+  color: var(--color-text-primary);
+  background: var(--color-background);
+}
+.primary,
+.secondary {
+  min-height: 44px;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  font: inherit;
+  cursor: pointer;
+}
+.primary {
+  background: var(--color-primary);
+  color: #fff;
+  border: 1px solid var(--color-primary);
+}
+.secondary {
+  background: transparent;
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
+}
+.primary:disabled,
+.secondary:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.feedback {
+  display: grid;
+  gap: 0.5rem;
+  border-top: 1px solid var(--color-border);
+  padding-top: 1rem;
+  line-height: 1.6;
+}
+.feedback p,
+.feedback h3 {
+  margin: 0;
+}
+.verdict {
+  color: var(--color-primary);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.feedback small {
+  color: var(--color-text-secondary);
+}
+.error {
+  color: var(--color-error);
+}
+.card audio {
+  width: 100%;
+}
+.root :focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+}

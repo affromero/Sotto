@@ -24,6 +24,13 @@ All React components, organized by feature domain. CSS Modules only — NO Tailw
 
 ### Learn Component Notes
 
+- `learn/vocabulary/` contains the Aula dictionary, import progress, flashcards,
+  direct recall, and cached local pronunciation controls. Keep unseen words
+  distinct from introduced words and assessed recall estimates.
+- Study retries preserve the original admission and answer requests. Flush
+  typed drafts before leaving. Word-recall and listening cards must not reveal
+  their answer through labels, audio URLs, or surrounding content.
+
 - `LessonAudioPlayer` uses the owned episode detail endpoint for native seeking,
   existing turn replay and ordered speaker playback. Switching audio or leaving
   the section pauses playback; replay never generates speech or changes answers.

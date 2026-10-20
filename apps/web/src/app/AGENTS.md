@@ -1,5 +1,12 @@
 # src/app/ — Next.js App Router Pages & API Routes
 
+Vocabulary lives at `/learn/vocabulary?course=...`, with optional `session` for
+resumption. Course vocabulary APIs list dictionary/import state, edit meanings,
+and admit deterministic study. Practice vocabulary actions preserve first-response
+receipts. Material `vocabulary-index` POST admits or explicitly retries indexing.
+Word/card audio POST prepares cached local pronunciation; GET only serves owned
+bytes. Authenticate every route and keep study answer keys private until feedback.
+
 Class preparation is durably admitted through `courses/[courseId]/next-class`.
 The `courses/[courseId]/preparation` route exposes explicit scheduling (POST),
 sanitized activity (GET), and acknowledged recovery after verified cleanup (PATCH).

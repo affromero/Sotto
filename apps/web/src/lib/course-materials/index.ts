@@ -13,6 +13,7 @@ import { extractUploadTexts, isUploadFile } from '../note-upload';
 import { getEditableCourseNote, mergeCourseNote, setCourseNote } from '../course-notes';
 import { sottoTransaction } from '../sidedoor/access/state/transaction';
 import type { SottoProviderExecution } from '../sidedoor/credentials/runtime/provider-execution';
+import { enqueueMaterialVocabularyIndex } from '../vocabulary/index-admission';
 
 const MAX_MATERIAL_BYTES = 50 * 1024 * 1024;
 const MAX_MATERIAL_FILES = 10;
@@ -175,6 +176,7 @@ export async function importCourseMaterials(
           data: { originalUrl },
         });
         if (published.count !== 1) throw new AccessError('conflict');
+        if (courseId) await enqueueMaterialVocabularyIndex(database, id, admission.userId);
       },
     });
     materials.push(
@@ -226,6 +228,7 @@ export async function attachCourseMaterials(
     data: { courseId },
   });
   if (attached.count !== ids.length) throw new AccessError('conflict');
+  for (const id of ids) await enqueueMaterialVocabularyIndex(database, id, userId);
 }
 
 export async function persistPlacementMaterials(

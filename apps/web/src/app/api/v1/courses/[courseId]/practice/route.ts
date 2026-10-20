@@ -16,6 +16,7 @@ import {
   ProviderCreditsExhaustedError,
   speechCreditsMessage,
 } from '@/lib/providers/shared/speech-availability';
+import { introducedVocabularyWhere } from '@/lib/learning/vocabulary/memory';
 
 type RouteParams = { params: Promise<{ courseId: string }> };
 
@@ -74,7 +75,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const now = new Date();
     const dueOrWeak = { OR: [{ dueAt: { lte: now } }, { mastery: { lt: 0.5 } }] };
     const [vocabDue, grammarDue, totalVocab, recent] = await Promise.all([
-      prisma.learnerVocab.count({ where: { courseId, ...dueOrWeak } }),
+      prisma.learnerVocab.count({
+        where: { courseId, AND: [dueOrWeak, introducedVocabularyWhere()] },
+      }),
       prisma.learnerGrammar.count({ where: { courseId, ...dueOrWeak } }),
       prisma.learnerVocab.count({ where: { courseId } }),
       prisma.practiceSession.findMany({

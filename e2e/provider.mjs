@@ -1,4 +1,9 @@
 import { createServer } from 'node:http';
+import {
+  vocabularyInventoryFixture,
+  vocabularyCoverageFixture,
+  vocabularyMetadataFixture,
+} from './vocabulary-provider.mjs';
 
 export function fixtureAudio() {
   const samples = 16000 * 8;
@@ -56,7 +61,19 @@ export async function startProvider() {
         const messages = body.messages.map((message) => message.content).join('\n');
         const system = body.messages.find((message) => message.role === 'system')?.content || '';
         let content;
-        if (
+        if (system.startsWith('Inventory every ')) {
+          content = JSON.stringify(
+            vocabularyInventoryFixture(
+              JSON.parse(body.messages.find((message) => message.role === 'user').content)
+            )
+          );
+        } else if (system.startsWith('Independently verify complete vocabulary coverage')) {
+          content = JSON.stringify(
+            vocabularyCoverageFixture(
+              JSON.parse(body.messages.find((message) => message.role === 'user').content)
+            )
+          );
+        } else if (
           system.startsWith('Extract useful ') &&
           system.includes('from the supplied reading passage')
         ) {
@@ -99,30 +116,34 @@ export async function startProvider() {
           const input = JSON.parse(
             body.messages.find((message) => message.role === 'user').content
           );
-          if (
-            !Array.isArray(input.items) ||
-            input.items.length !== 1 ||
-            input.items[0].index !== 0 ||
-            input.items[0].content.lemma !== 'Hallo' ||
-            input.items[0].content.gloss !== 'hello' ||
-            input.items[0].content.sourceQuote !== 'Hallo' ||
-            input.items[0].content.passageText !== 'Anna sagt Hallo zu ihrem Freund.'
-          ) {
-            throw new Error('Unexpected vocabulary review fixture');
+          if (input.items?.[0]?.content.lemma !== 'Hallo') {
+            content = JSON.stringify(vocabularyMetadataFixture(input));
+          } else {
+            if (
+              !Array.isArray(input.items) ||
+              input.items.length !== 1 ||
+              input.items[0].index !== 0 ||
+              input.items[0].content.lemma !== 'Hallo' ||
+              input.items[0].content.gloss !== 'hello' ||
+              input.items[0].content.sourceQuote !== 'Hallo' ||
+              input.items[0].content.passageText !== 'Anna sagt Hallo zu ihrem Freund.'
+            ) {
+              throw new Error('Unexpected vocabulary review fixture');
+            }
+            content = JSON.stringify({
+              items: [
+                {
+                  index: 0,
+                  metadata: { acceptable: true, issues: [], feedback: [] },
+                  associations: input.items[0].content.questionIndices.map((questionIndex) => ({
+                    questionIndex,
+                    canAnswerWithoutWord: false,
+                    reasoning: 'The greeting meaning distinguishes the required answer.',
+                  })),
+                },
+              ],
+            });
           }
-          content = JSON.stringify({
-            items: [
-              {
-                index: 0,
-                metadata: { acceptable: true, issues: [], feedback: [] },
-                associations: input.items[0].content.questionIndices.map((questionIndex) => ({
-                  questionIndex,
-                  canAnswerWithoutWord: false,
-                  reasoning: 'The greeting meaning distinguishes the required answer.',
-                })),
-              },
-            ],
-          });
         } else if (
           system.startsWith(
             'Determine whether each supplied reading question can be correctly answered'

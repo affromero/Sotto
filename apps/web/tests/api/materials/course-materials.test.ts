@@ -8,7 +8,11 @@ import { POST as placementUpload } from '@/app/api/v1/placement/from-notes/uploa
 import { getCachedNotesDeduction } from '@/lib/placement-notes';
 import { closeRedis } from '@/lib/redis';
 import { GET as download } from '@/app/api/v1/materials/[materialId]/file/route';
-import { GET as notes, PUT as saveNotes } from '@/app/api/v1/courses/[courseId]/notes/route';
+import {
+  GET as notes,
+  PUT as saveNotes,
+  POST as uploadNotes,
+} from '@/app/api/v1/courses/[courseId]/notes/route';
 import { getCourseNote } from '@/lib/course-notes';
 import { captureMaterialDocuments } from '@/lib/course-materials/documents';
 import { originalPdf } from '../../helpers/learning/pdf';
@@ -158,6 +162,32 @@ suite('owned original course materials', () => {
       },
     };
   }
+  it('retains original course notes and admits their full vocabulary index atomically', async () => {
+    const text = 'Bahnhof = station\nFahrkarte = ticket';
+    const form = new FormData();
+    form.append('files', new File([text], 'Official German.md', { type: 'text/markdown' }));
+    const response = await uploadNotes(
+      request(`courses/${courseId}/notes`, identity.ownerToken, { method: 'POST', body: form }),
+      { params: Promise.resolve({ courseId }) }
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toMatchObject({ body: '', imported: 1, failed: 0, vocabularyIndexing: 'queued' });
+    expect(body.materials[0]).toMatchObject({ name: 'Official German.md', extractedText: text });
+    expect(body.materials[0]).not.toHaveProperty('originalUrl');
+    expect(
+      await instance.database.materialVocabularyIndex.findFirst({
+        where: { materialId: body.materials[0].id },
+      })
+    ).toMatchObject({ courseId, status: 'PENDING', textLength: text.length });
+    expect(await instance.database.learnerVocab.count({ where: { courseId } })).toBe(0);
+    const original = await download(request(`materials/${body.materials[0].id}/file`), {
+      params: Promise.resolve({ materialId: body.materials[0].id }),
+    });
+    expect(await original.text()).toBe(text);
+    expect(await getCourseNote(courseId)).toContain(text);
+  });
+
   it('retains a PDF without transcription, reads its exact original for AI, and fences removal', async () => {
     const bytes = originalPdf(2, { text: false });
     const form = new FormData();

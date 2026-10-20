@@ -3,6 +3,7 @@
 // response schemas are authored here to mirror the actual route behavior
 // (read against the routes + practice-service, not invented).
 import { z } from 'zod';
+import { vocabularyStudySessionSchema } from '../learning/vocabulary-study';
 import { readingVocabularySchema } from '../reading-vocabulary';
 import { skillRequirementsSchema } from '../learning-requirements';
 import { classTeachingSchema } from './class-teaching';
@@ -209,6 +210,7 @@ export const startPracticeReadyFullSchema = z.object({
 });
 
 export const startPracticeResponseSchema = z.discriminatedUnion('status', [
+  vocabularyStudySessionSchema,
   practicePreparingSchema,
   startPracticeUnavailableSchema,
   startPracticeReadySchema,

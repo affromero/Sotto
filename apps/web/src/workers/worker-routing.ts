@@ -15,6 +15,8 @@ export const HEAVY_WORKERS = new Set(['audio-generation', 'audio-stitching']);
 const PIPELINE_WORKERS = new Set([
   'class-preparation',
   'practice-preparation',
+  'vocabulary-audio',
+  'vocabulary-index',
   'content-extraction',
   'deep-research',
   'creative-planning',
