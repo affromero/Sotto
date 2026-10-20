@@ -319,7 +319,7 @@ def activate_provider(directory: Path, release: str) -> None:
     atomic_json(path, {**expected, 'fishEnabled': True}, 0o444)
 
 
-def runtime_command(arguments: list[str]) -> bytes:
+def command_output(arguments: list[str], timeout: int | None = 120) -> bytes:
     descriptors: tuple[int, ...]
     try:
         os.fstat(9)
@@ -327,9 +327,13 @@ def runtime_command(arguments: list[str]) -> bytes:
     except OSError:
         descriptors = ()
     return subprocess.run(
-        ['docker', *arguments], capture_output=True, check=True,
-        timeout=120, pass_fds=descriptors,
+        arguments, capture_output=True, check=True,
+        timeout=timeout, pass_fds=descriptors,
     ).stdout
+
+
+def runtime_command(arguments: list[str]) -> bytes:
+    return command_output(['docker', *arguments])
 
 
 def enabled_activation(directory: Path, release: str) -> None:
@@ -621,14 +625,18 @@ def schema_transition(
 def unchanged_queue_contract(bound: Mapping[str, object]) -> None:
     review = mapping(cast(str, bound['review']).encode())
     contracts = cast(dict[str, str], review['previousWorkerContracts'])
-    source = read_bytes(Path(__file__).parent / 'images/queue-names.cjs')
+    directory = Path(__file__).parent / 'images'
     inventories = []
     for image in [os.environ['SOTTO_WORKERS_IMAGE_REF'], *contracts]:
-        raw = runtime_command([
-            'run', '--rm', '--pull', 'never', '--network', 'none',
-            '--read-only', '--entrypoint', 'node', image,
-            '--import', 'tsx', '-e', source.decode(),
-        ])
+        try:
+            raw = command_output([
+                sys.executable, str(directory / 'probe.py'),
+                '--reference', image,
+                '--source', str(directory / 'queue-names.cjs'), '--tsx',
+            ], timeout=None)
+        except subprocess.CalledProcessError as error:
+            detail = error.stderr.decode(errors='replace').strip()
+            raise ValueError('Queue inventory probe failed: ' + detail) from None
         names = json.loads(raw)
         if not isinstance(names, list) or not names or any(
             not isinstance(name, str) for name in names

@@ -117,6 +117,22 @@ class SchemaReviewTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 REVIEW.unchanged_queue_contract(self.bound)
 
+    def test_failed_queue_probe_exposes_the_runtime_error_before_admission(
+        self,
+    ) -> None:
+        def failed_probe(
+            arguments: list[str], **options: object,
+        ) -> subprocess.CompletedProcess[bytes]:
+            raise subprocess.CalledProcessError(
+                1, arguments, stderr=b'fixture queue module failed to load',
+            )
+
+        with patch.dict(os.environ, self.case.environment), patch.object(
+            REVIEW.subprocess, 'run', side_effect=failed_probe
+        ):
+            with self.assertRaisesRegex(ValueError, 'queue module failed to load'):
+                REVIEW.unchanged_queue_contract(self.bound)
+
     def test_stopped_proof_rejects_running_replaced_or_abnormal_captured_services(self) -> None:
         fixture = self.case.legacy_continuity_fixture()
         previous = fixture['review']['providerActivation']['previousRuntimes']
