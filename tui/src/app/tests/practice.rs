@@ -76,6 +76,7 @@ async fn second_select_while_starting_does_not_dispatch_twice() {
             vocab: 3,
             grammar: 0,
             total_vocab: 9,
+            ..Default::default()
         },
         menu_cursor: 0,
         notice: None,

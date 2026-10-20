@@ -792,19 +792,9 @@ struct PracticeKindOption: Identifiable {
     let kind: String
     let label: String
 
-    /// Only vocabulary and grammar carry a due count server-side; a full
-    /// catch-up draws on both, and the rest are generated on demand.
+    /// Overall counts include each objective once; skill counts can overlap.
     func dueCount(in overview: SottoPracticeOverview) -> Int? {
-        switch kind {
-        case "FULL":
-            return overview.totalDue
-        case "VOCAB":
-            return overview.due.vocab
-        case "GRAMMAR":
-            return overview.due.grammar
-        default:
-            return nil
-        }
+        overview.due.count(for: kind)
     }
 }
 

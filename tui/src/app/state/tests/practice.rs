@@ -1,6 +1,38 @@
     use super::*;
 
     #[test]
+    fn canonical_review_counts_survive_without_legacy_items_and_overlap_only_by_skill() {
+        let response: types::PracticeOverviewResponse = serde_json::from_value(serde_json::json!({
+            "due":{"vocab":0,"grammar":0,"objectives":1,"bySkill":{"GRAMMAR":1,"WRITING":1}},
+            "totalVocab":0,"recent":[]
+        })).unwrap();
+        let due = DueCounts::from(&response);
+        assert_eq!(due.total_due(), 1);
+        assert_eq!(due.skill_due(SkillChoice::Grammar), Some(1));
+        assert_eq!(due.skill_due(SkillChoice::Writing), Some(1));
+        assert_eq!(due.skill_due(SkillChoice::Speaking), None);
+        assert_eq!(due.objectives, 1);
+        assert!(!can_review_vocab(&due));
+        let mixed: types::PracticeOverviewResponse = serde_json::from_value(serde_json::json!({
+            "due":{"vocab":4,"grammar":2,"objectives":3,"bySkill":{"GRAMMAR":2,"WRITING":3}},
+            "totalVocab":40,"recent":[]
+        })).unwrap();
+        let due = DueCounts::from(&mixed);
+        assert_eq!(due.total_due(), 9);
+        assert_eq!(due.skill_due(SkillChoice::Grammar), Some(4));
+        assert_eq!(due.vocab, 4);
+        assert_eq!(due.grammar, 2);
+        assert_eq!(due.total_vocab, 40);
+        let legacy: types::PracticeOverviewResponse = serde_json::from_value(serde_json::json!({
+            "due":{"vocab":4,"grammar":2},"totalVocab":40,"recent":[]
+        })).unwrap();
+        let due = DueCounts::from(&legacy);
+        assert_eq!(due.total_due(), 6);
+        assert_eq!(due.skill_due(SkillChoice::Grammar), Some(2));
+        assert_eq!(due.skill_due(SkillChoice::Writing), None);
+    }
+
+    #[test]
     fn practice_reading_keeps_the_passage_with_its_question() {
         let item: types::PracticeItem = serde_json::from_value(serde_json::json!({
             "id": "r0", "prompt": "Wo ist Mia?", "options": ["Berlin", "Bonn"],
@@ -49,6 +81,7 @@
                 vocab: 4,
                 grammar: 0,
                 total_vocab: 12,
+                ..Default::default()
             },
             menu_cursor: 0,
             notice: None,
@@ -161,12 +194,14 @@
             vocab: 3,
             grammar: 0,
             total_vocab: 0,
+            ..Default::default()
         }));
         assert!(can_review_vocab(&DueCounts {
             recent: Vec::new(),
             vocab: 0,
             grammar: 0,
             total_vocab: 10,
+            ..Default::default()
         }));
         // Grammar-only due does not enable the vocab review.
         assert!(!can_review_vocab(&DueCounts {
@@ -174,6 +209,7 @@
             vocab: 0,
             grammar: 5,
             total_vocab: 0,
+            ..Default::default()
         }));
     }
 

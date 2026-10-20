@@ -258,14 +258,18 @@ fn draw_course_home(
             ),
         ]),
         Line::from(vec![
-            Span::styled("Due  ", Style::default().fg(p.ink_soft)),
+            Span::styled(format!("Due {} total  ", due.total_due()), Style::default().fg(p.ink_soft)),
             Span::styled(
                 format!("{} vocab", due.vocab),
                 Style::default().fg(p.primary).add_modifier(Modifier::BOLD),
             ),
             Span::styled("   ", Style::default().fg(p.ink_soft)),
             Span::styled(
-                format!("{} grammar", due.grammar),
+                format!("{} legacy grammar", due.grammar),
+                Style::default().fg(p.accent),
+            ),
+            Span::styled(
+                format!("   {} objective{}", due.objectives, if due.objectives == 1 { "" } else { "s" }),
                 Style::default().fg(p.accent),
             ),
             Span::styled(
@@ -289,8 +293,9 @@ fn draw_course_home(
                 Style::default().fg(p.ink).add_modifier(Modifier::BOLD)
             };
             let suffix = if disabled { "  (nothing due)" } else { "" };
+            let badge = due.skill_due(*skill).map(|value| format!("  ({value} due)")).unwrap_or_default();
             ListItem::new(Line::from(Span::styled(
-                format!("{}{}", skill.label(), suffix),
+                format!("{}{}{}", skill.label(), badge, suffix),
                 style,
             )))
         })

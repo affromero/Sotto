@@ -142,13 +142,33 @@ struct SottoPracticeOverview: Decodable, Equatable {
     struct Due: Decodable, Equatable {
         let vocab: Int
         let grammar: Int
+        let objectives: Int?
+        let bySkill: [String: Int]?
+
+        func count(for kind: String) -> Int? {
+            switch kind {
+            case "FULL": return vocab + grammar + (objectives ?? 0)
+            case "VOCAB": return vocab
+            case "GRAMMAR": return grammar + (bySkill?[kind] ?? 0)
+            default: return bySkill?[kind]
+            }
+        }
     }
 
     let due: Due
     let totalVocab: Int
     let recent: [SottoPracticeSessionSummary]
 
-    var totalDue: Int { due.vocab + due.grammar }
+    var totalDue: Int { due.vocab + due.grammar + (due.objectives ?? 0) }
+    var dueSummary: String {
+        var parts: [String] = []
+        if due.vocab > 0 { parts.append("\(due.vocab) word\(due.vocab == 1 ? "" : "s")") }
+        if due.grammar > 0 { parts.append("\(due.grammar) legacy grammar point\(due.grammar == 1 ? "" : "s")") }
+        if let objectives = due.objectives, objectives > 0 {
+            parts.append("\(objectives) objective\(objectives == 1 ? "" : "s")")
+        }
+        return parts.isEmpty ? "" : "\(parts.joined(separator: " and ")) due for review."
+    }
     var unfinished: [SottoPracticeSessionSummary] {
         recent.filter { $0.status == "ACTIVE" && $0.completedAt == nil }
     }
