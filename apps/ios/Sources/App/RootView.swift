@@ -11,13 +11,17 @@ struct RootView: View {
 
     var body: some View {
         ZStack {
-            if model.isPaired {
+            if model.showingPlay {
+                PlayRootView(coordinator: model.play)
+            } else if model.isPaired {
                 if model.hasSelectedProfile {
                     if !model.hasAIConsent, let serverURL = model.credentials?.serverURL {
                         PrivacyConsentView(serverURL: serverURL) {
                             model.acceptAIProcessing()
                         } onDecline: {
                             model.signOut()
+                        } onPlay: {
+                            model.openPlay()
                         }
                     } else if let selectedClass = model.selectedClass {
                         let state = model.learningSessionState(path: "/api/v1/classes/\(selectedClass.id)",
@@ -35,7 +39,7 @@ struct RootView: View {
                 PairingView()
             }
 
-            if model.isLoading {
+            if model.isLoading && !model.showingPlay {
                 LoadingOverlay(
                     operation: model.loadingOperation,
                     onCancel: {
@@ -49,7 +53,7 @@ struct RootView: View {
         .background(SottoTheme.paper)
         .environment(\.sottoLayout, layout)
         .safeAreaInset(edge: .top) {
-            if let failure = model.courseRefreshError {
+            if !model.showingPlay, let failure = model.courseRefreshError {
                 Text(failure)
                     .font(.caption)
                     .foregroundStyle(SottoTheme.muted)
@@ -59,10 +63,11 @@ struct RootView: View {
                     .accessibilityAddTraits(.updatesFrequently)
             }
         }
-        .task(id: CourseRefreshLifecycle(scenePhase: scenePhase, identity: model.courseRefreshIdentity)) {
-            guard scenePhase == .active, model.hasSelectedProfile else { return }
+        .task(id: CourseRefreshLifecycle(scenePhase: scenePhase, identity: model.courseRefreshIdentity, showingPlay: model.showingPlay)) {
+            guard scenePhase == .active, model.hasSelectedProfile, !model.showingPlay else { return }
             while !Task.isCancelled {
                 await model.loadCourses(showLoading: false)
+                guard !Task.isCancelled, !model.showingPlay else { return }
                 await model.refreshPreparingPracticeOverview()
                 do { try await Task.sleep(for: .seconds(15)) }
                 catch { return }
@@ -103,7 +108,7 @@ struct RootView: View {
 
     private var practiceSheetBinding: Binding<Bool> {
         Binding {
-            model.practiceStart != nil
+            !model.showingPlay && model.practiceStart != nil
         } set: { isPresented in
             if !isPresented {
                 model.closePractice()
@@ -113,7 +118,7 @@ struct RootView: View {
 
     private var workbookSheetBinding: Binding<Bool> {
         Binding {
-            model.workbook != nil && model.selectedClass == nil
+            !model.showingPlay && model.workbook != nil && model.selectedClass == nil
         } set: { isPresented in
             if !isPresented {
                 model.workbook = nil
@@ -125,6 +130,7 @@ struct RootView: View {
 private struct CourseRefreshLifecycle: Equatable {
     let scenePhase: ScenePhase
     let identity: SottoLearnerIdentity?
+    let showingPlay: Bool
 }
 
 struct LoadingOverlay: View {

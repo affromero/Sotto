@@ -37,6 +37,7 @@ import { processSpeakingGrading } from '@/workers/speaking-grading.worker';
 import { processWorksheetPdf } from '@/workers/worksheet-pdf.worker';
 import { processPencilHomework } from '@/workers/pencil/pencil-homework.worker';
 import { startPricingRefreshInterval } from '@/lib/pricing';
+import { expirePlayAdmissions } from '@/lib/play/storage/maintenance';
 
 const WORKER_PROFILE = process.env.WORKER_PROFILE || 'all';
 const WORKER_PRESET = process.env.WORKER_PRESET || 'full';
@@ -182,6 +183,14 @@ async function admitScheduled(queue: typeof pricingFetchQueue, type: JobType, jo
 
 if (WORKER_PROFILE === 'all' || WORKER_PROFILE === 'light') {
   const day = 24 * 60 * 60 * 1000;
+  if (shouldRun('play-maintenance'))
+    scheduleRecurring(
+      'Play admission expiry',
+      () => 60_000,
+      async () => {
+        await expirePlayAdmissions(prisma);
+      }
+    );
   if (shouldRun('key-validation'))
     scheduleRecurring(
       'Credential validation scheduling',

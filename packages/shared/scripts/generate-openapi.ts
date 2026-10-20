@@ -8,8 +8,9 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
-import { vocabularyStudySessionSchema } from '../src/learning/vocabulary-study';
+import { playContractSchemas } from '../src/contracts/play';
 import {
+  vocabularyStudySessionSchema,
   vocabularyStudyRequestSchema,
   vocabularyStudyActionSchema,
 } from '../src/learning/vocabulary-study';
@@ -243,6 +244,7 @@ const namedSchemas: Record<string, z.ZodType> = {
   RedeemPairingRequest: redeemPairingRequestSchema,
   RedeemPairingResponse: redeemPairingResponseSchema,
   PairedUser: pairedUserSchema,
+  ...playContractSchemas,
 };
 
 // Map a Zod schema instance back to its component name so endpoints can $ref it.
@@ -345,9 +347,10 @@ function to30Object(node: { [key: string]: JsonValue }): JsonSchema {
 // Build components.schemas via a single registry pass so cross-references emit
 // as `$ref`, then run each through `to30`. The StartPracticeResponse entry is
 // replaced with an explicit oneOf + discriminator over its named variants.
-function buildComponentsSchemas(): Record<string, JsonValue> {
+function buildComponentsSchemas(codegen: boolean): Record<string, JsonValue> {
   const registry = z.registry<{ id: string }>();
   for (const [name, schema] of Object.entries(namedSchemas)) {
+    if (codegen && Object.hasOwn(playContractSchemas, name)) continue;
     registry.add(schema, { id: name });
   }
   const { schemas } = z.toJSONSchema(registry, {
@@ -399,7 +402,7 @@ function queryParameters(endpoint: EndpointDef): JsonValue[] {
   }));
 }
 
-function operationFor(endpoint: EndpointDef): JsonValue {
+export function buildEndpointOperation(endpoint: EndpointDef): JsonValue {
   const responses: JsonSchema = {};
   if (endpoint.responses) {
     // Distinct schema per status code.
@@ -440,6 +443,7 @@ function operationFor(endpoint: EndpointDef): JsonValue {
   }
 
   if (endpoint.auth === 'bearer') operation.security = [{ bearerAuth: [] }];
+  if (endpoint.auth === 'claimant') operation.security = [{ playClaimantProof: [] }];
 
   return operation;
 }
@@ -447,11 +451,11 @@ function operationFor(endpoint: EndpointDef): JsonValue {
 function buildPaths(opts: { codegen: boolean }): Record<string, JsonValue> {
   const paths: Record<string, JsonSchema> = {};
   for (const endpoint of endpoints) {
-    // The codegen spec omits operations progenitor cannot generate; they remain
-    // in the truthful spec and are hand-rolled in the Rust client.
+    // Excluded operations remain in the full contract. Some have hand-written
+    // Rust transport; Play belongs to the web and mobile clients.
     if (opts.codegen && endpoint.codegenExclude) continue;
     const entry = (paths[endpoint.path] ??= {});
-    entry[endpoint.method.toLowerCase()] = operationFor(endpoint);
+    entry[endpoint.method.toLowerCase()] = buildEndpointOperation(endpoint);
   }
   return paths;
 }
@@ -481,8 +485,15 @@ export function buildOpenApiDocument(opts: { codegen?: boolean } = {}): JsonSche
           description:
             'A long-lived Sotto API key (sk_sotto_...) minted via /api/v1/auth/pair/redeem.',
         },
+        playClaimantProof: {
+          type: 'apiKey',
+          in: 'header',
+          name: 'X-Sotto-Play-Proof',
+          description:
+            'A private proof for one pending game invitation and credential delivery. A room code or request ID is not this proof.',
+        },
       },
-      schemas: buildComponentsSchemas(),
+      schemas: buildComponentsSchemas(codegen),
     },
     paths: buildPaths({ codegen }),
   };

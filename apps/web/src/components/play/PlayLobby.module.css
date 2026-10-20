@@ -1,0 +1,240 @@
+.root {
+  max-width: 1040px;
+  padding: 24px 16px 120px;
+  margin: 0 auto;
+}
+.header {
+  padding: 16px 0 36px;
+}
+.eyebrow,
+.ticket {
+  font: 500 11px var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--color-primary);
+}
+.header h1 {
+  font: 400 clamp(38px, 6vw, 64px)/1.04 var(--font-heading);
+  margin: 20px 0;
+  letter-spacing: -0.025em;
+}
+.header em {
+  color: var(--color-primary);
+  font-weight: 400;
+}
+.header > p {
+  max-width: 54ch;
+  color: var(--color-text-secondary);
+  line-height: 1.7;
+  font-size: 16px;
+}
+.columns {
+  display: grid;
+  gap: 32px;
+}
+.make h2,
+.join h2,
+.resume h2,
+.enrollments h2 {
+  font: 400 30px var(--font-heading);
+  margin: 0 0 20px;
+}
+.modes {
+  border: 0;
+  padding: 0;
+  margin: 0 0 24px;
+  display: grid;
+  gap: 10px;
+}
+.modes legend {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.mode {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+  cursor: pointer;
+}
+.mode input {
+  margin-top: 5px;
+  accent-color: var(--color-primary);
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+.mode strong {
+  display: block;
+  font: 400 22px var(--font-heading);
+}
+.mode small {
+  display: block;
+  margin-top: 6px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.selected {
+  border-color: var(--color-primary);
+  background: var(--color-primary-lighter);
+}
+.theme {
+  display: grid;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 16px;
+}
+.theme select,
+.join input {
+  width: 100%;
+  min-height: 46px;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  color: var(--color-text-primary);
+  background: var(--color-surface);
+  font: inherit;
+}
+.options {
+  margin-bottom: 28px;
+  font-size: 13px;
+}
+.options summary {
+  cursor: pointer;
+  padding: 12px 0;
+  min-height: 44px;
+}
+.options label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+}
+.options input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--color-primary);
+}
+.primary,
+.secondary {
+  min-height: 46px;
+  padding: 12px 20px;
+  border-radius: 8px;
+  border: 1px solid var(--color-primary);
+  font: 500 14px var(--font-body);
+  cursor: pointer;
+}
+.primary {
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  width: 100%;
+}
+.secondary {
+  background: var(--color-surface);
+  color: var(--color-primary);
+}
+.primary:disabled,
+.secondary:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.join {
+  padding: 28px 24px;
+  border: 1px dashed var(--color-primary);
+  border-radius: 12px;
+  align-self: start;
+}
+.join h2 {
+  margin-top: 16px;
+}
+.join p,
+.enrollments > p {
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  line-height: 1.6;
+}
+.join form {
+  display: grid;
+  gap: 12px;
+  margin-top: 22px;
+}
+.join label {
+  font-size: 13px;
+  font-weight: 500;
+}
+.join input {
+  font: 500 20px var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.join .small {
+  margin-top: 24px;
+  font-size: 12px;
+}
+.resume,
+.enrollments {
+  border-top: 1px solid var(--color-border);
+  margin-top: 48px;
+  padding-top: 28px;
+}
+.sectionHeading {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+.sectionHeading h2 {
+  margin: 0;
+}
+.sectionHeading > span {
+  font: 400 11px var(--font-mono);
+  color: var(--color-text-secondary);
+}
+.games {
+  padding: 0;
+  list-style: none;
+  margin: 18px 0;
+}
+.games li {
+  border-bottom: 1px solid var(--color-border);
+}
+.games a {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  padding: 18px 0;
+  min-height: 68px;
+  color: var(--color-text-primary);
+  text-decoration: none;
+}
+.games span {
+  font: 400 22px var(--font-heading);
+  overflow-wrap: anywhere;
+}
+.games small {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+.root :is(button, input, select, a, summary):focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 4px;
+}
+@media (min-width: 768px) {
+  .root {
+    padding: 32px 32px 100px;
+  }
+  .columns {
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+    gap: 48px;
+  }
+}

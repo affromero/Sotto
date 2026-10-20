@@ -722,7 +722,7 @@ struct SottoAPIClient {
     static let generationTimeout: TimeInterval = 300
     static let defaultTimeout: TimeInterval = 60
 
-    private func makeRequest(
+    func makeRequest(
         path: String,
         method: String,
         authorized: Bool,
@@ -756,11 +756,12 @@ struct SottoAPIClient {
         return request
     }
 
-    private func send<Response: Decodable>(
+    func send<Response: Decodable>(
         _ request: URLRequest,
-        acceptedStatuses: Set<Int>
+        acceptedStatuses: Set<Int>,
+        policy: SottoAPIRequestPolicy = .standard
     ) async throws -> Response {
-        let (data, response) = try await session.data(for: request, delegate: SottoAPIRedirectPolicy(serverURL: serverURL))
+        let (data, response) = try await session.data(for: request, delegate: SottoAPIRedirectPolicy(serverURL: serverURL, policy: policy))
         guard let http = response as? HTTPURLResponse else {
             throw SottoAPIError.message("Sotto returned a non-HTTP response.")
         }
@@ -984,16 +985,4 @@ private struct EmptyBody: Encodable {}
 
 private struct ClassGenerationCancelResponse: Decodable {
     let cancelled: Bool
-}
-
-enum SottoAPIError: LocalizedError {
-    case message(String)
-    case http(Int, String)
-
-    var errorDescription: String? {
-        switch self {
-        case let .message(value), let .http(_, value):
-            value
-        }
-    }
 }

@@ -13,6 +13,7 @@ import styles from './ProfilePicker.module.css';
 interface ProfilePickerProps {
   profiles: HouseholdProfile[];
   activeId: string | null;
+  canCreateProfiles: boolean;
 }
 
 type Editor = { mode: 'create' } | { mode: 'edit'; profile: HouseholdProfile } | null;
@@ -27,7 +28,7 @@ function metaLine(p: HouseholdProfile): string {
   return `${langLabel(p.primaryCourse.targetLang)} · ${p.primaryCourse.level}${extra}`;
 }
 
-export function ProfilePicker({ profiles, activeId }: ProfilePickerProps) {
+export function ProfilePicker({ profiles, activeId, canCreateProfiles }: ProfilePickerProps) {
   const router = useRouter();
   const [managing, setManaging] = useState(false);
   const [editor, setEditor] = useState<Editor>(null);
@@ -261,7 +262,7 @@ export function ProfilePicker({ profiles, activeId }: ProfilePickerProps) {
           </button>
         ))}
 
-        {!managing && (
+        {!managing && canCreateProfiles && (
           <button
             type="button"
             className={`${styles.profile} ${styles.add}`}

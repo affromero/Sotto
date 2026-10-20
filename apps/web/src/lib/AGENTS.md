@@ -32,6 +32,29 @@ acknowledges them separately. A missing attached workspace fails closed.
 
 All shared business logic and external service integrations live here.
 
+`play/engine.ts` owns deterministic two-player round transitions. `play/projection.ts`
+builds the personalized client view and excludes unrevealed partner information.
+`play/private-state.ts` validates server-private saved rounds; never return these
+records directly. `play/catalogue.ts` contains curated scenarios and level guidance.
+
+`play/storage/rooms.ts` commits room lifecycle, round transitions, revisions and
+action receipts through `sottoTransaction`. Revalidate original admission before
+receipt replay. `room-view.ts` loads participant-only personalized projections;
+round IDs support explicit phrase provenance. Presence visibility compares the
+complete canonical access fingerprint, without retaining host credentials.
+
+`play/admission/presence.ts` uses canonical browser/device hard expiry and a
+separate nonce for each foreground view. Released nonces remain fenced for the
+room lifetime; clients must rotate the nonce on foreground reentry. Profile
+creation always passes the owner-only guard in `sidedoor/access/core/profiles.ts`.
+`admission/claims.ts` commits member credentials and encrypted exact delivery
+receipts atomically. Recovery checks the original proof, room generation,
+canonical guest credential and sponsoring owner. ACK/expiry erase ciphertext.
+Existing players retain their original credentials. `play/http.ts` applies the
+canonical browser-origin policy and sends session tokens only as HttpOnly
+cookies. Proofs, private state and credential envelopes never enter public views.
+Game points do not update language mastery or spaced-repetition state.
+
 `classes/generation/stages.ts` runs at most two class text branches and drains
 admitted work before returning a failure. Listening preparation persists the script
 and questions before audio admission. Failed text or speaking generation retires

@@ -182,6 +182,14 @@ When a episode fails, `POST /api/v1/episodes/[id]/generate` uses `determineResum
 
 ## Adding a New Worker
 
+Light/all worker hosts use the existing recurring scheduler for Play admission
+expiry every minute. `play/storage/maintenance.ts` erases expired encrypted
+deliveries, expires waiting requests/rooms and removes inactive leases. Released
+view tombstones survive until their room ends. This does not delete approved
+profiles or revoke their ordinary credentials. Claim-time checks independently
+deny expired recovery even when maintenance is delayed. The `play-maintenance`
+filter can explicitly select or exclude this housekeeping operation.
+
 1. Create `src/workers/new-thing.worker.ts` with `export async function processNewThing(job: Job<Payload>)`
 2. Add payload type to `src/lib/queue.ts`
 3. Add queue instance to `src/lib/queue.ts`

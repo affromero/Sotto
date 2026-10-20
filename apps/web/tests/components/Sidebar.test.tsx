@@ -32,10 +32,11 @@ describe('Sidebar', () => {
   });
 
   it('renders the language-focused navigation for a default USER', () => {
-    render(<Sidebar currentPath="/learn" />);
+    render(<Sidebar currentPath="/learn" isOpen />);
 
     expect(screen.getByText('Learn')).toBeInTheDocument();
     expect(screen.getByText('Memory')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Play' })).toHaveAttribute('href', '/play');
     expect(screen.getByText('Settings')).toBeInTheDocument();
     // Analytics is admin-only; the old episode surfaces are gone.
     expect(screen.queryByText('Analytics')).not.toBeInTheDocument();

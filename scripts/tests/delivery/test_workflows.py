@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import glob
+import fnmatch
 import json
 import os
 import subprocess
@@ -98,6 +99,15 @@ class WorkflowScopeTests(unittest.TestCase):
         ])
         self.assertEqual(self.scope(), {'runtime': 'false', 'source': 'true'})
 
+    def test_integration_harness_changes_validate_without_runtime_images(self) -> None:
+        for path in ('e2e/native/run.mjs', 'e2e/android/process.mjs',
+                     'e2e/run.mjs', 'e2e/provider.mjs'):
+            with self.subTest(path=path):
+                self.add_paths([path])
+                self.assertEqual(self.scope(), {'runtime': 'false', 'source': 'true'})
+                (self.root / 'scope-output').unlink()
+                self.before = self.git('rev-parse', 'HEAD').strip()
+
     def test_hook_changes_validate_without_images(self) -> None:
         self.add_paths(['.pre-commit-config.yaml'])
         self.assertEqual(self.scope(), {'runtime': 'false', 'source': 'true'})
@@ -167,6 +177,79 @@ class WorkflowScopeTests(unittest.TestCase):
         self.assertEqual(self.scope(event='pull_request'), {
             'runtime': 'false', 'source': 'false',
         })
+
+
+class AndroidWorkflowTests(unittest.TestCase):
+    def setUp(self) -> None:
+        parsed = subprocess.run([
+            'node', '-e',
+            ("process.stdout.write(JSON.stringify(require('yaml').parse("
+             "require('node:fs').readFileSync(process.argv[1], 'utf8'))))"),
+            str(WORKFLOWS / 'release-surfaces-ci.yml'),
+        ], cwd=ROOT, text=True, capture_output=True, check=True)
+        self.workflow = json.loads(parsed.stdout)
+
+    def test_shared_inputs_and_android_recovery_trigger_native_workflow(self) -> None:
+        for event in ('push', 'pull_request'):
+            patterns = self.workflow['on'][event]['paths']
+            for path in ('apps/android/app/MainActivity.kt',
+                         'e2e/android/process.mjs',
+                         'e2e/native/run.mjs', 'e2e/run.mjs', 'e2e/provider.mjs',
+                         'packages/shared/fixtures/play/contract.json',
+                         'packages/shared/src/play/types.ts',
+                         'packages/shared/src/contracts/play.ts',
+                         'scripts/play/export-fixtures.ts',
+                         'apps/web/src/lib/play/projection.ts'):
+                with self.subTest(event=event, path=path):
+                    self.assertTrue(any(fnmatch.fnmatch(path, pattern)
+                                        for pattern in patterns))
+
+    def test_android_jobs_prepare_sdk_before_using_command_line_tools(self) -> None:
+        for name in ('android', 'android-device'):
+            with self.subTest(job=name):
+                steps = self.workflow['jobs'][name]['steps']
+                setup = next(index for index, step in enumerate(steps)
+                             if step.get('uses', '').startswith(
+                                 'android-actions/setup-android@'))
+                consumer = next(index for index, step in enumerate(steps)
+                                if 'sdkmanager ' in step.get('run', '')
+                                or 'android-emulator-runner@'
+                                in step.get('uses', ''))
+                self.assertLess(setup, consumer)
+                packages = steps[setup]['with']['packages'].split()
+                self.assertIn('platform-tools', packages)
+                self.assertNotIn('tools', packages)
+
+    def test_android_build_produces_both_unsigned_distribution_formats(self) -> None:
+        steps = self.workflow['jobs']['android']['steps']
+        build = next(step['run'] for step in steps
+                     if step.get('name') ==
+                     'Validate Android and build unsigned distributions')
+        for task in ('lint', 'testDebugUnitTest', 'assembleDebugAndroidTest',
+                     'assembleRelease', 'bundleRelease'):
+            self.assertIn(task, build.split())
+        upload = next(step for step in steps if 'upload-artifact@'
+                      in step.get('uses', ''))
+        self.assertEqual(upload['if'], 'always()')
+        self.assertIn('outputs/bundle/', upload['with']['path'])
+        self.assertIn('test-results/', upload['with']['path'])
+
+    def test_both_emulators_run_external_recovery_in_addition_to_connected_tests(self) -> None:
+        job = self.workflow['jobs']['android-device']
+        matrix = job['strategy']['matrix']['include']
+        self.assertTrue({'36', '37.0'} <= {row['api'] for row in matrix})
+        self.assertIn('pixel_tablet', {row['profile'] for row in matrix})
+        runner = next(step for step in job['steps']
+                      if 'android-emulator-runner@' in step.get('uses', ''))
+        self.assertEqual(runner['with']['arch'], 'x86_64')
+        self.assertEqual(job['env']['ANDROID_SERIAL'], 'emulator-5554')
+        script = runner['with']['script']
+        self.assertIn('connectedDebugAndroidTest', script)
+        self.assertIn('node e2e/android/process.mjs "$ANDROID_SERIAL"', script)
+        upload = next(step for step in job['steps']
+                      if 'upload-artifact@' in step.get('uses', ''))
+        self.assertEqual(upload['if'], 'always()')
+        self.assertIn('android-process/', upload['with']['path'])
 
 
 class NativeResultBundleTests(unittest.TestCase):

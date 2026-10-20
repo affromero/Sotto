@@ -98,6 +98,8 @@ struct PairingView: View {
                     .foregroundStyle(SottoTheme.muted)
                     .fixedSize(horizontal: false, vertical: true)
                 PrivacyPolicyLink()
+                Button("Join a partner game") { model.openPlay() }
+                    .buttonStyle(SottoSecondaryButtonStyle())
             }
         }
     }

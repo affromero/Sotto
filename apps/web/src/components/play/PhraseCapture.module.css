@@ -1,0 +1,59 @@
+.root {
+  margin: 24px 0;
+  padding: 16px 0;
+  border-top: 1px solid var(--color-border);
+}
+.root summary {
+  min-height: 44px;
+  display: list-item;
+  padding: 12px 0;
+  cursor: pointer;
+  font-weight: 500;
+}
+.root p {
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.root form {
+  display: grid;
+  gap: 14px;
+}
+.root label {
+  display: grid;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 500;
+}
+.root select,
+.root textarea {
+  width: 100%;
+  min-height: 46px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font: inherit;
+}
+.root textarea {
+  resize: vertical;
+}
+.root button {
+  min-height: 44px;
+  border: 1px solid var(--color-primary);
+  border-radius: 8px;
+  padding: 12px 18px;
+  font: 500 14px var(--font-body);
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  cursor: pointer;
+}
+.root button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.root :is(button, select, textarea, summary):focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 3px;
+}

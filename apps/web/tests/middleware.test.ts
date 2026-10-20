@@ -65,6 +65,9 @@ describe('public proxy routes without a database', () => {
     '/api/v1/health',
     '/api/v1/auth/pair/redeem',
     '/api/v1/access/login',
+    '/play/join?v=1&code=ABCDEFGH2345',
+    '/api/v1/play/invitations?code=ABCDEFGH2345',
+    '/api/v1/play/join-requests/a-request',
   ])('preserves the public boundary for %s', async (path) => {
     expect((await proxy(request(path))).headers.get('x-middleware-next')).toBe('1');
   });
@@ -76,6 +79,15 @@ describe('public proxy routes without a database', () => {
     '/api/v1/onboarding/config',
     '/avatars-private',
     '/api/v1/accessibility/private',
+    '/play/join/private',
+    '/play/room',
+    '/api/v1/play/rooms',
+    '/api/v1/play/enrollments',
+    '/api/v1/play/phrases',
+    '/api/v1/play/invitations/private',
+    '/api/v1/play/join-requests/a-request/approve',
+    '/api/v1/play/join-requests/a-request/claim',
+    '/api/v1/play/join-requests/a-request/ack',
   ])('does not exempt the protected path %s', async (path) => {
     const response = await proxy(request(path, 'opaque-candidate'));
     expect(response.status).toBe(503);
@@ -106,6 +118,20 @@ describe('public proxy routes without a database', () => {
     expect(
       (await proxy(request('/api/v1/onboarding/check-storage', 'opaque-candidate'))).status
     ).toBe(503);
+  });
+  it.each([
+    '/api/v1/play/invitations',
+    '/api/v1/play/join-requests/a-request/claim',
+    '/api/v1/play/join-requests/a-request/ack',
+  ])('admits only POST capability writes at %s', async (path) => {
+    const response = await proxy(
+      new NextRequest(new URL(path, 'http://localhost:3000'), { method: 'POST' })
+    );
+    expect(response.headers.get('x-middleware-next')).toBe('1');
+    for (const method of ['PUT', 'PATCH', 'DELETE'])
+      expect(
+        (await proxy(new NextRequest(new URL(path, 'http://localhost:3000'), { method }))).status
+      ).toBe(503);
   });
   it.each([
     '/install.sh',

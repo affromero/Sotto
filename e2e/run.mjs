@@ -6,6 +6,7 @@ import { randomUUID } from 'node:crypto';
 import { createServer } from 'node:net';
 import pg from 'pg';
 import { startProvider, fixtureAudio } from './provider.mjs';
+import { runNativeMatrix } from './native/run.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 const base = new URL(process.env.SIDEDOOR_TEST_DATABASE_URL || 'postgresql://missing');
@@ -141,17 +142,20 @@ try {
   worker.on('error', (error) => {
     failure = error;
   });
-  await command(
-    'npx',
-    [
-      '--no-install',
-      'playwright',
-      'test',
-      '--config=e2e/playwright.config.ts',
-      ...process.argv.slice(2),
-    ],
-    env
-  );
+  if (process.argv[2] === '--native') {
+    await runNativeMatrix(root, env);
+  } else
+    await command(
+      'npx',
+      [
+        '--no-install',
+        'playwright',
+        'test',
+        '--config=e2e/playwright.config.ts',
+        ...process.argv.slice(2),
+      ],
+      env
+    );
   if (provider.unexpected.length)
     throw new Error(`Unexpected provider traffic: ${JSON.stringify(provider.unexpected)}`);
   if (worker.exitCode !== null || worker.signalCode !== null)

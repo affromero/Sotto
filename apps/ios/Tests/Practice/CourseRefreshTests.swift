@@ -5,6 +5,31 @@ import Combine
 
 final class CourseRefreshTests: XCTestCase {
     @MainActor
+    func testEnteringPlayCancelsAnOutstandingRefreshWithoutClearingLoadedCoursesOrGrantingAIConsent() async throws {
+        let session = makeSession()
+        let model = model(session: session)
+        await model.loadCourses(showLoading: false)
+        let loaded = model.courses
+        let host = try XCTUnwrap(model.credentials?.serverURL.host)
+        let arrival = expectation(description: "The old course refresh reaches HTTP")
+        await CourseRefreshServer.shared.set("profile-refresh", host: host, arrival: arrival)
+        let refresh = Task { await model.loadCourses(showLoading: false) }
+        guard await XCTWaiter.fulfillment(of: [arrival], timeout: 5) == .completed else {
+            refresh.cancel(); session.invalidateAndCancel()
+            return XCTFail("Course refresh did not reach HTTP.")
+        }
+        model.openPlay()
+        await CourseRefreshServer.shared.release(host: host)
+        await refresh.value
+        XCTAssertTrue(model.showingPlay)
+        XCTAssertEqual(model.courses, loaded)
+        XCTAssertNil(model.courseRefreshError)
+        XCTAssertFalse(model.hasAIConsent)
+        XCTAssertTrue(model.courseRefreshTasks.isEmpty)
+        session.invalidateAndCancel()
+    }
+
+    @MainActor
     func testPencilWorkbookOpensTheInteractiveClassWithoutRequiringAPDF() async {
         let model = model()
         await model.openWorkbook(for: "class-1", pencil: true)

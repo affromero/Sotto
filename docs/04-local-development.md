@@ -84,6 +84,65 @@ SIDEDOOR_EXECUTION_DIR="./.sotto/executions"
 
 Add provider and storage settings in `/welcome` or Admin for the workflow you are testing.
 
+Partner play runs without courses or AI providers. Invitation pages offer
+home-screen installation and show native downloads only when real URLs are set:
+`SOTTO_IOS_APP_STORE_URL` on `apps.apple.com`,
+`SOTTO_ANDROID_PLAY_STORE_URL` on `play.google.com`, and optional
+`SOTTO_ANDROID_APK_URL`. All download URLs require HTTPS. Empty values leave
+native downloads explicitly unavailable. Web games need a live connection;
+private game responses and pages are never available from an offline cache.
+
+### Native partner games
+
+The iPhone/iPad client is in `apps/ios`; the native Android phone/tablet client
+is a standalone Kotlin/Compose project in `apps/android`. Android currently
+supports server pairing and partner games. Solo courses remain available in
+web and iOS. Android needs Java 21 and SDK API 37 with build-tools 36.0.0:
+
+```bash
+./apps/android/gradlew -p apps/android lint testDebugUnitTest assembleDebug assembleDebugAndroidTest assembleRelease bundleRelease
+./apps/android/gradlew -p apps/android connectedDebugAndroidTest
+node e2e/android/process.mjs emulator-5580
+```
+
+Select a dedicated emulator explicitly for the last command. It installs the
+debug APKs, force-stops the app and verifies exact request and credential recovery.
+Android 17 also exercises local-network denial, grant and revocation. The normal
+connected gate excludes these externally staged tests. Release APK and AAB builds
+are unsigned until an operator configures real signing credentials.
+
+Native contract tests consume the same `packages/shared/fixtures/play/contract.json`.
+Regenerate it with `npx tsx scripts/play/export-fixtures.ts`; the web parity test
+checks it against actual engine projections. Native CI selects both mobile
+clients on shared Play changes and tests Android 16 phone and Android 17 tablet.
+
+On macOS, the real-server matrix plays six rounds, saves private notebook entries
+and opens the same rematch across web/iOS, web/Android and Android-host/iOS pairs:
+
+```bash
+export SOTTO_NATIVE_ANDROID_SERIAL=emulator-5580
+export SOTTO_NATIVE_IOS_SIMULATOR=YOUR_DEDICATED_SIMULATOR_UUID
+node e2e/run.mjs --native
+node --test e2e/native/*.test.mjs
+```
+
+Use the isolated PostgreSQL and Redis configuration described under Browser tests.
+The runner installs native debug builds on the selected devices and uses real
+pairing and invitation screens. It erases saved game data through those screens;
+use dedicated test devices. Public invitation and round barriers travel through a
+run-scoped loopback controller. Credentials stay with each client. The runner
+removes its own port forwards and processes, and retains logs, screenshots and
+Xcode results under `test-results/native`. Set `SOTTO_NATIVE_MATRIX_OUTPUT` to
+choose another output directory or `SOTTO_NATIVE_IOS_BUILD` to reuse dedicated
+DerivedData. The normal native gates exclude these external matrix cases.
+
+A real phone needs a server address reachable from that phone. `localhost`
+points to the phone itself. Use the host's LAN address or HTTPS domain; the
+Android emulator uses `10.0.2.2` for its host. Android 17 requires app-wide local
+network permission before connecting to a LAN server. A denial preserves saved
+profiles and requests. Private split-DNS servers can use the manual permission
+control in Saved connections. Granting permission never submits saved actions.
+
 ---
 
 ## 5. Provider Paths

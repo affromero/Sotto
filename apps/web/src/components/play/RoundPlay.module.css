@@ -1,0 +1,276 @@
+.root {
+  width: 100%;
+}
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  font: 500 11px/1.5 var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--color-text-secondary);
+}
+.prompt {
+  margin: 24px 0 12px;
+  font: 400 clamp(28px, 5vw, 42px)/1.12 var(--font-heading);
+  max-width: 24ch;
+  text-wrap: balance;
+}
+.instruction {
+  color: var(--color-text-secondary);
+  max-width: 58ch;
+  line-height: 1.6;
+}
+.cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 28px;
+}
+.card {
+  min-height: 150px;
+  padding: 18px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  cursor: pointer;
+  transition: transform 160ms ease;
+}
+.card:not(:disabled):hover {
+  transform: translateY(-3px);
+  border-color: var(--color-primary);
+}
+.card:disabled {
+  cursor: default;
+}
+.card:focus-visible,
+.primary:focus-visible,
+.secondary:focus-visible,
+.textButton:focus-visible,
+.utilities summary:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 4px;
+}
+.picked {
+  border: 2px solid var(--color-primary);
+  background: var(--color-primary-lighter);
+}
+.cardIndex {
+  font: 500 12px var(--font-mono);
+  color: var(--color-primary);
+}
+.word {
+  font: 400 clamp(20px, 3vw, 26px)/1.2 var(--font-heading);
+  overflow-wrap: anywhere;
+}
+.meaning {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+.pickLabel {
+  font: 500 11px var(--font-mono);
+  color: var(--color-primary);
+  margin-top: auto;
+}
+.textButton {
+  min-height: 44px;
+  padding: 8px 4px;
+  border: 0;
+  color: var(--color-primary);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.entry {
+  display: grid;
+  gap: 10px;
+  margin: 24px 0;
+}
+.entry label,
+.assessment label,
+.utilities label {
+  font-weight: 500;
+  font-size: 14px;
+}
+.entry textarea,
+.assessment textarea,
+.utilities input {
+  width: 100%;
+  min-height: 48px;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font: inherit;
+  resize: vertical;
+}
+.primary,
+.secondary {
+  min-height: 46px;
+  padding: 12px 20px;
+  border-radius: 8px;
+  border: 1px solid var(--color-primary);
+  font: 500 14px var(--font-body);
+  cursor: pointer;
+}
+.primary {
+  background: var(--color-primary);
+  color: var(--color-text-inverse, #fff);
+}
+.secondary {
+  background: var(--color-surface);
+  color: var(--color-primary);
+}
+.primary:disabled,
+.secondary:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.languageLine {
+  display: grid;
+  gap: 6px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+.languageLine > span,
+.objective > span {
+  font: 500 11px var(--font-mono);
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+  letter-spacing: 0.04em;
+}
+.languageLine strong {
+  font: 400 23px/1.4 var(--font-heading);
+  overflow-wrap: anywhere;
+}
+.objective {
+  padding: 20px;
+  margin: 24px 0 12px;
+  border: 1px dashed var(--color-primary);
+  border-radius: 10px;
+}
+.objective p,
+.twist p {
+  margin: 8px 0 0;
+  line-height: 1.5;
+}
+.budget {
+  font: 500 12px var(--font-mono);
+  color: var(--color-text-secondary);
+}
+.twist {
+  padding: 20px;
+  margin: 20px 0;
+  border-left: 4px solid var(--color-primary);
+  background: var(--color-primary-lighter);
+}
+.messages {
+  list-style: none;
+  margin: 20px 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+.messages li {
+  padding: 14px 18px;
+  border-radius: 10px;
+  background: var(--color-surface-nested);
+}
+.messages span {
+  font: 500 11px var(--font-mono);
+  color: var(--color-text-secondary);
+}
+.messages p {
+  margin: 6px 0 0;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.assessment {
+  border: 0;
+  padding: 0;
+  margin: 24px 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.assessment legend {
+  margin-bottom: 12px;
+  font: 400 25px var(--font-heading);
+}
+.assessment label,
+.assessment textarea {
+  flex-basis: 100%;
+}
+.waiting {
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  padding: 14px 0;
+  line-height: 1.5;
+}
+.result {
+  border-top: 2px solid var(--color-primary);
+  margin-top: 28px;
+  padding: 20px 0;
+}
+.result h3 {
+  margin: 0;
+  font: 400 28px var(--font-heading);
+}
+.result p {
+  margin: 8px 0;
+}
+.hints {
+  padding: 4px 16px;
+  border-left: 2px solid var(--color-border);
+}
+.utilities {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 24px;
+}
+.utilities summary,
+.guidance summary {
+  min-height: 44px;
+  cursor: pointer;
+  padding: 12px 0;
+  font-size: 14px;
+}
+.utilities form {
+  display: grid;
+  gap: 10px;
+  margin: 8px 0;
+}
+.guidance {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  margin-top: 12px;
+}
+@media (min-width: 960px) {
+  .cards {
+    gap: 16px;
+  }
+  .card {
+    min-height: 170px;
+    padding: 22px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    transition: none;
+  }
+  .card:not(:disabled):hover {
+    transform: none;
+  }
+}

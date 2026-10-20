@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { GraduationCap, Network, Settings } from 'lucide-react';
+import { GraduationCap, Network, Settings, Gamepad2 } from 'lucide-react';
 import styles from './MobileNav.module.css';
 
 interface MobileNavProps {
@@ -12,6 +12,7 @@ interface MobileNavProps {
 const tabs = [
   { href: '/learn', label: 'Learn', icon: GraduationCap },
   { href: '/memory', label: 'Memory', icon: Network },
+  { href: '/play', label: 'Play', icon: Gamepad2 },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 

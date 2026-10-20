@@ -20,10 +20,19 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>fm.sotto.app.play</string>
+			<key>CFBundleURLSchemes</key>
+			<array><string>sotto</string></array>
+		</dict>
+	</array>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>NSCameraUsageDescription</key>
-	<string>Sotto uses the camera to scan the pairing QR code from your self-hosted server.</string>
+	<string>Sotto uses the camera to scan device pairing codes and partner game invitations.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Sotto uses the microphone for speaking practice and live translation. Recordings are processed by your server's speech providers, and live audio is sent to Google Gemini after you agree.</string>
 	<key>NSLocalNetworkUsageDescription</key>

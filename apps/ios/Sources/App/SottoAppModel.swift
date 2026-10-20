@@ -23,12 +23,15 @@ final class SottoAppModel: ObservableObject {
     @Published var classGenerationErrors: [String: String] = [:]
     @Published var errorMessage: String?
     @Published var courseRefreshError: String?
+    @Published var showingPlay = false
+    lazy var play = PlayCoordinator(model: self, session: session, store: playStore)
     var courseRefreshTasks: [SottoLearnerIdentity: SottoCourseRefreshRequest] = [:]
     var practiceCourses: [String: String] = [:]
     var practiceOverviewCourseId: String?
 
     private let credentialStore: any SottoCredentialPersistence
     private let session: URLSession
+    private let playStore: any PlayProtectedPersistence
     private var work: Task<Void, Never>?
     private var workId: UUID?
     var classGenerationAdmissionId: UUID?
@@ -36,15 +39,37 @@ final class SottoAppModel: ObservableObject {
     var classGenerationObservations: [String: SottoClassGenerationObservation] = [:]
 
     init(credentials: SottoCredentials? = nil, session: URLSession = .shared,
-         credentialStore: any SottoCredentialPersistence = CredentialStore()) {
+         credentialStore: any SottoCredentialPersistence = CredentialStore(),
+         playStore: any PlayProtectedPersistence = PlayProtectedStore()) {
         self.session = session
         self.credentialStore = credentialStore
+        self.playStore = playStore
         self.credentials = credentials ?? (try? credentialStore.load())
     }
 
     func persistCredentials(_ next: SottoCredentials) throws {
         try credentialStore.save(next)
         credentials = next
+    }
+
+    func activatePlayConnection(_ next: SottoCredentials, profiles verifiedProfiles: [SottoProfile]) throws {
+        guard let selected = next.selectedProfile, verifiedProfiles.contains(where: { $0.id == selected.id }) else {
+            throw SottoAPIError.message("The selected profile was not verified.")
+        }
+        try persistCredentials(next)
+        work?.cancel()
+        work = nil
+        workId = nil
+        resetLearnerState()
+        profiles = verifiedProfiles
+    }
+
+    func openPlay(invitation: String? = nil) {
+        courseRefreshTasks.values.forEach { $0.task.cancel() }
+        courseRefreshTasks.removeAll()
+        courseRefreshError = nil
+        if let invitation { play.receive(invitation) }
+        showingPlay = true
     }
 
     var isPaired: Bool {
@@ -117,9 +142,12 @@ final class SottoAppModel: ObservableObject {
 
     @discardableResult
     func signOut() -> Bool {
+        do { try play.clearProtectedData() }
+        catch { report(error); return false }
         do { try credentialStore.delete() }
         catch { report(error); return false }
         credentials = nil
+        showingPlay = false
         profiles = []
         resetLearnerState()
         classGenerationTasks.values.forEach { $0.cancel() }

@@ -3,6 +3,7 @@
 // path with its Zod request/response schemas so a single source generates both
 // the OpenAPI document and any client-side validation.
 import { z } from 'zod';
+import { playEndpoints } from './play';
 import {
   dictionaryResponseSchema,
   dictionaryMeaningSchema,
@@ -82,7 +83,7 @@ export interface EndpointDef {
   method: 'GET' | 'POST' | 'PATCH' | 'DELETE';
   path: string;
   summary: string;
-  auth: 'bearer' | 'none';
+  auth: 'bearer' | 'claimant' | 'none';
   request?: z.ZodType;
   // A response schema. Use ONE of:
   //   - `response` + optional `successStatuses`: the same schema for every
@@ -100,13 +101,15 @@ export interface EndpointDef {
   successStatuses?: number[];
   // When true, this operation is documented in the truthful `openapi.json` but
   // EXCLUDED from the progenitor codegen spec (`openapi.codegen.json`). Used for
-  // operations progenitor cannot generate (e.g. `nextClass`, whose 200 and 201
+  // operations outside the TUI surface or that progenitor cannot generate
+  // (e.g. `nextClass`, whose 200 and 201
   // carry genuinely different bodies — progenitor allows only one 2xx body per
   // operation). The Rust client hand-rolls these via raw reqwest.
   codegenExclude?: boolean;
 }
 
 export const endpoints: EndpointDef[] = [
+  ...playEndpoints,
   {
     id: 'health',
     method: 'GET',

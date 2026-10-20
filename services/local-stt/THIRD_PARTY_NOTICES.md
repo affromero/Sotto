@@ -61,7 +61,7 @@ SOFTWARE.
 
 The root LICENSE contains PolyForm Noncommercial 1.0.0 and applies to eligible
 first-party Sotto code in this release, including its web application, shared
-and MCP packages, terminal client, desktop launcher and iOS client.
+and MCP packages, terminal client, desktop launcher, iOS client and Android client.
 
 Third-party material keeps its own terms. The root license does not replace or
 restrict the rights granted by those terms. In particular:

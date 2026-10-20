@@ -1,0 +1,157 @@
+.root {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 28px 20px 80px;
+}
+.brand {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font: 500 26px var(--font-heading);
+  color: var(--color-text-primary);
+  text-decoration: none;
+}
+.header {
+  padding: 32px 0 20px;
+}
+.eyebrow {
+  font: 500 11px var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-primary);
+}
+.header h1 {
+  font: 400 clamp(34px, 6vw, 52px)/1.08 var(--font-heading);
+  margin: 20px 0;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+.header > p {
+  max-width: 52ch;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+}
+.server {
+  padding: 16px 0;
+  margin: 0;
+  border-top: 1px solid var(--color-border);
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  overflow-wrap: anywhere;
+}
+.server strong {
+  font-family: var(--font-mono);
+  font-weight: 400;
+  color: var(--color-text-primary);
+}
+.native {
+  min-height: 44px;
+  padding: 12px 0;
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-primary);
+}
+.panel {
+  margin: 24px 0;
+  padding: 24px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+}
+.panel h2 {
+  font: 400 28px var(--font-heading);
+  margin: 0 0 18px;
+}
+.panel p {
+  font-size: 14px;
+  line-height: 1.6;
+}
+.name {
+  display: grid;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 500;
+}
+.name input {
+  width: 100%;
+  min-height: 46px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font: inherit;
+}
+.consent {
+  display: flex;
+  gap: 12px;
+  margin: 20px 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.consent input {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  accent-color: var(--color-primary);
+}
+.primary,
+.secondary,
+.quiet {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 46px;
+  padding: 12px 18px;
+  font: 500 14px var(--font-body);
+  border-radius: 8px;
+  cursor: pointer;
+  text-decoration: none;
+}
+.primary {
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  border: 1px solid var(--color-primary);
+  width: 100%;
+}
+.secondary {
+  background: var(--color-surface);
+  color: var(--color-primary);
+  border: 1px solid var(--color-primary);
+  margin: 8px 0;
+}
+.quiet {
+  background: transparent;
+  color: var(--color-text-secondary);
+  border: 0;
+  margin: 12px 0 0;
+}
+.root button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.status {
+  color: var(--color-text-secondary);
+}
+.error {
+  padding: 16px;
+  border-left: 3px solid var(--color-primary);
+  background: var(--color-surface-nested);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.panel .small {
+  font-size: 12px;
+}
+.root :is(button, input, select, summary, a):focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 3px;
+}
+@media (min-width: 640px) {
+  .root {
+    padding: 32px 36px 100px;
+  }
+  .panel {
+    padding: 32px;
+  }
+}

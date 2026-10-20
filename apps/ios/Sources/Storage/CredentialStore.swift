@@ -14,6 +14,11 @@ struct CredentialStore: SottoCredentialPersistence {
     init(account: String = "default") { self.account = account }
 
     func load() throws -> SottoCredentials? {
+        guard let data = try loadData() else { return nil }
+        return try JSONDecoder().decode(SottoCredentials.self, from: data)
+    }
+
+    func loadData() throws -> Data? {
         var query = baseQuery()
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
@@ -29,11 +34,14 @@ struct CredentialStore: SottoCredentialPersistence {
             throw KeychainError.unhandled(status)
         }
 
-        return try JSONDecoder().decode(SottoCredentials.self, from: data)
+        return data
     }
 
     func save(_ credentials: SottoCredentials) throws {
-        let data = try JSONEncoder().encode(credentials)
+        try saveData(JSONEncoder().encode(credentials))
+    }
+
+    func saveData(_ data: Data) throws {
         var query = baseQuery()
 
         let status = SecItemCopyMatching(query as CFDictionary, nil)
