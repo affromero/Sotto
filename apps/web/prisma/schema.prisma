@@ -93,6 +93,7 @@ model User {
   // Language learning
   courses            Course[]
   courseMaterials    CourseMaterial[]
+  materialUploadBatches MaterialUploadBatch[]
   classSubmissions   ClassSubmission[]
   speakingRecordings SpeakingRecording[]
   writingResponses   WritingResponse[]
@@ -1605,21 +1606,82 @@ model CourseNote {
 }
 
 model CourseMaterial {
-  id            String   @id @default(uuid())
-  userId        String
-  courseId      String?
-  name          String
-  mimeType      String
-  byteSize      Int
-  originalUrl   String?
-  extractedText String   @db.Text
-  createdAt     DateTime @default(now())
+  id                 String   @id @default(uuid())
+  userId             String
+  courseId           String?
+  name               String
+  mimeType           String
+  byteSize           Int
+  originalUrl        String?
+  originalSha256     String?
+  optimizedUrl       String?
+  processingStatus   String   @default("LEGACY")
+  processingRevision Int      @default(1)
+  processingError    String?
+  extractedText      String   @db.Text
+  createdAt          DateTime @default(now())
 
-  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  course Course? @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user   User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course Course?         @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  upload MaterialUpload?
 
   @@index([userId, courseId])
   @@index([courseId])
+}
+
+model MaterialUploadBatch {
+  id          String   @id @default(uuid())
+  userId      String
+  requestId   String
+  fingerprint String
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+
+  user    User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  uploads MaterialUpload[]
+
+  @@unique([userId, requestId])
+  @@index([userId, expiresAt])
+}
+
+model MaterialUpload {
+  id                      String    @id @default(uuid())
+  batchId                 String
+  materialId              String    @unique
+  clientId                String
+  expectedSha256          String?
+  status                  String    @default("UPLOADING")
+  revision                Int       @default(0)
+  finalizationOperationId String?
+  failureReason           String?
+  cleanupJobIds           String[]  @default([])
+  expiresAt               DateTime
+  completedAt             DateTime?
+  createdAt               DateTime  @default(now())
+
+  batch    MaterialUploadBatch  @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  material CourseMaterial       @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  parts    MaterialUploadPart[]
+
+  @@unique([batchId, clientId])
+  @@index([status, expiresAt])
+}
+
+model MaterialUploadPart {
+  id          String    @id @default(uuid())
+  uploadId    String
+  index       Int
+  offset      Int
+  byteSize    Int
+  sha256      String
+  writeToken  String
+  originalUrl String?
+  committedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  upload MaterialUpload @relation(fields: [uploadId], references: [id], onDelete: Cascade)
+
+  @@unique([uploadId, index])
 }
 
 // Shared immutable target-language catalog releases. No uploaded learner text belongs here.

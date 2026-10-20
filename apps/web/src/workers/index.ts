@@ -35,6 +35,9 @@ import { processSpeakingGrading } from '@/workers/speaking-grading.worker';
 import { processWorksheetPdf } from '@/workers/worksheet-pdf.worker';
 import { processPencilHomework } from '@/workers/pencil/pencil-homework.worker';
 import { startPricingRefreshInterval } from '@/lib/pricing';
+import { processMaterialFinalization } from '@/lib/course-materials/uploads/finalization';
+import { maintainMaterialUploads } from '@/lib/course-materials/uploads/cleanup';
+import { runTaskLoop } from 'thesidedoor-core/runtime/task-loop';
 
 const WORKER_PROFILE = process.env.WORKER_PROFILE || 'all';
 const WORKER_PRESET = process.env.WORKER_PRESET || 'full';
@@ -80,6 +83,11 @@ logger.info('Starting Sotto workers...', {
 
 // Create workers filtered by WORKER_PROFILE
 const workers = [
+  shouldRun('material-finalization') &&
+    createWorker('material-finalization', processMaterialFinalization, {
+      concurrency: 1,
+      lockDuration: 600000,
+    }),
   shouldRun('practice-preparation') &&
     createWorker('practice-preparation', processPracticePreparation, {
       concurrency: 1,
@@ -230,14 +238,33 @@ reconciliation?.done.catch(() => {
   void shutdown();
 });
 
+const uploadMaintenanceController = new AbortController();
+let uploadMaintenanceCursor: string | null = null;
+const uploadMaintenance = shouldRun('material-finalization')
+  ? runTaskLoop({
+      signal: uploadMaintenanceController.signal,
+      intervalMs: 60000,
+      onError: (error) => {
+        logger.error('Material upload maintenance failed', {
+          errorType: error instanceof Error ? error.name : 'unknown',
+        });
+      },
+      task: async (signal) => {
+        uploadMaintenanceCursor = await maintainMaterialUploads(signal, uploadMaintenanceCursor);
+      },
+    })
+  : Promise.resolve();
+
 // Graceful shutdown
 let shuttingDown = false;
 async function shutdown() {
   if (shuttingDown) return;
   shuttingDown = true;
   for (const timer of recurringTimers) clearTimeout(timer);
+  uploadMaintenanceController.abort();
   logger.info('Shutting down workers...');
   await Promise.all(workers.map((worker) => worker.pause(true)));
+  await uploadMaintenance;
   for (const worker of workers) worker.cancelAllJobs();
   await reconciliation?.stop().catch(() => {
     logger.error('Durable job reconciliation stopped with an error');

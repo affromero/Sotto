@@ -1,7 +1,7 @@
 // Course-scoped learner notes: free-text the learner writes about goals,
 // background, and interests. Feeds placement + per-learner class/practice
 // generation (never the shared curriculum). One editable doc per course.
-import { prisma, prismaUnfiltered } from './prisma';
+import { prismaUnfiltered } from './prisma';
 import { readCourseMaterialContext } from './course-materials/context';
 import { sottoTransaction } from './sidedoor/access/state/transaction';
 import type { Prisma } from '@/generated/prisma/client';
@@ -50,7 +50,7 @@ export async function getEditableCourseNote(
   courseId: string,
   transaction?: Pick<Prisma.TransactionClient, 'courseNote'>
 ): Promise<string> {
-  const note = await (transaction ?? prisma).courseNote.findUnique({
+  const note = await (transaction ?? prismaUnfiltered).courseNote.findUnique({
     where: { courseId },
     select: { body: true },
   });
@@ -76,7 +76,7 @@ export async function setCourseNote(
   body: string,
   transaction?: Pick<Prisma.TransactionClient, 'courseNote'>
 ): Promise<void> {
-  const database = transaction ?? prisma;
+  const database = transaction ?? prismaUnfiltered;
   const trimmed = normalizeCourseNote(body);
   if (trimmed === '') {
     await database.courseNote.deleteMany({ where: { courseId } });
@@ -88,5 +88,5 @@ export async function setCourseNote(
     update: { body: trimmed },
   };
   if (transaction) await transaction.courseNote.upsert(input);
-  else await prisma.courseNote.upsert(input);
+  else await prismaUnfiltered.courseNote.upsert(input);
 }

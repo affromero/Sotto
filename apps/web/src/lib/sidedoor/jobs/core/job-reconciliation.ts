@@ -1,4 +1,5 @@
 import { reconcileWritingResponse } from '@/lib/learning/writing/writing-execution';
+import { settleMaterialFinalizationFailure } from '@/lib/course-materials/jobs/failure';
 import type { Queue } from 'bullmq';
 import { reconcileOutboxPage, type JobDeliveryResult } from 'thesidedoor-core/runtime/outbox';
 import { runTaskLoop } from 'thesidedoor-core/runtime/task-loop';
@@ -95,6 +96,19 @@ export async function reconcileSottoJobs(options: ReconciliationOptions) {
           ? options.withQueue(receipt.handler, signal, deliver)
           : deliver(queue));
       } catch (error) {
+        if (
+          error instanceof SottoTerminalDeliveryError &&
+          error.observation.state === 'failed' &&
+          error.observation.handler === 'material-finalization' &&
+          error.observation.version === 1
+        ) {
+          await sottoTransaction(
+            database,
+            (tx) => settleMaterialFinalizationFailure(tx, error.observation),
+            { signal }
+          );
+          return 'complete';
+        }
         if (
           !(error instanceof SottoTerminalDeliveryError) ||
           error.observation.state !== 'failed' ||

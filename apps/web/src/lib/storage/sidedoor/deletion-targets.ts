@@ -4,7 +4,9 @@ import { LOCAL_STORAGE_URL_PREFIX } from '@/lib/r2';
 export type StorageDeletionScope =
   | { kind: 'instance' }
   | { kind: 'course'; id: string; episodeIds: readonly string[] }
-  | { kind: 'profile'; id: string };
+  | { kind: 'profile'; id: string }
+  | { kind: 'material'; id: string }
+  | { kind: 'material-upload'; id: string };
 
 export function ownedStorageReferences(
   values: Array<string | null | undefined>,
@@ -34,7 +36,8 @@ export interface StorageDeletionReferencePage {
     | 'prompt'
     | 'recording'
     | 'focus'
-    | 'material';
+    | 'material'
+    | 'upload-part';
   rows: Array<{ id: string; references: Record<string, string>; episodePrefix?: string }>;
 }
 
@@ -48,29 +51,6 @@ export async function visitStorageDeletionReferences(
   scope: StorageDeletionScope,
   visit: (page: StorageDeletionReferencePage) => Promise<void>
 ) {
-  const episodeWhere: Prisma.EpisodeWhereInput =
-    scope.kind === 'instance'
-      ? {}
-      : scope.kind === 'profile'
-        ? { userId: scope.id }
-        : { id: { in: [...scope.episodeIds] } };
-  const courseWhere =
-    scope.kind === 'instance'
-      ? {}
-      : scope.kind === 'profile'
-        ? { course: { userId: scope.id } }
-        : { courseId: scope.id };
-  const promptWhere: Prisma.SpeakingPromptWhereInput =
-    scope.kind === 'instance'
-      ? {}
-      : {
-          OR: [
-            { section: { class: courseWhere } },
-            { practiceSession: courseWhere },
-            { examSection: { exam: courseWhere } },
-            ...(scope.kind === 'profile' ? [{ examSection: { exam: { userId: scope.id } } }] : []),
-          ],
-        };
   async function pages<Row extends { id: string }>(
     source: StorageDeletionReferencePage['source'],
     fetch: (after: string | null) => Promise<Row[]>,
@@ -98,23 +78,69 @@ export async function visitStorageDeletionReferences(
   }
   const page = { orderBy: { id: 'asc' as const }, take: 100 };
   const afterId = (after: string | null) => (after === null ? {} : { id: { gt: after } });
+  async function uploadParts(where: Prisma.MaterialUploadPartWhereInput) {
+    await pages(
+      'upload-part',
+      (after) =>
+        database.materialUploadPart.findMany({
+          ...page,
+          where: { AND: [where, afterId(after)] },
+          select: { id: true, originalUrl: true },
+        }),
+      ({ originalUrl }) => ({ originalUrl })
+    );
+  }
+  // Completed-upload cleanup fences transfer work without touching the retained document.
+  if (scope.kind === 'material-upload') {
+    await uploadParts({ uploadId: scope.id });
+    return;
+  }
+  const materialWhere: Prisma.CourseMaterialWhereInput =
+    scope.kind === 'instance'
+      ? {}
+      : scope.kind === 'profile'
+        ? { userId: scope.id }
+        : scope.kind === 'material'
+          ? { id: scope.id }
+          : { courseId: scope.id };
   await pages(
     'material',
     (after) =>
       database.courseMaterial.findMany({
         ...page,
         where: {
-          ...(scope.kind === 'instance'
-            ? {}
-            : scope.kind === 'profile'
-              ? { userId: scope.id }
-              : { courseId: scope.id }),
+          ...materialWhere,
           ...afterId(after),
         },
-        select: { id: true, originalUrl: true },
+        select: { id: true, originalUrl: true, optimizedUrl: true },
       }),
-    ({ originalUrl }) => ({ originalUrl })
+    ({ originalUrl, optimizedUrl }) => ({ originalUrl, optimizedUrl })
   );
+  await uploadParts({ upload: { material: materialWhere } });
+  if (scope.kind === 'material') return;
+  const episodeWhere: Prisma.EpisodeWhereInput =
+    scope.kind === 'instance'
+      ? {}
+      : scope.kind === 'profile'
+        ? { userId: scope.id }
+        : { id: { in: [...scope.episodeIds] } };
+  const courseWhere =
+    scope.kind === 'instance'
+      ? {}
+      : scope.kind === 'profile'
+        ? { course: { userId: scope.id } }
+        : { courseId: scope.id };
+  const promptWhere: Prisma.SpeakingPromptWhereInput =
+    scope.kind === 'instance'
+      ? {}
+      : {
+          OR: [
+            { section: { class: courseWhere } },
+            { practiceSession: courseWhere },
+            { examSection: { exam: courseWhere } },
+            ...(scope.kind === 'profile' ? [{ examSection: { exam: { userId: scope.id } } }] : []),
+          ],
+        };
   if (scope.kind !== 'course' || scope.episodeIds.length > 0) {
     await pages(
       'episode',

@@ -41,6 +41,14 @@ See `docs/background-preparation.md` for scheduling and recovery semantics.
 
 ## Pipeline Flow
 
+`material-finalization` runs on the pipeline profile with concurrency one. Its
+processor owns its durable envelope and execution workspace. Keep it outside
+the generic queue wrapper to avoid nesting the same execution lifetime. Original
+publication and completion share a transaction. Terminal failures retain parts;
+failure events and queue reconciliation record the same recovery state. Upload
+maintenance expires abandoned transfers and retires completed parts through the
+canonical cleanup journal, preserving originals and unresolved cleanup work.
+
 ```
 content-extraction → deep-research → creative-planning → script-writing → compile-script
                                                                         │

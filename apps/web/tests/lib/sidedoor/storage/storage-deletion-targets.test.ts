@@ -42,6 +42,12 @@ suite('storage ownership collection with PostgreSQL', () => {
     );
     for (const statement of materialsMigration.split(';').filter((sql) => sql.trim()))
       await database.$executeRawUnsafe(statement);
+    const uploadsMigration = await readFile(
+      'prisma/migrations/20261020170000_resumable_material_uploads/migration.sql',
+      'utf8'
+    );
+    for (const statement of uploadsMigration.split(';').filter((sql) => sql.trim()))
+      await database.$executeRawUnsafe(statement);
     for (const owner of ['first', 'second']) {
       await insert('User', {
         id: owner,

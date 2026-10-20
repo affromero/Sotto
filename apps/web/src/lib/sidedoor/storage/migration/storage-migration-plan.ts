@@ -22,6 +22,7 @@ import {
 import { requireOriginalSottoAdmission } from '@/lib/sidedoor/access/core/request-identity';
 import { SIDEDOOR_STATE_ID, sottoStorageInstance } from '@/lib/sidedoor/access/state/store';
 import { materialStorageScopes } from '@/lib/course-materials';
+import { materialUploadStorageScopes } from '@/lib/course-materials/uploads/scopes';
 
 type Scope = { subjectId: string; generation: number };
 type ConsumerState = { reference: string | null; scopes: Scope[]; associations?: Prisma.JsonValue };
@@ -35,12 +36,23 @@ async function currentConsumer(
   if (parts.length !== 3) return null;
   const [kind, id, slot] = parts;
   if (!id) return null;
-  if (kind === 'material' && slot === 'original') {
+  if (kind === 'material' && (slot === 'original' || slot === 'optimized')) {
     const material = await database.courseMaterial.findUnique({ where: { id } });
     if (!material) return { reference: null, scopes: [] };
     return {
-      reference: material.originalUrl,
+      reference: slot === 'optimized' ? material.optimizedUrl : material.originalUrl,
       ...(await materialStorageScopes(database, material)),
+    };
+  }
+  if (kind === 'upload-part' && slot === 'original') {
+    const part = await database.materialUploadPart.findUnique({
+      where: { id },
+      include: { upload: { include: { material: true } } },
+    });
+    if (!part) return { reference: null, scopes: [] };
+    return {
+      reference: part.originalUrl,
+      ...(await materialUploadStorageScopes(database, part.upload)),
     };
   }
   if (kind === 'profile' && slot === 'avatar') {

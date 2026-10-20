@@ -80,6 +80,12 @@ npx prisma studio      # Visual database browser
 
 ## Scope
 
+MaterialUploadBatch reserves an owned declaration set by request identity.
+MaterialUpload binds each transfer to its stable CourseMaterial. Immutable
+MaterialUploadPart receipts record exact ranges and SHA-256 checksums. Complete
+original publication and durable finalizer completion commit together. Cleanup
+job identities survive cancellation, expiration and interrupted part retirement.
+
 LearningMapRevision stores immutable shared target-language catalogs. LearningNodeIdentity
 keeps stable identities across releases. LearningLevelBinding pins each course band's
 catalog and legitimate skill coverage; LearningLevelCompletion records earned transitions.

@@ -14,6 +14,12 @@ acknowledges them separately. A missing attached workspace fails closed.
 
 All shared business logic and external service integrations live here.
 
+`course-materials/uploads/` reserves resumable file batches, verifies bounded parts,
+and publishes complete originals through the canonical storage journal. Transfer
+scopes protect temporary parts independently of retained originals. Failed or
+uncertain finalization preserves parts and reports recovery status. Upload
+maintenance pages past blocked cleanup and retains exact pending cleanup jobs.
+
 `learning-map/` publishes immutable language catalogs and pins each course band's
 requirements. `evidence/` deduplicates qualified task observations and rebuilds
 bounded session projections with the canonical mastery model and SRS scheduler.

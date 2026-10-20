@@ -129,3 +129,4 @@ export {
 
 // API contracts (Zod schemas + endpoint registry for OpenAPI/Rust codegen)
 export * from './contracts';
+export * from './course-materials/uploads';
