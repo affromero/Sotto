@@ -2,20 +2,123 @@
 // user's AI provider (BYOK or local Claude/Codex), render a prompt, call the
 // model, parse JSON. A single batch of questions spans A1..C2; the learner's
 // level is the highest band they clear on a staircase.
-import { capturedLearningAiOptions, resolveCapturedLearningAi } from './learning-ai';
-import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
-import { createAIProvider } from './providers/ai';
 import { loadAndRender } from './prompt-loader';
 import { formatNotesForPrompt } from './course-notes';
-import { logUsage } from './usage-logger';
-import { logger } from './logger';
-import { CEFR_ORDER } from './cefr-levels';
+import { z } from 'zod';
 import type { CefrLevel } from '@sotto/shared';
 
 const PLACEMENT_LEVELS: CefrLevel[] = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
 const PLACEMENT_SKILLS = ['grammar', 'vocab', 'reading'] as const;
 const PASS_THRESHOLD = 0.7;
 const PER_BAND = 4;
+export const PLACEMENT_SCORING_VERSION = 1;
+export const placementPrivateQuestionSchema = z
+  .object({
+    id: z.string().regex(/^pq_\d+$/),
+    cefr: z.enum(PLACEMENT_LEVELS as ['A1', 'A2', 'B1', 'B2', 'C1', 'C2']),
+    skill: z.enum(PLACEMENT_SKILLS),
+    prompt: z
+      .string()
+      .trim()
+      .min(1)
+      .max(4000)
+      .refine((text) => text.isWellFormed()),
+    options: z
+      .array(
+        z
+          .string()
+          .trim()
+          .min(1)
+          .max(2000)
+          .refine((text) => text.isWellFormed())
+      )
+      .length(5),
+    correctIndex: z.number().int().min(0).max(3),
+    explanation: z
+      .string()
+      .max(4000)
+      .refine((text) => text.isWellFormed()),
+  })
+  .strict();
+const generatedQuestionSchema = placementPrivateQuestionSchema
+  .omit({ id: true })
+  .extend({
+    options: z
+      .array(
+        z
+          .string()
+          .trim()
+          .min(1)
+          .max(2000)
+          .refine((text) => text.isWellFormed())
+      )
+      .length(4),
+  })
+  .strict()
+  .refine((question) => new Set(question.options).size === 4, 'Question options must be distinct.');
+const PLACEMENT_RESPONSE_SCHEMA = z.toJSONSchema(
+  z.object({ questions: z.array(generatedQuestionSchema).min(6).max(24) }).strict()
+);
+
+export function preparePlacementQuestionBatch(
+  nativeLang: string,
+  targetLang: string,
+  note = '',
+  perBand = PER_BAND
+) {
+  if (!Number.isSafeInteger(perBand) || perBand < 1 || perBand > PER_BAND)
+    throw new Error('Invalid questions per placement band.');
+  const count = PLACEMENT_LEVELS.length * perBand;
+  return {
+    system:
+      loadAndRender('placement/placement-probe.md', {
+        NATIVE: nativeLang,
+        TARGET: targetLang,
+        LEVELS: PLACEMENT_LEVELS.join(', '),
+        SKILLS: PLACEMENT_SKILLS.join(', '),
+        PER_BAND: String(perBand),
+        COUNT: String(count),
+        NOTES: formatNotesForPrompt(note),
+      }) +
+      '\nReturn one JSON object with a questions array matching the supplied strict schema. Source material difficulty is not learner mastery.',
+    messages: [
+      {
+        role: 'user' as const,
+        content: `Generate exactly ${count} placement questions (${perBand} per CEFR level).`,
+      },
+    ],
+    jsonSchema: { name: 'placement_questions', schema: PLACEMENT_RESPONSE_SCHEMA },
+    maxOutputTokens: 8192,
+    perBand,
+  };
+}
+
+/** A retained complete response must contain the complete requested band ladder. */
+export function parsePlacementQuestionBatch(
+  content: string,
+  nativeLang: string,
+  perBand: number
+): PlacementQuestion[] {
+  if (Buffer.byteLength(content, 'utf8') > 512 * 1024)
+    throw new Error('Placement output exceeds its receipt budget.');
+  const output = z
+    .object({ questions: z.array(generatedQuestionSchema).min(6).max(24) })
+    .strict()
+    .parse(JSON.parse(content));
+  if (
+    output.questions.length !== PLACEMENT_LEVELS.length * perBand ||
+    PLACEMENT_LEVELS.some(
+      (level) => output.questions.filter((question) => question.cefr === level).length !== perBand
+    ) ||
+    output.questions.some((question) => question.options.includes(idkLabel(nativeLang)))
+  )
+    throw new Error('Placement must include every requested question in every CEFR band.');
+  return output.questions.map((question, index) => ({
+    ...question,
+    id: `pq_${index}`,
+    options: [...question.options, idkLabel(nativeLang)],
+  }));
+}
 
 // "I don't know" in the learner's native language, so even an absolute beginner
 // can opt out of guessing. Appended as the last option of every placement
@@ -79,103 +182,6 @@ export function toPublic(q: PlacementQuestion): PlacementQuestionPublic {
   return { id: q.id, cefr: q.cefr, skill: q.skill, prompt: q.prompt, options: q.options };
 }
 
-export async function generatePlacement(
-  userId: string,
-  execution: SottoProviderExecution,
-  nativeLang: string,
-  targetLang: string,
-  note = '',
-  // Questions per CEFR band. Defaults to the full test; the "verify with a few
-  // questions" path passes a smaller value for a shorter run. Clamped 1..PER_BAND.
-  perBand: number = PER_BAND
-): Promise<{ questions: PlacementQuestion[]; provider: string; model: string }> {
-  const ai = await resolveCapturedLearningAi(userId, execution);
-  const bandCount = Math.max(1, Math.min(PER_BAND, Math.round(perBand)));
-  const count = PLACEMENT_LEVELS.length * bandCount;
-
-  const systemPrompt = loadAndRender('placement/placement-probe.md', {
-    NATIVE: nativeLang,
-    TARGET: targetLang,
-    LEVELS: PLACEMENT_LEVELS.join(', '),
-    SKILLS: PLACEMENT_SKILLS.join(', '),
-    PER_BAND: String(bandCount),
-    COUNT: String(count),
-    NOTES: formatNotesForPrompt(note),
-  });
-
-  const provider = createAIProvider(ai.provider);
-  const response = await provider.generateResponse(
-    systemPrompt,
-    [
-      {
-        role: 'user',
-        content: `Generate exactly ${count} placement questions (${bandCount} per CEFR level).`,
-      },
-    ],
-    { ...(await capturedLearningAiOptions(ai)), maxTokens: 6000, temperature: 0.7 }
-  );
-
-  logUsage({
-    service: ai.provider,
-    model: response.model,
-    category: 'placement',
-    inputTokens: response.inputTokens,
-    outputTokens: response.outputTokens,
-    userId,
-  });
-
-  const cleaned = response.content
-    .replace(/```json\n?/g, '')
-    .replace(/```\n?/g, '')
-    .trim();
-  let raw: Array<{
-    cefr?: string;
-    skill?: string;
-    prompt?: string;
-    options?: string[];
-    correctIndex?: number;
-    explanation?: string;
-  }>;
-  try {
-    raw = JSON.parse(cleaned);
-  } catch (err) {
-    logger.error('Failed to parse placement LLM response', {
-      error: err instanceof Error ? err.message : String(err),
-    });
-    throw new Error('Placement generation returned malformed output.');
-  }
-
-  const questions = raw
-    .filter(
-      (q) =>
-        typeof q.prompt === 'string' &&
-        PLACEMENT_LEVELS.includes(q.cefr as CefrLevel) &&
-        Array.isArray(q.options) &&
-        q.options.length === 4 &&
-        typeof q.correctIndex === 'number'
-    )
-    .map((q, i): PlacementQuestion => ({
-      id: `pq_${i}`,
-      cefr: q.cefr as CefrLevel,
-      skill: (PLACEMENT_SKILLS.includes(q.skill as PlacementSkill)
-        ? q.skill
-        : 'grammar') as PlacementSkill,
-      prompt: q.prompt as string,
-      // The LLM returns 4 content options; append a native-language "I don't
-      // know" as the 5th (index 4). correctIndex stays 0..3, so picking it is
-      // always scored as not-mastered.
-      options: [...(q.options as string[]).slice(0, 4), idkLabel(nativeLang)],
-      correctIndex: Math.max(0, Math.min(3, q.correctIndex as number)),
-      explanation: q.explanation ?? '',
-    }));
-
-  if (questions.length === 0) {
-    throw new Error('Placement generation produced no usable questions.');
-  }
-
-  return { questions, provider: ai.provider, model: response.model };
-}
-
 export interface PlacementOutcome {
   level: CefrLevel;
   scoreByBand: Record<string, number>;
@@ -223,80 +229,4 @@ export function scorePlacement(
   }
 
   return { level, scoreByBand, scoreBySkill, responses };
-}
-
-export interface NotesDeduction {
-  level: CefrLevel;
-  rationale: string;
-  /** 0..1 — how strongly the materials support the level. */
-  confidence: number;
-}
-
-/**
- * Deduce a learner's CEFR level from materials they uploaded (notes, a textbook
- * excerpt, their own writing). Pure inference — no DB writes; the caller decides
- * whether to confirm directly or verify with a short quiz, then creates the
- * course. Reuses the learner's resolved AI provider, same as generatePlacement.
- */
-export async function deduceLevelFromNotes(
-  userId: string,
-  execution: SottoProviderExecution,
-  nativeLang: string,
-  targetLang: string,
-  content: string
-): Promise<{ deduction: NotesDeduction; provider: string; model: string }> {
-  const ai = await resolveCapturedLearningAi(userId, execution);
-
-  const systemPrompt = loadAndRender('placement/deduce-from-notes.md', {
-    NATIVE: nativeLang,
-    TARGET: targetLang,
-    CONTENT: content,
-  });
-
-  const provider = createAIProvider(ai.provider);
-  const response = await provider.generateResponse(
-    systemPrompt,
-    [{ role: 'user', content: 'Assess the CEFR level shown by these materials.' }],
-    {
-      ...(await capturedLearningAiOptions(ai, { includeSourceDocuments: true })),
-      maxTokens: 800,
-      temperature: 0.2,
-    }
-  );
-
-  logUsage({
-    service: ai.provider,
-    model: response.model,
-    category: 'placement',
-    inputTokens: response.inputTokens,
-    outputTokens: response.outputTokens,
-    userId,
-  });
-
-  const cleaned = response.content
-    .replace(/```json\n?/g, '')
-    .replace(/```\n?/g, '')
-    .trim();
-  let raw: { level?: string; rationale?: string; confidence?: number };
-  try {
-    raw = JSON.parse(cleaned);
-  } catch (err) {
-    logger.error('Failed to parse notes-deduction LLM response', {
-      error: err instanceof Error ? err.message : String(err),
-    });
-    throw new Error('Level deduction returned malformed output.');
-  }
-
-  const level = (CEFR_ORDER as readonly string[]).includes(raw.level ?? '')
-    ? (raw.level as CefrLevel)
-    : 'A1';
-  const confidence =
-    typeof raw.confidence === 'number' ? Math.max(0, Math.min(1, raw.confidence)) : 0;
-  const rationale = typeof raw.rationale === 'string' ? raw.rationale.trim() : '';
-
-  return {
-    deduction: { level, rationale, confidence },
-    provider: ai.provider,
-    model: response.model,
-  };
 }

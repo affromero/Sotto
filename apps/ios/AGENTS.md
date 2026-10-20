@@ -65,7 +65,10 @@ their UDIDs to `xcodebuild`. Test **both** families: the layout differs by size 
   Keep recording, feedback, and Submit in the class flow. PDF notes remain a separate surface.
 - Course materials download through the owning profile's material endpoint and
   open locally with Quick Look. Keep originals and imported text outside the
-  editable notes field. Native uploads use bounded reads and a 10MB total limit.
+  editable notes field. Native originals use protected staged files, bounded
+  hashing, and file-backed resumable transfers. Each file can be 100MiB, with
+  250MiB across up to ten files. Persist receipt metadata before admission and
+  completion; uncertain outcomes retain their exact identities for resume.
 
 - iPad writing prompts offer a Pencil canvas with on-device Vision text recognition.
   Learners review the recognized text before it enters `WritingDraftStore`; the

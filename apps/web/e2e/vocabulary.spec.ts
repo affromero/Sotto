@@ -92,12 +92,17 @@ test('uploaded words flow through the dictionary, local pronunciation, study, an
     .getByRole('listitem')
     .filter({ has: page.getByText('German vocabulary browser', { exact: true }) });
   await card.getByRole('button', { name: /Course notes/ }).click();
-  await card.getByLabel('Upload course note files').setInputFiles({
+  await card.getByLabel('Choose original files').setInputFiles({
     name: 'Vocab Deutsch.txt',
     mimeType: 'text/plain',
     buffer: Buffer.from(entries.map(([lemma, meaning]) => `${lemma} = ${meaning}`).join('\n')),
   });
-  await expect(card.getByText('Vocabulary indexing is queued.', { exact: false })).toBeVisible();
+  await card.getByRole('button', { name: 'Upload originals', exact: true }).click();
+  await expect(
+    card.getByText('Original files saved. Page processing continues in the background.', {
+      exact: true,
+    })
+  ).toBeVisible();
   await card.getByRole('link', { name: 'View vocabulary and import progress' }).click();
   await expect(page.getByRole('heading', { name: /Your words/ })).toBeVisible();
   await expect(page.getByText('Coverage verified', { exact: true })).toBeVisible({

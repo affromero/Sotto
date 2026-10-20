@@ -1,6 +1,7 @@
 /// Draw the active screen into `area`.
 pub(super) fn draw_view(frame: &mut Frame, area: Rect, view: &View, config: &Config, p: &Palette) {
     match view {
+        View::LearningMap { course, state } => draw_learning_map(frame, area, course, state, p),
         View::Loading => draw_loading(frame, area, config, p),
         View::Error { message, .. } => draw_error(frame, area, message, p),
         View::Courses { courses, cursor } => draw_courses(frame, area, courses, *cursor, p),
@@ -257,14 +258,18 @@ fn draw_course_home(
             ),
         ]),
         Line::from(vec![
-            Span::styled("Due  ", Style::default().fg(p.ink_soft)),
+            Span::styled(format!("Due {} total  ", due.total_due()), Style::default().fg(p.ink_soft)),
             Span::styled(
                 format!("{} vocab", due.vocab),
                 Style::default().fg(p.primary).add_modifier(Modifier::BOLD),
             ),
             Span::styled("   ", Style::default().fg(p.ink_soft)),
             Span::styled(
-                format!("{} grammar", due.grammar),
+                format!("{} legacy grammar", due.grammar),
+                Style::default().fg(p.accent),
+            ),
+            Span::styled(
+                format!("   {} objective{}", due.objectives, if due.objectives == 1 { "" } else { "s" }),
                 Style::default().fg(p.accent),
             ),
             Span::styled(
@@ -288,8 +293,9 @@ fn draw_course_home(
                 Style::default().fg(p.ink).add_modifier(Modifier::BOLD)
             };
             let suffix = if disabled { "  (nothing due)" } else { "" };
+            let badge = due.skill_due(*skill).map(|value| format!("  ({value} due)")).unwrap_or_default();
             ListItem::new(Line::from(Span::styled(
-                format!("{}{}", skill.label(), suffix),
+                format!("{}{}{}", skill.label(), badge, suffix),
                 style,
             )))
         })
@@ -336,6 +342,7 @@ fn draw_course_home(
             "c class",
             "e exam",
             "m memory",
+            "l learning map",
             "s settings",
             "q back",
         ]

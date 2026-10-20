@@ -1,7 +1,9 @@
+// @vitest-environment node
 import { randomUUID } from 'node:crypto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { practicePreparingSchema } from '@sotto/shared';
+import { reviewFixture } from '../../lib/learning-map/adaptation/fixtures';
 
 const mocks = vi.hoisted(() => ({
   authenticate: vi.fn(),
@@ -12,6 +14,9 @@ const mocks = vi.hoisted(() => ({
   vocab: vi.fn(),
   grammar: vi.fn(),
   sessions: vi.fn(),
+  memoryCourse: vi.fn(),
+  bindings: vi.fn(),
+  states: vi.fn(),
 }));
 vi.mock('@/lib/api-keys', () => ({ authenticateRequest: mocks.authenticate }));
 vi.mock('@/lib/practice/preparation', async (importOriginal) => ({
@@ -24,8 +29,11 @@ vi.mock('@/lib/practice-service', async (importOriginal) => ({
   submitPractice: mocks.submit,
 }));
 vi.mock('@/lib/prisma', () => ({
+  prismaUnfiltered: {},
   prisma: {
-    course: { findFirst: mocks.course },
+    course: { findFirst: mocks.course, findUnique: mocks.memoryCourse },
+    learningLevelBinding: { findMany: mocks.bindings },
+    learnerObjectiveState: { findMany: mocks.states },
     learnerVocab: { count: mocks.vocab },
     learnerGrammar: { count: mocks.grammar },
     practiceSession: { findMany: mocks.sessions },
@@ -45,16 +53,50 @@ const sessionParams = { params: Promise.resolve({ sessionId: 'ps1' }) };
 const jsonReq = (body: unknown) =>
   new NextRequest('http://localhost/api/v1/practice', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', authorization: 'Bearer test-device' },
     body: JSON.stringify(body),
   });
 beforeEach(() => {
   vi.resetAllMocks();
   mocks.authenticate.mockResolvedValue({ userId: 'u1' });
+  mocks.memoryCourse.mockResolvedValue({ nativeLang: 'en', targetLang: 'es', currentLevel: 'A1' });
+  mocks.bindings.mockResolvedValue([]);
+  mocks.states.mockResolvedValue([]);
   mocks.admit.mockResolvedValue({ id: randomUUID(), sessionId: randomUUID(), status: 'QUEUED' });
 });
 
 describe('Practice HTTP contract', () => {
+  it('passes the complete explicit lower-level selection to durable admission', async () => {
+    const learningSelection = {
+      catalogVersion: 1,
+      nodeIds: ['de.a1.grammar.word-order'],
+      level: 'A1',
+      materialFocusId: 'owned-source',
+    };
+    const response = await startPost(
+      jsonReq({ kind: 'GRAMMAR', requestId: randomUUID(), learningSelection }),
+      courseParams
+    );
+    expect(response.status).toBe(202);
+    expect(practicePreparingSchema.parse(await response.json()).message).toMatch(/saved/);
+    expect(mocks.admit).toHaveBeenCalledWith(
+      'c1',
+      'GRAMMAR',
+      expect.objectContaining({ userId: 'u1' }),
+      expect.objectContaining({ learningSelection })
+    );
+  });
+
+  it.each([
+    { kind: 'GRAMMAR', learningSelection: { catalogVersion: 1, nodeIds: [], level: 'A1' } },
+    {
+      kind: 'GRAMMAR',
+      learningSelection: { catalogVersion: null, nodeIds: ['canonical'], level: 'A1' },
+    },
+    { kind: 'GRAMMAR', unreviewedDifficulty: 'C2' },
+  ])('rejects an incomplete or unrecognized selection %j', async (body) => {
+    expect((await startPost(jsonReq(body), courseParams)).status).toBe(400);
+  });
   it('explains the explicit choices when credits prevent FULL generation', async () => {
     mocks.admit.mockRejectedValue(new ProviderCreditsExhaustedError('cartesia'));
     const response = await startPost(jsonReq({ kind: 'FULL' }), courseParams);
@@ -159,7 +201,7 @@ describe('Practice HTTP contract', () => {
   });
 
   it('shows due counts and preparation failures in the owner’s recent history', async () => {
-    mocks.course.mockResolvedValue({ id: 'c1' });
+    mocks.course.mockResolvedValue({ id: 'c1', currentLevel: 'A1', targetLang: 'es' });
     mocks.vocab.mockResolvedValueOnce(7).mockResolvedValueOnce(20);
     mocks.grammar.mockResolvedValue(3);
     mocks.sessions.mockResolvedValue([{ id: 'ps1', kind: 'FULL', status: 'FAILED', score: null }]);
@@ -173,5 +215,25 @@ describe('Practice HTTP contract', () => {
       totalVocab: 20,
       recent: [{ status: 'FAILED' }],
     });
+  });
+  it('reports qualified current-band channel reviews separately while preserving broad legacy grammar', async () => {
+    const { entry, binding, states } = reviewFixture();
+    mocks.course.mockResolvedValue({ id: 'c1', currentLevel: 'A1', targetLang: 'es' });
+    mocks.bindings.mockResolvedValue([binding]);
+    mocks.states.mockResolvedValue(states);
+    mocks.vocab.mockResolvedValue(0);
+    mocks.grammar.mockImplementation(async (query: { where: { NOT?: unknown } }) =>
+      query.where.NOT ? 1 : 2
+    );
+    mocks.sessions.mockResolvedValue([]);
+    const response = await overviewGet(
+      new NextRequest('http://localhost/api/v1/practice'),
+      courseParams
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      due: { vocab: 0, grammar: 1, objectives: 1, bySkill: { GRAMMAR: 1, WRITING: 1 } },
+    });
+    expect(entry.progress.status).toBe('NEEDS_WORK');
   });
 });

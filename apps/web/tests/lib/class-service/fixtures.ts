@@ -108,6 +108,8 @@ vi.mock('@/lib/learning/skill-requirements', async (importOriginal) => ({
 // ---- Hoisted mock handles ----
 
 const mockCourseFindFirst = vi.fn();
+const mockLearningLevelBindings = vi.fn().mockResolvedValue([]);
+const mockObjectiveStates = vi.fn().mockResolvedValue([]);
 const mockCourseClassFindFirst = vi.fn();
 const mockCourseClassFindUnique = vi.fn();
 const mockCourseClassFindMany = vi.fn();
@@ -161,13 +163,22 @@ vi.mock('@/lib/prisma', () => {
         (await mockCourseMaterialRows()).find((row: { id: string }) => row.id === where.id),
     },
     courseNote: { findUnique: async () => null },
+    learningLevelBinding: { findMany: (...args: unknown[]) => mockLearningLevelBindings(...args) },
+    learnerObjectiveState: { findMany: (...args: unknown[]) => mockObjectiveStates(...args) },
     course: {
+      findUnique: (...args: unknown[]) => mockCourseFindFirst(...args),
       findFirst: (...args: unknown[]) => mockCourseFindFirst(...args),
       update: (...args: unknown[]) => mockCourseUpdate(...args),
       updateMany: (...args: unknown[]) => mockCourseUpdateMany(...args),
     },
     courseClass: {
       findFirst: async (...args: unknown[]) => {
+        const query = args[0] as {
+          where: { id?: string };
+          include?: { lesson?: { include?: { learningObjectives?: boolean } } };
+        };
+        if (query.include?.lesson?.include?.learningObjectives)
+          return { id: query.where.id, skillRequirements: null };
         const cls = await mockCourseClassFindFirst(...args);
         return cls ? { updatedAt: new Date('2026-09-30T00:00:00Z'), sections: [], ...cls } : null;
       },
@@ -477,6 +488,8 @@ const SAMPLE_QUESTIONS = [
 
 export {
   mockCourseFindFirst,
+  mockLearningLevelBindings,
+  mockObjectiveStates,
   mockCourseClassFindFirst,
   mockCourseClassFindUnique,
   mockCourseClassFindMany,

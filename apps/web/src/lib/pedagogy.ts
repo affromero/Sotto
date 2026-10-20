@@ -82,7 +82,7 @@ export function formatPedagogyForPrompt(style: PedagogyStyle): string {
  * no note collapses to empty so generation is unchanged from before this feature.
  */
 export function buildLearnerContext(note: string, style: PedagogyStyle): string {
-  const trimmedNote = note.trim();
+  const trimmedNote = note.trim().replaceAll('\u0000', '\\u0000');
   // BALANCED (and any unset/invalid value) adds no methodology, so generation is
   // unchanged from before this feature.
   const resolved = isPedagogyStyle(style) ? style : 'BALANCED';

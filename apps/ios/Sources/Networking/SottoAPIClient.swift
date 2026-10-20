@@ -74,7 +74,7 @@ struct SottoAPIClient {
     let serverURL: URL
     let apiKey: String?
     let profileId: String?
-    private let session: URLSession
+    let session: URLSession
 
     init(serverURL: URL, apiKey: String?, profileId: String? = nil, session: URLSession = .shared) {
         self.serverURL = serverURL
@@ -239,15 +239,15 @@ struct SottoAPIClient {
         let _: DeleteClassResponse = try await delete("/api/v1/classes/\(classId)")
     }
 
-    func startPractice(courseId: String, kind: String, requestId: UUID = UUID()) async throws -> SottoPracticeStart {
+    func startPractice(courseId: String, kind: String, requestId: UUID = UUID(), learningSelection: SottoLearningSelection? = nil) async throws -> SottoPracticeStart {
         // The server builds a script and its audio here; the web client warns
         // this runs one to three minutes.
-        try await post(
+        do { return try await post(
             "/api/v1/courses/\(courseId)/practice",
-            body: StartPracticeRequest(kind: kind, requestId: requestId.uuidString),
+            body: StartPracticeRequest(kind: kind, requestId: requestId.uuidString, learningSelection: learningSelection),
             acceptedStatuses: [200, 201, 202],
             timeout: SottoAPIClient.generationTimeout
-        )
+        ) } catch { throw SottoLearningMapFailure.normalized(error) }
     }
 
     func practiceGenerationAction(sessionId: String, action: String, acknowledgeUnknownOutcome: Bool = false) async throws -> SottoPracticeStart {
@@ -266,8 +266,19 @@ struct SottoAPIClient {
         return response.topics
     }
 
-    func fetchCourseNotes(courseId: String) async throws -> SottoCourseNotesResponse {
-        try await get("/api/v1/courses/\(courseId)/notes")
+    func fetchCourseNotes(courseId: String, cursor: String? = nil) async throws -> SottoCourseNotesResponse {
+        let query: String
+        if let cursor {
+            guard cursor.count <= 2000, let encoded = cursor.addingPercentEncoding(withAllowedCharacters: .alphanumerics) else {
+                throw SottoAPIError.message("The material list cursor is invalid.")
+            }
+            query = "?after=\(encoded)"
+        } else { query = "" }
+        let result: SottoCourseNotesResponse = try await get("/api/v1/courses/\(courseId)/notes\(query)")
+        guard (result.materials?.count ?? 0) <= 20, result.nextCursor == nil || result.nextCursor != cursor else {
+            throw SottoAPIError.message("The material list returned an invalid pagination receipt.")
+        }
+        return result
     }
 
     func saveCourseNotes(courseId: String, body: String) async throws -> SottoCourseNotesResponse {
@@ -292,28 +303,7 @@ struct SottoAPIClient {
     }
 
     func importCourseMaterials(courseId: String, urls: [URL]) async throws -> SottoCourseNotesResponse {
-        guard !urls.isEmpty, urls.count <= 10 else { throw SottoAPIError.message("Choose up to 10 files.") }
-        let boundary = "Sotto-material-\(UUID().uuidString)"
-        var body = Data()
-        for url in urls {
-            let scoped = url.startAccessingSecurityScopedResource()
-            defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-            let file = try FileHandle(forReadingFrom: url)
-            defer { try? file.close() }
-            let available = 10 * 1024 * 1024 - body.count
-            guard available >= 0 else { throw SottoAPIError.message("Materials must total 10MB or less.") }
-            let data = try file.read(upToCount: available + 1) ?? Data()
-            guard body.count + data.count <= 10 * 1024 * 1024 else { throw SottoAPIError.message("Materials must total 10MB or less.") }
-            let name = url.lastPathComponent.replacingOccurrences(of: "\"", with: "_").replacingOccurrences(of: "\r", with: "_").replacingOccurrences(of: "\n", with: "_")
-            body.append(Data("--\(boundary)\r\nContent-Disposition: form-data; name=\"files\"; filename=\"\(name)\"\r\nContent-Type: application/octet-stream\r\n\r\n".utf8))
-            body.append(data)
-            body.append(Data("\r\n".utf8))
-        }
-        body.append(Data("--\(boundary)--\r\n".utf8))
-        var request = try makeRequest(path: "/api/v1/courses/\(courseId)/notes", method: "POST", authorized: true, timeout: Self.generationTimeout)
-        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-        request.httpBody = body
-        return try await send(request, acceptedStatuses: [200])
+        try await importResumableMaterials(courseId: courseId, urls: urls)
     }
 
     func updateCoursePedagogy(
@@ -530,26 +520,6 @@ struct SottoAPIClient {
 
     // MARK: - Placement
 
-    /// Generates the adaptive question batch, so this runs against a model.
-    func fetchPlacement(native: String, target: String) async throws -> SottoPlacementBatch {
-        try await get(
-            "/api/v1/placement?native=\(native)&target=\(target)",
-            timeout: SottoAPIClient.generationTimeout
-        )
-    }
-
-    func submitPlacement(
-        native: String,
-        target: String,
-        answers: [SottoPlacementAnswer]
-    ) async throws -> SottoPlacementResult {
-        try await post(
-            "/api/v1/placement",
-            body: SubmitPlacementRequest(native: native, target: target, answers: answers),
-            timeout: SottoAPIClient.generationTimeout
-        )
-    }
-
     /// Declaring a level skips the test but still creates the course, which
     /// builds a curriculum on the server, so it gets the long timeout too.
     func submitManualPlacement(
@@ -664,12 +634,13 @@ struct SottoAPIClient {
         )
     }
 
-    private func get<Response: Decodable>(
+    func get<Response: Decodable>(
         _ path: String,
+        acceptedStatuses: Set<Int> = [200],
         timeout: TimeInterval = SottoAPIClient.defaultTimeout
     ) async throws -> Response {
         let request = try makeRequest(path: path, method: "GET", authorized: true, timeout: timeout)
-        return try await send(request, acceptedStatuses: [200])
+        return try await send(request, acceptedStatuses: acceptedStatuses)
     }
 
     private func delete<Response: Decodable>(_ path: String) async throws -> Response {
@@ -677,7 +648,7 @@ struct SottoAPIClient {
         return try await send(request, acceptedStatuses: [200])
     }
 
-    private func post<Body: Encodable, Response: Decodable>(
+    func post<Body: Encodable, Response: Decodable>(
         _ path: String,
         body: Body,
         authorized: Bool = true,
@@ -722,7 +693,7 @@ struct SottoAPIClient {
     static let generationTimeout: TimeInterval = 300
     static let defaultTimeout: TimeInterval = 60
 
-    private func makeRequest(
+    func makeRequest(
         path: String,
         method: String,
         authorized: Bool,
@@ -756,11 +727,16 @@ struct SottoAPIClient {
         return request
     }
 
-    private func send<Response: Decodable>(
+    func send<Response: Decodable>(
         _ request: URLRequest,
         acceptedStatuses: Set<Int>
     ) async throws -> Response {
         let (data, response) = try await session.data(for: request, delegate: SottoAPIRedirectPolicy(serverURL: serverURL))
+        return try decodeResponse(data, response: response, acceptedStatuses: acceptedStatuses)
+    }
+
+    func decodeResponse<Response: Decodable>(_ data: Data, response: URLResponse,
+        acceptedStatuses: Set<Int>) throws -> Response {
         guard let http = response as? HTTPURLResponse else {
             throw SottoAPIError.message("Sotto returned a non-HTTP response.")
         }
@@ -891,6 +867,7 @@ private struct CreateProfileRequest: Encodable {
 private struct StartPracticeRequest: Encodable {
     let kind: String
     let requestId: String
+    let learningSelection: SottoLearningSelection?
 }
 
 private struct CreateCourseRequest: Encodable {
@@ -948,12 +925,6 @@ private struct LiveSessionRequest: Encodable {
 }
 
 private struct LiveSessionSaveResponse: Decodable {}
-
-private struct SubmitPlacementRequest: Encodable {
-    let native: String
-    let target: String
-    let answers: [SottoPlacementAnswer]
-}
 
 private struct ManualPlacementRequest: Encodable {
     let native: String

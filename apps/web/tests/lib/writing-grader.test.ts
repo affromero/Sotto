@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Unit tests for src/lib/writing-grader.ts — synchronous LLM grading of a
  * learner's writing: parses + clamps the score, filters corrections, and
@@ -27,6 +28,8 @@ vi.mock('@/lib/usage-logger', () => ({ logUsage: vi.fn() }));
 
 import { gradeWriting } from '@/lib/writing-grader';
 import { blockedProviderExecution } from '../helpers/runtime/provider-execution';
+import { assessmentFixture } from './learning-map/evidence/evidence-fixtures';
+import { objectiveEvidenceHash } from '@/lib/learning-map/evidence/protocol';
 
 const PARAMS = {
   userId: 'u1',
@@ -45,6 +48,51 @@ beforeEach(() => {
 });
 
 describe('gradeWriting', () => {
+  it('preserves an unassessed criterion despite a high aggregate writing score', async () => {
+    const assessed = assessmentFixture('WRITING');
+    if (assessed.task.kind !== 'ORIGINAL_WRITING') throw new Error('Expected writing fixture.');
+    const text = 'Hallo.';
+    mockGenerateResponse
+      .mockResolvedValueOnce({
+        content: JSON.stringify({
+          overallScore: 0.95,
+          corrections: [],
+          feedback: 'The sentence is well formed.',
+        }),
+        model: 'configured-model',
+      })
+      .mockResolvedValueOnce({
+        content: JSON.stringify({
+          finding: {
+            schemaVersion: 1,
+            taskFingerprint: assessed.taskFingerprint,
+            responseSha256: objectiveEvidenceHash({ text }),
+            assessed: false,
+            quality: null,
+            quotes: [],
+            rationale: 'A greeting supplies no evidence about the required dietary request.',
+          },
+          feedback: 'Make the requested dietary request.',
+        }),
+        model: 'configured-model',
+      });
+    const grade = await gradeWriting({
+      ...PARAMS,
+      userId: 'user-1',
+      execution: blockedProviderExecution('user-1'),
+      targetLang: 'de',
+      level: 'A2',
+      task: assessed.task.task,
+      guidance: assessed.task.guidance,
+      ideas: assessed.task.suppliedSupport,
+      text,
+      learningObjectives: assessed,
+    });
+    expect(grade).toMatchObject({
+      overallScore: 0.95,
+      objectiveEvidence: { assessed: false, quality: null, quotes: [] },
+    });
+  });
   it('parses score, corrections, and feedback', async () => {
     mockGenerateResponse.mockResolvedValue({
       content: JSON.stringify({

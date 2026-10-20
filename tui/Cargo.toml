@@ -65,7 +65,7 @@ async-trait = "0.1.92"
 # Generated API client + its runtime requirements.
 progenitor = "0.14"
 regress = "0.11"
-chrono = { version = "0.4", default-features = false, features = ["serde", "std"] }
+chrono = { version = "0.4.45", default-features = false, features = ["serde", "std"] }
 
 # Audio: playback (rodio), capture (cpal), and WAV encoding (hound).
 rodio = "0.22"

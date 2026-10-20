@@ -8,6 +8,7 @@ pub(crate) enum View {
     Error { message: String, retry: RetryKind },
     /// The learner's courses, with a cursor for selection.
     Courses { courses: Vec<Course>, cursor: usize },
+    LearningMap { course: Course, state: Box<LearningMapState> },
     /// A selected course: due counts plus a skill menu (vocab/listening/speaking).
     CourseHome {
         course: Course,

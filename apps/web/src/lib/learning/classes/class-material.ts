@@ -1,3 +1,4 @@
+import { speakingTaskMode } from '@/lib/learning-map/evidence/communicative-speaking';
 import { z } from 'zod';
 import { assertStoredReadingVocabulary } from '../reading-vocabulary';
 import { learningScriptHash } from '../script-hash';
@@ -87,6 +88,7 @@ export async function assertStoredClassMaterial(database: LearningDatabase, clas
   }
   if (requirements.referenceAudioRequired)
     for (const prompt of sections.flatMap((section) => section.prompts)) {
+      if (speakingTaskMode(prompt.learningObjectives) === 'COMMUNICATIVE') continue;
       if (!prompt.referenceTtsUrl)
         throw new LearningIncompleteError('Speaking reference audio is missing.', ['SPEAKING']);
       await resolveStorageInput(database, {
@@ -107,6 +109,9 @@ export async function assertStoredClassMaterial(database: LearningDatabase, clas
       passageText: section.questions.find((question) => question.passageText)?.passageText,
       audio: section.episode?.deletedAt ? null : section.episode,
       referenceAudioUrls: section.prompts.map((prompt) => prompt.referenceTtsUrl),
+      speakingTaskModes: section.prompts.map((prompt) =>
+        speakingTaskMode(prompt.learningObjectives)
+      ),
     }))
   );
   if (requirements.skills.READING.state === 'REQUIRED')

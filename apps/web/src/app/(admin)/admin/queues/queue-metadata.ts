@@ -22,6 +22,27 @@ export const PIPELINE_STAGE_ORDER: PipelineStage[] = [
 ];
 
 export const QUEUE_METADATA: Record<string, QueueMeta> = {
+  'material-analysis': {
+    description:
+      'Discovers source focuses from every retained text chunk with saved response receipts',
+    stage: 'Content Pipeline',
+  },
+  'placement-generation': {
+    description: 'Prepares private placement question sessions bound to exact source analyses',
+    stage: 'Content Pipeline',
+  },
+  'material-optimization': {
+    description: 'Verifies complete PDF content before publishing optional lossless compression',
+    stage: 'Content Pipeline',
+  },
+  'material-extraction': {
+    description: 'Extracts complete page text and records visual coverage gaps',
+    stage: 'Content Pipeline',
+  },
+  'material-finalization': {
+    description: 'Verifies uploaded parts and publishes the complete original document',
+    stage: 'Content Pipeline',
+  },
   'vocabulary-index': {
     description: 'Indexes complete course materials with reviewed vocabulary coverage',
     stage: 'Content Pipeline',

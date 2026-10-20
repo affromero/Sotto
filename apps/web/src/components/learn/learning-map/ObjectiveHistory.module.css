@@ -1,0 +1,52 @@
+.root {
+  margin-block: 1rem;
+  color: var(--color-text-secondary);
+}
+.root h4 {
+  margin: 0.5rem 0;
+}
+.root ol {
+  display: grid;
+  gap: 0.75rem;
+  padding-inline-start: 1.5rem;
+}
+.root li {
+  padding-block: 0.75rem;
+  border-bottom: 1px solid var(--color-border);
+}
+.root p {
+  margin-block: 0.5rem;
+  overflow-wrap: anywhere;
+}
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+.root button,
+.root summary {
+  min-height: 44px;
+  padding: 0.75rem;
+  cursor: pointer;
+}
+.root button {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-primary);
+  border-radius: var(--radius-md);
+  font: inherit;
+}
+.root button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.root button:focus-visible,
+.root summary:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+}
+.error {
+  color: var(--color-error);
+}

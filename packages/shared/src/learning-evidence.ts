@@ -19,6 +19,7 @@ export const speakingEvidenceSchema = z.object({
       accuracy: z.number().finite().min(0).max(1).optional(),
       completeness: z.number().finite().min(0).max(1).optional(),
       fluency: z.number().finite().min(0).max(1).optional(),
+      communicative: z.number().finite().min(0).max(1).optional(),
     })
     .nullable()
     .optional(),

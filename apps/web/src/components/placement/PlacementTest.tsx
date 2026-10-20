@@ -2,8 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { z } from 'zod';
+import { placementSessionPublicSchema, type CefrLevel } from '@sotto/shared';
 import { CefrDisclaimer } from '@/components/learn/CefrDisclaimer';
 import { SottoSpinner } from '@/components/ui/SottoSpinner';
+import type { MaterialPlacementReference } from '@/lib/course-materials/client/analysis';
 import styles from './PlacementTest.module.css';
 
 // ---- Types (mirrors API contract) ----
@@ -15,10 +18,20 @@ interface PlacementQuestion {
   prompt: string;
   options: string[];
 }
+const placementResponseSchema = placementSessionPublicSchema
+  .pick({
+    placementSessionId: true,
+    questionsDigest: true,
+    status: true,
+    failureReason: true,
+    questions: true,
+  })
+  .partial()
+  .extend({ error: z.string().optional() });
 
 interface PlacementResult {
   courseId: string;
-  level: 'A1' | 'A2' | 'B1' | 'B2';
+  level: CefrLevel;
   scoreBySkill: Record<string, number>;
 }
 
@@ -35,16 +48,24 @@ const LEVEL_DESCRIPTIONS: Record<string, string> = {
   A2: 'Elementary: you can handle everyday basics.',
   B1: 'Intermediate: you can manage familiar topics.',
   B2: 'Upper Intermediate: you can discuss a wide range of subjects.',
+  C1: 'Advanced: you can work with complex material and express precise ideas.',
+  C2: 'Proficient: you can work on nuance, idiom, and flexible expression.',
 };
 
 interface PlacementTestProps {
   native: string;
   target: string;
-  /** When set, runs a shorter test focused on this level (notes "verify"). */
+  /** Display context for a shorter quiz bound to the exact source analysis. */
   focusLevel?: string;
+  analysisReference?: MaterialPlacementReference;
 }
 
-export function PlacementTest({ native, target, focusLevel }: PlacementTestProps) {
+export function PlacementTest({
+  native,
+  target,
+  focusLevel,
+  analysisReference,
+}: PlacementTestProps) {
   const [phase, setPhase] = useState<Phase>('loading');
   const [questions, setQuestions] = useState<PlacementQuestion[]>([]);
   const [answers, setAnswers] = useState<Record<string, number>>({});
@@ -53,16 +74,71 @@ export function PlacementTest({ native, target, focusLevel }: PlacementTestProps
   const [currentIndex, setCurrentIndex] = useState(0);
   const optionRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const loadController = useRef<AbortController | null>(null);
+  const generationRequest = useRef<string | null>(null);
+  const confirmationRequest = useRef<string | null>(null);
+  const session = useRef<{ placementSessionId: string; questionsDigest: string } | null>(null);
+  const generationKey = useRef('');
+  const submissionBody = useRef<string | null>(null);
+  const [retrySubmission, setRetrySubmission] = useState(false);
 
   const loadQuestions = useCallback(async () => {
     const controller = new AbortController();
+    loadController.current?.abort();
     loadController.current = controller;
+    const current = () => !controller.signal.aborted && loadController.current === controller;
     try {
-      const focusParam = focusLevel ? `&focusLevel=${encodeURIComponent(focusLevel)}` : '';
-      const res = await fetch(
-        `/api/v1/placement?native=${encodeURIComponent(native)}&target=${encodeURIComponent(target)}${focusParam}`,
-        { signal: controller.signal }
-      );
+      const key = JSON.stringify({ native, target, analysisReference });
+      if (generationKey.current !== key) {
+        generationKey.current = key;
+        generationRequest.current = null;
+        confirmationRequest.current = null;
+        session.current = null;
+        submissionBody.current = null;
+      }
+      generationRequest.current ??= crypto.randomUUID();
+      let res = await fetch('/api/v1/placement/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+        body: JSON.stringify({
+          schemaVersion: 1,
+          native,
+          target,
+          requestId: generationRequest.current,
+          ...analysisReference,
+        }),
+      });
+      let data = placementResponseSchema.parse(await res.json());
+      if (!current()) return;
+      while (res.ok && res.status === 202) {
+        if (!data.placementSessionId || !data.questionsDigest)
+          throw new Error('Missing placement preparation receipt.');
+        session.current = {
+          placementSessionId: data.placementSessionId,
+          questionsDigest: data.questionsDigest,
+        };
+        await new Promise<void>((resolve, reject) => {
+          const abort = () => {
+            clearTimeout(timer);
+            reject(controller.signal.reason);
+          };
+          const timer = setTimeout(() => {
+            controller.signal.removeEventListener('abort', abort);
+            resolve();
+          }, 1_000);
+          if (controller.signal.aborted) {
+            abort();
+            return;
+          }
+          controller.signal.addEventListener('abort', abort, { once: true });
+        });
+        res = await fetch(
+          `/api/v1/placement?placementSessionId=${encodeURIComponent(data.placementSessionId)}`,
+          { signal: controller.signal }
+        );
+        data = placementResponseSchema.parse(await res.json());
+        if (!current()) return;
+      }
       if (res.status === 401) {
         setErrorMessage('You must be signed in to take the placement test.');
         setPhase('error');
@@ -79,25 +155,46 @@ export function PlacementTest({ native, target, focusLevel }: PlacementTestProps
         return;
       }
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        setErrorMessage(body.error ?? 'Failed to generate the placement test.');
+        setErrorMessage(data.error ?? 'Failed to generate the placement test.');
         setPhase('error');
         return;
       }
-      const data: { questions: PlacementQuestion[] } = await res.json();
+      if (
+        data.status !== 'READY' ||
+        !data.placementSessionId ||
+        !data.questionsDigest ||
+        !data.questions?.length
+      ) {
+        if (data.status && ['FAILED', 'OUTPUT_INVALID', 'EXPIRED'].includes(data.status)) {
+          generationRequest.current = null;
+          confirmationRequest.current = null;
+          session.current = null;
+        }
+        setErrorMessage(
+          data.failureReason ??
+            'The placement session is unavailable. Review its processing status before trying again.'
+        );
+        setPhase('error');
+        return;
+      }
+      session.current = {
+        placementSessionId: data.placementSessionId,
+        questionsDigest: data.questionsDigest,
+      };
+      confirmationRequest.current ??= crypto.randomUUID();
       setQuestions(data.questions);
       setAnswers({});
       setCurrentIndex(0);
       setPhase('testing');
-    } catch (err) {
+    } catch {
       // cancelPlacement already moved the learner out of the wait.
-      if (err instanceof DOMException && err.name === 'AbortError') return;
+      if (!current()) return;
       setErrorMessage('A network error occurred. Please check your connection and try again.');
       setPhase('error');
     } finally {
       if (loadController.current === controller) loadController.current = null;
     }
-  }, [native, target, focusLevel]);
+  }, [native, target, analysisReference]);
 
   const cancelPlacement = useCallback(() => {
     loadController.current?.abort();
@@ -110,6 +207,9 @@ export function PlacementTest({ native, target, focusLevel }: PlacementTestProps
     void (async () => {
       await loadQuestions();
     })();
+    return () => {
+      loadController.current?.abort();
+    };
   }, [loadQuestions]);
 
   // Keyboard shortcut: number keys select an option (incl. the "I don't know"
@@ -140,18 +240,29 @@ export function PlacementTest({ native, target, focusLevel }: PlacementTestProps
 
   async function submit() {
     setPhase('submitting');
+    setRetrySubmission(true);
     const payload = {
+      schemaVersion: 1,
+      requestId: confirmationRequest.current,
       native,
       target,
+      ...session.current,
+      ...analysisReference,
       answers: Object.entries(answers).map(([id, selectedIndex]) => ({ id, selectedIndex })),
     };
+    submissionBody.current ??= JSON.stringify(payload);
     try {
       const res = await fetch('/api/v1/placement', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: submissionBody.current,
       });
       if (res.status === 409) {
+        setRetrySubmission(false);
+        submissionBody.current = null;
+        generationRequest.current = null;
+        confirmationRequest.current = null;
+        session.current = null;
         setPhase('expired');
         return;
       }
@@ -163,6 +274,7 @@ export function PlacementTest({ native, target, focusLevel }: PlacementTestProps
       }
       const data: PlacementResult = await res.json();
       setResult(data);
+      setRetrySubmission(false);
       setPhase('result');
     } catch {
       setErrorMessage('A network error occurred while submitting. Please try again.');
@@ -179,7 +291,15 @@ export function PlacementTest({ native, target, focusLevel }: PlacementTestProps
   if (phase === 'loading') {
     return (
       <div className={styles.center} role="status" aria-live="polite">
-        <SottoSpinner size="large" label="Generating your placement test" orientation="stack" />
+        <SottoSpinner
+          size="large"
+          label={
+            focusLevel
+              ? `Preparing questions around ${focusLevel}`
+              : 'Generating your placement test'
+          }
+          orientation="stack"
+        />
         <button type="button" className={styles.retryButton} onClick={cancelPlacement}>
           Cancel
         </button>
@@ -210,12 +330,16 @@ export function PlacementTest({ native, target, focusLevel }: PlacementTestProps
         <button
           className={styles.retryButton}
           onClick={() => {
+            if (retrySubmission) {
+              void submit();
+              return;
+            }
             setPhase('loading');
             setErrorMessage('');
             void loadQuestions();
           }}
         >
-          Try again
+          {retrySubmission ? 'Retry submission' : 'Try again'}
         </button>
       </div>
     );

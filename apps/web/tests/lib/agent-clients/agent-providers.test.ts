@@ -20,6 +20,25 @@ vi.mock('@/lib/claude-code-client', () => ({
 }));
 
 describe('CLI agent providers', () => {
+  it('enforces a recognition output ceiling through the canonical Codex boundary', async () => {
+    const { CodexProvider } = await import('@/lib/providers/codex');
+    executeCodex.mockImplementationOnce(async (system, input, options) => {
+      expect(system).toBe('Read the page');
+      expect(input).toBe('Transcribe');
+      if (options.maxOutputBytes === 512)
+        throw new Error('Recognition output exceeds its byte limit.');
+      return { content: 'unbounded' };
+    });
+    await expect(
+      new CodexProvider().generateResponse(
+        'Read the page',
+        [{ role: 'user', content: 'Transcribe' }],
+        {
+          maxOutputBytes: 512,
+        }
+      )
+    ).rejects.toThrow('Recognition output exceeds its byte limit.');
+  });
   it('preserves an explicit isolation requirement at the Codex process boundary', async () => {
     const { CodexProvider } = await import('@/lib/providers/codex');
     const isolated = isolatedFixture();

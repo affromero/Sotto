@@ -23,3 +23,4 @@ include!("ui/base.rs");
 include!("ui/class.rs");
 include!("ui/exam_placement.rs");
 include!("ui/settings_ask.rs");
+include!("ui/learning_map.rs");

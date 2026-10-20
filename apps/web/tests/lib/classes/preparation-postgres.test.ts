@@ -38,6 +38,7 @@ import { classPreparationGrant } from '@/lib/classes/preparation-grant';
 import { registerPreparationFailureTests } from './quality/preparation-failure-cases';
 import { registerLearningFailureWireTests } from './quality/wire/preparation-failure-cases';
 import { registerQuizRetryAdmissionTests } from './quiz-retry/admission-cases';
+import { registerDocumentRequestTests } from './preparation/document-request-cases';
 import { preparationProviderRequest } from '@/lib/classes/preparation-provider';
 import { capturedLearningAiOptions, resolveCapturedLearningAi } from '@/lib/learning-ai';
 import { createAIProvider } from '@/lib/providers/ai';
@@ -141,9 +142,34 @@ suite('durable preparation admission and provider accounting', () => {
     return { ...operation, status: 'RUNNING' as const };
   }
 
+  it('preserves admitted no-audio class work after speech is enabled with invalid new endpoints', async () => {
+    await instance.database.user.update({
+      where: { id: identity.ownerId },
+      data: { preferredTtsProvider: 'disabled' },
+    });
+    const operation = await running();
+    expect(operation.requirements?.skills.SPEAKING.state).toBe('EXEMPT_NO_PROVIDER');
+    await instance.database.user.update({
+      where: { id: identity.ownerId },
+      data: { preferredTtsProvider: null },
+    });
+    await instance.configureInfrastructure({
+      ttsProvider: 'local',
+      ttsBaseUrl: 'file:///new-invalid-tts',
+      sttProvider: 'local',
+      sttBaseUrl: 'file:///new-invalid-stt',
+    });
+    const checked = await sottoTransaction(instance.database, (database) =>
+      validateClassPreparation(database, courseId, operation.id)
+    );
+    expect(checked.requirements).toEqual(operation.requirements);
+    expect(checked.speechFingerprint).toBe(operation.speechFingerprint);
+  });
+
   registerPreparationFailureTests(() => ({ instance, courseId, execution, running, lesson }));
   registerLearningFailureWireTests(() => ({ instance, courseId, execution, running, lesson }));
   registerQuizRetryAdmissionTests(() => ({ instance, courseId, execution, lesson, queuedJob }));
+  registerDocumentRequestTests(() => ({ instance, courseId, execution, running }));
 
   it.each(['local', 'disabled'] as const)(
     'captures the current %s speech policy for a new whole-class regeneration without changing old material',
@@ -467,74 +493,6 @@ suite('durable preparation admission and provider accounting', () => {
       'succeeded',
     ]);
     expect(JSON.stringify(activity)).not.toContain('Private input');
-  });
-
-  it('admits complete document bodies beyond 4 MiB and fingerprints their final bytes', async () => {
-    const operation = await running(2);
-    const provider = preparationProviderRequest(operation, new AbortController().signal, () => {
-      throw new Error('Unexpected uncertainty');
-    });
-    const document = Buffer.alloc(4 * 1024 * 1024, 'p');
-    document.write('%PDF-1.7');
-    const bodies: string[] = [];
-    for (const ending of ['first final page', 'changed final page']) {
-      const body = JSON.stringify({
-        model: operation.selection.model,
-        input: [
-          {
-            type: 'input_file',
-            file_data: Buffer.concat([document, Buffer.from(ending)]).toString('base64'),
-          },
-        ],
-      });
-      const http = new Request('https://api.openai.com/v1/responses', { method: 'POST', body });
-      const response = await provider(http, async () => {
-        bodies.push(await http.text());
-        return new Response('accepted');
-      });
-      expect(await response.text()).toBe('accepted');
-    }
-    expect(
-      bodies.map((body) =>
-        Buffer.from(JSON.parse(body).input[0].file_data, 'base64')
-          .subarray(document.length)
-          .toString()
-      )
-    ).toEqual(['first final page', 'changed final page']);
-    const grant = await sottoTransaction(instance.database, (database) =>
-      classPreparationGrant(database, operation).read(operation.grant)
-    );
-    expect(grant.attempts.map((attempt) => attempt.outcome)).toEqual(['succeeded', 'succeeded']);
-    expect(new Set(grant.attempts.map((attempt) => attempt.fingerprint)).size).toBe(2);
-    expect(JSON.stringify(grant)).not.toContain('first final page');
-  });
-
-  it('rejects an oversized document request before admission or provider dispatch', async () => {
-    const operation = await running();
-    const provider = preparationProviderRequest(operation, new AbortController().signal, () => {
-      throw new Error('Unexpected uncertainty');
-    });
-    let dispatched = false;
-    const http = new Request('https://api.openai.com/v1/responses', {
-      method: 'POST',
-      body: 'p'.repeat(72 * 1024 * 1024 + 1),
-    });
-    try {
-      const error = await provider(http, async () => {
-        dispatched = true;
-        return new Response('Unexpected dispatch');
-      }).then(
-        () => null,
-        (failure: unknown) => failure
-      );
-      expect(error instanceof AggregateError ? error.cause : error).toMatchObject({
-        name: 'ResponseBodyTooLargeError',
-      });
-    } finally {
-      await http.body?.cancel();
-    }
-    expect(dispatched).toBe(false);
-    expect((await readPreparationActivity(courseId, execution))?.providerRequestsAdmitted).toBe(0);
   });
 
   it('accounts for overlapping provider requests and refuses work beyond their shared cap', async () => {

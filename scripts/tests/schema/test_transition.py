@@ -133,6 +133,40 @@ class SchemaReviewTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'queue module failed to load'):
                 REVIEW.unchanged_queue_contract(self.bound)
 
+    def test_additive_review_binds_exact_previous_candidate_and_added_queue_inventories(self) -> None:
+        transition = {'previousQueues': ['audio-generation'],
+                      'candidateQueues': ['audio-generation', 'material-analysis'],
+                      'addedQueues': ['material-analysis']}
+        reviewed = {**self.review, 'schemaVersion': 2, 'queueTransition': transition}
+        self.validate(reviewed)
+
+        def probe(arguments: list[str], **options: object) -> subprocess.CompletedProcess:
+            names = transition['previousQueues' if self.case.image in arguments else 'candidateQueues']
+            return subprocess.CompletedProcess(arguments, 0, json.dumps(names).encode())
+
+        with patch.dict(os.environ, self.case.environment), patch.object(REVIEW.subprocess, 'run', side_effect=probe):
+            REVIEW.unchanged_queue_contract(self.bound, transition)
+            with self.assertRaises(ValueError):
+                REVIEW.unchanged_queue_contract(self.bound)
+            for field, value in [('previousQueues', ['audio-generation', 'foreign']),
+                                 ('candidateQueues', ['audio-generation', 'foreign']),
+                                 ('addedQueues', ['foreign'])]:
+                with self.subTest(field=field), self.assertRaises(ValueError):
+                    REVIEW.unchanged_queue_contract(self.bound, {**transition, field: value})
+        for changed in [
+            {**transition, 'candidateQueues': ['material-analysis']},
+            {**transition, 'addedQueues': []},
+            {**transition, 'previousQueues': ['audio-generation', 'audio-generation']},
+            {**transition, 'skipQueueChecks': True},
+        ]:
+            with self.subTest(changed=changed), self.assertRaises(ValueError):
+                self.validate({**reviewed, 'queueTransition': changed})
+
+    def test_queue_lifecycle_preserves_every_observed_added_queue_flag(self) -> None:
+        path = os.path.join(os.path.dirname(__file__), '..', 'fixtures', 'queue-transition.cjs')
+        result = subprocess.run(['node', '--test', path], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_stopped_proof_rejects_running_replaced_or_abnormal_captured_services(self) -> None:
         fixture = self.case.legacy_continuity_fixture()
         previous = fixture['review']['providerActivation']['previousRuntimes']
@@ -167,6 +201,26 @@ class SchemaReviewTests(unittest.TestCase):
 
 
 class SchemaControllerTests(unittest.TestCase):
+    def test_additive_transition_restores_old_and_new_flags_after_fenced_cutover(self) -> None:
+        case = controller_tests.DeploymentFailureTests()
+        state, output = case.run_deployment('migration-success', schema_transition=True,
+            additive_queues=True, success=True, expect_rollback=False, prepaused=True)
+        self.assertEqual(state['active_route'], 'candidate', output)
+        self.assertTrue(state['migration_admitted_safely'], output)
+        self.assertEqual(state['queue_flags'], {'audio-generation': True,
+            'speaking-grading': False, 'material-analysis': True, 'vocabulary-audio': False}, output)
+        self.assertIsNone(state['unresolved_marker'], output)
+
+    def test_additive_partial_migration_keeps_every_queue_fenced(self) -> None:
+        case = controller_tests.DeploymentFailureTests()
+        state, output = case.run_deployment('migration-partial', schema_transition=True,
+            additive_queues=True, expect_rollback=False, prepaused=True, retained_candidate=True)
+        self.assertEqual(state['active_route'], 'maintenance', output)
+        self.assertEqual(set(state['queue_flags']), {'audio-generation', 'speaking-grading',
+            'material-analysis', 'vocabulary-audio'}, output)
+        self.assertTrue(all(state['queue_flags'].values()), output)
+        self.assertEqual(state['unresolved_marker']['phase'], 'compatibility-cutover', output)
+
     def run_transition(self, failure: str, *, success: bool) -> dict:
         case = controller_tests.DeploymentFailureTests()
         state, output = case.run_deployment(

@@ -31,9 +31,13 @@ docker run --rm --network "$suffix" \
     claude --version
     codex --version
     ffmpeg -version >/dev/null
+    qpdf --version
     node --import tsx --input-type=module -e '\''
       import { createRequire } from "node:module";
-      import { readdir } from "node:fs/promises";
+      import { readdir, mkdtemp, readFile, writeFile, rm } from "node:fs/promises";
+      import { createHash } from "node:crypto";
+      import { tmpdir } from "node:os";
+      import { join } from "node:path";
       import assert from "node:assert/strict";
       import { chromium } from "playwright";
       const require = createRequire(import.meta.url);
@@ -50,7 +54,21 @@ docker run --rm --network "$suffix" \
       const pdf = await page.pdf();
       assert.equal(pdf.subarray(0, 5).toString(), "%PDF-");
       await browser.close();
-      console.log("Worker imports, migrations, CLIs and Chromium PDF passed");
+      const directory = await mkdtemp(join(tmpdir(), "sotto-material-smoke-"));
+      try {
+        const original = join(directory, "original.pdf");
+        await writeFile(original, pdf);
+        const { extractMaterialPdf } = require("./src/lib/course-materials/extraction/pdf.ts");
+        const parsed = await extractMaterialPdf({
+          pdfPath: original, executionDirectory: directory,
+          expectedSha256: createHash("sha256").update(pdf).digest("hex"),
+        });
+        assert.equal(parsed.result.pageCount, 1);
+        const receipt = JSON.parse(await readFile(join(parsed.directory, parsed.result.pages[0].file), "utf8"));
+        assert.equal(receipt.text.manifest.hasNonWhitespace, true);
+        assert.equal(receipt.image.mimeType, "image/png");
+      } finally { await rm(directory, { recursive: true, force: true }); }
+      console.log("Worker imports, migrations, CLIs, Chromium PDF and native page rendering passed");
       process.exit(0);
     '\''
   '

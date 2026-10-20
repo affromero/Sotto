@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 import { sampleTeaching } from '../helpers/learning/class-teaching';
@@ -181,6 +182,7 @@ describe('GET /api/v1/classes/[classId]', () => {
     const prompts = body.sections[0].prompts;
     expect(prompts).toHaveLength(1);
     expect(prompts[0]).toMatchObject({
+      taskMode: 'READ_ALOUD',
       id: 'p1',
       targetPhrase: 'Hola',
       translation: 'Hello',

@@ -72,7 +72,10 @@ interface Runtime {
 const { run } = createRequire(import.meta.url)(
   resolve(process.cwd(), '../../scripts/deploy/queue-lifecycle.cjs')
 ) as {
-  run: (input: { command: string; manifest?: unknown }, runtime: Runtime) => Promise<Report>;
+  run: (
+    input: { command: string; manifest?: unknown; queueTransition?: unknown },
+    runtime: Runtime
+  ) => Promise<Report>;
 };
 const suite =
   process.env.SIDEDOOR_TEST_DATABASE_URL && process.env.SIDEDOOR_TEST_REDIS_URL
@@ -205,6 +208,36 @@ suite('deployment queue and execution settlement', () => {
     expect(await run({ command: 'snapshot' }, runtime)).toEqual(original);
     expect(original.queues.find((entry) => entry.name === 'pricing-fetch')?.paused).toBe(true);
     expect(snapshot.queues.every((entry) => !entry.paused)).toBe(true);
+  });
+
+  it('fences added queues from the previous runtime and restores their exact flags on the candidate', async () => {
+    const addedQueues = ['material-analysis', 'vocabulary-audio'];
+    const candidateQueues = [...ALL_QUEUE_NAMES].sort();
+    expect(addedQueues.every((name) => candidateQueues.includes(name))).toBe(true);
+    const previousQueues = candidateQueues.filter((name) => !addedQueues.includes(name));
+    await queue('material-analysis').pause();
+    await queue('pricing-fetch').pause();
+    const keys = (await connection.keys(`${prefix}:*`)).sort();
+    const original = await run(
+      {
+        command: 'snapshot',
+        queueTransition: {
+          previousQueues,
+          candidateQueues,
+          addedQueues,
+        },
+      },
+      { ...runtime, names: previousQueues }
+    );
+    expect((await connection.keys(`${prefix}:*`)).sort()).toEqual(keys);
+    await run({ command: 'pause', manifest: original }, { ...runtime, names: previousQueues });
+    expect((await run({ command: 'drained-all', manifest: original }, runtime)).drained).toBe(true);
+    await run({ command: 'restore', manifest: original }, runtime);
+    const restored = await run({ command: 'snapshot' }, runtime);
+    expect(restored.queues).toEqual(original.queues);
+    expect(await queue('material-analysis').isPaused()).toBe(true);
+    expect(await queue('vocabulary-audio').isPaused()).toBe(false);
+    expect(await queue('pricing-fetch').isPaused()).toBe(true);
   });
 
   it('checks empty Fish state without writing credentials or queue metadata', async () => {

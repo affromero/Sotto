@@ -26,11 +26,12 @@ class LearningConfigurationError extends Error {
 /** Inspect exact selected access without dispatching provider requests or recording use. */
 export async function resolveSkillRequirements(
   execution: SottoProviderExecution,
-  context: Pick<SkillRequirements, 'scope' | 'nativeLang' | 'targetLang' | 'level'>
+  context: Pick<SkillRequirements, 'scope' | 'nativeLang' | 'targetLang' | 'level'>,
+  captured?: SkillRequirements
 ): Promise<SkillRequirements> {
   return sottoTransaction(
     prismaUnfiltered,
-    (database) => resolveSkillRequirementsInTransaction(database, execution, context),
+    (database) => resolveSkillRequirementsInTransaction(database, execution, context, captured),
     { signal: execution.signal }
   );
 }
@@ -38,11 +39,20 @@ export async function resolveSkillRequirements(
 export async function resolveSkillRequirementsInTransaction(
   database: Prisma.TransactionClient,
   execution: SottoProviderExecution,
-  context: Pick<SkillRequirements, 'scope' | 'nativeLang' | 'targetLang' | 'level'>
+  context: Pick<SkillRequirements, 'scope' | 'nativeLang' | 'targetLang' | 'level'>,
+  captured?: SkillRequirements
 ): Promise<SkillRequirements> {
   const recipient = await execution.authorize(database);
   if (recipient.userId !== execution.userId)
     throw new LearningConfigurationError('Learning recipient changed.');
+  if (
+    captured &&
+    (captured.scope !== context.scope ||
+      captured.level !== context.level ||
+      captured.nativeLang !== context.nativeLang ||
+      captured.targetLang !== context.targetLang)
+  )
+    throw new LearningConfigurationError('Captured speech requirements changed their scope.');
   const configuration = await getSiteConfig({ database });
   const user = await database.user.findUnique({
     where: { id: recipient.userId },
@@ -50,8 +60,14 @@ export async function resolveSkillRequirementsInTransaction(
   });
   if (!user) throw new LearningConfigurationError('Learner no longer exists.');
   const disabled = isSpeechDisabled(user);
-  const wantsTts = !disabled && ['CLASS', 'FULL', 'LISTENING', 'SPEAKING'].includes(context.scope);
-  const wantsStt = !disabled && ['CLASS', 'FULL', 'SPEAKING'].includes(context.scope);
+  const wantsTts =
+    !disabled &&
+    captured?.ttsProvider !== null &&
+    ['CLASS', 'FULL', 'LISTENING', 'SPEAKING'].includes(context.scope);
+  const wantsStt =
+    !disabled &&
+    captured?.sttProvider !== null &&
+    ['CLASS', 'FULL', 'SPEAKING'].includes(context.scope);
   const selectedTts = wantsTts
     ? user.preferredTtsProvider?.trim() || configuration.ttsProvider?.trim() || null
     : null;

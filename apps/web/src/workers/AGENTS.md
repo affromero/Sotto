@@ -27,6 +27,20 @@ access/device migrations and storage-instance initialization must precede dispat
 
 ## Worker Index
 
+Material finalization, extraction and optional optimization own their durable
+execution lifetime. Keep them outside the generic queue contract wrapper.
+Extraction runs sequential bounded PDF parsing and retains unresolved coverage.
+Recognition requires an explicitly admitted reviewed provider policy. Unknown
+provider or storage outcomes preserve their workspace for canonical recovery.
+
+`material-analysis` and `placement-generation` also own their durable execution
+lifetime and run on the pipeline profile with concurrency one. Analysis yields
+between bounded chunk batches using the BullMQ lock token. Saved response
+receipts support replay without another provider request. Explicit analysis
+retries fork immutable results, inherit successful chunks, and keep unknown
+provider outcomes fenced. Placement questions and confirmation identities are
+private retained receipts. Exposure and placement never award objective mastery.
+
 `classes/class-preparation.worker.ts` consumes the `class-preparation` queue with concurrency 2.
 Admission and outbox writes precede all generation. It pins learner/course identity and
 model credentials, preserves unknown outcomes, and validates inherited audio authority.
@@ -52,6 +66,14 @@ See `docs/background-preparation.md` for scheduling and recovery semantics.
 | `worksheet-pdf`        | `worksheet-pdf`        | 2           | CourseClass → `buildClassDocument()` → `renderWorksheetHtml()` → Playwright PDF (graceful no-op if Chromium absent) → R2 upload                                                                                                                           | Sets CourseClass.worksheetPdfUrl                                                                          |
 
 ## Pipeline Flow
+
+`material-finalization` runs on the pipeline profile with concurrency one. Its
+processor owns its durable envelope and execution workspace. Keep it outside
+the generic queue wrapper to avoid nesting the same execution lifetime. Original
+publication and completion share a transaction. Terminal failures retain parts;
+failure events and queue reconciliation record the same recovery state. Upload
+maintenance expires abandoned transfers and retires completed parts through the
+canonical cleanup journal, preserving originals and unresolved cleanup work.
 
 ```
 content-extraction → deep-research → creative-planning → script-writing → compile-script

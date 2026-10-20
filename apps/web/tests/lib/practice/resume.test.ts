@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createHash } from 'node:crypto';
 import { createSkillRequirements } from '@sotto/shared';
@@ -146,6 +147,8 @@ describe('resumePractice', () => {
       episodeId: 'published-audio',
       skillRequirements: requirements,
       generationSpec: generation,
+      practiceLevel: null,
+      learningSelection: null,
       generationState: completed,
     };
     mockSessionFindFirst.mockResolvedValueOnce({
@@ -262,6 +265,9 @@ describe('resumePractice', () => {
       kind: 'GRAMMAR',
       items: [{ id: 'g0', prompt: 'Was hast du gestern gemacht?', options: ['a', 'b', 'c', 'd'] }],
       episodeId: undefined,
+      practiceLevel: null,
+      learningSelection: null,
+      progressRevision: undefined,
     });
     expect(JSON.stringify(result)).not.toContain('correctIndex');
   });

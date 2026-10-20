@@ -316,6 +316,8 @@ fn draw_notes_placement(
             level,
             rationale,
             confidence,
+            partial,
+            accepted_partial,
         } => {
             let lines = vec![
                 Line::from(Span::styled(
@@ -335,13 +337,24 @@ fn draw_notes_placement(
                 )),
                 Line::default(),
                 Line::from(Span::styled(
-                    "Starting here never lowers a level you have already reached.",
+                    if *partial && !*accepted_partial {
+                        "Partial source coverage. Press p to accept these limits before continuing."
+                    } else if *partial {
+                        "Partial source coverage accepted. Your earned course level stays the same."
+                    } else {
+                        "An existing course keeps its earned level."
+                    },
                     Style::default().fg(p.ink_soft),
                 )),
             ];
             (
                 Text::from(lines),
-                &["enter start here", "t take the test", "esc back"][..],
+                &[
+                    "enter start here",
+                    "t take the test",
+                    "p accept partial",
+                    "esc back",
+                ][..],
                 Alignment::Center,
             )
         }

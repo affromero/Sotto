@@ -149,7 +149,7 @@ def runtime_row(identifier):
         key for key in services if identifier in (old_workers[key], new_workers[key]))
     project = os.environ['SOTTO_STACK'] + ('-' + (state['new_slot'] if candidate else state['old_slot']) if service == 'web' else '')
     source = state.get('candidate_activation', state.get('old_activation', '')) if candidate else state.get('old_activation', '')
-    return {'Id': identifier, 'State': {'Running': state['running'].get(identifier, True),
+    row = {'Id': identifier, 'State': {'Running': state['running'].get(identifier, True),
         'ExitCode': 143 if identifier in (old_web, candidate_web) and not state['running'].get(identifier, True) else 0,
         'OOMKilled': False, 'Error': ''}, 'Image': image_for(identifier), 'RestartCount': 0,
         'Config': {'Labels': {'org.opencontainers.image.revision': sha if candidate else 'd' * 40,
@@ -162,6 +162,10 @@ def runtime_row(identifier):
         'Mounts': [{'Type': 'bind', 'Source': source, 'Destination': '/run/sotto-provider-activation',
             'RW': (mode == 'compat-provider-old-mount' and not candidate)
                 or (mode == 'compat-provider-overlap' and candidate and state['worker_generation'] == 'new')}]}
+    if not candidate and state.get('implicit_without_release'):
+        row['Config']['Env'] = [entry for entry in row['Config']['Env'] if not entry.startswith(('SOTTO_RELEASE_SHA=', 'SOTTO_PROVIDER_ACTIVATION_FILE='))]
+        row['Mounts'] = []
+    return row
 if name == 'sleep': finish()
 if name == 'flock':
     try: fcntl.flock(int(args[-1]), fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -225,7 +229,10 @@ if name == 'curl':
 if name != 'docker': finish(code=2)
 if args[0] == 'version': finish('linux/amd64')
 if args[:2] == ['image', 'inspect']:
-    if '--format' not in args: finish(code=0 if state['pulled'] else 1)
+    if '--format' not in args:
+        if state.get('implicit_without_release') and args[-1] == old:
+            finish(json.dumps([{'Id': old, 'Config': {'Labels': {'org.opencontainers.image.revision': ('e' if mode == 'migration-implicit-forged-image' else 'd') * 40, 'org.opencontainers.image.source': 'https://github.com/affromero/Sotto'}}}]))
+        finish(code=0 if state['pulled'] else 1)
     fmt = args[args.index('--format') + 1]
     if fmt == '{{json .Config}}':
         finish(json.dumps({'Cmd': ['node', 'server.js'], 'Entrypoint': ['docker-entrypoint.sh'],
@@ -279,7 +286,8 @@ if args[0] == 'run':
         available = 1024 if mode == 'overlap-memory' else 6291456
         finish('MemTotal: 8388608 kB\nMemAvailable: ' + str(available) + ' kB')
     if 'ALL_QUEUE_NAMES' in args[-1]:
-        finish(json.dumps(sorted(state['queue_flags'])))
+        transition = state.get('queue_transition')
+        finish(json.dumps(transition['previousQueues' if old in args else 'candidateQueues'] if transition else sorted(state['queue_flags'])))
     if (mode == 'contract' or mode.startswith(('compat-', 'migration-'))) and 'schema.prisma' not in args[-1]:
         if mode == 'migration-schema-only': finish('d' * 64)
         finish(('d' if old in args else 'e') * 64)
@@ -293,6 +301,9 @@ if args[0] == 'exec':
         command = request['command']
         snapshot = {'schemaVersion': 1, 'connectionIdentity': 'f' * 64,
                     'queues': [{'name': key, 'paused': value} for key, value in sorted(state['queue_flags'].items())]}
+        transition = request.get('queueTransition', request.get('manifest', {}).get('queueTransition'))
+        if transition:
+            snapshot.update(schemaVersion=2, queueTransition=transition)
         if command == 'established':
             finish('SOTTO_DEPLOY_QUEUE=' + json.dumps({'schemaVersion': 1, 'connectionIdentity': 'f' * 64,
                                                      'established': True, 'appliedMigrations': 3}))
@@ -432,7 +443,7 @@ class DeploymentFailureTests(unittest.TestCase):
     def run_deployment(self, failure, stack='sotto-test', reviewed_schema=False, success=False,
                        expect_rollback=True, prepaused=False, retained_candidate=False, rollback_blocked=False,
                        old_slot='blue', reviewed_runtime=False, stale_review=False, provider_continuity=False,
-                       schema_transition=False):
+                       schema_transition=False, additive_queues=False, implicit_without_release=False):
         if schema_transition:
             reviewed_runtime = provider_continuity = True
         with tempfile.TemporaryDirectory() as directory:
@@ -456,6 +467,14 @@ class DeploymentFailureTests(unittest.TestCase):
                      'queue_flags': {'audio-generation': prepaused, 'speaking-grading': False},
                      'active': 1, 'journal_pending': failure == 'unknown-cleanup', 'unsafe_stops': [],
                      'unsafe_starts': [], 'stopped': [], 'worker_generation': 'old'}
+            state['implicit_without_release'] = implicit_without_release
+            if additive_queues:
+                previous = sorted(state['queue_flags'])
+                state['queue_flags'].update({'material-analysis': True, 'vocabulary-audio': False})
+                state['queue_transition'] = {
+                    'previousQueues': previous, 'candidateQueues': sorted(state['queue_flags']),
+                    'addedQueues': ['material-analysis', 'vocabulary-audio'],
+                }
             if provider_continuity:
                 activation = root / 'previous-activation'
                 activation.mkdir()
@@ -520,6 +539,9 @@ class DeploymentFailureTests(unittest.TestCase):
                             'apps/web/prisma/migrations/20261020120000_learner_review_events/migration.sql': {
                                 'previousSha256': None, 'candidateSha256': '9' * 64},
                         })
+                    if implicit_without_release:
+                        for runtime in review['providerActivation']['previousRuntimes'].values():
+                            runtime['activationMode'] = 'implicit-enabled'
                 review_path.write_text(json.dumps(review))
                 review_path.chmod(0o600)
                 values['SOTTO_COMPATIBILITY_REVIEW_FILE'] = str(review_path)
@@ -540,6 +562,10 @@ class DeploymentFailureTests(unittest.TestCase):
                         'evidenceSha256': hashlib.sha256(schema_evidence.read_bytes()).hexdigest(),
                     }))
                     schema_review.chmod(0o600)
+                    if additive_queues:
+                        value = json.loads(schema_review.read_text())
+                        value.update(schemaVersion=2, queueTransition=state['queue_transition'])
+                        schema_review.write_text(json.dumps(value))
             (root / '.env.production').write_text(''.join(key + '=' + value + '\n' for key, value in values.items()))
             with serving_fixture(root) as (ports, observations, phase_observations):
                 environment.update(ports)

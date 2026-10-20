@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { StartNextClass } from '@/components/learn/StartNextClass';
@@ -20,6 +21,24 @@ function jsonResponse(body: unknown, status = 200) {
 }
 
 describe('StartNextClass', () => {
+  it('directs a learner with exhausted sequential lessons to authoritative level requirements', async () => {
+    vi.mocked(global.fetch).mockImplementation(async (_url, init) =>
+      init?.method === 'POST'
+        ? jsonResponse({ requirementsRemaining: true })
+        : jsonResponse({ status: 'IDLE' })
+    );
+    render(<StartNextClass courseId="course-1" activeClassId={null} />);
+    await screen.findByText('No class is being prepared.');
+    fireEvent.click(screen.getByRole('button', { name: /take a class at this level/i }));
+    expect(await screen.findByRole('link', { name: 'View level requirements' })).toHaveAttribute(
+      'href',
+      '/learn/map?course=course-1'
+    );
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Review its objectives and readiness before advancing.'
+    );
+    expect(screen.queryByText('Course complete')).not.toBeInTheDocument();
+  });
   it('discards previous course preparation reads when switching courses', async () => {
     const previous = Promise.withResolvers<Response>();
     let signal: AbortSignal | null | undefined;

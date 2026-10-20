@@ -29,7 +29,10 @@ vi.mock('@/lib/sidedoor/credentials/runtime/credential-execution', () => ({
   captureSottoExecutionCredential: async () => null,
 }));
 
-import { learningSpeechFingerprint } from '@/lib/learning/speech-configuration';
+import {
+  learningSpeechFingerprint,
+  matchesLearningSpeechFingerprint,
+} from '@/lib/learning/speech-configuration';
 import { resolveSkillRequirementsInTransaction } from '@/lib/learning/skill-requirements';
 
 const database = {
@@ -82,14 +85,48 @@ describe('captured speech configuration', () => {
     );
   });
 
-  it('rejects enabling speech after capturing an operation with disabled audio', async () => {
+  it('keeps captured disabled audio exempt when a new local provider is enabled', async () => {
     state.user.preferredTtsProvider = 'disabled';
     const captured = await requirements();
     state.user.preferredTtsProvider = 'local';
     state.configuration.ttsBaseUrl = 'http://local-tts:8000';
-    await expect(learningSpeechFingerprint(database, authorize, captured)).rejects.toThrow(
-      /provider changed/
+    expect(await learningSpeechFingerprint(database, authorize, captured)).toBe(
+      createHash('sha256').update('{}').digest('hex')
     );
+  });
+
+  it('does not resolve invalid newly configured channels that were absent from the attempt', async () => {
+    const captured = await requirements();
+    const original = await learningSpeechFingerprint(database, authorize, captured);
+    state.configuration.ttsProvider = 'invalid-new-provider';
+    state.configuration.sttProvider = 'invalid-new-provider';
+    expect(await learningSpeechFingerprint(database, authorize, captured)).toBe(original);
+    await expect(requirements()).rejects.toThrow(/invalid/);
+  });
+
+  it('matches only known no-audio receipts across later explicit audio enablement', async () => {
+    state.user.preferredTtsProvider = 'disabled';
+    const captured = await requirements();
+    state.user.preferredTtsProvider = 'local';
+    state.configuration.ttsBaseUrl = 'file:///invalid-new-provider';
+    for (const marker of ['{}', '{"audioDisabled":true}']) {
+      expect(
+        await matchesLearningSpeechFingerprint(
+          database,
+          authorize,
+          captured,
+          createHash('sha256').update(marker).digest('hex')
+        )
+      ).toBe(true);
+    }
+    expect(
+      await matchesLearningSpeechFingerprint(
+        database,
+        authorize,
+        captured,
+        createHash('sha256').update('{"other":true}').digest('hex')
+      )
+    ).toBe(false);
   });
 
   it('rejects disabling speech after capturing a required local provider', async () => {

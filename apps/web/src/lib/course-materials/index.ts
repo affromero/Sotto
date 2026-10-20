@@ -8,7 +8,8 @@ import type { AuthenticatedRequest } from '../api-keys';
 import { prismaUnfiltered } from '../prisma';
 import { writeStorageReference } from '../sidedoor/storage/core/storage-write';
 import { requireOriginalSottoAdmission } from '../sidedoor/access/core/request-identity';
-import { sottoStorageInstance } from '../sidedoor/access/state/store';
+import { materialStorageScopes } from './scopes';
+export { materialStorageScopes } from './scopes';
 import { extractUploadTexts, isUploadFile } from '../note-upload';
 import { getEditableCourseNote, mergeCourseNote, setCourseNote } from '../course-notes';
 import { sottoTransaction } from '../sidedoor/access/state/transaction';
@@ -22,7 +23,6 @@ export const materialSelect = {
   name: true,
   mimeType: true,
   byteSize: true,
-  extractedText: true,
   createdAt: true,
 } as const;
 
@@ -47,32 +47,13 @@ export async function readMaterialForm(request: Request) {
   return { form, files };
 }
 
-export async function materialStorageScopes(
-  database: Prisma.TransactionClient,
-  input: { id: string; userId: string; createdAt: Date }
-) {
-  const instance = await sottoStorageInstance(database).read();
-  const user = await database.user.findUnique({
-    where: { id: input.userId },
-    select: { createdAt: true },
-  });
-  if (!user) throw new AccessError('unauthorized');
-  return {
-    instanceId: instance.instanceId,
-    scopes: [
-      { subjectId: instance.subjectId, generation: instance.generation },
-      { subjectId: `profile:${input.userId}`, generation: user.createdAt.getTime() },
-      { subjectId: `material:${input.id}`, generation: input.createdAt.getTime() },
-    ].sort((left, right) => left.subjectId.localeCompare(right.subjectId)),
-  };
-}
-
 export function materialResponse(material: {
   id: string;
   name: string;
   mimeType: string;
   byteSize: number;
-  extractedText: string;
+  extractedText?: string;
+  textRetained?: boolean;
   createdAt: Date;
 }) {
   return {
@@ -80,8 +61,14 @@ export function materialResponse(material: {
     name: material.name,
     mimeType: material.mimeType,
     byteSize: material.byteSize,
-    extractedText: material.extractedText,
-    createdAt: material.createdAt,
+    extractedText: '',
+    textRetained: material.textRetained ?? Boolean(material.extractedText),
+    processingUrl: `/api/v1/materials/${material.id}/processing`,
+    legacyTextUrl:
+      (material.textRetained ?? Boolean(material.extractedText))
+        ? `/api/v1/materials/${material.id}/legacy-text`
+        : null,
+    createdAt: material.createdAt.toISOString(),
     fileUrl: `/api/v1/materials/${material.id}/file`,
   };
 }
@@ -204,6 +191,11 @@ export async function attachCourseMaterials(
   if (!ids.length) return;
   if (!(await database.course.findFirst({ where: { id: courseId, userId }, select: { id: true } })))
     throw new AccessError('conflict');
+  for (const id of [...ids].sort())
+    await database.$queryRaw`
+      SELECT id FROM "CourseMaterial"
+      WHERE id = ${id} AND "userId" = ${userId} FOR UPDATE
+    `;
   const materials = await database.courseMaterial.findMany({
     where: {
       id: { in: ids },
@@ -211,7 +203,7 @@ export async function attachCourseMaterials(
       originalUrl: { not: null },
       OR: [{ courseId: null }, { courseId }],
     },
-    select: { id: true },
+    select: { id: true, originalSha256: true, processingStatus: true },
   });
   if (materials.length !== ids.length)
     throw new AccessError(
@@ -228,7 +220,9 @@ export async function attachCourseMaterials(
     data: { courseId },
   });
   if (attached.count !== ids.length) throw new AccessError('conflict');
-  for (const id of ids) await enqueueMaterialVocabularyIndex(database, id, userId);
+  for (const material of materials)
+    if (!material.originalSha256 || ['READY', 'PARTIAL'].includes(material.processingStatus))
+      await enqueueMaterialVocabularyIndex(database, material.id, userId);
 }
 
 export async function persistPlacementMaterials(

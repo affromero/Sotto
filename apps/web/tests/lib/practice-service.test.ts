@@ -1,15 +1,12 @@
-import { blockedProviderExecution } from '../helpers/runtime/provider-execution';
-/**
- * Unit tests for src/lib/practice-service.ts — ungated single-skill practice.
- * Verifies: course ownership, VOCAB cold-start guard + recall-item shape (answer
- * hidden in the public projection), GRAMMAR seed → generator, no-content guard,
- * and that submit drives SRS (per-item for VOCAB, aggregate otherwise).
- */
+// @vitest-environment node
+import { authorizedLearnerExecution } from '../helpers/runtime/provider-execution';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createSkillRequirements } from '@sotto/shared';
 import type { VocabularyMemory } from '@/lib/learning/vocabulary/selection';
 import type { DueItems } from '@/lib/knowledge-graph';
 import { recordFullPracticeFailures } from '@/lib/learning/practice-generation-failures';
+import { practiceBandFixture } from '../helpers/learning/practice-band';
+import { reviewFixture } from './learning-map/adaptation/fixtures';
 
 const mockReadingProviderInput = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/learning-ai', () => ({
@@ -24,6 +21,19 @@ vi.mock('@/lib/providers/ai', () => ({
       options: { jsonSchema?: { name: string } }
     ) => {
       const input = JSON.parse(messages[0]!.content);
+      if (options.jsonSchema?.name === 'exact_objective_assessment_review')
+        return {
+          content: JSON.stringify({
+            inputSha256: input.inputSha256,
+            items: input.tasks.map((_: unknown, index: number) => ({
+              index,
+              objectiveId: null,
+              elicitationQuote: '',
+              rationale: 'This isolated provider response does not qualify criterion attribution.',
+            })),
+          }),
+          model: 'fixture',
+        };
       if (input.passageText) {
         expect(system).toContain('JSON object containing only a words array');
         expect(options.jsonSchema?.name).toBe('reading_vocabulary_extraction');
@@ -89,6 +99,11 @@ const mockSpeakingRecordingFindMany = vi.fn();
 
 vi.mock('@/lib/prisma', () => {
   const database = {
+    $transaction: async (work: (transaction: unknown) => Promise<unknown>): Promise<unknown> =>
+      work(database),
+    learningLevelBinding: {
+      findUnique: async () => practiceBandFixture(),
+    },
     episode: { findUnique: (...a: unknown[]) => mockEpisodeFindUnique(...a) },
     course: {
       findFirst: async (query: { select?: Record<string, unknown> }) => {
@@ -186,8 +201,8 @@ import {
 } from '@/lib/practice-service';
 import { practiceGenerationSchema } from '@/lib/practice/preparation-state';
 
-function setDueItems(due: DueItems) {
-  mockGetDueItems.mockResolvedValue(due);
+function setDueItems(due: Omit<DueItems, 'objectives'> & { objectives?: DueItems['objectives'] }) {
+  mockGetDueItems.mockResolvedValue({ objectives: [], ...due });
   vocabularyRows = due.vocab.map((word) => ({
     ...word,
     partOfSpeech: null,
@@ -277,7 +292,7 @@ describe('dictionary-driven practice', () => {
         priorityBoost: 0.4,
       },
     ]);
-    const result = await startPractice('c1', 'u1', 'WRITING', blockedProviderExecution('u1'));
+    const result = await startPractice('c1', 'u1', 'WRITING', authorizedLearnerExecution('u1'));
     expect(result.status).toBe('ready_writing');
     expect(vocabularyRows.map(({ lemma }) => lemma)).not.toContain(sentence);
     expect(mockPracticeSessionCreate.mock.calls[0][0].data.focusTargetIds).toEqual([
@@ -301,7 +316,7 @@ describe('dictionary-driven practice', () => {
         'c1',
         'u1',
         kind,
-        blockedProviderExecution('u1')
+        authorizedLearnerExecution('u1')
       );
       expect(context.seed?.targetVocab).toEqual([{ lemma: 'Bahnhof', gloss: 'station' }]);
     }
@@ -326,7 +341,7 @@ describe('dictionary-driven practice', () => {
       'c1',
       'u1',
       'VOCAB',
-      blockedProviderExecution('u1')
+      authorizedLearnerExecution('u1')
     );
     expect(context.seed?.targetVocab).toEqual([
       { lemma: 'Bahnhof', gloss: 'station' },
@@ -344,7 +359,7 @@ describe('dictionary-driven practice', () => {
       'c1',
       'u1',
       'VOCAB',
-      blockedProviderExecution('u1')
+      authorizedLearnerExecution('u1')
     );
     const generation = practiceGenerationSchema.parse(JSON.parse(JSON.stringify(context)));
     mockCourseFindFirst.mockResolvedValue({ ...COURSE, vocabularySupport: 'WORD_RECALL' });
@@ -352,7 +367,7 @@ describe('dictionary-driven practice', () => {
       vocab: [{ id: 'later', lemma: 'Fahrkarte', translation: 'ticket', mastery: 0.1 }],
       grammar: [],
     });
-    const result = await startPractice('c1', 'u1', 'VOCAB', blockedProviderExecution('u1'), {
+    const result = await startPractice('c1', 'u1', 'VOCAB', authorizedLearnerExecution('u1'), {
       generation,
     });
     expect(result.status).toBe('ready');
@@ -388,7 +403,7 @@ describe('dictionary-driven practice', () => {
       seed: null,
     });
     const original = structuredClone(generation);
-    const result = await startPractice('c1', 'u1', 'VOCAB', blockedProviderExecution('u1'), {
+    const result = await startPractice('c1', 'u1', 'VOCAB', authorizedLearnerExecution('u1'), {
       generation,
     });
     expect(result.status).toBe('ready');
@@ -401,7 +416,7 @@ describe('dictionary-driven practice', () => {
       'c1',
       'u1',
       'VOCAB',
-      blockedProviderExecution('u1')
+      authorizedLearnerExecution('u1')
     );
     const generation = practiceGenerationSchema.parse(JSON.parse(JSON.stringify(captured)));
     expect(generation.seed?.targetVocab).toEqual([]);
@@ -410,7 +425,7 @@ describe('dictionary-driven practice', () => {
       grammar: [],
     });
     expect(
-      await startPractice('c1', 'u1', 'VOCAB', blockedProviderExecution('u1'), { generation })
+      await startPractice('c1', 'u1', 'VOCAB', authorizedLearnerExecution('u1'), { generation })
     ).toEqual({ status: 'unavailable', reason: 'not_enough_vocab' });
   });
 
@@ -431,12 +446,12 @@ describe('dictionary-driven practice', () => {
       'c1',
       'u1',
       'VOCAB',
-      blockedProviderExecution('u1'),
+      authorizedLearnerExecution('u1'),
       { focusTargetId: 'focus' }
     );
     const generation = practiceGenerationSchema.parse(JSON.parse(JSON.stringify(captured)));
     mockCourseFindFirst.mockResolvedValue({ ...COURSE, vocabularySupport: 'WORD_RECALL' });
-    const result = await startPractice('c1', 'u1', 'VOCAB', blockedProviderExecution('u1'), {
+    const result = await startPractice('c1', 'u1', 'VOCAB', authorizedLearnerExecution('u1'), {
       generation,
     });
     expect(result.status).toBe('ready');
@@ -453,7 +468,7 @@ describe('startPractice — ownership', () => {
   it("throws PracticeCourseNotFoundError when the course is not the user's", async () => {
     mockCourseFindFirst.mockResolvedValue(null);
     await expect(
-      startPractice('c1', 'intruder', 'VOCAB', blockedProviderExecution('intruder'))
+      startPractice('c1', 'intruder', 'VOCAB', authorizedLearnerExecution('intruder'))
     ).rejects.toBeInstanceOf(PracticeCourseNotFoundError);
   });
 });
@@ -473,12 +488,12 @@ describe('startPractice — VOCAB', () => {
       },
     ]);
     await expect(
-      startPractice('c1', 'u1', 'VOCAB', blockedProviderExecution('u1'))
+      startPractice('c1', 'u1', 'VOCAB', authorizedLearnerExecution('u1'))
     ).rejects.toThrow(/contextual exercise/);
     expect(mockPracticeSessionCreate).not.toHaveBeenCalled();
   });
   it('is unavailable (not_enough_vocab) on a cold-start course', async () => {
-    const r = await startPractice('c1', 'u1', 'VOCAB', blockedProviderExecution('u1'));
+    const r = await startPractice('c1', 'u1', 'VOCAB', authorizedLearnerExecution('u1'));
     expect(r).toEqual({ status: 'unavailable', reason: 'not_enough_vocab' });
     expect(mockPracticeSessionCreate).not.toHaveBeenCalled();
   });
@@ -492,7 +507,7 @@ describe('startPractice — VOCAB', () => {
       grammar: [],
     });
 
-    const r = await startPractice('c1', 'u1', 'VOCAB', blockedProviderExecution('u1'));
+    const r = await startPractice('c1', 'u1', 'VOCAB', authorizedLearnerExecution('u1'));
     if (r.status !== 'ready') throw new Error('expected ready');
 
     expect(r.kind).toBe('VOCAB');
@@ -534,7 +549,7 @@ describe('startPractice — GRAMMAR', () => {
         explanation: 'The source says Kino.',
       },
     ]);
-    const result = await startPractice('c1', 'u1', 'READING', blockedProviderExecution('u1'));
+    const result = await startPractice('c1', 'u1', 'READING', authorizedLearnerExecution('u1'));
     expect(result).toMatchObject({
       items: [
         {
@@ -580,7 +595,7 @@ describe('startPractice — GRAMMAR', () => {
             ]
     );
 
-    const r = await startPractice('c1', 'u1', 'GRAMMAR', blockedProviderExecution('u1'));
+    const r = await startPractice('c1', 'u1', 'GRAMMAR', authorizedLearnerExecution('u1'));
     if (r.status !== 'ready') throw new Error('expected ready');
 
     expect(mockGenerateSectionQuestions).toHaveBeenCalledWith(
@@ -598,7 +613,7 @@ describe('startPractice — GRAMMAR', () => {
     setDueItems({ vocab: [], grammar: [] });
     mockLessonFindFirst.mockResolvedValue(null);
 
-    const r = await startPractice('c1', 'u1', 'GRAMMAR', blockedProviderExecution('u1'));
+    const r = await startPractice('c1', 'u1', 'GRAMMAR', authorizedLearnerExecution('u1'));
     expect(r).toEqual({ status: 'unavailable', reason: 'no_content' });
     expect(mockGenerateSectionQuestions).not.toHaveBeenCalled();
   });
@@ -633,7 +648,7 @@ describe('startPractice — GRAMMAR', () => {
             ]
     );
 
-    const r = await startPractice('c1', 'u1', 'READING', blockedProviderExecution('u1'), {
+    const r = await startPractice('c1', 'u1', 'READING', authorizedLearnerExecution('u1'), {
       focusTargetId: 'ft1',
     });
     if (r.status !== 'ready') throw new Error('expected ready');
@@ -649,9 +664,56 @@ describe('startPractice — GRAMMAR', () => {
 
 describe('practice content topics', () => {
   const due = {
+    objectives: [],
     vocab: [{ id: 'lv-due', lemma: 'mesa', translation: 'table', mastery: 0.4 }],
     grammar: [{ id: 'lg-due', topicKey: 'prepositions', title: 'Prepositions', mastery: 0.3 }],
   };
+  it('reviews the exact qualified objective instead of falling back to an unrelated lesson without selecting credit', async () => {
+    const { entry } = reviewFixture();
+    mockGetDueItems.mockResolvedValue({ objectives: [entry], vocab: [], grammar: [] });
+    mockLessonFindFirst.mockResolvedValue({
+      objective: 'Unrelated first lesson',
+      grammarPoints: ['unrelated'],
+      targetVocab: [],
+    });
+    const context = await capturePracticeContext(
+      'c1',
+      'u1',
+      'GRAMMAR',
+      authorizedLearnerExecution('u1')
+    );
+    expect(context.seed?.objective).toContain(entry.objective.title);
+    expect(context.seed?.objective).toContain(entry.objective.skillCriteria.GRAMMAR);
+    expect(context.seed?.objective).not.toContain('Unrelated first lesson');
+    expect(context.seed?.grammarPoints).toEqual([]);
+    expect(context.learningSelection).toBeNull();
+    expect(context.learningRequest).toBeNull();
+    mockGenerateSectionQuestions.mockResolvedValue(contextualQuestions([{ lemma: 'hola' }]));
+    const result = await startPractice('c1', 'u1', 'GRAMMAR', authorizedLearnerExecution('u1'));
+    expect(result.status).toBe('ready');
+    expect(mockGenerateSectionQuestions.mock.calls[0][0].objective).toContain(
+      entry.objective.skillCriteria.GRAMMAR
+    );
+    expect(mockPracticeSessionCreate.mock.calls[0][0].data.grammarKeys).toEqual([]);
+  });
+  it('keeps an explicitly selected lexical focus ahead of automatic objective recommendations', async () => {
+    const { entry } = reviewFixture();
+    mockGetDueItems.mockResolvedValue({ objectives: [entry], vocab: [], grammar: [] });
+    mockLessonFindFirst.mockResolvedValue({
+      objective: 'Describe places',
+      grammarPoints: ['places'],
+      targetVocab: [],
+    });
+    const context = await capturePracticeContext(
+      'c1',
+      'u1',
+      'GRAMMAR',
+      authorizedLearnerExecution('u1'),
+      { focusTargetId: 'selected-expression' }
+    );
+    expect(context.seed?.objective).toBe('Describe places');
+    expect(context.seed?.objective).not.toContain(entry.objective.title);
+  });
   const focus = {
     id: 'focus-place',
     kind: 'SENTENCE',
@@ -670,7 +732,7 @@ describe('practice content topics', () => {
     setDueItems(due);
     mockPracticeSessionCreate.mockRejectedValueOnce(new Error('Practice persistence failed'));
     await expect(
-      startPractice('c1', 'u1', 'LISTENING', blockedProviderExecution('u1'))
+      startPractice('c1', 'u1', 'LISTENING', authorizedLearnerExecution('u1'))
     ).rejects.toThrow('Practice persistence failed');
     expect(mockQueueListeningAudio).not.toHaveBeenCalled();
   });
@@ -679,7 +741,7 @@ describe('practice content topics', () => {
     setDueItems(due);
     mockLessonFindFirst.mockResolvedValue(lesson);
     mockGenerateSectionQuestions.mockResolvedValue(contextualQuestions(due.vocab));
-    const result = await startPractice('c1', 'u1', 'GRAMMAR', blockedProviderExecution('u1'));
+    const result = await startPractice('c1', 'u1', 'GRAMMAR', authorizedLearnerExecution('u1'));
     expect(result.status).toBe('ready');
     expect(mockGenerateSectionQuestions).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -696,7 +758,7 @@ describe('practice content topics', () => {
     async (currentLesson) => {
       setDueItems(due);
       mockLessonFindFirst.mockResolvedValue(currentLesson);
-      const result = await startPractice('c1', 'u1', 'LISTENING', blockedProviderExecution('u1'));
+      const result = await startPractice('c1', 'u1', 'LISTENING', authorizedLearnerExecution('u1'));
       expect(result.status).toBe('ready');
       expect(mockComposeListeningContent).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -713,7 +775,7 @@ describe('practice content topics', () => {
       setDueItems({ vocab: [], grammar: [] });
       mockLessonFindFirst.mockResolvedValue(currentLesson);
       mockGetPracticeFocusTargets.mockResolvedValue([focus]);
-      const result = await startPractice('c1', 'u1', 'LISTENING', blockedProviderExecution('u1'));
+      const result = await startPractice('c1', 'u1', 'LISTENING', authorizedLearnerExecution('u1'));
       expect(result.status).toBe('ready');
       expect(mockComposeListeningContent).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -799,20 +861,32 @@ describe('startPractice — FULL', () => {
     });
     mockPracticeSessionCreate.mockResolvedValue({ id: 'pfull' });
     mockSpeakingPromptFindMany.mockResolvedValue([
-      { id: 'sp1', targetPhrase: 'Hola', translation: 'Hello', referenceTtsUrl: null },
+      {
+        id: 'sp1',
+        targetPhrase: 'Hola',
+        translation: 'Hello',
+        referenceTtsUrl: null,
+        taskMode: 'READ_ALOUD',
+      },
     ]);
     mockWritingPromptFindMany.mockResolvedValue([
       { id: 'wp1', task: 'Write a greeting note.', guidance: null },
     ]);
 
-    const r = await startPractice('c1', 'u1', 'FULL', blockedProviderExecution('u1'));
+    const r = await startPractice('c1', 'u1', 'FULL', authorizedLearnerExecution('u1'));
     if (r.status !== 'ready_full') throw new Error(`expected ready_full, got ${r.status}`);
 
     expect(r.kind).toBe('FULL');
     expect(r.episodeId).toBe('ep1');
     expect(r.items.length).toBeGreaterThanOrEqual(4);
     expect(r.speakingPrompts).toEqual([
-      { id: 'sp1', targetPhrase: 'Hola', translation: 'Hello', referenceTtsUrl: null },
+      {
+        id: 'sp1',
+        targetPhrase: 'Hola',
+        translation: 'Hello',
+        referenceTtsUrl: null,
+        taskMode: 'READ_ALOUD',
+      },
     ]);
     expect(r.writingPrompts).toEqual([
       { id: 'wp1', task: 'Write a greeting note.', guidance: null },
@@ -864,7 +938,7 @@ describe('startPractice — FULL', () => {
     mockSpeakingPromptFindMany.mockResolvedValue([]);
     mockWritingPromptFindMany.mockResolvedValue([]);
 
-    const r = await startPractice('c1', 'u1', 'FULL', blockedProviderExecution('u1'));
+    const r = await startPractice('c1', 'u1', 'FULL', authorizedLearnerExecution('u1'));
     if (r.status !== 'ready_full') throw new Error(`expected ready_full, got ${r.status}`);
 
     expect(r.items.some((item) => item.id.startsWith('v'))).toBe(true);
@@ -892,7 +966,7 @@ describe('startPractice — WRITING', () => {
       { id: 'wp1', task: 'Write a greeting note.', guidance: null },
     ]);
 
-    const r = await startPractice('c1', 'u1', 'WRITING', blockedProviderExecution('u1'));
+    const r = await startPractice('c1', 'u1', 'WRITING', authorizedLearnerExecution('u1'));
     if (r.status !== 'ready_writing') throw new Error(`expected ready_writing, got ${r.status}`);
 
     expect(r.sessionId).toBe('pw1');

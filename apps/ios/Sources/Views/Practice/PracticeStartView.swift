@@ -51,6 +51,17 @@ struct PracticeStartView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     header
+                    if let level = currentStart.practiceLevel {
+                        Text("Practice difficulty: \(level.rawValue). This does not change your course level.")
+                            .font(.callout).foregroundStyle(SottoTheme.muted)
+                    }
+                    if let selection = currentStart.learningSelection {
+                        ForEach(selection.objectives, id: \.id) { Text($0.title).font(.callout) }
+                        if selection.materialFocusId != nil {
+                            Text("Private source practice. Source exposure does not count toward level mastery.")
+                                .font(.caption).foregroundStyle(SottoTheme.muted)
+                        }
+                    }
 
                     if let result = model.practiceResult ?? currentStart.submissionResult {
                         PracticeResultBanner(result: result)

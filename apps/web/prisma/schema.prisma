@@ -31,6 +31,10 @@ model SidedoorState {
 }
 
 model User {
+  materialAnalyses MaterialAnalysis[]
+  materialAnalysisRequests MaterialAnalysisRequest[]
+  placementSessions PlacementSession[]
+  placementConfirmations PlacementConfirmationReceipt[]
   id        String   @id @default(cuid())
   email     String   @unique
   name      String?
@@ -93,6 +97,7 @@ model User {
   // Language learning
   courses            Course[]
   courseMaterials    CourseMaterial[]
+  materialUploadBatches MaterialUploadBatch[]
   classSubmissions   ClassSubmission[]
   speakingRecordings SpeakingRecording[]
   writingResponses   WritingResponse[]
@@ -104,6 +109,7 @@ model User {
 // ============ EPISODES ============
 
 model Episode {
+  learningAudioIdentity Json? // immutable stitched audio and script identity
   id             String        @id @default(cuid())
   userId         String
   title          String
@@ -938,6 +944,7 @@ model Lesson {
   parent     Lesson?       @relation("LessonTree", fields: [parentId], references: [id], onDelete: SetNull)
   children   Lesson[]      @relation("LessonTree")
   classes    CourseClass[]
+  learningObjectives LessonLearningObjective[]
 
   @@unique([curriculumId, slug])
   @@unique([curriculumId, order])
@@ -948,6 +955,9 @@ model Lesson {
 // A learner's enrollment in one language pair. CEFR level lives here (a user
 // can hold several courses at several levels).
 model Course {
+  intendedMaterialAnalyses MaterialAnalysis[] @relation("IntendedMaterialAnalysis")
+  attachedMaterialAnalyses MaterialAnalysis[] @relation("AttachedMaterialAnalysis")
+  placementConfirmations PlacementConfirmationReceipt[]
   id                String             @id @default(cuid())
   userId            String
   nativeLang        String
@@ -978,6 +988,10 @@ model Course {
   reviewEvents      LearnerReviewEvent[]
   pronunciations    VocabularyPronunciation[]
   vocabularyIndexes MaterialVocabularyIndex[]
+  levelBindings    LearningLevelBinding[]
+  levelCompletions LearningLevelCompletion[]
+  objectiveStates  LearnerObjectiveState[]
+  observations     LearningObservation[]
 
   @@unique([userId, nativeLang, targetLang]) // one course per user per language pair
   @@index([userId])
@@ -1066,6 +1080,7 @@ enum FocusTargetSource {
 // A ~1h class instantiated from a Lesson for a specific course. Mastery-gated:
 // the next class only unlocks once this one is PASSED.
 model CourseClass {
+  learningSelection Json? // immutable language-map objectives and criteria for this class
   readingVocabulary Json? // exact reading source and assessed vocabulary provenance
   id                String      @id @default(cuid())
   courseId          String
@@ -1130,6 +1145,7 @@ model ClassSection {
 // MC question for a GRAMMAR/READING/LISTENING section. Forked from the old
 // post-listen quiz question shape, but supports retries and has no episode.
 model LessonQuestion {
+  learningAssessment Json? // reviewed private objective attribution for this exact question
   id           String    @id @default(cuid())
   sectionId    String
   order        Int
@@ -1197,6 +1213,7 @@ enum SpeakingGradeStatus {
 // A speaking prompt hangs off EXACTLY ONE parent: a class section (gated class)
 // or a practice session (ungated). The XOR is enforced in app code.
 model SpeakingPrompt {
+  learningObjectives Json? // exact criteria the speaking task is intended to assess
   id                String   @id @default(cuid())
   sectionId         String?
   practiceSessionId String?
@@ -1223,6 +1240,7 @@ model SpeakingPrompt {
 
 // A learner's recorded attempt at a SpeakingPrompt, graded asynchronously.
 model SpeakingRecording {
+  objectiveEvidence Json? // criterion-specific findings supported by this recording's transcript
   attempt           Int                 @default(1)
   sttProvider       String? // provider selected by the immutable learning contract
   sttSelection      Json? // immutable model, endpoint and credential revision metadata, never secrets
@@ -1256,6 +1274,7 @@ model SpeakingRecording {
 // A writing task. Hangs off EXACTLY ONE parent (a class section or a practice
 // session), like SpeakingPrompt; XOR enforced in app code.
 model WritingPrompt {
+  learningObjectives Json? // exact criteria the writing task is intended to assess
   id                String   @id @default(cuid())
   sectionId         String?
   practiceSessionId String?
@@ -1284,6 +1303,7 @@ model WritingPrompt {
 // A learner's writing response, graded synchronously by the LLM (corrections +
 // score), unlike speaking which is graded async by a worker.
 model WritingResponse {
+  objectiveEvidence Json? // criterion-specific findings supported by the exact learner response
   gradingState      Json? // durable synchronous grade and provider outcome journal
   attempt           Int      @default(1)
   id                String   @id @default(cuid())
@@ -1498,6 +1518,7 @@ model LearnerGrammar {
 }
 
 model MaterialVocabularyIndex {
+  sourceSnapshot Json?
   id                String                 @id @default(uuid())
   materialId        String
   courseId          String
@@ -1523,6 +1544,7 @@ model MaterialVocabularyIndex {
 }
 
 model VocabularyIndexChunk {
+  resultBytes Bytes?
   id          String                       @id @default(uuid())
   indexId     String
   startOffset Int
@@ -1549,7 +1571,8 @@ model VocabularySourceOccurrence {
   chunkId     String
   startOffset Int
   endOffset   Int
-  quote       String               @db.Text
+  quote       String?              @db.Text
+  quoteBytes  Bytes?
   meaning     String
   word        LearnerVocab         @relation(fields: [wordId, courseId], references: [id, courseId], onDelete: Cascade)
   material    CourseMaterial       @relation(fields: [materialId], references: [id], onDelete: Cascade)
@@ -1643,6 +1666,8 @@ model PracticeRequestReceipt {
 }
 
 model PracticeSession {
+  practiceLevel CefrLevel? // immutable generation difficulty; null on legacy sessions
+  learningSelection Json? // immutable language-map selection; distinct from lexical focusTargetIds
   vocabularyStudy     Json? // private versioned dictionary study and recall snapshot
   listeningScriptHash String? // binds comprehension questions to the preserved listening script
   generationSpec      Json? // captured private context, frozen requirements and source identity
@@ -1726,21 +1751,544 @@ model CourseNote {
 }
 
 model CourseMaterial {
-  id            String   @id @default(uuid())
-  userId        String
-  courseId      String?
-  name          String
-  mimeType      String
-  byteSize      Int
-  originalUrl   String?
-  extractedText String   @db.Text
-  createdAt     DateTime @default(now())
+  analysisSources MaterialAnalysisSource[]
+  id                 String   @id @default(uuid())
+  userId             String
+  courseId           String?
+  name               String
+  mimeType           String
+  byteSize           Int
+  originalUrl        String?
+  originalSha256     String?
+  optimizedUrl       String?
+  optimizationReceipt Json?
+  processingStatus   String   @default("LEGACY")
+  processingRevision Int      @default(1)
+  processingError    String?
+  extractedText      String   @db.Text
+  createdAt          DateTime @default(now())
 
   user              User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
   course            Course?                      @relation(fields: [courseId], references: [id], onDelete: Cascade)
   vocabularyIndexes MaterialVocabularyIndex[]
   vocabularySources VocabularySourceOccurrence[]
+  upload MaterialUpload?
+  extractionRuns MaterialExtractionRun[]
 
   @@index([userId, courseId])
+  @@index([courseId])
+}
+
+model MaterialExtractionRun {
+  analysisSources MaterialAnalysisSource[]
+  id                 String   @id @default(uuid())
+  materialId         String
+  processingRevision Int
+  runKey             String   @unique
+  requestId          String?
+  originalSha256     String
+  extractorVersion   String
+  rendererVersion    String
+  recognitionPolicy  Json
+  providerSelection  Json?
+  status             String   @default("PENDING")
+  pageCount          Int?
+  coverage           Json?
+  failureReason      String?
+  completedAt        DateTime?
+  createdAt          DateTime @default(now())
+
+  material CourseMaterial @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  pages    MaterialPage[]
+
+  @@unique([materialId, processingRevision])
+  @@unique([materialId, requestId])
+  @@index([status, createdAt])
+}
+
+model MaterialPage {
+  id              String   @id @default(uuid())
+  runId           String
+  pageNumber      Int
+  width           Float?
+  height          Float?
+  rotation        Int?
+  pageImageSha256 String?
+  renderIdentity  Json?
+  embeddedText    Json
+  visualCoverage  Json
+  failureReason   String?
+  createdAt       DateTime @default(now())
+
+  run                 MaterialExtractionRun        @relation(fields: [runId], references: [id], onDelete: Cascade)
+  textStreams         MaterialPageText[]
+  recognitions        MaterialRecognitionOperation[]
+
+  @@unique([runId, pageNumber])
+}
+
+model MaterialPageText {
+  id       String @id @default(uuid())
+  pageId   String
+  origin   String
+  manifest Json
+
+  page   MaterialPage        @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  chunks MaterialTextChunk[]
+
+  @@unique([pageId, origin])
+}
+
+model MaterialTextChunk {
+  id             String @id @default(uuid())
+  streamId       String
+  index          Int
+  codePointStart Int
+  codePointEnd   Int
+  utf8ByteStart  Int
+  utf8ByteEnd    Int
+  sha256         String
+  textBytes      Bytes
+
+  stream MaterialPageText @relation(fields: [streamId], references: [id], onDelete: Cascade)
+
+  @@unique([streamId, index])
+}
+
+model MaterialUploadBatch {
+  id          String   @id @default(uuid())
+  userId      String
+  requestId   String
+  fingerprint String
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+
+  user    User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  uploads MaterialUpload[]
+
+  @@unique([userId, requestId])
+  @@index([userId, expiresAt])
+}
+
+model MaterialUpload {
+  id                      String    @id @default(uuid())
+  batchId                 String
+  materialId              String    @unique
+  clientId                String
+  expectedSha256          String?
+  status                  String    @default("UPLOADING")
+  revision                Int       @default(0)
+  finalizationOperationId String?
+  failureReason           String?
+  cleanupJobIds           String[]  @default([])
+  expiresAt               DateTime
+  completedAt             DateTime?
+  createdAt               DateTime  @default(now())
+
+  batch    MaterialUploadBatch  @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  material CourseMaterial       @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  parts    MaterialUploadPart[]
+
+  @@unique([batchId, clientId])
+  @@index([status, expiresAt])
+}
+
+model MaterialUploadPart {
+  id          String    @id @default(uuid())
+  uploadId    String
+  index       Int
+  offset      Int
+  byteSize    Int
+  sha256      String
+  writeToken  String
+  originalUrl String?
+  committedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  upload MaterialUpload @relation(fields: [uploadId], references: [id], onDelete: Cascade)
+
+  @@unique([uploadId, index])
+}
+
+// Shared immutable target-language catalog releases. No uploaded learner text belongs here.
+model LearningMapRevision {
+  materialAnalyses MaterialAnalysis[]
+  id          String   @id @default(cuid())
+  targetLang  String
+  version     Int
+  catalogHash String
+  definition  Json
+  createdAt   DateTime @default(now())
+
+  bindings     LearningLevelBinding[]
+  observations LearningObservation[]
+
+  @@unique([targetLang, version])
+  @@unique([targetLang, catalogHash])
+}
+
+// Stable identities outlive labels and display-parent changes. Meaning changes use criterionVersion.
+model LearningNodeIdentity {
+  id         String   @id
+  targetLang String
+  branch     String
+  kind       String
+  createdAt  DateTime @default(now())
+
+  states       LearnerObjectiveState[]
+  observations LearningObservation[]
+  lessons      LessonLearningObjective[]
+
+  @@index([targetLang, kind])
+}
+
+// Each active/completed band pins a release and genuine skill exemptions until explicitly upgraded.
+model LearningLevelBinding {
+  id            String    @id @default(cuid())
+  courseId      String
+  level         CefrLevel
+  revisionId    String
+  policyVersion Int       @default(1)
+  coverage      Json
+  createdAt     DateTime  @default(now())
+
+  course     Course                    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  revision   LearningMapRevision       @relation(fields: [revisionId], references: [id], onDelete: Restrict)
+  completion LearningLevelCompletion?
+
+  @@unique([courseId, level])
+  @@index([revisionId])
+}
+
+// Durable transition receipt; a due review never deletes or rewrites an earned completion.
+model LearningLevelCompletion {
+  id            String    @id @default(cuid())
+  requestId     String    @unique
+  courseId      String
+  level         CefrLevel
+  nextLevel     CefrLevel?
+  bindingId     String    @unique
+  intentHash    String
+  evidenceHash  String
+  receipt       Json
+  completedAt   DateTime  @default(now())
+
+  course  Course                @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  binding LearningLevelBinding  @relation(fields: [bindingId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, level])
+}
+
+// Immutable qualified evidence. Source/response identities prevent repair and submission replay credit.
+model LearningObservation {
+  id               String    @id @default(cuid())
+  deduplicationKey  String    @unique
+  courseId         String
+  objectiveId      String
+  criterionVersion Int
+  policyVersion    Int
+  level            CefrLevel
+  skill            SkillType
+  revisionId       String
+  sourceType       String
+  sessionId        String
+  taskId           String
+  responseIdentity String
+  quality          Float
+  evidence         Json
+  observedAt       DateTime  @default(now())
+
+  course    Course               @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  objective LearningNodeIdentity @relation(fields: [objectiveId], references: [id], onDelete: Restrict)
+  revision  LearningMapRevision  @relation(fields: [revisionId], references: [id], onDelete: Restrict)
+
+  @@index([courseId, objectiveId, criterionVersion, policyVersion, level, skill])
+  @@index([courseId, sessionId])
+  @@index([courseId, observedAt, id])
+}
+
+// Rebuildable projections. Initial posterior is neutral; zero observations remain visibly unassessed.
+model LearnerObjectiveState {
+  id               String    @id @default(cuid())
+  courseId         String
+  objectiveId      String
+  criterionVersion Int
+  policyVersion    Int
+  level            CefrLevel
+  skill            SkillType
+  mastery          Float     @default(0.5)
+  assessedTasks    Int       @default(0)
+  assessedSessions Int       @default(0)
+  lastQuality      Float?
+  lastReviewed     DateTime?
+  dueAt            DateTime?
+  ease             Float     @default(2.5)
+  intervalDays     Float     @default(0)
+  reps             Int       @default(0)
+  lapses           Int       @default(0)
+  updatedAt        DateTime  @updatedAt
+
+  course    Course               @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  objective LearningNodeIdentity @relation(fields: [objectiveId], references: [id], onDelete: Restrict)
+
+  @@unique([courseId, objectiveId, criterionVersion, policyVersion, level, skill], map: "LearnerObjectiveState_criterion_key")
+  @@index([courseId, dueAt])
+}
+
+model LessonLearningObjective {
+  lessonId         String
+  objectiveId      String
+  criterionVersion Int
+  role             String
+
+  lesson    Lesson               @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  objective LearningNodeIdentity @relation(fields: [objectiveId], references: [id], onDelete: Restrict)
+
+  @@id([lessonId, objectiveId])
+  @@index([objectiveId])
+}
+
+model MaterialRecognitionOperation {
+  id                 String   @id @default(uuid())
+  runId              String
+  pageNumber         Int
+  mode               String
+  identityDigest     String
+  inputDigest        String
+  originalSha256     String
+  pageImageSha256    String
+  identity           Json
+  grant              Json
+  status             String   @default("READY")
+  attemptId          String?  @unique
+  attemptFingerprint String?
+  admittedAt         DateTime?
+  settledAt          DateTime?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  page     MaterialPage                 @relation(fields: [runId, pageNumber], references: [runId, pageNumber], onDelete: Cascade)
+  response MaterialRecognitionResponse?
+
+  @@unique([runId, identityDigest])
+  @@index([status, updatedAt])
+}
+
+model MaterialRecognitionResponse {
+  operationId String   @id
+  kind        String
+  metadata    Json
+  body        Bytes    @db.ByteA
+  bodySha256  String
+  bodyBytes   Int
+  createdAt   DateTime @default(now())
+
+  operation MaterialRecognitionOperation @relation(fields: [operationId], references: [id], onDelete: Cascade)
+}
+
+model MaterialAnalysis {
+  id                String    @id @default(uuid())
+  userId            String
+  userGeneration    BigInt
+  nativeLang        String
+  targetLang        String
+  intendedCourseId  String?
+  attachedCourseId  String?
+  purpose           String
+  requestId         String
+  revision          Int       @default(1)
+  admissionDigest   String
+  sourceSetDigest   String
+  retryOfAnalysisId String?
+  retryCounts       Json?
+  catalogRevisionId String?
+  policy            Json
+  identity          Json?
+  identityDigest    String?
+  status            String    @default("WAITING_SOURCE")
+  coverage          Json?
+  summary           Json?
+  resultBytes       Bytes?
+  resultDigest      String?
+  acceptedReceiptId String?   @unique
+  failureReason     String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  completedAt       DateTime?
+
+  user            User                           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  intendedCourse  Course?                        @relation("IntendedMaterialAnalysis", fields: [intendedCourseId], references: [id], onDelete: Cascade)
+  attachedCourse  Course?                        @relation("AttachedMaterialAnalysis", fields: [attachedCourseId], references: [id], onDelete: Cascade)
+  catalogRevision LearningMapRevision?           @relation(fields: [catalogRevisionId], references: [id], onDelete: Restrict)
+  sources         MaterialAnalysisSource[]
+  units           MaterialAnalysisUnit[]
+  focuses         MaterialSourceFocus[]
+  sessions        PlacementSession[]
+  confirmations   PlacementConfirmationReceipt[]
+  requests        MaterialAnalysisRequest[]
+  retryOf         MaterialAnalysis?              @relation("MaterialAnalysisRetry", fields: [retryOfAnalysisId], references: [id], onDelete: Cascade)
+  retries         MaterialAnalysis[]             @relation("MaterialAnalysisRetry")
+
+  @@unique([userId, requestId])
+  @@unique([userId, admissionDigest])
+  @@index([userId, identityDigest])
+  @@index([userId, nativeLang, targetLang, status])
+  @@index([status, updatedAt])
+  @@index([userId, sourceSetDigest])
+}
+
+model MaterialAnalysisRequest {
+  userId       String
+  requestId    String
+  analysisId   String
+  intentDigest String
+
+  user     User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  analysis MaterialAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@id([userId, requestId])
+}
+
+model MaterialAnalysisSource {
+  id                 String  @id @default(uuid())
+  analysisId         String
+  sourceId           String  @default(uuid())
+  order              Int
+  kind               String
+  name               String
+  materialId         String?
+  materialGeneration BigInt?
+  runId              String?
+  processingRevision Int?
+  originalSha256     String?
+  snapshotBytes      Bytes?
+  snapshotSha256     String?
+  noteId             String?
+  noteGeneration     BigInt?
+  revision           Int     @default(1)
+  inventory          Json?
+  inventoryDigest    String?
+
+  analysis MaterialAnalysis       @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  material CourseMaterial?        @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  run      MaterialExtractionRun? @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([analysisId, order])
+  @@unique([analysisId, materialId])
+  @@unique([analysisId, sourceId])
+  @@index([materialId])
+}
+
+model MaterialAnalysisUnit {
+  id                     String    @id @default(uuid())
+  analysisId             String
+  stage                  String
+  unitKey                String
+  identity               Json
+  identityDigest         String
+  inputDigest            String
+  grant                  Json?
+  reuse                  Json?
+  cancellationVerifiedAt DateTime?
+  mode                   String
+  status                 String    @default("READY")
+  attemptId              String?   @unique
+  attemptFingerprint     String?
+  responseKind           String?
+  responseMetadata       Json?
+  responseBytes          Bytes?
+  responseSha256         String?
+  outputBytes            Bytes?
+  outputSha256           String?
+  admittedAt             DateTime?
+  settledAt              DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  analysis MaterialAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@unique([analysisId, stage, unitKey])
+  @@index([analysisId, cancellationVerifiedAt, id], map: "MaterialAnalysisUnit_cancellation_verification_idx")
+  @@index([status, updatedAt])
+}
+
+model MaterialSourceFocus {
+  id           String @id @default(uuid())
+  analysisId   String
+  localKey     String
+  order        Int
+  title        String
+  kind         String
+  level        CefrLevel?
+  objectiveIds Json
+  detailsBytes Bytes
+  detailsSha256 String
+  createdAt    DateTime @default(now())
+
+  analysis MaterialAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@unique([analysisId, localKey])
+  @@index([analysisId, order, id])
+}
+
+model PlacementSession {
+  id                 String @id @default(uuid())
+  requestId          String
+  semanticDigest     String
+  policy             Json
+  input              Json
+  inputDigest        String
+  grant              Json
+  mode               String
+  attemptId          String? @unique
+  attemptFingerprint String?
+  responseKind       String?
+  responseMetadata   Json?
+  responseBytes      Bytes?
+  responseSha256     String?
+  admittedAt         DateTime?
+  settledAt          DateTime?
+  failureReason      String?
+  userId             String
+  userGeneration     BigInt
+  nativeLang         String
+  targetLang         String
+  analysisId         String?
+  analysisRevision   Int?
+  analysisDigest     String?
+  questionsBytes     Bytes
+  questionsDigest    String
+  scoringVersion     Int @default(1)
+  status             String @default("READY")
+  acceptedReceiptId  String? @unique
+  expiresAt          DateTime
+  createdAt          DateTime @default(now())
+
+  user          User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  analysis      MaterialAnalysis? @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  confirmations PlacementConfirmationReceipt[]
+
+  @@index([userId, createdAt])
+  @@unique([userId, requestId])
+  @@index([userId, semanticDigest, status])
+}
+
+model PlacementConfirmationReceipt {
+  id           String @id @default(uuid())
+  requestId    String
+  userId       String
+  courseId     String
+  analysisId   String?
+  sessionId    String?
+  intentDigest String
+  response     Json
+  createdAt    DateTime @default(now())
+
+  user     User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  analysis MaterialAnalysis? @relation(fields: [analysisId], references: [id], onDelete: SetNull)
+  session  PlacementSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, requestId])
   @@index([courseId])
 }

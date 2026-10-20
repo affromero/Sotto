@@ -4,6 +4,36 @@ import XCTest
 @testable import Sotto
 
 final class APITransportPrivacyTests: XCTestCase {
+    func testPracticeConfigurationFailurePointsToTheWebApp() async throws {
+        let server = try LocalHTTPServer { _ in
+            .init(status: 500, headers: [:], body: #"{"error":"A provider API_KEY is not configured"}"#)
+        }
+        try await server.start(); defer { server.stop() }
+        let client = SottoAPIClient(serverURL: server.url, apiKey: "native-key", profileId: "learner", session: URLSession(configuration: .ephemeral))
+        do { _ = try await client.startPractice(courseId: "course", kind: "GRAMMAR"); XCTFail("Expected server configuration failure") }
+        catch {
+            XCTAssertTrue(error.localizedDescription.contains("web app"))
+            XCTAssertFalse(error.localizedDescription.contains("API_KEY"))
+        }
+    }
+    func testMaterialReceiptRedirectKeepsTheFrozenProfileAssertionOnThePairedOrigin() async throws {
+        struct Receipt: Decodable { let id: String }
+        let server = try LocalHTTPServer { request in
+            if request.hasPrefix("GET /material-final ") { return .json(#"{"id":"learner"}"#) }
+            return .init(status: 307, headers: ["Location": "/material-final"], body: "")
+        }
+        try await server.start()
+        defer { server.stop() }
+        let client = SottoAPIClient(serverURL: server.url, apiKey: "material-key", profileId: "learner", session: URLSession(configuration: .ephemeral))
+        let receipt: Receipt = try await client.materialRequest("/api/v1/users/me")
+        XCTAssertEqual(receipt.id, "learner")
+        XCTAssertEqual(server.requests.count, 2)
+        for request in server.requests {
+            XCTAssertTrue(request.lowercased().contains("x-sotto-expected-profile-id: learner"))
+            XCTAssertTrue(request.lowercased().contains("authorization: bearer material-key"))
+            XCTAssertFalse(request.lowercased().contains("cookie:"))
+        }
+    }
     func testPencilReviewSendsTheImageToThePairedServerAndKeepsItsRetryIdentity() async throws {
         let id = UUID()
         let server = try LocalHTTPServer { _ in .init(status: 202, headers: [:], body: "{\"status\":\"PENDING\",\"operationId\":\"\(id.uuidString)\"}") }

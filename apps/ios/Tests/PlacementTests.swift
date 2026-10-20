@@ -11,13 +11,17 @@ final class PlacementTests: XCTestCase {
                 {
                   "native": "en",
                   "target": "de",
+                  "placementSessionId": "d1438bc6-a9a6-4c4a-bf12-e7b11c79110a",
+                  "status": "READY",
+                  "questionsDigest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+                  "expiresAt": "2099-01-01T00:00:00.000Z",
                   "questions": [
                     {
-                      "id": "p1",
+                      "id": "pq_0",
                       "cefr": "A2",
                       "skill": "grammar",
                       "prompt": "Ich ___ nach Hause.",
-                      "options": ["gehe", "gehst", "geht", "gehen"]
+                      "options": ["gehe", "gehst", "geht", "gehen", "I do not know"]
                     }
                   ]
                 }
@@ -26,7 +30,8 @@ final class PlacementTests: XCTestCase {
         )
 
         XCTAssertEqual(batch.target, "de")
-        XCTAssertEqual(batch.questions.first?.options.count, 4)
+        XCTAssertEqual(batch.questions.first?.options.count, 5)
+        XCTAssertEqual(batch.status, "READY")
     }
 
     /// The scorer treats index 4 as "I don't know", which is distinct from a
@@ -35,7 +40,7 @@ final class PlacementTests: XCTestCase {
         XCTAssertEqual(SottoPlacementAnswer.dontKnowIndex, 4)
 
         let encoded = try JSONEncoder().encode(
-            SottoPlacementAnswer(id: "p1", selectedIndex: SottoPlacementAnswer.dontKnowIndex)
+            SottoPlacementAnswer(id: "pq_0", selectedIndex: SottoPlacementAnswer.dontKnowIndex)
         )
         let decoded = try JSONSerialization.jsonObject(with: encoded) as? [String: Any]
 
@@ -47,12 +52,13 @@ final class PlacementTests: XCTestCase {
             SottoPlacementResult.self,
             from: Data(
                 """
-                { "courseId": "c1", "level": "B1", "scoreBySkill": { "grammar": 0.7 } }
+                { "courseId": "c1", "level": "A2", "assessedLevel": "B1", "confirmationReceiptId": "d1438bc6-a9a6-4c4a-bf12-e7b11c79110a", "scoreBySkill": { "grammar": 0.7 } }
                 """.utf8
             )
         )
 
-        XCTAssertEqual(result.level, "B1")
+        XCTAssertEqual(result.level, "A2")
+        XCTAssertEqual(result.assessedLevel, "B1")
         XCTAssertEqual(result.scoreBySkill?["grammar"], 0.7)
     }
 

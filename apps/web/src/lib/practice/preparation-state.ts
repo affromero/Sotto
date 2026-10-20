@@ -1,5 +1,10 @@
 import { z } from 'zod';
-import { skillRequirementsSchema } from '@sotto/shared';
+import {
+  skillRequirementsSchema,
+  learningLevelSchema,
+  learningSelectionRequestSchema,
+  learningSelectionSnapshotSchema,
+} from '@sotto/shared';
 import { preparationSchema } from '../classes/preparation-state';
 
 export const practicePreparationSchema = preparationSchema
@@ -9,11 +14,20 @@ export const practicePreparationSchema = preparationSchema
     unavailableReason: z.enum(['not_enough_vocab', 'nothing_due', 'no_content']).nullable(),
     speechFingerprint: z.string().length(64),
     focusTargetId: z.string().min(1).nullable(),
+    generationVersion: z.literal(2).optional(),
+    sourceRetired: z.literal(true).optional(),
+    practiceLevel: learningLevelSchema.optional(),
+    learningRequest: learningSelectionRequestSchema.nullable().optional(),
   });
 export type PracticePreparation = z.infer<typeof practicePreparationSchema>;
 
 export const practiceGenerationSchema = z
   .object({
+    schemaVersion: z.literal(2).optional(),
+    practiceLevel: learningLevelSchema.optional(),
+    learningRequest: learningSelectionRequestSchema.nullable().optional(),
+    learningSelection: learningSelectionSnapshotSchema.nullable().optional(),
+    levelCoverage: skillRequirementsSchema.nullable().optional(),
     course: z
       .object({
         id: z.string().min(1),
@@ -51,4 +65,40 @@ export const practiceGenerationSchema = z
       .strict()
       .nullable(),
   })
-  .strict();
+  .strict()
+  .superRefine((generation, context) => {
+    if (generation.schemaVersion !== 2) {
+      if (
+        [
+          generation.practiceLevel,
+          generation.learningRequest,
+          generation.learningSelection,
+          generation.levelCoverage,
+        ].some((value) => value !== undefined)
+      )
+        context.addIssue({
+          code: 'custom',
+          message: 'Focused practice requires its explicit versioned context.',
+        });
+      return;
+    }
+    if (
+      !generation.practiceLevel ||
+      generation.learningRequest === undefined ||
+      generation.learningSelection === undefined ||
+      generation.levelCoverage === undefined ||
+      generation.requirements.level !== generation.practiceLevel ||
+      (generation.learningRequest === null) !== (generation.learningSelection === null) ||
+      (generation.learningSelection === null) !== (generation.levelCoverage === null) ||
+      (generation.learningSelection &&
+        generation.learningSelection.level !== generation.practiceLevel) ||
+      (generation.levelCoverage &&
+        (generation.levelCoverage.scope !== 'CLASS' ||
+          generation.levelCoverage.level !== generation.practiceLevel))
+    )
+      context.addIssue({
+        code: 'custom',
+        message:
+          'Frozen practice difficulty, selection and coverage must describe the same admitted task.',
+      });
+  });

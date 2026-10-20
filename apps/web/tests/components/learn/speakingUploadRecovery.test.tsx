@@ -1,4 +1,5 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+// @vitest-environment jsdom
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SpeakingExercise } from '@/components/class/SpeakingExercise';
 import { SpeakingSection } from '@/components/learn/SpeakingSection';
@@ -17,11 +18,57 @@ vi.mock('@/lib/hooks/useAudioRecorder', () => ({
   }),
 }));
 afterEach(() => {
+  cleanup();
   microphone.blob = null;
   vi.unstubAllGlobals();
 });
 
 describe('speaking upload recovery', () => {
+  it.each(['practice', 'class'] as const)(
+    'presents an independent %s response task without read-aloud guidance',
+    async (kind) => {
+      const prompt = {
+        id: 'free-task',
+        order: 1,
+        targetPhrase: 'Request a vegetarian meal and explain your dietary constraint.',
+        translation: 'Address the server politely.',
+        taskMode: 'COMMUNICATIVE' as const,
+        assessmentScope: 'PRIVATE_SOURCE' as const,
+        ipa: 'answer pronunciation',
+        referenceTtsUrl: '/forbidden-answer.mp3',
+      };
+      render(
+        kind === 'class' ? (
+          <SpeakingSection
+            endpointBase="/api/v1/classes/free/speaking"
+            prompts={[prompt]}
+            gate={70}
+            nextName={null}
+            onScore={() => {}}
+            onContinue={() => {}}
+          />
+        ) : (
+          <SpeakingExercise endpointBase="/api/v1/practice/free/speaking" prompts={[prompt]} />
+        )
+      );
+      expect(
+        await screen.findByRole('button', { name: 'Start recording your response' })
+      ).toBeTruthy();
+      expect(screen.getByText(prompt.targetPhrase)).toBeTruthy();
+      expect(
+        screen.getByText(
+          'Private source feedback. This practice does not count toward level mastery.'
+        )
+      ).toBeTruthy();
+      expect(screen.getByText(/communicative goal/)).toBeTruthy();
+      expect(screen.queryByText('Say this')).toBeNull();
+      expect(screen.queryByText('answer pronunciation')).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Play reference pronunciation' })).toBeNull();
+      expect(
+        screen.queryByRole('button', { name: 'Start recording your pronunciation' })
+      ).toBeNull();
+    }
+  );
   it.each(['practice', 'class'] as const)(
     'retains an unknown %s upload across remount and resumes only new saved evidence',
     async (kind) => {
