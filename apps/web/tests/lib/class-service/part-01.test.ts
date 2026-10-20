@@ -101,7 +101,7 @@ describe('createNextClass', () => {
     ).rejects.toBeInstanceOf(CourseNotFoundError);
   });
 
-  it('publishes accepted teaching with a frozen mix of new and struggling words', async () => {
+  it('publishes dictionary review without new words while active recall is weak', async () => {
     mockCourseFindFirst.mockResolvedValue({
       ...SAMPLE_COURSE,
       curriculum: {
@@ -134,10 +134,7 @@ describe('createNextClass', () => {
         published = seed;
       },
     });
-    const expected = [
-      { lemma: 'visitar', gloss: 'visit' },
-      { lemma: 'museo', gloss: 'museum' },
-    ];
+    const expected = [{ lemma: 'visitar', gloss: 'visit' }];
     expect(published).toMatchObject({
       teaching: sampleTeaching,
       classTargets: { vocab: expected, grammarPoints: SAMPLE_LESSON.grammarPoints },
