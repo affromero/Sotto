@@ -42,12 +42,25 @@ impl App {
     }
 
     pub(super) fn start_skill(&mut self, course: Course, skill: SkillChoice) {
+        self.start_focused_skill(course, skill, None);
+    }
+
+    pub(super) fn start_focused_skill(
+        &mut self,
+        course: Course,
+        skill: SkillChoice,
+        selection: Option<types::LearningSelectionRequest>,
+    ) {
         // New target: invalidate prior in-flight requests, clear any stale
         // notice, and mark the start in flight so a repeat Select is ignored.
         let req_gen = self.bump_gen();
         let request_id = uuid::Uuid::new_v4();
         self.pending_admissions
             .insert(request_id, (course.id.clone(), skill.kind()));
+        if let Some(selection) = selection.as_ref() {
+            self.pending_selections
+                .insert(request_id, selection.clone());
+        }
         self.view = View::PracticePreparing {
             course: course.clone(),
             request_id,
@@ -65,10 +78,16 @@ impl App {
         self.dispatch(
             req_gen,
             async move {
-                tokio::time::timeout(
-                    std::time::Duration::from_secs(30),
-                    client.start_practice(&course_id, kind, request_id),
-                )
+                tokio::time::timeout(std::time::Duration::from_secs(30), async {
+                    match selection {
+                        Some(selection) => {
+                            client
+                                .start_selected_practice(&course_id, kind, request_id, selection)
+                                .await
+                        }
+                        None => client.start_practice(&course_id, kind, request_id).await,
+                    }
+                })
                 .await
                 .map_err(|_| {
                     color_eyre::eyre::eyre!(
@@ -421,6 +440,7 @@ impl App {
                     }
                     if let View::PracticePreparing { request_id, .. } = &self.view {
                         self.pending_admissions.remove(request_id);
+                        self.pending_selections.remove(request_id);
                     }
                     let next = reduce_start(std::mem::replace(&mut self.view, View::Loading), resp);
                     self.view = next;

@@ -338,6 +338,7 @@ private struct CourseDetailPane: View {
     @State private var showingPlacement = false
     @State private var showingMemory = false
     @State private var showingLive = false
+    @State private var showingLearningMap = false
 
     private var generation: SottoLoadingOperation? {
         model.classGenerationOperations[course.id]
@@ -409,11 +410,21 @@ private struct CourseDetailPane: View {
                     )
                 }
 
+                Button {
+                    showingLearningMap = true
+                } label: {
+                    Label("Learning map and level requirements", systemImage: "map")
+                        .frame(minHeight: 44)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(.bordered)
+
                 SourcedClassPanel(course: course, activeClassId: course.activeClassId)
 
                 TeachingApproachPanel(course: course)
 
                 CourseNotesEditor(course: course)
+                    .id(course.id)
 
                 CourseClassHistoryPanel(course: course)
             }
@@ -445,6 +456,9 @@ private struct CourseDetailPane: View {
         .sheet(isPresented: $showingPlacement) {
             PlacementView(nativeLang: course.nativeLang, targetLang: course.targetLang)
                 .environmentObject(model)
+        }
+        .sheet(isPresented: $showingLearningMap) {
+            LearningMapView(courseId: course.id).environmentObject(model)
         }
     }
 

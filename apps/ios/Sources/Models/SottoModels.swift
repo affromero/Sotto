@@ -209,6 +209,7 @@ struct SottoCourseNotesResponse: Decodable, Equatable {
     let imported: Int?
     let failed: Int?
     let materials: [SottoCourseMaterial]?
+    let nextCursor: String?
 }
 
 struct SottoCoursePedagogyResponse: Decodable, Equatable {
@@ -430,6 +431,9 @@ struct SottoSpeakingPrompt: Decodable, Identifiable, Equatable {
     let ipa: String?
     let referenceTtsUrl: String?
     let latestRecording: SottoSpeakingRecording?
+    let taskMode: String?
+    let assessmentScope: String?
+    var communicative: Bool { taskMode == "COMMUNICATIVE" }
 }
 
 struct SottoSpeakingRecording: Decodable, Equatable {

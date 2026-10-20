@@ -2,6 +2,18 @@
 /// inherent progenitor-backed method above.
 #[async_trait]
 impl Api for SottoClient {
+    async fn learning_map(&self, course_id: &str, level: Option<&str>) -> Result<types::LearningMapResponse> {
+        SottoClient::learning_map(self, course_id, level).await
+    }
+    async fn preview_learning_selection(&self, course_id: &str, selection: types::LearningSelectionRequest) -> Result<types::LearningSelectionPreview> {
+        SottoClient::preview_learning_selection(self, course_id, selection).await
+    }
+    async fn start_selected_practice(&self, course_id: &str, kind: types::PracticeKind, request_id: uuid::Uuid, selection: types::LearningSelectionRequest) -> Result<types::StartPracticeResponse> {
+        SottoClient::start_selected_practice(self, course_id, kind, request_id, selection).await
+    }
+    async fn advance_learning_level(&self, course_id: &str, request: types::AdvanceLearningLevelRequest) -> Result<types::LearningLevelCompletion> {
+        SottoClient::advance_learning_level(self, course_id, request).await
+    }
     async fn courses(&self) -> Result<types::CoursesListResponse> {
         SottoClient::courses(self).await
     }

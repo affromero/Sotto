@@ -55,6 +55,8 @@ struct SottoPracticeStart: Decodable, Identifiable, Equatable {
     let preparationStatus: String?
     let message: String?
     let canRecover: Bool?
+    let practiceLevel: SottoLearningLevel?
+    let learningSelection: SottoLearningSelectionPreview.Snapshot?
 
     func preservingContext(kind knownKind: String?, sessionId knownId: String) -> Self {
         var response = self
@@ -108,6 +110,7 @@ struct SottoPracticeStart: Decodable, Identifiable, Equatable {
         case speakingPrompts, writingPrompts, skillRequirements
         case learnerAnswers, writingDrafts, progressRevision, submissionResult
         case preparationStatus, message, canRecover
+        case practiceLevel, learningSelection
     }
 
     init(from decoder: Decoder) throws {
@@ -130,6 +133,8 @@ struct SottoPracticeStart: Decodable, Identifiable, Equatable {
         preparationStatus = try values.decodeIfPresent(String.self, forKey: .preparationStatus)
         message = try values.decodeIfPresent(String.self, forKey: .message)
         canRecover = try values.decodeIfPresent(Bool.self, forKey: .canRecover)
+        practiceLevel = try values.decodeIfPresent(SottoLearningLevel.self, forKey: .practiceLevel)
+        learningSelection = try values.decodeIfPresent(SottoLearningSelectionPreview.Snapshot.self, forKey: .learningSelection)
     }
 }
 

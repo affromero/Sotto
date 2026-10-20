@@ -92,6 +92,28 @@ pub(crate) enum NextClassOutcome {
 pub(crate) trait Api: Send + Sync {
     async fn courses(&self) -> Result<types::CoursesListResponse>;
     async fn practice_overview(&self, course_id: &str) -> Result<types::PracticeOverviewResponse>;
+    async fn learning_map(
+        &self,
+        course_id: &str,
+        level: Option<&str>,
+    ) -> Result<types::LearningMapResponse>;
+    async fn preview_learning_selection(
+        &self,
+        course_id: &str,
+        selection: types::LearningSelectionRequest,
+    ) -> Result<types::LearningSelectionPreview>;
+    async fn start_selected_practice(
+        &self,
+        course_id: &str,
+        kind: types::PracticeKind,
+        request_id: uuid::Uuid,
+        selection: types::LearningSelectionRequest,
+    ) -> Result<types::StartPracticeResponse>;
+    async fn advance_learning_level(
+        &self,
+        course_id: &str,
+        request: types::AdvanceLearningLevelRequest,
+    ) -> Result<types::LearningLevelCompletion>;
     async fn start_practice(
         &self,
         course_id: &str,
@@ -309,11 +331,17 @@ pub(crate) struct SottoClient {
 }
 
 include!("api/placement.rs");
+include!("api/learning_map.rs");
 include!("api/client.rs");
 include!("api/impl.rs");
+
+#[cfg(test)]
+#[path = "api/learning_map_fixtures.rs"]
+pub(crate) mod learning_map_fixtures;
 
 #[cfg(test)]
 mod tests {
     include!("api/tests.rs");
     include!("api/placement_tests.rs");
+    include!("api/learning_map_tests.rs");
 }

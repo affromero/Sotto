@@ -1,6 +1,7 @@
 /// Draw the active screen into `area`.
 pub(super) fn draw_view(frame: &mut Frame, area: Rect, view: &View, config: &Config, p: &Palette) {
     match view {
+        View::LearningMap { course, state } => draw_learning_map(frame, area, course, state, p),
         View::Loading => draw_loading(frame, area, config, p),
         View::Error { message, .. } => draw_error(frame, area, message, p),
         View::Courses { courses, cursor } => draw_courses(frame, area, courses, *cursor, p),
@@ -336,6 +337,7 @@ fn draw_course_home(
             "c class",
             "e exam",
             "m memory",
+            "l learning map",
             "s settings",
             "q back",
         ]

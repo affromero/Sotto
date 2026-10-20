@@ -94,7 +94,7 @@ private struct ClassSpeakingPromptCard: View {
             HStack(alignment: .top, spacing: 14) {
                 VStack(alignment: .leading, spacing: 6) {
                     SpeakingPromptTextBlock(
-                        label: "Say this",
+                        label: prompt.communicative ? "Your speaking task" : "Say this",
                         text: prompt.targetPhrase,
                         font: LearnerTextFonts.headline,
                         color: SottoTheme.ink,
@@ -109,7 +109,15 @@ private struct ClassSpeakingPromptCard: View {
                         emphasized: false,
                         onSelectionHelp: onSelectionHelp
                     )
-                    if let ipa = prompt.ipa, !ipa.isEmpty {
+                    if prompt.communicative {
+                        Text("Respond in your own words in the language you are learning. Do not read the instruction aloud.")
+                            .font(.caption).foregroundStyle(SottoTheme.muted)
+                    }
+                    if prompt.assessmentScope == "PRIVATE_SOURCE" {
+                        Text("Private source feedback. This practice does not count toward level mastery.")
+                            .font(.caption).foregroundStyle(SottoTheme.muted)
+                    }
+                    if !prompt.communicative, let ipa = prompt.ipa, !ipa.isEmpty {
                         Text(ipa)
                             .font(.caption.monospaced())
                             .foregroundStyle(SottoTheme.primary)
@@ -138,7 +146,7 @@ private struct ClassSpeakingPromptCard: View {
                 .buttonStyle(SottoPrimaryButtonStyle())
                 .disabled(!isRecording && !saved.canRecord)
 
-                if let reference = prompt.referenceTtsUrl {
+                if !prompt.communicative, let reference = prompt.referenceTtsUrl {
                     LearnerAudioPlayer(reference: reference)
                 }
             }
@@ -396,7 +404,7 @@ private struct SpeakingFeedbackBlock: View {
 
             if let rubric = feedback.rubricScores {
                 HStack(spacing: 6) {
-                    ForEach(["accuracy", "fluency", "completeness"], id: \.self) { key in
+                    ForEach(["communicative", "accuracy", "fluency", "completeness"], id: \.self) { key in
                         if let value = rubric[key] {
                             Text("\(key) \(percent(value))")
                                 .font(.caption.monospacedDigit())

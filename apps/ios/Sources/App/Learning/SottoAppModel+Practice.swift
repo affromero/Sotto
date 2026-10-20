@@ -64,9 +64,14 @@ extension SottoAppModel {
         return state
     }
 
-    func startPractice(courseId: String, kind: String) async {
+    func startPractice(courseId: String, kind: String, learningSelection: SottoLearningSelection? = nil) async {
         guard let client = makeClient() else { return }
-        let key = "\(client.serverURL.absoluteString)/\(client.profileId ?? "")/\(courseId)/\(kind)"
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let selectionKey: String
+        do { selectionKey = try learningSelection.map { String(decoding: try encoder.encode($0), as: UTF8.self) } ?? "" }
+        catch { report(error); return }
+        let key = "\(client.serverURL.absoluteString)/\(client.profileId ?? "")/\(courseId)/\(kind)/\(selectionKey)"
         let requestId = pendingPracticeAdmissions[key] ?? UUID()
         pendingPracticeAdmissions[key] = requestId
         isLoading = true
@@ -76,7 +81,7 @@ extension SottoAppModel {
         errorMessage = nil
         defer { isLoading = false; loadingOperation = nil }
         do {
-            let response = try await client.startPractice(courseId: courseId, kind: kind, requestId: requestId)
+            let response = try await client.startPractice(courseId: courseId, kind: kind, requestId: requestId, learningSelection: learningSelection)
             guard isCurrentLearningClient(client), courses.contains(where: { $0.id == courseId }) else { return }
             let admitted = response.preservingContext(kind: kind, sessionId: requestId.uuidString)
             practiceStart = admitted

@@ -21,6 +21,7 @@ final class SottoAPIRedirectPolicy: NSObject, URLSessionTaskDelegate {
         var safe = request
         safe.setValue(task.originalRequest?.value(forHTTPHeaderField: "Authorization"), forHTTPHeaderField: "Authorization")
         safe.setValue(task.originalRequest?.value(forHTTPHeaderField: "X-Sotto-Profile-Id"), forHTTPHeaderField: "X-Sotto-Profile-Id")
+        safe.setValue(task.originalRequest?.value(forHTTPHeaderField: "x-sotto-expected-profile-id"), forHTTPHeaderField: "x-sotto-expected-profile-id")
         safe.httpShouldHandleCookies = task.originalRequest?.httpShouldHandleCookies ?? false
         if !safe.httpShouldHandleCookies { safe.setValue(nil, forHTTPHeaderField: "Cookie") }
         completionHandler(safe)

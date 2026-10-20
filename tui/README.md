@@ -146,23 +146,30 @@ languages, answer a short assessment, and get a course at the right CEFR level.
 
 Press **`?`** on any screen for a help overlay listing that screen's keys.
 
-| Key | Action |
-| --- | --- |
-| `↑`/`↓` or `k`/`j` | move the selection |
-| `1`–`9` | pick an option directly |
-| `Enter` | confirm / answer / continue |
-| `PgUp`/`PgDn` | scroll a long prompt or list |
-| `Space` | play / pause (listening) |
-| `r` | record / stop (speaking) |
-| `a` | ask a question about the current audio (listening) |
-| `Ctrl-D` | submit (writing) |
-| `c` / `e` | next class / mock exam (course home) |
-| `m` / `s` | memory graph / settings (course home) |
-| `?` | toggle the key-help overlay |
-| `t` | toggle the theme picker (mode / palette / accent) |
-| `A` | toggle the account switcher |
-| `q` / `Esc` | back out a screen (or quit at the top) |
-| `Ctrl-C` | quit |
+In the learning map, `/` searches titles, structures, and examples. Enter opens
+details, Space selects a group or objective, and `p` previews the exact objectives
+and available practice formats. `[` and `]` browse bands, `c` returns to the current
+band, `v` shows requirements, and `r` refreshes progress. Future bands are read-only.
+Advancement uses the server's readiness decision and requires pressing `a` twice.
+
+| Key                | Action                                             |
+| ------------------ | -------------------------------------------------- |
+| `↑`/`↓` or `k`/`j` | move the selection                                 |
+| `1`–`9`            | pick an option directly                            |
+| `Enter`            | confirm / answer / continue                        |
+| `PgUp`/`PgDn`      | scroll a long prompt or list                       |
+| `Space`            | play / pause (listening)                           |
+| `r`                | record / stop (speaking)                           |
+| `a`                | ask a question about the current audio (listening) |
+| `Ctrl-D`           | submit (writing)                                   |
+| `c` / `e`          | next class / mock exam (course home)               |
+| `m` / `s`          | memory graph / settings (course home)              |
+| `l`                | learning map and requirements (course home)        |
+| `?`                | toggle the key-help overlay                        |
+| `t`                | toggle the theme picker (mode / palette / accent)  |
+| `A`                | toggle the account switcher                        |
+| `q` / `Esc`        | back out a screen (or quit at the top)             |
+| `Ctrl-C`           | quit                                               |
 
 ## Audio
 

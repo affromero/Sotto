@@ -2,6 +2,26 @@ use std::sync::Arc;
 
 use crate::api::{NextClassOutcome, SpeakingUploadResponse, WritingGradeResponse, types};
 
+#[derive(Clone, Debug)]
+pub(crate) enum LearningMapIntent {
+    Open,
+    Up,
+    Down,
+    Select,
+    Back,
+    Toggle,
+    Preview,
+    Refresh,
+    Level(i8),
+    Current,
+    Requirements,
+    Search,
+    Input(char),
+    Erase,
+    Advance,
+    Scroll(i16),
+}
+
 /// Actions are the reduced intents the [`crate::app::App`] event loop applies
 /// to its state. Terminal input is mapped to actions; async API calls dispatch
 /// a tokio task that sends a result action (e.g. [`Action::CoursesLoaded`])
@@ -69,6 +89,10 @@ pub(crate) enum Action {
     NotesCancel,
     /// Continue the course / advance to the next class.
     NextClass,
+    LearningMap(LearningMapIntent),
+    LearningMapLoaded(u64, ApiResult<types::LearningMapResponse>),
+    LearningSelectionPreviewed(u64, ApiResult<types::LearningSelectionPreview>),
+    LearningLevelAdvanced(u64, ApiResult<types::LearningLevelCompletion>),
 
     // --- Async API results, delivered by spawned tasks ---
     //

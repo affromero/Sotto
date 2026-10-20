@@ -671,20 +671,6 @@ final class SottoAppModel: ObservableObject {
         return try await client.fetchCourseTopics(courseId: courseId)
     }
 
-    func fetchCourseNotes(courseId: String) async throws -> SottoCourseNotesResponse {
-        guard let client = makeClient() else {
-            throw SottoAPIError.message("Pair this device before loading course notes.")
-        }
-        return try await client.fetchCourseNotes(courseId: courseId)
-    }
-
-    func saveCourseNotes(courseId: String, body: String) async throws -> SottoCourseNotesResponse {
-        guard let client = makeClient() else {
-            throw SottoAPIError.message("Pair this device before saving course notes.")
-        }
-        return try await client.saveCourseNotes(courseId: courseId, body: body)
-    }
-
     func updateCoursePedagogy(
         courseId: String,
         pedagogy: SottoPedagogyStyle

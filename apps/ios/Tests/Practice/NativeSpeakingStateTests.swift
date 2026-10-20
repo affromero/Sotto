@@ -3,6 +3,14 @@ import XCTest
 
 @MainActor
 final class NativeSpeakingStateTests: XCTestCase {
+    func testCommunicativeSourceTaskRetainsItsPrivateFeedbackScope() throws {
+        let prompt = try JSONDecoder().decode(SottoSpeakingPrompt.self, from: Data(#"{"id":"speaking","targetPhrase":"Explain why the appointment changed.","translation":"Use your own explanation.","taskMode":"COMMUNICATIVE","assessmentScope":"PRIVATE_SOURCE"}"#.utf8))
+        XCTAssertTrue(prompt.communicative)
+        XCTAssertEqual(prompt.assessmentScope, "PRIVATE_SOURCE")
+        XCTAssertNil(prompt.referenceTtsUrl)
+        let legacy = try JSONDecoder().decode(SottoSpeakingPrompt.self, from: Data(#"{"id":"legacy","targetPhrase":"Guten Tag","translation":"Good day"}"#.utf8))
+        XCTAssertFalse(legacy.communicative)
+    }
     private func recording(id: String, status: String, score: Double? = nil) -> SottoSpeakingRecording {
         SottoSpeakingRecording(id: id, status: status, transcript: "Hola", overallScore: score,
             rubricScores: nil, phonemeScores: nil, feedback: "Both words are present.")

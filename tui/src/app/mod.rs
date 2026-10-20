@@ -3,6 +3,8 @@ mod class;
 mod exam;
 #[path = "runtime/input.rs"]
 mod input;
+#[path = "runtime/learning_map.rs"]
+mod learning_map;
 #[path = "runtime/lifecycle.rs"]
 mod lifecycle;
 mod onboard;
@@ -88,6 +90,7 @@ pub(crate) struct App {
     /// class (or the done screen) can keep offering "next class".
     pending_course: Option<Course>,
     pending_admissions: std::collections::BTreeMap<uuid::Uuid, (String, types::PracticeKind)>,
+    pending_selections: std::collections::BTreeMap<uuid::Uuid, types::LearningSelectionRequest>,
     practice_cache: std::collections::BTreeMap<String, View>,
     progress_sequence: u64,
     placement_transport: placement_transport::PlacementTransport,
@@ -121,4 +124,5 @@ mod tests {
     include!("tests/ask_settings.rs");
     include!("tests/keymap.rs");
     include!("tests/render_accounts.rs");
+    include!("tests/learning_map.rs");
 }

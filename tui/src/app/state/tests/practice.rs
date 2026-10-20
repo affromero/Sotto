@@ -11,6 +11,17 @@
         assert!(review.prompt.contains("Wo ist Mia?"));
     }
 
+    #[test]
+    fn restored_lower_band_difficulty_does_not_change_the_course_band() {
+        let response = start_response(serde_json::json!({
+            "status":"ready_writing","sessionId":"lower-band","practiceLevel":"A1",
+            "prompts":[{"id":"w0","task":"Greet Ana.","guidance":null}]
+        }));
+        let View::Practice { course, requirements, .. } = reduce_start(course_home(), &response) else { panic!("practice expected") };
+        assert_eq!(course.current_level,"A2");
+        assert!(requirements.iter().any(|line| line == "Practice A1 · course A2"));
+    }
+
     fn item(id: &str, options: &[&str]) -> VocabItem {
         VocabItem {
             id: id.to_string(),

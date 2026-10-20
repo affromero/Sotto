@@ -10,6 +10,20 @@ struct StubApi;
 
 #[async_trait]
 impl Api for StubApi {
+    async fn learning_map(&self, course_id: &str, level: Option<&str>) -> Result<types::LearningMapResponse> {
+        Ok(serde_json::from_value(crate::api::learning_map_fixtures::map(course_id, level.unwrap_or("A2"), "A2", false))?)
+    }
+    async fn preview_learning_selection(&self, _course_id: &str, selection: types::LearningSelectionRequest) -> Result<types::LearningSelectionPreview> {
+        let level = serde_json::to_value(selection)?["level"].as_str().unwrap_or("A2").to_owned();
+        Ok(serde_json::from_value(crate::api::learning_map_fixtures::preview(&level))?)
+    }
+    async fn start_selected_practice(&self, _course_id: &str, _kind: types::PracticeKind, _request_id: uuid::Uuid, _selection: types::LearningSelectionRequest) -> Result<types::StartPracticeResponse> {
+        Err(color_eyre::eyre::eyre!("Selected admission acknowledgement lost"))
+    }
+    async fn advance_learning_level(&self, course_id: &str, request: types::AdvanceLearningLevelRequest) -> Result<types::LearningLevelCompletion> {
+        let request = serde_json::to_value(request)?;
+        Ok(serde_json::from_value(crate::api::learning_map_fixtures::completion(course_id, request["expectedLevel"].as_str().unwrap_or("A2")))?)
+    }
     async fn courses(&self) -> Result<types::CoursesListResponse> {
         Ok(types::CoursesListResponse { courses: vec![] })
     }
