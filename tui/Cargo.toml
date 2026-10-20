@@ -20,7 +20,6 @@ include = [
     "openapi.codegen.json",
     "README.md",
     "LICENSE",
-    "LICENSE-SCOPE.md",
     "THIRD_PARTY_NOTICES.md",
     "Cargo.toml",
 ]

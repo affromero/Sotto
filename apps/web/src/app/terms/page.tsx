@@ -25,7 +25,7 @@ export default function TermsPage() {
             <h2>1. Source-available software</h2>
             <p>
               Sotto&apos;s first-party application is provided under PolyForm Noncommercial 1.0.0,
-              subject to the component exceptions in LICENSE-SCOPE.md. The license permits its
+              subject to the component exceptions in THIRD_PARTY_NOTICES.md. The license permits its
               stated noncommercial, personal and institutional uses. Other commercial use requires
               separate permission from the rights holders. The repository license governs use,
               copying, modification and distribution.

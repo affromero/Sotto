@@ -36,11 +36,15 @@ describe('self-hosted language-learning surfaces', () => {
     }
   });
 
-  it('ships with the PolyForm Noncommercial license and component scope', () => {
+  it('ships with the PolyForm Noncommercial license and component notices', () => {
     const licenseSource = readFileSync(resolve(repoRoot, 'LICENSE'), 'utf8');
     expect(existsSync(resolve(repoRoot, 'LICENSE'))).toBe(true);
     expect(licenseSource).toContain('PolyForm Noncommercial License 1.0.0');
-    expect(existsSync(resolve(repoRoot, 'LICENSE-SCOPE.md'))).toBe(true);
+    const noticesSource = readFileSync(resolve(repoRoot, 'THIRD_PARTY_NOTICES.md'), 'utf8');
+    expect(noticesSource).toContain('services/local-tts/');
+    expect(noticesSource).toContain('AGPL-3.0-only');
+    expect(noticesSource).toContain('packages/groundcheck/');
+    expect(noticesSource).toContain('MIT License');
   });
 
   it('positions the product around private language-learning infrastructure', () => {
