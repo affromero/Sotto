@@ -457,7 +457,7 @@ See [all contributors](https://github.com/affromero/Sotto/graphs/contributors) a
 personal and institutional uses. Other commercial use requires separate
 permission from the rights holders. Sotto is source available.
 
-[LICENSE-SCOPE.md](LICENSE-SCOPE.md) identifies separately licensed components,
+[Component terms and notices](THIRD_PARTY_NOTICES.md) cover separately licensed components,
 including the AGPL speech service, MIT submodules and third-party dependencies.
 Earlier AGPL releases and their existing grants remain unchanged.
 
