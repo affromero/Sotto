@@ -27,6 +27,7 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
+source scripts/deploy/schema/rollout.sh
 
 COMPOSE_INFRA="docker-compose.infra.yml"
 COMPOSE_APP="docker-compose.app.yml"
@@ -181,6 +182,7 @@ chmod 600 "$COMPOSE_ENV_FILE"
 set -a
 source "$COMPOSE_ENV_FILE"
 set +a
+configure_schema_transition "$@"
 require_env NEXT_PUBLIC_APP_URL
 require_env_min_length BYOK_ENCRYPTION_KEY 32
 
@@ -391,12 +393,15 @@ for kind in WEB WORKERS; do
     fi
   fi
 done
-schema_hash_script='const fs=require("node:fs"),path=require("node:path"),crypto=require("node:crypto");const root="/app/apps/web/prisma",hash=crypto.createHash("sha256");function add(file){const full=path.join(root,file);if(fs.statSync(full).isDirectory()){for(const name of fs.readdirSync(full).sort())add(path.join(file,name));}else{hash.update(file);hash.update(fs.readFileSync(full));}}add("schema.prisma");if(fs.existsSync(path.join(root,"migrations")))add("migrations");console.log(hash.digest("hex"));'
+schema_hash_script=$(<scripts/deploy/images/schema.cjs)
 candidate_schema=$(docker run --rm --pull never --network none --entrypoint node "$SOTTO_WORKERS_IMAGE_REF" -e "$schema_hash_script")
+previous_schemas="$IMAGE_OVERRIDES/previous-schemas.txt"
+: > "$previous_schemas"
 while IFS= read -r previous_image; do
   [ -z "$previous_image" ] && continue
   previous_schema=$(docker run --rm --pull never --network none --entrypoint node "$previous_image" -e "$schema_hash_script")
-  if [ "$previous_schema" != "$candidate_schema" ]; then
+  printf '%s %s\n' "$previous_image" "$previous_schema" >> "$previous_schemas"
+  if [ "$previous_schema" != "$candidate_schema" ] && [ "$SCHEMA_TRANSITION" != true ]; then
     echo "ERROR: schema or migration assets differ. Use a separately reviewed migration procedure before deploying this release." >&2
     exit 1
   fi
@@ -417,7 +422,7 @@ if [ "$OLD_SLOT" != none ]; then
     printf '%s %s\n' "$previous_image" "$previous_contract" >> "$previous_contracts"
     if [ "$previous_contract" != "$candidate_contract" ]; then contracts_match=false; fi
   done < <(python3 -c 'import json,sys; print("\n".join(sorted({item["image"] for item in json.load(open(sys.argv[1]))["services"].values()})))' "$PREVIOUS_WORKER_IMAGES")
-  if [ "$contracts_match" != true ]; then
+  if [ "$contracts_match" != true ] || [ "$SCHEMA_TRANSITION" = true ]; then
     if [ -z "${SOTTO_COMPATIBILITY_REVIEW_FILE:-}" ] || [ -z "${SOTTO_COMPATIBILITY_EVIDENCE_FILE:-}" ]; then
       echo "ERROR: job, authority, storage or shared-runtime contracts differ. Use a separately reviewed compatibility procedure." >&2
       exit 1
@@ -428,20 +433,29 @@ if [ "$OLD_SLOT" != none ]; then
   fi
 fi
 
+if [ "$SCHEMA_TRANSITION" = true ]; then
+  [ "$COMPATIBILITY_REVIEWED" = true ] || { echo "ERROR: schema transition requires reviewed runtime continuity." >&2; exit 1; }
+  python3 scripts/deploy/compatibility-review.py schema-validate "$SCHEMA_REVIEW_FILE" "$SCHEMA_EVIDENCE_FILE" "$IMAGE_OVERRIDES/compatibility-review.json" "$candidate_schema" "$previous_schemas" > "$IMAGE_OVERRIDES/schema-review.json"
+  chmod 600 "$IMAGE_OVERRIDES/schema-review.json"
+fi
+
 DEPLOY_STATE_DIR="$DEPLOY_STATE_ROOT/$SOTTO_RELEASE_SHA-$RETENTION_ATTEMPT_KEY"
 mkdir -p "$DEPLOY_STATE_DIR"
 chmod 700 "$DEPLOY_STATE_DIR"
 if [ "$COMPATIBILITY_REVIEWED" = true ]; then
-  python3 - "$IMAGE_OVERRIDES/compatibility-review.json" "$DEPLOY_STATE_DIR/compatibility-review.json" <<'REVIEW_RECORD'
+  review_records=("$IMAGE_OVERRIDES/compatibility-review.json" "$DEPLOY_STATE_DIR/compatibility-review.json")
+  if [ "$SCHEMA_TRANSITION" = true ]; then review_records+=("$IMAGE_OVERRIDES/schema-review.json" "$DEPLOY_STATE_DIR/schema-review.json"); fi
+  python3 - "${review_records[@]}" <<'REVIEW_RECORD'
 import os, pathlib, sys
-with open(sys.argv[2], 'xb') as stream:
-    os.fchmod(stream.fileno(), 0o600)
-    stream.write(pathlib.Path(sys.argv[1]).read_bytes())
-    stream.flush()
-    os.fsync(stream.fileno())
-directory = os.open(os.path.dirname(sys.argv[2]), os.O_RDONLY)
-os.fsync(directory)
-os.close(directory)
+for index in range(1, len(sys.argv), 2):
+    with open(sys.argv[index + 1], 'xb') as stream:
+        os.fchmod(stream.fileno(), 0o600)
+        stream.write(pathlib.Path(sys.argv[index]).read_bytes())
+        stream.flush()
+        os.fsync(stream.fileno())
+    directory = os.open(os.path.dirname(sys.argv[index + 1]), os.O_RDONLY)
+    os.fsync(directory)
+    os.close(directory)
 REVIEW_RECORD
   SOTTO_PROVIDER_ACTIVATION_DIR="$DEPLOY_STATE_DIR/provider-activation"
   provider_activation_mode=$(python3 scripts/deploy/compatibility-review.py activation-mode "$IMAGE_OVERRIDES/compatibility-review.json")
@@ -459,56 +473,7 @@ QUEUE_HELPER=$(<scripts/deploy/queue-lifecycle.cjs)
 QUEUE_HELPER+=$'\nmodule.exports.main().catch(() => { console.error("Deployment queue lifecycle failed. Preserve the original manifest and inspect existing state."); process.exitCode = 1; });'
 QUEUES_PAUSED=false
 
-queue_control() {
-  local command="$1" container="" ids payload raw report
-  for service in workers-light workers-pipeline workers-heavy; do
-    ids=$(docker ps -q --no-trunc --filter "label=com.docker.compose.project=$SOTTO_STACK" --filter "label=com.docker.compose.service=$service")
-    if [ -n "$ids" ]; then
-      if [ "$(printf '%s\n' "$ids" | wc -l | tr -d ' ')" != 1 ]; then
-        echo "ERROR: ambiguous deployment control worker." >&2
-        return 1
-      fi
-      container="$ids"
-      break
-    fi
-  done
-  if [ -z "$container" ]; then echo "ERROR: no running worker can supervise the queue lifecycle." >&2; return 1; fi
-  payload=$(python3 - "$command" "$QUEUE_MANIFEST" <<'QUEUE_INPUT'
-import json, pathlib, sys
-command, path = sys.argv[1:]
-value = {'command': command}
-if command not in ('snapshot', 'established', 'activation-ready'):
-    value['manifest'] = json.loads(pathlib.Path(path).read_text())
-print(json.dumps(value))
-QUEUE_INPUT
-  ) || return 1
-  raw=$(mktemp "$DEPLOY_STATE_DIR/queue-$command.log.XXXXXX")
-  printf '%s\n' "$payload" | docker exec -i -w /app/apps/web "$container" node --import tsx -e "$QUEUE_HELPER" > "$raw" || return 1
-  report=$(python3 - "$raw" <<'QUEUE_OUTPUT'
-import json, pathlib, sys
-lines = [line.removeprefix('SOTTO_DEPLOY_QUEUE=') for line in pathlib.Path(sys.argv[1]).read_text().splitlines() if line.startswith('SOTTO_DEPLOY_QUEUE=')]
-assert len(lines) == 1, 'Missing queue lifecycle report'
-print(json.dumps(json.loads(lines[0])))
-QUEUE_OUTPUT
-  ) || return 1
-  if [ "$command" = snapshot ]; then
-    printf '%s\n' "$report" | python3 -c 'import os,sys; path=sys.argv[1]; stream=open(path,"x"); stream.write(sys.stdin.read()); stream.flush(); os.fsync(stream.fileno()); stream.close(); directory=os.open(os.path.dirname(path),os.O_RDONLY); os.fsync(directory); os.close(directory)' "$QUEUE_MANIFEST" || return 1
-  fi
-  printf '%s\n' "$report"
-}
-
-wait_for_worker_drain() {
-  local deadline=$((SECONDS + 1200)) report
-  while true; do
-    report=$(queue_control drained) || return 1
-    if printf '%s\n' "$report" | python3 -c 'import json,sys; sys.exit(0 if json.load(sys.stdin)["drained"] else 1)'; then return 0; fi
-    if [ "$SECONDS" -ge "$deadline" ]; then
-      echo "ERROR: worker drain did not settle. Current web remains serving; no forced termination." >&2
-      return 1
-    fi
-    sleep 2
-  done
-}
+source scripts/deploy/runtime/queues.sh
 
 record_unresolved() {
   python3 scripts/deploy/compatibility-review.py marker "$UNRESOLVED_DEPLOYMENT" "$DEPLOY_STATE_DIR" "$IMAGE_OVERRIDES" "$SOTTO_STACK" "$1"
@@ -516,7 +481,7 @@ record_unresolved() {
 
 hold_unresolved() {
   record_unresolved unresolved || echo "ERROR: recovery marker identity is unconfirmed; retain the deployment lock." >&2
-  echo "Unresolved deployment. Keeping current HTTP service and deployment lock; inspect $UNRESOLVED_DEPLOYMENT" >&2
+  echo "Unresolved deployment. Retaining deployment lock and recovery evidence; inspect $UNRESOLVED_DEPLOYMENT" >&2
   while true; do /bin/sleep 30; done
 }
 
@@ -546,6 +511,10 @@ finish_deployment() {
   local status=$?
   trap - EXIT
   set +e
+  if [ "$status" -ne 0 ] && [ "$SCHEMA_FENCED" = true ]; then
+    retain_schema_fence
+    hold_unresolved
+  fi
   if [ "$status" -ne 0 ] && [ "$COMPATIBILITY_CUTOVER" = true ]; then
     echo "Compatibility cutover is irreversible. Preserving compatible services and recovery evidence." >&2
     queue_control pause > "$DEPLOY_STATE_DIR/compatibility-repause.json" || echo "ERROR: delivery fencing is unconfirmed; preserve active execution ownership." >&2
@@ -759,29 +728,11 @@ export WEB_PORT=$NEW_WEB_PORT
 
 # --- Database migrations ---
 
-echo "=== Backing up the application database ==="
-database_url="${DIRECT_DATABASE_URL:-$DATABASE_URL}"
-database_bytes=$(printf '%s\n' "$database_url" | python3 scripts/deploy/database-command.py size)
-if [[ ! "$database_bytes" =~ ^[0-9]+$ ]] || [ "$database_bytes" -gt "$SOTTO_BACKUP_BYTES" ]; then
-  echo "ERROR: database size exceeds the measured backup allowance." >&2
-  exit 1
-fi
-python3 "$PRODUCTION_CAPACITY_CHECKER" before-switch "${backup_capacity[@]}"
-backup_file="$SOTTO_BACKUP_DIR/${SOTTO_RELEASE_SHA}-${RETENTION_ATTEMPT_KEY}.dump"
-umask 077
-printf '%s\n' "$database_url" | python3 scripts/deploy/database-command.py dump > "$backup_file.partial"
-test -s "$backup_file.partial"
-docker exec -i sotto-prod-postgres pg_restore --file=/dev/null < "$backup_file.partial"
-mv "$backup_file.partial" "$backup_file"
-sha256sum "$backup_file" > "$backup_file.sha256"
-python3 "$PRODUCTION_CAPACITY_CHECKER" before-switch
+if [ "$SCHEMA_TRANSITION" = true ]; then prepare_schema_transition; else backup_database; fi
 
 echo ""
 if [ "$OLD_SLOT" = none ]; then
-echo "=== Running database migrations ==="
-docker compose -f "$COMPOSE_WORKERS" -f "$WORKER_IMAGES" -p "$SOTTO_STACK" run --rm --no-deps --pull never \
-  -e DATABASE_URL="${DIRECT_DATABASE_URL:-$DATABASE_URL}" \
-  workers-heavy npx --no-install prisma migrate deploy --config=/app/prisma.config.ts
+apply_migrations
 docker compose -f "$COMPOSE_APP" -f "$APP_IMAGES" -p "${SOTTO_STACK}-${NEW_SLOT}" run --rm --no-deps --pull never \
   -e DATABASE_URL="${DIRECT_DATABASE_URL:-$DATABASE_URL}" \
   web node dist/access.cjs initialize
@@ -792,7 +743,7 @@ fi
 # --- Start new slot ---
 
 # Pin dual-slot routing to the current service before starting a candidate.
-if [ "$OLD_SLOT" != none ]; then
+if [ "$OLD_SLOT" != none ] && [ "$SCHEMA_TRANSITION" != true ]; then
   if [ "$OLD_SLOT" = blue ]; then old_web_port=$WEB_PORT_BLUE; else old_web_port=$WEB_PORT_GREEN; fi
   ( NEW_WEB_PORT=$old_web_port; render_caddy_config "$APP_DOMAIN" "$WWW_DOMAIN" ) > "$IMAGE_OVERRIDES/caddy.current"
   CADDY_CHANGED=true
@@ -863,7 +814,10 @@ BASE_URL="http://127.0.0.1:${NEW_WEB_PORT}" bash scripts/smoke-prod.sh
 echo ""
 echo "=== Restarting workers ==="
 echo "Worker presets: heavy=${WORKER_PRESET_HEAVY:-full} pipeline=${WORKER_PRESET_PIPELINE:-full} light=${WORKER_PRESET_LIGHT:-full}"
-if [ "$OLD_SLOT" != none ]; then
+if [ "$SCHEMA_TRANSITION" = true ]; then
+  WORKERS_CHANGED=true
+  docker compose -f "$COMPOSE_WORKERS" -f "$WORKER_IMAGES" -p "$SOTTO_STACK" up -d --no-deps --no-build --pull never workers-heavy workers-pipeline workers-light
+elif [ "$OLD_SLOT" != none ]; then
   echo "=== Draining workers while current web remains serving ==="
   queue_control snapshot
   if [ "$COMPATIBILITY_REVIEWED" = true ]; then record_unresolved compatibility-preparation; fi
@@ -891,9 +845,13 @@ for service in workers-heavy workers-pipeline workers-light; do
 done
 
 if [ "$PRESERVE_EXISTING_PROVIDER" = true ]; then
-  python3 scripts/deploy/compatibility-review.py continuity-overlap "$IMAGE_OVERRIDES/compatibility-review.json" "$SOTTO_PROVIDER_ACTIVATION_DIR" "$OLD_SLOT" "$NEW_SLOT"
+  if [ "$SCHEMA_TRANSITION" = true ]; then
+    python3 scripts/deploy/compatibility-review.py continuity-final "$IMAGE_OVERRIDES/compatibility-review.json" "$SOTTO_PROVIDER_ACTIVATION_DIR" "$NEW_SLOT"
+  else
+    python3 scripts/deploy/compatibility-review.py continuity-overlap "$IMAGE_OVERRIDES/compatibility-review.json" "$SOTTO_PROVIDER_ACTIVATION_DIR" "$OLD_SLOT" "$NEW_SLOT"
+  fi
 fi
-if [ "$COMPATIBILITY_REVIEWED" = true ]; then
+if [ "$COMPATIBILITY_REVIEWED" = true ] && [ "$COMPATIBILITY_CUTOVER" != true ]; then
   record_unresolved compatibility-cutover
   COMPATIBILITY_CUTOVER=true
 fi
@@ -939,9 +897,11 @@ if [ "$OLD_SLOT" != "none" ]; then
     export WEB_PORT=$WEB_PORT_GREEN
   fi
 
-  OLD_SLOT_STOPPED=true
-  previous_web_container=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["x-captured-container"])' "$PREVIOUS_APP_IMAGES")
-  python3 scripts/deploy/stop-workers.py stop-web "$previous_web_container" || hold_unresolved
+  if [ "$OLD_SLOT_STOPPED" != true ]; then
+    OLD_SLOT_STOPPED=true
+    previous_web_container=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["x-captured-container"])' "$PREVIOUS_APP_IMAGES")
+    python3 scripts/deploy/stop-workers.py stop-web "$previous_web_container" || hold_unresolved
+  fi
   docker compose -f "$COMPOSE_APP" -f "$APP_IMAGES" -p "${SOTTO_STACK}-${OLD_SLOT}" down --timeout 10
 fi
 
@@ -970,6 +930,7 @@ if [ "$COMPATIBILITY_CUTOVER" = true ]; then
   fi
   python3 scripts/deploy/compatibility-review.py clear "$UNRESOLVED_DEPLOYMENT" "$DEPLOY_STATE_DIR" compatibility-cutover
 fi
+SCHEMA_FENCED=false
 echo "Images and build cache retained. Run host maintenance separately with rollback protection."
 
 echo ""
