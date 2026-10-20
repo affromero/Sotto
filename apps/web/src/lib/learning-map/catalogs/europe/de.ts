@@ -125,7 +125,7 @@ export const germanCatalog = buildLanguageCatalog({
       'Sequence past events using nachdem',
       'Use nachdem to show the earlier past event and choose tenses that make the sequence clear.',
       'Nachdem ich gegessen hatte, ging ich spazieren.',
-      ['nachdem', 'plusquamperfekt'],
+      ['nachdem'],
     ],
     [
       'B1',
@@ -151,7 +151,7 @@ export const germanCatalog = buildLanguageCatalog({
       'Form the present passive',
       'Use present werden plus a past participle and express the agent with von plus dative where needed.',
       'Der Brief wird von meiner Kollegin geschrieben.',
-      ['passiv-praesens', 'passive-voice'],
+      ['passiv-praesens'],
     ],
     [
       'B1',
@@ -185,7 +185,7 @@ export const germanCatalog = buildLanguageCatalog({
       'Use würde for hypothetical situations',
       'Express a hypothetical situation with würde plus infinitive and an appropriate condition.',
       'Wenn ich mehr Zeit hätte, würde ich reisen.',
-      ['konjunktiv-ii', 'würde'],
+      ['würde'],
     ],
     [
       'B2',

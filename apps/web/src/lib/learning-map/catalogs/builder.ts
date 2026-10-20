@@ -187,6 +187,8 @@ const groupKeys: Readonly<Record<string, string>> = {
   Verbs: 'verbs',
   'Word order': 'word-order',
   'Nouns and cases': 'nouns-cases',
+  'Nouns and agreement': 'nouns-agreement',
+  'Nouns and classifiers': 'nouns-classifiers',
   Negation: 'negation',
   'Time relationships': 'time',
   Pronouns: 'pronouns',
@@ -275,6 +277,15 @@ export function buildLanguageCatalog(input: LanguageRows): LearningCatalog {
       criterionVersion: 1,
       policyVersion: 1,
       skills: ['GRAMMAR', 'WRITING'],
+      skillCriteria: {
+        GRAMMAR:
+          `In ${input.title}, choose or construct the named structure: "${title}". ` + assessment,
+        WRITING:
+          `Write an original ${input.title} response demonstrating "${title}". ` +
+          `${assessment} ` +
+          'Use the structure independently to express the intended meaning, ' +
+          'with suitable form and word order, without copying a supplied model.',
+      },
       assessment,
       examples: [example],
       grammarKeys: [key, ...aliases],
@@ -302,6 +313,26 @@ export function buildLanguageCatalog(input: LanguageRows): LearningCatalog {
         criterionVersion: 1,
         policyVersion: 1,
         skills: ['READING', 'LISTENING', 'SPEAKING', 'WRITING'],
+        skillCriteria: {
+          READING:
+            `Read a ${input.title} written exchange about "${title}". ` +
+            "Identify the participants' intent and relevant constraints, " +
+            'and choose or explain an appropriate response based on that exchange. ' +
+            `Recognize how the participants meet these goal criteria: ${assessment}`,
+          LISTENING:
+            `Listen to the exact supplied ${input.title} spoken exchange about "${title}". ` +
+            "Identify the speakers' intent and relevant constraints, " +
+            'and choose or explain an appropriate response based on what was heard. ' +
+            `Recognize how the speakers meet these goal criteria: ${assessment}`,
+          WRITING:
+            `Independently write a ${input.title} response that achieves "${title}". ` +
+            "Address the situation's constraints and give the needed information " +
+            `in original wording without copying a supplied model. Goal criteria: ${assessment}`,
+          SPEAKING:
+            `Independently respond aloud in ${input.title} to a situational prompt for "${title}". ` +
+            "Achieve the communicative goal and address the listener's constraints " +
+            `using original wording without reading a supplied target phrase. Goal criteria: ${assessment}`,
+        },
         assessment,
         examples: [examples[taskIndex]!],
         grammarKeys: [],

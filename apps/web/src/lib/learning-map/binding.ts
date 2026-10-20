@@ -1,13 +1,12 @@
 import {
   skillRequirementsSchema,
-  learningCatalogSchema,
   type SkillRequirements,
   type CefrLevel,
   type LearningSkill,
 } from '@sotto/shared';
 import type { Prisma } from '@/generated/prisma/client';
 import { getLanguageCatalog } from './catalogs';
-import { publishLearningCatalog } from './catalog';
+import { publishLearningCatalog, readPublishedLearningCatalog } from './catalog';
 
 export interface LearningCourse {
   id: string;
@@ -67,13 +66,24 @@ export async function ensureLearningLevelBinding(
 }
 
 export function readBoundCatalog(binding: {
-  revision: { targetLang: string; definition: unknown };
+  revision: { targetLang: string; definition: unknown; version: number; catalogHash: string };
   coverage: unknown;
   level: CefrLevel;
+  policyVersion: number;
 }) {
-  const catalog = learningCatalogSchema.parse(binding.revision.definition);
+  const catalog = readPublishedLearningCatalog(binding.revision);
   const coverage = skillRequirementsSchema.parse(binding.coverage);
-  if (catalog.targetLang !== coverage.targetLang || coverage.level !== binding.level)
+  if (
+    catalog.targetLang !== coverage.targetLang ||
+    coverage.level !== binding.level ||
+    binding.policyVersion !== 1 ||
+    catalog.nodes.some(
+      (node) =>
+        node.kind === 'OBJECTIVE' &&
+        node.level === binding.level &&
+        node.policyVersion !== binding.policyVersion
+    )
+  )
     throw new Error('A pinned learning requirement set has inconsistent language or difficulty.');
   return { catalog, coverage, exemptSkills: learningCoverageExemptions(coverage) };
 }

@@ -8,11 +8,16 @@ import {
   type SharedTestInstance,
 } from '../../helpers/setup/shared-instance';
 import { ensureLearningLevelBinding } from '@/lib/learning-map/binding';
-import { publishLearningCatalog } from '@/lib/learning-map/catalog';
+import {
+  publishLearningCatalog,
+  readPublishedLearningCatalog,
+  learningCatalogHash,
+} from '@/lib/learning-map/catalog';
 import { getLanguageCatalog } from '@/lib/learning-map/catalogs';
 import { recordObjectiveObservation } from '@/lib/learning-map/evidence/record';
 import { advanceLearningLevel } from '@/lib/learning-map/progression/advance';
 import { readLearningMap } from '@/lib/learning-map/read';
+import { publishCurriculumLearningMappings } from '@/lib/learning-map/lessons';
 
 const boundary = vi.hoisted(() => ({ database: null as PrismaClient | null }));
 vi.mock('@/lib/prisma', async () => {
@@ -87,7 +92,7 @@ suite('Versioned learning requirements against PostgreSQL', () => {
       responseIdentity: 'answer:one',
       quality: 1,
       evidence: {
-        assessment: objective.assessment,
+        assessment: objective.skillCriteria[objective.skills[0]!]!,
         rationale: 'The assessed response satisfies the criterion.',
       },
     };
@@ -100,6 +105,9 @@ suite('Versioned learning requirements against PostgreSQL', () => {
   const execution = () => ({ userId, authorize: async () => ({ userId }) });
 
   it('keeps placement and lower-level browsing separate from mastery', async () => {
+    expect(learningCatalogHash(readPublishedLearningCatalog(binding.revision))).toBe(
+      binding.revision.catalogHash
+    );
     const map = await readLearningMap(instance.database, course);
     expect(map.readiness.ready).toBe(false);
     expect(
@@ -143,6 +151,46 @@ suite('Versioned learning requirements against PostgreSQL', () => {
       )
     ).rejects.toThrow('does not match');
   });
+  it('stores curriculum teaching links separately from learner evidence', async () => {
+    const lesson = await instance.database.lesson.create({
+      data: {
+        curriculumId: course.curriculumId,
+        slug: randomUUID(),
+        level: 'A2',
+        order: 1,
+        title: 'Meeting arrangements',
+        objective: 'Arrange a meeting.',
+        grammarPoints: ['temporal-als-wenn'],
+        vocabThemes: [],
+        targetVocab: [],
+      },
+    });
+    const result = await instance.database.$transaction((database) =>
+      publishCurriculumLearningMappings(database, course.curriculumId, 'de', [
+        {
+          slug: lesson.slug,
+          level: 'A2',
+          grammarPoints: ['temporal-als-wenn'],
+          learningObjectiveIds: ['de.s.plans'],
+        },
+      ])
+    );
+    expect(result).toMatchObject({ mapped: 2, unresolved: 0 });
+    expect(
+      (
+        await instance.database.lessonLearningObjective.findMany({
+          where: { lessonId: lesson.id },
+          orderBy: { objectiveId: 'asc' },
+        })
+      ).map((item) => item.objectiveId)
+    ).toEqual(['de.g.als-wenn-past', 'de.s.plans']);
+    expect(
+      await instance.database.learnerObjectiveState.count({ where: { courseId: course.id } })
+    ).toBe(0);
+    expect(
+      await instance.database.learningObservation.count({ where: { courseId: course.id } })
+    ).toBe(0);
+  });
   it('prevents criterion meaning from being resurrected after an intervening release', async () => {
     const objective = evidence().objectiveId;
     const revision2 = {
@@ -165,6 +213,31 @@ suite('Versioned learning requirements against PostgreSQL', () => {
     await expect(
       instance.database.$transaction((database) => publishLearningCatalog(database, revision3))
     ).rejects.toThrow('new criterion revision');
+  });
+  it('serializes concurrent releases that assign different meanings to one new criterion revision', async () => {
+    const original = getLanguageCatalog('ja');
+    await instance.database.$transaction((database) => publishLearningCatalog(database, original));
+    const releases = [2, 3].map((version) => {
+      const candidate = structuredClone(original);
+      candidate.version = version;
+      const objective = candidate.nodes.find((node) => node.kind === 'OBJECTIVE');
+      if (objective?.kind !== 'OBJECTIVE') throw new Error('Missing test criterion');
+      objective.criterionVersion = 2;
+      objective.skillCriteria.WRITING = `Independently demonstrate the meaning specified by release ${version}.`;
+      return candidate;
+    });
+    const outcomes = await Promise.allSettled(
+      releases.map((candidate) =>
+        instance.database.$transaction((database) => publishLearningCatalog(database, candidate))
+      )
+    );
+    expect(outcomes.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    expect(outcomes.filter((result) => result.status === 'rejected')).toHaveLength(1);
+    expect(
+      await instance.database.learningMapRevision.count({
+        where: { targetLang: 'ja', version: { gt: 1 } },
+      })
+    ).toBe(1);
   });
   it('restores completed C2 maintenance without duplicating completion or accepting stale requirements', async () => {
     course = await instance.database.course.update({
@@ -234,7 +307,7 @@ suite('Versioned learning requirements against PostgreSQL', () => {
                 taskId: `${objective.id}:${skill}:${task}`,
                 responseIdentity: `response:${task}`,
                 evidence: {
-                  assessment: objective.assessment,
+                  assessment: objective.skillCriteria[skill]!,
                   rationale: 'The assessed response satisfies the criterion.',
                 },
               });

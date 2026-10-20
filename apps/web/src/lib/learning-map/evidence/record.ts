@@ -54,7 +54,7 @@ export async function recordObjectiveObservation(
     objective.criterionVersion !== observation.criterionVersion ||
     !objective.skills.includes(observation.skill) ||
     exemptSkills.includes(observation.skill) ||
-    objective.assessment !== observation.evidence.assessment
+    objective.skillCriteria[observation.skill] !== observation.evidence.assessment
   )
     throw new Error('The assessment does not match this pinned objective criterion.');
   const criterion = {

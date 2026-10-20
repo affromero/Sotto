@@ -19,6 +19,9 @@ requirements. `evidence/` deduplicates qualified task observations and rebuilds
 bounded session projections with the canonical mastery model and SRS scheduler.
 `progression/` records replayable level-completion receipts under a course lock.
 Read projections never create requirements or manufacture assessment evidence.
+`learning-map/lessons.ts` records explicit teaching scope and exact reviewed keys;
+ambiguous labels and unavailable language maps remain unresolved. Catalog
+publication serializes by target language and verifies canonical content hashes.
 
 `providers/tts/fish/fish.provider.ts` uses Fish Audio's captured JSON transport and
 verified official voice pool. Fish defaults to `s2.1-pro-free`; explicit paid

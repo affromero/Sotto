@@ -7,6 +7,42 @@ export const learningLevels = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'] as const;
 export const learningLevelSchema = z.enum(learningLevels);
 export const learningSkillSchema = z.enum(learningSkills);
 export const learningBranchSchema = z.enum(['GRAMMAR', 'SITUATIONS']);
+export const learningSkillCriteriaSchema = z.partialRecord(
+  learningSkillSchema,
+  z.string().trim().min(1).max(2000)
+);
+
+/** Rubrics describe exactly the skills that this objective or snapshot declares. */
+export function validateLearningSkillCriteria(
+  objective: {
+    skills: readonly LearningSkill[];
+    skillCriteria: Partial<Record<LearningSkill, string>>;
+  },
+  context: z.RefinementCtx
+): void {
+  if (new Set(objective.skills).size !== objective.skills.length)
+    context.addIssue({
+      code: 'custom',
+      path: ['skills'],
+      message: 'Skills must be unique.',
+    });
+  for (const skill of learningSkills) {
+    const declared = objective.skills.includes(skill);
+    const rubric = objective.skillCriteria[skill];
+    if (declared && !rubric)
+      context.addIssue({
+        code: 'custom',
+        path: ['skillCriteria', skill],
+        message: 'Every declared skill needs an assessment rubric.',
+      });
+    if (!declared && rubric !== undefined)
+      context.addIssue({
+        code: 'custom',
+        path: ['skillCriteria', skill],
+        message: 'Assessment rubrics must belong to declared skills.',
+      });
+  }
+}
 
 const key = z
   .string()
@@ -31,12 +67,14 @@ export const learningObjectiveSchema = nodeBase
     criterionVersion: z.number().int().positive(),
     policyVersion: z.literal(1),
     skills: z.array(learningSkillSchema).min(1).max(5),
+    skillCriteria: learningSkillCriteriaSchema,
     assessment: z.string().trim().min(10).max(2000),
     examples: z.array(z.string().trim().min(1).max(1000)).min(1).max(8),
     grammarKeys: z.array(z.string().trim().min(1).max(120)).max(20),
     vocabulary: z.array(z.object({ lemma: z.string().min(1), gloss: z.string() }).strict()).max(20),
   })
-  .strict();
+  .strict()
+  .superRefine(validateLearningSkillCriteria);
 export const learningNodeSchema = z.discriminatedUnion('kind', [
   learningGroupSchema,
   learningObjectiveSchema,
@@ -103,12 +141,6 @@ export const learningCatalogSchema = z
           code: 'custom',
           path: ['nodes', index],
           message: 'Learning groups must have children.',
-        });
-      if (node.kind === 'OBJECTIVE' && new Set(node.skills).size !== node.skills.length)
-        context.addIssue({
-          code: 'custom',
-          path: ['nodes', index, 'skills'],
-          message: 'Skills must be unique.',
         });
     }
     for (const level of learningLevels) {

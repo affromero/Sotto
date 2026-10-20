@@ -86,6 +86,9 @@ catalog and legitimate skill coverage; LearningLevelCompletion records earned tr
 LearningObservation contains deduplicated criterion-bound assessment evidence, and
 LearnerObjectiveState is its rebuildable per-skill projection. LessonLearningObjective
 links curricula to precise objectives. Private uploads never enter shared catalog content.
+The curriculum seeder publishes lesson links in its curriculum transaction.
+Reviewed seed associations are version-bound teaching metadata and confer no
+learner mastery. Unreviewed and partial scopes remain explicitly unresolved.
 
 `CourseMaterial` retains an immutable original document reference, a bounded text
 extract and profile ownership. Its optional course association lets onboarding

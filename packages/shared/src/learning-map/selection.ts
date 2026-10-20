@@ -2,6 +2,8 @@ import { z } from 'zod';
 import {
   learningLevelSchema,
   learningSkillSchema,
+  learningSkillCriteriaSchema,
+  validateLearningSkillCriteria,
   type LearningCatalog,
   type LearningObjective,
   learningDescendants,
@@ -37,11 +39,13 @@ export const learningSelectionSnapshotSchema = z
             level: learningLevelSchema,
             assessment: z.string().min(1),
             examples: z.array(z.string().min(1)).min(1),
-            skills: z.array(learningSkillSchema).min(1),
+            skills: z.array(learningSkillSchema).min(1).max(5),
+            skillCriteria: learningSkillCriteriaSchema,
             grammarKeys: z.array(z.string()),
             vocabulary: z.array(z.object({ lemma: z.string(), gloss: z.string() }).strict()),
           })
           .strict()
+          .superRefine(validateLearningSkillCriteria)
       )
       .min(1)
       .max(4),

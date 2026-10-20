@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   learningCatalogSchema,
+  learningObjectiveSchema,
   type LearningCatalog,
   type LearningObjective,
 } from '../src/learning-map/catalog';
@@ -9,7 +10,10 @@ import {
   objectiveProgress,
   type ObjectiveEvidenceState,
 } from '../src/learning-map/progress';
-import { resolveLearningSelection } from '../src/learning-map/selection';
+import {
+  learningSelectionSnapshotSchema,
+  resolveLearningSelection,
+} from '../src/learning-map/selection';
 
 function catalog(): LearningCatalog {
   const nodes: LearningCatalog['nodes'] = [
@@ -47,6 +51,14 @@ function catalog(): LearningCatalog {
         criterionVersion: 1,
         policyVersion: 1,
         skills: branch === 'GRAMMAR' ? ['GRAMMAR'] : ['WRITING', 'SPEAKING'],
+        skillCriteria:
+          branch === 'GRAMMAR'
+            ? { GRAMMAR: 'Choose or construct the selected German structure accurately.' }
+            : {
+                WRITING: 'Independently write a German response that meets the situation goal.',
+                SPEAKING:
+                  'Independently respond in German without reading a supplied target phrase.',
+              },
         assessment: 'Demonstrate the selected construction in a suitable task.',
         examples: ['Ein Beispiel.'],
         grammarKeys: [],
@@ -83,6 +95,70 @@ function evidence(
 const now = new Date('2026-10-20T12:00:00.000Z');
 
 describe('learning maps', () => {
+  it('requires exactly one nonempty rubric for each declared objective skill', () => {
+    const objective = catalog().nodes.find(
+      (node): node is LearningObjective => node.kind === 'OBJECTIVE' && node.branch === 'GRAMMAR'
+    )!;
+    expect(learningObjectiveSchema.safeParse(objective).success).toBe(true);
+    for (const skillCriteria of [
+      {},
+      { GRAMMAR: '   ' },
+      { GRAMMAR: 'x'.repeat(2001) },
+      { ...objective.skillCriteria, SPEAKING: 'Speak about the topic.' },
+      { ...objective.skillCriteria, TRANSLATION: 'Translate the phrase.' },
+    ])
+      expect(learningObjectiveSchema.safeParse({ ...objective, skillCriteria }).success).toBe(
+        false
+      );
+  });
+
+  it('preserves channel rubrics in a selection snapshot independently of later catalog edits', () => {
+    const source = catalog();
+    const objective = source.nodes.find(
+      (node): node is LearningObjective =>
+        node.kind === 'OBJECTIVE' && node.id === 'de.situations.a2'
+    )!;
+    const snapshot = learningSelectionSnapshotSchema.parse({
+      schemaVersion: 1,
+      catalogVersion: source.version,
+      catalogHash: 'a'.repeat(64),
+      targetLang: source.targetLang,
+      level: 'A2',
+      nodeIds: [objective.id],
+      objectives: [
+        {
+          id: objective.id,
+          criterionVersion: objective.criterionVersion,
+          policyVersion: objective.policyVersion,
+          title: objective.title,
+          branch: objective.branch,
+          level: objective.level,
+          assessment: objective.assessment,
+          examples: objective.examples,
+          skills: objective.skills,
+          skillCriteria: objective.skillCriteria,
+          grammarKeys: objective.grammarKeys,
+          vocabulary: objective.vocabulary,
+        },
+      ],
+      materialFocusId: null,
+    });
+    expect(snapshot.objectives[0]!.skillCriteria).toEqual(objective.skillCriteria);
+    objective.skillCriteria.WRITING = 'A revised writing criterion.';
+    expect(snapshot.objectives[0]!.skillCriteria.WRITING).toBe(
+      'Independently write a German response that meets the situation goal.'
+    );
+    for (const skillCriteria of [
+      { SPEAKING: 'Respond independently to the prompt.' },
+      { ...snapshot.objectives[0]!.skillCriteria, WRITING: '' },
+      { ...snapshot.objectives[0]!.skillCriteria, LISTENING: 'Understand the recording.' },
+    ]) {
+      const invalid = structuredClone(snapshot);
+      invalid.objectives[0]!.skillCriteria = skillCriteria;
+      expect(learningSelectionSnapshotSchema.safeParse(invalid).success).toBe(false);
+    }
+  });
+
   it('rejects missing parents, cycles, duplicate identities, and missing level coverage', () => {
     const original = catalog();
     const duplicate = structuredClone(original);
