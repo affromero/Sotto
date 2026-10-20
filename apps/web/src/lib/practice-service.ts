@@ -27,6 +27,7 @@ import { PracticeIncompleteError } from './practice/types';
 import { resolveSkillRequirements } from './learning/skill-requirements';
 import { extractReadingVocabulary } from './learning/reading-vocabulary';
 import { getVocabularyTargets } from './learning/vocabulary/targets';
+import { getVocabularySupportContext } from './learning/vocabulary/support';
 import { buildVocabItems } from './practice/vocabulary';
 import type {
   CefrLevel,
@@ -126,7 +127,8 @@ async function buildFocusItems(
   focusTargets: FocusPracticeTarget[],
   idPrefix: string,
   course: CourseCtx,
-  execution: import('@/lib/sidedoor/credentials/runtime/provider-execution').SottoProviderExecution
+  execution: import('@/lib/sidedoor/credentials/runtime/provider-execution').SottoProviderExecution,
+  note: string
 ): Promise<PracticeMcItem[]> {
   const items: PracticeMcItem[] = [];
   for (const target of focusTargets) {
@@ -141,6 +143,7 @@ async function buildFocusItems(
       objective: `Use the selected expression in a new sentence or exchange. The supplied context is background, not an answer to copy: ${target.contextText ?? target.text}`,
       grammarPoints: [],
       targetVocab: [{ lemma: target.text, gloss: '' }],
+      note,
       seed: `${course.id}-focus-${target.id}-${Date.now()}`,
     });
     const question = questions.find(
@@ -286,6 +289,7 @@ export async function startPractice(
       await startVocab(
         course,
         seed?.targetVocab ?? [],
+        note,
         seedToken,
         focusTargets,
         execution,
@@ -371,8 +375,14 @@ export async function capturePracticeContext(
     options.focusTargetId ?? null
   );
 
+  const support = await getVocabularySupportContext(courseId, userId);
   const note =
-    kind === 'VOCAB' ? '' : buildLearnerContext(await getCourseNote(courseId), course.pedagogy);
+    kind === 'VOCAB'
+      ? support
+      : buildLearnerContext(
+          [support, await getCourseNote(courseId)].filter(Boolean).join('\n\n'),
+          course.pedagogy
+        );
   const due = await getDueItems(
     courseId,
     kind === 'FULL' || kind === 'VOCAB' ? FULL_DUE_COUNT : MC_COUNT
@@ -407,17 +417,19 @@ async function attachPracticeRequirements(
 async function startVocab(
   course: CourseCtx,
   words: PracticeSeed['targetVocab'],
+  note: string,
   seedToken: string,
   focusTargets: FocusPracticeTarget[],
   execution: import('@/lib/sidedoor/credentials/runtime/provider-execution').SottoProviderExecution,
   lifecycle?: PracticeBuildLifecycle
 ): Promise<StartPracticeResult> {
-  const built = await buildVocabItems(course, words, VOCAB_COUNT, 'v', execution);
+  const built = await buildVocabItems(course, words, VOCAB_COUNT, 'v', execution, note);
   const focusItems = await buildFocusItems(
     focusTargets.filter((target) => target.kind !== 'SENTENCE'),
     'f',
     course,
-    execution
+    execution,
+    note
   );
   if (built.status === 'unavailable' && focusItems.length === 0) return built;
   const items = built.status === 'ready' ? [...focusItems, ...built.items] : focusItems;
@@ -467,7 +479,7 @@ async function startMc(
     'q',
     execution
   );
-  const focusItems = await buildFocusItems(focusTargets, 'f', course, execution);
+  const focusItems = await buildFocusItems(focusTargets, 'f', course, execution, note);
   const items = [...focusItems, ...generatedItems];
   const readingVocabulary =
     kind === 'READING'
@@ -624,10 +636,17 @@ async function startFull(
     throw new Error('Full practice generation did not produce every required exercise.');
   }
 
-  const vocab = await buildVocabItems(course, seed.targetVocab, FULL_VOCAB_COUNT, 'v', execution);
+  const vocab = await buildVocabItems(
+    course,
+    seed.targetVocab,
+    FULL_VOCAB_COUNT,
+    'v',
+    execution,
+    note
+  );
   const vocabItems = vocab.status === 'ready' ? vocab.items : [];
   const vocabLemmas = vocab.status === 'ready' ? vocab.lemmas : [];
-  const focusItems = await buildFocusItems(focusTargets, 'f', course, execution);
+  const focusItems = await buildFocusItems(focusTargets, 'f', course, execution, note);
 
   if (vocab.status !== 'ready')
     logger.info('No separate vocabulary review is due for full practice', {
@@ -781,7 +800,7 @@ async function startListening(
     vocabLemma: null,
     focusTargetId: null,
   }));
-  const focusItems = await buildFocusItems(focusTargets, 'f', course, execution);
+  const focusItems = await buildFocusItems(focusTargets, 'f', course, execution, note);
   const allItems = [...focusItems, ...items];
   const session = await persistPracticeSession(
     {

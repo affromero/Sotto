@@ -2,6 +2,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PrismaClient } from '@/generated/prisma/client';
 import { getVocabularyTargets } from '@/lib/learning/vocabulary/targets';
+import { getVocabularySupportContext } from '@/lib/learning/vocabulary/support';
 import {
   createSharedTestInstance,
   type SharedTestInstance,
@@ -18,6 +19,7 @@ const suite = process.env.SIDEDOOR_TEST_DATABASE_URL ? describe : describe.skip;
 suite('dictionary selection against PostgreSQL', () => {
   let instance: SharedTestInstance;
   let courseId: string;
+  let userId: string;
   beforeAll(async () => {
     instance = await createSharedTestInstance('vocabulary_selection');
     boundary.database = instance.database;
@@ -28,6 +30,7 @@ suite('dictionary selection against PostgreSQL', () => {
   });
   beforeEach(async () => {
     const { ownerId } = await instance.reset();
+    userId = ownerId;
     const curriculum = await instance.database.curriculum.upsert({
       where: { nativeLang_targetLang: { nativeLang: 'en', targetLang: 'de' } },
       create: { nativeLang: 'en', targetLang: 'de', title: 'Vocabulary fixture' },
@@ -38,6 +41,28 @@ suite('dictionary selection against PostgreSQL', () => {
         data: { userId: ownerId, curriculumId: curriculum.id, nativeLang: 'en', targetLang: 'de' },
       })
     ).id;
+  });
+
+  it('captures the owned course preference and allows clearing it', async () => {
+    expect(await getVocabularySupportContext(courseId, userId)).toBe('');
+    await instance.database.course.update({
+      where: { id: courseId },
+      data: { vocabularySupport: 'MEANING_RECALL' },
+    });
+    const captured = await getVocabularySupportContext(courseId, userId);
+    expect(captured).toContain('native-language glosses');
+    await instance.database.course.update({
+      where: { id: courseId },
+      data: { vocabularySupport: null },
+    });
+    expect(await getVocabularySupportContext(courseId, userId)).toBe('');
+    expect(captured).toContain('native-language glosses');
+  });
+
+  it('does not expose another learner’s course preference', async () => {
+    await expect(getVocabularySupportContext(courseId, 'another-learner')).rejects.toThrow(
+      'owned course'
+    );
   });
 
   it('keeps active dictionary review visible after a large import without recording mastery', async () => {

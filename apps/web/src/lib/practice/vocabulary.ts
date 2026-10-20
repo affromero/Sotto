@@ -15,7 +15,8 @@ export async function buildVocabItems(
   words: readonly VocabularyTarget[],
   count: number,
   idPrefix: string,
-  execution: SottoProviderExecution
+  execution: SottoProviderExecution,
+  note = ''
 ): Promise<
   | { status: 'ready'; items: PracticeMcItem[]; lemmas: string[] }
   | { status: 'unavailable'; reason: 'not_enough_vocab' }
@@ -36,6 +37,7 @@ export async function buildVocabItems(
       objective: 'Choose words that complete meaningful sentences in context.',
       grammarPoints: [],
       targetVocab: batch,
+      note,
       seed: `${course.id}-vocab-${Date.now()}-${offset}`,
     });
     for (const word of batch) {

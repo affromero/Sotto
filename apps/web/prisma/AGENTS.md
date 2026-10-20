@@ -80,6 +80,11 @@ npx prisma studio      # Visual database browser
 
 ## Scope
 
+`Course.vocabularySupport` is an optional `VocabularySupport` enum:
+`MEANING_RECALL`, `WORD_RECALL`, or `LISTENING_RECOGNITION`. It records
+learner-reported support for future generation, separately from assessed mastery.
+Null means no preference. Onboarding preserves the stored choice when omitted.
+
 `CourseMaterial` retains an immutable original document reference, a bounded text
 extract and profile ownership. Its optional course association lets onboarding
 stage files before creating a course. Note edits leave these records untouched.

@@ -104,6 +104,7 @@ describe('createNextClass', () => {
   it('publishes dictionary review without new words while active recall is weak', async () => {
     mockCourseFindFirst.mockResolvedValue({
       ...SAMPLE_COURSE,
+      vocabularySupport: 'MEANING_RECALL',
       curriculum: {
         lessons: [{ ...SAMPLE_LESSON, targetVocab: [{ lemma: 'museo', gloss: 'museum' }] }],
       },
@@ -135,6 +136,7 @@ describe('createNextClass', () => {
       },
     });
     const expected = [{ lemma: 'visitar', gloss: 'visit' }];
+    expect(mockGenerateClassIntro.mock.calls[0][0].note).toContain('native-language glosses');
     expect(published).toMatchObject({
       teaching: sampleTeaching,
       classTargets: { vocab: expected, grammarPoints: SAMPLE_LESSON.grammarPoints },

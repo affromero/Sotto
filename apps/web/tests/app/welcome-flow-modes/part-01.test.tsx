@@ -952,6 +952,7 @@ describe('welcome hosted-demo mode', () => {
           accessKeyId: 'test-access',
           secretAccessKey: 'test-secret',
         }}
+        vocabularySupport="MEANING_RECALL"
         config={{ selfHosted: true, isOwner: true }}
         onRestart={vi.fn()}
         onJump={vi.fn()}
@@ -970,7 +971,7 @@ describe('welcome hosted-demo mode', () => {
       })
     );
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
-      course: { native: 'en', target: 'it', level: 'A2' },
+      course: { native: 'en', target: 'it', level: 'A2', vocabularySupport: 'MEANING_RECALL' },
       preferred: { language: 'it' },
       infra: {
         storageProvider: 's3',

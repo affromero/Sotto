@@ -90,7 +90,13 @@ const mockSpeakingRecordingFindMany = vi.fn();
 vi.mock('@/lib/prisma', () => {
   const database = {
     episode: { findUnique: (...a: unknown[]) => mockEpisodeFindUnique(...a) },
-    course: { findFirst: (...a: unknown[]) => mockCourseFindFirst(...a) },
+    course: {
+      findFirst: async (query: { select?: Record<string, unknown> }) => {
+        const row = (await mockCourseFindFirst(query)) as Record<string, unknown> | null;
+        if (!row || !query.select) return row;
+        return Object.fromEntries(Object.keys(query.select).map((key) => [key, row[key]]));
+      },
+    },
     learnerVocab: {
       findMany: (...a: unknown[]) => mockLearnerVocabFindMany(...a),
       upsert: async (input: {
@@ -329,6 +335,7 @@ describe('dictionary-driven practice', () => {
   });
 
   it('uses the saved vocabulary after admission even if the dictionary changes', async () => {
+    mockCourseFindFirst.mockResolvedValue({ ...COURSE, vocabularySupport: 'MEANING_RECALL' });
     setDueItems({
       vocab: [{ id: 'original', lemma: 'Bahnhof', translation: 'station', mastery: 0.2 }],
       grammar: [],
@@ -340,6 +347,7 @@ describe('dictionary-driven practice', () => {
       blockedProviderExecution('u1')
     );
     const generation = practiceGenerationSchema.parse(JSON.parse(JSON.stringify(context)));
+    mockCourseFindFirst.mockResolvedValue({ ...COURSE, vocabularySupport: 'WORD_RECALL' });
     setDueItems({
       vocab: [{ id: 'later', lemma: 'Fahrkarte', translation: 'ticket', mastery: 0.1 }],
       grammar: [],
@@ -350,9 +358,47 @@ describe('dictionary-driven practice', () => {
     expect(result.status).toBe('ready');
     const stored = mockPracticeSessionCreate.mock.calls[0][0].data;
     expect(stored.vocabLemmas).toEqual(['Bahnhof']);
+    expect(mockGenerateSectionQuestions.mock.calls[0][0].note).toContain('native-language glosses');
+    expect(mockGenerateSectionQuestions.mock.calls[0][0].note).not.toContain(
+      'gradually reduce cues'
+    );
     expect(stored.items.map((item: { vocabLemma: string }) => item.vocabLemma)).toEqual([
       'Bahnhof',
     ]);
+  });
+
+  it('preserves captured meaning support for a focus-only vocabulary session', async () => {
+    mockCourseFindFirst.mockResolvedValue({ ...COURSE, vocabularySupport: 'MEANING_RECALL' });
+    setDueItems({ vocab: [], grammar: [] });
+    mockGetPracticeFocusTargets.mockResolvedValue([
+      {
+        id: 'focus',
+        kind: 'WORD',
+        text: 'Bahnhof',
+        normalizedText: 'bahnhof',
+        contextText: null,
+        priorityBoost: 0.5,
+      },
+    ]);
+    const captured = await capturePracticeContext(
+      'c1',
+      'u1',
+      'VOCAB',
+      blockedProviderExecution('u1'),
+      { focusTargetId: 'focus' }
+    );
+    const generation = practiceGenerationSchema.parse(JSON.parse(JSON.stringify(captured)));
+    mockCourseFindFirst.mockResolvedValue({ ...COURSE, vocabularySupport: 'WORD_RECALL' });
+    const result = await startPractice('c1', 'u1', 'VOCAB', blockedProviderExecution('u1'), {
+      generation,
+    });
+    expect(result.status).toBe('ready');
+    expect(mockPracticeSessionCreate.mock.calls[0][0].data.items).toEqual([
+      expect.objectContaining({ focusTargetId: 'focus', vocabLemma: 'Bahnhof' }),
+    ]);
+    const guidance = mockGenerateSectionQuestions.mock.calls[0][0].note;
+    expect(guidance).toContain('native-language glosses');
+    expect(guidance).not.toContain('gradually reduce cues');
   });
 });
 

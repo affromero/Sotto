@@ -21,6 +21,7 @@ import { generateClassIntro } from './classes/class-intro';
 import { generateClassTeaching, teachingFromSeed } from './classes/lesson/teaching';
 import { classTargetsFromSeed } from './classes/lesson/class-targets';
 import { getVocabularyTargets } from './learning/vocabulary/targets';
+import { getVocabularySupportContext } from './learning/vocabulary/support';
 import { getCourseVocabularyTargets } from './course-materials/vocabulary-context';
 import { logger } from './logger';
 import { resolveSkillRequirements, readSkillRequirements } from './learning/skill-requirements';
@@ -274,7 +275,9 @@ async function buildClassContent(p: ClassContentBuildParams): Promise<Prisma.Inp
       : corpus.context;
   const note = noteForAttempt(
     buildLearnerContext(
-      capturedContext,
+      [await getVocabularySupportContext(p.courseId, p.userId), capturedContext]
+        .filter(Boolean)
+        .join('\n\n'),
       p.course.pedagogy as Parameters<typeof buildLearnerContext>[1]
     ),
     p.classId,
