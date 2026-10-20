@@ -175,6 +175,17 @@ suite('owned original course materials', () => {
       materialIds: [materials[0].id],
     });
     expect(captured.parts[0]?.data).toEqual(bytes);
+    await instance.database.courseMaterial.update({
+      where: { id: materials[0].id },
+      data: { byteSize: bytes.length + 1 },
+    });
+    await expect(
+      captureMaterialDocuments(execution(), { materialIds: [materials[0].id] })
+    ).rejects.toThrow('type or size');
+    await instance.database.courseMaterial.update({
+      where: { id: materials[0].id },
+      data: { byteSize: bytes.length },
+    });
     const other = await identity.household('Other learner');
     await expect(
       captureMaterialDocuments(execution(other.id, other.token), { materialIds: [materials[0].id] })

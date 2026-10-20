@@ -1,8 +1,9 @@
-import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
+import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { StorageReadCleanupError } from 'thesidedoor-core/storage';
+import { isJobExecutionCleanupFailure } from 'thesidedoor-core/runtime/outbox';
 import { prismaUnfiltered } from '../prisma';
 import { restoreStorageBackend } from '../r2';
 import { sottoTransaction } from '../sidedoor/access/state/transaction';
@@ -13,6 +14,7 @@ import {
 import type { SottoProviderExecution } from '../sidedoor/credentials/runtime/provider-execution';
 import type { SourceDocuments, DocumentContentPart } from '../providers/ai';
 import { validatePdfDocument } from '../providers/documents/pdf-input';
+import { readPdfFile } from '../providers/documents/files';
 import { logger } from '../logger';
 
 /** Capture and read immutable originals through their owned storage references. */
@@ -115,12 +117,11 @@ export async function captureMaterialDocuments(
       const backend = await restoreStorageBackend(storage.backend.descriptor);
       const path = join(directory, row.id);
       await backend.downloadToFile(storage.input.reference, path, execution.signal);
-      if ((await stat(path)).size !== row.byteSize) throw new Error('Original PDF size changed.');
       const part: DocumentContentPart = {
         type: 'document',
         name: row.name,
         mediaType: 'application/pdf',
-        data: await readFile(path),
+        data: await readPdfFile(path, { maximum: row.byteSize, expectedBytes: row.byteSize }),
       };
       validatePdfDocument(part);
       parts.push(part);
@@ -129,7 +130,7 @@ export async function captureMaterialDocuments(
     return { parts, validate };
   } catch (error) {
     primary = error;
-    if (error instanceof StorageReadCleanupError) {
+    if (isJobExecutionCleanupFailure(error)) {
       cleanupUnconfirmed = true;
       logger.error('Original PDF read cleanup is unconfirmed', { directory });
       execution.onCleanupError?.(error);

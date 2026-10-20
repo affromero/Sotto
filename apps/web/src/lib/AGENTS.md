@@ -32,6 +32,8 @@ Rendering destroys each page's PDF.js document before opening the next page.
 disabled core dumps. Its stdin lifetime and deadline fence parent loss.
 The parent records canonical workspace identities before launch, verifies every
 numbered image after confirmed process exit, and clears ownership after cleanup.
+Original staging uses the canonical owned byte copier. Source and image reads
+use one bounded regular-file descriptor and retain uncertain descriptor closure.
 Uncertain cleanup preserves the workspace and blocks reuse. Operator recovery
 requires stopping the exact supervisor/container and all owned I/O; recorded
 PIDs and timestamps alone do not authorize recovery or directory deletion.
