@@ -452,7 +452,12 @@ suite('Atomic onboarding with shared authority', () => {
     await noLearnerChanges();
   });
   it('saves placement, notes and preferences while preserving existing course progress on retry', async () => {
-    const first = await POST(await request(base, identity.ownerToken));
+    const first = await POST(
+      await request(
+        { ...base, course: { ...base.course, vocabularySupport: 'MEANING_RECALL' } },
+        identity.ownerToken
+      )
+    );
     expect(first.status).toBe(200);
     const { courseId } = await first.json();
     expect(
@@ -462,6 +467,7 @@ suite('Atomic onboarding with shared authority', () => {
       currentLevel: 'B1',
       startLevel: 'B1',
       placementSource: 'MANUAL',
+      vocabularySupport: 'MEANING_RECALL',
     });
     expect(
       await instance.database.courseNote.findUniqueOrThrow({ where: { courseId } })
@@ -486,11 +492,21 @@ suite('Atomic onboarding with shared authority', () => {
     expect(retry.status).toBe(200);
     expect(
       await instance.database.course.findUniqueOrThrow({ where: { id: courseId } })
-    ).toMatchObject({ currentLevel: 'C1', startLevel: 'B1' });
+    ).toMatchObject({ currentLevel: 'C1', startLevel: 'B1', vocabularySupport: 'MEANING_RECALL' });
     expect(
       await instance.database.courseNote.findUniqueOrThrow({ where: { courseId } })
     ).toMatchObject({ body: base.note });
     expect(await instance.database.course.count()).toBe(1);
+    const cleared = await POST(
+      await request(
+        { ...base, course: { ...base.course, vocabularySupport: null } },
+        identity.ownerToken
+      )
+    );
+    expect(cleared.status).toBe(200);
+    expect(
+      await instance.database.course.findUniqueOrThrow({ where: { id: courseId } })
+    ).toMatchObject({ currentLevel: 'C1', vocabularySupport: null });
   });
   it('rejects household server configuration before creating a course', async () => {
     const initialConfiguration = await getSiteConfig();

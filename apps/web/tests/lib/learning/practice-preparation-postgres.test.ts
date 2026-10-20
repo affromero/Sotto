@@ -48,15 +48,13 @@ import {
   type SharedTestIdentity,
 } from '../../helpers/setup/shared-instance';
 import { requiresReadingSupport } from '../classes/quality/teaching/reading-support-fixture';
-import { practiceProviderFixture } from './practice/provider-fixture';
-
+import { practiceProviderFixture, practiceVocabularyFixture } from './practice/provider-fixture';
 const boundary = vi.hoisted(() => ({ database: null as PrismaClient | null }));
 vi.mock('@/lib/prisma', async () => {
   const { prismaTestBoundary } = await import('../../helpers/setup/shared-instance');
   const database = prismaTestBoundary(boundary);
   return { prisma: database, prismaUnfiltered: database };
 });
-
 const suite = process.env.SIDEDOOR_TEST_DATABASE_URL ? describe : describe.skip;
 suite('Durable practice preparation against PostgreSQL', () => {
   let instance: SharedTestInstance;
@@ -126,7 +124,6 @@ suite('Durable practice preparation against PostgreSQL', () => {
     await instance?.close();
     await rm(temporaryRoot, { recursive: true, force: true });
   });
-
   async function queuedJob(operationId: string) {
     const record = await sottoTransaction(instance.database, (database) =>
       sottoJobOutbox(database).read(operationId)
@@ -242,7 +239,6 @@ suite('Durable practice preparation against PostgreSQL', () => {
     ).toBe('QUEUED');
     expect(await instance.database.practiceSession.count()).toBe(1);
   });
-
   it('reports failed generation without inventing a settings diagnosis or exposing private errors', async () => {
     const course = await instance.database.course.findUniqueOrThrow({ where: { id: courseId } });
     await instance.database.lesson.upsert({
@@ -634,6 +630,7 @@ suite('Durable practice preparation against PostgreSQL', () => {
           const reading = requiresReadingSupport(schemaOptions);
           let content: unknown;
           let reviewed: {
+            exerciseMode?: 'vocabulary_recall';
             items?: {
               index: number;
               content: {
@@ -700,7 +697,11 @@ suite('Durable practice preparation against PostgreSQL', () => {
                   reviewed.criticisms!,
                   false,
                   0,
-                  reading
+                  reading,
+                  undefined,
+                  undefined,
+                  undefined,
+                  reviewed.exerciseMode === 'vocabulary_recall'
                 ),
                 strict: true,
               },
@@ -832,7 +833,7 @@ suite('Durable practice preparation against PostgreSQL', () => {
                 passageRef: '',
               })),
             };
-          else throw new Error('Unexpected generation request: ' + system.slice(0, 100));
+          else content = practiceVocabularyFixture(user);
           response.writeHead(200, { 'Content-Type': 'application/json' });
           response.end(JSON.stringify(practiceProviderFixture(content, user, schemaOptions)));
         } catch (failure) {
@@ -979,7 +980,6 @@ suite('Durable practice preparation against PostgreSQL', () => {
       )
     ).toBeNull();
   });
-
   it('fences an interrupted running attempt and requires acknowledgement before cancellation recovery', async () => {
     const operation = await requestPracticePreparation(courseId, 'FULL', execution);
     await instance.database.practiceSession.update({

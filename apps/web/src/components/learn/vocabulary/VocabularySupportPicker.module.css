@@ -1,0 +1,36 @@
+.root {
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  border: 0;
+}
+
+.legend {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.help {
+  margin: 8px 0 12px;
+  color: var(--ink-mute);
+  line-height: 1.5;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 10px 0;
+  cursor: pointer;
+  line-height: 1.5;
+}
+
+.option input {
+  flex-shrink: 0;
+  accent-color: var(--accent);
+}
+
+.root:disabled .option {
+  cursor: wait;
+}
