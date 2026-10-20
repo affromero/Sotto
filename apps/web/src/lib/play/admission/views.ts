@@ -14,7 +14,7 @@ export async function loadPlayJoinRequest(database: Prisma.TransactionClient, re
   return candidate;
 }
 
-export async function playJoinStatus(
+async function playJoinStatus(
   database: Prisma.TransactionClient,
   candidate: PlayJoinRequest,
   room: StoredPlayRoom,

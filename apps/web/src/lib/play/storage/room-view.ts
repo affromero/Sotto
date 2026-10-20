@@ -10,7 +10,7 @@ import { PlayRuleError } from '../errors';
 import { projectPlayRound } from '../projection';
 import { playFingerprint } from './fingerprint';
 
-export const storedRoomInclude = {
+const storedRoomInclude = {
   host: { select: { id: true, name: true } },
   guest: { select: { id: true, name: true } },
   rounds: { orderBy: { order: 'asc' } },

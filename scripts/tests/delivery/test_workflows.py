@@ -204,6 +204,19 @@ class AndroidWorkflowTests(unittest.TestCase):
                     self.assertTrue(any(fnmatch.fnmatch(path, pattern)
                                         for pattern in patterns))
 
+    def test_android_jobs_prepare_sdk_before_using_command_line_tools(self) -> None:
+        for name in ('android', 'android-device'):
+            with self.subTest(job=name):
+                steps = self.workflow['jobs'][name]['steps']
+                setup = next(index for index, step in enumerate(steps)
+                             if step.get('uses', '').startswith(
+                                 'android-actions/setup-android@'))
+                consumer = next(index for index, step in enumerate(steps)
+                                if 'sdkmanager ' in step.get('run', '')
+                                or 'android-emulator-runner@'
+                                in step.get('uses', ''))
+                self.assertLess(setup, consumer)
+
     def test_android_build_produces_both_unsigned_distribution_formats(self) -> None:
         steps = self.workflow['jobs']['android']['steps']
         build = next(step['run'] for step in steps

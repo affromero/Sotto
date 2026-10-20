@@ -12,7 +12,7 @@ import { playFingerprint } from '../storage/fingerprint';
 
 const id = z.string().min(1).max(100);
 const digest = z.string().regex(/^[a-f0-9]{64}$/);
-export const playDeliveryBindingSchema = z.strictObject({
+const playDeliveryBindingSchema = z.strictObject({
   version: z.literal(1),
   instanceId: z.uuid(),
   roomId: id,

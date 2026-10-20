@@ -2,6 +2,7 @@
 import { randomUUID } from 'node:crypto';
 import { newToken, tokenHash } from 'thesidedoor-core/access';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { PlayRuleError } from '@/lib/play/errors';
 import {
   openPlayDelivery,
   sealPlayDelivery,
@@ -83,6 +84,13 @@ describe('encrypted exact play credential delivery', () => {
     expect(() => openPlayDelivery(binding, state)).toThrow();
     vi.stubEnv('BYOK_ENCRYPTION_KEY', 'private-play-delivery-test-key');
     expect(openPlayDelivery(binding, state)).toEqual(envelope);
+  });
+
+  it('rejects a browser session hidden in native credential delivery', () => {
+    const { binding, envelope } = fixture(true);
+    expect(() =>
+      sealPlayDelivery(binding, { ...envelope, browserSessionToken: newToken() })
+    ).toThrow(PlayRuleError);
   });
 
   it('rejects inconsistent member bindings and token hashes before sealing', () => {
