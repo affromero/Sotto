@@ -5,8 +5,9 @@ import { prisma, prismaUnfiltered } from './prisma';
 import { reviewCard } from './srs';
 import { normalizeLearningTargetText } from './learning-targets';
 import { rankLearningTargets } from '@sotto/learning-model';
-import type { CefrLevel } from '@sotto/shared';
+import type { CefrLevel, LearningObjectiveMemory } from '@sotto/shared';
 import type { LearningDatabase } from './learning/database';
+import { readCourseObjectiveMemory, dueObjectiveMemory } from './learning-map/objective-memory';
 
 export interface VocabItem {
   lemma: string;
@@ -193,6 +194,7 @@ export async function applyReviewOutcome(
 }
 
 export interface DueItems {
+  objectives: LearningObjectiveMemory[];
   vocab: Array<{ id: string; lemma: string; translation: string; mastery: number }>;
   grammar: Array<{ id: string; topicKey: string; title: string; mastery: number }>;
 }
@@ -200,6 +202,7 @@ export interface DueItems {
 /** Adaptive due-or-weak items, used to seed practice, classes, and listening. */
 export async function getDueItems(courseId: string, limit = 8): Promise<DueItems> {
   const now = new Date();
+  const objectiveMemory = await readCourseObjectiveMemory(courseId, now);
   const dueOrWeak = { OR: [{ dueAt: { lte: now } }, { mastery: { lt: 0.5 } }] };
   const candidateLimit = Math.max(limit, limit * 4);
   const [focusTargets, vocab, grammar] = await Promise.all([
@@ -225,7 +228,13 @@ export async function getDueItems(courseId: string, limit = 8): Promise<DueItems
       },
     }),
     prisma.learnerGrammar.findMany({
-      where: { courseId, ...dueOrWeak },
+      where: {
+        courseId,
+        ...dueOrWeak,
+        ...(objectiveMemory.legacyGrammarExclusions.length
+          ? { NOT: objectiveMemory.legacyGrammarExclusions }
+          : {}),
+      },
       orderBy: [{ dueAt: 'asc' }, { mastery: 'asc' }],
       take: candidateLimit,
       select: {
@@ -255,6 +264,7 @@ export async function getDueItems(courseId: string, limit = 8): Promise<DueItems
     };
   });
   return {
+    objectives: dueObjectiveMemory(objectiveMemory.objectives, limit),
     vocab: rankLearningTargets(boostedVocab, now)
       .slice(0, limit)
       .map(({ id, lemma, translation, actualMastery }) => ({
@@ -270,6 +280,7 @@ export async function getDueItems(courseId: string, limit = 8): Promise<DueItems
 }
 
 export interface MemoryGraph {
+  objectives: LearningObjectiveMemory[];
   nodes: Array<{
     id: string;
     kind: 'vocab' | 'grammar';
@@ -304,6 +315,7 @@ function toIsoDate(value: Date | null | undefined): string | null {
 /** Whole course graph for the learner-facing memory visualization. */
 export async function getMemoryGraph(courseId: string): Promise<MemoryGraph> {
   const now = Date.now();
+  const { objectives } = await readCourseObjectiveMemory(courseId, new Date(now));
   const [vocab, grammar, edges] = await Promise.all([
     prisma.learnerVocab.findMany({
       where: { courseId },
@@ -397,5 +409,5 @@ export async function getMemoryGraph(courseId: string): Promise<MemoryGraph> {
     }))
     .filter((e) => e.source && e.target);
 
-  return { nodes, edges: graphEdges };
+  return { nodes, edges: graphEdges, objectives };
 }

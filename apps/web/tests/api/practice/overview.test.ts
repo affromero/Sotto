@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { randomUUID } from 'node:crypto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
@@ -24,6 +25,7 @@ vi.mock('@/lib/practice-service', async (importOriginal) => ({
   submitPractice: mocks.submit,
 }));
 vi.mock('@/lib/prisma', () => ({
+  prismaUnfiltered: {},
   prisma: {
     course: { findFirst: mocks.course },
     learnerVocab: { count: mocks.vocab },
@@ -45,7 +47,7 @@ const sessionParams = { params: Promise.resolve({ sessionId: 'ps1' }) };
 const jsonReq = (body: unknown) =>
   new NextRequest('http://localhost/api/v1/practice', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', authorization: 'Bearer test-device' },
     body: JSON.stringify(body),
   });
 beforeEach(() => {
@@ -55,6 +57,37 @@ beforeEach(() => {
 });
 
 describe('Practice HTTP contract', () => {
+  it('passes the complete explicit lower-level selection to durable admission', async () => {
+    const learningSelection = {
+      catalogVersion: 1,
+      nodeIds: ['de.a1.grammar.word-order'],
+      level: 'A1',
+      materialFocusId: 'owned-source',
+    };
+    const response = await startPost(
+      jsonReq({ kind: 'GRAMMAR', requestId: randomUUID(), learningSelection }),
+      courseParams
+    );
+    expect(response.status).toBe(202);
+    expect(practicePreparingSchema.parse(await response.json()).message).toMatch(/saved/);
+    expect(mocks.admit).toHaveBeenCalledWith(
+      'c1',
+      'GRAMMAR',
+      expect.objectContaining({ userId: 'u1' }),
+      expect.objectContaining({ learningSelection })
+    );
+  });
+
+  it.each([
+    { kind: 'GRAMMAR', learningSelection: { catalogVersion: 1, nodeIds: [], level: 'A1' } },
+    {
+      kind: 'GRAMMAR',
+      learningSelection: { catalogVersion: null, nodeIds: ['canonical'], level: 'A1' },
+    },
+    { kind: 'GRAMMAR', unreviewedDifficulty: 'C2' },
+  ])('rejects an incomplete or unrecognized selection %j', async (body) => {
+    expect((await startPost(jsonReq(body), courseParams)).status).toBe(400);
+  });
   it('explains the explicit choices when credits prevent FULL generation', async () => {
     mocks.admit.mockRejectedValue(new ProviderCreditsExhaustedError('cartesia'));
     const response = await startPost(jsonReq({ kind: 'FULL' }), courseParams);

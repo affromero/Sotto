@@ -67,6 +67,7 @@ impl SottoClient {
         let body = types::StartPracticeRequest {
             kind,
             focus_target_id: None,
+            learning_selection: None,
             request_id: Some(request_id),
         };
         let resp = self

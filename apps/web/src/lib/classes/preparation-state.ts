@@ -104,7 +104,7 @@ export const preparationSchema = z
     ]),
     classId: z.string().nullable(),
     audioEpisodeIds: z.array(z.string().min(1)).max(16),
-    result: z.enum(['created', 'gated', 'done']).nullable(),
+    result: z.enum(['created', 'gated', 'done', 'requirements']).nullable(),
     updatedAt: z.number().int(),
     failure: z
       .enum(['generation_failed', 'source_unreadable', 'interrupted', 'expired'])

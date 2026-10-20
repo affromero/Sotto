@@ -81,6 +81,24 @@ describe('NotesPlacement', () => {
     });
   });
 
+  it('replays the exact course confirmation after its committed response is lost', async () => {
+    await deduce();
+    const fetch = global.fetch as ReturnType<typeof vi.fn>;
+    fetch.mockRejectedValueOnce(new Error('Synthetic lost source confirmation'));
+    fireEvent.click(screen.getByRole('button', { name: /start here/i }));
+    await screen.findByRole('button', { name: 'Retry course confirmation' });
+    fetch.mockResolvedValueOnce(
+      jsonResponse({ courseId: 'course-1', level: 'B1', addedVocabulary: 0 })
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Retry course confirmation' }));
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/learn'));
+    const confirmations = fetch.mock.calls.filter(
+      ([url]) => url === '/api/v1/placement/from-notes/confirm'
+    );
+    expect(confirmations[0][1].body).toBe(confirmations[1][1].body);
+    expect(confirmations).toHaveLength(2);
+  });
+
   it('"Verify" hands the deduced level back to the parent', async () => {
     const onVerify = await deduce();
     fireEvent.click(screen.getByRole('button', { name: /verify with a few questions/i }));

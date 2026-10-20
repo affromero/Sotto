@@ -16,6 +16,8 @@ import {
 } from '../learning/session-evaluation';
 import { assertStoredPracticeMaterial } from './material';
 import { scoreMultipleChoice } from './grading';
+import { recordPracticeAssessmentObservations } from '../learning-map/evidence/session';
+import { speakingTaskMode } from '../learning-map/evidence/communicative-speaking';
 import {
   PracticeIncompleteError,
   type PracticeMcItem,
@@ -148,6 +150,9 @@ export async function submitPractice(
         score: average(oralGrades),
         passThreshold: 0.7,
         referenceAudioUrls: session.prompts.map((prompt) => prompt.referenceTtsUrl),
+        speakingTaskModes: session.prompts.map((prompt) =>
+          speakingTaskMode(prompt.learningObjectives)
+        ),
       });
     if (session.writingPrompts.length)
       work.push({
@@ -179,6 +184,17 @@ export async function submitPractice(
         ? mc.score
         : scores.reduce((sum, part) => sum + part, 0) / scores.length;
     const now = new Date();
+    const canonicalGrammar = await recordPracticeAssessmentObservations(tx, {
+      courseId: session.courseId,
+      userId,
+      sessionId,
+      episodeId: session.episodeId,
+      items,
+      answers,
+      prompts: session.prompts,
+      writingPrompts: session.writingPrompts,
+    });
+    const legacyGrammar = session.grammarKeys.filter((key) => !canonicalGrammar.has(key));
     if (mc.correctLemmas.length)
       await applyReviewOutcome(session.courseId, mc.correctLemmas, [], 1, 0, now, tx);
     if (mc.incorrectLemmas.length)
@@ -195,11 +211,11 @@ export async function submitPractice(
     const aggregateVocab = session.readingVocabulary
       ? []
       : session.vocabLemmas.filter((lemma) => !assessed.has(lemma));
-    if (aggregateVocab.length || session.grammarKeys.length)
+    if (aggregateVocab.length || legacyGrammar.length)
       await applyReviewOutcome(
         session.courseId,
         aggregateVocab,
-        session.grammarKeys,
+        legacyGrammar,
         work.find((section) => section.skill === 'READING')?.score ?? score,
         work.find((section) => section.skill === 'GRAMMAR')?.score ?? score,
         now,

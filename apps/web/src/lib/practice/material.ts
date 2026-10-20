@@ -1,3 +1,4 @@
+import { speakingTaskMode } from '@/lib/learning-map/evidence/communicative-speaking';
 import { z } from 'zod';
 import { assertStoredReadingVocabulary } from '../learning/reading-vocabulary';
 import { learningScriptHash } from '../learning/script-hash';
@@ -64,6 +65,7 @@ export async function assertStoredPracticeMaterial(database: LearningDatabase, s
     throw new LearningIncompleteError('Practice question identities are duplicated.');
   if (requirements.referenceAudioRequired)
     for (const prompt of session.prompts) {
+      if (speakingTaskMode(prompt.learningObjectives) === 'COMMUNICATIVE') continue;
       if (!prompt.referenceTtsUrl)
         throw new LearningIncompleteError('Speaking reference audio is missing.', ['SPEAKING']);
       await resolveStorageInput(database, {
@@ -96,6 +98,9 @@ export async function assertStoredPracticeMaterial(database: LearningDatabase, s
       skill: 'SPEAKING',
       itemIds: session.prompts.map((prompt) => prompt.id),
       referenceAudioUrls: session.prompts.map((prompt) => prompt.referenceTtsUrl),
+      speakingTaskModes: session.prompts.map((prompt) =>
+        speakingTaskMode(prompt.learningObjectives)
+      ),
     },
     { skill: 'WRITING', itemIds: session.writingPrompts.map((prompt) => prompt.id) },
   ]);

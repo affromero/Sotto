@@ -5,7 +5,17 @@ import { prepareJob } from 'thesidedoor-core/runtime/outbox';
 import { delegationGrantBinding } from 'thesidedoor-core/runtime/delegation';
 import { Prisma } from '@/generated/prisma/client';
 import { prismaUnfiltered as prisma } from '../prisma';
-import type { PracticeKind } from '@sotto/shared';
+import {
+  normalizeLearningSelection,
+  type PracticeKind,
+  type LearningSelectionRequest,
+} from '@sotto/shared';
+import { materialRecognitionHash } from '../course-materials/recognition/protocol';
+import { mergeMaterialAnalysisScopes } from '../course-materials/jobs/analysis-authority';
+import {
+  capturePracticeLearningSelection,
+  focusedPracticeRequirements,
+} from '../learning-map/selection';
 import { capturePracticeContext } from '../practice-service';
 import type { SottoProviderExecution } from '../sidedoor/credentials/runtime/provider-execution';
 import { sottoTransaction } from '../sidedoor/access/state/transaction';
@@ -35,6 +45,14 @@ export const practicePreparationPayload = z
   .strict();
 const inputHash = (value: unknown) =>
   createHash('sha256').update(JSON.stringify(value)).digest('hex');
+const generationHash = (generation: ReturnType<typeof practiceGenerationSchema.parse>) =>
+  generation.schemaVersion === 2 ? materialRecognitionHash(generation) : inputHash(generation);
+function sameLearningRequest(previous: PracticePreparation, input?: LearningSelectionRequest) {
+  return (
+    materialRecognitionHash(previous.learningRequest ?? null) ===
+    materialRecognitionHash(input ? normalizeLearningSelection(input) : null)
+  );
+}
 export const practicePreparationGrant = (
   database: Prisma.TransactionClient,
   operation: Pick<PracticePreparation, 'id' | 'courseId' | 'userId'>
@@ -43,6 +61,14 @@ export const practicePreparationGrant = (
 export function practicePreparationProgress(
   operation: PracticePreparation
 ): import('@sotto/shared').PracticePreparing {
+  if (operation.sourceRetired)
+    return {
+      status: 'preparing',
+      sessionId: operation.sessionId,
+      preparationStatus: 'FAILED',
+      message: 'The original source was removed. Start new practice with an available source.',
+      canRecover: false,
+    };
   const messages = {
     QUEUED: 'Practice is saved and waiting for a worker.',
     RUNNING: 'Preparing exercises and reference audio.',
@@ -71,15 +97,36 @@ export async function readPracticePreparation(
   if (!session?.generationState)
     throw new PreparationConflictError('Practice preparation not found.');
   const operation = practicePreparationSchema.parse(session.generationState);
+  if (operation.sourceRetired)
+    throw new PreparationConflictError(
+      'The original source was removed. Start new practice with an available source.'
+    );
   const generation = practiceGenerationSchema.parse(session.generationSpec);
   if (
     operation.sessionId !== session.id ||
     generation.course.id !== operation.courseId ||
     generation.course.userId !== operation.userId ||
-    inputHash(generation) !== operation.inputFingerprint ||
+    generationHash(generation) !== operation.inputFingerprint ||
     !isDeepStrictEqual(session.skillRequirements, generation.requirements)
   )
     throw new PreparationConflictError('Practice preparation inputs changed.');
+  if (generation.schemaVersion === 2) {
+    if (
+      operation.generationVersion !== 2 ||
+      operation.practiceLevel !== generation.practiceLevel ||
+      session.practiceLevel !== generation.practiceLevel ||
+      !sameLearningRequest(operation, generation.learningRequest ?? undefined) ||
+      !isDeepStrictEqual(session.learningSelection, generation.learningSelection)
+    )
+      throw new PreparationConflictError(
+        'The stored practice difficulty or objective selection changed.'
+      );
+  } else if (
+    operation.generationVersion !== undefined ||
+    session.practiceLevel !== null ||
+    session.learningSelection !== null
+  )
+    throw new PreparationConflictError('Focused practice cannot use a legacy generation identity.');
   return { session, operation, generation };
 }
 
@@ -113,6 +160,22 @@ export async function validatePracticePreparation(
     if (operation.status !== 'RUNNING' || Date.now() >= operation.expiresAt)
       throw new PreparationConflictError('Practice preparation is no longer authorized.');
     await practicePreparationGrant(database, operation).validate(operation.grant);
+    if (work.generation.learningRequest && work.generation.learningSelection) {
+      const course = await database.course.findFirstOrThrow({
+        where: { id: operation.courseId, userId: operation.userId },
+      });
+      await capturePracticeLearningSelection(
+        database,
+        {
+          userId: operation.userId,
+          authorize: async () => ({ userId: operation.userId }),
+        },
+        course,
+        work.generation.learningRequest,
+        work.session.kind,
+        work.generation.learningSelection
+      );
+    }
     await validatePracticeSpeechConfiguration(database, work);
   }
   return work;
@@ -151,7 +214,11 @@ export async function requestPracticePreparation(
   courseId: string,
   kind: PracticeKind,
   execution: SottoProviderExecution,
-  input: { requestId?: string; focusTargetId?: string } = {}
+  input: {
+    requestId?: string;
+    focusTargetId?: string;
+    learningSelection?: LearningSelectionRequest;
+  } = {}
 ) {
   const sessionId = input.requestId ?? randomUUID();
   z.uuid().parse(sessionId);
@@ -178,7 +245,14 @@ export async function requestPracticePreparation(
       if (session.courseId !== courseId || session.kind !== kind || !session.generationState)
         throw new PreparationConflictError('This practice request ID belongs to different work.');
       const operation = practicePreparationSchema.parse(session.generationState);
-      if (operation.focusTargetId !== (input.focusTargetId ?? null))
+      if (operation.sourceRetired)
+        throw new PreparationConflictError(
+          'The original source was removed. Start new practice with an available source.'
+        );
+      if (
+        operation.focusTargetId !== (input.focusTargetId ?? null) ||
+        !sameLearningRequest(operation, input.learningSelection)
+      )
         throw new PreparationConflictError(
           'This practice request ID belongs to a different focus target.'
         );
@@ -214,11 +288,16 @@ export async function requestPracticePreparation(
       });
       if (duplicate) {
         const previous = practicePreparationSchema.parse(duplicate.generationState);
+        if (previous.sourceRetired)
+          throw new PreparationConflictError(
+            'The original source was removed. Start new practice with an available source.'
+          );
         if (
           previous.userId !== actor.userId ||
           duplicate.courseId !== courseId ||
           duplicate.kind !== kind ||
-          previous.focusTargetId !== (input.focusTargetId ?? null)
+          previous.focusTargetId !== (input.focusTargetId ?? null) ||
+          !sameLearningRequest(previous, input.learningSelection)
         )
           throw new PreparationConflictError('This request ID belongs to different practice.');
         return previous;
@@ -258,14 +337,32 @@ export async function requestPracticePreparation(
           pedagogy: true,
         },
       });
-      if (!isDeepStrictEqual(course, generation.course))
+      if (!course || !isDeepStrictEqual(course, generation.course))
         throw new PreparationConflictError('The course changed before practice admission.');
-      const requirements = await resolveSkillRequirementsInTransaction(database, execution, {
+      const practiceLevel = generation.practiceLevel ?? generation.course.currentLevel;
+      const resolved = await resolveSkillRequirementsInTransaction(database, execution, {
         scope: kind,
         nativeLang: generation.course.nativeLang,
         targetLang: generation.course.targetLang,
-        level: generation.course.currentLevel,
+        level: practiceLevel,
       });
+      let requirements = resolved;
+      if (generation.learningRequest && generation.learningSelection) {
+        const selected = await capturePracticeLearningSelection(
+          database,
+          execution,
+          course,
+          generation.learningRequest,
+          kind,
+          generation.learningSelection,
+          true
+        );
+        if (!isDeepStrictEqual(selected.coverage, generation.levelCoverage))
+          throw new PreparationConflictError(
+            'The captured level skill coverage changed before admission.'
+          );
+        requirements = focusedPracticeRequirements(resolved, selected.coverage);
+      }
       if (!isDeepStrictEqual(requirements, generation.requirements))
         throw new PreparationConflictError(
           'Speech requirements changed before practice admission.'
@@ -302,7 +399,14 @@ export async function requestPracticePreparation(
         updatedAt: now,
         selection,
         grant: delegationGrantBinding(grantSpec),
-        inputFingerprint: inputHash(generation),
+        inputFingerprint: generationHash(generation),
+        ...(generation.schemaVersion === 2
+          ? {
+              generationVersion: 2,
+              practiceLevel,
+              learningRequest: generation.learningRequest ?? null,
+            }
+          : {}),
         speechFingerprint: await learningSpeechFingerprint(
           database,
           execution.authorize,
@@ -321,6 +425,9 @@ export async function requestPracticePreparation(
           id: sessionId,
           courseId,
           kind,
+          ...(generation.schemaVersion === 2
+            ? { practiceLevel, learningSelection: generation.learningSelection ?? Prisma.JsonNull }
+            : {}),
           status: 'GENERATING',
           items: [],
           seed: generation.seedToken,
@@ -340,7 +447,10 @@ export async function requestPracticePreparation(
           handler: PRACTICE_PREPARATION_QUEUE,
           version: 1,
           payload: { sessionId, operationId: id },
-          scopes: ownership.scopes,
+          scopes: mergeMaterialAnalysisScopes([
+            ...ownership.scopes,
+            ...(generation.learningSelection?.sourceFocus?.sourceScopes ?? []),
+          ]),
           delivery: { attempts: 1, priority: 0, availableAt: now },
         })
       );
@@ -430,6 +540,42 @@ export async function cancelPracticePreparation(
     prisma,
     async (database) => {
       const actor = await execution.authorize(database);
+      const retiredSession = await database.practiceSession.findFirst({
+        where: { id: sessionId, course: { userId: actor.userId } },
+        select: { generationState: true },
+      });
+      const retired = practicePreparationSchema.safeParse(retiredSession?.generationState);
+      if (retired.success && retired.data.sourceRetired) {
+        if (!discard)
+          throw new PreparationConflictError(
+            'The original source was removed. Start new practice with an available source.'
+          );
+        const operation = retired.data;
+        const ownership = await captureCourseStorage(database, operation.courseId);
+        if (
+          execution.userId !== actor.userId ||
+          actor.userId !== operation.userId ||
+          ownership.userId !== actor.userId ||
+          ownership.instanceId !== operation.instanceId ||
+          !ownership.scopes.some(
+            (scope) =>
+              scope.subjectId === `profile:${actor.userId}` &&
+              scope.generation === operation.userCreatedAt
+          ) ||
+          !ownership.scopes.some(
+            (scope) =>
+              scope.subjectId === `course:${operation.courseId}` &&
+              scope.generation === operation.courseCreatedAt
+          )
+        )
+          throw new PreparationConflictError('The retired practice owner changed.');
+        const receipt = await sottoJobOutbox(database).receipt(operation.id);
+        if (!receipt || receipt.handler !== PRACTICE_PREPARATION_QUEUE || receipt.version !== 1)
+          throw new PreparationConflictError('The retired generation receipt is unavailable.');
+        await sottoJobExecutions(database).requireParentDrained(operation.id, receipt.fingerprint);
+        await practicePreparationGrant(database, operation).revoke(operation.grant);
+        return operation;
+      }
       const { operation, session } = await readPracticePreparation(database, sessionId);
       await validatePracticePreparation(database, sessionId, operation.id, true);
       if (actor.userId !== operation.userId)

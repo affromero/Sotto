@@ -11,6 +11,13 @@ import {
   materialFocusAnalysisRetryRequestSchema,
   materialFocusAnalysisRetryResponseSchema,
 } from '../course-materials/analysis';
+import {
+  learningMapResponseSchema,
+  advanceLearningLevelSchema,
+  learningLevelCompletionSchema,
+  learningSelectionPreviewSchema,
+} from '../learning-map/contracts';
+import { learningSelectionRequestSchema } from '../learning-map/selection';
 import { pencilHomeworkRequestSchema, pencilHomeworkResponseSchema } from './pencil-homework';
 import {
   classRegenerationRequestSchema,
@@ -103,6 +110,16 @@ export interface EndpointDef {
 
 export const endpoints: EndpointDef[] = [
   {
+    id: 'previewLearningSelection',
+    method: 'POST',
+    path: '/api/v1/courses/{courseId}/learning-map/selection',
+    summary:
+      'Preview exact objectives, difficulty and supported practice formats before generation.',
+    auth: 'bearer',
+    request: learningSelectionRequestSchema,
+    response: learningSelectionPreviewSchema,
+  },
+  {
     id: 'health',
     method: 'GET',
     path: '/api/v1/health',
@@ -150,6 +167,34 @@ export const endpoints: EndpointDef[] = [
     response: startPracticeResponseSchema,
     // 202 acknowledges saved preparation; 200 restores an already published request.
     successStatuses: [200, 202],
+  },
+  {
+    id: 'getLearningMap',
+    method: 'GET',
+    path: '/api/v1/courses/{courseId}/learning-map',
+    summary: 'Read the private current or viewed learning band and authoritative readiness.',
+    auth: 'bearer',
+    response: learningMapResponseSchema,
+    successStatuses: [200],
+  },
+  {
+    id: 'getLearningLevelRequirements',
+    method: 'GET',
+    path: '/api/v1/courses/{courseId}/learning-map/levels/{level}',
+    summary: 'Read the requirements and readiness for one learning band.',
+    auth: 'bearer',
+    response: learningMapResponseSchema,
+    successStatuses: [200],
+  },
+  {
+    id: 'advanceLearningLevel',
+    method: 'POST',
+    path: '/api/v1/courses/{courseId}/learning-map/advance',
+    summary: 'Advance exactly one band after authoritative mastery and pending-work checks.',
+    auth: 'bearer',
+    request: advanceLearningLevelSchema,
+    response: learningLevelCompletionSchema,
+    successStatuses: [200],
   },
   {
     id: 'resumePractice',

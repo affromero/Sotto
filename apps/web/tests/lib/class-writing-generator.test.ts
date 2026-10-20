@@ -1,3 +1,4 @@
+// @vitest-environment node
 // Writing content, bounded repair and class persistence through canonical processing.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
@@ -12,6 +13,7 @@ vi.mock('@/lib/prisma', () => {
   const database = {
     $queryRaw: async () => [],
     courseClass: {
+      findFirst: async () => ({ id: 'class-1', skillRequirements: null }),
       findUnique: async () => ({ status: 'GENERATING', attempt: 1, course: { userId: 'u1' } }),
     },
     classSection: { create: (...a: unknown[]) => mockClassSectionCreate(...a) },

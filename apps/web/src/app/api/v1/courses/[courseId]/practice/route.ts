@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sottoRequestExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
-import { z } from 'zod';
+import { startPracticeRequestSchema } from '@sotto/shared';
+import { LearningMapError } from '@/lib/learning-map/read';
+import { MaterialAnalysisConflict } from '@/lib/course-materials/analysis/inventory';
+import { learningMapJson } from '@/lib/learning-map/http';
+import { accessOperation } from '@/lib/sidedoor/access/core/http';
+import { RequestBodyTooLargeError } from 'thesidedoor-core/runtime/request';
 import { authenticateRequest } from '@/lib/api-keys';
 import { prisma } from '@/lib/prisma';
 import { errorResponse } from '@/lib/api-response';
@@ -19,20 +24,19 @@ import {
 
 type RouteParams = { params: Promise<{ courseId: string }> };
 
-const startSchema = z.object({
-  kind: z.enum(['FULL', 'GRAMMAR', 'READING', 'LISTENING', 'SPEAKING', 'WRITING', 'VOCAB']),
-  focusTargetId: z.string().min(1).optional(),
-  requestId: z.uuid().optional(),
-});
-
 /** POST /api/courses/[courseId]/practice — start an ungated practice session. */
-export async function POST(request: NextRequest, { params }: RouteParams) {
+export function POST(request: NextRequest, context: RouteParams) {
+  return accessOperation(request, !request.headers.has('authorization'), () =>
+    start(request, context)
+  );
+}
+async function start(request: NextRequest, { params }: RouteParams) {
   try {
     const authed = await authenticateRequest(request);
     if (!authed) return errorResponse('Unauthorized', 401);
     const { courseId } = await params;
 
-    const parsed = startSchema.safeParse(await request.json());
+    const parsed = startPracticeRequestSchema.safeParse(await learningMapJson(request));
     if (!parsed.success) return errorResponse('Invalid practice kind', 400);
 
     const operation = await requestPracticePreparation(
@@ -42,12 +46,19 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       {
         focusTargetId: parsed.data.focusTargetId,
         requestId: parsed.data.requestId,
+        learningSelection: parsed.data.learningSelection,
       }
     );
     if (operation.status === 'COMPLETED')
       return NextResponse.json(await resumePractice(operation.sessionId, authed.userId));
     return NextResponse.json(practicePreparationProgress(operation), { status: 202 });
   } catch (error: unknown) {
+    if (error instanceof SyntaxError) return errorResponse('Invalid practice request.', 400);
+    if (error instanceof RequestBodyTooLargeError)
+      return errorResponse('Practice request exceeds its byte limit.', 413);
+    if (error instanceof LearningMapError) return errorResponse(error.message, error.status);
+    if (error instanceof MaterialAnalysisConflict)
+      return errorResponse(error.message, error.status);
     if (error instanceof ProviderCreditsExhaustedError)
       return errorResponse(speechCreditsMessage(error), 402, { code: error.code });
     if (error instanceof PreparationConflictError) return errorResponse(error.message, 409);
@@ -84,6 +95,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         select: {
           id: true,
           kind: true,
+          practiceLevel: true,
           status: true,
           score: true,
           startedAt: true,

@@ -23,6 +23,9 @@ import { deleteSottoProfile } from '@/lib/sidedoor/access/deletion/profile-delet
 import { ACTIVE_PROFILE_COOKIE } from '@/lib/profiles/profile-cookie';
 import { SHARED_SESSION_COOKIE } from '@/lib/sidedoor/access/core/session-identity';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
+import { requireOriginalSottoAdmission } from '@/lib/sidedoor/access/core/request-identity';
+import { isAccessError } from 'thesidedoor-core/access';
+import { accessErrorStatus } from 'thesidedoor-core/access/http';
 
 const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365;
 
@@ -78,6 +81,11 @@ export async function GET(request: NextRequest) {
       return errorResponse('Unauthorized', 401);
     }
 
+    if (request.headers.has('x-sotto-expected-profile-id'))
+      await sottoTransaction(prismaUnfiltered, (database) =>
+        requireOriginalSottoAdmission(database, request, authResult)
+      );
+
     const user = await prisma.user.findUnique({
       where: { id: authResult.userId },
       include: {
@@ -110,6 +118,7 @@ export async function GET(request: NextRequest) {
       showAgentUsageStatus: user.showAgentUsageStatus,
     });
   } catch (error: unknown) {
+    if (isAccessError(error)) return errorResponse(error.code, accessErrorStatus(error));
     logger.error('Failed to fetch user', {
       error: error instanceof Error ? error.message : String(error),
     });

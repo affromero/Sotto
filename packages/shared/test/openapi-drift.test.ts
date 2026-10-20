@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
@@ -126,6 +127,10 @@ describe('openapi.json drift guard', () => {
         'GET /api/v1/material-analyses/{analysisId}',
         'GET /api/v1/courses/{courseId}/learning-targets',
         'GET /api/v1/courses/{courseId}/practice',
+        'GET /api/v1/courses/{courseId}/learning-map',
+        'GET /api/v1/courses/{courseId}/learning-map/levels/{level}',
+        'POST /api/v1/courses/{courseId}/learning-map/advance',
+        'POST /api/v1/courses/{courseId}/learning-map/selection',
         'POST /api/v1/courses/{courseId}/learning-targets',
         'POST /api/v1/courses/{courseId}/learning-targets/{targetId}/pronunciation',
         'POST /api/v1/courses/{courseId}/learning-targets/{targetId}/visual-cue',
@@ -877,6 +882,7 @@ describe('response schemas accept representative payloads', () => {
 
   it('memory graph (vocab + grammar nodes, loose superset)', () => {
     const parsed = memoryGraphResponseSchema.parse({
+      objectives: [],
       nodes: [
         {
           id: 'v0',

@@ -1,5 +1,9 @@
 import { z } from 'zod';
 import {
+  materialMergedSourceFocusSchema,
+  materialFocusAnalysisCoverageSchema,
+} from '../course-materials/analysis';
+import {
   learningLevelSchema,
   learningSkillSchema,
   learningSkillCriteriaSchema,
@@ -11,22 +15,90 @@ import {
 
 export const learningSelectionRequestSchema = z
   .object({
-    catalogVersion: z.number().int().positive(),
-    nodeIds: z.array(z.string().min(1).max(120)).min(1).max(8),
+    catalogVersion: z.number().int().positive().nullable(),
+    nodeIds: z.array(z.string().min(1).max(120)).max(8),
     level: learningLevelSchema,
     materialFocusId: z.string().min(1).optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((selection, context) => {
+    if (
+      (!selection.nodeIds.length && !selection.materialFocusId) ||
+      (selection.nodeIds.length > 0 && selection.catalogVersion === null)
+    )
+      context.addIssue({
+        code: 'custom',
+        message:
+          'Choose an objective or an owned source focus. Canonical objectives require a catalog version.',
+      });
+  });
 export type LearningSelectionRequest = z.infer<typeof learningSelectionRequestSchema>;
+
+export const learningSourceFocusSnapshotSchema = z
+  .object({
+    id: z.string().min(1),
+    analysisId: z.string().min(1),
+    analysisRevision: z.number().int().positive(),
+    resultDigest: z.string().regex(/^[a-f0-9]{64}$/),
+    focusDigest: z.string().regex(/^[a-f0-9]{64}$/),
+    detailsBase64: z
+      .string()
+      .min(1)
+      .max(699052)
+      .regex(/^[A-Za-z0-9+/]+={0,2}$/),
+    sourceContext: z
+      .string()
+      .refine((text) => [...text].length <= 12000 && !text.includes('\u0000')),
+    includedCitationCount: z.number().int().positive(),
+    contextTruncated: z.boolean(),
+    sourceScopes: z
+      .array(
+        z
+          .object({
+            subjectId: z.string().min(1),
+            generation: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+          })
+          .strict()
+      )
+      .min(3)
+      .max(32),
+    coverage: materialFocusAnalysisCoverageSchema,
+  })
+  .strict()
+  .superRefine((focus, context) => {
+    try {
+      const binary = atob(focus.detailsBase64);
+      if (binary.length > 524288 || btoa(binary) !== focus.detailsBase64)
+        throw new Error('Noncanonical source encoding.');
+      const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+      const details = materialMergedSourceFocusSchema.parse(
+        JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes))
+      );
+      if (
+        focus.includedCitationCount > details.citations.length ||
+        focus.contextTruncated !== focus.includedCitationCount < details.citations.length
+      )
+        throw new Error('The source excerpt coverage changed.');
+    } catch {
+      context.addIssue({
+        code: 'custom',
+        message: 'The frozen source focus requires complete canonical UTF-8 JSON bytes.',
+      });
+    }
+  });
+export type LearningSourceFocusSnapshot = z.infer<typeof learningSourceFocusSnapshotSchema>;
 
 export const learningSelectionSnapshotSchema = z
   .object({
     schemaVersion: z.literal(1),
-    catalogVersion: z.number().int().positive(),
-    catalogHash: z.string().regex(/^[a-f0-9]{64}$/),
+    catalogVersion: z.number().int().positive().nullable(),
+    catalogHash: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/)
+      .nullable(),
     targetLang: z.string().regex(/^[a-z]{2}$/),
     level: learningLevelSchema,
-    nodeIds: z.array(z.string().min(1)).min(1).max(8),
+    nodeIds: z.array(z.string().min(1)).max(8),
     objectives: z
       .array(
         z
@@ -47,11 +119,28 @@ export const learningSelectionSnapshotSchema = z
           .strict()
           .superRefine(validateLearningSkillCriteria)
       )
-      .min(1)
       .max(4),
     materialFocusId: z.string().nullable(),
+    sourceFocus: learningSourceFocusSnapshotSchema.nullable().optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((selection, context) => {
+    if (
+      (selection.catalogVersion === null) !== (selection.catalogHash === null) ||
+      (!selection.objectives.length && !selection.sourceFocus) ||
+      ((selection.catalogVersion === null || selection.catalogHash === null) &&
+        (selection.nodeIds.length > 0 ||
+          selection.objectives.length > 0 ||
+          !selection.sourceFocus)) ||
+      selection.objectives.some((objective) => objective.level !== selection.level) ||
+      selection.materialFocusId !== (selection.sourceFocus?.id ?? null)
+    )
+      context.addIssue({
+        code: 'custom',
+        message:
+          'Canonical criteria require their exact catalog and difficulty. Private source-only focus requires its frozen owned source receipt.',
+      });
+  });
 export type LearningSelectionSnapshot = z.infer<typeof learningSelectionSnapshotSchema>;
 
 export function normalizeLearningSelection(
@@ -67,6 +156,7 @@ export function resolveLearningSelection(
   priorityObjectiveIds: readonly string[] = []
 ): LearningObjective[] {
   const selection = normalizeLearningSelection(request);
+  if (!selection.nodeIds.length && selection.materialFocusId) return [];
   if (selection.catalogVersion !== catalog.version)
     throw new Error('The learning catalog changed. Reload your selection.');
   const objectives = new Map<string, LearningObjective>();

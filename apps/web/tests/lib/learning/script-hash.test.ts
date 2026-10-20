@@ -1,7 +1,21 @@
+// @vitest-environment node
 import { describe, expect, it } from 'vitest';
-import { learningScriptHash } from '@/lib/learning/script-hash';
+import { learningScriptHash, learningScriptTranscript } from '@/lib/learning/script-hash';
 
 describe('learning script identity', () => {
+  it('retains every exact spoken turn and direction in the private assessment source', () => {
+    expect(
+      JSON.parse(
+        learningScriptTranscript([
+          { speaker: 'Ana', text: 'Hola.', direction: 'quiet' },
+          { speaker: 'Luis', text: 'Adiós.' },
+        ])
+      )
+    ).toEqual([
+      ['Ana', 'Hola.', 'quiet'],
+      ['Luis', 'Adiós.', null],
+    ]);
+  });
   it('retains identity when database JSON object keys are reordered', () => {
     expect(learningScriptHash([{ speaker: 'Ana', text: 'Hola.', direction: 'quiet' }])).toBe(
       learningScriptHash([{ direction: 'quiet', text: 'Hola.', speaker: 'Ana' }])

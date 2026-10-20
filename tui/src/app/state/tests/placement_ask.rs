@@ -141,7 +141,8 @@ fn memory_items_sort_vocab_first_then_due_then_mastery() {
                 { "id": "v0", "kind": "vocab", "label": "casa", "translation": "house", "strength": 0.9, "due": false },
                 { "id": "v1", "kind": "vocab", "label": "perro", "translation": "dog", "strength": 0.3, "due": true }
             ],
-            "edges": []
+            "edges": [],
+            "objectives": []
         }))
         .expect("valid");
     let items = memory_items(&graph);

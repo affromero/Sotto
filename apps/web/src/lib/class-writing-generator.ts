@@ -3,6 +3,10 @@
 // (reused by practice); generateClassWriting adds the ClassSection + WritingPrompt
 // persistence.
 import { withClassGeneration } from './learning/classes/class-generation-state';
+import {
+  captureClassAssessmentScope,
+  reviewWritingAssessments,
+} from './learning-map/evidence/producers';
 import { z } from 'zod';
 import type { ClassTeaching } from '@sotto/shared';
 import { capturedLearningAiOptions, resolveCapturedLearningAi } from './learning-ai';
@@ -417,7 +421,7 @@ export interface ClassWritingResult {
 
 export async function generateClassWriting(p: ClassWritingParams): Promise<ClassWritingResult> {
   const attempt = p.attempt ?? 1;
-  const prompts = await composeWritingPrompts({
+  const composedPrompts = await composeWritingPrompts({
     taskMode: 'translation',
     teaching: p.teaching,
     userId: p.userId,
@@ -428,6 +432,17 @@ export async function generateClassWriting(p: ClassWritingParams): Promise<Class
     objective: p.objective,
     targetVocab: p.targetVocab,
     note: p.note,
+  });
+  const scope = await captureClassAssessmentScope({
+    classId: p.classId,
+    userId: p.userId,
+    execution: p.execution,
+  });
+  const prompts = await reviewWritingAssessments({
+    userId: p.userId,
+    execution: p.execution,
+    scope,
+    prompts: composedPrompts,
   });
 
   const section = await withClassGeneration(p.execution, p.classId, attempt, async (database) => {
@@ -450,6 +465,12 @@ export async function generateClassWriting(p: ClassWritingParams): Promise<Class
         task: c.task,
         guidance: c.guidance,
         ideas: c.ideas,
+        ...(c.learningObjectives
+          ? {
+              learningObjectives:
+                c.learningObjectives as unknown as import('@/generated/prisma/client').Prisma.InputJsonValue,
+            }
+          : {}),
       })),
     });
     return section;

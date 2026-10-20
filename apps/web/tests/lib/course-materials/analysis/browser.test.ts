@@ -104,6 +104,8 @@ describe('profile-bound material analysis browser transport', () => {
     const submitted: unknown = JSON.parse(fetch.mock.calls[2][1].body);
     expect(submitted).toMatchObject({ content, native: 'en', target: 'de', materialIds: [] });
     expect(checkpoint).toMatchObject({ profileId: 'owner', analysisId });
+    for (const [, init] of fetch.mock.calls.slice(1))
+      expect(new Headers(init.headers).get('x-sotto-expected-profile-id')).toBe('owner');
     expect(materialPlacementReference(output, false)).toEqual({
       analysisId,
       analysisRevision: 1,

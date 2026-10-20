@@ -1,10 +1,9 @@
-// Zod schemas for the core /api/v1 endpoints the terminal client consumes.
-// Request schemas reuse the canonical web validators where one already exists;
-// response schemas are authored here to mirror the actual route behavior
-// (read against the routes + practice-service, not invented).
+// Zod contracts mirror canonical API routes, validators and practice services.
+// They are also used by the terminal client.
 import { z } from 'zod';
 import { readingVocabularySchema } from '../reading-vocabulary';
 import { skillRequirementsSchema } from '../learning-requirements';
+import { learningObjectiveMemorySchema } from '../learning-map/contracts';
 import { classTeachingSchema } from './class-teaching';
 import {
   placementSessionPublicSchema,
@@ -13,6 +12,10 @@ import {
   placementSourceRequestSchema,
   placementSourceAdmissionSchema,
 } from '../placement/contracts';
+import {
+  learningSelectionRequestSchema,
+  learningSelectionSnapshotSchema,
+} from '../learning-map/selection';
 import {
   practicePreparingSchema,
   practiceReceiptSchema,
@@ -112,6 +115,7 @@ export const coursesListResponseSchema = z.object({
 // ---------------------------------------------------------------------------
 
 export const practiceRecentSessionSchema = z.object({
+  practiceLevel: cefrLevelSchema.nullable().optional(),
   id: z.string(),
   kind: practiceKindSchema,
   status: practiceStatusSchema,
@@ -132,11 +136,14 @@ export const practiceOverviewResponseSchema = z.object({
 // apps/web/src/lib/practice-service.ts (discriminated on `status`).
 // ---------------------------------------------------------------------------
 
-export const startPracticeRequestSchema = z.object({
-  kind: practiceKindSchema,
-  focusTargetId: z.string().min(1).optional(),
-  requestId: z.uuid().optional(),
-});
+export const startPracticeRequestSchema = z
+  .object({
+    kind: practiceKindSchema,
+    focusTargetId: z.string().min(1).optional(),
+    requestId: z.uuid().optional(),
+    learningSelection: learningSelectionRequestSchema.optional(),
+  })
+  .strict();
 
 // Public projection of a multiple-choice item (toPublic drops the answer).
 export const practiceItemSchema = z.object({
@@ -147,6 +154,8 @@ export const practiceItemSchema = z.object({
 });
 
 export const practiceSpeakingPromptSchema = z.object({
+  taskMode: z.enum(['READ_ALOUD', 'COMMUNICATIVE']).optional(),
+  assessmentScope: z.enum(['PRIVATE_SOURCE', 'CANONICAL']).optional(),
   id: z.string(),
   targetPhrase: z.string(),
   translation: z.string(),
@@ -164,6 +173,8 @@ export const practiceWritingPromptSchema = z.object({
 });
 
 const learningProgressFields = {
+  practiceLevel: cefrLevelSchema.nullable().optional(),
+  learningSelection: learningSelectionSnapshotSchema.nullable().optional(),
   progressRevision: z.number().int().nonnegative().optional(),
   learnerAnswers: z.record(z.string(), z.number().int().min(0).max(3)).optional(),
   writingDrafts: z.record(z.string(), z.string()).optional(),
@@ -424,6 +435,8 @@ export const classQuestionSchema = z
   .loose();
 
 export const classSpeakingPromptSchema = z.object({
+  taskMode: z.enum(['READ_ALOUD', 'COMMUNICATIVE']).optional(),
+  assessmentScope: z.enum(['PRIVATE_SOURCE', 'CANONICAL']).optional(),
   id: z.string(),
   order: z.number().int(),
   targetPhrase: z.string(),
@@ -769,8 +782,8 @@ export const deleteCourseResponseSchema = z.object({
 // ---------------------------------------------------------------------------
 // GET /api/v1/courses/{courseId}/graph — the vocabulary/grammar memory graph.
 // Mirrors apps/web/src/lib/knowledge-graph.ts (getMemoryGraph). The route
-// returns exactly `{ nodes, edges }`; `.loose()` on the node tolerates any
-// extra fields a future projection adds.
+// returns legacy nodes/edges plus separate pinned objective projections.
+// `.loose()` on a legacy node tolerates additional display metadata.
 // ---------------------------------------------------------------------------
 
 export const memoryNodeSchema = z
@@ -797,6 +810,7 @@ export const memoryEdgeSchema = z
 
 export const memoryGraphResponseSchema = z
   .object({
+    objectives: z.array(learningObjectiveMemorySchema),
     nodes: z.array(memoryNodeSchema),
     edges: z.array(memoryEdgeSchema),
   })

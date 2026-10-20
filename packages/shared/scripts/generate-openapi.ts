@@ -9,6 +9,14 @@ import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
 import {
+  learningMapResponseSchema,
+  advanceLearningLevelSchema,
+  learningLevelCompletionSchema,
+  learningSelectionPreviewSchema,
+  learningObjectiveMemorySchema,
+} from '../src/learning-map/contracts';
+import { learningSelectionRequestSchema } from '../src/learning-map/selection';
+import {
   placementGenerateRequestSchema,
   placementSourceStatusSchema,
 } from '../src/placement/contracts';
@@ -137,6 +145,12 @@ const startPracticeVariants: Record<string, string> = {
 // pointers instead of being inlined — this keeps the document DRY and gives the
 // Rust codegen clean, named types. Order is irrelevant; refs resolve by id.
 const namedSchemas: Record<string, z.ZodType> = {
+  LearningMapResponse: learningMapResponseSchema,
+  AdvanceLearningLevelRequest: advanceLearningLevelSchema,
+  LearningLevelCompletion: learningLevelCompletionSchema,
+  LearningSelectionPreview: learningSelectionPreviewSchema,
+  LearningSelectionRequest: learningSelectionRequestSchema,
+  LearningObjectiveMemory: learningObjectiveMemorySchema,
   AdmitPlacementRequest: placementGenerateRequestSchema,
   MaterialAnalysisStatusResponse: placementSourceStatusSchema,
   PencilHomeworkRequest: pencilHomeworkRequestSchema,

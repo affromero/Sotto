@@ -1,6 +1,7 @@
 import type { Prisma } from '@/generated/prisma/client';
 import type { StorageDeletionScope } from '@/lib/storage/sidedoor/deletion-targets';
 import { SIDEDOOR_STATE_ID } from '@/lib/sidedoor/access/state/store';
+import { retirePracticeSourceSnapshots } from '@/lib/practice/source-retirement';
 
 function analysisWhere(
   scope: Exclude<StorageDeletionScope, { kind: 'material-upload' }>
@@ -73,6 +74,21 @@ export async function eraseMaterialAnalysisState(
   if (scope.kind === 'material-upload') return;
   const analysis = analysisWhere(scope);
   let after: string | null = null;
+  while (true) {
+    const rows: Array<{ id: string }> = await database.materialAnalysis.findMany({
+      where: { ...analysis, ...(after ? { id: { gt: after } } : {}) },
+      orderBy: { id: 'asc' },
+      take: 100,
+      select: { id: true },
+    });
+    await retirePracticeSourceSnapshots(
+      database,
+      rows.map((row) => row.id)
+    );
+    if (rows.length < 100) break;
+    after = rows[rows.length - 1]!.id;
+  }
+  after = null;
   while (true) {
     const rows: Array<{ id: string }> = await database.materialAnalysisUnit.findMany({
       where: {

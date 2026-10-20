@@ -1,7 +1,7 @@
 import {
   evaluateLevelReadiness,
   objectiveProgress,
-  type CefrLevel,
+  skillRequirementsSchema,
   type ObjectiveEvidenceState,
   type LearningNode,
   type ObjectiveProgress,
@@ -10,6 +10,8 @@ import type { Prisma } from '@/generated/prisma/client';
 import { classPreparationStore } from '../classes/preparation';
 import { readCourseCatalog } from './catalog';
 import { learningCoverageExemptions, type LearningCourse } from './binding';
+import { readObjectiveStates } from './objective-state';
+export { readObjectiveStates } from './objective-state';
 
 export class LearningMapError extends Error {
   constructor(
@@ -39,27 +41,6 @@ export async function ownedLearningCourse(
   });
   if (!course) throw new LearningMapError('Course not found.', 404);
   return course;
-}
-
-export async function readObjectiveStates(
-  database: Prisma.TransactionClient,
-  courseId: string,
-  level: CefrLevel
-): Promise<ObjectiveEvidenceState[]> {
-  const rows = await database.learnerObjectiveState.findMany({ where: { courseId, level } });
-  return rows.map((row) => ({
-    objectiveId: row.objectiveId,
-    criterionVersion: row.criterionVersion,
-    policyVersion: row.policyVersion,
-    level: row.level,
-    skill: row.skill,
-    mastery: row.mastery,
-    assessedTasks: row.assessedTasks,
-    assessedSessions: row.assessedSessions,
-    lastQuality: row.lastQuality,
-    lastReviewed: row.lastReviewed?.toISOString() ?? null,
-    dueAt: row.dueAt?.toISOString() ?? null,
-  }));
 }
 
 export async function learningTransitionBlockers(
@@ -164,6 +145,7 @@ export async function readLearningMap(
     catalogVersion: catalog.version,
     catalogHash,
     requirementId: binding?.id ?? null,
+    coverage: binding ? skillRequirementsSchema.parse(binding.coverage) : null,
     readiness,
     blockers,
     completedAt: completion?.completedAt.toISOString() ?? null,

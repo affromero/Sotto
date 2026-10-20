@@ -109,6 +109,7 @@ model User {
 // ============ EPISODES ============
 
 model Episode {
+  learningAudioIdentity Json? // immutable stitched audio and script identity
   id             String        @id @default(cuid())
   userId         String
   title          String
@@ -1532,6 +1533,7 @@ model PracticeRequestReceipt {
 }
 
 model PracticeSession {
+  practiceLevel CefrLevel? // immutable generation difficulty; null on legacy sessions
   learningSelection Json? // immutable language-map selection; distinct from lexical focusTargetIds
   listeningScriptHash String? // binds comprehension questions to the preserved listening script
   generationSpec    Json? // captured private context, frozen requirements and source identity

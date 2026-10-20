@@ -185,9 +185,17 @@ export async function analyzePlacementMaterials(input: {
   onProjection?: (value: MaterialAnalysisProjection) => void;
 }): Promise<MaterialAnalysisProjection> {
   const signal = AbortSignal.any([input.signal, AbortSignal.timeout(7_200_000)]);
-  const profile = z
-    .object({ id: z.string().min(1) })
-    .parse(await json(await fetch('/api/v1/users/me', { signal, cache: 'no-store' })));
+  const profile = z.object({ id: z.string().min(1) }).parse(
+    await json(
+      await fetch('/api/v1/users/me', {
+        signal,
+        cache: 'no-store',
+        ...(input.checkpoint
+          ? { headers: { 'x-sotto-expected-profile-id': input.checkpoint.profileId } }
+          : {}),
+      })
+    )
+  );
   let state = input.checkpoint ?? null;
   if (state && state.profileId !== profile.id)
     throw new Error('The active profile changed. Select your materials again.');
@@ -232,7 +240,13 @@ export async function analyzePlacementMaterials(input: {
       clientId: saved.files[index].clientId,
       file,
     }));
-    saved.upload ??= createMaterialUploadClientState(files);
+    saved.upload ??= createMaterialUploadClientState(files, { expectedProfileId: saved.profileId });
+    if (
+      saved.upload.expectedProfileId !== undefined &&
+      saved.upload.expectedProfileId !== saved.profileId
+    )
+      throw new Error('The upload checkpoint belongs to another captured profile.');
+    saved.upload.expectedProfileId = saved.profileId;
     checkpoint();
     const uploaded = await uploadMaterialFiles({
       files,
@@ -257,16 +271,25 @@ export async function analyzePlacementMaterials(input: {
     });
   }
   if (!saved.analysisId) {
-    const current = z
-      .object({ id: z.string().min(1) })
-      .parse(await json(await fetch('/api/v1/users/me', { signal, cache: 'no-store' })));
+    const current = z.object({ id: z.string().min(1) }).parse(
+      await json(
+        await fetch('/api/v1/users/me', {
+          signal,
+          cache: 'no-store',
+          headers: { 'x-sotto-expected-profile-id': saved.profileId },
+        })
+      )
+    );
     if (current.id !== saved.profileId)
       throw new Error('The active profile changed before analysis. Select your materials again.');
     const admitted = materialAnalysisProjectionSchema.parse(
       await json(
         await fetch('/api/v1/placement/from-notes', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'x-sotto-expected-profile-id': saved.profileId,
+          },
           signal,
           body: JSON.stringify({
             schemaVersion: 1,
@@ -287,7 +310,11 @@ export async function analyzePlacementMaterials(input: {
     input.onProgress?.('Reading the saved analysis status');
     const result = materialAnalysisProjectionSchema.parse(
       await json(
-        await fetch(`/api/v1/material-analyses/${saved.analysisId}`, { signal, cache: 'no-store' })
+        await fetch(`/api/v1/material-analyses/${saved.analysisId}`, {
+          signal,
+          cache: 'no-store',
+          headers: { 'x-sotto-expected-profile-id': saved.profileId },
+        })
       )
     );
     signal.throwIfAborted();

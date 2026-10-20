@@ -52,6 +52,8 @@ export function NotesPlacement({ native, target, onVerify }: NotesPlacementProps
   const deduceController = useRef<AbortController | null>(null);
   const checkpoint = useRef<MaterialPlacementCheckpoint | null>(null);
   const confirmationId = useRef<string | null>(null);
+  const confirmationBody = useRef<string | null>(null);
+  const [confirmationFailed, setConfirmationFailed] = useState(false);
   const [acceptPartial, setAcceptPartial] = useState(false);
   const [progress, setProgress] = useState('Reading your materials');
   const [lastAnalysis, setLastAnalysis] = useState<MaterialAnalysisProjection | null>(null);
@@ -61,9 +63,11 @@ export function NotesPlacement({ native, target, onVerify }: NotesPlacementProps
     deduceController.current = null;
     checkpoint.current = null;
     confirmationId.current = null;
+    confirmationBody.current = null;
     setLastAnalysis(null);
     setDeduction(null);
     setAcceptPartial(false);
+    setConfirmationFailed(false);
   }
 
   // Stop polling without replacing the admitted background operation.
@@ -76,6 +80,7 @@ export function NotesPlacement({ native, target, onVerify }: NotesPlacementProps
   const hasMaterials = text.trim().length > 0 || files.length > 0;
 
   async function deduce() {
+    setConfirmationFailed(false);
     setPhase('deducing');
     setErrorMessage('');
     const controller = new AbortController();
@@ -109,6 +114,7 @@ export function NotesPlacement({ native, target, onVerify }: NotesPlacementProps
       });
       setAcceptPartial(false);
       confirmationId.current = crypto.randomUUID();
+      confirmationBody.current = null;
       setPhase('result');
     } catch (err) {
       // cancelDeduction already returned the learner to the form.
@@ -125,19 +131,21 @@ export function NotesPlacement({ native, target, onVerify }: NotesPlacementProps
   async function startHere() {
     if (!deduction) return;
     setPhase('confirming');
+    confirmationBody.current ??= JSON.stringify({
+      schemaVersion: 1,
+      requestId: confirmationId.current,
+      native,
+      target,
+      ...materialPlacementReference(deduction.analysis, acceptPartial),
+    });
     try {
       const res = await fetch('/api/v1/placement/from-notes/confirm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          schemaVersion: 1,
-          requestId: confirmationId.current,
-          native,
-          target,
-          ...materialPlacementReference(deduction.analysis, acceptPartial),
-        }),
+        body: confirmationBody.current,
       });
       if (!res.ok) {
+        setConfirmationFailed(true);
         const body = await res.json().catch(() => ({}));
         setErrorMessage(body.error ?? 'Could not start your course. Please try again.');
         setPhase('error');
@@ -145,6 +153,7 @@ export function NotesPlacement({ native, target, onVerify }: NotesPlacementProps
       }
       router.push('/learn');
     } catch {
+      setConfirmationFailed(true);
       setErrorMessage('A network error occurred while starting your course. Please try again.');
       setPhase('error');
     }
@@ -179,6 +188,11 @@ export function NotesPlacement({ native, target, onVerify }: NotesPlacementProps
       <div className={styles.center} role="alert">
         <p className={styles.errorMessage}>{errorMessage}</p>
         <MaterialAnalysisRetry analysis={lastAnalysis} onRetry={resumeRetry} />
+        {deduction && confirmationFailed && (
+          <button type="button" className={styles.primaryButton} onClick={() => void startHere()}>
+            Retry course confirmation
+          </button>
+        )}
         <button type="button" className={styles.secondaryButton} onClick={() => setPhase('input')}>
           Try again
         </button>

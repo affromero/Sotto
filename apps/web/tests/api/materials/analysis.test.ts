@@ -1,4 +1,5 @@
 // @vitest-environment node
+import { registerFocusedMaterialPracticeCases } from './analysis/focused-practice-cases';
 import { createHash, randomUUID } from 'node:crypto';
 import { createServer, type Server } from 'node:http';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -953,5 +954,18 @@ suite('durable owned material focus analysis', () => {
     setMode: (value) => {
       mode = value;
     },
+  }));
+  registerFocusedMaterialPracticeCases(() => ({
+    instance,
+    identity,
+    courseId,
+    admitted,
+    input,
+    delivered,
+    request,
+    requests,
+    materialFixture,
+    exactText,
+    sha,
   }));
 });

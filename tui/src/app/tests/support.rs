@@ -354,7 +354,7 @@ impl Api for StubApi {
 
     async fn graph(&self, _course_id: &str) -> Result<types::MemoryGraphResponse> {
         Ok(
-            serde_json::from_value(serde_json::json!({ "nodes": [], "edges": [] }))
+            serde_json::from_value(serde_json::json!({ "nodes": [], "edges": [], "objectives": [] }))
                 .expect("valid graph JSON"),
         )
     }

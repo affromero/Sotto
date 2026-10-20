@@ -27,6 +27,7 @@ const checkpointSchema = z
     schemaVersion: z.literal(1),
     request: materialUploadBatchRequestSchema,
     courseId: z.string().min(1).max(100).optional(),
+    expectedProfileId: z.string().min(1).max(100).optional(),
     batch: materialUploadBatchReceiptSchema.nullable(),
     partIdentities: z
       .array(z.object({ clientId: z.uuid(), part: materialUploadPartMetadataSchema }).strict())
@@ -40,6 +41,32 @@ const checkpointSchema = z
   .strict();
 
 export type MaterialUploadClientState = z.infer<typeof checkpointSchema>;
+
+export function restoreMaterialUploadClientState(input: unknown): MaterialUploadClientState {
+  return checkpointSchema.parse(input);
+}
+
+/** Every resumed or cancelled receipt must remain bound to its original upload declaration. */
+export function validateMaterialUploadReceipt(
+  input: unknown,
+  expected: MaterialUploadResume
+): MaterialUploadResume {
+  const upload = materialUploadResumeSchema.parse(input);
+  if (
+    upload.uploadId !== expected.uploadId ||
+    upload.materialId !== expected.materialId ||
+    upload.batchId !== expected.batchId ||
+    JSON.stringify(upload.file) !== JSON.stringify(expected.file) ||
+    upload.revision < expected.revision
+  )
+    throw new Error('The server returned a different or stale upload identity.');
+  for (const part of upload.parts) {
+    const planned = planMaterialUploadPart(upload.file.byteSize, part.index);
+    if (part.offset !== planned.offset || part.byteSize !== planned.byteSize)
+      throw new Error('The server part receipt differs from the exact file plan.');
+  }
+  return upload;
+}
 export interface MaterialUploadClientFile {
   clientId: string;
   file: File;
@@ -73,7 +100,7 @@ export class MaterialUploadClientError extends Error {
 /** Caller owns profile-scoped checkpoint retention. This module persists nothing. */
 export function createMaterialUploadClientState(
   files: readonly MaterialUploadClientFile[],
-  options: { requestId?: string; courseId?: string } = {}
+  options: { requestId?: string; courseId?: string; expectedProfileId?: string } = {}
 ): MaterialUploadClientState {
   return checkpointSchema.parse({
     schemaVersion: 1,
@@ -88,6 +115,9 @@ export function createMaterialUploadClientState(
       })),
     },
     ...(options.courseId === undefined ? {} : { courseId: options.courseId }),
+    ...(options.expectedProfileId === undefined
+      ? {}
+      : { expectedProfileId: options.expectedProfileId }),
     batch: null,
     partIdentities: [],
     completions: [],
@@ -201,19 +231,8 @@ export async function uploadMaterialFiles(options: {
     }
   };
   const accept = (input: unknown, expected: MaterialUploadResume) => {
-    const upload = materialUploadResumeSchema.parse(input);
-    if (
-      upload.uploadId !== expected.uploadId ||
-      upload.materialId !== expected.materialId ||
-      upload.batchId !== expected.batchId ||
-      JSON.stringify(upload.file) !== JSON.stringify(expected.file) ||
-      upload.revision < expected.revision
-    )
-      fail('PROTOCOL', 'The server returned a different or stale upload identity.');
+    const upload = validateMaterialUploadReceipt(input, expected);
     for (const part of upload.parts) {
-      const planned = planMaterialUploadPart(upload.file.byteSize, part.index);
-      if (part.offset !== planned.offset || part.byteSize !== planned.byteSize)
-        fail('PROTOCOL', 'The server part receipt differs from the exact file plan.');
       remember(upload.file.clientId, {
         schemaVersion: 1,
         index: part.index,
@@ -233,10 +252,13 @@ export async function uploadMaterialFiles(options: {
   };
   const json = async (url: string, init: RequestInit = {}) => {
     signal.throwIfAborted();
+    const headers = new Headers(init.headers);
+    if (state.expectedProfileId !== undefined)
+      headers.set('x-sotto-expected-profile-id', state.expectedProfileId);
     let response: Response;
     try {
       response = await withSignal(
-        request(url, { ...init, credentials: 'same-origin', cache: 'no-store', signal }),
+        request(url, { ...init, headers, credentials: 'same-origin', cache: 'no-store', signal }),
         signal
       );
     } catch (error) {

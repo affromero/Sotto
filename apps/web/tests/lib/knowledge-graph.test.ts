@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ---- Hoisted mock handles ----
@@ -13,6 +14,12 @@ const mockVocabEdgeFindMany = vi.fn();
 
 vi.mock('@/lib/prisma', () => {
   const database = {
+    course: {
+      findUnique: vi
+        .fn()
+        .mockResolvedValue({ nativeLang: 'en', targetLang: 'es', currentLevel: 'A1' }),
+    },
+    learningLevelBinding: { findMany: vi.fn().mockResolvedValue([]) },
     learnerVocab: {
       upsert: (...args: unknown[]) => mockLearnerVocabUpsert(...args),
       findMany: (...args: unknown[]) => mockLearnerVocabFindMany(...args),

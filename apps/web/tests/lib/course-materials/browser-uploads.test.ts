@@ -197,6 +197,27 @@ beforeEach(() => vi.stubGlobal('crypto', webcrypto));
 afterEach(() => vi.unstubAllGlobals());
 
 describe('bounded resumable material browser uploads', () => {
+  it('asserts the captured profile on every upload request without changing the semantic declaration', async () => {
+    const server = new UploadServer();
+    const files = [input()];
+    const state = createMaterialUploadClientState(files, { expectedProfileId: 'captured-learner' });
+    const saved = structuredClone(state);
+    const methods = new Set<string>();
+    const result = await run(server, files, state, {
+      fetch: async (url, init) => {
+        expect(new Headers(init?.headers).get('x-sotto-expected-profile-id')).toBe(
+          'captured-learner'
+        );
+        methods.add(init?.method ?? 'GET');
+        if (String(url) === '/api/v1/materials/uploads')
+          expect(JSON.parse(String(init?.body))).not.toHaveProperty('expectedProfileId');
+        return server.fetch(url, init);
+      },
+    });
+    expect(methods).toEqual(new Set(['POST', 'GET', 'PUT']));
+    expect(result.expectedProfileId).toBe('captured-learner');
+    expect(state).toEqual(saved);
+  });
   it('publishes receipts and reports file IDs and committed bytes without mutating caller state', async () => {
     const server = new UploadServer();
     const files = [input()];

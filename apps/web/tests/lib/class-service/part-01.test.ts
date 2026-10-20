@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createSkillRequirements } from '@sotto/shared';
 import { sampleTeaching } from '../../helpers/learning/class-teaching';
@@ -197,7 +198,7 @@ describe('createNextClass', () => {
     expect(result).toEqual({ kind: 'gated', activeClassId: 'class-active', status: 'IN_PROGRESS' });
   });
 
-  it('clears a stale below-level active class and creates at the course currentLevel', async () => {
+  it('preserves a lower-level unfinished class and keeps it resumable', async () => {
     mockCourseFindFirst.mockResolvedValue({
       ...SAMPLE_COURSE,
       currentLevel: 'B1',
@@ -213,20 +214,14 @@ describe('createNextClass', () => {
 
     const result = await createNextClass('course-1', 'u1', authorizedLearnerExecution('u1'));
 
-    expect(result.kind).toBe('created');
-    expect(mockCourseClassDelete).toHaveBeenCalledWith({ where: { id: 'class-stale-a1' } });
-    expect(mockCourseUpdate).toHaveBeenCalledWith({
-      where: { id: 'course-1' },
-      data: { activeClassId: null },
+    expect(result).toEqual({
+      kind: 'gated',
+      activeClassId: 'class-stale-a1',
+      status: 'IN_PROGRESS',
     });
-    expect(mockCourseClassCreate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ lessonId: 'lesson-b1', order: 15 }),
-      })
-    );
   });
 
-  it('returns {kind:"done"} when all lessons are passed', async () => {
+  it('requires a level readiness review when all current-band lessons are passed', async () => {
     mockCourseFindFirst.mockResolvedValue(SAMPLE_COURSE);
     // No active class
     mockCourseClassFindFirst.mockResolvedValue(null);
@@ -235,7 +230,18 @@ describe('createNextClass', () => {
 
     const result = await createNextClass('course-1', 'u1', authorizedLearnerExecution('u1'));
 
-    expect(result).toEqual({ kind: 'done' });
+    expect(result).toEqual({ kind: 'requirements' });
+  });
+  it('never selects a future-band lesson after the current band is exhausted', async () => {
+    mockCourseFindFirst.mockResolvedValue({
+      ...SAMPLE_COURSE,
+      curriculum: { lessons: [SAMPLE_LESSON, SAMPLE_B1_LESSON] },
+    });
+    mockCourseClassFindFirst.mockResolvedValue(null);
+    mockCourseClassFindMany.mockResolvedValue([{ lessonId: SAMPLE_LESSON.id }]);
+    expect(await createNextClass('course-1', 'u1', authorizedLearnerExecution('u1'))).toEqual({
+      kind: 'requirements',
+    });
   });
 
   it('returns {kind:"created"} and creates sections + questions when a new class is needed', async () => {
