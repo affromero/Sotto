@@ -30,7 +30,10 @@ import {
   learningPreparationGrant,
   learningPreparationGrantSpec,
 } from '../learning/preparation/preparation-grant';
-import { learningSpeechFingerprint } from '../learning/speech-configuration';
+import {
+  learningSpeechFingerprint,
+  matchesLearningSpeechFingerprint,
+} from '../learning/speech-configuration';
 import { resolveSkillRequirementsInTransaction } from '../learning/skill-requirements';
 import { cancelPreparation, PreparationConflictError } from '../classes/preparation-state';
 import {
@@ -173,7 +176,9 @@ export async function validatePracticePreparation(
         course,
         work.generation.learningRequest,
         work.session.kind,
-        work.generation.learningSelection
+        work.generation.learningSelection,
+        false,
+        work.generation.requirements
       );
     }
     await validatePracticeSpeechConfiguration(database, work);
@@ -187,11 +192,12 @@ export async function validatePracticeSpeechConfiguration(
 ) {
   // The caller validates the original course, profile and grant before delegation.
   if (
-    (await learningSpeechFingerprint(
+    !(await matchesLearningSpeechFingerprint(
       database,
       async () => ({ userId: work.operation.userId }),
-      work.generation.requirements
-    )) !== work.operation.speechFingerprint
+      work.generation.requirements,
+      work.operation.speechFingerprint
+    ))
   )
     throw new PreparationConflictError(
       'The selected speech model, endpoint or credential changed.'
@@ -355,7 +361,8 @@ export async function requestPracticePreparation(
           generation.learningRequest,
           kind,
           generation.learningSelection,
-          true
+          true,
+          generation.requirements
         );
         if (!isDeepStrictEqual(selected.coverage, generation.levelCoverage))
           throw new PreparationConflictError(

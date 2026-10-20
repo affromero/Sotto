@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { SottoSpinner } from '@/components/ui/SottoSpinner';
 import { PracticeRunner, type PracticeStart } from './PracticeRunner';
 import styles from './PracticePanel.module.css';
-import type { PracticePreparing } from '@sotto/shared';
+import type { PracticePreparing, LearningSkill } from '@sotto/shared';
 import {
   startPracticeRequestSchema,
   startPracticeResponseSchema,
@@ -22,7 +22,12 @@ interface PracticePanelProps {
 }
 
 interface Overview {
-  due: { vocab: number; grammar: number };
+  due: {
+    vocab: number;
+    grammar: number;
+    objectives?: number;
+    bySkill?: Partial<Record<LearningSkill, number>>;
+  };
   totalVocab: number;
   recent: Array<{
     id: string;
@@ -394,9 +399,15 @@ export function PracticePanel({
   }
 
   const dueBadge: Record<string, number | undefined> = {
-    FULL: overview ? overview.due.vocab + overview.due.grammar : undefined,
+    FULL: overview
+      ? overview.due.vocab + overview.due.grammar + (overview.due.objectives ?? 0)
+      : undefined,
     VOCAB: overview?.due.vocab,
-    GRAMMAR: overview?.due.grammar,
+    GRAMMAR: overview ? overview.due.grammar + (overview.due.bySkill?.GRAMMAR ?? 0) : undefined,
+    READING: overview?.due.bySkill?.READING,
+    WRITING: overview?.due.bySkill?.WRITING,
+    LISTENING: overview?.due.bySkill?.LISTENING,
+    SPEAKING: overview?.due.bySkill?.SPEAKING,
   };
 
   return (

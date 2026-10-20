@@ -72,8 +72,7 @@ export function focusedPracticeKinds(
     ? new Set(selection.objectives.flatMap((objective) => objective.skills))
     : new Set(['GRAMMAR', 'READING', 'LISTENING', 'SPEAKING', 'WRITING']);
   return (['FULL', 'GRAMMAR', 'READING', 'LISTENING', 'SPEAKING', 'WRITING'] as const).filter(
-    (kind) =>
-      kind === 'FULL' || (skills.has(kind) && coverage.skills[kind].state !== 'EXEMPT_NO_PROVIDER')
+    (kind) => kind === 'FULL' || (skills.has(kind) && coverage.skills[kind].state === 'REQUIRED')
   );
 }
 
@@ -103,10 +102,8 @@ export function focusedPracticeRequirements(
     nativeLang: current.nativeLang,
     targetLang: current.targetLang,
     level: current.level,
-    ttsProvider:
-      coverage.skills.LISTENING.state === 'EXEMPT_NO_PROVIDER' ? null : current.ttsProvider,
-    sttProvider:
-      coverage.skills.SPEAKING.state === 'EXEMPT_NO_PROVIDER' ? null : current.sttProvider,
+    ttsProvider: current.ttsProvider,
+    sttProvider: current.sttProvider,
   });
 }
 
@@ -118,7 +115,8 @@ export async function capturePracticeLearningSelection(
   input: LearningSelectionRequest,
   kind: PracticeKind,
   frozen?: LearningSelectionSnapshot,
-  pin = false
+  pin = false,
+  frozenRequirements?: SkillRequirements
 ) {
   const actor = await execution.authorize(database);
   if (actor.userId !== course.userId || execution.userId !== actor.userId)
@@ -214,7 +212,26 @@ export async function capturePracticeLearningSelection(
   }
   if (frozen && !isDeepStrictEqual(selection, learningSelectionSnapshotSchema.parse(frozen)))
     throw new LearningMapError('The frozen learning selection or owned source changed.', 409);
-  const availableKinds = focusedPracticeKinds(selection, coverage);
+  const attemptCoverage =
+    frozenRequirements ??
+    (await resolveSkillRequirementsInTransaction(database, execution, {
+      scope: kind === 'FULL' ? 'CLASS' : kind,
+      nativeLang: course.nativeLang,
+      targetLang: course.targetLang,
+      level: request.level,
+    }));
+  if (
+    attemptCoverage.nativeLang !== course.nativeLang ||
+    attemptCoverage.targetLang !== course.targetLang ||
+    attemptCoverage.level !== request.level
+  )
+    throw new LearningMapError(
+      'Practice provider coverage changed its language or difficulty.',
+      409
+    );
+  if (frozenRequirements && attemptCoverage.scope !== kind)
+    throw new LearningMapError('Frozen practice provider coverage changed its format.', 409);
+  const availableKinds = focusedPracticeKinds(selection, attemptCoverage);
   if (!availableKinds.some((available) => available === kind))
     throw new LearningMapError(
       'Choose a format supported by the selected objectives and pinned skill coverage.',

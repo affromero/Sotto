@@ -60,7 +60,7 @@ export async function captureObjectiveAssessmentScope(
     });
     binding = await ensureLearningLevelBinding(database, course, input.level, coverage);
   }
-  const { catalog, exemptSkills } = readBoundCatalog(binding);
+  const { catalog } = readBoundCatalog(binding);
   if (
     selected &&
     (selected.catalogHash !== binding.revision.catalogHash ||
@@ -93,8 +93,7 @@ export async function captureObjectiveAssessmentScope(
     )
       throw new Error('Assessment candidate changed its pinned criterion.');
     for (const skill of objective.skills) {
-      if (exemptSkills.includes(skill) || input.requirements.skills[skill].state !== 'REQUIRED')
-        continue;
+      if (input.requirements.skills[skill].state !== 'REQUIRED') continue;
       criteria.push({
         objectiveId: id,
         criterionVersion: objective.criterionVersion,

@@ -107,6 +107,8 @@ vi.mock('@/lib/learning/skill-requirements', async (importOriginal) => ({
 // ---- Hoisted mock handles ----
 
 const mockCourseFindFirst = vi.fn();
+const mockLearningLevelBindings = vi.fn().mockResolvedValue([]);
+const mockObjectiveStates = vi.fn().mockResolvedValue([]);
 const mockCourseClassFindFirst = vi.fn();
 const mockCourseClassFindUnique = vi.fn();
 const mockCourseClassFindMany = vi.fn();
@@ -157,7 +159,8 @@ vi.mock('@/lib/prisma', () => {
         (await mockCourseMaterialRows()).find((row: { id: string }) => row.id === where.id),
     },
     courseNote: { findUnique: async () => null },
-    learningLevelBinding: { findMany: async () => [] },
+    learningLevelBinding: { findMany: (...args: unknown[]) => mockLearningLevelBindings(...args) },
+    learnerObjectiveState: { findMany: (...args: unknown[]) => mockObjectiveStates(...args) },
     course: {
       findUnique: (...args: unknown[]) => mockCourseFindFirst(...args),
       findFirst: (...args: unknown[]) => mockCourseFindFirst(...args),
@@ -445,6 +448,8 @@ const SAMPLE_QUESTIONS = [
 
 export {
   mockCourseFindFirst,
+  mockLearningLevelBindings,
+  mockObjectiveStates,
   mockCourseClassFindFirst,
   mockCourseClassFindUnique,
   mockCourseClassFindMany,

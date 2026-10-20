@@ -8,6 +8,8 @@ import { accessOperation } from '@/lib/sidedoor/access/core/http';
 import { RequestBodyTooLargeError } from 'thesidedoor-core/runtime/request';
 import { authenticateRequest } from '@/lib/api-keys';
 import { prisma } from '@/lib/prisma';
+import { readCourseObjectiveMemory } from '@/lib/learning-map/objective-memory';
+import { objectiveReviewCounts } from '@/lib/learning-map/adaptation/review';
 import { errorResponse } from '@/lib/api-response';
 import { logger } from '@/lib/logger';
 import { PracticeCourseNotFoundError } from '@/lib/practice-service';
@@ -78,15 +80,31 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     const course = await prisma.course.findFirst({
       where: { id: courseId, userId: authed.userId },
-      select: { id: true },
+      select: { id: true, currentLevel: true, targetLang: true },
     });
     if (!course) return errorResponse('Course not found', 404);
 
     const now = new Date();
+    const memory = await readCourseObjectiveMemory(courseId, now);
+    const objectiveDue = objectiveReviewCounts(
+      memory.objectives,
+      {
+        level: course.currentLevel,
+        targetLang: course.targetLang,
+        kind: 'FULL',
+      },
+      now
+    );
     const dueOrWeak = { OR: [{ dueAt: { lte: now } }, { mastery: { lt: 0.5 } }] };
     const [vocabDue, grammarDue, totalVocab, recent] = await Promise.all([
       prisma.learnerVocab.count({ where: { courseId, ...dueOrWeak } }),
-      prisma.learnerGrammar.count({ where: { courseId, ...dueOrWeak } }),
+      prisma.learnerGrammar.count({
+        where: {
+          courseId,
+          ...dueOrWeak,
+          ...(memory.legacyGrammarExclusions.length ? { NOT: memory.legacyGrammarExclusions } : {}),
+        },
+      }),
       prisma.learnerVocab.count({ where: { courseId } }),
       prisma.practiceSession.findMany({
         where: { courseId },
@@ -105,7 +123,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     ]);
 
     return NextResponse.json({
-      due: { vocab: vocabDue, grammar: grammarDue },
+      due: { vocab: vocabDue, grammar: grammarDue, ...objectiveDue },
       totalVocab,
       recent,
     });

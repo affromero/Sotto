@@ -204,7 +204,7 @@ function LearningMapController({
     []
   );
 
-  async function startPractice(selection: LearningSelectionRequest, kind: PracticeKind) {
+  async function resolvePractice(selection: LearningSelectionRequest, kind: PracticeKind | null) {
     const scope = map ?? privateSource;
     if (!scope || loading || saving || mutation.current || practice) return;
     const parsed = learningSelectionRequestSchema.parse(selection);
@@ -244,12 +244,12 @@ function LearningMapController({
         preview.selection.level !== parsed.level ||
         preview.selection.targetLang !== scope.targetLang ||
         preview.selection.materialFocusId !== (parsed.materialFocusId ?? null) ||
-        kind === 'VOCAB' ||
-        !preview.availableKinds.includes(kind)
+        (kind !== null && (kind === 'VOCAB' || !preview.availableKinds.includes(kind)))
       )
         throw new Error(
           'The practice selection or available format changed. Reload the map and preview it again.'
         );
+      if (kind === null) return preview.availableKinds;
       const frozen = learningSelectionRequestSchema.parse({
         catalogVersion: preview.selection.catalogVersion,
         level: preview.selection.level,
@@ -270,6 +270,16 @@ function LearningMapController({
         setSaving(false);
       }
     }
+  }
+
+  async function startPractice(selection: LearningSelectionRequest, kind: PracticeKind) {
+    await resolvePractice(selection, kind);
+  }
+
+  async function previewPracticeFormats(selection: LearningSelectionRequest) {
+    const kinds = await resolvePractice(selection, null);
+    if (!kinds) throw new Error('The practice selection changed. Choose its formats again.');
+    return kinds;
   }
 
   async function advance() {
@@ -388,6 +398,7 @@ function LearningMapController({
             onClearSourceExposure={() => setSourceExposure(null)}
             onViewLevel={(level) => void loadMap(level)}
             onPractice={startPractice}
+            onPreviewSelection={previewPracticeFormats}
             onAdvance={advance}
             busy={loading || saving}
             error={error}

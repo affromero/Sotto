@@ -8,6 +8,10 @@ import { rankLearningTargets } from '@sotto/learning-model';
 import type { CefrLevel, LearningObjectiveMemory } from '@sotto/shared';
 import type { LearningDatabase } from './learning/database';
 import { readCourseObjectiveMemory, dueObjectiveMemory } from './learning-map/objective-memory';
+import {
+  objectiveReviewTargets,
+  type ObjectiveReviewScope,
+} from './learning-map/adaptation/review';
 
 export interface VocabItem {
   lemma: string;
@@ -200,7 +204,11 @@ export interface DueItems {
 }
 
 /** Adaptive due-or-weak items, used to seed practice, classes, and listening. */
-export async function getDueItems(courseId: string, limit = 8): Promise<DueItems> {
+export async function getDueItems(
+  courseId: string,
+  limit = 8,
+  objectiveScope?: ObjectiveReviewScope
+): Promise<DueItems> {
   const now = new Date();
   const objectiveMemory = await readCourseObjectiveMemory(courseId, now);
   const dueOrWeak = { OR: [{ dueAt: { lte: now } }, { mastery: { lt: 0.5 } }] };
@@ -264,7 +272,12 @@ export async function getDueItems(courseId: string, limit = 8): Promise<DueItems
     };
   });
   return {
-    objectives: dueObjectiveMemory(objectiveMemory.objectives, limit),
+    objectives: dueObjectiveMemory(
+      objectiveScope
+        ? objectiveReviewTargets(objectiveMemory.objectives, objectiveScope, now)
+        : objectiveMemory.objectives,
+      limit
+    ),
     vocab: rankLearningTargets(boostedVocab, now)
       .slice(0, limit)
       .map(({ id, lemma, translation, actualMastery }) => ({

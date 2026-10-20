@@ -7,6 +7,8 @@ struct SavedSourceFocusLibrary: View {
     let level: SottoLearningLevel
     let previewOnly: Bool
     let onChoose: (SottoLearningSelection) -> Void
+    let selectedObjectiveCount: Int
+    let onCombine: ((SottoLearningSelection) -> Void)?
     @State private var analyses: SottoSavedSourceAnalyses?
     @State private var selected: SottoSavedSourceAnalyses.Item?
     @State private var focuses: SottoSavedSourceFocuses?
@@ -15,6 +17,14 @@ struct SavedSourceFocusLibrary: View {
     @State private var busy = false
     @State private var error = ""
     @State private var epoch = UUID()
+
+    init(courseId: String, target: String, level: SottoLearningLevel, previewOnly: Bool,
+        selectedObjectiveCount: Int = 0, onCombine: ((SottoLearningSelection) -> Void)? = nil,
+        onChoose: @escaping (SottoLearningSelection) -> Void) {
+        self.courseId = courseId; self.target = target; self.level = level
+        self.previewOnly = previewOnly; self.selectedObjectiveCount = selectedObjectiveCount
+        self.onCombine = onCombine; self.onChoose = onChoose
+    }
 
     var body: some View {
         DisclosureGroup("Saved source focuses") {
@@ -54,6 +64,11 @@ struct SavedSourceFocusLibrary: View {
                     Button("Review private practice at \(level.rawValue)") {
                         onChoose(SottoLearningSelection(catalogVersion: nil, nodeIds: [], level: level, materialFocusId: selectedFocus.id))
                     }.buttonStyle(.bordered).frame(minHeight: 44).disabled(busy || previewOnly)
+                    if selectedObjectiveCount > 0, let onCombine {
+                        Button("Review source with \(selectedObjectiveCount) selected objectives at \(level.rawValue)") {
+                            onCombine(SottoLearningSelection(catalogVersion: nil, nodeIds: [], level: level, materialFocusId: selectedFocus.id))
+                        }.buttonStyle(.bordered).frame(minHeight: 44).disabled(busy || previewOnly)
+                    }
                 }
             }
         }

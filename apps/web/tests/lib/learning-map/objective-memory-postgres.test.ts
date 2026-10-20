@@ -180,6 +180,39 @@ suite('qualified objective memory reads against PostgreSQL', () => {
     expect(progress?.skills.every((skill) => skill.evidence === null)).toBe(true);
     expect((await getDueItems(courseId)).objectives).toEqual([]);
   });
+  it('filters qualified reviews to the requested band and skill before applying the limit without writing evidence', async () => {
+    const { objective } = await pin();
+    await evidence(objective);
+    const course = await instance.database.course.findUniqueOrThrow({ where: { id: courseId } });
+    const lowerCoverage = createSkillRequirements({
+      scope: 'CLASS',
+      nativeLang: 'en',
+      targetLang: 'de',
+      level: 'A1',
+      ttsProvider: null,
+      sttProvider: null,
+    });
+    const lowerBinding = await instance.database.$transaction((database) =>
+      ensureLearningLevelBinding(database, course, 'A1', lowerCoverage)
+    );
+    const lower = readBoundCatalog(lowerBinding).catalog.nodes.find(
+      (node): node is LearningObjective =>
+        node.kind === 'OBJECTIVE' && node.level === 'A1' && node.branch === 'GRAMMAR'
+    );
+    if (!lower) throw new Error('Expected lower-band objective.');
+    await evidence(lower);
+    const before = await instance.database.learnerObjectiveState.findMany({ where: { courseId } });
+    const due = await getDueItems(courseId, 1, { level: 'A2', targetLang: 'de', kind: 'GRAMMAR' });
+    expect(due.objectives.map((entry) => entry.objective.id)).toEqual([objective.id]);
+    expect(
+      (await getDueItems(courseId, 1, { level: 'A2', targetLang: 'de', kind: 'READING' }))
+        .objectives
+    ).toEqual([]);
+    expect(await instance.database.learnerObjectiveState.findMany({ where: { courseId } })).toEqual(
+      before
+    );
+    expect(await instance.database.learningObservation.count()).toBe(0);
+  });
 
   it('preserves ambiguous aliases and does not publish a catalog while reading an unbound course', async () => {
     const unbound = await getMemoryGraph(courseId);

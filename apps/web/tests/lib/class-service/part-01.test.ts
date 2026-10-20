@@ -1,9 +1,12 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createSkillRequirements } from '@sotto/shared';
+import { reviewFixture } from '../learning-map/adaptation/fixtures';
 import { sampleTeaching } from '../../helpers/learning/class-teaching';
 import {
   mockCourseFindFirst,
+  mockLearningLevelBindings,
+  mockObjectiveStates,
   mockCourseClassFindFirst,
   mockCourseClassFindUnique,
   mockCourseClassFindMany,
@@ -46,6 +49,8 @@ import {
 describe('createNextClass', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockLearningLevelBindings.mockResolvedValue([]);
+    mockObjectiveStates.mockResolvedValue([]);
     mockDueVocabRows.mockResolvedValue([]);
     mockCourseMaterialRows.mockResolvedValue([]);
     mockLearnerVocabFindMany.mockResolvedValue([
@@ -100,6 +105,27 @@ describe('createNextClass', () => {
     await expect(
       createNextClass('course-1', 'u1', authorizedLearnerExecution('u1'))
     ).rejects.toBeInstanceOf(CourseNotFoundError);
+  });
+  it('adds qualified objective criteria to the class context and snapshot without replacing its lesson scope', async () => {
+    const { entry, binding, states } = reviewFixture();
+    mockCourseFindFirst.mockResolvedValue(SAMPLE_COURSE);
+    mockCourseClassFindFirst.mockResolvedValue(null);
+    mockCourseClassFindMany.mockResolvedValue([]);
+    mockLearningLevelBindings.mockResolvedValueOnce([binding]);
+    mockObjectiveStates.mockResolvedValueOnce(states);
+    await createNextClass('course-1', 'u1', authorizedLearnerExecution('u1'));
+    const generation = mockGenerateSectionQuestions.mock.calls[0][0];
+    expect(generation.note).toContain(entry.objective.id);
+    expect(generation.note).toContain(entry.objective.skillCriteria.GRAMMAR);
+    expect(generation.objective).toBe(SAMPLE_LESSON.objective);
+    const publication = mockCourseClassUpdate.mock.calls
+      .map(([input]) => input.data)
+      .find((data) => data.adaptiveSeed?.objectiveReviewContext);
+    expect(publication.adaptiveSeed.objectiveReviewContext).toContain(entry.catalogHash);
+    expect(publication.adaptiveSeed.dueCount).toBe(1);
+    expect(publication.adaptiveSeed.classTargets.grammarPoints).toEqual(
+      SAMPLE_LESSON.grammarPoints
+    );
   });
 
   it('publishes accepted teaching with a frozen mix of new and struggling words', async () => {

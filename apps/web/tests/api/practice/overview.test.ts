@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { practicePreparingSchema } from '@sotto/shared';
+import { reviewFixture } from '../../lib/learning-map/adaptation/fixtures';
 
 const mocks = vi.hoisted(() => ({
   authenticate: vi.fn(),
@@ -13,6 +14,9 @@ const mocks = vi.hoisted(() => ({
   vocab: vi.fn(),
   grammar: vi.fn(),
   sessions: vi.fn(),
+  memoryCourse: vi.fn(),
+  bindings: vi.fn(),
+  states: vi.fn(),
 }));
 vi.mock('@/lib/api-keys', () => ({ authenticateRequest: mocks.authenticate }));
 vi.mock('@/lib/practice/preparation', async (importOriginal) => ({
@@ -27,7 +31,9 @@ vi.mock('@/lib/practice-service', async (importOriginal) => ({
 vi.mock('@/lib/prisma', () => ({
   prismaUnfiltered: {},
   prisma: {
-    course: { findFirst: mocks.course },
+    course: { findFirst: mocks.course, findUnique: mocks.memoryCourse },
+    learningLevelBinding: { findMany: mocks.bindings },
+    learnerObjectiveState: { findMany: mocks.states },
     learnerVocab: { count: mocks.vocab },
     learnerGrammar: { count: mocks.grammar },
     practiceSession: { findMany: mocks.sessions },
@@ -53,6 +59,9 @@ const jsonReq = (body: unknown) =>
 beforeEach(() => {
   vi.resetAllMocks();
   mocks.authenticate.mockResolvedValue({ userId: 'u1' });
+  mocks.memoryCourse.mockResolvedValue({ nativeLang: 'en', targetLang: 'es', currentLevel: 'A1' });
+  mocks.bindings.mockResolvedValue([]);
+  mocks.states.mockResolvedValue([]);
   mocks.admit.mockResolvedValue({ id: randomUUID(), sessionId: randomUUID(), status: 'QUEUED' });
 });
 
@@ -192,7 +201,7 @@ describe('Practice HTTP contract', () => {
   });
 
   it('shows due counts and preparation failures in the owner’s recent history', async () => {
-    mocks.course.mockResolvedValue({ id: 'c1' });
+    mocks.course.mockResolvedValue({ id: 'c1', currentLevel: 'A1', targetLang: 'es' });
     mocks.vocab.mockResolvedValueOnce(7).mockResolvedValueOnce(20);
     mocks.grammar.mockResolvedValue(3);
     mocks.sessions.mockResolvedValue([{ id: 'ps1', kind: 'FULL', status: 'FAILED', score: null }]);
@@ -206,5 +215,25 @@ describe('Practice HTTP contract', () => {
       totalVocab: 20,
       recent: [{ status: 'FAILED' }],
     });
+  });
+  it('reports qualified current-band channel reviews separately while preserving broad legacy grammar', async () => {
+    const { entry, binding, states } = reviewFixture();
+    mocks.course.mockResolvedValue({ id: 'c1', currentLevel: 'A1', targetLang: 'es' });
+    mocks.bindings.mockResolvedValue([binding]);
+    mocks.states.mockResolvedValue(states);
+    mocks.vocab.mockResolvedValue(0);
+    mocks.grammar.mockImplementation(async (query: { where: { NOT?: unknown } }) =>
+      query.where.NOT ? 1 : 2
+    );
+    mocks.sessions.mockResolvedValue([]);
+    const response = await overviewGet(
+      new NextRequest('http://localhost/api/v1/practice'),
+      courseParams
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      due: { vocab: 0, grammar: 1, objectives: 1, bySkill: { GRAMMAR: 1, WRITING: 1 } },
+    });
+    expect(entry.progress.status).toBe('NEEDS_WORK');
   });
 });

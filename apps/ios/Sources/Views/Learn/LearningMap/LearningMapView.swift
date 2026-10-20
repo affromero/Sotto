@@ -10,17 +10,23 @@ struct LearningMapView: View {
     @State private var selected = Set<String>()
     @State private var preview: SottoLearningSelectionPreview?
     @State private var kind = "FULL"
-    @State private var busy = false
+    @StateObject private var activity = NativeLearningMapActivity()
     @State private var error = ""
-    @State private var epoch = UUID()
-    @State private var pendingAdvance: SottoLearningAdvanceRequest?
     @State private var query = ""
+
+    private var busy: Bool { activity.busy }
+    private var context: NativeLearningMapContext? {
+        guard let client = model.makeClient(), model.courses.contains(where: { $0.id == courseId }) else { return nil }
+        return NativeLearningMapContext(learner: SottoLearnerIdentity(client), courseId: courseId, viewedLevel: viewed)
+    }
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
-                    Picker("Viewed level", selection: $viewed) {
+                    Picker("Viewed level", selection: Binding(get: { viewed }, set: {
+                        activity.invalidate(); preview = nil; selected = []; viewed = $0
+                    })) {
                         Text("Current level").tag(SottoLearningLevel?.none)
                         ForEach(SottoLearningLevel.allCases) { level in
                             Text(level.rawValue).tag(Optional(level))
@@ -65,9 +71,10 @@ struct LearningMapView: View {
                             LearningMapNodeRow(row: row, map: map, selected: $selected, disabled: busy || map.previewOnly, visibleIds: visibleIds)
                         }
                         SavedSourceFocusLibrary(courseId: courseId, target: map.targetLang, level: map.viewedLevel,
-                            previewOnly: map.previewOnly) { request in
+                            previewOnly: map.previewOnly, selectedObjectiveCount: selected.count,
+                            onCombine: { request in Task { await resolveSelection(request: request, includeSelected: true) } }) { request in
                             Task { await resolveSelection(request: request) }
-                        }.environmentObject(model)
+                        }.environmentObject(model).disabled(busy)
                         if !map.previewOnly {
                             Button("Review selected practice (\(selected.count))") { Task { await resolveSelection() } }
                                 .buttonStyle(.bordered).frame(minHeight: 44)
@@ -76,13 +83,14 @@ struct LearningMapView: View {
                                 VStack(alignment: .leading, spacing: 8) {
                                     Text("Practice at \(preview.selection.level.rawValue)").font(.headline)
                                     ForEach(preview.selection.objectives, id: \.id) { Text($0.title) }
-                                    if preview.selection.materialFocusId != nil {
-                                        Text("Private source practice. No canonical objective credit.").font(.caption)
+                                    if let credit = preview.sourceCreditMessage {
+                                        Text(credit).font(.caption)
                                     }
                                     Picker("Practice format", selection: $kind) {
                                         ForEach(preview.availableKinds, id: \.self) { Text($0.capitalized).tag($0) }
                                     }
                                     .frame(minHeight: 44)
+                                    .disabled(busy)
                                     Button("Start focused practice") { Task { await start(preview) } }
                                         .buttonStyle(.borderedProminent).frame(minHeight: 44).disabled(busy)
                                 }
@@ -120,67 +128,77 @@ struct LearningMapView: View {
                     Button("Refresh", systemImage: "arrow.clockwise") { Task { await load() } }.disabled(busy)
                 }
             }
-            .task(id: viewed) { await load() }
+            .task(id: context) { await load() }
             .onChange(of: selected) { _, _ in preview = nil }
-            .onDisappear { epoch = UUID() }
+            .onDisappear { activity.invalidate() }
         }
     }
 
     private func load() async {
-        let token = UUID(); epoch = token
-        busy = true; error = ""; preview = nil; selected = []
-        defer { if epoch == token { busy = false } }
+        guard let owner = context else {
+            activity.invalidate(); map = nil; preview = nil; selected = []
+            return
+        }
+        let token = activity.begin(owner)
+        error = ""; preview = nil; selected = []
+        defer { activity.finish(token, context: context) }
         do {
-            let value = try await model.learningMap(courseId: courseId, level: viewed)
+            let value = try await model.learningMap(courseId: owner.courseId, level: owner.viewedLevel)
             try Task.checkCancellation()
-            guard epoch == token else { return }
+            guard activity.accepts(token, context: context) else { return }
             map = value
-            if let pendingAdvance, value.currentLevel != pendingAdvance.expectedLevel || value.completedAt != nil {
-                self.pendingAdvance = nil
-            }
+            activity.reconcileAdvance(value, context: owner)
         } catch {
-            if epoch == token && !Task.isCancelled { self.error = error.localizedDescription; map = nil }
+            if activity.accepts(token, context: context) && !Task.isCancelled { self.error = error.localizedDescription; map = nil }
         }
     }
 
-    private func resolveSelection(request chosen: SottoLearningSelection? = nil) async {
-        guard let map, !map.previewOnly, !busy else { return }
-        let request = chosen ?? SottoLearningSelection(catalogVersion: map.catalogVersion,
-            nodeIds: selected.sorted(), level: map.viewedLevel)
-        busy = true; error = ""
-        let token = epoch
-        defer { if epoch == token { busy = false } }
+    private func resolveSelection(request chosen: SottoLearningSelection? = nil, includeSelected: Bool = false) async {
+        guard let map, !map.previewOnly, !busy, let owner = context,
+              map.viewedLevel == (owner.viewedLevel ?? map.currentLevel) else { return }
+        let token = activity.begin(owner)
+        error = ""
+        defer { activity.finish(token, context: context) }
         do {
-            let value = try await model.previewLearningSelection(courseId: courseId, selection: request)
-            guard epoch == token else { return }
+            let request = try map.practiceSelection(source: chosen, selected: chosen == nil || includeSelected ? selected : [])
+            let value = try await model.previewLearningSelection(courseId: owner.courseId, selection: request)
+            guard activity.accepts(token, context: context), !Task.isCancelled else { return }
             let explicit = Set(request.nodeIds.filter { id in map.nodes.contains { $0.id == id && $0.node.kind == "OBJECTIVE" } })
             guard value.selection.targetLang == map.targetLang,
                   explicit.isSubset(of: Set(value.selection.objectives.map(\.id))) else {
                 throw SottoAPIError.message("The practice preview dropped an explicit objective or changed its language.")
             }
             preview = value; kind = value.availableKinds.contains("FULL") ? "FULL" : value.availableKinds[0]
-        } catch { if epoch == token { self.error = error.localizedDescription } }
+        } catch { if activity.accepts(token, context: context) && !Task.isCancelled { self.error = error.localizedDescription } }
     }
 
     private func start(_ preview: SottoLearningSelectionPreview) async {
-        guard !busy, map?.previewOnly == false, preview.availableKinds.contains(kind) else { return }
-        busy = true
-        await model.startPractice(courseId: courseId, kind: kind, learningSelection: preview.explicitSelection())
-        busy = false
+        guard !busy, let map, !map.previewOnly, self.preview?.selection == preview.selection,
+              preview.availableKinds.contains(kind), let owner = context,
+              map.viewedLevel == (owner.viewedLevel ?? map.currentLevel),
+              preview.selection.level == map.viewedLevel else { return }
+        let token = activity.begin(owner)
+        defer { activity.finish(token, context: context) }
+        await model.startPractice(courseId: owner.courseId, kind: kind, learningSelection: preview.explicitSelection())
+        guard activity.accepts(token, context: context), !Task.isCancelled else { return }
         if model.practiceStart != nil && model.errorMessage == nil { dismiss() }
         else { error = model.errorMessage ?? "Practice is not confirmed. Retry the saved request." }
     }
 
     private func advance(_ map: SottoLearningMap) async {
-        guard map.canAdvance, !busy else { return }
-        let request = pendingAdvance ?? SottoLearningAdvanceRequest(requestId: UUID(), expectedLevel: map.currentLevel, catalogHash: map.catalogHash)
-        pendingAdvance = request
-        busy = true; error = ""
+        guard map.canAdvance, !busy, let owner = context,
+              map.viewedLevel == (owner.viewedLevel ?? map.currentLevel) else { return }
+        let request = activity.advanceRequest(context: owner, level: map.currentLevel, catalogHash: map.catalogHash)
+        let token = activity.begin(owner)
+        error = ""
+        defer { activity.finish(token, context: context) }
         do {
-            try await model.advanceLearningLevel(courseId: courseId, request: request)
-            pendingAdvance = nil; viewed = nil
-            await load()
-        } catch { self.error = error.localizedDescription; busy = false }
+            try await model.advanceLearningLevel(courseId: owner.courseId, request: request)
+            guard activity.accepts(token, context: context), !Task.isCancelled else { return }
+            activity.confirmAdvance(request, context: owner)
+            if viewed != nil { viewed = nil }
+            else { await load() }
+        } catch { if activity.accepts(token, context: context) && !Task.isCancelled { self.error = error.localizedDescription } }
     }
 }
 

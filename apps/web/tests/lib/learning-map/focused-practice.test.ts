@@ -438,7 +438,7 @@ suite('repeatable focused practice with immutable owned difficulty', () => {
     expect(reread.session.practiceLevel).toBeNull();
   });
 
-  it('rejects tampered stored difficulty and preserves pinned oral exemptions without waiving required speech', async () => {
+  it('rejects tampered difficulty and required speech outages while allowing newly configured optional speech', async () => {
     const { progress } = await admit();
     await instance.database.practiceSession.update({
       where: { id: progress.sessionId },
@@ -458,9 +458,7 @@ suite('repeatable focused practice with immutable owned difficulty', () => {
       ttsProvider: 'local',
       sttProvider: 'local',
     });
-    expect(focusedPracticeRequirements(configured, exempt).skills.SPEAKING.state).toBe(
-      'EXEMPT_NO_PROVIDER'
-    );
+    expect(focusedPracticeRequirements(configured, exempt).skills.SPEAKING.state).toBe('REQUIRED');
     const required = createSkillRequirements({
       ...base,
       scope: 'CLASS',

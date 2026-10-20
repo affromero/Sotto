@@ -141,6 +141,30 @@ suite('durable preparation admission and provider accounting', () => {
     return { ...operation, status: 'RUNNING' as const };
   }
 
+  it('preserves admitted no-audio class work after speech is enabled with invalid new endpoints', async () => {
+    await instance.database.user.update({
+      where: { id: identity.ownerId },
+      data: { preferredTtsProvider: 'disabled' },
+    });
+    const operation = await running();
+    expect(operation.requirements?.skills.SPEAKING.state).toBe('EXEMPT_NO_PROVIDER');
+    await instance.database.user.update({
+      where: { id: identity.ownerId },
+      data: { preferredTtsProvider: null },
+    });
+    await instance.configureInfrastructure({
+      ttsProvider: 'local',
+      ttsBaseUrl: 'file:///new-invalid-tts',
+      sttProvider: 'local',
+      sttBaseUrl: 'file:///new-invalid-stt',
+    });
+    const checked = await sottoTransaction(instance.database, (database) =>
+      validateClassPreparation(database, courseId, operation.id)
+    );
+    expect(checked.requirements).toEqual(operation.requirements);
+    expect(checked.speechFingerprint).toBe(operation.speechFingerprint);
+  });
+
   registerPreparationFailureTests(() => ({ instance, courseId, execution, running, lesson }));
   registerLearningFailureWireTests(() => ({ instance, courseId, execution, running, lesson }));
   registerQuizRetryAdmissionTests(() => ({ instance, courseId, execution, lesson, queuedJob }));

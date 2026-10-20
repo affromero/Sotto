@@ -3,6 +3,42 @@ import XCTest
 @testable import Sotto
 
 final class LearningMapTransportTests: XCTestCase {
+    func testSourceAndCheckedObjectivesRemainCombinedThroughPreviewAndAdmission() async throws {
+        let fixture = await makeClient()
+        let map = try await fixture.client.fetchLearningMap(courseId: "course", level: .a1)
+        let source = SottoLearningSelection(catalogVersion: nil, nodeIds: [], level: .a1,
+            materialFocusId: String(repeating: "f", count: 64))
+        let combined = try map.practiceSelection(source: source, selected: ["de.a1.order"])
+        XCTAssertEqual(combined.catalogVersion, 1)
+        XCTAssertEqual(combined.nodeIds, ["de.a1.order"])
+        let preview = try await fixture.client.previewLearningSelection(courseId: "course", selection: combined)
+        XCTAssertEqual(preview.sourceCreditMessage,
+            "Your source guides this practice. Eligible assessment results can contribute to the selected objectives.")
+        _ = try await fixture.client.startPractice(courseId: "course", kind: "GRAMMAR", requestId: UUID(),
+            learningSelection: preview.explicitSelection())
+        let requests = await LearningMapServer.shared.requests(fixture.host)
+        let body = try JSONDecoder().decode(PracticeRequest.self, from: XCTUnwrap(requests.last?.httpBody))
+        XCTAssertEqual(body.learningSelection, combined)
+        let privateSelection = try map.practiceSelection(source: source, selected: [])
+        XCTAssertNil(privateSelection.catalogVersion)
+        XCTAssertTrue(privateSelection.nodeIds.isEmpty)
+        let privatePreview = try await fixture.client.previewLearningSelection(courseId: "course", selection: privateSelection)
+        XCTAssertEqual(privatePreview.sourceCreditMessage, "Private source practice. No canonical objective credit.")
+    }
+
+    func testCombinedSelectionRejectsChangedBandAndUnknownOrGroupedObjectives() async throws {
+        let fixture = await makeClient()
+        let map = try await fixture.client.fetchLearningMap(courseId: "course", level: .a1)
+        for id in ["de.grammar", "unknown.objective"] {
+            XCTAssertThrowsError(try map.practiceSelection(source: nil, selected: [id]))
+        }
+        let changed = SottoLearningSelection(catalogVersion: nil, nodeIds: [], level: .a2,
+            materialFocusId: String(repeating: "f", count: 64))
+        XCTAssertThrowsError(try map.practiceSelection(source: changed, selected: ["de.a1.order"]))
+        let future = try await fixture.client.fetchLearningMap(courseId: "course", level: .b1)
+        XCTAssertThrowsError(try future.practiceSelection(source: nil, selected: ["de.a1.order"]))
+    }
+
     func testSourceOnlyPreviewKeepsTheExactFocusWithoutManufacturingCanonicalObjectives() async throws {
         let fixture = await makeClient()
         let selected = SottoLearningSelection(catalogVersion: nil, nodeIds: [], level: .a1, materialFocusId: String(repeating: "f", count: 64))

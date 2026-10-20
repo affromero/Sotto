@@ -287,6 +287,11 @@ coverage. Later catalog publication preserves those pinned requirements. The
 upgrade API previews a newer catalog without rewriting earned evidence or
 replacing the current binding.
 
+Enabling oral providers later allows optional assessment in an exempt band.
+New attempts capture their own provider requirements. Optional evidence remains
+visible while the original completion exemptions and earned receipts stay
+unchanged. Queued classes and practice retain their captured audio requirements.
+
 Placement establishes the starting band. It creates no lower-band mastery.
 Class and practice submissions can contribute exact criterion-bound
 observations. Qualified tasks retain response, task fingerprint, skill,

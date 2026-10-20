@@ -8,6 +8,7 @@ import {
   validatePristineRegeneration,
 } from './classes/regeneration/pristine';
 import { getDueItems } from './knowledge-graph';
+import { objectiveReviewContext } from './learning-map/adaptation/review';
 import { generateClassListening } from './class-listening-generator';
 import { prepareClassSource, type PreparedClassSource } from './class-source';
 import { generateClassSpeaking } from './class-speaking-generator';
@@ -256,7 +257,13 @@ interface ClassContentBuildParams {
 
 async function buildClassContent(p: ClassContentBuildParams): Promise<Prisma.InputJsonObject> {
   await assertClassStillGenerating(p.classId, p.attempt);
-  const due = await getDueItems(p.courseId);
+  const reviewScope = {
+    level: p.requirements.level,
+    targetLang: p.requirements.targetLang,
+    kind: 'FULL' as const,
+  };
+  const due = await getDueItems(p.courseId, 8, reviewScope);
+  const objectiveReview = objectiveReviewContext(due.objectives, reviewScope, new Date());
   const corpus = p.preserveTeaching
     ? undefined
     : await getCourseVocabularyTargets({
@@ -273,10 +280,15 @@ async function buildClassContent(p: ClassContentBuildParams): Promise<Prisma.Inp
       ? await getCourseNote(p.courseId, `${p.classId}:${p.attempt}`)
       : corpus.context;
   const note = noteForAttempt(
-    buildLearnerContext(
-      capturedContext,
-      p.course.pedagogy as Parameters<typeof buildLearnerContext>[1]
-    ),
+    [
+      buildLearnerContext(
+        capturedContext,
+        p.course.pedagogy as Parameters<typeof buildLearnerContext>[1]
+      ),
+      objectiveReview.text,
+    ]
+      .filter(Boolean)
+      .join('\n\n'),
     p.classId,
     p.attempt
   );
@@ -468,7 +480,8 @@ async function buildClassContent(p: ClassContentBuildParams): Promise<Prisma.Inp
     ...p.existingSeed,
     vocabIds: due.vocab.map((v) => v.id),
     grammarKeys: due.grammar.map((g) => g.topicKey),
-    dueCount: due.vocab.length + due.grammar.length,
+    dueCount: due.vocab.length + due.grammar.length + objectiveReview.entries.length,
+    objectiveReviewContext: objectiveReview.text,
     intro: intro as unknown as Prisma.InputJsonObject,
     ...(!p.preserveTeaching || p.existingSeed?.classTargets
       ? { classTargets: targets as unknown as Prisma.InputJsonObject }

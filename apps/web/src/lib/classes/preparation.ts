@@ -5,7 +5,10 @@ import { selectClassRepairSkills } from '../learning/classes/class-repair';
 import { captureClassQuizRetry } from '../learning/classes/class-quiz-retry';
 import { claimClassRegenerationInTransaction } from '../learning/classes/class-generation-state';
 import { readPristine } from './regeneration/pristine';
-import { learningSpeechFingerprint } from '../learning/speech-configuration';
+import {
+  learningSpeechFingerprint,
+  matchesLearningSpeechFingerprint,
+} from '../learning/speech-configuration';
 import { createHash, randomUUID } from 'node:crypto';
 import { sqlStateBackend } from 'thesidedoor-core/storage/sql';
 import { prepareJob } from 'thesidedoor-core/runtime/outbox';
@@ -145,11 +148,12 @@ export async function validateClassPreparation(
       )
         throw new PreparationConflictError('The admitted class language or level changed.');
       if (
-        (await learningSpeechFingerprint(
+        !(await matchesLearningSpeechFingerprint(
           database,
           async () => ({ userId: operation.userId }),
-          operation.requirements
-        )) !== operation.speechFingerprint
+          operation.requirements,
+          operation.speechFingerprint
+        ))
       )
         throw new PreparationConflictError(
           'The selected speech model, endpoint or credential changed.'

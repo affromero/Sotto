@@ -46,14 +46,13 @@ export async function recordObjectiveObservation(
     include: { revision: true },
   });
   if (!binding) throw new Error('Objective evidence requires an owned, pinned level.');
-  const { catalog, exemptSkills } = readBoundCatalog(binding);
+  const { catalog } = readBoundCatalog(binding);
   const objective = catalog.nodes.find((node) => node.id === observation.objectiveId);
   if (
     objective?.kind !== 'OBJECTIVE' ||
     objective.level !== binding.level ||
     objective.criterionVersion !== observation.criterionVersion ||
     !objective.skills.includes(observation.skill) ||
-    exemptSkills.includes(observation.skill) ||
     objective.skillCriteria[observation.skill] !== observation.evidence.assessment
   )
     throw new Error('The assessment does not match this pinned objective criterion.');

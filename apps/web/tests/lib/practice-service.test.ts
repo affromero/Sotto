@@ -11,6 +11,8 @@ import { createSkillRequirements } from '@sotto/shared';
 import { recordFullPracticeFailures } from '@/lib/learning/practice-generation-failures';
 import { getLanguageCatalog } from '@/lib/learning-map/catalogs';
 import { learningCatalogHash } from '@/lib/learning-map/catalog';
+import { reviewFixture } from './learning-map/adaptation/fixtures';
+import { capturePracticeContext } from '@/lib/practice/context';
 
 const mockReadingProviderInput = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/learning-ai', () => ({
@@ -266,6 +268,7 @@ describe('startPractice — VOCAB', () => {
   it('rejects gloss-only output instead of persisting a misleading exercise', async () => {
     mockLearnerVocabCount.mockResolvedValue(3);
     mockGetDueItems.mockResolvedValue({
+      objectives: [],
       vocab: [{ id: 'word', lemma: 'gemacht', translation: 'done; made', mastery: 0 }],
       grammar: [],
     });
@@ -292,6 +295,7 @@ describe('startPractice — VOCAB', () => {
   it('preserves contextual questions and word attribution without exposing the answer key', async () => {
     mockLearnerVocabCount.mockResolvedValue(10);
     mockGetDueItems.mockResolvedValue({
+      objectives: [],
       vocab: [
         { id: 'lv1', lemma: 'hola', translation: 'hello', mastery: 0.2 },
         { id: 'lv2', lemma: 'gracias', translation: 'thanks', mastery: 0.3 },
@@ -332,6 +336,7 @@ describe('startPractice — VOCAB', () => {
 describe('startPractice — GRAMMAR', () => {
   it('keeps the reading source in the stored session and public response', async () => {
     mockGetDueItems.mockResolvedValue({
+      objectives: [],
       vocab: [{ id: 'word', lemma: 'Kino', translation: 'cinema', mastery: 0 }],
       grammar: [],
     });
@@ -373,6 +378,7 @@ describe('startPractice — GRAMMAR', () => {
   });
   it('seeds from due items and generates questions', async () => {
     mockGetDueItems.mockResolvedValue({
+      objectives: [],
       vocab: [{ id: 'lv1', lemma: 'hola', translation: 'hello', mastery: 0.4 }],
       grammar: [{ id: 'lg1', topicKey: 'ser-vs-estar', title: 'Ser vs Estar', mastery: 0.3 }],
     });
@@ -405,7 +411,7 @@ describe('startPractice — GRAMMAR', () => {
   });
 
   it('is unavailable (no_content) when nothing is due and no curriculum lesson exists', async () => {
-    mockGetDueItems.mockResolvedValue({ vocab: [], grammar: [] });
+    mockGetDueItems.mockResolvedValue({ objectives: [], vocab: [], grammar: [] });
     mockLessonFindFirst.mockResolvedValue(null);
 
     const r = await startPractice('c1', 'u1', 'GRAMMAR', authorizedLearnerExecution('u1'));
@@ -425,6 +431,7 @@ describe('startPractice — GRAMMAR', () => {
       },
     ]);
     mockGetDueItems.mockResolvedValue({
+      objectives: [],
       vocab: [{ id: 'lv1', lemma: 'entender', translation: 'understand', mastery: 0.4 }],
       grammar: [],
     });
@@ -459,9 +466,56 @@ describe('startPractice — GRAMMAR', () => {
 
 describe('practice content topics', () => {
   const due = {
+    objectives: [],
     vocab: [{ id: 'lv-due', lemma: 'mesa', translation: 'table', mastery: 0.4 }],
     grammar: [{ id: 'lg-due', topicKey: 'prepositions', title: 'Prepositions', mastery: 0.3 }],
   };
+  it('reviews the exact qualified objective instead of falling back to an unrelated lesson without selecting credit', async () => {
+    const { entry } = reviewFixture();
+    mockGetDueItems.mockResolvedValue({ objectives: [entry], vocab: [], grammar: [] });
+    mockLessonFindFirst.mockResolvedValue({
+      objective: 'Unrelated first lesson',
+      grammarPoints: ['unrelated'],
+      targetVocab: [],
+    });
+    const context = await capturePracticeContext(
+      'c1',
+      'u1',
+      'GRAMMAR',
+      authorizedLearnerExecution('u1')
+    );
+    expect(context.seed?.objective).toContain(entry.objective.title);
+    expect(context.seed?.objective).toContain(entry.objective.skillCriteria.GRAMMAR);
+    expect(context.seed?.objective).not.toContain('Unrelated first lesson');
+    expect(context.seed?.grammarPoints).toEqual([]);
+    expect(context.learningSelection).toBeNull();
+    expect(context.learningRequest).toBeNull();
+    mockGenerateSectionQuestions.mockResolvedValue(contextualQuestions([{ lemma: 'hola' }]));
+    const result = await startPractice('c1', 'u1', 'GRAMMAR', authorizedLearnerExecution('u1'));
+    expect(result.status).toBe('ready');
+    expect(mockGenerateSectionQuestions.mock.calls[0][0].objective).toContain(
+      entry.objective.skillCriteria.GRAMMAR
+    );
+    expect(mockPracticeSessionCreate.mock.calls[0][0].data.grammarKeys).toEqual([]);
+  });
+  it('keeps an explicitly selected lexical focus ahead of automatic objective recommendations', async () => {
+    const { entry } = reviewFixture();
+    mockGetDueItems.mockResolvedValue({ objectives: [entry], vocab: [], grammar: [] });
+    mockLessonFindFirst.mockResolvedValue({
+      objective: 'Describe places',
+      grammarPoints: ['places'],
+      targetVocab: [],
+    });
+    const context = await capturePracticeContext(
+      'c1',
+      'u1',
+      'GRAMMAR',
+      authorizedLearnerExecution('u1'),
+      { focusTargetId: 'selected-expression' }
+    );
+    expect(context.seed?.objective).toBe('Describe places');
+    expect(context.seed?.objective).not.toContain(entry.objective.title);
+  });
   const focus = {
     id: 'focus-place',
     kind: 'SENTENCE',
@@ -520,7 +574,7 @@ describe('practice content topics', () => {
   it.each([null, lesson])(
     'retains focus material without turning it into the listening topic',
     async (currentLesson) => {
-      mockGetDueItems.mockResolvedValue({ vocab: [], grammar: [] });
+      mockGetDueItems.mockResolvedValue({ objectives: [], vocab: [], grammar: [] });
       mockLessonFindFirst.mockResolvedValue(currentLesson);
       mockGetPracticeFocusTargets.mockResolvedValue([focus]);
       const result = await startPractice('c1', 'u1', 'LISTENING', authorizedLearnerExecution('u1'));
@@ -584,10 +638,12 @@ describe('startPractice — FULL', () => {
     mockLearnerVocabCount.mockResolvedValue(10);
     mockGetDueItems
       .mockResolvedValueOnce({
+        objectives: [],
         vocab: [{ id: 'lv1', lemma: 'hola', translation: 'hello', mastery: 0.4 }],
         grammar: [{ id: 'lg1', topicKey: 'ser-vs-estar', title: 'Ser vs Estar', mastery: 0.3 }],
       })
       .mockResolvedValueOnce({
+        objectives: [],
         vocab: [{ id: 'lv1', lemma: 'hola', translation: 'hello', mastery: 0.4 }],
         grammar: [],
       });
@@ -684,6 +740,7 @@ describe('startPractice — FULL', () => {
       }
     );
     mockGetDueItems.mockResolvedValue({
+      objectives: [],
       vocab: [{ id: 'lv1', lemma: 'hola', translation: 'hello', mastery: 0.4 }],
       grammar: [],
     });
@@ -714,6 +771,7 @@ describe('startPractice — FULL', () => {
 describe('startPractice — WRITING', () => {
   it('creates a session + writing prompts and returns ready_writing', async () => {
     mockGetDueItems.mockResolvedValue({
+      objectives: [],
       vocab: [{ id: 'lv1', lemma: 'hola', translation: 'hello', mastery: 0.4 }],
       grammar: [],
     });

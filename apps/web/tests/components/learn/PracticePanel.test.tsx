@@ -52,6 +52,27 @@ afterEach(() => {
 });
 
 describe('PracticePanel recent sessions', () => {
+  it('shows qualified objective reviews once in full catch-up and in each applicable channel', async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse({
+        ...OVERVIEW,
+        due: {
+          vocab: 3,
+          grammar: 1,
+          objectives: 2,
+          bySkill: { GRAMMAR: 1, READING: 2, WRITING: 1 },
+        },
+      })
+    );
+    render(<PracticePanel courseId="course-1" courseName="German" />);
+    expect(
+      await screen.findByRole('button', { name: 'Practice Full catch-up, 6 due' })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Practice Grammar, 2 due' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Practice Reading, 2 due' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Practice Writing, 1 due' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Practice Vocabulary, 3 due' })).toBeInTheDocument();
+  });
   it('badges each past session by how it ended', async () => {
     render(<PracticePanel courseId="course-1" courseName="German" />);
 

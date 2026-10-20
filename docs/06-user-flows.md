@@ -289,6 +289,11 @@ level lists everything still required before the next band. An objective can
 be confident and due for review at the same time. Open assessment history to
 see the observations behind its status.
 
+If oral skills were exempt when the level opened, enabling speech later allows
+optional listening and speaking practice. Select an objective and choose
+Check available practice formats. Optional assessment results appear in its
+details; the captured completion requirements and earned levels stay saved.
+
 Search titles, examples or grammar aliases, then filter by branch, requirement,
 evidence, skill or review due date. These filters keep each objective's ancestor
 path visible and distinguish shown objectives from whole-level progress.

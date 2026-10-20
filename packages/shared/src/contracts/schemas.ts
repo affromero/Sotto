@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { readingVocabularySchema } from '../reading-vocabulary';
 import { skillRequirementsSchema } from '../learning-requirements';
 import { learningObjectiveMemorySchema } from '../learning-map/contracts';
+import { learningSkillSchema } from '../learning-map/catalog';
 import { classTeachingSchema } from './class-teaching';
 import {
   placementSessionPublicSchema,
@@ -125,7 +126,12 @@ export const practiceRecentSessionSchema = z.object({
 });
 
 export const practiceOverviewResponseSchema = z.object({
-  due: z.object({ vocab: z.number(), grammar: z.number() }),
+  due: z.object({
+    vocab: z.number(),
+    grammar: z.number(),
+    objectives: z.number().int().nonnegative().optional(),
+    bySkill: z.partialRecord(learningSkillSchema, z.number().int().nonnegative()).optional(),
+  }),
   totalVocab: z.number(),
   recent: z.array(practiceRecentSessionSchema),
 });

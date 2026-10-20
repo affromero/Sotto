@@ -66,6 +66,19 @@ struct SottoLearningMap: Decodable {
     func children(of id: String) -> [SottoLearningNodeView] {
         nodes.filter { $0.node.parentId == id }.sorted { $0.node.order < $1.node.order }
     }
+    func practiceSelection(source: SottoLearningSelection?, selected: Set<String>) throws -> SottoLearningSelection {
+        guard !previewOnly, source == nil || source?.level == viewedLevel else {
+            throw SottoAPIError.message("The source practice level changed. Review the current selection.")
+        }
+        let ids = selected.union(source?.nodeIds ?? [])
+        guard ids.allSatisfy({ id in
+            nodes.contains { $0.id == id && $0.node.kind == "OBJECTIVE" && $0.node.level == viewedLevel }
+        }), !ids.isEmpty || source?.materialFocusId != nil else {
+            throw SottoAPIError.message("Choose objectives from this level before reviewing practice.")
+        }
+        return SottoLearningSelection(catalogVersion: ids.isEmpty ? nil : catalogVersion,
+            nodeIds: ids.sorted(), level: viewedLevel, materialFocusId: source?.materialFocusId)
+    }
     func visibleNodeIds(query: String) -> Set<String> {
         let needle = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         if needle.isEmpty { return Set(nodes.map(\.id)) }
@@ -171,6 +184,12 @@ struct SottoLearningSelectionPreview: Decodable {
     let selection: Snapshot
     let availableKinds: [String]
     let requirementId: String?
+    var sourceCreditMessage: String? {
+        guard selection.materialFocusId != nil else { return nil }
+        return selection.objectives.isEmpty
+            ? "Private source practice. No canonical objective credit."
+            : "Your source guides this practice. Eligible assessment results can contribute to the selected objectives."
+    }
     func explicitSelection() -> SottoLearningSelection {
         SottoLearningSelection(catalogVersion: selection.catalogVersion,
             nodeIds: selection.objectives.map(\.id).sorted(), level: selection.level,

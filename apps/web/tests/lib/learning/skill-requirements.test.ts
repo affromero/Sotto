@@ -191,6 +191,21 @@ suite('learner speech access with canonical PostgreSQL credential selection', ()
     await configure({ sttProvider: 'local' });
     await expect(requirements()).rejects.toThrow(/endpoint/);
   });
+  it('validates only frozen requested channels without admitting newly configured oral work', async () => {
+    const captured = await requirements();
+    await configure({
+      ttsProvider: 'local',
+      sttProvider: 'local',
+      ttsBaseUrl: 'file:///invalid-tts',
+      sttBaseUrl: 'file:///invalid-stt',
+    });
+    const sameAttempt = await resolveSkillRequirements(await execution(), context, captured);
+    expect(sameAttempt).toEqual(captured);
+    await expect(requirements()).rejects.toThrow(/HTTP or HTTPS/);
+    await expect(
+      resolveSkillRequirements(await execution(), { ...context, level: 'B1' }, captured)
+    ).rejects.toThrow(/scope/);
+  });
   it('rejects malformed persisted requirements instead of treating the session as legacy', () => {
     expect(readSkillRequirements(null)).toBeNull();
     expect(() => readSkillRequirements({ version: 1 })).toThrow();

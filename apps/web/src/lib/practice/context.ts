@@ -10,6 +10,7 @@ import type {
 import { normalizeLearningSelection } from '@sotto/shared';
 import { prismaUnfiltered as prisma } from '../prisma';
 import { getDueItems } from '../knowledge-graph';
+import { objectiveReviewContext } from '../learning-map/adaptation/review';
 import { getCourseNote } from '../course-notes';
 import { buildLearnerContext } from '../pedagogy';
 import { getPracticeFocusTargets, type FocusPracticeTarget } from '../learning-targets';
@@ -69,16 +70,23 @@ function uniqueVocab(values: PracticeSeed['targetVocab']): PracticeSeed['targetV
 async function genericSeed(
   course: CourseCtx,
   level: CefrLevel,
-  count: number
+  count: number,
+  kind: PracticeKind,
+  includeObjectiveReview: boolean
 ): Promise<PracticeSeed | null> {
-  const due = await getDueItems(course.id, count);
+  const scope = { level, targetLang: course.targetLang, kind };
+  const due = await getDueItems(course.id, count, scope);
+  const review = includeObjectiveReview
+    ? objectiveReviewContext(due.objectives, scope, new Date())
+    : null;
   const lesson = await prisma.lesson.findFirst({
     where: { curriculumId: course.curriculumId, level },
     orderBy: { order: 'asc' },
     select: { objective: true, grammarPoints: true, targetVocab: true },
   });
-  const objective = lesson?.objective.trim() || 'Everyday conversations and situations.';
-  if (due.grammar.length || due.vocab.length)
+  const objective =
+    review?.text || lesson?.objective.trim() || 'Everyday conversations and situations.';
+  if (review?.entries.length || due.grammar.length || due.vocab.length)
     return {
       objective,
       grammarPoints: due.grammar.map((item) => item.topicKey),
@@ -242,7 +250,13 @@ export async function capturePracticeContext(
   if (kind === 'VOCAB') return { ...base, note: '', seed: null };
   const seed = selected
     ? selectedSeed(selected.selection)
-    : ((await genericSeed(course, practiceLevel, kind === 'FULL' ? 12 : 6)) ??
+    : ((await genericSeed(
+        course,
+        practiceLevel,
+        kind === 'FULL' ? 12 : 6,
+        kind,
+        !options.focusTargetId
+      )) ??
       (focusTargets.length
         ? {
             objective: 'Everyday conversations and situations.',

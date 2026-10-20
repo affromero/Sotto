@@ -25,6 +25,7 @@ export interface LearningMapProps {
   map: LearningMapResponse;
   onViewLevel: (level: CefrLevel) => void;
   onPractice: (selection: LearningSelectionRequest, kind: PracticeKind) => Promise<void>;
+  onPreviewSelection?: (selection: LearningSelectionRequest) => Promise<PracticeKind[]>;
   onAdvance: () => Promise<void>;
   busy: boolean;
   error: string | null;
@@ -65,6 +66,7 @@ function LearningMapView({
   map,
   onViewLevel,
   onPractice,
+  onPreviewSelection,
   onAdvance,
   busy,
   error,
@@ -76,7 +78,11 @@ function LearningMapView({
   const id = useId();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [format, setFormat] = useState<PracticeKind>('FULL');
-  const [pending, setPending] = useState<'practice' | 'advance' | null>(null);
+  const [pending, setPending] = useState<'practice' | 'advance' | 'preview' | null>(null);
+  const [reviewedFormats, setReviewedFormats] = useState<{
+    key: string;
+    kinds: PracticeKind[];
+  } | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [sourceOnlyKey, setSourceOnlyKey] = useState<string | null>(null);
   const [localView, setLocalView] = useState<MapViewState>({
@@ -110,18 +116,36 @@ function LearningMapView({
   const hiddenSelectedCount = selected.filter(
     (item) => !discovery.visible.has(item.node.id)
   ).length;
-  const availableFormats: PracticeKind[] = [
-    'FULL',
-    ...(['GRAMMAR', 'READING', 'LISTENING', 'SPEAKING', 'WRITING'] as const).filter(
-      (skill) =>
-        selected.length > 0 &&
-        !(
-          (skill === 'LISTENING' || skill === 'SPEAKING') &&
-          map.readiness.exemptSkills.includes(skill)
-        ) &&
-        selected.every((item) => item.node.kind === 'OBJECTIVE' && item.node.skills.includes(skill))
-    ),
-  ];
+  const selectionKey = JSON.stringify([
+    map.courseId,
+    map.catalogHash,
+    map.viewedLevel,
+    selected.map((item) => item.node.id).sort(),
+  ]);
+  const availableFormats: PracticeKind[] =
+    reviewedFormats?.key === selectionKey
+      ? reviewedFormats.kinds.filter(
+          (kind) =>
+            kind === 'FULL' ||
+            (kind !== 'VOCAB' &&
+              selected.every(
+                (item) => item.node.kind === 'OBJECTIVE' && item.node.skills.includes(kind)
+              ))
+        )
+      : [
+          'FULL',
+          ...(['GRAMMAR', 'READING', 'LISTENING', 'SPEAKING', 'WRITING'] as const).filter(
+            (skill) =>
+              selected.length > 0 &&
+              !(
+                (skill === 'LISTENING' || skill === 'SPEAKING') &&
+                map.readiness.exemptSkills.includes(skill)
+              ) &&
+              selected.every(
+                (item) => item.node.kind === 'OBJECTIVE' && item.node.skills.includes(skill)
+              )
+          ),
+        ];
   const chosenFormat = availableFormats.includes(format) ? format : 'FULL';
   const currentView = map.viewedLevel === map.currentLevel;
   const lowerView =
@@ -148,6 +172,26 @@ function LearningMapView({
           ? [...previous, objectiveId]
           : previous
     );
+  }
+
+  async function checkFormats() {
+    if (!onPreviewSelection || working || futureView || !selected.length) return;
+    setActionError(null);
+    setPending('preview');
+    try {
+      const kinds = await onPreviewSelection({
+        catalogVersion: map.catalogVersion,
+        level: map.viewedLevel,
+        nodeIds: selected.map((item) => item.node.id).sort(),
+      });
+      setReviewedFormats({ key: selectionKey, kinds });
+    } catch (failure) {
+      setActionError(
+        failure instanceof Error ? failure.message : 'Could not check available practice formats.'
+      );
+    } finally {
+      setPending(null);
+    }
   }
 
   async function runAction(action: 'practice' | 'advance') {
@@ -279,7 +323,11 @@ function LearningMapView({
                         <span className={styles.skillName}>{formatLabels[skill.skill]}</span>
                         <p>{node.skillCriteria[skill.skill]}</p>
                         <span>
-                          {skill.exempt ? 'Exempt, unassessed' : statusLabels[skill.status]}
+                          {skill.exempt
+                            ? skill.evidence
+                              ? `Exempt from completion; optional assessment: ${statusLabels[skill.status]}`
+                              : 'Exempt, unassessed'
+                            : statusLabels[skill.status]}
                         </span>
                         {skill.evidence && (
                           <span className={styles.evidenceDetail}>
@@ -388,7 +436,7 @@ function LearningMapView({
           <p className={styles.coverage}>
             Exempt from this level&apos;s requirements:{' '}
             {map.readiness.exemptSkills.map((skill) => formatLabels[skill]).join(', ')}. These
-            skills remain unassessed.
+            skills are optional for completion. Any optional assessments appear in their details.
           </p>
         )}
         {map.readiness.missingObjectiveIds.length > 0 && (
@@ -500,6 +548,24 @@ function LearningMapView({
             </ul>
           ) : (
             <p className={styles.emptySelection}>Select one objective to begin.</p>
+          )}
+          {onPreviewSelection && (
+            <>
+              <button
+                type="button"
+                className={styles.secondary}
+                disabled={working || futureView || selected.length === 0}
+                onClick={() => void checkFormats()}
+              >
+                Check available practice formats
+              </button>
+              {map.readiness.exemptSkills.length > 0 && (
+                <p>
+                  Configured oral skills can be assessed optionally. Captured level exemptions stay
+                  unchanged.
+                </p>
+              )}
+            </>
           )}
           <label className={styles.formatField}>
             Practice format
