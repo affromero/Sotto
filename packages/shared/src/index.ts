@@ -38,6 +38,12 @@ export {
 } from './learning-requirements';
 export type { SkillRequirements, SkillRequirement } from './learning-requirements';
 export * from './learning-evidence';
+export * from './learning-map/catalog';
+export * from './learning-map/upgrade';
+export * from './learning-map/progress';
+export * from './learning-map/selection';
+export * from './learning-map/contracts';
+export * from './learning-map/library';
 export * from './contracts/pencil-homework';
 export * from './reading-vocabulary';
 export * from './contracts/class-teaching';
@@ -133,6 +139,13 @@ export * from './play/rooms';
 export * from './play/admission';
 export * from './play/api';
 export * from './play/phrases';
+export * from './course-materials/uploads';
+export * from './course-materials/extraction';
+
+export * from './course-materials/analysis';
+export * from './course-materials/legacy';
+export * from './course-materials/cancellation';
+export * from './placement/contracts';
 export * from './learning/vocabulary-support';
 export * from './learning/vocabulary-study';
 export * from './learning/dictionary';

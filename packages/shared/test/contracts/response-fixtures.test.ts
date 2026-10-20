@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it } from 'vitest';
 import {
   askInteractionRequestSchema,
@@ -441,13 +442,21 @@ describe('response schemas accept representative payloads', () => {
       generatePlacementResponseSchema.parse({
         native: 'en',
         target: 'es',
+        placementSessionId: '123e4567-e89b-42d3-a456-426614174000',
+        status: 'READY',
+        questionsDigest: 'a'.repeat(64),
+        analysisId: null,
+        analysisRevision: null,
+        resultDigest: null,
+        expiresAt: '2026-10-20T20:00:00.000Z',
+        failureReason: null,
         questions: [
           {
             id: 'pq_0',
             cefr: 'A2',
             skill: 'grammar',
             prompt: 'Choose the article',
-            options: ['el', 'la', 'los', 'las'],
+            options: ['el', 'la', 'los', 'las', "I don't know"],
           },
         ],
       })
@@ -460,6 +469,8 @@ describe('response schemas accept representative payloads', () => {
         courseId: 'c-new',
         level: 'B1',
         scoreBySkill: { grammar: 0.8, vocab: 0.5, reading: 0.6 },
+        assessedLevel: 'B1',
+        confirmationReceiptId: '123e4567-e89b-42d3-a456-426614174000',
       })
     ).toBeTruthy();
   });
@@ -482,6 +493,7 @@ describe('response schemas accept representative payloads', () => {
 
   it('memory graph (vocab + grammar nodes, loose superset)', () => {
     const parsed = memoryGraphResponseSchema.parse({
+      objectives: [],
       nodes: [
         {
           id: 'v0',

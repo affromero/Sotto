@@ -1,6 +1,6 @@
 # Local Development Guide - Sotto
 
-> **Date**: 2026-06-13
+> **Date**: 2026-10-20
 >
 > **Summary**: Run Sotto locally without a hosted secret manager, production database sync, cloud storage, or hosted infrastructure. The default local path uses PostgreSQL, Redis, local file storage, and explicit provider configuration.
 
@@ -30,6 +30,8 @@ Optional:
 - `uv` and `pandoc` for release packet generation.
 - A local agent CLI such as Claude Code or Codex.
 - A hosted provider key for LLM/TTS/STT.
+- `qpdf` for optional verified PDF compression. The worker base includes it;
+  local macOS development can install it with `brew install qpdf`.
 
 ---
 
@@ -214,6 +216,68 @@ Select **Use local speech** to save. Advanced settings also keeps custom model
 and manual voice IDs available; discovery preserves existing selections.
 
 See `docs/05-provider-extension-guide.md` for the exact LLM/STT/TTS contracts and native-provider checklists.
+
+---
+
+### Material processing and learning maps
+
+Apply committed Prisma migrations and generate the client after updating an
+existing instance. Keep the web app and workers at the same source revision.
+Material extraction, visual recognition, analysis and optimization run through
+Redis/BullMQ. `npm run dev:workers` starts these handlers; the web server alone
+does not process uploaded documents.
+
+The upload capability endpoint is `GET /api/v1/materials/uploads`.
+Current `SOTTO_PARTS` limits are ten files per batch, 100 MiB per original,
+250 MiB per batch and 4 MiB per part. A profile may hold twenty pending files
+totalling 500 MiB. Reservations expire after 24 hours. Complete or explicitly
+cancel pending transfers before reserving replacements.
+
+PDF processing currently allows 1,000 pages, 8 million pixels per rendered page,
+an 8,192-pixel dimension and 64 MiB text per page. Each parser run allows 512 MiB
+of generated artifacts, in addition to its staged original. Optimization compares
+separate original and candidate parser runs, so its total workspace can be larger.
+The child process has a 512 MiB V8 heap and ten-minute deadline. These bounds
+do not enforce a native RSS limit. Container memory settings remain a separate
+deployment concern. Limits and parser failures leave originals retained and
+report unresolved coverage rather than silently shortening the document.
+
+Visual recognition needs an explicit visual model with saved credentials and
+an operator-reviewed capability for that exact provider/model. Configure the
+capability in Admin Providers, then admit recognition from the document's
+processing view. Embedded text remains available when recognition is pending
+or unavailable. Recognition and source analysis may incur configured provider
+costs. Unknown outcomes must settle through their retained execution records
+before another paid attempt is admitted.
+
+Existing courses can preview missing map bindings and lesson links through the
+authenticated maintenance CLI:
+
+```bash
+export SOTTO_API_KEY='your existing paired device key'
+npx tsx scripts/learning-map/backfill.ts --base-url http://localhost:3000 --course COURSE_ID
+npx tsx scripts/learning-map/backfill.ts --base-url http://localhost:3000 --course COURSE_ID --apply
+```
+
+`SOTTO_URL` supplies the URL when `--base-url` is omitted.
+
+Dry-run is the default. The private checkpoint resumes the same course, profile,
+catalog and source meaning. `--checkpoint PATH` chooses its location. Apply adds
+missing canonical bindings and exact lesson links. Existing explicit links,
+pinned requirements, placement provenance and assessment history remain intact.
+The report identifies originals needing extraction or analysis; it dispatches
+no paid work and invents no historical mastery. A changed course identity, band,
+catalog or captured coverage requires a fresh preview with a new checkpoint path.
+A source page that changes between preview and apply is rejected; inspect a new dry-run before
+resuming apply. Repeating an interrupted apply adds only rows still missing.
+
+`ORIGINAL_VERIFICATION_REQUIRED` means an older material has no retained original
+SHA256 receipt. This command does not verify or repair original bytes. There is
+no in-place original-verification endpoint. Download the owned original if it is
+available, then re-upload through Course notes to create a new checksum-verified
+material and extraction ledger. Keep the older material and its source links.
+`ORIGINAL_UNAVAILABLE` requires obtaining the source file again; retained text
+alone cannot prove or reconstruct the original. These steps do not change mastery.
 
 ---
 

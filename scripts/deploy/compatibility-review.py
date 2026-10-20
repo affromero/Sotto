@@ -15,6 +15,7 @@ from typing import Mapping, cast
 
 
 LIMIT = 262144
+MAX_REVIEWED_RUNTIME_FILES = 1024
 FIELDS = {
     'schemaVersion', 'procedure', 'stack', 'releaseSha',
     'candidateWebImage', 'candidateWorkersImage', 'previousWebImage',
@@ -67,7 +68,7 @@ def provider_activation(review: Mapping[str, object]) -> dict[str, object]:
         if runtime['imageId'] not in allowed:
             raise ValueError('Previous runtime differs from reviewed images')
     files = value['reviewedRuntimeFiles']
-    if not isinstance(files, dict) or len(files) > 512:
+    if not isinstance(files, dict) or len(files) > MAX_REVIEWED_RUNTIME_FILES:
         raise ValueError('Bounded exact runtime file review required')
     for path, pair in files.items():
         if not isinstance(path, str) or not re.fullmatch(
@@ -462,7 +463,22 @@ def inspect_enabled_runtime(
     releases = [entry for entry in entries
                 if entry == release_name or entry.startswith(release_name + '=')]
     if releases != [release_name + '=' + release]:
-        raise ValueError('Unique release-bound provider authority required')
+        if activation_mode != 'implicit-enabled' or releases:
+            raise ValueError('Unique release-bound provider authority required')
+        images: object = json.loads(runtime_command(['image', 'inspect', image]))
+        if (not isinstance(images, list) or len(images) != 1
+                or not isinstance(images[0], dict)):
+            raise ValueError('Unique immutable previous image required')
+        image_config = images[0].get('Config')
+        image_labels = (
+            image_config.get('Labels')
+            if isinstance(image_config, dict) else None
+        )
+        if (images[0].get('Id') != image or not isinstance(image_labels, dict)
+                or image_labels.get('org.opencontainers.image.revision') != release
+                or image_labels.get('org.opencontainers.image.source')
+                != 'https://github.com/affromero/Sotto'):
+            raise ValueError('Immutable previous image release provenance differs')
     mounts = row.get('Mounts')
     if not isinstance(mounts, list):
         raise ValueError('Actual runtime mounts required')
@@ -568,13 +584,16 @@ def schema_transition(
         'previousSchemaHashes', 'compatibilityReviewSha256',
         'reviewer', 'evidenceSha256',
     }
-    if review.get('schemaVersion') == 2:
-        fields |= {'previousQueueNames', 'candidateQueueNames'}
-    if set(review) != fields or type(review['schemaVersion']) is not int or (
-        review['schemaVersion'] not in (1, 2)
+    version = review.get('schemaVersion')
+    if version == 2:
+        fields.add('queueTransition')
+    if set(review) != fields or type(version) is not int or (
+        version not in (1, 2)
         or review['procedure'] != 'fenced-schema-migration'
     ):
         raise ValueError('Exact fenced schema transition review required')
+    if version == 2:
+        validate_queue_transition(review['queueTransition'])
     expected: dict[str, object] = {
         'stack': environment['SOTTO_STACK'],
         'releaseSha': environment['SOTTO_RELEASE_SHA'],
@@ -624,6 +643,23 @@ def schema_transition(
         raise ValueError('Bounded added migration inventory required')
 
 
+def validate_queue_transition(value: object) -> dict[str, list[str]]:
+    fields = {'previousQueues', 'candidateQueues', 'addedQueues'}
+    if not isinstance(value, dict) or set(value) != fields:
+        raise ValueError('Exact additive queue transition review required')
+    for names in value.values():
+        if (not isinstance(names, list) or not names or len(names) > 100
+                or any(not isinstance(name, str) or not re.fullmatch(
+                    r'[a-z][a-z-]*', name) for name in names)
+                or names != sorted(set(names))):
+            raise ValueError('Bounded sorted unique queue names required')
+    previous, candidate = set(value['previousQueues']), set(value['candidateQueues'])
+    if not previous < candidate or value['addedQueues'] != sorted(candidate - previous):
+        raise ValueError('Only exact additive queue transitions are supported')
+    return cast(dict[str, list[str]], value)
+
+
+
 def queue_transition(
     bound: Mapping[str, object], schema_review: bytes | None = None,
 ) -> dict[str, object] | None:
@@ -659,10 +695,9 @@ def queue_transition(
         if candidate != previous:
             raise ValueError('Schema transition requires unchanged queue names')
         return None
-    if not set(previous) < set(candidate):
-        raise ValueError('Reviewed queue transition must be strictly additive')
-    if schema.get('previousQueueNames') != previous or (
-        schema.get('candidateQueueNames') != candidate
+    reviewed = validate_queue_transition(schema.get('queueTransition'))
+    if reviewed['previousQueues'] != previous or (
+        reviewed['candidateQueues'] != candidate
     ):
         raise ValueError('Queue transition differs from exact reviewed inventories')
     continuity = provider_activation(review)
@@ -879,8 +914,9 @@ def main() -> int:
             evidence = read_bytes(Path(arguments[2]), private=True)
             bound = mapping(read_bytes(Path(arguments[3]), private=True))
             continuity = bound_continuity(Path(arguments[3]))
+            review = mapping(raw)
             schema_transition(
-                mapping(raw), evidence, bound, continuity, arguments[4],
+                review, evidence, bound, continuity, arguments[4],
                 read_bytes(Path(arguments[5])), os.environ,
             )
             transition = queue_transition(bound, raw)

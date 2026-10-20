@@ -10,6 +10,10 @@ import type {
   OnboardingConfig,
 } from '@/app/welcome/WelcomeFlow';
 import { resumeEndpoint, resumeEndpoints } from '@/app/welcome/session/resume-security';
+import {
+  materialPlacementChoiceSchema,
+  type MaterialPlacementChoice,
+} from '@/lib/course-materials/client/analysis';
 
 export const DEFAULT_AGENT: AgentState = {
   provider: '',
@@ -57,6 +61,7 @@ export interface WelcomeSnapshot {
   sources: Set<string>;
   contextItems: ContextItem[];
   understood: Set<CefrLevel>;
+  placementAnalysis?: MaterialPlacementChoice;
 }
 
 export function clampStep(n: number) {
@@ -212,6 +217,7 @@ export function parseStoredSnapshot(raw: string): WelcomeSnapshot | null {
     const understood = Array.isArray(record.understood)
       ? record.understood.filter(isCefrLevel)
       : [];
+    const placement = materialPlacementChoiceSchema.safeParse(record.placementAnalysis);
 
     return {
       onboardingResumeKey:
@@ -235,6 +241,7 @@ export function parseStoredSnapshot(raw: string): WelcomeSnapshot | null {
       sources: new Set(sources),
       contextItems: parseContextItems(record.contextItems),
       understood: toSingleUnderstoodSet(understood),
+      ...(placement.success ? { placementAnalysis: placement.data } : {}),
     };
   } catch {
     return null;

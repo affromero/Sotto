@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { PlacementTest } from './PlacementTest';
 import { NotesPlacement } from './NotesPlacement';
 import { ManualPlacement } from './ManualPlacement';
+import type { MaterialPlacementReference } from '@/lib/course-materials/client/analysis';
 import styles from './PlacementEntry.module.css';
 
 interface PlacementEntryProps {
@@ -18,16 +19,30 @@ type Mode = 'choose' | 'test' | 'notes' | 'verify' | 'manual';
  * or shares materials from their current level. The notes path can hand off to
  * the test in "verify" mode (a shorter run focused on the deduced level).
  */
-export function PlacementEntry({ native, target }: PlacementEntryProps) {
+export function PlacementEntry(props: PlacementEntryProps) {
+  return <PlacementChooser key={`${props.native}:${props.target}`} {...props} />;
+}
+
+function PlacementChooser({ native, target }: PlacementEntryProps) {
   const [mode, setMode] = useState<Mode>('choose');
   const [verifyLevel, setVerifyLevel] = useState<string | undefined>(undefined);
+  const [analysisReference, setAnalysisReference] = useState<
+    MaterialPlacementReference | undefined
+  >();
 
   if (mode === 'test') {
     return <PlacementTest native={native} target={target} />;
   }
 
   if (mode === 'verify') {
-    return <PlacementTest native={native} target={target} focusLevel={verifyLevel} />;
+    return (
+      <PlacementTest
+        native={native}
+        target={target}
+        focusLevel={verifyLevel}
+        analysisReference={analysisReference}
+      />
+    );
   }
 
   if (mode === 'notes') {
@@ -39,8 +54,9 @@ export function PlacementEntry({ native, target }: PlacementEntryProps) {
         <NotesPlacement
           native={native}
           target={target}
-          onVerify={(level) => {
+          onVerify={(level, reference) => {
             setVerifyLevel(level);
+            setAnalysisReference(reference);
             setMode('verify');
           }}
         />

@@ -2,6 +2,26 @@ use std::sync::Arc;
 
 use crate::api::{NextClassOutcome, SpeakingUploadResponse, WritingGradeResponse, types};
 
+#[derive(Clone, Debug)]
+pub(crate) enum LearningMapIntent {
+    Open,
+    Up,
+    Down,
+    Select,
+    Back,
+    Toggle,
+    Preview,
+    Refresh,
+    Level(i8),
+    Current,
+    Requirements,
+    Search,
+    Input(char),
+    Erase,
+    Advance,
+    Scroll(i16),
+}
+
 /// Actions are the reduced intents the [`crate::app::App`] event loop applies
 /// to its state. Terminal input is mapped to actions; async API calls dispatch
 /// a tokio task that sends a result action (e.g. [`Action::CoursesLoaded`])
@@ -62,12 +82,17 @@ pub(crate) enum Action {
     NotesSubmit,
     /// Accept the deduced level and create the course ("start here").
     NotesConfirm,
+    NotesAcceptPartial,
     /// Take the MC test instead of accepting the deduced level (`t`).
     NotesTakeTest,
     /// Back out of notes placement (Esc).
     NotesCancel,
     /// Continue the course / advance to the next class.
     NextClass,
+    LearningMap(LearningMapIntent),
+    LearningMapLoaded(u64, ApiResult<types::LearningMapResponse>),
+    LearningSelectionPreviewed(u64, ApiResult<types::LearningSelectionPreview>),
+    LearningLevelAdvanced(u64, ApiResult<types::LearningLevelCompletion>),
 
     // --- Async API results, delivered by spawned tasks ---
     //
@@ -141,7 +166,7 @@ pub(crate) enum Action {
     /// `POST /placement` returned (or failed) — the assessed level + course id.
     PlacementSubmitted(u64, ApiResult<types::SubmitPlacementResponse>),
     /// `POST /placement/from-notes` returned (or failed) — the deduced level.
-    NotesDeduced(u64, ApiResult<types::DeduceFromNotesResponse>),
+    NotesDeduced(u64, ApiResult<crate::api::PlacementAnalysisStatus>),
     /// `POST /placement/from-notes/confirm` returned (or failed) — created course.
     NotesConfirmed(u64, ApiResult<types::ConfirmFromNotesResponse>),
     /// `GET /courses/{id}/graph` returned (or failed) — the memory graph.

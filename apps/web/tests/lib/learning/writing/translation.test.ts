@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   emptyTeachingCriticFixture,
@@ -15,6 +16,7 @@ vi.mock('@/lib/prisma', () => {
   const database = {
     $queryRaw: async () => [],
     courseClass: {
+      findFirst: async () => ({ id: 'class-1', skillRequirements: null }),
       findUnique: async () => ({ status: 'GENERATING', attempt: 1, course: { userId: 'u1' } }),
     },
     classSection: { create: async () => ({ id: 'writing-1' }) },

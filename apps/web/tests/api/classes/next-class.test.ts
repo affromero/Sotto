@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
@@ -71,6 +72,17 @@ describe('POST /api/v1/courses/[courseId]/next-class', () => {
     const response = await next();
     expect(response.status).toBe(201);
     expect(await response.json()).toEqual({ classId: 'class-new' });
+  });
+  it('returns an explicit requirements action when current-band sequential lessons are exhausted', async () => {
+    mockReadPreparation.mockResolvedValue({
+      id: 'operation-1',
+      status: 'COMPLETED',
+      result: 'requirements',
+      classId: null,
+    });
+    const response = await next();
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ requirementsRemaining: true });
   });
 
   it('returns the durable operation identity for background preparation', async () => {

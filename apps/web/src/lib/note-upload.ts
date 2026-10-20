@@ -28,6 +28,10 @@ const TEXT_EXTENSIONS = new Set([
 ]);
 const MARKIT_EXTENSIONS = new Set(['.docx', '.pptx', '.xlsx', '.epub']);
 
+export function isTextMaterial(name: string, mimeType: string): boolean {
+  return mimeType.startsWith('text/') || TEXT_EXTENSIONS.has(extname(name).toLowerCase());
+}
+
 /** Narrow a multipart form entry to an uploaded File. */
 export function isUploadFile(value: unknown): value is File {
   return typeof value === 'object' && value !== null && 'arrayBuffer' in value && 'name' in value;
@@ -71,7 +75,7 @@ async function extractUploadText(file: File): Promise<{ text: string; sourceText
     return { text: `Original course PDF: ${name}`, sourceText };
   }
 
-  if (file.type.startsWith('text/') || TEXT_EXTENSIONS.has(extension)) {
+  if (isTextMaterial(name, file.type)) {
     const text = normalizeImportedText(buffer.toString('utf8'));
     if (!text) throw new Error('Empty note file');
     return { text: `Uploaded course note: ${name}\n${text}`, sourceText: text };

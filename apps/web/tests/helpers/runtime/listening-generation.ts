@@ -142,6 +142,7 @@ vi.mock('@/lib/prisma', () => {
   const database = {
     $queryRaw: async () => [],
     courseClass: {
+      findFirst: async () => ({ id: 'class-1', skillRequirements: null }),
       findUnique: async () => ({ status: 'GENERATING', attempt: 1, course: { userId: 'u1' } }),
     },
     episode: {

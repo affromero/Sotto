@@ -83,7 +83,9 @@ describe('getCourseNote', () => {
         extractedText: 'Bahnhof means station.',
       },
     ]);
-    expect(await getCourseNote('c1')).toContain('Bahnhof means station.');
+    const context = await getCourseNote('c1');
+    expect(context).toContain('Bahnhof means station.');
+    expect(context).toContain('Focus on travel');
     expect(await getEditableCourseNote('c1')).toBe('Focus on travel');
   });
   it('returns the trimmed body when a note exists', async () => {

@@ -2,6 +2,11 @@ import XCTest
 @testable import Sotto
 
 final class CourseMaterialTests: XCTestCase {
+    func testMaterialMetadataDoesNotRequireExtractedText() throws {
+        let material = try JSONDecoder().decode(SottoCourseMaterial.self, from: Data(#"{"id":"material","name":"Original.pdf","mimeType":"application/pdf","byteSize":12345}"#.utf8))
+        XCTAssertEqual(material.name, "Original.pdf")
+        XCTAssertEqual(material.byteSize, 12345)
+    }
     private func material() throws -> SottoCourseMaterial {
         try JSONDecoder().decode(SottoCourseMaterial.self, from: Data(#"{"id":"a604f52a-d011-4a21-9c6c-23de4930eeed","name":"Vocab Deutsch.pdf","mimeType":"application/pdf","byteSize":18,"extractedText":"Bahnhof means station."}"#.utf8))
     }
@@ -24,12 +29,12 @@ final class CourseMaterialTests: XCTestCase {
         FileManager.default.createFile(atPath: url.path, contents: nil)
         defer { try? FileManager.default.removeItem(at: url) }
         let handle = try FileHandle(forWritingTo: url)
-        try handle.truncate(atOffset: 100 * 1024 * 1024)
+        try handle.truncate(atOffset: 100 * 1024 * 1024 + 1)
         try handle.close()
         do {
             _ = try await CourseMaterialTestProtocol.client().importCourseMaterials(courseId: "course", urls: [url])
             XCTFail("Oversized material must not be uploaded.")
-        } catch { XCTAssertTrue(error.localizedDescription.contains("10MB")) }
+        } catch { XCTAssertTrue(error.localizedDescription.contains("100MiB")) }
     }
 }
 

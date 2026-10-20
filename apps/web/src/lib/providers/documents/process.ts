@@ -5,7 +5,7 @@ import { ProcessRunner, ProcessExecutionError } from 'thesidedoor-core/runtime/p
 import { isJobExecutionCleanupFailure } from 'thesidedoor-core/runtime/outbox';
 import { copyOwnedBytesToFile } from 'thesidedoor-core/storage';
 import { withPdfWorkspace } from './workspace';
-import { readPdfFile } from './files';
+import { readBoundedRegularFile } from './files';
 import type { renderPdfFile } from '../../../../scripts/pdf-render/render-worker.mjs';
 
 const runner = new ProcessRunner(1);
@@ -83,7 +83,9 @@ export async function renderPdfImages(
         'The original PDF could not be rendered. Split the document or check its format.';
       try {
         const failure: unknown = JSON.parse(
-          (await readPdfFile(join(directory, 'failure.json'), { maximum: 4096 })).toString()
+          (
+            await readBoundedRegularFile(join(directory, 'failure.json'), { maximum: 4096 })
+          ).toString()
         );
         message = z
           .object({ message: z.string().min(1).max(256) })
@@ -97,7 +99,9 @@ export async function renderPdfImages(
     }
     options.signal?.throwIfAborted();
     const manifest = manifestSchema.parse(
-      JSON.parse((await readPdfFile(join(directory, 'pages.json'), { maximum: 65536 })).toString())
+      JSON.parse(
+        (await readBoundedRegularFile(join(directory, 'pages.json'), { maximum: 65536 })).toString()
+      )
     );
     if (manifest.images.length !== manifest.pages)
       throw new Error('Original PDF page coverage is incomplete.');
@@ -108,7 +112,7 @@ export async function renderPdfImages(
         throw new Error('Original PDF page order changed.');
       bytes += image.bytes;
       if (bytes > 20 * 1024 * 1024) throw new Error('Original PDF page images exceed 20 MB.');
-      const jpeg = await readPdfFile(join(directory, image.file), {
+      const jpeg = await readBoundedRegularFile(join(directory, image.file), {
         maximum: image.bytes,
         expectedBytes: image.bytes,
       });

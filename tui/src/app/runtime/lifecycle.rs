@@ -68,8 +68,11 @@ impl App {
             recorder: Recorder::new(),
             pending_course: None,
             pending_admissions: Default::default(),
+            pending_selections: Default::default(),
             practice_cache: Default::default(),
             progress_sequence: 0,
+            placement_transport: Default::default(),
+            placement_task: None,
             theme,
             theme_picker: ThemePicker::closed(),
             help_open: false,
@@ -81,6 +84,9 @@ impl App {
 
     /// Invalidate any in-flight request and return the new current generation.
     pub(super) fn bump_gen(&mut self) -> u64 {
+        if let Some(task) = self.placement_task.take() {
+            task.abort();
+        }
         self.request_gen += 1;
         self.request_gen
     }
@@ -164,6 +170,16 @@ impl App {
                 }
             }
             Action::NextClass => self.on_next_class(),
+            Action::LearningMap(intent) => self.learning_map_intent(intent),
+            Action::LearningMapLoaded(req_gen, result) => {
+                self.on_learning_map_loaded(req_gen, result)
+            }
+            Action::LearningSelectionPreviewed(req_gen, result) => {
+                self.on_learning_selection_previewed(req_gen, result)
+            }
+            Action::LearningLevelAdvanced(req_gen, result) => {
+                self.on_learning_level_advanced(req_gen, result)
+            }
             Action::CoursesLoaded(req_gen, result) => self.on_courses_loaded(req_gen, result),
             Action::DueLoaded(req_gen, result) => self.on_due_loaded(req_gen, result),
             Action::PracticeStarted(req_gen, result) => self.on_practice_started(req_gen, result),
@@ -222,6 +238,7 @@ impl App {
             Action::NotesInputBackspace => self.notes_input_backspace(),
             Action::NotesSubmit => self.notes_submit(),
             Action::NotesConfirm => self.notes_confirm(),
+            Action::NotesAcceptPartial => self.notes_accept_partial(),
             Action::NotesTakeTest => self.notes_take_test(),
             Action::NotesCancel => self.notes_cancel(),
             Action::GraphLoaded(req_gen, result) => self.on_graph_loaded(req_gen, result),

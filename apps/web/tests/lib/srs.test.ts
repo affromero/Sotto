@@ -1,10 +1,19 @@
 import { describe, it, expect } from 'vitest';
-import { reviewCard, type SrsState } from '@/lib/srs';
+import { reviewCard, reviewSchedule, type SrsState } from '@/lib/srs';
 
 const fresh: SrsState = { ease: 2.5, intervalDays: 0, reps: 0, lapses: 0, mastery: 0 };
 const NOW = new Date('2026-06-08T00:00:00.000Z');
 
 describe('reviewCard (SM-2)', () => {
+  it('schedules independent objective reviews without requiring or changing a posterior', () => {
+    const first = reviewSchedule({ ease: 2.5, intervalDays: 0, reps: 0, lapses: 0 }, 1, NOW);
+    expect(first.intervalDays).toBe(1);
+    expect(first.reps).toBe(1);
+    const failed = reviewSchedule(first, 0, NOW);
+    expect(failed.reps).toBe(0);
+    expect(failed.lapses).toBe(1);
+    expect(failed.dueAt).toEqual(NOW);
+  });
   it('schedules a passed new card 1 day out and raises mastery', () => {
     const u = reviewCard(fresh, 1, NOW);
     expect(u.reps).toBe(1);

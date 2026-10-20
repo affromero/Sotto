@@ -10,7 +10,9 @@ import type { LearningDatabase } from '../learning/database';
 import type { SottoProviderExecution } from '../sidedoor/credentials/runtime/provider-execution';
 import { materialVocabularyFingerprint, sourceTextHash } from './index-state';
 import { planVocabularyChunks } from './index-chunks';
-import { VocabularyStudyNotFound } from './study-state';
+import { VocabularyStudyNotFound, VocabularyStudyUnavailable } from './study-state';
+import { captureCanonicalVocabularySource, canonicalVocabularySourceHash } from './source/snapshot';
+import { planCanonicalVocabularyChunks } from './source/ranges';
 
 /** Called inside material attachment so the indexing intent cannot be lost after upload. */
 export async function enqueueMaterialVocabularyIndex(
@@ -27,19 +29,40 @@ export async function enqueueMaterialVocabularyIndex(
     throw new VocabularyStudyNotFound('Attached material not found.');
   const { course } = material;
   if (course.userId !== userId) throw new VocabularyStudyNotFound('Course not found.');
-  const sourceFingerprint = materialVocabularyFingerprint({
-    text: material.extractedText,
-    reference: material.originalUrl,
-    nativeLang: course.nativeLang,
-    targetLang: course.targetLang,
-  });
+  if (material.originalSha256 && !['READY', 'PARTIAL'].includes(material.processingStatus))
+    throw new VocabularyStudyUnavailable(
+      'Complete the retained material extraction before indexing its current source.'
+    );
+  const sourceSnapshot = material.originalSha256
+    ? await captureCanonicalVocabularySource(database, material)
+    : null;
+  const textHash = sourceSnapshot
+    ? canonicalVocabularySourceHash(sourceSnapshot)
+    : sourceTextHash(material.extractedText);
+  const sourceFingerprint = sourceSnapshot
+    ? sourceTextHash(
+        JSON.stringify([
+          'source-inventory-v2',
+          course.nativeLang,
+          course.targetLang,
+          material.originalUrl,
+          textHash,
+        ])
+      )
+    : materialVocabularyFingerprint({
+        text: material.extractedText,
+        reference: material.originalUrl,
+        nativeLang: course.nativeLang,
+        targetLang: course.targetLang,
+      });
   await database.materialVocabularyIndex.createMany({
     data: {
       materialId,
       courseId: course.id,
       sourceFingerprint,
-      textHash: sourceTextHash(material.extractedText),
-      textLength: material.extractedText.length,
+      textHash,
+      textLength: sourceSnapshot?.inventory.length ?? material.extractedText.length,
+      ...(sourceSnapshot ? { protocol: 2, sourceSnapshot } : {}),
       originalInput: { reference: material.originalUrl },
       materialCreatedAt: material.createdAt,
       nativeLang: course.nativeLang,
@@ -54,7 +77,9 @@ export async function enqueueMaterialVocabularyIndex(
     return { index, delivery: null };
   let ranges: ReturnType<typeof planVocabularyChunks>;
   try {
-    ranges = planVocabularyChunks(material.extractedText, course.targetLang);
+    ranges = sourceSnapshot
+      ? await planCanonicalVocabularyChunks(database, sourceSnapshot, course.targetLang)
+      : planVocabularyChunks(material.extractedText, course.targetLang);
   } catch (error) {
     index = await database.materialVocabularyIndex.update({
       where: { id: index.id },
@@ -69,6 +94,18 @@ export async function enqueueMaterialVocabularyIndex(
     data: ranges.map((range) => ({ indexId: index.id, ...range })),
     skipDuplicates: true,
   });
+  if (sourceSnapshot && ranges.length === 0) {
+    index = await database.materialVocabularyIndex.update({
+      where: { id: index.id },
+      data: {
+        status: sourceSnapshot.inventory.coverage.coverageComplete ? 'COMPLETE' : 'NEEDS_TEXT',
+        error: sourceSnapshot.inventory.coverage.coverageComplete
+          ? null
+          : 'No readable text is available and original page coverage remains unresolved.',
+      },
+    });
+    return { index, delivery: null };
+  }
   if (retry && ['FAILED', 'UNRESOLVED'].includes(index.status))
     index = await database.materialVocabularyIndex.update({
       where: { id: index.id },

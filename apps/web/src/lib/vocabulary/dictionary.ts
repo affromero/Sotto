@@ -11,12 +11,14 @@ import { sourceTextHash } from './index-state';
 import { reconcileVocabularyIndex } from './index-reconciliation';
 import { sottoTransaction } from '../sidedoor/access/state/transaction';
 import { prismaUnfiltered } from '../prisma';
+import { canonicalVocabularySourceSchema } from './source/snapshot';
+import { decodeVocabularySourceQuote } from './source/publication';
 
 export async function readDictionary(courseId: string, userId: string, input: unknown) {
   const query = dictionaryQuerySchema.parse(input);
   const course = await prisma.course.findFirst({
     where: { id: courseId, userId },
-    select: { id: true, vocabularySupport: true },
+    select: { id: true, vocabularySupport: true, nativeLang: true, targetLang: true },
   });
   if (!course) throw new VocabularyStudyNotFound('Course not found.');
   const running = await prisma.materialVocabularyIndex.findMany({
@@ -56,8 +58,10 @@ export async function readDictionary(courseId: string, userId: string, input: un
             startOffset: true,
             endOffset: true,
             quote: true,
+            quoteBytes: true,
             meaning: true,
             material: { select: { name: true } },
+            chunk: { select: { index: { select: { protocol: true } } } },
           },
           orderBy: { startOffset: 'asc' },
           take: 10,
@@ -79,6 +83,9 @@ export async function readDictionary(courseId: string, userId: string, input: un
         name: true,
         extractedText: true,
         originalUrl: true,
+        originalSha256: true,
+        processingRevision: true,
+        createdAt: true,
         vocabularyIndexes: {
           orderBy: { createdAt: 'desc' },
           take: 1,
@@ -109,9 +116,14 @@ export async function readDictionary(courseId: string, userId: string, input: un
         dueAt: word.lastReviewed ? word.dueAt.toISOString() : null,
         lastReviewed: word.lastReviewed?.toISOString() ?? null,
         sourceCount: word._count.sources,
-        sources: word.sources.map(({ material, ...source }) => ({
-          ...source,
-          name: material.name,
+        sources: word.sources.map((source) => ({
+          materialId: source.materialId,
+          startOffset: source.startOffset,
+          endOffset: source.endOffset,
+          meaning: source.meaning,
+          quote: decodeVocabularySourceQuote(source),
+          coordinateSystem: source.chunk.index.protocol === 2 ? 'MATERIAL_CODEPOINTS' : 'UTF16',
+          name: source.material.name,
         })),
       })
     ),
@@ -122,13 +134,21 @@ export async function readDictionary(courseId: string, userId: string, input: un
     vocabularySupport: course.vocabularySupport,
     materials: materials.map((material) => {
       const index = material.vocabularyIndexes[0];
+      const snapshot =
+        index?.protocol === 2 ? canonicalVocabularySourceSchema.parse(index.sourceSnapshot) : null;
+      const current =
+        index &&
+        index.nativeLang === course.nativeLang &&
+        index.targetLang === course.targetLang &&
+        (snapshot
+          ? snapshot.materialGeneration === material.createdAt.getTime() &&
+            snapshot.processingRevision === material.processingRevision &&
+            snapshot.inventory.originalSha256 === material.originalSha256
+          : index.textHash === sourceTextHash(material.extractedText));
       return {
         id: material.id,
         name: material.name,
-        status:
-          !index || index.textHash !== sourceTextHash(material.extractedText)
-            ? 'NOT_INDEXED'
-            : index.status,
+        status: !current ? 'NOT_INDEXED' : index.status,
         error: index?.error ?? null,
         processedChunks: index?.chunks.filter((chunk) => chunk.status === 'COMPLETE').length ?? 0,
         totalChunks: index?.chunks.length ?? 0,

@@ -1,12 +1,17 @@
-// Grades a learner's writing response synchronously via the LLM: returns an
-// overall score, inline corrections (old/new/why), and encouraging feedback.
-// Unlike speaking (STT + async worker), writing grading is a single LLM call.
+// Grades writing feedback and, when available, a separately supported objective
+// criterion under the canonical writing execution.
 import { capturedLearningAiOptions, resolveCapturedLearningAi } from './learning-ai';
 import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import { createAIProvider } from './providers/ai';
 import { loadAndRender } from './prompt-loader';
 import { logUsage } from './usage-logger';
 import { z } from 'zod';
+import { gradeProductiveObjective } from './learning-map/evidence/productive';
+import {
+  objectiveEvidenceHash,
+  reviewedObjectiveAssessmentSchema,
+  type ProductiveCriterionFinding,
+} from './learning-map/evidence/protocol';
 
 interface WritingCorrection {
   old: string;
@@ -18,6 +23,7 @@ export interface WritingGrade {
   overallScore: number; // 0..1
   corrections: WritingCorrection[];
   feedback: string;
+  objectiveEvidence?: ProductiveCriterionFinding;
 }
 
 export interface GradeWritingParams {
@@ -27,7 +33,10 @@ export interface GradeWritingParams {
   targetLang: string;
   level: string;
   task: string;
+  guidance?: string | null;
+  ideas?: string[];
   text: string;
+  learningObjectives?: unknown;
 }
 
 const writingGradeSchema = z
@@ -41,6 +50,24 @@ const writingGradeSchema = z
   .strict();
 
 export async function gradeWriting(p: GradeWritingParams): Promise<WritingGrade> {
+  const assessment =
+    p.learningObjectives === null || p.learningObjectives === undefined
+      ? null
+      : reviewedObjectiveAssessmentSchema.parse(p.learningObjectives);
+  if (
+    assessment &&
+    (assessment.scope.userId !== p.userId ||
+      assessment.scope.targetLang !== p.targetLang ||
+      assessment.scope.level !== p.level ||
+      objectiveEvidenceHash(assessment.task) !==
+        objectiveEvidenceHash({
+          kind: 'ORIGINAL_WRITING',
+          task: p.task,
+          guidance: p.guidance ?? null,
+          suppliedSupport: p.ideas ?? [],
+        }))
+  )
+    throw new Error('Writing criterion does not belong to the actual task, learner or difficulty.');
   const ai = await resolveCapturedLearningAi(p.userId, p.execution);
 
   const systemPrompt = loadAndRender('writing/grade-writing.md', {
@@ -93,6 +120,16 @@ export async function gradeWriting(p: GradeWritingParams): Promise<WritingGrade>
         'Writing grading returned a correction that does not match the learner response.'
       );
     used.push({ start, end: start + correction.old.length });
+  }
+  if (assessment) {
+    const qualified = await gradeProductiveObjective({
+      userId: p.userId,
+      execution: p.execution,
+      assessment,
+      text: p.text,
+      ai,
+    });
+    return { ...result.data, objectiveEvidence: qualified.finding };
   }
   return result.data;
 }

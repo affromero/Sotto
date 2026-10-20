@@ -269,7 +269,7 @@ final class LayoutAppearanceTests: XCTestCase {
             id: "synthetic-material",
             name: "German vocabulary and exercise guidance (reviewed transcription).txt",
             mimeType: "text/plain", byteSize: 512,
-            extractedText: "Synthetic source text for a layout test."
+            textRetained: false, legacyTextUrl: nil
         )
         let content = VStack(alignment: .leading, spacing: 24) {
             CourseMaterialList(materials: [material])

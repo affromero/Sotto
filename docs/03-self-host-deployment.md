@@ -300,8 +300,9 @@ uses a separate, explicit procedure. The ordinary `scripts/deploy.sh` invocation
 continues to reject different Prisma assets. Both paths use the same committed
 release, immutable images, capacity admission, deployment lock and provider
 continuity checks. The fenced procedure supports added migration SQL while
-preserving every previously published migration file. Schema review version 1
-requires unchanged queue names. Existing provider activation must remain enabled.
+preserving every previously published migration file. An existing provider
+activation must remain enabled. Schema review version 1 requires unchanged
+queue names. Version 2 supports an explicitly reviewed addition of queues.
 
 Supply the ordinary schema version 2 runtime continuity review through
 `SOTTO_COMPATIBILITY_REVIEW_FILE` and `SOTTO_COMPATIBILITY_EVIDENCE_FILE`.
@@ -309,7 +310,7 @@ The additional private schema review has exactly these fields:
 
 | Field                                        | Required value                                                                   |
 | -------------------------------------------- | -------------------------------------------------------------------------------- |
-| `schemaVersion`                              | Integer `1`                                                                      |
+| `schemaVersion`                              | Integer `1`, or `2` for an additive queue transition                             |
 | `procedure`                                  | `fenced-schema-migration`                                                        |
 | `stack`, `releaseSha`                        | Exact stack and full candidate source SHA                                        |
 | `candidateWebImage`, `candidateWorkersImage` | Exact digest-pinned references                                                   |
@@ -317,6 +318,19 @@ The additional private schema review has exactly these fields:
 | `previousSchemaHashes`                       | Object mapping every captured worker image ID to its canonical Prisma asset hash |
 | `compatibilityReviewSha256`                  | SHA-256 of the exact schema version 2 review file bytes                          |
 | `reviewer`, `evidenceSha256`                 | Independent schema reviewer and SHA-256 of the exact schema evidence bytes       |
+
+Version 2 additionally requires `queueTransition`, containing exactly
+`previousQueues`, `candidateQueues`, and `addedQueues`. Each is a sorted,
+unique, nonempty list of at most 100 queue names. The candidate must retain
+every previous queue, and `addedQueues` must equal the exact difference.
+Canonical probes of the immutable candidate and every previous worker image
+must match these inventories. Removing or renaming queues is unsupported.
+
+The captured old runtime saves the actual original pause state of every queue
+in the candidate inventory, including newly added names. Snapshot reads avoid
+updating queue metadata. Both old and candidate runtimes use that complete
+version 2 manifest for pausing, drain checks, recovery and state restoration.
+An unrelated queue or a changed runtime inventory stops the transition.
 
 The runtime review binds all four previous containers, both complete provider
 inventories and every changed runtime file, including Prisma assets. Schema
@@ -354,11 +368,10 @@ The controller never resolves migration history or restarts old code after a
 migration has started. Before that point, a reviewed recovery may return to the
 captured old release after its execution ownership is proven settled.
 
-Schema review version 2 additionally requires `previousQueueNames` and
-`candidateQueueNames`, each a sorted array of unique queue names. It permits
-strict additions only. The controller probes every captured worker image and
-the candidate image, requires all previous inventories to agree, and matches
-the inventories to the review. Version 1 continues to require unchanged queues.
+The controller probes every captured worker image and the candidate image,
+requires all previous inventories to agree, and matches them to the version 2
+`queueTransition` review. Only strict additions are permitted. Version 1
+continues to require unchanged queues.
 The runtime compatibility review remains version 2 and retains its complete
 container, provider and changed-file bindings.
 

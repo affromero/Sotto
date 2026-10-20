@@ -26,6 +26,8 @@ import { ContinueBar, ScoreDial } from './ClassWidgets';
 import type { ClassSpeakingPrompt, ClassSpeakingRecording } from './classTypes';
 import styles from './SpeakingSection.module.css';
 
+type SpeakingTaskPrompt = ClassSpeakingPrompt & { taskMode?: 'READ_ALOUD' | 'COMMUNICATIVE' };
+
 const POLL_INTERVAL_MS = 1500;
 const RUBRIC_AXES: { key: 'accuracy' | 'fluency' | 'completeness'; label: string }[] = [
   { key: 'accuracy', label: 'accuracy' },
@@ -37,6 +39,7 @@ interface RubricScores {
   accuracy?: number;
   fluency?: number;
   completeness?: number;
+  communicative?: number;
 }
 
 interface AlignmentToken {
@@ -67,7 +70,7 @@ interface CardState {
 
 interface SpeakingSectionProps {
   endpointBase: string;
-  prompts: ClassSpeakingPrompt[];
+  prompts: SpeakingTaskPrompt[];
   gate: number; // 0..100
   nextName: string | null;
   /** Report the running 0..100 average overall score upward. */
@@ -81,7 +84,7 @@ interface SpeakingSectionProps {
 
 interface PromptCardProps {
   endpointBase: string;
-  prompt: ClassSpeakingPrompt;
+  prompt: SpeakingTaskPrompt;
   index: number;
   total: number;
   onScored: (promptId: string, result: ScoringResult) => void;
@@ -272,17 +275,26 @@ function PromptCard({
       id={`speaking-prompt-${prompt.id}`}
       aria-label={`Speaking prompt ${index + 1} of ${total}`}
     >
+      {prompt.assessmentScope === 'PRIVATE_SOURCE' && (
+        <p className={styles.speakEn}>
+          Private source feedback. This practice does not count toward level mastery.
+        </p>
+      )}
       <div className={styles.promptBlock}>
-        <div className={styles.promptLabel}>Say this</div>
+        <div className={styles.promptLabel}>
+          {prompt.taskMode === 'COMMUNICATIVE' ? 'Your task' : 'Say this'}
+        </div>
         <div className={styles.speakTarget} lang="auto">
           {prompt.targetPhrase}
         </div>
       </div>
       <div className={styles.cueBlock}>
-        <div className={styles.promptLabel}>Meaning / cue</div>
+        <div className={styles.promptLabel}>
+          {prompt.taskMode === 'COMMUNICATIVE' ? 'Constraints' : 'Meaning / cue'}
+        </div>
         <div className={styles.speakEn}>{prompt.translation}</div>
       </div>
-      {prompt.ipa && (
+      {prompt.taskMode !== 'COMMUNICATIVE' && prompt.ipa && (
         <div className={styles.speakIpa} aria-label={`Pronunciation: ${prompt.ipa}`}>
           {prompt.ipa}
         </div>
@@ -328,8 +340,19 @@ function PromptCard({
           </div>
         ) : phase === 'scored' && result ? (
           <div className={styles.scoredZone}>
-            <div className={styles.phoneme} role="group" aria-label="Pronunciation breakdown">
-              {RUBRIC_AXES.map((axis) => {
+            <div
+              className={styles.phoneme}
+              role="group"
+              aria-label={
+                prompt.taskMode === 'COMMUNICATIVE'
+                  ? 'Communicative task feedback'
+                  : 'Pronunciation breakdown'
+              }
+            >
+              {(prompt.taskMode === 'COMMUNICATIVE'
+                ? [{ key: 'communicative' as const, label: 'communicative task' }]
+                : RUBRIC_AXES
+              ).map((axis) => {
                 const raw = rubric?.[axis.key];
                 if (typeof raw !== 'number') return null;
                 const v = typeof raw === 'number' ? Math.round(raw * 100) : 0;
@@ -357,7 +380,7 @@ function PromptCard({
                 <p className={styles.transcript}>&ldquo;{result.transcript}&rdquo;</p>
               </div>
             )}
-            {focusTokens.length > 0 && (
+            {prompt.taskMode !== 'COMMUNICATIVE' && focusTokens.length > 0 && (
               <div className={styles.soundFocus} aria-label="Pronunciation focus">
                 {focusTokens.map((token, tokenIndex) => (
                   <span className={styles.soundChip} key={`${token.op}-${tokenIndex}`}>
@@ -377,7 +400,11 @@ function PromptCard({
               type="button"
               className={styles.recBtn}
               onClick={() => void handleStart()}
-              aria-label="Start recording your pronunciation"
+              aria-label={
+                prompt.taskMode === 'COMMUNICATIVE'
+                  ? 'Start recording your response'
+                  : 'Start recording your pronunciation'
+              }
             >
               <ClassGlyph name="mic" size={28} />
             </button>
@@ -525,9 +552,13 @@ export function SpeakingSection({
         <div className={styles.eyebrow}>
           <span className={styles.eyebrowIdx}>03 ·</span> Speaking
         </div>
-        <h1 className={styles.title}>Say it out loud.</h1>
+        <h1 className={styles.title}>
+          {cur?.taskMode === 'COMMUNICATIVE' ? 'Respond in your own words.' : 'Say it out loud.'}
+        </h1>
         <p className={styles.modLede}>
-          Record each phrase. Feedback measures recognized words and available word timing. Phrase{' '}
+          {cur?.taskMode === 'COMMUNICATIVE'
+            ? 'Follow the task and constraints. Feedback assesses the communicative goal. Task'
+            : 'Record each phrase. Feedback measures recognized words and available word timing. Phrase'}{' '}
           {idx + 1} of {total}.
         </p>
 
@@ -552,7 +583,8 @@ export function SpeakingSection({
               className={`${styles.btn} ${styles.btnPrimary}`}
               onClick={() => setIdx((i) => i + 1)}
             >
-              Next phrase <ClassGlyph name="arrow" size={16} />
+              {cur?.taskMode === 'COMMUNICATIVE' ? 'Next task' : 'Next phrase'}{' '}
+              <ClassGlyph name="arrow" size={16} />
             </button>
           </div>
         )}

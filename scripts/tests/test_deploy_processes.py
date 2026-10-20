@@ -448,6 +448,8 @@ class CompatibilityReviewTests(unittest.TestCase):
                 return subprocess.CompletedProcess(
                     arguments, 0, (candidates[service] + '\n').encode())
             elif arguments[:3] == ['docker', 'image', 'inspect']:
+                if '--format' not in arguments:
+                    return subprocess.CompletedProcess(arguments, 0, json.dumps([{'Id': arguments[3], 'Config': {'Labels': {'org.opencontainers.image.revision': 'd' * 40, 'org.opencontainers.image.source': 'https://github.com/affromero/Sotto'}}}]).encode())
                 return subprocess.CompletedProcess(
                     arguments, 0, new_image.encode())
             else:
@@ -528,7 +530,7 @@ class CompatibilityReviewTests(unittest.TestCase):
             [release, activation + '=/missing'],
             [release, activation, activation + '=/missing'],
             [release, activation + '=/first', activation + '=/second'],
-            [release, release], ['SOTTO_RELEASE_SHA'], [],
+            [release, release], ['SOTTO_RELEASE_SHA'], ['SOTTO_RELEASE_SHA='],
             [release, 'SOTTO_RELEASE_SHA'], [release, 42],
         ]
         with patch.dict(os.environ, self.environment), patch.object(

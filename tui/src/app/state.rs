@@ -18,6 +18,7 @@
 use crate::api::types;
 
 include!("state/core.rs");
+include!("state/learning_map.rs");
 include!("state/sections.rs");
 include!("state/practice.rs");
 include!("state/placement.rs");

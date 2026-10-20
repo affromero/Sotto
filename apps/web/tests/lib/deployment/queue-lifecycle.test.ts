@@ -195,10 +195,10 @@ suite('deployment queue and execution settlement', () => {
     });
   }
 
-  function transition() {
+  function transition(addedNames: readonly string[] = ['vocabulary-audio']) {
     const previous = {
       ...runtime,
-      names: runtime.names.filter((name) => name !== 'vocabulary-audio'),
+      names: runtime.names.filter((name) => !addedNames.includes(name)),
     };
     const proof = JSON.stringify({
       schemaVersion: 1,
@@ -436,6 +436,35 @@ suite('deployment queue and execution settlement', () => {
     expect(await run({ command: 'snapshot' }, runtime)).toEqual(original);
     expect(original.queues.find((entry) => entry.name === 'pricing-fetch')?.paused).toBe(true);
     expect(snapshot.queues.every((entry) => !entry.paused)).toBe(true);
+  });
+
+  it('fences added queues from the previous runtime and restores their exact flags on the candidate', async () => {
+    const addedQueues = ['material-analysis', 'vocabulary-audio'];
+    const candidateQueues = [...ALL_QUEUE_NAMES].sort();
+    expect(addedQueues.every((name) => candidateQueues.includes(name))).toBe(true);
+    const { previous, previousInput, candidateInput } = transition(addedQueues);
+    await queue('material-analysis').pause();
+    await queue('pricing-fetch').pause();
+    const keys = (await connection.keys(`${prefix}:*`)).sort();
+    const original = await run(
+      {
+        command: 'snapshot',
+        ...previousInput,
+      },
+      previous
+    );
+    expect((await connection.keys(`${prefix}:*`)).sort()).toEqual(keys);
+    await run({ command: 'pause', manifest: original, ...previousInput }, previous);
+    expect(
+      (await run({ command: 'drained-all', manifest: original, ...candidateInput }, runtime))
+        .drained
+    ).toBe(true);
+    await run({ command: 'restore', manifest: original, ...candidateInput }, runtime);
+    const restored = await run({ command: 'snapshot' }, runtime);
+    expect(restored.queues).toEqual(original.queues);
+    expect(await queue('material-analysis').isPaused()).toBe(true);
+    expect(await queue('vocabulary-audio').isPaused()).toBe(false);
+    expect(await queue('pricing-fetch').isPaused()).toBe(true);
   });
 
   it('checks empty Fish state without writing credentials or queue metadata', async () => {

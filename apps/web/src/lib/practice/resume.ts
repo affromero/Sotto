@@ -1,3 +1,7 @@
+import {
+  speakingTaskMode,
+  speakingAssessmentScope,
+} from '../learning-map/evidence/communicative-speaking';
 /**
  * Re-entering a practice session that is still ACTIVE.
  *
@@ -17,6 +21,7 @@ import {
   practiceReceiptSchema,
   speakingEvidenceSchema,
   writingFeedbackSchema,
+  learningSelectionSnapshotSchema,
 } from '@sotto/shared';
 import { practicePreparationSchema } from './preparation-state';
 import { practicePreparationProgress, reconcilePracticePreparation } from './preparation';
@@ -71,6 +76,8 @@ export async function resumePractice(
         submissionResult: true,
         progressRevision: true,
         generationState: true,
+        practiceLevel: true,
+        learningSelection: true,
       },
     });
   let session = await readSession();
@@ -137,6 +144,10 @@ export async function resumePractice(
   const drafts = z.record(z.string(), z.string()).safeParse(session.writingDrafts);
   const requirements = readSkillRequirements(session.skillRequirements);
   const progress = {
+    practiceLevel: session.practiceLevel ?? null,
+    learningSelection: session.learningSelection
+      ? learningSelectionSnapshotSchema.parse(session.learningSelection)
+      : null,
     progressRevision: session.progressRevision,
     ...(requirements ? { skillRequirements: requirements } : {}),
     ...(answers.success ? { learnerAnswers: answers.data } : {}),
@@ -157,6 +168,7 @@ export async function resumePractice(
         targetPhrase: true,
         translation: true,
         referenceTtsUrl: true,
+        learningObjectives: true,
         recordings: {
           where: { userId },
           orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
@@ -172,7 +184,9 @@ export async function resumePractice(
         },
       },
     });
-    const speakingPrompts = prompts.map(({ recordings, ...prompt }) => ({
+    const speakingPrompts = prompts.map(({ recordings, learningObjectives, ...prompt }) => ({
+      taskMode: speakingTaskMode(learningObjectives),
+      assessmentScope: speakingAssessmentScope(learningObjectives),
       ...prompt,
       latestRecording: recordings[0]
         ? speakingEvidenceSchema.parse({ ...recordings[0], recordingId: recordings[0].id })

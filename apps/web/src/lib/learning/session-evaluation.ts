@@ -16,6 +16,7 @@ export interface LearningSectionMaterial {
   passageText?: string | null;
   audio?: { status: string; audioUrl: string | null } | null;
   referenceAudioUrls?: readonly (string | null)[];
+  speakingTaskModes?: readonly ('READ_ALOUD' | 'COMMUNICATIVE')[];
 }
 
 export interface LearningSectionWork extends LearningSectionMaterial {
@@ -61,6 +62,15 @@ export function assertLearningMaterial(
         `${skill.toLowerCase()} exercises are incomplete. Repair the missing material.`,
         [skill]
       );
+    if (
+      skill === 'SPEAKING' &&
+      section.speakingTaskModes &&
+      (section.speakingTaskModes.length !== requirement.expectedCount ||
+        section.speakingTaskModes.some((mode) => mode !== 'READ_ALOUD' && mode !== 'COMMUNICATIVE'))
+    )
+      throw new LearningIncompleteError('Speaking task modes are incomplete or unsupported.', [
+        skill,
+      ]);
     if (skill === 'READING' && !section.passageText?.trim())
       throw new LearningIncompleteError('Reading needs its full source passage.', [skill]);
     if (skill === 'LISTENING') {
@@ -83,7 +93,9 @@ export function assertLearningMaterial(
       skill === 'SPEAKING' &&
       requirements.referenceAudioRequired &&
       (section.referenceAudioUrls?.length !== requirement.expectedCount ||
-        section.referenceAudioUrls.some((url) => !url?.trim()))
+        section.referenceAudioUrls.some(
+          (url, index) => section.speakingTaskModes?.[index] !== 'COMMUNICATIVE' && !url?.trim()
+        ))
     )
       throw new LearningIncompleteError(
         'Speaking reference audio is incomplete. Repair the audio before finishing.',

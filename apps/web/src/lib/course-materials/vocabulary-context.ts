@@ -119,7 +119,7 @@ export async function getCourseVocabularyTargets(p: {
       return end > start ? [text.slice(start, end)] : [];
     })
     .filter((fragment) => /[\p{L}\p{N}]/u.test(fragment));
-  if (!sourceFragments.length) throw new Error('Course excerpts contain no complete source words.');
+  if (!sourceFragments.length) return { imported: false, vocab: [], context: captured.text };
   const due = await getDueItems(p.courseId);
   const rankedMemory = await sottoTransaction(
     prismaUnfiltered,

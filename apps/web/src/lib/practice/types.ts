@@ -19,6 +19,7 @@ export interface PracticeMcItem {
   explanation: string;
   vocabLemma: string | null;
   focusTargetId: string | null;
+  learningAssessment?: unknown;
 }
 
 /** The client-safe projection of a stored item. */
@@ -41,6 +42,8 @@ export interface PracticeSpeakingItem {
   targetPhrase: string;
   translation: string;
   referenceTtsUrl: string | null;
+  taskMode?: 'READ_ALOUD' | 'COMMUNICATIVE';
+  assessmentScope?: 'PRIVATE_SOURCE' | 'CANONICAL';
   latestRecording?: import('@sotto/shared').SpeakingEvidence | null;
 }
 

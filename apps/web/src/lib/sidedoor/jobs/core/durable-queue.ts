@@ -1,7 +1,9 @@
 import { createHash, randomUUID } from 'node:crypto';
+import { isDeepStrictEqual } from 'node:util';
 import type { Job, Queue } from 'bullmq';
 import { z } from 'zod';
 import { prepareJob } from 'thesidedoor-core/runtime/outbox';
+import { completeErasedJob } from '@/lib/sidedoor/access/deletion/job-erasure';
 import type { Prisma } from '@/generated/prisma/client';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import {
@@ -19,8 +21,29 @@ import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/
 import { classifyError, userMessage } from '@/lib/byok-errors';
 import { validatePreparationAudio } from '@/lib/classes/preparation-audio';
 import { settleVocabularyQueueFailure } from '@/lib/vocabulary/recovery/queue-failure';
+import { materialStorageScopes } from '@/lib/course-materials/scopes';
+import {
+  materialAnalysisJobAuthoritySchema,
+  placementSessionJobAuthoritySchema,
+  captureMaterialAnalysisJobAuthority,
+  capturePlacementSessionJobAuthority,
+  validateMaterialAnalysisJobAuthority,
+} from '@/lib/course-materials/jobs/analysis-authority';
+
+const sha256Schema = z.string().regex(/^[a-f0-9]{64}$/);
+const materialWorkInputSchema = z
+  .object({
+    materialId: z.uuid(),
+    userId: z.string().min(1).optional(),
+    processingRevision: z.number().int().positive(),
+    inputSha256: sha256Schema.optional(),
+    uploadId: z.uuid().optional(),
+  })
+  .passthrough();
 
 const authoritySchema = z.discriminatedUnion('kind', [
+  materialAnalysisJobAuthoritySchema,
+  placementSessionJobAuthoritySchema,
   z
     .object({
       kind: z.literal('episode'),
@@ -30,6 +53,34 @@ const authoritySchema = z.discriminatedUnion('kind', [
       pipelineGeneration: z.string().nullable(),
       preparationAudioGenerationKey: z.string().min(1).optional(),
       snapshot: z.json(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('material'),
+      materialId: z.uuid(),
+      userId: z.string().min(1),
+      materialCreatedAt: z.number().int().nonnegative(),
+      processingRevision: z.number().int().positive(),
+      instanceId: z.uuid(),
+      inputSha256: sha256Schema.nullable(),
+      scopes: z.array(
+        z
+          .object({
+            subjectId: z.string().min(1),
+            generation: z.number().int().nonnegative(),
+          })
+          .strict()
+      ),
+      upload: z
+        .object({
+          id: z.uuid(),
+          createdAt: z.number().int().nonnegative(),
+          finalizationOperationId: z.uuid(),
+          expectedSha256: sha256Schema.nullable(),
+        })
+        .strict()
+        .nullable(),
     })
     .strict(),
   z
@@ -82,7 +133,11 @@ export function durableQueueOperationId(queueName: string, jobId?: string): stri
   return `${digest.slice(0, 8)}-${digest.slice(8, 12)}-4${digest.slice(13, 16)}-a${digest.slice(17, 20)}-${digest.slice(20, 32)}`;
 }
 
-async function captureAuthority(database: Prisma.TransactionClient, payload: unknown) {
+async function captureAuthority(
+  database: Prisma.TransactionClient,
+  payload: unknown,
+  operationId: string
+) {
   const input =
     payload !== null && typeof payload === 'object' ? (payload as Record<string, unknown>) : {};
   const episodeId = typeof input.episodeId === 'string' ? input.episodeId : null;
@@ -114,6 +169,99 @@ async function captureAuthority(database: Prisma.TransactionClient, payload: unk
       scopes: snapshot.scopes,
     };
   }
+  if ('materialId' in input) {
+    const requested = materialWorkInputSchema.parse(input);
+    const material = await database.courseMaterial.findUnique({
+      where: { id: requested.materialId },
+      select: {
+        id: true,
+        userId: true,
+        createdAt: true,
+        processingRevision: true,
+        originalUrl: true,
+        originalSha256: true,
+      },
+    });
+    if (!material || (requested.userId !== undefined && material.userId !== requested.userId))
+      throw new Error('Durable material owner changed');
+    if (material.processingRevision !== requested.processingRevision)
+      throw new Error('Durable material processing revision changed');
+    const storage = await materialStorageScopes(database, material);
+    const upload = requested.uploadId
+      ? await database.materialUpload.findUnique({
+          where: { id: requested.uploadId },
+          select: {
+            id: true,
+            materialId: true,
+            createdAt: true,
+            status: true,
+            expectedSha256: true,
+            finalizationOperationId: true,
+            batch: { select: { userId: true } },
+          },
+        })
+      : null;
+    if (
+      requested.uploadId &&
+      (!upload ||
+        upload.materialId !== material.id ||
+        upload.batch.userId !== material.userId ||
+        !['FINALIZING', 'COMPLETE'].includes(upload.status) ||
+        !upload.finalizationOperationId)
+    )
+      throw new Error('Durable material upload changed');
+    if (
+      requested.inputSha256 === undefined &&
+      (!upload || upload.finalizationOperationId !== operationId)
+    )
+      throw new Error('Durable material work requires a bound original or its finalizer');
+    const scopes = [
+      ...storage.scopes,
+      ...(upload
+        ? [
+            {
+              subjectId: `material-upload:${upload.id}`,
+              generation: upload.createdAt.getTime(),
+            },
+          ]
+        : []),
+    ].sort((left, right) => left.subjectId.localeCompare(right.subjectId));
+    return {
+      authority: {
+        kind: 'material' as const,
+        materialId: material.id,
+        userId: material.userId,
+        materialCreatedAt: material.createdAt.getTime(),
+        processingRevision: material.processingRevision,
+        instanceId: storage.instanceId,
+        inputSha256: requested.inputSha256 ?? null,
+        scopes,
+        upload: upload
+          ? {
+              id: upload.id,
+              createdAt: upload.createdAt.getTime(),
+              finalizationOperationId: upload.finalizationOperationId!,
+              expectedSha256: upload.expectedSha256,
+            }
+          : null,
+      },
+      scopes,
+    };
+  }
+  if ('analysisId' in input) {
+    const selected = z
+      .object({ userId: z.string().min(1), analysisId: z.uuid() })
+      .passthrough()
+      .parse(input);
+    return captureMaterialAnalysisJobAuthority(database, selected);
+  }
+  if ('placementSessionId' in input) {
+    const selected = z
+      .object({ userId: z.string().min(1), placementSessionId: z.uuid() })
+      .passthrough()
+      .parse(input);
+    return capturePlacementSessionJobAuthority(database, selected);
+  }
   const instance = await sottoStorageInstance(database).read();
   if (requestedUserId) {
     const profile = await database.user.findUnique({
@@ -130,7 +278,10 @@ async function captureAuthority(database: Prisma.TransactionClient, payload: unk
       },
       scopes: [
         { subjectId: instance.subjectId, generation: instance.generation },
-        { subjectId: `profile:${requestedUserId}`, generation: profile.createdAt.getTime() },
+        {
+          subjectId: `profile:${requestedUserId}`,
+          generation: profile.createdAt.getTime(),
+        },
       ].sort((left, right) => left.subjectId.localeCompare(right.subjectId)),
     };
   }
@@ -144,6 +295,8 @@ export async function validateDurableAuthority(
   database: Prisma.TransactionClient,
   authority: DurableAuthority
 ): Promise<{ userId: string } | null> {
+  if (authority.kind === 'material-analysis' || authority.kind === 'placement-session')
+    return validateMaterialAnalysisJobAuthority(database, authority);
   if (authority.kind === 'episode') {
     if (authority.preparationAudioGenerationKey)
       await validatePreparationAudio(
@@ -167,6 +320,73 @@ export async function validateDurableAuthority(
     if (snapshot.userId !== authority.ownerUserId) throw new Error('Durable episode owner changed');
     return { userId: authority.userId };
   }
+  if (authority.kind === 'material') {
+    const material = await database.courseMaterial.findUnique({
+      where: { id: authority.materialId },
+      select: {
+        id: true,
+        userId: true,
+        createdAt: true,
+        processingRevision: true,
+        originalUrl: true,
+        originalSha256: true,
+      },
+    });
+    if (
+      !material ||
+      material.userId !== authority.userId ||
+      material.createdAt.getTime() !== authority.materialCreatedAt ||
+      material.processingRevision !== authority.processingRevision
+    )
+      throw new Error('Durable material owner or processing generation changed');
+    if (
+      authority.inputSha256 !== null &&
+      (!material.originalUrl || material.originalSha256 !== authority.inputSha256)
+    )
+      throw new Error('Durable material original changed');
+    const storage = await materialStorageScopes(database, material);
+    const scopes = [...storage.scopes];
+    if (authority.upload) {
+      const upload = await database.materialUpload.findUnique({
+        where: { id: authority.upload.id },
+        select: {
+          materialId: true,
+          createdAt: true,
+          status: true,
+          expectedSha256: true,
+          finalizationOperationId: true,
+          batch: { select: { userId: true } },
+        },
+      });
+      if (
+        !upload ||
+        upload.materialId !== material.id ||
+        upload.batch.userId !== authority.userId ||
+        upload.createdAt.getTime() !== authority.upload.createdAt ||
+        upload.finalizationOperationId !== authority.upload.finalizationOperationId ||
+        upload.expectedSha256 !== authority.upload.expectedSha256 ||
+        !['FINALIZING', 'COMPLETE'].includes(upload.status)
+      )
+        throw new Error('Durable material upload changed');
+      if (
+        upload.status === 'COMPLETE' &&
+        (!material.originalUrl ||
+          !sha256Schema.safeParse(material.originalSha256).success ||
+          (upload.expectedSha256 !== null && upload.expectedSha256 !== material.originalSha256))
+      )
+        throw new Error('Durable material upload publication is incomplete');
+      scopes.push({
+        subjectId: `material-upload:${authority.upload.id}`,
+        generation: authority.upload.createdAt,
+      });
+    } else if (authority.inputSha256 === null) {
+      throw new Error('Durable material work requires a bound original or its finalizer');
+    }
+    scopes.sort((left, right) => left.subjectId.localeCompare(right.subjectId));
+    if (storage.instanceId !== authority.instanceId || !isDeepStrictEqual(scopes, authority.scopes))
+      throw new Error('Durable material storage scopes changed');
+    return { userId: authority.userId };
+  }
   const instance = await sottoStorageInstance(database).read();
   if (instance.instanceId !== authority.instanceId)
     throw new Error('Durable work instance changed');
@@ -181,6 +401,45 @@ export async function validateDurableAuthority(
 }
 
 /** Authorize a source operation and commit its application claim with outbox admission. */
+/** Enqueue inside an existing publication transaction. Delivery follows the committed outbox. */
+export async function enqueueDurableQueueJob<Payload>(
+  database: Prisma.TransactionClient,
+  options: {
+    handler: string;
+    type: string;
+    payload: Payload;
+    jobId: string;
+    attempts?: number;
+    priority?: number;
+    version?: number;
+  }
+) {
+  const operationId = durableQueueOperationId(options.handler, options.jobId);
+  const captured = await captureAuthority(database, options.payload, operationId);
+  await validateDurableAuthority(database, captured.authority);
+  const outbox = sottoJobOutbox(database);
+  const existing = await outbox.read(operationId);
+  return outbox.enqueue(
+    prepareJob({
+      id: operationId,
+      namespace: SIDEDOOR_STATE_ID,
+      handler: options.handler,
+      version: options.version ?? 1,
+      payload: jsonClone({
+        type: options.type,
+        payload: jsonClone(options.payload),
+        authority: captured.authority,
+      }),
+      scopes: captured.scopes,
+      delivery: {
+        attempts: options.attempts ?? 3,
+        priority: options.priority ?? 0,
+        availableAt: existing?.job.delivery.availableAt ?? Date.now(),
+      },
+    })
+  );
+}
+
 export async function admitDurableQueueJob<Payload>(options: {
   queue: Queue;
   type: string;
@@ -197,31 +456,19 @@ export async function admitDurableQueueJob<Payload>(options: {
   const record = await sottoTransaction(prisma, async (database) => {
     const authorized = await options.authorize(database);
     await options.mutate(database, operationId);
-    const captured = await captureAuthority(database, options.payload);
+    const captured = await captureAuthority(database, options.payload, operationId);
     const recipient = await validateDurableAuthority(database, captured.authority);
     if (authorized?.userId && recipient?.userId !== authorized.userId)
       throw new Error('Durable source recipient differs from its authorization');
-    const outbox = sottoJobOutbox(database);
-    const existing = await outbox.read(operationId);
-    return outbox.enqueue(
-      prepareJob({
-        id: operationId,
-        namespace: SIDEDOOR_STATE_ID,
-        handler: options.queue.name,
-        version,
-        payload: jsonClone({
-          type: options.type,
-          payload: jsonClone(options.payload),
-          authority: captured.authority,
-        }),
-        scopes: captured.scopes,
-        delivery: {
-          attempts: options.attempts ?? 3,
-          priority: options.priority ?? 0,
-          availableAt: existing?.job.delivery.availableAt ?? Date.now(),
-        },
-      })
-    );
+    return enqueueDurableQueueJob(database, {
+      handler: options.queue.name,
+      type: options.type,
+      payload: options.payload,
+      jobId: options.jobId,
+      version,
+      attempts: options.attempts,
+      priority: options.priority,
+    });
   });
   await deliverSottoJob({
     database: prisma,
@@ -256,7 +503,7 @@ export async function transitionDurableQueueJob<Payload>(options: {
     const parent = workByJob.get(options.job);
     if (!parent) throw new Error('Durable parent binding is missing');
     const parentRecipient = await validateDurableAuthority(database, parent.authority);
-    const captured = await captureAuthority(database, options.payload);
+    const captured = await captureAuthority(database, options.payload, operationId);
     const childRecipient = await validateDurableAuthority(database, captured.authority);
     if (parentRecipient?.userId !== childRecipient?.userId)
       throw new Error('Durable child recipient differs from its parent');
@@ -319,7 +566,7 @@ export async function admitDurableQueueBatch(options: {
       ? await validateDurableAuthority(database, parent.authority)
       : await options.authorize?.(database);
     const children = await options.prepare(database);
-    const episodeAuthorities = new Map<
+    const cachedAuthorities = new Map<
       string,
       {
         captured: Awaited<ReturnType<typeof captureAuthority>>;
@@ -342,12 +589,25 @@ export async function admitDurableQueueBatch(options: {
               typeof input.audioGenerationKey === 'string' ? input.audioGenerationKey : null,
             ])
           : null;
-      let authority = episodeKey === null ? undefined : episodeAuthorities.get(episodeKey);
+      const materialInput = 'materialId' in input ? materialWorkInputSchema.parse(input) : null;
+      const materialKey = materialInput
+        ? JSON.stringify([
+            'material',
+            materialInput.materialId,
+            materialInput.userId ?? null,
+            materialInput.processingRevision,
+            materialInput.inputSha256 ?? null,
+            materialInput.uploadId ?? null,
+            materialInput.inputSha256 === undefined ? operationId : null,
+          ])
+        : null;
+      const authorityKey = episodeKey === null ? materialKey : `episode:${episodeKey}`;
+      let authority = authorityKey === null ? undefined : cachedAuthorities.get(authorityKey);
       if (!authority) {
-        const captured = await captureAuthority(database, child.payload);
+        const captured = await captureAuthority(database, child.payload, operationId);
         const recipient = await validateDurableAuthority(database, captured.authority);
         authority = { captured, recipient };
-        if (episodeKey !== null) episodeAuthorities.set(episodeKey, authority);
+        if (authorityKey !== null) cachedAuthorities.set(authorityKey, authority);
       }
       const { captured, recipient } = authority;
       if (expected?.userId && recipient?.userId !== expected.userId)
@@ -375,7 +635,7 @@ export async function admitDurableQueueBatch(options: {
       );
       records.push({ child, operationId, version, record });
     }
-    for (const { captured, recipient } of episodeAuthorities.values()) {
+    for (const { captured, recipient } of cachedAuthorities.values()) {
       const current = await validateDurableAuthority(database, captured.authority);
       if (current?.userId !== recipient?.userId)
         throw new Error('Durable child recipient changed before admission');
@@ -406,6 +666,11 @@ export async function loadDurableQueueJob<Payload>(
     payload: durableEnvelopeSchema,
   });
   if (work.complete) return work;
+  if (
+    ['material', 'material-analysis', 'placement-session'].includes(work.payload.authority.kind) &&
+    (await completeErasedJob(database, work))
+  )
+    return { complete: true as const, erased: true as const };
   await validateDurableAuthority(database, work.payload.authority);
   return {
     ...work,

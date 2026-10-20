@@ -106,14 +106,7 @@ struct PracticeDuePanel: View {
     }
 
     private var dueSummary: String {
-        var parts: [String] = []
-        if overview.due.vocab > 0 {
-            parts.append("\(overview.due.vocab) word\(overview.due.vocab == 1 ? "" : "s")")
-        }
-        if overview.due.grammar > 0 {
-            parts.append("\(overview.due.grammar) grammar point\(overview.due.grammar == 1 ? "" : "s")")
-        }
-        return parts.isEmpty ? "" : "\(parts.joined(separator: " and ")) due for review."
+        overview.dueSummary
     }
 
     private func kindLabel(_ kind: String) -> String {

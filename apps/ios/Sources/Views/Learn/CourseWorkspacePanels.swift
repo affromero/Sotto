@@ -1,5 +1,4 @@
 import SwiftUI
-import UniformTypeIdentifiers
 
 struct CourseHeroPanel: View {
     @Environment(\.sottoLayout) private var layout
@@ -411,7 +410,8 @@ struct CourseNotesEditor: View {
 
     @State private var bodyText = ""
     @State private var materials: [SottoCourseMaterial] = []
-    @State private var showingImporter = false
+    @State private var materialsCursor: String?
+    @State private var materialPageCursors = Set<String>()
     @State private var isLoaded = false
     @State private var isLoading = false
     @State private var isSaving = false
@@ -429,11 +429,23 @@ struct CourseNotesEditor: View {
             )
 
             CourseMaterialList(materials: materials)
+            if let level = SottoLearningLevel(rawValue: course.currentLevel) {
+                SourceFocusPracticePanel(courseId: course.id, target: course.targetLang, level: level)
+                    .environmentObject(model)
+            }
+            if let cursor = materialsCursor {
+                Button("Load more material originals") { Task { await loadMoreMaterials(cursor) } }
+                    .frame(minHeight: 44).disabled(isLoading || isSaving)
+            }
 
-            Button("Upload notes") { showingImporter = true }
-                .buttonStyle(.bordered)
-                .frame(minHeight: 44)
-                .disabled(!isLoaded || isLoading || isSaving)
+            CourseMaterialTransferControls(courseId: course.id) { response in
+                materials = response.materials ?? []
+                materialsCursor = response.nextCursor
+                materialPageCursors = []
+                message = "Original materials saved separately from editable notes."
+            }
+            .environmentObject(model)
+            .disabled(!isLoaded || isLoading || isSaving)
 
             TextEditor(text: $bodyText)
                 .font(.body)
@@ -484,22 +496,6 @@ struct CourseNotesEditor: View {
         .task(id: course.id) {
             await loadNotes()
         }
-        .fileImporter(isPresented: $showingImporter, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
-            switch result {
-            case .success(let urls):
-                isSaving = true
-                error = ""
-                Task {
-                    defer { isSaving = false }
-                    do {
-                        let response = try await model.importCourseMaterials(courseId: course.id, urls: urls)
-                        materials = response.materials ?? []
-                        message = notesStatus(response)
-                    } catch { self.error = "Could not upload these materials. Use supported documents totaling 10MB or less." }
-                }
-            case .failure: error = "Could not select the material."
-            }
-        }
     }
 
     private func loadNotes() async {
@@ -511,6 +507,8 @@ struct CourseNotesEditor: View {
             let response = try await model.fetchCourseNotes(courseId: course.id)
             bodyText = response.body ?? ""
             materials = response.materials ?? []
+            materialsCursor = response.nextCursor
+            materialPageCursors = []
             isLoaded = true
         } catch {
             self.error = "Could not load course notes."
@@ -536,6 +534,23 @@ struct CourseNotesEditor: View {
                 }
             }
         }
+    }
+
+    private func loadMoreMaterials(_ cursor: String) async {
+        guard !isLoading, !isSaving, !materialPageCursors.contains(cursor) else { return }
+        isLoading = true; error = ""
+        defer { isLoading = false }
+        do {
+            let response = try await model.fetchCourseNotes(courseId: course.id, cursor: cursor)
+            let next = response.nextCursor
+            guard next == nil || (next != cursor && !materialPageCursors.contains(next!)) else {
+                throw SottoAPIError.message("The material list repeated a pagination receipt. Refresh the course before continuing.")
+            }
+            let known = Set(materials.map(\.id))
+            materials.append(contentsOf: (response.materials ?? []).filter { !known.contains($0.id) })
+            materialPageCursors.insert(cursor)
+            materialsCursor = next
+        } catch { self.error = error.localizedDescription }
     }
 
     private func notesStatus(_ response: SottoCourseNotesResponse) -> String {
@@ -777,19 +792,9 @@ struct PracticeKindOption: Identifiable {
     let kind: String
     let label: String
 
-    /// Only vocabulary and grammar carry a due count server-side; a full
-    /// catch-up draws on both, and the rest are generated on demand.
+    /// Overall counts include each objective once; skill counts can overlap.
     func dueCount(in overview: SottoPracticeOverview) -> Int? {
-        switch kind {
-        case "FULL":
-            return overview.totalDue
-        case "VOCAB":
-            return overview.due.vocab
-        case "GRAMMAR":
-            return overview.due.grammar
-        default:
-            return nil
-        }
+        overview.due.count(for: kind)
     }
 }
 

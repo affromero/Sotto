@@ -3,6 +3,36 @@ import XCTest
 @testable import Sotto
 
 final class PracticeOverviewTests: XCTestCase {
+    func testCanonicalOnlyReviewAppearsOverallAndInItsQualifiedSkills() throws {
+        let result = try overview("""
+        {"due":{"vocab":0,"grammar":0,"objectives":1,"bySkill":{"GRAMMAR":1,"WRITING":1}},"totalVocab":0,"recent":[]}
+        """)
+        XCTAssertEqual(result.totalDue, 1)
+        XCTAssertEqual(practiceOptions.first { $0.kind == "FULL" }?.dueCount(in: result), 1)
+        XCTAssertEqual(practiceOptions.first { $0.kind == "GRAMMAR" }?.dueCount(in: result), 1)
+        XCTAssertEqual(practiceOptions.first { $0.kind == "WRITING" }?.dueCount(in: result), 1)
+        XCTAssertEqual(practiceOptions.first { $0.kind == "VOCAB" }?.dueCount(in: result), 0)
+        XCTAssertNil(practiceOptions.first { $0.kind == "SPEAKING" }?.dueCount(in: result))
+        XCTAssertTrue(result.dueSummary.contains("1 objective"))
+        XCTAssertFalse(result.dueSummary.contains("grammar point"))
+    }
+
+    func testMixedReviewCountsObjectivesOnceAndPreservesLegacyVocabularyAndGrammar() throws {
+        let result = try overview("""
+        {"due":{"vocab":4,"grammar":2,"objectives":3,"bySkill":{"GRAMMAR":2,"READING":2,"LISTENING":1,"SPEAKING":1,"WRITING":3}},"totalVocab":40,"recent":[]}
+        """)
+        XCTAssertEqual(result.totalDue, 9)
+        XCTAssertEqual(result.due.count(for: "GRAMMAR"), 4)
+        XCTAssertEqual(result.due.count(for: "READING"), 2)
+        XCTAssertEqual(result.due.count(for: "LISTENING"), 1)
+        XCTAssertEqual(result.due.count(for: "SPEAKING"), 1)
+        XCTAssertEqual(result.due.count(for: "WRITING"), 3)
+        XCTAssertEqual(result.due.count(for: "VOCAB"), 4)
+        XCTAssertTrue(result.dueSummary.contains("4 words"))
+        XCTAssertTrue(result.dueSummary.contains("2 legacy grammar points"))
+        XCTAssertTrue(result.dueSummary.contains("3 objectives"))
+    }
+
     private func overview(_ json: String) throws -> SottoPracticeOverview {
         try JSONDecoder().decode(SottoPracticeOverview.self, from: Data(json.utf8))
     }

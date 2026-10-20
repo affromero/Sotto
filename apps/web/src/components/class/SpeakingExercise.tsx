@@ -23,12 +23,15 @@ interface Prompt {
   ipa?: string | null;
   referenceTtsUrl?: string | null;
   latestRecording?: SpeakingEvidence | null;
+  taskMode?: 'READ_ALOUD' | 'COMMUNICATIVE';
+  assessmentScope?: 'PRIVATE_SOURCE' | 'CANONICAL';
 }
 
 interface RubricScores {
   accuracy?: number;
   fluency?: number;
   completeness?: number;
+  communicative?: number;
 }
 
 interface ScoringResult {
@@ -64,6 +67,7 @@ const RUBRIC_LABELS: Record<string, string> = {
   accuracy: 'Recognized words',
   fluency: 'Timing fluency',
   completeness: 'Completeness',
+  communicative: 'Communicative task',
 };
 
 // ---- PromptCard sub-component ----
@@ -76,6 +80,7 @@ interface PromptCardProps {
 }
 
 function PromptCard({ endpointBase, prompt, index, total }: PromptCardProps) {
+  const communicative = prompt.taskMode === 'COMMUNICATIVE';
   const [state, setState] = useState<PromptState>(() => {
     const pending = pendingSpeakingUpload(endpointBase, prompt.id);
     if (
@@ -329,6 +334,11 @@ function PromptCard({ endpointBase, prompt, index, total }: PromptCardProps) {
           {index + 1}
         </div>
         <div className={styles.phraseContent}>
+          {prompt.assessmentScope === 'PRIVATE_SOURCE' && (
+            <p className={styles.translation}>
+              Private source feedback. This practice does not count toward level mastery.
+            </p>
+          )}
           <p
             className={`${styles.targetPhrase} ${guardStyles.guarded}`}
             lang="auto"
@@ -342,7 +352,7 @@ function PromptCard({ endpointBase, prompt, index, total }: PromptCardProps) {
           >
             {prompt.translation}
           </p>
-          {prompt.ipa && (
+          {!communicative && prompt.ipa && (
             <p
               className={`${styles.ipa} ${guardStyles.guarded}`}
               aria-label={`Pronunciation: ${prompt.ipa}`}
@@ -353,7 +363,7 @@ function PromptCard({ endpointBase, prompt, index, total }: PromptCardProps) {
           )}
         </div>
 
-        {prompt.referenceTtsUrl && (
+        {!communicative && prompt.referenceTtsUrl && (
           <button
             type="button"
             className={`${styles.playRefButton} ${isPlayingRef ? styles.playRefButtonActive : ''}`}
@@ -394,7 +404,11 @@ function PromptCard({ endpointBase, prompt, index, total }: PromptCardProps) {
               type="button"
               className={styles.recordButton}
               onClick={() => void handleStartRecording()}
-              aria-label="Start recording your pronunciation"
+              aria-label={
+                communicative
+                  ? 'Start recording your response'
+                  : 'Start recording your pronunciation'
+              }
             >
               <span className={styles.recordDot} aria-hidden="true" />
               Record
@@ -519,7 +533,7 @@ function PromptCard({ endpointBase, prompt, index, total }: PromptCardProps) {
               })}
             </div>
           )}
-          {result.rubricScores?.fluency == null && (
+          {!communicative && result.rubricScores?.fluency == null && (
             <p className={styles.feedback}>
               Timing fluency was not measured. Feedback measures recognized words and available
               timing.
@@ -560,7 +574,9 @@ export function SpeakingExercise({ endpointBase, prompts }: SpeakingExerciseProp
       <header className={styles.exerciseHeader}>
         <h2 className={styles.exerciseTitle}>Speaking Practice</h2>
         <p className={styles.exerciseSubtitle}>
-          Record each phrase. You&rsquo;ll receive pronunciation feedback instantly.
+          {prompts.some((prompt) => prompt.taskMode === 'COMMUNICATIVE')
+            ? 'Respond in your own words to each task. Feedback assesses the required communicative goal.'
+            : 'Record each phrase for pronunciation feedback.'}
         </p>
       </header>
 

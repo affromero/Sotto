@@ -64,6 +64,8 @@ export interface ClassReference {
 }
 
 export interface ClassSpeakingPrompt {
+  taskMode?: 'READ_ALOUD' | 'COMMUNICATIVE';
+  assessmentScope?: 'PRIVATE_SOURCE' | 'CANONICAL';
   id: string;
   order: number;
   targetPhrase: string;
@@ -88,6 +90,7 @@ export interface ClassSpeakingRecording {
     accuracy?: number;
     fluency?: number;
     completeness?: number;
+    communicative?: number;
   } | null;
   phonemeScores?: ClassSpeakingAlignmentToken[] | null;
   feedback?: string | null;

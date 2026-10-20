@@ -1,7 +1,11 @@
 // Review the generated listening script and quiz before persisting accepted
 // script, vocabulary, and learner graph material. Verified references gate
 // readiness; audio waits for the final learning association and questions.
-import { learningScriptHash } from './learning/script-hash';
+import { learningScriptHash, learningScriptTranscript } from './learning/script-hash';
+import {
+  captureClassAssessmentScope,
+  reviewMultipleChoiceAssessments,
+} from './learning-map/evidence/producers';
 import { prisma } from './prisma';
 import { capturedLearningAiOptions, resolveCapturedLearningAi } from './learning-ai';
 import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
@@ -801,6 +805,20 @@ export async function prepareClassListening(
     sourceUrl: p.sourceUrl,
   });
   const { episodeId, comprehensionQuestions } = content;
+  const scope = await captureClassAssessmentScope({
+    classId: p.classId,
+    userId: p.userId,
+    execution: p.execution,
+  });
+  const assessedQuestions = await reviewMultipleChoiceAssessments({
+    userId: p.userId,
+    execution: p.execution,
+    scope,
+    skill: 'LISTENING',
+    questions: comprehensionQuestions,
+    transcript: learningScriptTranscript(content.turns),
+    pendingListeningScriptSha256: learningScriptHash(content.turns),
+  });
 
   try {
     const section = await withClassGeneration(p.execution, p.classId, attempt, async (database) => {
@@ -818,7 +836,7 @@ export async function prepareClassListening(
       });
 
       await database.lessonQuestion.createMany({
-        data: comprehensionQuestions.map((q, i) => ({
+        data: assessedQuestions.map((q, i) => ({
           sectionId: section.id,
           order: i + 1,
           skill: 'LISTENING' as const,
@@ -826,6 +844,12 @@ export async function prepareClassListening(
           options: q.options,
           correctIndex: q.correctIndex,
           explanation: q.explanation,
+          ...(q.learningAssessment
+            ? {
+                learningAssessment:
+                  q.learningAssessment as unknown as import('@/generated/prisma/client').Prisma.InputJsonValue,
+              }
+            : {}),
         })),
       });
       return section;
