@@ -3,6 +3,7 @@
 // due/weak items that drive the next class's adaptive content and the graph viz.
 import { prisma, prismaUnfiltered } from './prisma';
 import { reviewCard } from './srs';
+import { recordReviewEvent, reviewSnapshot, type ReviewEvidence } from './learning/review/events';
 import { normalizeLearningTargetText } from './learning-targets';
 import { rankLearningTargets } from '@sotto/learning-model';
 import type { CefrLevel } from '@sotto/shared';
@@ -150,12 +151,14 @@ export async function applyReviewOutcome(
   vocabQuality: number,
   grammarQuality: number,
   now: Date,
-  database: LearningDatabase = prismaUnfiltered
+  database: LearningDatabase,
+  evidence: ReviewEvidence
 ): Promise<void> {
   const vocab = await database.learnerVocab.findMany({
     where: { courseId, lemma: { in: vocabLemmas } },
   });
   for (const v of vocab) {
+    const before = reviewSnapshot(v);
     const u = reviewCard(
       {
         ease: v.ease,
@@ -168,12 +171,23 @@ export async function applyReviewOutcome(
       now
     );
     await database.learnerVocab.update({ where: { id: v.id }, data: { ...u, lastReviewed: now } });
+    await recordReviewEvent(database, {
+      courseId,
+      vocabId: v.id,
+      targetKey: `vocab:${v.lemma}`,
+      quality: Math.max(0, Math.min(1, vocabQuality)),
+      reviewedAt: now,
+      before,
+      after: reviewSnapshot({ ...u, lastReviewed: now }),
+      evidence,
+    });
   }
 
   const grammar = await database.learnerGrammar.findMany({
     where: { courseId, topicKey: { in: grammarPoints } },
   });
   for (const g of grammar) {
+    const before = reviewSnapshot(g);
     const u = reviewCard(
       {
         ease: g.ease,
@@ -188,6 +202,16 @@ export async function applyReviewOutcome(
     await database.learnerGrammar.update({
       where: { id: g.id },
       data: { ...u, lastReviewed: now },
+    });
+    await recordReviewEvent(database, {
+      courseId,
+      grammarId: g.id,
+      targetKey: `grammar:${g.topicKey}`,
+      quality: Math.max(0, Math.min(1, grammarQuality)),
+      reviewedAt: now,
+      before,
+      after: reviewSnapshot({ ...u, lastReviewed: now }),
+      evidence,
     });
   }
 }

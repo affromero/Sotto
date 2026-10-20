@@ -302,4 +302,38 @@ describe('reference verification AI routing', () => {
       detail: expect.stringMatching(/unparseable/i),
     });
   });
+
+  it('rejects an unsupported claim without requesting replacement sources', async () => {
+    generateResponse.mockResolvedValueOnce({
+      content: JSON.stringify({
+        evaluations: [
+          {
+            refNumber: 1,
+            sourceExists: true,
+            verdict: 'CONTRADICTED',
+            confidence: 0.95,
+            reasoning: 'The real source contradicts the claim.',
+            suggestedReplacement: null,
+          },
+        ],
+      }),
+      model: 'codex',
+      inputTokens: 10,
+      outputTokens: 10,
+    });
+    const result = await runReferenceVerification(
+      [reference],
+      [{ speaker: 'HOST', text: 'A cited claim appears here [1].' }],
+      'Source evaluation topic',
+      capturedAi()
+    );
+    expect(result.results.get(reference.id)?.verdict.status).toBe('REMOVED');
+    expect(result.results.get(reference.id)?.checks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ layer: 'url', passed: true }),
+        expect.objectContaining({ layer: 'ai', passed: false }),
+      ])
+    );
+    expect(generateResponse).toHaveBeenCalledTimes(1);
+  });
 });

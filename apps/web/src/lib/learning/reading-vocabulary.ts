@@ -288,7 +288,8 @@ export async function reviewReadingVocabulary(
   courseId: string,
   snapshot: unknown,
   answers: ReadonlyMap<string, boolean>,
-  now: Date
+  now: Date,
+  source: import('./review/events').ReviewSource
 ): Promise<Set<string>> {
   if (snapshot == null) return new Set();
   const vocabulary = readingVocabularySchema.parse(snapshot);
@@ -296,7 +297,11 @@ export async function reviewReadingVocabulary(
   for (const word of vocabulary.words) {
     if (!word.questionIds.length || word.questionIds.some((id) => !answers.has(id))) continue;
     const score = word.questionIds.filter((id) => answers.get(id)).length / word.questionIds.length;
-    await applyReviewOutcome(courseId, [word.lemma], [], score, 0, now, database);
+    await applyReviewOutcome(courseId, [word.lemma], [], score, 0, now, database, {
+      source,
+      assessment: 'READING_VOCABULARY',
+      questionIdsByTarget: new Map([[`vocab:${word.lemma}`, word.questionIds]]),
+    });
     assessed.add(word.lemma);
   }
   return assessed;

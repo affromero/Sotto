@@ -17,6 +17,8 @@ import {
   mockCourseUpdate,
   mockCourseUpdateMany,
   mockTransaction,
+  mockEpisodeUpdateMany,
+  mockQueueListeningAudio,
   mockGenerateSectionQuestions,
   mockGenerateClassIntro,
   mockGenerateClassListening,
@@ -330,8 +332,41 @@ describe('createNextClass', () => {
       expect.objectContaining({ where: { id: 'class-new' } })
     );
     expect(mockGenerateClassSpeaking).not.toHaveBeenCalled();
-    expect(mockGenerateClassWriting).not.toHaveBeenCalled();
   });
+
+  it.each(['writing', 'speaking', 'audio admission'] as const)(
+    'retires unqueued listening after a later %s failure',
+    async (stage) => {
+      mockCourseFindFirst.mockResolvedValue(SAMPLE_COURSE);
+      mockCourseClassFindFirst.mockResolvedValue(null);
+      mockCourseClassFindMany.mockResolvedValue([]);
+      const prepared = Promise.withResolvers<void>();
+      mockGenerateClassListening.mockImplementationOnce(async () => {
+        prepared.resolve();
+        return { sectionId: 'section-listening', episodeId: 'episode-listening' };
+      });
+      const failure = async () => {
+        await prepared.promise;
+        throw new Error('Required section rejected');
+      };
+      if (stage === 'writing') mockGenerateClassWriting.mockImplementationOnce(failure);
+      else if (stage === 'speaking') mockGenerateClassSpeaking.mockImplementationOnce(failure);
+      else mockQueueListeningAudio.mockImplementationOnce(failure);
+      await expect(
+        createNextClass('course-1', 'u1', authorizedLearnerExecution('u1'))
+      ).rejects.toThrow('Required section rejected');
+      expect(mockEpisodeUpdateMany).toHaveBeenCalledWith({
+        where: {
+          id: 'episode-listening',
+          userId: 'u1',
+          source: 'CLASS',
+          status: 'SCRIPT_READY',
+          audioGenerationKey: null,
+        },
+        data: { status: 'FAILED' },
+      });
+    }
+  );
 
   it('stops cleanly when the generated class is cancelled midway', async () => {
     mockCourseFindFirst.mockResolvedValue(SAMPLE_COURSE);

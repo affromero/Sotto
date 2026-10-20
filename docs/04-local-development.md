@@ -218,6 +218,34 @@ and documentation changes avoid backend validation. Run `npm run ci` locally
 to investigate broader failures or qualify an offline release. A passing focused
 check does not replace applicable remote checks for the exact release revision.
 
+### Offline scheduler comparison
+
+New class and practice submissions record private review observations alongside
+their existing SM-2 updates. Apply the additive Prisma migration before running
+updated web and worker processes. No historical events are fabricated. Deleting
+a course, memory target, class or practice session also deletes its observations.
+
+Run an owned course comparison with a fixed held-out cutoff:
+
+```bash
+npm run learning:compare -- --course-id COURSE_ID --user-id USER_ID --test-after 2026-10-20T00:00:00Z
+```
+
+Add `--export /private/path/reviews.json` to create a new private snapshot, or
+use `--input /private/path/reviews.json` for an offline replay without database
+access. The command refuses to overwrite an export. Snapshots contain private
+target and question identifiers; keep them local.
+
+The report compares fixed-default FSRS recall predictions with the existing
+mastery estimate on single-question vocabulary recognition events. It scores
+each answer before updating either history. Earlier observations warm the model;
+same-day reviews update history but are excluded from held-out metrics. Replay
+stops at the first aggregate, missing or invalid transition and preserves earlier
+predictions. Left-truncated histories are excluded and counted. SM-2 replay
+checks use the canonical scheduler. The mastery baseline is not an SM-2 recall
+probability. These metrics do not establish fewer required reviews, improved
+learning, or the effect of a different review policy. Live scheduling is unchanged.
+
 ### Browser tests
 
 The browser suite exercises household sign-in, local-provider onboarding, course creation,
