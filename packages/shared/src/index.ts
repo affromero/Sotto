@@ -39,6 +39,7 @@ export {
 export type { SkillRequirements, SkillRequirement } from './learning-requirements';
 export * from './learning-evidence';
 export * from './learning-map/catalog';
+export * from './learning-map/upgrade';
 export * from './learning-map/progress';
 export * from './learning-map/selection';
 export * from './learning-map/contracts';

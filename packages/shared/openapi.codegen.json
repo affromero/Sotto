@@ -14,6 +14,654 @@
       }
     },
     "schemas": {
+      "ApplyLearningUpgradeRequest": {
+        "type": "object",
+        "properties": {
+          "schemaVersion": {
+            "type": "number",
+            "enum": [1]
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "expectedLevel": {
+            "type": "string",
+            "enum": ["A1", "A2", "B1", "B2", "C1", "C2"]
+          },
+          "expectedCatalogHash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "nullable": true
+          },
+          "expectedPageDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "cursor",
+          "expectedLevel",
+          "expectedCatalogHash",
+          "expectedPageDigest"
+        ],
+        "additionalProperties": false
+      },
+      "LearningUpgradeReport": {
+        "type": "object",
+        "properties": {
+          "schemaVersion": {
+            "type": "number",
+            "enum": [1]
+          },
+          "courseId": {
+            "type": "string"
+          },
+          "courseGeneration": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "level": {
+            "type": "string",
+            "enum": ["A1", "A2", "B1", "B2", "C1", "C2"]
+          },
+          "startLevel": {
+            "type": "string",
+            "enum": ["A1", "A2", "B1", "B2", "C1", "C2"]
+          },
+          "placementSource": {
+            "type": "string",
+            "nullable": true
+          },
+          "mode": {
+            "type": "string",
+            "enum": ["DRY_RUN", "APPLY"]
+          },
+          "cursor": {
+            "type": "object",
+            "properties": {
+              "schemaVersion": {
+                "type": "number",
+                "enum": [1]
+              },
+              "stage": {
+                "type": "string",
+                "enum": ["COURSE", "LESSONS", "GRAMMAR", "MATERIALS"]
+              },
+              "afterId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200,
+                "nullable": true
+              },
+              "cutoff": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 50
+              },
+              "identityDigest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "required": ["schemaVersion", "stage", "afterId", "cutoff", "limit", "identityDigest"],
+            "additionalProperties": false
+          },
+          "nextCursor": {
+            "type": "string",
+            "maxLength": 4096,
+            "nullable": true
+          },
+          "pageDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "catalog": {
+            "type": "object",
+            "properties": {
+              "available": {
+                "type": "boolean"
+              },
+              "hash": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$",
+                "nullable": true
+              },
+              "version": {
+                "type": "integer",
+                "minimum": 0,
+                "exclusiveMinimum": true,
+                "maximum": 9007199254740991,
+                "nullable": true
+              },
+              "pinned": {
+                "type": "boolean"
+              }
+            },
+            "required": ["available", "hash", "version", "pinned"],
+            "additionalProperties": false
+          },
+          "coverage": {
+            "type": "object",
+            "properties": {
+              "version": {
+                "type": "number",
+                "enum": [1]
+              },
+              "scope": {
+                "type": "string",
+                "enum": [
+                  "CLASS",
+                  "FULL",
+                  "GRAMMAR",
+                  "READING",
+                  "LISTENING",
+                  "SPEAKING",
+                  "WRITING",
+                  "VOCAB"
+                ]
+              },
+              "nativeLang": {
+                "type": "string",
+                "minLength": 1
+              },
+              "targetLang": {
+                "type": "string",
+                "minLength": 1
+              },
+              "level": {
+                "type": "string",
+                "enum": ["A1", "A2", "B1", "B2", "C1", "C2"]
+              },
+              "ttsProvider": {
+                "type": "string",
+                "minLength": 1,
+                "nullable": true
+              },
+              "sttProvider": {
+                "type": "string",
+                "minLength": 1,
+                "nullable": true
+              },
+              "referenceAudioRequired": {
+                "type": "boolean"
+              },
+              "skills": {
+                "type": "object",
+                "properties": {
+                  "GRAMMAR": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "state": {
+                            "type": "string",
+                            "enum": ["REQUIRED"]
+                          },
+                          "expectedCount": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": true,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": ["state", "expectedCount"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "state": {
+                            "type": "string",
+                            "enum": ["EXEMPT_NO_PROVIDER"]
+                          },
+                          "reason": {
+                            "type": "string",
+                            "enum": ["NO_TTS_PROVIDER", "NO_STT_PROVIDER"]
+                          }
+                        },
+                        "required": ["state", "reason"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "state": {
+                            "type": "string",
+                            "enum": ["NOT_REQUESTED"]
+                          }
+                        },
+                        "required": ["state"],
+                        "additionalProperties": false
+                      }
+                    ]
+                  },
+                  "READING": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "state": {
+                            "type": "string",
+                            "enum": ["REQUIRED"]
+                          },
+                          "expectedCount": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": true,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": ["state", "expectedCount"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "state": {
+                            "type": "string",
+                            "enum": ["EXEMPT_NO_PROVIDER"]
+                          },
+                          "reason": {
+                            "type": "string",
+                            "enum": ["NO_TTS_PROVIDER", "NO_STT_PROVIDER"]
+                          }
+                        },
+                        "required": ["state", "reason"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "state": {
+                            "type": "string",
+                            "enum": ["NOT_REQUESTED"]
+                          }
+                        },
+                        "required": ["state"],
+                        "additionalProperties": false
+                      }
+                    ]
+                  },
+                  "LISTENING": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "state": {
+                            "type": "string",
+                            "enum": ["REQUIRED"]
+                          },
+                          "expectedCount": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": true,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": ["state", "expectedCount"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "state": {
+                            "type": "string",
+                            "enum": ["EXEMPT_NO_PROVIDER"]
+                          },
+                          "reason": {
+                            "type": "string",
+                            "enum": ["NO_TTS_PROVIDER", "NO_STT_PROVIDER"]
+                          }
+                        },
+                        "required": ["state", "reason"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "state": {
+                            "type": "string",
+                            "enum": ["NOT_REQUESTED"]
+                          }
+                        },
+                        "required": ["state"],
+                        "additionalProperties": false
+                      }
+                    ]
+                  },
+                  "SPEAKING": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "state": {
+                            "type": "string",
+                            "enum": ["REQUIRED"]
+                          },
+                          "expectedCount": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": true,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": ["state", "expectedCount"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "state": {
+                            "type": "string",
+                            "enum": ["EXEMPT_NO_PROVIDER"]
+                          },
+                          "reason": {
+                            "type": "string",
+                            "enum": ["NO_TTS_PROVIDER", "NO_STT_PROVIDER"]
+                          }
+                        },
+                        "required": ["state", "reason"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "state": {
+                            "type": "string",
+                            "enum": ["NOT_REQUESTED"]
+                          }
+                        },
+                        "required": ["state"],
+                        "additionalProperties": false
+                      }
+                    ]
+                  },
+                  "WRITING": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "state": {
+                            "type": "string",
+                            "enum": ["REQUIRED"]
+                          },
+                          "expectedCount": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": true,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": ["state", "expectedCount"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "state": {
+                            "type": "string",
+                            "enum": ["EXEMPT_NO_PROVIDER"]
+                          },
+                          "reason": {
+                            "type": "string",
+                            "enum": ["NO_TTS_PROVIDER", "NO_STT_PROVIDER"]
+                          }
+                        },
+                        "required": ["state", "reason"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "state": {
+                            "type": "string",
+                            "enum": ["NOT_REQUESTED"]
+                          }
+                        },
+                        "required": ["state"],
+                        "additionalProperties": false
+                      }
+                    ]
+                  }
+                },
+                "required": ["GRAMMAR", "READING", "LISTENING", "SPEAKING", "WRITING"],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "version",
+              "scope",
+              "nativeLang",
+              "targetLang",
+              "level",
+              "ttsProvider",
+              "sttProvider",
+              "referenceAudioRequired",
+              "skills"
+            ],
+            "additionalProperties": false,
+            "nullable": true
+          },
+          "upgrade": {
+            "type": "object",
+            "properties": {
+              "available": {
+                "type": "boolean"
+              },
+              "targetHash": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$",
+                "nullable": true
+              },
+              "added": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "removed": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "changed": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "earnedTransitionsPreserved": {
+                "type": "boolean",
+                "enum": [true]
+              }
+            },
+            "required": [
+              "available",
+              "targetHash",
+              "added",
+              "removed",
+              "changed",
+              "earnedTransitionsPreserved"
+            ],
+            "additionalProperties": false
+          },
+          "items": {
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": ["COURSE", "LESSON", "LEGACY_GRAMMAR", "MATERIAL"]
+                },
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "sourceDigest": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "level": {
+                  "type": "string",
+                  "enum": ["A1", "A2", "B1", "B2", "C1", "C2"],
+                  "nullable": true
+                },
+                "disposition": {
+                  "type": "string",
+                  "enum": [
+                    "PINNED",
+                    "WOULD_BIND",
+                    "CONFIGURATION_BLOCKED",
+                    "CATALOG_UNAVAILABLE",
+                    "MAPPED",
+                    "MAPPING_UNRESOLVED",
+                    "BROAD_LEGACY",
+                    "ORIGINAL_UNAVAILABLE",
+                    "ORIGINAL_VERIFICATION_REQUIRED",
+                    "EXTRACTION_REQUIRED",
+                    "EXTRACTION_PENDING",
+                    "RECOVERY_REQUIRED",
+                    "ANALYSIS_REQUIRED",
+                    "ANALYSIS_PENDING",
+                    "ANALYSIS_READY",
+                    "ANALYSIS_PARTIAL"
+                  ]
+                },
+                "objectiveIds": {
+                  "maxItems": 200,
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "unresolvedKeys": {
+                  "maxItems": 200,
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "existingLinks": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "missingLinks": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "notes": {
+                  "maxItems": 8,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "maxLength": 400
+                  }
+                }
+              },
+              "required": [
+                "kind",
+                "id",
+                "sourceDigest",
+                "level",
+                "disposition",
+                "objectiveIds",
+                "unresolvedKeys",
+                "existingLinks",
+                "missingLinks",
+                "notes"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "changed": {
+            "type": "object",
+            "properties": {
+              "bindings": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "lessonLinks": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": ["bindings", "lessonLinks"],
+            "additionalProperties": false
+          },
+          "evidence": {
+            "type": "string",
+            "enum": ["LEGACY_EVIDENCE_REMAINS_BROAD"]
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "courseId",
+          "courseGeneration",
+          "level",
+          "startLevel",
+          "placementSource",
+          "mode",
+          "cursor",
+          "nextCursor",
+          "pageDigest",
+          "catalog",
+          "coverage",
+          "upgrade",
+          "items",
+          "changed",
+          "evidence"
+        ],
+        "additionalProperties": false
+      },
+      "LearningUpgradeCourses": {
+        "type": "object",
+        "properties": {
+          "courses": {
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "nativeLang": {
+                  "type": "string"
+                },
+                "targetLang": {
+                  "type": "string"
+                },
+                "level": {
+                  "type": "string",
+                  "enum": ["A1", "A2", "B1", "B2", "C1", "C2"]
+                }
+              },
+              "required": ["id", "nativeLang", "targetLang", "level"],
+              "additionalProperties": false
+            }
+          },
+          "nextAfterId": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": ["courses", "nextAfterId"],
+        "additionalProperties": false
+      },
       "CourseNotesPage": {
         "type": "object",
         "properties": {
@@ -11784,6 +12432,121 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/MaterialAnalysisCancellationRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/learning-map/upgrade": {
+      "get": {
+        "operationId": "listLearningUpgradeCourses",
+        "summary": "List twenty owned courses for resumable learning-map maintenance.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningUpgradeCourses"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "afterId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/courses/{courseId}/learning-map/upgrade": {
+      "get": {
+        "operationId": "previewLearningUpgrade",
+        "summary": "Preview a bounded upgrade page without changing requirements, evidence or original materials.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningUpgradeReport"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "courseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "applyLearningUpgrade",
+        "summary": "Add only missing current-band bindings and exact lesson aliases from an unchanged preview page.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningUpgradeReport"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "courseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApplyLearningUpgradeRequest"
               }
             }
           }

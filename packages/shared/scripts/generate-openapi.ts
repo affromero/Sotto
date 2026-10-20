@@ -8,6 +8,11 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
+import {
+  applyLearningUpgradeRequestSchema,
+  learningUpgradeReportSchema,
+  learningUpgradeCoursesSchema,
+} from '../src/learning-map/upgrade';
 import { courseNotesPageSchema, legacyMaterialTextSchema } from '../src/course-materials/legacy';
 import {
   learningMapResponseSchema,
@@ -153,6 +158,9 @@ const startPracticeVariants: Record<string, string> = {
 // pointers instead of being inlined — this keeps the document DRY and gives the
 // Rust codegen clean, named types. Order is irrelevant; refs resolve by id.
 const namedSchemas: Record<string, z.ZodType> = {
+  ApplyLearningUpgradeRequest: applyLearningUpgradeRequestSchema,
+  LearningUpgradeReport: learningUpgradeReportSchema,
+  LearningUpgradeCourses: learningUpgradeCoursesSchema,
   CourseNotesPage: courseNotesPageSchema,
   LegacyMaterialText: legacyMaterialTextSchema,
   LearningMapResponse: learningMapResponseSchema,

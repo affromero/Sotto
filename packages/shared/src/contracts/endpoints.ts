@@ -3,6 +3,11 @@
 // path with its Zod request/response schemas so a single source generates both
 // the OpenAPI document and any client-side validation.
 import { z } from 'zod';
+import {
+  applyLearningUpgradeRequestSchema,
+  learningUpgradeReportSchema,
+  learningUpgradeCoursesSchema,
+} from '../learning-map/upgrade';
 import { courseNotesPageSchema, legacyMaterialTextSchema } from '../course-materials/legacy';
 import {
   placementGenerateRequestSchema,
@@ -542,6 +547,35 @@ export const endpoints: EndpointDef[] = [
     request: materialAnalysisCancellationRequestSchema,
     response: materialAnalysisCancellationResponseSchema,
     successStatuses: [200, 202],
+  },
+  {
+    id: 'listLearningUpgradeCourses',
+    method: 'GET',
+    path: '/api/v1/learning-map/upgrade',
+    summary: 'List twenty owned courses for resumable learning-map maintenance.',
+    auth: 'bearer',
+    response: learningUpgradeCoursesSchema,
+    query: [{ name: 'afterId', required: false }],
+  },
+  {
+    id: 'previewLearningUpgrade',
+    method: 'GET',
+    path: '/api/v1/courses/{courseId}/learning-map/upgrade',
+    summary:
+      'Preview a bounded upgrade page without changing requirements, evidence or original materials.',
+    auth: 'bearer',
+    response: learningUpgradeReportSchema,
+    query: [{ name: 'cursor', required: false }],
+  },
+  {
+    id: 'applyLearningUpgrade',
+    method: 'POST',
+    path: '/api/v1/courses/{courseId}/learning-map/upgrade',
+    summary:
+      'Add only missing current-band bindings and exact lesson aliases from an unchanged preview page.',
+    auth: 'bearer',
+    request: applyLearningUpgradeRequestSchema,
+    response: learningUpgradeReportSchema,
   },
   {
     id: 'manualPlacement',
