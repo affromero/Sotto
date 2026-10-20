@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdtemp, open, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { ExecutionWorkspace } from 'thesidedoor-core/storage';
@@ -28,9 +28,13 @@ describe('owned PDF render lifetime', () => {
     vi.stubEnv('OPENAI_API_KEY', 'private-test-key');
     vi.spyOn(ProcessRunner.prototype, 'execute').mockImplementation(async (request) => {
       workspace = request.args.at(-1)!;
-      const file = join(workspace, 'original.pdf');
-      expect((await stat(file)).mode & 0o777).toBe(0o600);
-      expect(await readFile(file)).toEqual(original);
+      const file = await open(join(workspace, 'original.pdf'), 'r');
+      try {
+        expect((await file.stat()).mode & 0o777).toBe(0o600);
+        expect(await file.readFile()).toEqual(original);
+      } finally {
+        await file.close();
+      }
       expect(request.environment).not.toHaveProperty('OPENAI_API_KEY');
       expect(request.environment).not.toHaveProperty('NODE_OPTIONS');
       expect(request.keepInputOpen).toBe(true);

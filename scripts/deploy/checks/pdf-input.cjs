@@ -9,7 +9,9 @@ async function main() {
   const applicationRequire = createRequire(join(process.cwd(), 'package.json'));
   const parserRequire = createRequire(applicationRequire.resolve('pdf-parse'));
   const assets = dirname(parserRequire.resolve('pdfjs-dist/package.json'));
-  const { PDFParse } = await import('pdf-parse');
+  const { PDFParse } = await import(
+    pathToFileURL(applicationRequire.resolve('pdf-parse')).href
+  );
   const sharp = applicationRequire('sharp');
   const content = 'BT /F1 18 Tf 30 100 Td (Original PDF smoke) Tj ET';
   const objects = [
