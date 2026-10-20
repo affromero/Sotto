@@ -263,6 +263,23 @@ class AffectedChecksTests(unittest.TestCase):
         self.assertIn('Ran 1 test', result.stderr)
         self.assertEqual(self.calls(), [])
 
+    def test_packaged_python_test_imports_its_sibling_fixture(self) -> None:
+        selected = 'scripts/tests/images/test_selected.py'
+        self.write('scripts/tests/images/__init__.py', '')
+        self.write('scripts/tests/images/fixtures.py', 'EXPECTED = "ready"\n')
+        self.write(selected,
+                   'import unittest\nfrom images.fixtures import EXPECTED\n'
+                   'class Selected(unittest.TestCase):\n'
+                   '    def test_delivery(self):\n'
+                   '        self.assertEqual(EXPECTED, "ready")\n')
+        self.git('add', selected)
+        self.write('scripts/tests/test_unrelated.py',
+                   'raise RuntimeError("Unrelated suite must not run")\n')
+        result = self.run_checks()
+        self.assert_passed(result)
+        self.assertIn('Ran 1 test', result.stderr)
+        self.assertEqual(self.calls(), [])
+
     def test_changed_python_failure_blocks_the_local_gate(self) -> None:
         selected = 'scripts/tests/test_selected.py'
         self.write(selected, 'import unittest\n'
@@ -277,6 +294,7 @@ class AffectedChecksTests(unittest.TestCase):
 
     def test_hook_configuration_runs_its_own_behavior_tests(self) -> None:
         selected = 'scripts/tests/delivery/test_affected_checks.py'
+        self.write('scripts/tests/delivery/__init__.py', '')
         self.write(selected, 'import unittest\n'
                    'class HookBehavior(unittest.TestCase):\n'
                    '    def test_delivery(self):\n'

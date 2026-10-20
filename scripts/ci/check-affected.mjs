@@ -136,7 +136,9 @@ if (allScriptTests) {
   run('python3', ['-m', 'unittest', 'discover', '-s', 'scripts/tests', '-p', 'test*.py']);
 } else {
   for (const test of scriptTests) {
-    run('python3', ['-m', 'unittest', 'discover', '-s', dirname(test), '-p', basename(test)]);
+    run('python3', [
+      '-m', 'unittest', 'discover', '-s', dirname(test), '-t', 'scripts/tests', '-p', basename(test),
+    ]);
   }
 }
 

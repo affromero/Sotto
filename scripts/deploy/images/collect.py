@@ -18,27 +18,9 @@ from scripts.deploy.images.metadata import (
     source_sha,
     validate_receipt,
 )
+from scripts.deploy.images.probe import probe
 
 DEPLOY = Path(__file__).resolve().parents[1]
-
-
-def probe(reference: str, path: Path, tsx: bool = False) -> str:
-    command = [
-        'docker', 'run', '--rm', '--pull', 'never', '--network', 'none',
-        '--platform', 'linux/amd64', '--read-only', '--tmpfs', '/tmp',
-        '--workdir', '/app/apps/web', '--env', 'TSX_DISABLE_CACHE=1',
-        '--env', 'TSX_TSCONFIG_PATH=/app/apps/web/tsconfig.json',
-        '--env', 'DATABASE_URL=postgresql://probe:probe@127.0.0.1:1/probe',
-        '--env', 'REDIS_URL=redis://127.0.0.1:1/15', '--entrypoint', 'node',
-        reference,
-    ]
-    if tsx:
-        command.extend(['--require', 'tsx/cjs'])
-    command.extend(['-e', path.read_text()])
-    output = subprocess.check_output(command, text=True).strip()
-    if not output:
-        raise ValueError(f'{path.name}: runtime probe returned no evidence')
-    return output
 
 
 def collect(role: str, sha: str, reference: str) -> dict[str, object]:
