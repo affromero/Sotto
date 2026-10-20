@@ -1,6 +1,8 @@
 import {
   playRoundViewSchema,
   playSeatSchema,
+  PLAY_MISSION_MESSAGES,
+  PLAY_MISSION_TWIST_AT,
   type PlayRoundView,
   type PlaySeat,
 } from '@sotto/shared';
@@ -19,11 +21,11 @@ function instructionFor(round: PrivatePlayRound, viewer: PlaySeat): string {
       : 'Answer the question about yourself, using your partner’s target language.';
   if (round.mode === 'DESCRIBE')
     return learner
-      ? 'Choose a secret word or phrase. Describe it without naming it.'
+      ? 'Pick a secret card or your own word. Give one clue without naming it.'
       : 'Read your partner’s clue and guess their secret word or phrase.';
   return learner
-    ? 'Use the language you are learning to work toward your private objective.'
-    : 'Use your partner’s target language to help the conversation while pursuing your own objective.';
+    ? 'You have six messages together. Work toward your secret objective and react to the twist.'
+    : 'Use your partner’s target language. You share six messages and each have a secret objective.';
 }
 
 /** Build the complete client payload explicitly. Never spread a private round. */
@@ -51,6 +53,7 @@ export function projectPlayRound(input: unknown, viewerInput: PlaySeat): PlayRou
     return playRoundViewSchema.parse({
       ...common,
       mode: round.mode,
+      targetSuggestions: viewer === round.learner ? round.targetSuggestions : null,
       target: viewer === round.learner || round.revealed ? round.target : null,
       clue: round.clue,
       guess: round.guess,
@@ -71,6 +74,8 @@ export function projectPlayRound(input: unknown, viewerInput: PlaySeat): PlayRou
     ownObjective: round.objectives[viewer],
     otherObjective: round.revealed ? round.objectives[other] : null,
     messages: round.messages,
+    remainingMessages: PLAY_MISSION_MESSAGES - round.messages.length,
+    twist: round.messages.length >= PLAY_MISSION_TWIST_AT ? round.twist : null,
     ownOutcome: round.outcomes[viewer],
     otherOutcome: round.revealed ? round.outcomes[other] : null,
   });

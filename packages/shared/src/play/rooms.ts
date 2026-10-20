@@ -69,7 +69,11 @@ export const requestPlayJoinSchema = z.strictObject({
   client: z.enum(['BROWSER', 'NATIVE']),
   deviceName: z.string().trim().min(1).max(80),
   candidate: z.discriminatedUnion('kind', [
-    z.strictObject({ kind: z.literal('EXISTING'), settings: playSettingsSchema }),
+    z.strictObject({
+      kind: z.literal('EXISTING'),
+      expectedProfileId: id,
+      settings: playSettingsSchema,
+    }),
     z.strictObject({
       kind: z.literal('NEW'),
       name: z.string().trim().min(1).max(80),

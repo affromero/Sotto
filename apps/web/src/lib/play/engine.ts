@@ -2,6 +2,8 @@ import {
   playGameConfigSchema,
   playRoundCommandSchema,
   playSeatSchema,
+  PLAY_MISSION_MESSAGES,
+  PLAY_MISSION_OUTCOME_AFTER,
   type PlayActionType,
   type PlayGameConfig,
   type PlayMode,
@@ -10,6 +12,7 @@ import {
 } from '@sotto/shared';
 import { playCard, playGuidance } from './catalogue';
 import { playChoicePrompt, playChoices } from './choices';
+import { playTargetSuggestions } from './targets';
 import { PlayRuleError } from './errors';
 import { privatePlayRoundSchema, type PrivatePlayRound } from './private-state';
 
@@ -52,6 +55,12 @@ export function createPlayRounds(input: PlayGameConfig, seed = 0): PrivatePlayRo
           ...common,
           mode,
           phase: 'SETUP',
+          targetSuggestions: playTargetSuggestions(
+            config.theme,
+            settings.targetLang,
+            settings.nativeLang,
+            seed + roleIndex
+          ),
           target: null,
           clue: null,
           guess: null,
@@ -83,6 +92,7 @@ export function createPlayRounds(input: PlayGameConfig, seed = 0): PrivatePlayRo
         ...common,
         mode,
         phase: 'EXCHANGE',
+        twist: card.twist,
         objectives: {
           [learner]: card.objectives.learner,
           [otherPlaySeat(learner)]: card.objectives.partner,
@@ -111,12 +121,17 @@ export function allowedPlayActions(round: PrivatePlayRound, actor: PlaySeat): Pl
     if (round.answers[actor] === null)
       actions.push(round.questionStyle === 'CHOICES' ? 'CHOOSE' : 'ANSWER');
   } else {
-    if (round.messages.length < 24 && round.messages.at(-1)?.seat !== actor)
+    if (round.messages.length < PLAY_MISSION_MESSAGES && round.messages.at(-1)?.seat !== actor)
       actions.push('MESSAGE');
     const contributed = (['HOST', 'GUEST'] as const).every((seat) =>
       round.messages.some((message) => message.seat === seat)
     );
-    if (contributed && round.outcomes[actor] === null) actions.push('MISSION_DONE');
+    if (
+      contributed &&
+      round.messages.length >= PLAY_MISSION_OUTCOME_AFTER &&
+      round.outcomes[actor] === null
+    )
+      actions.push('MISSION_DONE');
   }
   return actions;
 }

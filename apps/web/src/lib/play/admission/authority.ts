@@ -4,7 +4,25 @@ import type { Prisma, PlayJoinRequest } from '@/generated/prisma/client';
 import { sottoAccessStore } from '@/lib/sidedoor/access/core/access-store';
 import { SHARED_SESSION_COOKIE } from '@/lib/sidedoor/access/core/session-identity';
 import { sottoDeviceService } from '@/lib/sidedoor/access/state/device-identity';
+import { resolveSottoRequest } from '@/lib/sidedoor/access/core/request-identity';
 import type { PlayActor } from '../storage/rooms';
+
+export interface PlayBrowserContext {
+  request: Request;
+  expectedProfileId: string | null;
+}
+
+/** A profile assertion is a precondition, never a source of authority. */
+export async function requirePlayBrowserContext(
+  database: Prisma.TransactionClient,
+  context: PlayBrowserContext | undefined
+) {
+  if (!context || context.request.headers.has('authorization')) throw new AccessError('invalid');
+  const current = await resolveSottoRequest(database, context.request);
+  const profileId = current?.kind === 'content' ? current.userId : null;
+  if (profileId !== context.expectedProfileId)
+    throw new AccessError('conflict', 'Your active profile changed. Check it before joining.');
+}
 
 /** Owner authority can differ from the household's selected content profile. */
 export async function playSponsoringOwner(database: Prisma.TransactionClient, actor: PlayActor) {

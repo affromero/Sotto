@@ -66,7 +66,7 @@ export function InstallPrompt() {
       <div className={styles.body}>
         <span className={styles.title}>Install Sotto</span>
         <span className={styles.text}>
-          Add it to your home screen for full-screen, offline access.
+          Add Sotto to your home screen. Playing together needs a connection.
         </span>
       </div>
       <div className={styles.actions}>

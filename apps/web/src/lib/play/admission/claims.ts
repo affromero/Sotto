@@ -12,7 +12,11 @@ import { PlayRuleError } from '../errors';
 import { playFingerprint } from '../storage/fingerprint';
 import { loadPlayRoom, playHostWaiting, type StoredPlayRoom } from '../storage/room-view';
 import type { PlayActor, PlayClock } from '../storage/rooms';
-import { requireOrdinaryPlayEnrollment } from './authority';
+import {
+  requireOrdinaryPlayEnrollment,
+  requirePlayBrowserContext,
+  type PlayBrowserContext,
+} from './authority';
 import {
   openPlayDelivery,
   sealPlayDelivery,
@@ -138,7 +142,8 @@ export async function claimPlayEntry(
   requestId: string,
   proof: unknown,
   actor: PlayActor | null,
-  clock: PlayClock = () => new Date()
+  clock: PlayClock = () => new Date(),
+  browserContext?: PlayBrowserContext
 ): Promise<PlayClaimResult> {
   const proofHash = playProofHash(proof),
     deliveryId = randomUUID();
@@ -146,6 +151,8 @@ export async function claimPlayEntry(
     database,
     async (transaction): Promise<PlayClaimResult | null> => {
       const candidate = await requirePlayClaimant(transaction, requestId, proofHash);
+      if (candidate.client === 'BROWSER')
+        await requirePlayBrowserContext(transaction, browserContext);
       const room = await loadPlayRoom(transaction, candidate.roomId);
       const now = clock();
       if (candidate.status === 'CLAIMED' && candidate.candidateKind === 'NEW')

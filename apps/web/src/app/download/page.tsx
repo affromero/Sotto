@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { DownloadOptions } from './DownloadOptions';
+import { PlayInstallOptions } from '@/components/pwa/PlayInstallOptions';
+import { playDistribution, type PlayDistribution } from '@/lib/play/install/distribution';
 import styles from './page.module.css';
 
 export const metadata: Metadata = {
@@ -8,8 +10,17 @@ export const metadata: Metadata = {
   description:
     'Get Sotto on your computer, phone, or server. The desktop app runs the whole stack for you; the mobile app and PWA connect to your server.',
 };
+export const dynamic = 'force-dynamic';
 
 export default function DownloadPage() {
+  let distribution: PlayDistribution;
+  let installationError: string | null = null;
+  try {
+    distribution = playDistribution();
+  } catch {
+    distribution = { ios: null, androidStore: null, androidApk: null };
+    installationError = 'Native app download links are misconfigured on this server.';
+  }
   return (
     <main className={styles.main}>
       <nav className={styles.topNav} aria-label="Download page">
@@ -27,6 +38,11 @@ export default function DownloadPage() {
       </header>
 
       <DownloadOptions />
+      <PlayInstallOptions
+        distribution={distribution}
+        error={installationError}
+        invitationReturn={false}
+      />
 
       <section className={styles.serverBlock} aria-labelledby="server-heading">
         <h2 id="server-heading" className={styles.sectionTitle}>

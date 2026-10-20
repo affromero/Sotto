@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { playPhraseInputSchema, playPhraseViewSchema, type PlayRoundView } from '@sotto/shared';
+import { playPhraseInputSchema, playPhraseViewSchema, playVisibleTexts } from '@sotto/shared';
 import type { PlayPhrase } from '@/generated/prisma/client';
 import { requireOriginalSottoAdmission } from '@/lib/sidedoor/access/core/request-identity';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
@@ -7,16 +7,6 @@ import { PlayRuleError } from '../errors';
 import { playFingerprint } from './fingerprint';
 import { loadPlayRoom, projectStoredPlayRoom } from './room-view';
 import type { PlayActor, PlayClock } from './rooms';
-
-function visiblePhrases(round: PlayRoundView): (string | null)[] {
-  const shared = [...round.hints.map((hint) => hint.text), round.result?.correction ?? null];
-  if (round.mode === 'DESCRIBE') return [...shared, round.target, round.clue, round.guess];
-  if (round.mode === 'MISSION')
-    return [...shared, ...round.messages.map((message) => message.text)];
-  if (round.questionStyle === 'CHOICES')
-    return [...shared, ...round.choices.map((card) => card.text)];
-  return [...shared, round.ownAnswer, round.otherAnswer];
-}
 
 function phraseView(phrase: PlayPhrase) {
   return playPhraseViewSchema.parse({
@@ -51,7 +41,7 @@ export function saveStoredPlayPhrase(
     const round = [room.round, ...room.completedRounds].find(
       (candidate) => candidate?.id === command.roundId
     );
-    if (!round || !visiblePhrases(round).some((source) => source?.includes(command.text)))
+    if (!round || !playVisibleTexts(round).some((source) => source.includes(command.text)))
       throw new PlayRuleError('forbidden', 'Save a phrase visible in your game.');
     const fingerprint = playFingerprint({
       kind: command.kind,

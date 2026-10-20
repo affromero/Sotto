@@ -170,7 +170,14 @@ suite('invitation requests and canonical owner approval', () => {
 
   it('requires current admission for existing learners and rejects self-joining', async () => {
     const { owner, invitation } = await roomFixture();
-    const request = { ...newRequest(invitation.code), candidate: { kind: 'EXISTING', settings } };
+    const request = {
+      ...newRequest(invitation.code),
+      candidate: {
+        kind: 'EXISTING',
+        expectedProfileId: owner.identity.userId,
+        settings,
+      },
+    };
     await expect(
       requestPlayEntry(instance.database, request, newToken(), null)
     ).rejects.toMatchObject({ code: 'unauthorized' });
@@ -178,10 +185,68 @@ suite('invitation requests and canonical owner approval', () => {
       requestPlayEntry(instance.database, request, newToken(), owner)
     ).rejects.toMatchObject({ code: 'conflict' });
     const guest = await actor((await authority.household('Existing guest')).token);
+    request.candidate.expectedProfileId = guest.identity.userId;
     expect(await requestPlayEntry(instance.database, request, newToken(), guest)).toMatchObject({
       status: 'HOST_UNAVAILABLE',
     });
     expect(await instance.database.user.count()).toBe(2);
+  });
+
+  it('rejects an existing intake when the displayed profile differs from canonical admission, including replay', async () => {
+    const { invitation } = await roomFixture();
+    const first = await actor((await authority.household('First')).token);
+    const second = await actor((await authority.household('Second')).token);
+    const proof = newToken();
+    const request = {
+      ...newRequest(invitation.code),
+      candidate: {
+        kind: 'EXISTING',
+        expectedProfileId: first.identity.userId,
+        settings,
+      },
+    };
+    await expect(requestPlayEntry(instance.database, request, proof, second)).rejects.toMatchObject(
+      { code: 'conflict' }
+    );
+    expect(await instance.database.playJoinRequest.count()).toBe(0);
+    await requestPlayEntry(instance.database, request, proof, first);
+    await expect(requestPlayEntry(instance.database, request, proof, second)).rejects.toMatchObject(
+      { code: 'conflict' }
+    );
+    expect(
+      await instance.database.playJoinRequest.findUniqueOrThrow({
+        where: { id: request.requestId },
+      })
+    ).toMatchObject({ candidateUserId: first.identity.userId });
+  });
+
+  it('allows explicit new browser enrollment with an unselected cookie and fences selected-profile intake and replay', async () => {
+    const { owner, invitation } = await roomFixture();
+    const proof = newToken();
+    const request = { ...newRequest(invitation.code), client: 'BROWSER' };
+    const selected = { request: owner.request, expectedProfileId: null };
+    await expect(
+      requestPlayEntry(instance.database, request, proof, null, undefined, selected)
+    ).rejects.toMatchObject({ code: 'conflict' });
+    const unselectedToken = await authority.access.enterHousehold(
+      'owner password for integration tests'
+    );
+    const unselected = {
+      request: new Request('http://localhost', {
+        headers: { cookie: `sotto_session=${unselectedToken}` },
+      }),
+      expectedProfileId: null,
+    };
+    await requestPlayEntry(instance.database, request, proof, null, undefined, unselected);
+    await expect(
+      requestPlayEntry(instance.database, request, proof, null, undefined, selected)
+    ).rejects.toMatchObject({ code: 'conflict' });
+    expect(await instance.database.user.count()).toBe(1);
+    expect(
+      await instance.database.playJoinRequest.findUniqueOrThrow({
+        where: { id: request.requestId },
+      })
+    ).toMatchObject({ candidateUserId: null, provisionedUserId: null });
   });
 
   it('separates server-owner enrollment from a different game host accepting entry', async () => {
@@ -363,7 +428,14 @@ suite('invitation requests and canonical owner approval', () => {
     const candidates = [];
     for (const name of ['First guest', 'Second guest']) {
       const guest = await actor((await authority.household(name)).token);
-      const command = { ...newRequest(invitation.code), candidate: { kind: 'EXISTING', settings } };
+      const command = {
+        ...newRequest(invitation.code),
+        candidate: {
+          kind: 'EXISTING',
+          expectedProfileId: guest.identity.userId,
+          settings,
+        },
+      };
       await requestPlayEntry(instance.database, command, newToken(), guest);
       candidates.push(command);
     }

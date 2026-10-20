@@ -4695,6 +4695,39 @@
                     "type": "string",
                     "enum": ["DESCRIBE"]
                   },
+                  "targetSuggestions": {
+                    "minItems": 4,
+                    "maxItems": 4,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "enum": ["A", "B", "C", "D"]
+                        },
+                        "text": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "supportText": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500,
+                          "nullable": true
+                        },
+                        "symbol": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 8
+                        }
+                      },
+                      "required": ["id", "text", "supportText", "symbol"],
+                      "additionalProperties": false
+                    },
+                    "nullable": true
+                  },
                   "target": {
                     "type": "string",
                     "minLength": 1,
@@ -4735,6 +4768,7 @@
                   "hints",
                   "result",
                   "mode",
+                  "targetSuggestions",
                   "target",
                   "clue",
                   "guess",
@@ -5081,7 +5115,7 @@
                     "nullable": true
                   },
                   "messages": {
-                    "maxItems": 24,
+                    "maxItems": 6,
                     "type": "array",
                     "items": {
                       "type": "object",
@@ -5099,6 +5133,17 @@
                       "required": ["seat", "text"],
                       "additionalProperties": false
                     }
+                  },
+                  "remainingMessages": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 6
+                  },
+                  "twist": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500,
+                    "nullable": true
                   },
                   "ownOutcome": {
                     "type": "boolean",
@@ -5133,6 +5178,8 @@
                   "ownObjective",
                   "otherObjective",
                   "messages",
+                  "remainingMessages",
+                  "twist",
                   "ownOutcome",
                   "otherOutcome",
                   "id"
@@ -5278,6 +5325,39 @@
                       "type": "string",
                       "enum": ["DESCRIBE"]
                     },
+                    "targetSuggestions": {
+                      "minItems": 4,
+                      "maxItems": 4,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "enum": ["A", "B", "C", "D"]
+                          },
+                          "text": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          },
+                          "supportText": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500,
+                            "nullable": true
+                          },
+                          "symbol": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 8
+                          }
+                        },
+                        "required": ["id", "text", "supportText", "symbol"],
+                        "additionalProperties": false
+                      },
+                      "nullable": true
+                    },
                     "target": {
                       "type": "string",
                       "minLength": 1,
@@ -5318,6 +5398,7 @@
                     "hints",
                     "result",
                     "mode",
+                    "targetSuggestions",
                     "target",
                     "clue",
                     "guess",
@@ -5680,7 +5761,7 @@
                       "nullable": true
                     },
                     "messages": {
-                      "maxItems": 24,
+                      "maxItems": 6,
                       "type": "array",
                       "items": {
                         "type": "object",
@@ -5698,6 +5779,17 @@
                         "required": ["seat", "text"],
                         "additionalProperties": false
                       }
+                    },
+                    "remainingMessages": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 6
+                    },
+                    "twist": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 500,
+                      "nullable": true
                     },
                     "ownOutcome": {
                       "type": "boolean",
@@ -5732,6 +5824,8 @@
                     "ownObjective",
                     "otherObjective",
                     "messages",
+                    "remainingMessages",
+                    "twist",
                     "ownOutcome",
                     "otherOutcome",
                     "id"
@@ -6163,6 +6257,11 @@
                     "type": "string",
                     "enum": ["EXISTING"]
                   },
+                  "expectedProfileId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
                   "settings": {
                     "type": "object",
                     "properties": {
@@ -6183,7 +6282,7 @@
                     "additionalProperties": false
                   }
                 },
-                "required": ["kind", "settings"],
+                "required": ["kind", "expectedProfileId", "settings"],
                 "additionalProperties": false
               },
               {
@@ -6589,6 +6688,28 @@
         "type": "object",
         "properties": {},
         "additionalProperties": false
+      },
+      "PlayClaim": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "expectedProfileId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100,
+                "nullable": true
+              }
+            },
+            "required": ["expectedProfileId"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": false
+          }
+        ]
       },
       "PlayAcknowledgment": {
         "type": "object",
@@ -7180,7 +7301,7 @@
     "/api/v1/play/join-requests/{requestId}/claim": {
       "post": {
         "operationId": "playClaimEntry",
-        "summary": "Claim or recover the exact proof-bound admission. EXISTING also requires its current app credential. BROWSER requires canonical origin and sets only an HttpOnly session cookie. NATIVE returns one app-only credential.",
+        "summary": "Claim or recover the exact proof-bound admission. EXISTING also requires its current app credential. BROWSER requires canonical origin and expectedProfileId (null for an unselected browser), and sets only an HttpOnly session cookie. NATIVE returns one app-only credential.",
         "responses": {
           "200": {
             "description": "Success",
@@ -7208,7 +7329,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/PlayEmptyBody"
+                "$ref": "#/components/schemas/PlayClaim"
               }
             }
           }

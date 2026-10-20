@@ -9,6 +9,7 @@ import {
   savePlayPhraseSchema,
 } from '../play/api';
 import {
+  claimPlayEntrySchema,
   playInvitationActionSchema,
   playInvitationPreviewSchema,
   playInvitationViewSchema,
@@ -46,6 +47,7 @@ export const playContractSchemas = {
   PlayPendingRequestList: playPendingRequestListSchema,
   PlayDelivery: playDeliverySchema,
   PlayEmptyBody: playEmptyQuerySchema,
+  PlayClaim: claimPlayEntrySchema,
   PlayAcknowledgment: acknowledgePlayDeliverySchema,
   PlayAcknowledged: playAcknowledgedSchema,
   PlaySavePhrase: savePlayPhraseSchema,
@@ -182,9 +184,9 @@ export const playEndpoints: EndpointDef[] = (
       method: 'POST',
       path: `${root}/join-requests/{requestId}/claim`,
       summary:
-        'Claim or recover the exact proof-bound admission. EXISTING also requires its current app credential. BROWSER requires canonical origin and sets only an HttpOnly session cookie. NATIVE returns one app-only credential.',
+        'Claim or recover the exact proof-bound admission. EXISTING also requires its current app credential. BROWSER requires canonical origin and expectedProfileId (null for an unselected browser), and sets only an HttpOnly session cookie. NATIVE returns one app-only credential.',
       auth: 'claimant',
-      request: playEmptyQuerySchema,
+      request: claimPlayEntrySchema,
       response: playDeliverySchema,
     },
     {

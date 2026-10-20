@@ -24,6 +24,11 @@ export const playPresenceViewSchema = z.strictObject({
 
 const id = z.string().min(1).max(100);
 const instant = z.iso.datetime();
+/** Browser claims assert the profile observed before explicit switch consent. */
+export const claimPlayEntrySchema = z.union([
+  z.strictObject({ expectedProfileId: id.nullable() }),
+  z.strictObject({}),
+]);
 export const playInvitationActionSchema = z.strictObject({
   actionId: z.uuid(),
   expectedRevision: z.number().int().nonnegative(),

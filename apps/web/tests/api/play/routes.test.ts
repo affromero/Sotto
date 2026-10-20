@@ -190,6 +190,17 @@ suite('partner play API with canonical admission and real PostgreSQL/Redis', () 
     expect(await instance.database.playRoom.count()).toBe(0);
   });
 
+  it('treats a client profile assertion as a canonical precondition rather than authority', async () => {
+    const command = { actionId: randomUUID(), kind: 'MIXED', theme: 'FOOD', settings };
+    const wrong = { ...browser(), 'X-Sotto-Play-Profile': 'another-profile' };
+    expect((await rooms(request('GET', '/rooms', undefined, wrong))).status).toBe(403);
+    expect((await createRoom(request('POST', '/rooms', command, wrong))).status).toBe(403);
+    expect(await instance.database.playRoom.count()).toBe(0);
+    const correct = { ...browser(), 'X-Sotto-Play-Profile': identity.ownerId };
+    expect((await createRoom(request('POST', '/rooms', command, correct))).status).toBe(201);
+    expect((await rooms(request('GET', '/rooms', undefined, correct))).status).toBe(200);
+  });
+
   it('keeps previews minimal and rejects duplicate, unknown and oversized query input', async () => {
     const fixture = await waiting();
     const response = await preview(request('GET', `/invitations?code=${fixture.code}`));
@@ -302,7 +313,10 @@ suite('partner play API with canonical admission and real PostgreSQL/Redis', () 
       (await instance.database.playRoom.findUniqueOrThrow({ where: { id: fixture.room.id } }))
         .guestUserId
     ).toBeNull();
-    const response = await claim(request('POST', path, {}, claimant(fixture.proof, true)), context);
+    const response = await claim(
+      request('POST', path, { expectedProfileId: null }, claimant(fixture.proof, true)),
+      context
+    );
     expect(response.status).toBe(200);
     const cookie = response.headers.get('set-cookie')!;
     expect(cookie).toContain('HttpOnly');
@@ -339,7 +353,7 @@ suite('partner play API with canonical admission and real PostgreSQL/Redis', () 
             origin: alias,
             'X-Sotto-Play-Proof': fixture.proof,
           },
-          body: '{}',
+          body: JSON.stringify({ expectedProfileId: null }),
         }),
         requestContext(fixture.requestId)
       );

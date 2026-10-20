@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   createPlayRoomSchema,
+  claimPlayEntrySchema,
   playRoundActionRequestSchema,
   playRoundCommandSchema,
   playStoredRoundViewSchema,
@@ -78,6 +79,32 @@ describe('cross-client play inputs', () => {
     ).toBe(false);
   });
 
+  it('requires the displayed existing profile as an assertion and distinguishes anonymous browser claims', () => {
+    const command = {
+      requestId: actionId,
+      code: 'ABCDEFGHJKLM',
+      client: 'BROWSER',
+      deviceName: 'Browser',
+      candidate: { kind: 'EXISTING', settings },
+    };
+    expect(requestPlayJoinSchema.safeParse(command).success).toBe(false);
+    expect(
+      requestPlayJoinSchema.parse({
+        ...command,
+        candidate: {
+          ...command.candidate,
+          expectedProfileId: 'displayed-profile',
+        },
+      }).candidate
+    ).toMatchObject({ expectedProfileId: 'displayed-profile' });
+    expect(claimPlayEntrySchema.parse({ expectedProfileId: null })).toEqual({
+      expectedProfileId: null,
+    });
+    expect(
+      claimPlayEntrySchema.safeParse({ expectedProfileId: null, allowProfileSwitch: true }).success
+    ).toBe(false);
+  });
+
   it('requires server round provenance while preserving strict hidden-answer projections', () => {
     const round = {
       id: 'server-round-id',
@@ -96,6 +123,7 @@ describe('cross-client play inputs', () => {
       hints: [],
       result: null,
       mode: 'DESCRIBE',
+      targetSuggestions: null,
       target: null,
       clue: 'It keeps the rain away.',
       guess: null,

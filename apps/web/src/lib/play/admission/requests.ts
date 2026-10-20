@@ -7,6 +7,7 @@ import { PlayRuleError } from '../errors';
 import { playFingerprint } from '../storage/fingerprint';
 import type { PlayActor, PlayClock } from '../storage/rooms';
 import { projectPlayJoinStatus } from './views';
+import { requirePlayBrowserContext, type PlayBrowserContext } from './authority';
 
 const JOIN_TTL_MS = 15 * 60 * 1000;
 
@@ -34,18 +35,29 @@ export async function requestPlayEntry(
   input: unknown,
   proof: unknown,
   actor: PlayActor | null,
-  clock: PlayClock = () => new Date()
+  clock: PlayClock = () => new Date(),
+  browserContext?: PlayBrowserContext
 ) {
   const command = requestPlayJoinSchema.parse(input);
   const proofHash = playProofHash(proof);
   const candidateUserId = command.candidate.kind === 'EXISTING' ? actor?.identity.userId : null;
   if (command.candidate.kind === 'EXISTING' && !actor) throw new AccessError('unauthorized');
+  const requireCandidate = async (transaction: Prisma.TransactionClient) => {
+    if (command.candidate.kind === 'EXISTING' && actor) {
+      await requireOriginalSottoAdmission(transaction, actor.request, actor.identity);
+      if (actor.identity.userId !== command.candidate.expectedProfileId)
+        throw new AccessError('conflict', 'Your active profile changed. Check it before joining.');
+    }
+    if (command.candidate.kind === 'NEW' && command.client === 'BROWSER') {
+      if (browserContext?.expectedProfileId !== null) throw new AccessError('invalid');
+      await requirePlayBrowserContext(transaction, browserContext);
+    }
+  };
   const fingerprint = playFingerprint({ command, candidateUserId, proofHash });
   const operation = () =>
     sottoTransaction(database, async (transaction) => {
       const now = clock();
-      if (command.candidate.kind === 'EXISTING' && actor)
-        await requireOriginalSottoAdmission(transaction, actor.request, actor.identity);
+      await requireCandidate(transaction);
       const previous = await transaction.playJoinRequest.findUnique({
         where: { id: command.requestId },
       });
@@ -100,8 +112,7 @@ export async function requestPlayEntry(
       throw error;
     return sottoTransaction(database, async (transaction) => {
       const now = clock();
-      if (command.candidate.kind === 'EXISTING' && actor)
-        await requireOriginalSottoAdmission(transaction, actor.request, actor.identity);
+      await requireCandidate(transaction);
       const previous = await transaction.playJoinRequest.findUnique({
         where: { id: command.requestId },
       });

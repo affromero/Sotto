@@ -193,6 +193,17 @@ describe('two-player language rounds', () => {
       type: 'MESSAGE',
       text: 'Ja, dort können wir sitzen.',
     });
+    expect(() => advancePlayRound(round, 'HOST', { type: 'MISSION_DONE', achieved: true })).toThrow(
+      PlayRuleError
+    );
+    round = advancePlayRound(round, 'HOST', {
+      type: 'MESSAGE',
+      text: 'Und unser Freund kommt mit.',
+    });
+    round = advancePlayRound(round, 'GUEST', {
+      type: 'MESSAGE',
+      text: 'Dann treffen wir uns zu dritt.',
+    });
     round = advancePlayRound(round, 'HOST', { type: 'MISSION_DONE', achieved: true });
     expect(round.revealed).toBe(false);
     expect(() =>
@@ -211,7 +222,7 @@ describe('two-player language rounds', () => {
 
   it('caps the conversation while still allowing both players to finish', () => {
     let round = start('MISSION');
-    for (let index = 0; index < 24; index++)
+    for (let index = 0; index < 6; index++)
       round = advancePlayRound(round, index % 2 === 0 ? 'HOST' : 'GUEST', {
         type: 'MESSAGE',
         text: `Message ${index}`,
@@ -228,6 +239,8 @@ describe('two-player language rounds', () => {
     let round = start('MISSION');
     round = advancePlayRound(round, 'HOST', { type: 'MESSAGE', text: 'Gehen wir in den Park?' });
     round = advancePlayRound(round, 'GUEST', { type: 'MESSAGE', text: 'Gibt es dort eine Bank?' });
+    round = advancePlayRound(round, 'HOST', { type: 'MESSAGE', text: 'Unser Freund kommt auch.' });
+    round = advancePlayRound(round, 'GUEST', { type: 'MESSAGE', text: 'Wir haben genug Platz.' });
     round = advancePlayRound(round, 'HOST', { type: 'MISSION_DONE', achieved: true });
     round = advancePlayRound(round, 'HOST', {
       type: 'MESSAGE',

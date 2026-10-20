@@ -84,6 +84,14 @@ SIDEDOOR_EXECUTION_DIR="./.sotto/executions"
 
 Add provider and storage settings in `/welcome` or Admin for the workflow you are testing.
 
+Partner play runs without courses or AI providers. Invitation pages offer
+home-screen installation and show native downloads only when real URLs are set:
+`SOTTO_IOS_APP_STORE_URL` on `apps.apple.com`,
+`SOTTO_ANDROID_PLAY_STORE_URL` on `play.google.com`, and optional
+`SOTTO_ANDROID_APK_URL`. All download URLs require HTTPS. Empty values leave
+native downloads explicitly unavailable. Web games need a live connection;
+private game responses and pages are never available from an offline cache.
+
 ---
 
 ## 5. Provider Paths

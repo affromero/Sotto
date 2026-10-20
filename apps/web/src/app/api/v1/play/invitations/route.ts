@@ -36,14 +36,21 @@ export function POST(request: Request) {
     await limitPlayOperation('intake:instance', 30);
     const command = await playBody(request, requestPlayJoinSchema);
     return playOperation(request, command.client === 'BROWSER', async () => {
-      const actor = await optionalPlayActor(request);
+      const browserNew = command.client === 'BROWSER' && command.candidate.kind === 'NEW';
+      // Explicit anonymous enrollment uses no authority from an unselected cookie.
+      const actor =
+        browserNew && !request.headers.has('authorization')
+          ? null
+          : await optionalPlayActor(request);
       return playJson(
         playJoinStatusViewSchema,
         await requestPlayEntry(
           prismaUnfiltered,
           command,
           request.headers.get(PLAY_PROOF_HEADER),
-          actor
+          actor,
+          undefined,
+          browserNew ? { request, expectedProfileId: null } : undefined
         ),
         201
       );

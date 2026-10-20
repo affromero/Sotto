@@ -6,6 +6,8 @@ import {
   playTextSchema,
   playQuestionStyleSchema,
   playChoiceSchema,
+  PLAY_MISSION_MESSAGES,
+  PLAY_MISSION_OUTCOME_AFTER,
 } from '@sotto/shared';
 
 const common = {
@@ -19,6 +21,7 @@ const common = {
 const describeSchema = z.strictObject({
   ...common,
   mode: z.literal('DESCRIBE'),
+  targetSuggestions: z.array(playChoiceSchema).length(4).nullable(),
   phase: z.enum(['SETUP', 'CLUE', 'GUESS', 'FEEDBACK', 'FINISHED']),
   target: playTextSchema.nullable(),
   clue: playTextSchema.nullable(),
@@ -37,7 +40,8 @@ const missionSchema = z.strictObject({
   mode: z.literal('MISSION'),
   phase: z.enum(['EXCHANGE', 'FEEDBACK', 'FINISHED']),
   objectives: z.strictObject({ HOST: playTextSchema, GUEST: playTextSchema }),
-  messages: z.array(playMessageSchema).max(24),
+  messages: z.array(playMessageSchema).max(PLAY_MISSION_MESSAGES),
+  twist: playTextSchema,
   outcomes: z.strictObject({ HOST: z.boolean().nullable(), GUEST: z.boolean().nullable() }),
 });
 
@@ -82,6 +86,11 @@ export const privatePlayRoundSchema = z
     if (!['FEEDBACK', 'FINISHED'].includes(round.phase) && round.revealed)
       invalid('Round revealed before completion');
     if (round.mode === 'DESCRIBE') {
+      if (
+        round.targetSuggestions &&
+        new Set(round.targetSuggestions.map((choice) => choice.id)).size !== 4
+      )
+        invalid('Target suggestions require four distinct cards');
       if (round.clue !== null && round.target === null) invalid('A clue requires a target');
       if (round.guess !== null && (round.clue === null || !round.revealed))
         invalid('A guess requires a clue and triggers reveal');
@@ -121,6 +130,7 @@ export const privatePlayRoundSchema = z
     if (round.mode === 'MISSION') {
       const bothFinished = round.outcomes.HOST !== null && round.outcomes.GUEST !== null;
       const bothContributed =
+        round.messages.length >= PLAY_MISSION_OUTCOME_AFTER &&
         round.messages.some((message) => message.seat === 'HOST') &&
         round.messages.some((message) => message.seat === 'GUEST');
       if (round.revealed && !bothFinished)

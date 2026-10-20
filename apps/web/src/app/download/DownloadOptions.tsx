@@ -3,14 +3,14 @@
 import { useEffect, useState } from 'react';
 import styles from './page.module.css';
 
-type Platform = 'mac' | 'windows' | 'linux' | 'unknown';
+type Platform = 'mac' | 'windows' | 'linux' | 'ios' | 'android' | 'unknown';
 
 // Everything is distributed from sotto.fm. The product runs on the user's stack,
 // and these are the clients + installer that connect to YOUR server.
 const DL_BASE = 'https://sotto.fm/download';
 
 interface DesktopTarget {
-  id: Exclude<Platform, 'unknown'>;
+  id: 'mac' | 'windows' | 'linux';
   label: string;
   hint: string;
   href: string;
@@ -25,9 +25,15 @@ const DESKTOP_TARGETS: DesktopTarget[] = [
 function detectPlatform(): Platform {
   if (typeof navigator === 'undefined') return 'unknown';
   const ua = `${navigator.userAgent} ${navigator.platform}`.toLowerCase();
-  if (/mac|iphone|ipad|ipod/.test(ua)) return 'mac';
+  if (
+    /iphone|ipad|ipod/.test(ua) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  )
+    return 'ios';
+  if (/android/.test(ua)) return 'android';
+  if (/mac/.test(ua)) return 'mac';
   if (/win/.test(ua)) return 'windows';
-  if (/linux|android|x11/.test(ua)) return 'linux';
+  if (/linux|x11/.test(ua)) return 'linux';
   return 'unknown';
 }
 

@@ -96,6 +96,8 @@ describe('private round projection', () => {
       text: 'Wir haben zwanzig Minuten.',
     });
     round = advancePlayRound(round, 'GUEST', { type: 'MESSAGE', text: 'Dann kochen wir Gemüse.' });
+    round = advancePlayRound(round, 'HOST', { type: 'MESSAGE', text: 'Ein Freund kommt mit.' });
+    round = advancePlayRound(round, 'GUEST', { type: 'MESSAGE', text: 'Wir haben genug Gemüse.' });
     round = advancePlayRound(round, 'HOST', { type: 'MISSION_DONE', achieved: true });
     expect(projectPlayRound(round, 'HOST')).toMatchObject({ ownOutcome: true, otherOutcome: null });
     expect(projectPlayRound(round, 'GUEST')).toMatchObject({

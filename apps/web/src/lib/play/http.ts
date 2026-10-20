@@ -21,6 +21,9 @@ export async function optionalPlayActor(request: Request): Promise<PlayActor | n
       throw new AccessError('unauthorized');
     return null;
   }
+  const expectedProfileId = request.headers.get('X-Sotto-Play-Profile');
+  if (expectedProfileId !== null && expectedProfileId !== identity.userId)
+    throw new AccessError('forbidden');
   return { database: prismaUnfiltered, request, identity };
 }
 

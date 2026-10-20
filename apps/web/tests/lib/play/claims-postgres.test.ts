@@ -86,7 +86,11 @@ suite('atomic guest credentials and exact delivery recovery', () => {
         candidate: { kind: 'NEW', name: 'Partner', settings, consentToProfile: true },
       },
       proof,
-      null
+      null,
+      undefined,
+      client === 'BROWSER'
+        ? { request: new Request('http://localhost'), expectedProfileId: null }
+        : undefined
     );
     const approval = await approvePlayEntry(fixture.host, requestId, {
       actionId: randomUUID(),
@@ -202,7 +206,18 @@ suite('atomic guest credentials and exact delivery recovery', () => {
     'recovers the exact %s credential after START and the waiting lease expires',
     async (client) => {
       const fixture = await renewed(client);
-      const first = await claimPlayEntry(instance.database, fixture.requestId, fixture.proof, null);
+      const context =
+        client === 'BROWSER'
+          ? { request: new Request('http://localhost'), expectedProfileId: null }
+          : undefined;
+      const first = await claimPlayEntry(
+        instance.database,
+        fixture.requestId,
+        fixture.proof,
+        null,
+        undefined,
+        context
+      );
       const room = await readStoredPlayRoom(fixture.host, fixture.room.id);
       await actOnStoredPlayRoom(fixture.host, room.id, {
         actionId: randomUUID(),
@@ -214,7 +229,8 @@ suite('atomic guest credentials and exact delivery recovery', () => {
         fixture.requestId,
         fixture.proof,
         null,
-        () => new Date(Date.now() + PLAY_HOST_LEASE_MS + 1)
+        () => new Date(Date.now() + PLAY_HOST_LEASE_MS + 1),
+        context
       );
       expect(recovered).toEqual(first);
       expect(await instance.database.user.count()).toBe(2);
@@ -302,7 +318,15 @@ suite('atomic guest credentials and exact delivery recovery', () => {
 
   it('uses current canonical browser-session expiry after a recovery retry', async () => {
     const fixture = await renewed('BROWSER');
-    const first = await claimPlayEntry(instance.database, fixture.requestId, fixture.proof, null);
+    const context = { request: new Request('http://localhost'), expectedProfileId: null };
+    const first = await claimPlayEntry(
+      instance.database,
+      fixture.requestId,
+      fixture.proof,
+      null,
+      undefined,
+      context
+    );
     const candidate = await instance.database.playJoinRequest.findUniqueOrThrow({
       where: { id: fixture.requestId },
     });
@@ -338,12 +362,77 @@ suite('atomic guest credentials and exact delivery recovery', () => {
       current = new Date(hardExpiry + 1);
     });
     await expect(
-      claimPlayEntry(database, fixture.requestId, fixture.proof, null, () => current)
+      claimPlayEntry(database, fixture.requestId, fixture.proof, null, () => current, context)
     ).rejects.toMatchObject({ code: 'unauthorized' });
     expect(
       (await instance.database.playJoinRequest.findUniqueOrThrow({ where: { id: candidate.id } }))
         .deliveryState
     ).toBeNull();
+  });
+
+  it('fences browser first claim and exact recovery against the profile observed before consent', async () => {
+    const fixture = await renewed('BROWSER');
+    const unchangedAnonymous = {
+      request: new Request('http://localhost'),
+      expectedProfileId: null,
+    };
+    const changedProfile = { request: fixture.host.request, expectedProfileId: null };
+    await expect(
+      claimPlayEntry(instance.database, fixture.requestId, fixture.proof, null)
+    ).rejects.toMatchObject({ code: 'invalid' });
+    await expect(
+      claimPlayEntry(
+        instance.database,
+        fixture.requestId,
+        fixture.proof,
+        null,
+        undefined,
+        changedProfile
+      )
+    ).rejects.toMatchObject({ code: 'conflict' });
+    expect((await readStoredPlayRoom(fixture.host, fixture.room.id)).guest).toBeNull();
+    const first = await claimPlayEntry(
+      instance.database,
+      fixture.requestId,
+      fixture.proof,
+      null,
+      undefined,
+      unchangedAnonymous
+    );
+    await expect(
+      claimPlayEntry(
+        instance.database,
+        fixture.requestId,
+        fixture.proof,
+        null,
+        undefined,
+        changedProfile
+      )
+    ).rejects.toMatchObject({ code: 'conflict' });
+    expect(
+      await claimPlayEntry(instance.database, fixture.requestId, fixture.proof, null, undefined, {
+        request: fixture.host.request,
+        expectedProfileId: fixture.host.identity.userId,
+      })
+    ).toEqual(first);
+    const invalidBearer = {
+      request: new Request('http://localhost', {
+        headers: {
+          authorization: 'Bearer invalid',
+        },
+      }),
+      expectedProfileId: null,
+    };
+    await expect(
+      claimPlayEntry(
+        instance.database,
+        fixture.requestId,
+        fixture.proof,
+        null,
+        undefined,
+        invalidBearer
+      )
+    ).rejects.toMatchObject({ code: 'invalid' });
   });
 
   it('does not erase a valid receipt for a wrong claimant or a temporarily missing encryption key', async () => {
@@ -651,7 +740,7 @@ suite('atomic guest credentials and exact delivery recovery', () => {
         code: fixture.invite.code,
         client: 'BROWSER',
         deviceName: 'Existing browser',
-        candidate: { kind: 'EXISTING', settings },
+        candidate: { kind: 'EXISTING', expectedProfileId: member.id, settings },
       },
       proof,
       guest
@@ -665,21 +754,35 @@ suite('atomic guest credentials and exact delivery recovery', () => {
       expectedRevision: 1,
       type: 'ACCEPT',
     });
-    await expect(claimPlayEntry(instance.database, requestId, proof, null)).rejects.toMatchObject({
+    const context = { request: guest.request, expectedProfileId: member.id };
+    await expect(
+      claimPlayEntry(instance.database, requestId, proof, null, undefined, context)
+    ).rejects.toMatchObject({
       code: 'unauthorized',
     });
     const before = await authority.access.store.read();
-    const result = await claimPlayEntry(instance.database, requestId, proof, guest);
+    const result = await claimPlayEntry(
+      instance.database,
+      requestId,
+      proof,
+      guest,
+      undefined,
+      context
+    );
     expect(result).toMatchObject({
       delivery: { kind: 'EXISTING', roomId: fixture.room.id, profile: { id: member.id } },
       browserSessionToken: null,
     });
     expect(await authority.access.store.read()).toEqual(before);
     expect(await instance.database.apiKey.count()).toBe(0);
-    expect(await claimPlayEntry(instance.database, requestId, proof, guest)).toEqual(result);
+    expect(
+      await claimPlayEntry(instance.database, requestId, proof, guest, undefined, context)
+    ).toEqual(result);
     await authority.access.logout(member.token);
-    await expect(claimPlayEntry(instance.database, requestId, proof, guest)).rejects.toMatchObject({
-      code: 'unauthorized',
+    await expect(
+      claimPlayEntry(instance.database, requestId, proof, guest, undefined, context)
+    ).rejects.toMatchObject({
+      code: 'conflict',
     });
   });
 });

@@ -132,3 +132,4 @@ export * from './play/links';
 export * from './play/rooms';
 export * from './play/admission';
 export * from './play/api';
+export * from './play/phrases';

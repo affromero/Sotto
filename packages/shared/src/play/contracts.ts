@@ -1,5 +1,10 @@
 import { z } from 'zod';
 
+export const PLAY_MISSION_MESSAGES = 6;
+export const PLAY_MISSION_TWIST_AT = 3;
+export const PLAY_MISSION_OUTCOME_AFTER = 4;
+export const PLAY_CARD_LANGUAGES = ['en', 'de', 'es', 'fr', 'pt', 'it', 'ja', 'zh', 'ko'] as const;
+
 export const playSeatSchema = z.enum(['HOST', 'GUEST']);
 export const playModeSchema = z.enum(['DESCRIBE', 'MISSION', 'KNOW_ME']);
 export const playSessionKindSchema = z.enum(['DESCRIBE', 'MISSION', 'KNOW_ME', 'MIXED']);
@@ -111,6 +116,7 @@ export const playRoundViewSchema = z.discriminatedUnion('mode', [
   z.strictObject({
     ...roundViewFields,
     mode: z.literal('DESCRIBE'),
+    targetSuggestions: z.array(playChoiceSchema).length(4).nullable(),
     target: playTextSchema.nullable(),
     clue: playTextSchema.nullable(),
     guess: playTextSchema.nullable(),
@@ -129,7 +135,9 @@ export const playRoundViewSchema = z.discriminatedUnion('mode', [
     mode: z.literal('MISSION'),
     ownObjective: playTextSchema,
     otherObjective: playTextSchema.nullable(),
-    messages: z.array(playMessageSchema).max(24),
+    messages: z.array(playMessageSchema).max(PLAY_MISSION_MESSAGES),
+    remainingMessages: z.number().int().min(0).max(PLAY_MISSION_MESSAGES),
+    twist: playTextSchema.nullable(),
     ownOutcome: z.boolean().nullable(),
     otherOutcome: z.boolean().nullable(),
   }),

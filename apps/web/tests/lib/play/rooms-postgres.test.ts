@@ -323,6 +323,26 @@ suite('persistent private games on PostgreSQL', () => {
     ).rejects.toMatchObject({ code: 'conflict' });
   });
 
+  it('lets only the learner save their unchosen secret target cards', async () => {
+    const { host, guest, room } = await playingPair('DESCRIBE');
+    if (room.round?.mode !== 'DESCRIBE' || !room.round.targetSuggestions)
+      throw new Error('Fixture requires private target suggestions');
+    const phrase = {
+      roundId: room.round.id,
+      kind: 'WORD',
+      text: room.round.targetSuggestions[0].text,
+      contextText: null,
+    };
+    expect(await saveStoredPlayPhrase(host, room.id, phrase)).toMatchObject({
+      text: phrase.text,
+      targetLang: 'de',
+    });
+    await expect(saveStoredPlayPhrase(guest, room.id, phrase)).rejects.toMatchObject({
+      code: 'forbidden',
+    });
+    expect((await listStoredPlayPhrases(guest)).phrases).toEqual([]);
+  });
+
   it('saves only visible phrases, keeping a skipped secret private in the recap too', async () => {
     const { host, guest, room } = await playingPair('DESCRIBE');
     const selected = await actOnStoredPlayRoom(
