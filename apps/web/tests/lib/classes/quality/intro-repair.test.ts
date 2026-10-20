@@ -243,12 +243,12 @@ describe('field-local A1 intro repair', () => {
   });
 
   it.each([false, true])(
-    'refreshes references to the first repaired example with an overview rejection of %s',
+    'renders a replaced target consistently when overview rejection is %s',
     async (rejectAbout) => {
       const correctedExample = {
-        target: 'Ich habe gestern einen Film gesehen.',
-        meaning: 'Yesterday I watched a film.',
-        note: '„Ich habe gestern einen Film gesehen.“: „Sehen“ steht hier mit „haben“.',
+        target: 'Ich habe heute Brot gekauft.',
+        meaning: 'I bought bread today.',
+        note: '„Ich habe heute Brot gekauft.“: Kaufen bildet das Perfekt mit haben.',
       };
       const rejected: Record<string, ReviewIssue> = {
         'examples:0': { issues: ['unsupported'], feedback: ['Correct the example.'] },
@@ -256,17 +256,17 @@ describe('field-local A1 intro repair', () => {
           ? { about: { issues: ['incorrect'], feedback: ['Correct the rule.'] } }
           : {}),
       };
-      const repaired = {
+      const expectedIntro = {
         ...candidate,
-        about: '„Ich habe gestern einen Film gesehen.“: Yesterday I watched a film.',
+        about: '„Ich habe heute Brot gekauft.“: I bought bread today.',
         focus: [
-          '„Ich habe gestern einen Film gesehen.“: Wähle das passende Hilfsverb.',
-          '„Ich habe gestern einen Film gesehen.“: Beachte die Wortstellung.',
+          '„Ich habe heute Brot gekauft.“: Wähle das passende Hilfsverb.',
+          '„Ich habe heute Brot gekauft.“: Beachte die Wortstellung.',
         ],
         tips: [
-          '„Ich habe gestern einen Film gesehen.“: Lerne das Hilfsverb.',
-          '„Ich habe gestern einen Film gesehen.“: Nenne die vergangene Zeit.',
-          '„Ich habe gestern einen Film gesehen.“: Vergleiche vollständige Sätze.',
+          '„Ich habe heute Brot gekauft.“: Lerne das Hilfsverb.',
+          '„Ich habe heute Brot gekauft.“: Nenne die vergangene Zeit.',
+          '„Ich habe heute Brot gekauft.“: Vergleiche vollständige Sätze.',
         ],
         examples: [correctedExample, ...candidate.examples.slice(1)],
       };
@@ -278,14 +278,14 @@ describe('field-local A1 intro repair', () => {
           examples: { '0': correctedExample },
         }),
       });
-      queueReview(repaired);
+      queueReview(expectedIntro);
 
-      await expect(generateClassIntro(params)).resolves.toEqual(repaired);
+      await expect(generateClassIntro(params)).resolves.toEqual(expectedIntro);
       const finalReviews = boundary.generate.mock.calls
         .filter(([, , options]) => options.jsonSchema?.name === 'class_intro_adjudicator')
         .slice(2);
       for (const [, messages] of finalReviews)
-        expect(JSON.parse(messages[0].content).introContext.about).toBe(repaired.about);
+        expect(JSON.parse(messages[0].content).introContext.about).toBe(expectedIntro.about);
     }
   );
   it.each(['größer', 'größer'.normalize('NFD'), '42'])(

@@ -474,14 +474,15 @@ Semantic patches use a reference for rejected about and atoms for rejected
 focus and tip entries. An about-only rejection never expands repair authority to
 an accepted example; select another useful example or fail the final audit closed.
 All example patches merge first; references then resolve against the complete
-merged array. Rejected about, observations and example notes are compiled. Private fresh-generation
-indices retain the original about, focus and tip bindings without changing stored content.
-When a selected example target changes, its linked about is rendered again and only the
-compiler-added prefixes on accepted focus and tips are refreshed. Authored observation
-text and unrelated accepted strings remain exact; duplicate target strings do not
-change index identity. The full final audit checks every retained observation against
-the repaired example. Historical restoration never
-adds framing. Explicit local scope does not prove linguistic correctness.
+merged array. The parser returns a candidate together with immutable private binding
+snapshots from `classes/intro/bindings.ts`. Snapshots retain each observation body,
+its rendered value and its example index. Repair validates this evidence against
+the original candidate before rendering target changes through the compiler.
+Equal target strings at different indices remain distinct examples. Accepted bodies
+and unrelated strings stay exact. A meaning-only repair preserves accepted overview
+text unless that overview was also rejected. The final review evaluates the whole
+candidate again. Restored historical content uses its existing parser without new
+framing. Local example scope alone does not establish linguistic correctness.
 Every fresh visual text, including titles and labels, must exactly reuse a compiled
 observation, complete target or paired meaning. URLs remain typed URL fields.
 Validation precedes visual normalization, so discarded content cannot hide an
@@ -498,8 +499,8 @@ Structural repair receives measured word-limit and address-limit diagnostics,
 may remove redundant whole entries, and aims for 80 raw words to leave room for
 compiled quotes. Semantic repair preserves every accepted entry even when shortening.
 Intro semantic repair returns a strict patch of the actual rejected addresses.
-Accepted authored fields and array entries remain exact apart from those derived
-example references; accepted visuals are retained, and
+Only authorized authored entries and compiler-rendered references can change.
+Accepted visuals remain present, and
 rejected optional visuals are removed. The initial full audit binds its private
 receipt to the captured execution and trusted lesson context. The replacement audit
 reviews every current address again and never reuses prior approvals. Every address
