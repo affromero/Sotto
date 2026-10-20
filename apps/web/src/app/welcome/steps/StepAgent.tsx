@@ -53,7 +53,7 @@ export function StepAgent({
 
   const savedReady = savedDetected.includes(agent.provider);
   const savedCredentialReady = !demoMode && agent.method === 'key' && !agent.value && savedReady;
-  const [keyOverrides, setKeyOverrides] = useState<Record<string, boolean>>({});
+  const [keyOverrides, setKeyOverrides] = useState(() => new Set<string>());
   const [savedProof, setSavedProof] = useState<{
     fingerprint: string;
     status: 'verified' | 'saved' | 'configured';
@@ -74,7 +74,7 @@ export function StepAgent({
       mounted.current = false;
     };
   }, []);
-  const showDetectedKey = savedCredentialReady && !keyOverrides[agent.provider];
+  const showDetectedKey = savedCredentialReady && !keyOverrides.has(agent.provider);
   useEffect(() => {
     if ((savedCredentialReady || savedOutcome) && agent.status === 'idle') {
       setAgent((a) => ({ ...a, status: 'connected' }));
@@ -340,14 +340,12 @@ export function StepAgent({
               detected={showDetectedKey}
               hasSavedKey={savedReady}
               busy={agent.status === 'verifying'}
-              focusKey={Boolean(keyOverrides[agent.provider])}
+              focusKey={keyOverrides.has(agent.provider)}
               canSave={Boolean(onSave)}
               outcome={proof?.status ?? null}
               onChange={changeConnection}
               onSave={saveConfiguration}
-              onOverride={() =>
-                setKeyOverrides((current) => ({ ...current, [agent.provider]: true }))
-              }
+              onOverride={() => setKeyOverrides((current) => new Set(current).add(agent.provider))}
             />
           )}
 
