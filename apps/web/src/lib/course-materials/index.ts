@@ -21,7 +21,6 @@ export const materialSelect = {
   name: true,
   mimeType: true,
   byteSize: true,
-  extractedText: true,
   createdAt: true,
 } as const;
 
@@ -71,7 +70,8 @@ export function materialResponse(material: {
   name: string;
   mimeType: string;
   byteSize: number;
-  extractedText: string;
+  extractedText?: string;
+  textRetained?: boolean;
   createdAt: Date;
 }) {
   return {
@@ -79,8 +79,14 @@ export function materialResponse(material: {
     name: material.name,
     mimeType: material.mimeType,
     byteSize: material.byteSize,
-    extractedText: material.extractedText,
-    createdAt: material.createdAt,
+    extractedText: '',
+    textRetained: material.textRetained ?? Boolean(material.extractedText),
+    processingUrl: `/api/v1/materials/${material.id}/processing`,
+    legacyTextUrl:
+      (material.textRetained ?? Boolean(material.extractedText))
+        ? `/api/v1/materials/${material.id}/legacy-text`
+        : null,
+    createdAt: material.createdAt.toISOString(),
     fileUrl: `/api/v1/materials/${material.id}/file`,
   };
 }

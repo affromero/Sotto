@@ -777,6 +777,8 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
     case 7:
       stepView = (
         <StepContext
+          key={`${config.onboardingResumeKey}:${baseLang}:${language}`}
+          uploadScope={`welcome:${config.onboardingResumeKey ?? 'new'}:${baseLang}:${language}`}
           contextItems={contextItems}
           setContextItems={setContextItems}
           demoMode={demoMode}

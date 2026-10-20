@@ -36,7 +36,8 @@ export async function materialUploadOperation(
   request: NextRequest,
   operation: (admission: AuthenticatedRequest) => Promise<NextResponse>
 ) {
-  return accessOperation(request, !request.headers.has('authorization'), async () => {
+  const write = !['GET', 'HEAD'].includes(request.method.toUpperCase());
+  return accessOperation(request, write && !request.headers.has('authorization'), async () => {
     const admission = await authenticateRequest(request);
     if (!admission) return errorResponse('Unauthorized', 401);
     try {

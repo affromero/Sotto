@@ -67,6 +67,7 @@ export async function settleAnalysisFailure(
       },
     });
     if (!analysis) throw new Error('A missing analysis requires canonical erasure proof.');
+    if (analysis.status === 'CANCELLING') return;
     if (!['COMPLETE', 'PARTIAL', 'INSUFFICIENT_SOURCE', 'CANCELLED'].includes(analysis.status)) {
       const unknown = await database.materialAnalysisUnit.findFirst({
         where: { analysisId: analysis.id, status: { in: ['DISPATCHING', 'UNKNOWN'] } },

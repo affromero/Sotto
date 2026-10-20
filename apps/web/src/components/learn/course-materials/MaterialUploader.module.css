@@ -1,0 +1,70 @@
+.root {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+}
+.root h3 {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: 1.3rem;
+}
+.root p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.root input {
+  max-width: 100%;
+  min-height: 44px;
+}
+.field {
+  font-weight: 600;
+}
+.saved {
+  padding: 0.75rem;
+  background: var(--color-background);
+  overflow-wrap: anywhere;
+}
+.saved ol {
+  margin-bottom: 0;
+  padding-left: 1.5rem;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.primary,
+.secondary {
+  min-height: 44px;
+  padding: 0.65rem 1rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  font: inherit;
+  cursor: pointer;
+}
+.primary {
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+}
+.secondary {
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+}
+.primary:disabled,
+.secondary:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.primary:focus-visible,
+.secondary:focus-visible,
+.root input:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+}
+.error {
+  color: var(--color-error);
+}

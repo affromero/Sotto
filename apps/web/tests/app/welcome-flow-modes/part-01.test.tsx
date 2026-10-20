@@ -4,8 +4,10 @@
  * route visitors into the authenticated learning app.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { File as NodeFile } from 'node:buffer';
+import { webcrypto } from 'node:crypto';
 import type { ImgHTMLAttributes } from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { WelcomeFlow } from '@/app/welcome/WelcomeFlow';
 import type { AgentState, ContextItem, VoiceState } from '@/app/welcome/WelcomeFlow';
@@ -25,6 +27,7 @@ beforeEach(() => {
 });
 import { StepVoice } from '@/app/welcome/steps/StepVoice';
 import { COMPOSE_LOG, MODULES } from '@/app/welcome/data';
+import { UploadServer } from '../../helpers/materials/uploads';
 
 const mockPush = vi.fn();
 
@@ -704,7 +707,7 @@ describe('welcome hosted-demo mode', () => {
     expect(screen.getByText('Required')).toBeInTheDocument();
     expect(screen.getByText(/Class notes, a syllabus/i)).toBeInTheDocument();
     expect(screen.queryByText('Optional')).not.toBeInTheDocument();
-    expect(screen.getByText(/Original documents are saved separately/i)).toBeInTheDocument();
+    expect(screen.getByText(/Originals are saved separately/i)).toBeInTheDocument();
     expect(screen.queryByText(/Context permissions/i)).not.toBeInTheDocument();
     expect(screen.getByRole('radio', { name: /Web links/i })).toHaveAttribute(
       'aria-checked',
@@ -732,27 +735,24 @@ describe('welcome hosted-demo mode', () => {
     );
     await user.click(screen.getByRole('button', { name: /^Add material$/i }));
 
+    vi.stubGlobal('crypto', webcrypto);
+    vi.stubGlobal('File', NodeFile);
     const files = Array.from(
       { length: 7 },
       (_, index) =>
-        new File([`Italian notes from design doc ${index + 1}`], `notes-${index + 1}.md`, {
+        new NodeFile([`Italian notes from design doc ${index + 1}`], `notes-${index + 1}.md`, {
           type: 'text/markdown',
         })
     );
-    vi.mocked(global.fetch).mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({
-          materials: files.map((file, index) => ({
-            id: `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`,
-            name: file.name,
-            extractedText: `Italian notes ${index + 1}`,
-          })),
-          failed: 0,
-        }),
-        { status: 201 }
-      )
-    );
-    await user.upload(screen.getByLabelText(/Choose context files/i), files);
+    const uploadServer = new UploadServer();
+    uploadServer.finishDirectly = true;
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input) === '/api/v1/users/me') return Response.json({ id: 'owner' });
+      return uploadServer.fetch(input, init);
+    });
+    fireEvent.change(screen.getByLabelText(/Choose context files/i), {
+      target: { files },
+    });
     await waitFor(() => {
       expect(contextItems.map((item) => item.kind)).toEqual([
         'link',

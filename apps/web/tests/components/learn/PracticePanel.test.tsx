@@ -1,8 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { PracticePanel } from '@/components/learn/PracticePanel';
+import { StrictMode } from 'react';
 
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+}));
 
 const savedExercises = (sessionId: string) => ({
   status: 'ready',
@@ -61,7 +64,9 @@ describe('PracticePanel recent sessions', () => {
   it('offers to resume active work and view completed results', async () => {
     render(<PracticePanel courseId="course-1" courseName="German" />);
 
-    const resumeButtons = await screen.findAllByRole('button', { name: /^Resume / });
+    const resumeButtons = await screen.findAllByRole('button', {
+      name: /^Resume /,
+    });
     expect(resumeButtons).toHaveLength(1);
     expect(resumeButtons[0]).toHaveAccessibleName('Resume Full catch-up practice');
     expect(screen.getAllByRole('button', { name: /^View results for / })).toHaveLength(2);
@@ -96,6 +101,61 @@ describe('PracticePanel recent sessions', () => {
 });
 
 describe('PracticePanel durable generation', () => {
+  it('admits a focused lower-level selection once in StrictMode and returns from its saved result to the map', async () => {
+    const selection = {
+      catalogVersion: 3,
+      level: 'A1' as const,
+      nodeIds: ['de.grammar.exact', 'de.situations.exact'],
+      materialFocusId: 'owned-source-focus',
+    };
+    const admissions: Array<{
+      kind: string;
+      requestId: string;
+      learningSelection: unknown;
+    }> = [];
+    let returned = false;
+    fetchMock.mockImplementation(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method !== 'POST') return jsonResponse(OVERVIEW);
+      const body = JSON.parse(String(init.body));
+      admissions.push(body);
+      return jsonResponse({
+        ...savedExercises(body.requestId),
+        practiceLevel: 'A1',
+        submissionResult: { score: 1, correct: 1, total: 1 },
+      });
+    });
+    const { rerender } = render(
+      <StrictMode>
+        <PracticePanel
+          courseId="course-1"
+          courseName="German A2"
+          initialKind="GRAMMAR"
+          initialLearningSelection={selection}
+          onComplete={() => {
+            returned = true;
+          }}
+        />
+      </StrictMode>
+    );
+    expect(await screen.findByRole('region', { name: 'Practice result' })).toHaveTextContent(
+      '1 of 1 choices correct.'
+    );
+    expect(
+      screen.getByText('Focused practice at A1. Your course level stays the same.')
+    ).toBeTruthy();
+    expect(admissions).toEqual([
+      {
+        kind: 'GRAMMAR',
+        requestId: expect.stringMatching(/^[a-f0-9-]{36}$/),
+        learningSelection: selection,
+      },
+    ]);
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    expect(returned).toBe(true);
+    rerender(<p>Learning map reloaded from saved assessments.</p>);
+    expect(screen.getByText('Learning map reloaded from saved assessments.')).toBeTruthy();
+    expect(admissions).toHaveLength(1);
+  });
   const queued = {
     status: 'preparing',
     sessionId: 'saved-attempt',
@@ -109,9 +169,24 @@ describe('PracticePanel durable generation', () => {
       jsonResponse({
         ...OVERVIEW,
         recent: [
-          { id: 'saved-attempt', kind: 'GRAMMAR', status: 'GENERATING', score: null },
-          { id: 'failed-attempt', kind: 'READING', status: 'FAILED', score: null },
-          { id: 'cancelled-attempt', kind: 'FULL', status: 'CANCELLED', score: null },
+          {
+            id: 'saved-attempt',
+            kind: 'GRAMMAR',
+            status: 'GENERATING',
+            score: null,
+          },
+          {
+            id: 'failed-attempt',
+            kind: 'READING',
+            status: 'FAILED',
+            score: null,
+          },
+          {
+            id: 'cancelled-attempt',
+            kind: 'FULL',
+            status: 'CANCELLED',
+            score: null,
+          },
         ],
       })
     );
@@ -129,7 +204,11 @@ describe('PracticePanel durable generation', () => {
     await screen.findByText('In progress');
     fetchMock.mockResolvedValueOnce(jsonResponse(queued, 202));
     fetchMock.mockResolvedValueOnce(
-      jsonResponse({ ...queued, preparationStatus: 'RUNNING', message: 'Preparing exercises.' })
+      jsonResponse({
+        ...queued,
+        preparationStatus: 'RUNNING',
+        message: 'Preparing exercises.',
+      })
     );
     fetchMock.mockResolvedValueOnce(jsonResponse(savedExercises(queued.sessionId)));
     fireEvent.click(screen.getByRole('button', { name: /^Practice Grammar/ }));

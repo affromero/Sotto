@@ -5,6 +5,11 @@ import { SottoSpinner } from '@/components/ui/SottoSpinner';
 import { PracticeRunner, type PracticeStart } from './PracticeRunner';
 import styles from './PracticePanel.module.css';
 import type { PracticePreparing } from '@sotto/shared';
+import {
+  startPracticeRequestSchema,
+  startPracticeResponseSchema,
+  type LearningSelectionRequest,
+} from '@sotto/shared';
 
 interface PracticePanelProps {
   courseId: string;
@@ -12,6 +17,8 @@ interface PracticePanelProps {
   initialFocusTargetId?: string | null;
   initialAutoMode?: string | null;
   initialKind?: string | null;
+  initialLearningSelection?: LearningSelectionRequest;
+  onComplete?: () => void;
 }
 
 interface Overview {
@@ -30,13 +37,29 @@ interface Overview {
 type StartResponse = PracticeStart | PracticePreparing | { status: 'unavailable'; reason: string };
 
 const KINDS: Array<{ kind: string; label: string; blurb: string }> = [
-  { kind: 'FULL', label: 'Full catch-up', blurb: 'Mixed review across weak spots' },
+  {
+    kind: 'FULL',
+    label: 'Full catch-up',
+    blurb: 'Mixed review across weak spots',
+  },
   { kind: 'VOCAB', label: 'Vocabulary', blurb: 'Recall words from memory' },
   { kind: 'GRAMMAR', label: 'Grammar', blurb: 'Fresh grammar questions' },
-  { kind: 'READING', label: 'Reading', blurb: 'Short passages + comprehension' },
-  { kind: 'LISTENING', label: 'Listening', blurb: 'A short adaptive audio clip' },
+  {
+    kind: 'READING',
+    label: 'Reading',
+    blurb: 'Short passages + comprehension',
+  },
+  {
+    kind: 'LISTENING',
+    label: 'Listening',
+    blurb: 'A short adaptive audio clip',
+  },
   { kind: 'SPEAKING', label: 'Speaking', blurb: 'Say phrases, get feedback' },
-  { kind: 'WRITING', label: 'Writing', blurb: 'Write a reply, get inline corrections' },
+  {
+    kind: 'WRITING',
+    label: 'Writing',
+    blurb: 'Write a reply, get inline corrections',
+  },
 ];
 
 const UNAVAILABLE_COPY: Record<string, string> = {
@@ -67,6 +90,8 @@ export function PracticePanel({
   initialFocusTargetId = null,
   initialAutoMode = null,
   initialKind = null,
+  initialLearningSelection,
+  onComplete,
 }: PracticePanelProps) {
   const autoStarted = useRef(false);
   const [overview, setOverview] = useState<Overview | null>(null);
@@ -78,6 +103,7 @@ export function PracticePanel({
   const [preparation, setPreparation] = useState<PracticePreparing | null>(null);
   const pendingSessionId = useRef<string | null>(null);
   const startController = useRef<AbortController | null>(null);
+  useEffect(() => () => startController.current?.abort(), []);
 
   const acceptPreparation = useCallback((value: PracticePreparing) => {
     pendingSessionId.current = value.sessionId;
@@ -113,6 +139,7 @@ export function PracticePanel({
       setMessage('');
       setPreparation(null);
       const controller = new AbortController();
+      startController.current?.abort();
       startController.current = controller;
       const requestId = crypto.randomUUID();
       pendingSessionId.current = requestId;
@@ -120,15 +147,24 @@ export function PracticePanel({
         const res = await fetch(`/api/v1/courses/${courseId}/practice`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ kind, requestId, ...(focusTargetId ? { focusTargetId } : {}) }),
+          body: JSON.stringify(
+            startPracticeRequestSchema.parse({
+              kind,
+              requestId,
+              ...(focusTargetId ? { focusTargetId } : {}),
+              ...(initialLearningSelection ? { learningSelection: initialLearningSelection } : {}),
+            })
+          ),
           signal: controller.signal,
         });
-        const data = (await res.json()) as StartResponse;
+        const body: unknown = await res.json();
+        if (controller.signal.aborted || startController.current !== controller) return;
         if (!res.ok) {
-          setError(readPracticeError(data));
+          setError(readPracticeError(body));
           setPhase('overview');
           return;
         }
+        const data = startPracticeResponseSchema.parse(body);
         if (data.status === 'unavailable') {
           setMessage(
             UNAVAILABLE_COPY[data.reason] ?? 'Practice is not available yet for this skill.'
@@ -142,16 +178,16 @@ export function PracticePanel({
         }
         setStart(data);
         setPhase('running');
-      } catch (err) {
+      } catch {
         // An abort is the learner cancelling; cancelPractice already reset the
         // panel, so there is nothing to report.
-        if (err instanceof DOMException && err.name === 'AbortError') return;
+        if (controller.signal.aborted || startController.current !== controller) return;
         setError('The request acknowledgement was lost. Check whether this attempt was saved.');
       } finally {
         if (startController.current === controller) startController.current = null;
       }
     },
-    [courseId, acceptPreparation]
+    [courseId, acceptPreparation, initialLearningSelection]
   );
 
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -167,9 +203,13 @@ export function PracticePanel({
       setDeletingId(sessionId);
       setError('');
       try {
-        const res = await fetch(`/api/v1/practice/${sessionId}`, { method: 'DELETE' });
+        const res = await fetch(`/api/v1/practice/${sessionId}`, {
+          method: 'DELETE',
+        });
         if (!res.ok) {
-          const body = (await res.json().catch(() => ({}))) as { error?: string };
+          const body = (await res.json().catch(() => ({}))) as {
+            error?: string;
+          };
           setError(body.error ?? 'Could not delete that session. Please try again.');
         }
       } catch {
@@ -256,7 +296,9 @@ export function PracticePanel({
       if (!sessionId) return;
       try {
         const response = await fetch(`/api/v1/practice/${sessionId}`);
-        const data = (await response.json()) as StartResponse & { error?: string };
+        const data = (await response.json()) as StartResponse & {
+          error?: string;
+        };
         if (!isActive()) return;
         if (!response.ok) {
           setError(data.error ?? 'Could not check saved practice generation.');
@@ -298,9 +340,10 @@ export function PracticePanel({
 
   useEffect(() => {
     if (!initialFocusTargetId || autoStarted.current) return;
-    autoStarted.current = true;
     const kind = initialAutoMode === 'sentences' ? 'READING' : 'FULL';
     const timer = window.setTimeout(() => {
+      if (autoStarted.current) return;
+      autoStarted.current = true;
       void startKind(kind, initialFocusTargetId);
     }, 0);
     return () => window.clearTimeout(timer);
@@ -310,15 +353,19 @@ export function PracticePanel({
     if (!initialKind || initialFocusTargetId || autoStarted.current) return;
     const normalizedKind = initialKind.toUpperCase();
     if (!KINDS.some((item) => item.kind === normalizedKind)) return;
-    autoStarted.current = true;
     const timer = window.setTimeout(() => {
+      if (autoStarted.current) return;
+      autoStarted.current = true;
       void startKind(normalizedKind);
     }, 0);
     return () => window.clearTimeout(timer);
   }, [initialFocusTargetId, initialKind, startKind]);
 
   function backToOverview() {
+    startController.current?.abort();
+    startController.current = null;
     setStart(null);
+    setPreparation(null);
     setPhase('overview');
     void loadOverview();
   }
@@ -336,7 +383,12 @@ export function PracticePanel({
             ← Practice menu
           </button>
         </header>
-        <PracticeRunner courseId={courseId} start={start} onDone={backToOverview} />
+        {initialLearningSelection && (
+          <p role="status">
+            Focused practice at {initialLearningSelection.level}. Your course level stays the same.
+          </p>
+        )}
+        <PracticeRunner courseId={courseId} start={start} onDone={onComplete ?? backToOverview} />
       </div>
     );
   }
@@ -351,6 +403,11 @@ export function PracticePanel({
     <div className={styles.root}>
       <header className={styles.header}>
         <h2 className={styles.courseName}>{courseName}</h2>
+        {initialLearningSelection && (
+          <p role="status">
+            Focused practice at {initialLearningSelection.level}. Your course level stays the same.
+          </p>
+        )}
         <p className={styles.subtitle}>Quick, ungated review. Separate from your graded classes.</p>
       </header>
 
@@ -479,7 +536,13 @@ function kindLabel(kind: string | null): string {
   return KINDS.find((item) => item.kind === kind)?.label ?? 'your';
 }
 
-function readPracticeError(data: StartResponse | { error?: unknown }): string {
-  if ('error' in data && typeof data.error === 'string') return data.error;
+function readPracticeError(data: unknown): string {
+  if (
+    data !== null &&
+    typeof data === 'object' &&
+    'error' in data &&
+    typeof data.error === 'string'
+  )
+    return data.error;
   return 'Could not start practice. Try again.';
 }

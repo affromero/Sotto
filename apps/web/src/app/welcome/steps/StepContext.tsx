@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  useEffect,
   useRef,
   useState,
   type ChangeEvent,
@@ -13,11 +14,14 @@ import { Glyph } from '../Glyph';
 import type { ContextItem, ContextItemKind } from '../WelcomeFlow';
 import t from '../theme.module.css';
 import c from '@/app/welcome/components.styles';
+import { uploadBrowserMaterialFiles } from '@/lib/course-materials/client/browser-files';
+import { materialUploadLimits } from '@sotto/shared';
 
 interface Props {
   contextItems: ContextItem[];
   setContextItems: Dispatch<SetStateAction<ContextItem[]>>;
   demoMode: boolean;
+  uploadScope?: string;
   onNext: () => void;
   onBack: () => void;
 }
@@ -190,7 +194,14 @@ async function contextItemFromFile(file: File): Promise<Omit<ContextItem, 'id'>>
   };
 }
 
-export function StepContext({ contextItems, setContextItems, demoMode, onNext, onBack }: Props) {
+export function StepContext({
+  contextItems,
+  setContextItems,
+  demoMode,
+  uploadScope = 'welcome:context',
+  onNext,
+  onBack,
+}: Props) {
   const directCount = contextItems.length;
   const totalContext = directCount;
   const [entryKind, setEntryKind] = useState<MaterialEntryKind>('link');
@@ -198,6 +209,8 @@ export function StepContext({ contextItems, setContextItems, demoMode, onNext, o
   const [fileError, setFileError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const uploadController = useRef<AbortController | null>(null);
+  useEffect(() => () => uploadController.current?.abort(), []);
   const selectedMaterial =
     MATERIAL_TYPES.find((type) => type.id === entryKind) ?? MATERIAL_TYPES[0];
 
@@ -225,7 +238,11 @@ export function StepContext({ contextItems, setContextItems, demoMode, onNext, o
       .filter(Boolean)
       .map((line) => {
         const value = valueForMaterial(entryKind, line);
-        return { kind: entryKind, label: labelForMaterial(entryKind, line), value };
+        return {
+          kind: entryKind,
+          label: labelForMaterial(entryKind, line),
+          value,
+        };
       });
 
     addContextItems(directItems);
@@ -235,30 +252,28 @@ export function StepContext({ contextItems, setContextItems, demoMode, onNext, o
   async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const input = event.currentTarget;
     const files = Array.from(input.files ?? []);
-    if (!files.length) return;
+    if (!files.length || uploadController.current) return;
+    const current = new AbortController();
+    uploadController.current = current;
 
     setUploading(true);
     setFileError(null);
     try {
       if (!demoMode) {
-        const form = new FormData();
-        files.forEach((file) => form.append('files', file));
-        const response = await fetch('/api/v1/materials', { method: 'POST', body: form });
-        const data = (await response.json()) as {
-          materials?: Array<{ id: string; name: string; extractedText: string }>;
-          failed?: number;
-          error?: string;
-        };
-        if (!response.ok) throw new Error(data.error ?? 'Could not retain those files.');
+        const materials = await uploadBrowserMaterialFiles({
+          files,
+          scope: uploadScope,
+          signal: current.signal,
+        });
+        current.signal.throwIfAborted();
         addContextItems(
-          (data.materials ?? []).map((material) => ({
+          materials.map((material) => ({
             kind: 'file',
             label: material.name,
-            value: material.extractedText,
+            value: '',
             materialId: material.id,
           }))
         );
-        if (data.failed) setFileError(`${data.failed} files could not be read.`);
         return;
       }
       const results = await Promise.allSettled(files.map(contextItemFromFile));
@@ -273,9 +288,13 @@ export function StepContext({ contextItems, setContextItems, demoMode, onNext, o
         );
       }
     } catch (error) {
-      setFileError(error instanceof Error ? error.message : 'Could not read those files.');
+      if (!current.signal.aborted)
+        setFileError(error instanceof Error ? error.message : 'Could not read those files.');
     } finally {
-      setUploading(false);
+      if (uploadController.current === current) {
+        uploadController.current = null;
+        setUploading(false);
+      }
       input.value = '';
     }
   }
@@ -386,7 +405,7 @@ export function StepContext({ contextItems, setContextItems, demoMode, onNext, o
           <span className={c.contextUploadHint}>
             {demoMode
               ? 'Demo files stay in this browser.'
-              : 'Original documents are saved separately from editable notes. Maximum 10MB per upload.'}
+              : `Originals are saved separately from editable notes. Up to ${materialUploadLimits.maxFiles} files, ${materialUploadLimits.maxFileBytes / 1_048_576} MiB each. Reselect the same files to resume saved progress.`}
           </span>
         </div>
 
@@ -422,7 +441,11 @@ export function StepContext({ contextItems, setContextItems, demoMode, onNext, o
           ))}
         </div>
       ) : null}
-      {fileError ? <div className={c.contextNotice}>{fileError}</div> : null}
+      {fileError ? (
+        <div className={c.contextNotice} role="alert">
+          {fileError}
+        </div>
+      ) : null}
 
       <div className={c.ctxTally}>
         {totalContext === 0 ? (

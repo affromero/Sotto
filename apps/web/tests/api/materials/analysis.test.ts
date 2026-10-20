@@ -37,6 +37,8 @@ import { deliverSottoJob, sottoJobOutbox } from '@/lib/sidedoor/jobs/core/job-de
 import { durableQueueOperationId } from '@/lib/sidedoor/jobs/core/durable-queue';
 import { registerOnboardingMaterialReplayCase } from './analysis/onboarding-case';
 import { registerMaterialRetryAliasCase } from './analysis/retry-alias-case';
+import { registerMaterialCancellationCases } from './analysis/cancellation-case';
+import { createMaterialAnalysisResponseGate } from './analysis/response-gate';
 import {
   createSharedTestInstance,
   type SharedTestInstance,
@@ -102,6 +104,7 @@ suite('durable owned material focus analysis', () => {
   let endpoint: string;
   let mode: Mode;
   const requests: z.infer<typeof unitInput>[] = [];
+  const responseGate = createMaterialAnalysisResponseGate();
   const jobs = new Set<string>();
   beforeAll(async () => {
     instance = await createSharedTestInstance('material_analysis_http');
@@ -118,6 +121,7 @@ suite('durable owned material focus analysis', () => {
         if (!message) throw new Error('Missing exact source input.');
         const input = unitInput.parse(JSON.parse(message.content));
         requests.push(input);
+        await responseGate.wait(input.primary.source.pageNumber);
         if (mode === 'UNKNOWN') {
           request.socket.destroy();
           return;
@@ -240,6 +244,7 @@ suite('durable owned material focus analysis', () => {
     ).id;
   });
   afterEach(async () => {
+    responseGate.releaseAll();
     await instance.database.$executeRawUnsafe(
       'DROP TRIGGER IF EXISTS synthetic_analysis_failure ON "MaterialAnalysisUnit"'
     );
@@ -967,5 +972,23 @@ suite('durable owned material focus analysis', () => {
     materialFixture,
     exactText,
     sha,
+  }));
+  registerMaterialCancellationCases(() => ({
+    instance,
+    identity,
+    admitted,
+    input,
+    delivered,
+    request,
+    saved,
+    retryInput,
+    retryRequest,
+    requests,
+    projection,
+    materialFixture,
+    holdProvider: responseGate.hold,
+    setMode: (value) => {
+      mode = value;
+    },
   }));
 });

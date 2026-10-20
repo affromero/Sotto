@@ -22,7 +22,18 @@ vi.mock('@/lib/prisma', () => ({
     course: { findFirst: (...a: unknown[]) => mockCourseFindFirst(...a) },
     courseMaterial: { findMany: (...a: unknown[]) => mockMaterials(...a) },
   },
-  prismaUnfiltered: {},
+  prismaUnfiltered: {
+    $transaction: (operation: (database: object) => Promise<unknown>) =>
+      operation({
+        course: { findFirst: (...args: unknown[]) => mockCourseFindFirst(...args) },
+        courseMaterial: { findMany: (...args: unknown[]) => mockMaterials(...args) },
+        $queryRaw: async () =>
+          (await mockMaterials()).map((row: Record<string, unknown>) => ({
+            id: row.id,
+            textRetained: Boolean(row.extractedText),
+          })),
+      }),
+  },
 }));
 vi.mock('@/lib/sidedoor/access/core/http', () => ({
   accessOperation: (_request: Request, _browser: boolean, operation: () => Promise<Response>) =>
@@ -137,7 +148,7 @@ describe('GET /api/v1/courses/[courseId]/notes', () => {
     mockGetEditableNote.mockResolvedValue('travel to Italy');
     const res = await GET(getReq(), PARAMS);
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ body: 'travel to Italy', materials: [] });
+    expect(await res.json()).toEqual({ body: 'travel to Italy', materials: [], nextCursor: null });
   });
 
   it('401s without auth', async () => {
@@ -206,7 +217,8 @@ describe('POST /api/v1/courses/[courseId]/notes', () => {
     expect(body.body).toBe('editable note');
     expect(body.materials[0]).toMatchObject({
       name: 'official.md',
-      extractedText: expect.stringContaining('buongiorno'),
+      extractedText: '',
+      textRetained: true,
     });
     expect(body.materials[0]).not.toHaveProperty('originalUrl');
     expect(Buffer.from(mockWriteReference.mock.calls[0][0].body).toString()).toBe(file.content);
@@ -228,7 +240,10 @@ describe('POST /api/v1/courses/[courseId]/notes', () => {
       expect.any(Buffer),
       expect.objectContaining({ extension: '.pdf', url: 'upload://course.pdf' })
     );
-    expect((await res.json()).materials[0].extractedText).toContain('# Capitolo');
+    expect((await res.json()).materials[0]).toMatchObject({
+      extractedText: '',
+      textRetained: true,
+    });
   });
 
   it('400s when no files are uploaded', async () => {

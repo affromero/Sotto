@@ -222,7 +222,11 @@ export async function requestMaterialAnalysis(
         sources: descriptors,
       });
       const unresolved = await database.materialAnalysis.findFirst({
-        where: { userId: execution.userId, sourceSetDigest, status: 'RECOVERY_REQUIRED' },
+        where: {
+          userId: execution.userId,
+          sourceSetDigest,
+          status: { in: ['RECOVERY_REQUIRED', 'CANCELLING'] },
+        },
       });
       if (unresolved)
         throw new MaterialAnalysisConflict(

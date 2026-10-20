@@ -8,13 +8,17 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
+import { courseNotesPageSchema, legacyMaterialTextSchema } from '../src/course-materials/legacy';
 import {
   learningMapResponseSchema,
   advanceLearningLevelSchema,
   learningLevelCompletionSchema,
   learningSelectionPreviewSchema,
   learningObjectiveMemorySchema,
+  learningObjectiveDetailSchema,
+  learningObjectiveHistorySchema,
 } from '../src/learning-map/contracts';
+import { courseAnalysisListSchema, sourceFocusDetailSchema } from '../src/learning-map/library';
 import { learningSelectionRequestSchema } from '../src/learning-map/selection';
 import {
   placementGenerateRequestSchema,
@@ -24,6 +28,10 @@ import {
   materialFocusAnalysisRetryRequestSchema,
   materialFocusAnalysisRetryResponseSchema,
 } from '../src/course-materials/analysis';
+import {
+  materialAnalysisCancellationRequestSchema,
+  materialAnalysisCancellationResponseSchema,
+} from '../src/course-materials/cancellation';
 import {
   pencilHomeworkRequestSchema,
   pencilHomeworkResponseSchema,
@@ -145,12 +153,18 @@ const startPracticeVariants: Record<string, string> = {
 // pointers instead of being inlined — this keeps the document DRY and gives the
 // Rust codegen clean, named types. Order is irrelevant; refs resolve by id.
 const namedSchemas: Record<string, z.ZodType> = {
+  CourseNotesPage: courseNotesPageSchema,
+  LegacyMaterialText: legacyMaterialTextSchema,
   LearningMapResponse: learningMapResponseSchema,
   AdvanceLearningLevelRequest: advanceLearningLevelSchema,
   LearningLevelCompletion: learningLevelCompletionSchema,
   LearningSelectionPreview: learningSelectionPreviewSchema,
   LearningSelectionRequest: learningSelectionRequestSchema,
   LearningObjectiveMemory: learningObjectiveMemorySchema,
+  LearningObjectiveDetail: learningObjectiveDetailSchema,
+  LearningObjectiveHistory: learningObjectiveHistorySchema,
+  CourseAnalysisList: courseAnalysisListSchema,
+  SourceFocusDetail: sourceFocusDetailSchema,
   AdmitPlacementRequest: placementGenerateRequestSchema,
   MaterialAnalysisStatusResponse: placementSourceStatusSchema,
   PencilHomeworkRequest: pencilHomeworkRequestSchema,
@@ -163,6 +177,8 @@ const namedSchemas: Record<string, z.ZodType> = {
   PracticeGenerationAction: practiceGenerationActionSchema,
   MaterialAnalysisRetryRequest: materialFocusAnalysisRetryRequestSchema,
   MaterialAnalysisRetryResponse: materialFocusAnalysisRetryResponseSchema,
+  MaterialAnalysisCancellationRequest: materialAnalysisCancellationRequestSchema,
+  MaterialAnalysisCancellationResponse: materialAnalysisCancellationResponseSchema,
   CefrLevel: cefrLevelSchema,
   PracticeKind: practiceKindSchema,
   PracticeStatus: practiceStatusSchema,

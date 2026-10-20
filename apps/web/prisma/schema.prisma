@@ -2042,33 +2042,35 @@ model MaterialAnalysisSource {
 }
 
 model MaterialAnalysisUnit {
-  id                 String    @id @default(uuid())
-  analysisId         String
-  stage              String
-  unitKey            String
-  identity           Json
-  identityDigest     String
-  inputDigest        String
-  grant              Json?
-  reuse              Json?
-  mode               String
-  status             String    @default("READY")
-  attemptId          String?   @unique
-  attemptFingerprint String?
-  responseKind       String?
-  responseMetadata   Json?
-  responseBytes      Bytes?
-  responseSha256     String?
-  outputBytes        Bytes?
-  outputSha256       String?
-  admittedAt         DateTime?
-  settledAt          DateTime?
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  id                     String    @id @default(uuid())
+  analysisId             String
+  stage                  String
+  unitKey                String
+  identity               Json
+  identityDigest         String
+  inputDigest            String
+  grant                  Json?
+  reuse                  Json?
+  cancellationVerifiedAt DateTime?
+  mode                   String
+  status                 String    @default("READY")
+  attemptId              String?   @unique
+  attemptFingerprint     String?
+  responseKind           String?
+  responseMetadata       Json?
+  responseBytes          Bytes?
+  responseSha256         String?
+  outputBytes            Bytes?
+  outputSha256           String?
+  admittedAt             DateTime?
+  settledAt              DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
 
   analysis MaterialAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
 
   @@unique([analysisId, stage, unitKey])
+  @@index([analysisId, cancellationVerifiedAt, id], map: "MaterialAnalysisUnit_cancellation_verification_idx")
   @@index([status, updatedAt])
 }
 

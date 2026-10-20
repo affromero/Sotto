@@ -5,14 +5,23 @@ import { useRouter } from 'next/navigation';
 import { SottoSpinner } from '@/components/ui/SottoSpinner';
 import {
   analyzePlacementMaterials,
+  openSavedMaterialAnalysis,
+  forgetSavedMaterialAnalysis,
   materialPlacementReference,
   type MaterialAnalysisProjection,
   type MaterialPlacementCheckpoint,
   type MaterialPlacementReference,
 } from '@/lib/course-materials/client/analysis';
+import {
+  readSavedMaterialPlacement,
+  saveMaterialPlacementConfirmation,
+  saveMaterialPlacementRetry,
+  type SavedMaterialPlacementCheckpoint,
+} from '@/lib/course-materials/client/placement-checkpoint';
 import styles from './NotesPlacement.module.css';
 import { MaterialCoverage, MaterialPartialConsent } from './MaterialCoverage';
 import { MaterialAnalysisRetry } from './MaterialAnalysisRetry';
+import { MaterialAnalysisCancellation } from './analysis-controls/MaterialAnalysisCancellation';
 
 interface NotesPlacementProps {
   native: string;
@@ -51,6 +60,7 @@ export function NotesPlacement({ native, target, onVerify }: NotesPlacementProps
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const deduceController = useRef<AbortController | null>(null);
   const checkpoint = useRef<MaterialPlacementCheckpoint | null>(null);
+  const savedCheckpoint = useRef<SavedMaterialPlacementCheckpoint | null>(null);
   const confirmationId = useRef<string | null>(null);
   const confirmationBody = useRef<string | null>(null);
   const [confirmationFailed, setConfirmationFailed] = useState(false);
@@ -62,6 +72,7 @@ export function NotesPlacement({ native, target, onVerify }: NotesPlacementProps
     deduceController.current?.abort();
     deduceController.current = null;
     checkpoint.current = null;
+    savedCheckpoint.current = null;
     confirmationId.current = null;
     confirmationBody.current = null;
     setLastAnalysis(null);
@@ -79,7 +90,7 @@ export function NotesPlacement({ native, target, onVerify }: NotesPlacementProps
 
   const hasMaterials = text.trim().length > 0 || files.length > 0;
 
-  async function deduce() {
+  async function deduce(savedOnly = false) {
     setConfirmationFailed(false);
     setPhase('deducing');
     setErrorMessage('');
@@ -87,19 +98,33 @@ export function NotesPlacement({ native, target, onVerify }: NotesPlacementProps
     deduceController.current?.abort();
     deduceController.current = controller;
     try {
-      const analysis = await analyzePlacementMaterials({
-        native,
-        target,
-        content: text,
-        files,
-        signal: controller.signal,
-        checkpoint: checkpoint.current,
-        onCheckpoint: (value) => {
-          checkpoint.current = value;
-        },
-        onProgress: setProgress,
-        onProjection: setLastAnalysis,
-      });
+      const callbacks = { onProgress: setProgress, onProjection: setLastAnalysis };
+      const analysis = savedOnly
+        ? await openSavedMaterialAnalysis({
+            native,
+            target,
+            signal: controller.signal,
+            ...callbacks,
+            onSaved: (value) => {
+              savedCheckpoint.current = value;
+              setText('');
+              setFiles([]);
+            },
+          })
+        : await analyzePlacementMaterials({
+            native,
+            target,
+            content: text,
+            files,
+            signal: controller.signal,
+            checkpoint: checkpoint.current,
+            onCheckpoint: (value) => {
+              checkpoint.current = value;
+              savedCheckpoint.current = readSavedMaterialPlacement(value.profileId, native, target);
+            },
+            onProgress: setProgress,
+            onProjection: setLastAnalysis,
+          });
       controller.signal.throwIfAborted();
       const inference = analysis.summary?.inference;
       if (!inference)
@@ -113,8 +138,12 @@ export function NotesPlacement({ native, target, onVerify }: NotesPlacementProps
         analysis,
       });
       setAcceptPartial(false);
-      confirmationId.current = crypto.randomUUID();
-      confirmationBody.current = null;
+      const retained =
+        savedCheckpoint.current?.analysisId === analysis.analysisId
+          ? savedCheckpoint.current.confirmation
+          : null;
+      confirmationId.current = retained?.requestId ?? crypto.randomUUID();
+      confirmationBody.current = retained?.body ?? null;
       setPhase('result');
     } catch (err) {
       // cancelDeduction already returned the learner to the form.
@@ -139,9 +168,13 @@ export function NotesPlacement({ native, target, onVerify }: NotesPlacementProps
       ...materialPlacementReference(deduction.analysis, acceptPartial),
     });
     try {
+      const profileId = savedCheckpoint.current?.profileId ?? checkpoint.current?.profileId;
+      if (!profileId)
+        throw new Error('Reopen the saved analysis before confirming its learner identity.');
+      saveMaterialPlacementConfirmation(profileId, native, target, confirmationBody.current);
       const res = await fetch('/api/v1/placement/from-notes/confirm', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-sotto-expected-profile-id': profileId },
         body: confirmationBody.current,
       });
       if (!res.ok) {
@@ -152,18 +185,44 @@ export function NotesPlacement({ native, target, onVerify }: NotesPlacementProps
         return;
       }
       router.push('/learn');
-    } catch {
+    } catch (cause) {
       setConfirmationFailed(true);
-      setErrorMessage('A network error occurred while starting your course. Please try again.');
+      setErrorMessage(
+        cause instanceof Error
+          ? cause.message
+          : 'The course confirmation could not be read. Retry its saved request.'
+      );
       setPhase('error');
     }
   }
 
   async function resumeRetry(analysisId: string, parentId: string) {
-    if (!checkpoint.current || checkpoint.current.analysisId !== parentId)
+    const previous = savedCheckpoint.current;
+    if (!previous || previous.analysisId !== parentId)
       throw new Error('The source selection changed. Open its current analysis before retrying.');
-    checkpoint.current.analysisId = analysisId;
-    await deduce();
+    saveMaterialPlacementRetry(previous.profileId, native, target, parentId, analysisId);
+    if (checkpoint.current?.analysisId === parentId) checkpoint.current.analysisId = analysisId;
+    await deduce(true);
+  }
+
+  async function forgetSaved() {
+    const controller = new AbortController();
+    deduceController.current?.abort();
+    deduceController.current = controller;
+    try {
+      await forgetSavedMaterialAnalysis(native, target, controller.signal);
+      if (controller.signal.aborted) return;
+      invalidateSources();
+      setErrorMessage('');
+      setPhase('input');
+    } catch (cause) {
+      if (!controller.signal.aborted)
+        setErrorMessage(
+          cause instanceof Error ? cause.message : 'Could not clear this browser resume record.'
+        );
+    } finally {
+      if (deduceController.current === controller) deduceController.current = null;
+    }
   }
 
   if (phase === 'deducing' || phase === 'confirming') {
@@ -179,6 +238,7 @@ export function NotesPlacement({ native, target, onVerify }: NotesPlacementProps
             Stop waiting
           </button>
         )}
+        {phase === 'deducing' && <MaterialAnalysisCancellation analysis={lastAnalysis} />}
       </div>
     );
   }
@@ -188,6 +248,7 @@ export function NotesPlacement({ native, target, onVerify }: NotesPlacementProps
       <div className={styles.center} role="alert">
         <p className={styles.errorMessage}>{errorMessage}</p>
         <MaterialAnalysisRetry analysis={lastAnalysis} onRetry={resumeRetry} />
+        <MaterialAnalysisCancellation analysis={lastAnalysis} />
         {deduction && confirmationFailed && (
           <button type="button" className={styles.primaryButton} onClick={() => void startHere()}>
             Retry course confirmation
@@ -196,6 +257,13 @@ export function NotesPlacement({ native, target, onVerify }: NotesPlacementProps
         <button type="button" className={styles.secondaryButton} onClick={() => setPhase('input')}>
           Try again
         </button>
+        <button type="button" className={styles.secondaryButton} onClick={() => void forgetSaved()}>
+          Clear this browser&apos;s saved progress
+        </button>
+        <p>
+          Clears the resume record for the active learner. Saved sources and background work stay on
+          the server.
+        </p>
       </div>
     );
   }
@@ -318,6 +386,9 @@ export function NotesPlacement({ native, target, onVerify }: NotesPlacementProps
         aria-disabled={!hasMaterials}
       >
         Find my level
+      </button>
+      <button type="button" className={styles.secondaryButton} onClick={() => void deduce(true)}>
+        Open saved analysis
       </button>
     </div>
   );

@@ -11,6 +11,14 @@ import {
   uploadMaterialFiles,
   type MaterialUploadClientState,
 } from './uploads';
+import {
+  materialPlacementContentHash,
+  readSavedMaterialPlacement,
+  restoreMaterialPlacement,
+  saveMaterialPlacement,
+  forgetMaterialPlacement,
+  type SavedMaterialPlacementCheckpoint,
+} from './placement-checkpoint';
 
 const inferenceSchema = z.object({
   level: learningLevelSchema,
@@ -196,7 +204,18 @@ export async function analyzePlacementMaterials(input: {
       })
     )
   );
-  let state = input.checkpoint ?? null;
+  const contentSha256 = await materialPlacementContentHash(input.content);
+  signal.throwIfAborted();
+  let state =
+    input.checkpoint ??
+    restoreMaterialPlacement({
+      profileId: profile.id,
+      native: input.native,
+      target: input.target,
+      content: input.content,
+      contentSha256,
+      files: input.files,
+    });
   if (state && state.profileId !== profile.id)
     throw new Error('The active profile changed. Select your materials again.');
   if (
@@ -231,6 +250,7 @@ export async function analyzePlacementMaterials(input: {
   const saved = state;
   const checkpoint = () => {
     signal.throwIfAborted();
+    saveMaterialPlacement(saved, contentSha256);
     input.onCheckpoint(structuredClone(saved));
   };
   checkpoint();
@@ -305,19 +325,79 @@ export async function analyzePlacementMaterials(input: {
     saved.analysisId = admitted.analysisId;
     checkpoint();
   }
+  return pollMaterialAnalysis({
+    analysisId: saved.analysisId,
+    profileId: saved.profileId,
+    native: input.native,
+    target: input.target,
+    signal,
+    onProjection: input.onProjection,
+    onProgress: input.onProgress,
+  });
+}
+
+export async function openSavedMaterialAnalysis(input: {
+  native: string;
+  target: string;
+  signal: AbortSignal;
+  onProgress?: (message: string) => void;
+  onProjection?: (value: MaterialAnalysisProjection) => void;
+  onSaved: (checkpoint: SavedMaterialPlacementCheckpoint) => void;
+}) {
+  const signal = AbortSignal.any([input.signal, AbortSignal.timeout(7_200_000)]);
+  const profile = z
+    .object({ id: z.string().min(1) })
+    .parse(await json(await fetch('/api/v1/users/me', { signal, cache: 'no-store' })));
+  signal.throwIfAborted();
+  const saved = readSavedMaterialPlacement(profile.id, input.native, input.target);
+  if (!saved?.analysisId)
+    throw new Error(
+      saved
+        ? 'Select the same original files and paste the original text to resume the saved admission.'
+        : 'No saved source analysis is available for this learner and language pair.'
+    );
+  input.onSaved(saved);
+  return pollMaterialAnalysis({
+    ...input,
+    analysisId: saved.analysisId,
+    profileId: profile.id,
+    signal,
+  });
+}
+
+async function pollMaterialAnalysis(input: {
+  analysisId: string;
+  profileId: string;
+  native: string;
+  target: string;
+  signal: AbortSignal;
+  onProgress?: (message: string) => void;
+  onProjection?: (value: MaterialAnalysisProjection) => void;
+}) {
+  const { signal } = input;
   while (true) {
     signal.throwIfAborted();
     input.onProgress?.('Reading the saved analysis status');
-    const result = materialAnalysisProjectionSchema.parse(
-      await json(
-        await fetch(`/api/v1/material-analyses/${saved.analysisId}`, {
-          signal,
-          cache: 'no-store',
-          headers: { 'x-sotto-expected-profile-id': saved.profileId },
-        })
-      )
-    );
+    const result = materialAnalysisProjectionSchema
+      .extend({ native: z.string(), target: z.string() })
+      .parse(
+        await json(
+          await fetch(`/api/v1/material-analyses/${input.analysisId}`, {
+            signal,
+            cache: 'no-store',
+            headers: { 'x-sotto-expected-profile-id': input.profileId },
+          })
+        )
+      );
     signal.throwIfAborted();
+    if (
+      result.analysisId !== input.analysisId ||
+      result.native !== input.native ||
+      result.target !== input.target
+    )
+      throw new Error(
+        'The saved source analysis does not match this learner language pair and receipt.'
+      );
     input.onProjection?.(result);
     input.onProgress?.(
       result.status === 'WAITING_SOURCE'
@@ -331,6 +411,18 @@ export async function analyzePlacementMaterials(input: {
       throw new MaterialAnalysisProcessingError(result);
     await wait(signal);
   }
+}
+
+export async function forgetSavedMaterialAnalysis(
+  native: string,
+  target: string,
+  signal: AbortSignal
+) {
+  const profile = z
+    .object({ id: z.string().min(1) })
+    .parse(await json(await fetch('/api/v1/users/me', { signal, cache: 'no-store' })));
+  signal.throwIfAborted();
+  forgetMaterialPlacement(profile.id, native, target);
 }
 
 export function materialPlacementReference(

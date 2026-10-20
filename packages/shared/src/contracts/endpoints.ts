@@ -3,6 +3,7 @@
 // path with its Zod request/response schemas so a single source generates both
 // the OpenAPI document and any client-side validation.
 import { z } from 'zod';
+import { courseNotesPageSchema, legacyMaterialTextSchema } from '../course-materials/legacy';
 import {
   placementGenerateRequestSchema,
   placementSourceStatusSchema,
@@ -16,8 +17,15 @@ import {
   advanceLearningLevelSchema,
   learningLevelCompletionSchema,
   learningSelectionPreviewSchema,
+  learningObjectiveDetailSchema,
+  learningObjectiveHistorySchema,
 } from '../learning-map/contracts';
+import { courseAnalysisListSchema, sourceFocusDetailSchema } from '../learning-map/library';
 import { learningSelectionRequestSchema } from '../learning-map/selection';
+import {
+  materialAnalysisCancellationRequestSchema,
+  materialAnalysisCancellationResponseSchema,
+} from '../course-materials/cancellation';
 import { pencilHomeworkRequestSchema, pencilHomeworkResponseSchema } from './pencil-homework';
 import {
   classRegenerationRequestSchema,
@@ -110,6 +118,28 @@ export interface EndpointDef {
 
 export const endpoints: EndpointDef[] = [
   {
+    id: 'getCourseNotes',
+    method: 'GET',
+    path: '/api/v1/courses/{courseId}/notes',
+    summary: 'Read the editable note and at most twenty retained material metadata rows.',
+    auth: 'bearer',
+    response: courseNotesPageSchema,
+    query: [{ name: 'after', required: false }],
+  },
+  {
+    id: 'getMaterialLegacyText',
+    method: 'GET',
+    path: '/api/v1/materials/{materialId}/legacy-text',
+    summary:
+      'Read at most8192 codepoints from an owned retained legacy extract without changing its original value.',
+    auth: 'bearer',
+    response: legacyMaterialTextSchema,
+    query: [
+      { name: 'offset', required: false },
+      { name: 'limit', required: false },
+    ],
+  },
+  {
     id: 'previewLearningSelection',
     method: 'POST',
     path: '/api/v1/courses/{courseId}/learning-map/selection',
@@ -175,6 +205,7 @@ export const endpoints: EndpointDef[] = [
     summary: 'Read the private current or viewed learning band and authoritative readiness.',
     auth: 'bearer',
     response: learningMapResponseSchema,
+    query: [{ name: 'level', required: false }],
     successStatuses: [200],
   },
   {
@@ -195,6 +226,44 @@ export const endpoints: EndpointDef[] = [
     request: advanceLearningLevelSchema,
     response: learningLevelCompletionSchema,
     successStatuses: [200],
+  },
+  {
+    id: 'getLearningObjective',
+    method: 'GET',
+    path: '/api/v1/courses/{courseId}/learning-map/objectives/{objectiveId}',
+    summary: 'Read an owned objective and its pinned assessment criteria.',
+    auth: 'bearer',
+    response: learningObjectiveDetailSchema,
+    query: [{ name: 'level', required: false }],
+  },
+  {
+    id: 'getLearningObjectiveHistory',
+    method: 'GET',
+    path: '/api/v1/courses/{courseId}/learning-map/objectives/{objectiveId}/history',
+    summary: 'Page qualified evidence for the exact objective criterion and policy.',
+    auth: 'bearer',
+    response: learningObjectiveHistorySchema,
+    query: [
+      { name: 'level', required: false },
+      { name: 'after', required: false },
+    ],
+  },
+  {
+    id: 'listCourseMaterialAnalyses',
+    method: 'GET',
+    path: '/api/v1/courses/{courseId}/material-analyses',
+    summary: 'Page retained source analyses for an owned course.',
+    auth: 'bearer',
+    response: courseAnalysisListSchema,
+    query: [{ name: 'after', required: false }],
+  },
+  {
+    id: 'getMaterialSourceFocus',
+    method: 'GET',
+    path: '/api/v1/material-analyses/{analysisId}/focuses/{focusId}',
+    summary: 'Read a private source focus with verified citations and coverage.',
+    auth: 'bearer',
+    response: sourceFocusDetailSchema,
   },
   {
     id: 'resumePractice',
@@ -449,6 +518,7 @@ export const endpoints: EndpointDef[] = [
     summary: 'Read the owned source analysis, exact revision and placement inference.',
     auth: 'bearer',
     response: placementSourceStatusSchema,
+    query: [{ name: 'afterOrder', required: false }],
     successStatuses: [200],
   },
   {
@@ -460,6 +530,17 @@ export const endpoints: EndpointDef[] = [
     auth: 'bearer',
     request: materialFocusAnalysisRetryRequestSchema,
     response: materialFocusAnalysisRetryResponseSchema,
+    successStatuses: [200, 202],
+  },
+  {
+    id: 'cancelMaterialAnalysis',
+    method: 'POST',
+    path: '/api/v1/material-analyses/{analysisId}/cancellation',
+    summary:
+      'Stop future source-analysis chunks and verify settled work without aborting paid attempts.',
+    auth: 'bearer',
+    request: materialAnalysisCancellationRequestSchema,
+    response: materialAnalysisCancellationResponseSchema,
     successStatuses: [200, 202],
   },
   {

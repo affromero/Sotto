@@ -1,3 +1,5 @@
+import { beforeEach as clearBrowserState } from 'vitest';
+clearBrowserState(() => window.localStorage.clear());
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { StepPlacement } from '@/app/welcome/steps/StepPlacement';
@@ -18,6 +20,8 @@ describe('onboarding source placement', () => {
         .mockResolvedValueOnce(Response.json({ id: 'owner' }))
         .mockResolvedValueOnce(
           Response.json({
+            native: 'en',
+            target: 'de',
             analysisId: '6855420c-d68a-49c1-bd3c-f29dd8cb7f84',
             analysisRevision: 1,
             status: 'RUNNING',
@@ -58,6 +62,8 @@ describe('onboarding source placement', () => {
       await act(async () =>
         release(
           Response.json({
+            native: 'en',
+            target: 'de',
             analysisId: '6855420c-d68a-49c1-bd3c-f29dd8cb7f84',
             analysisRevision: 1,
             status: 'COMPLETE',
@@ -83,6 +89,8 @@ describe('onboarding source placement', () => {
         .mockResolvedValueOnce(Response.json({ id: 'owner' }))
         .mockResolvedValueOnce(
           Response.json({
+            native: 'en',
+            target: 'de',
             analysisId: '6855420c-d68a-49c1-bd3c-f29dd8cb7f84',
             analysisRevision: 1,
             status: 'INSUFFICIENT_SOURCE',
@@ -91,6 +99,8 @@ describe('onboarding source placement', () => {
         )
         .mockResolvedValueOnce(
           Response.json({
+            native: 'en',
+            target: 'de',
             analysisId: '6855420c-d68a-49c1-bd3c-f29dd8cb7f84',
             analysisRevision: 1,
             status: 'INSUFFICIENT_SOURCE',
@@ -122,6 +132,8 @@ describe('onboarding source placement', () => {
   });
   it('records the exact partial analysis only after the learner accepts unresolved coverage', async () => {
     const analysis = {
+      native: 'en',
+      target: 'de',
       analysisId: '6855420c-d68a-49c1-bd3c-f29dd8cb7f84',
       analysisRevision: 1,
       status: 'PARTIAL',

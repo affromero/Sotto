@@ -47,6 +47,8 @@ export const materialFocusAnalysisStatusIdentitySchema = z
       'RECOVERY_REQUIRED',
       'FAILED',
       'CANCELLED',
+      'CANCELLING',
+      'SUPERSEDED',
     ]),
     identityDigest: sha.nullable(),
     resultDigest: sha.nullable(),

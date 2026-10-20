@@ -1,3 +1,5 @@
+import { beforeEach as clearBrowserState } from 'vitest';
+clearBrowserState(() => window.localStorage.clear());
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { PlacementEntry } from '@/components/placement/PlacementEntry';
@@ -114,6 +116,8 @@ describe('placement entry with exact receipt transport', () => {
   it('carries the exact analyzed source receipt into verification and the saved quiz receipt into submission', async () => {
     const analysis = {
       analysisId,
+      native: 'en',
+      target: 'es',
       analysisRevision: 1,
       status: 'COMPLETE',
       resultDigest,

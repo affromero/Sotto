@@ -193,6 +193,13 @@ export default async function LearnPage() {
                   <StartNextClass courseId={course.id} activeClassId={activeClassId}>
                     <div className={styles.courseActions}>
                       <Link
+                        href={`/learn/map?course=${encodeURIComponent(course.id)}`}
+                        className={styles.practiceLink}
+                        aria-label={`Learning map and level requirements for ${courseTitle}`}
+                      >
+                        Learning map
+                      </Link>
+                      <Link
                         href="/learn/practice"
                         className={styles.practiceLink}
                         aria-label={`Practice a single skill for ${courseTitle}`}
@@ -237,7 +244,11 @@ export default async function LearnPage() {
                   <PedagogySelector courseId={course.id} current={course.pedagogy} />
                 </div>
                 <div className={styles.sourcedRow}>
-                  <CourseNotesPanel courseId={course.id} />
+                  <CourseNotesPanel
+                    courseId={course.id}
+                    nativeLang={course.nativeLang}
+                    targetLang={course.targetLang}
+                  />
                 </div>
                 <div className={styles.sourcedRow}>
                   <CourseClassHistory classes={course.classes} courseTitle={courseTitle} />

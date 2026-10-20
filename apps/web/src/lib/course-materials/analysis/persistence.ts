@@ -289,7 +289,11 @@ export async function readMaterialAnalysisEffectiveUnits(
     );
   return units;
 }
-function grantStore(database: Prisma.TransactionClient, context: MaterialAnalysisUnitAuthority) {
+function grantStore(
+  database: Prisma.TransactionClient,
+  context: MaterialAnalysisUnitAuthority,
+  captured?: Awaited<ReturnType<typeof loadUnit>>
+) {
   return new DelegationStore({
     backend: sqlStateBackend(
       {
@@ -299,11 +303,85 @@ function grantStore(database: Prisma.TransactionClient, context: MaterialAnalysi
       `${SIDEDOOR_STATE_ID}:material-analysis-grant:${context.unitId}`
     ),
     authorize: async ({ grant }) => {
-      const saved = await loadUnit(database, context);
+      const saved = captured ?? (await loadUnit(database, context));
       if (materialFocusAnalysisHash(saved.grant) !== materialFocusAnalysisHash(grant))
         throw new MaterialAnalysisConflict('The provider delegation receipt changed.');
     },
   });
+}
+
+/** Called only after the owned analysis fence and canonical executor drain, in the same transaction. */
+export async function verifyMaterialAnalysisCancellationUnits(
+  database: Prisma.TransactionClient,
+  context: MaterialAnalysisAuthority,
+  unitIds: readonly string[]
+) {
+  if (unitIds.length > 64)
+    throw new MaterialAnalysisConflict('Cancellation verification exceeds its transaction bound.');
+  const analysis = await requireMaterialAnalysis(database, context);
+  if (analysis.row.status !== 'CANCELLING')
+    throw new MaterialAnalysisConflict('Cancellation is not admitted.');
+  const analyses = new Map([[analysis.row.id, analysis]]);
+  for (const unitId of unitIds) {
+    const scope = { ...context, unitId };
+    const saved = await loadUnit(database, scope, new Set(), analyses);
+    if (saved.unit.reuse !== null) {
+      const owned = await database.materialAnalysisUnit.findUniqueOrThrow({
+        where: { id: unitId },
+      });
+      if (
+        owned.grant !== null ||
+        owned.attemptId !== null ||
+        !['SUCCEEDED', 'ANALYZED', 'OUTPUT_INVALID'].includes(owned.status)
+      )
+        throw new MaterialAnalysisConflict(
+          'Borrowed work cannot own cancellation dispatch authority.'
+        );
+    } else {
+      if (!saved.grant)
+        throw new MaterialAnalysisConflict('The native provider grant is unavailable.');
+      const store = grantStore(database, scope, saved);
+      const binding = delegationGrantBinding(saved.grant);
+      const record = await store.read(binding);
+      if (record.attempts.some((attempt) => ['admitted', 'unknown'].includes(attempt.outcome)))
+        throw new MaterialAnalysisConflict('The canonical provider attempt remains unresolved.');
+      const attempt = record.attempts[0];
+      if (saved.unit.attemptId === null) {
+        if (attempt || saved.unit.status !== 'READY')
+          throw new MaterialAnalysisConflict('The unstarted provider receipt changed.');
+      } else {
+        const outcome =
+          saved.unit.status === 'FAILED'
+            ? 'failed'
+            : ['SUCCEEDED', 'ANALYZED', 'OUTPUT_INVALID'].includes(saved.unit.status)
+              ? 'succeeded'
+              : null;
+        if (
+          !attempt ||
+          attempt.id !== saved.unit.attemptId ||
+          attempt.fingerprint !== saved.unit.attemptFingerprint ||
+          attempt.outcome !== outcome
+        )
+          throw new MaterialAnalysisConflict(
+            'The canonical provider outcome does not match the saved unit.'
+          );
+        if (outcome === 'succeeded' && !saved.unit.responseBytes)
+          throw new MaterialAnalysisConflict(
+            'A successful provider attempt has no saved response.'
+          );
+        if (
+          saved.unit.responseBytes &&
+          materialAnalysisBytesHash(saved.unit.responseBytes) !== saved.unit.responseSha256
+        )
+          throw new MaterialAnalysisConflict('The retained response checksum changed.');
+      }
+      await store.revoke(binding);
+    }
+    await database.materialAnalysisUnit.update({
+      where: { id: unitId },
+      data: { cancellationVerifiedAt: new Date() },
+    });
+  }
 }
 
 export async function createMaterialAnalysisUnit(
@@ -669,7 +747,7 @@ export async function markMaterialAnalysisUnitUnknown(
   await database.materialAnalysis.update({
     where: { id: context.analysisId },
     data: {
-      status: 'RECOVERY_REQUIRED',
+      status: saved.row.status === 'CANCELLING' ? 'CANCELLING' : 'RECOVERY_REQUIRED',
       failureReason:
         'A provider request has an unknown outcome. Its paid request cannot be repeated.',
     },

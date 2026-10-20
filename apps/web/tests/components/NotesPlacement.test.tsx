@@ -1,3 +1,5 @@
+import { beforeEach as clearBrowserState } from 'vitest';
+clearBrowserState(() => window.localStorage.clear());
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { NotesPlacement } from '@/components/placement/NotesPlacement';
@@ -13,6 +15,8 @@ const analysisId = 'b0687e4b-16d2-438b-a946-2a78bf8bf079';
 const resultDigest = 'a'.repeat(64);
 const analysis = {
   analysisId,
+  native: 'en',
+  target: 'es',
   analysisRevision: 1,
   identityDigest: 'd'.repeat(64),
   status: 'COMPLETE',

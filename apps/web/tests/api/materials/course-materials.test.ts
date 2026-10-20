@@ -203,7 +203,7 @@ suite('owned original course materials', () => {
     expect(result.failed).toBe(1);
     expect(result.materials).toHaveLength(1);
     expect(result.materials[0].name).toBe('good.txt');
-    expect(result.materials[0].extractedText).toBe('Hallo');
+    expect(result.materials[0]).toMatchObject({ extractedText: '', textRetained: true });
     const original = await download(request(`materials/${result.materials[0].id}/file`), {
       params: Promise.resolve({ materialId: result.materials[0].id }),
     });
@@ -221,8 +221,7 @@ suite('owned original course materials', () => {
     expect(response.status).toBe(201);
     const result = await response.json();
     expect(result.materials[0].name).toBe('Vocab Deutsch.txt');
-    expect(result.materials[0].extractedText).toBe(source);
-    expect(result.materials[0].extractedText).not.toContain('Uploaded course note:');
+    expect(result.materials[0]).toMatchObject({ extractedText: '', textRetained: true });
     const stored = await instance.database.courseMaterial.findUniqueOrThrow({
       where: { id: result.materials[0].id },
     });

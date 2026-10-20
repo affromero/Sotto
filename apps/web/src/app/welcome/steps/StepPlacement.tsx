@@ -13,13 +13,21 @@ import type { ContextItem } from '../WelcomeFlow';
 import { Glyph } from '../Glyph';
 import { MaterialCoverage, MaterialPartialConsent } from '@/components/placement/MaterialCoverage';
 import { MaterialAnalysisRetry } from '@/components/placement/MaterialAnalysisRetry';
+import { MaterialAnalysisCancellation } from '@/components/placement/analysis-controls/MaterialAnalysisCancellation';
 import {
   analyzePlacementMaterials,
+  openSavedMaterialAnalysis,
+  forgetSavedMaterialAnalysis,
   materialPlacementReference,
   type MaterialPlacementCheckpoint,
   type MaterialPlacementReference,
   type MaterialAnalysisProjection,
 } from '@/lib/course-materials/client/analysis';
+import {
+  readSavedMaterialPlacement,
+  saveMaterialPlacementRetry,
+  type SavedMaterialPlacementCheckpoint,
+} from '@/lib/course-materials/client/placement-checkpoint';
 import t from '../theme.module.css';
 import c from '@/app/welcome/components.styles';
 
@@ -102,6 +110,7 @@ export function StepPlacement({
   const [notesError, setNotesError] = useState('');
   const notesInputRef = useRef<HTMLInputElement>(null);
   const checkpoint = useRef<MaterialPlacementCheckpoint | null>(null);
+  const savedCheckpoint = useRef<SavedMaterialPlacementCheckpoint | null>(null);
   const notesController = useRef<AbortController | null>(null);
   const [acceptPartial, setAcceptPartial] = useState(false);
   const [notesProgress, setNotesProgress] = useState('Reading material...');
@@ -129,6 +138,7 @@ export function StepPlacement({
     notesController.current?.abort();
     notesController.current = null;
     checkpoint.current = null;
+    savedCheckpoint.current = null;
     setNotesDeduction(null);
     setAcceptPartial(false);
     setNotesPhase('input');
@@ -176,8 +186,8 @@ export function StepPlacement({
     if (itemsToAdd.length) onAddContextItems?.(itemsToAdd);
   }
 
-  async function deduceFromNotes() {
-    if (!hasNotesMaterial) return;
+  async function deduceFromNotes(savedOnly = false) {
+    if (!savedOnly && !hasNotesMaterial) return;
     setNotesPhase('deducing');
     onAnalysis?.(null);
     onAnalysisPending?.(true);
@@ -210,19 +220,37 @@ export function StepPlacement({
     notesController.current?.abort();
     notesController.current = controller;
     try {
-      const analysis = await analyzePlacementMaterials({
-        native: baseLang,
-        target: language,
-        content: notesText,
-        files: notesFiles,
-        checkpoint: checkpoint.current,
-        signal: controller.signal,
-        onCheckpoint: (value) => {
-          checkpoint.current = value;
-        },
-        onProgress: setNotesProgress,
-        onProjection: setLastAnalysis,
-      });
+      const analysis = savedOnly
+        ? await openSavedMaterialAnalysis({
+            native: baseLang,
+            target: language,
+            signal: controller.signal,
+            onProgress: setNotesProgress,
+            onProjection: setLastAnalysis,
+            onSaved: (value) => {
+              savedCheckpoint.current = value;
+              setNotesText('');
+              setNotesFiles([]);
+            },
+          })
+        : await analyzePlacementMaterials({
+            native: baseLang,
+            target: language,
+            content: notesText,
+            files: notesFiles,
+            checkpoint: checkpoint.current,
+            signal: controller.signal,
+            onCheckpoint: (value) => {
+              checkpoint.current = value;
+              savedCheckpoint.current = readSavedMaterialPlacement(
+                value.profileId,
+                baseLang,
+                language
+              );
+            },
+            onProgress: setNotesProgress,
+            onProjection: setLastAnalysis,
+          });
       controller.signal.throwIfAborted();
       const inference = analysis.summary?.inference;
       if (!inference || !isCefrLevel(inference.level))
@@ -265,10 +293,31 @@ export function StepPlacement({
     invalidateSourceSelection();
   }
   async function resumeRetry(analysisId: string, parentId: string) {
-    if (!checkpoint.current || checkpoint.current.analysisId !== parentId)
+    const previous = savedCheckpoint.current;
+    if (!previous || previous.analysisId !== parentId)
       throw new Error('The source selection changed. Open its current analysis before retrying.');
-    checkpoint.current.analysisId = analysisId;
-    await deduceFromNotes();
+    saveMaterialPlacementRetry(previous.profileId, baseLang, language, parentId, analysisId);
+    if (checkpoint.current?.analysisId === parentId) checkpoint.current.analysisId = analysisId;
+    await deduceFromNotes(true);
+  }
+
+  async function forgetSaved() {
+    const controller = new AbortController();
+    notesController.current?.abort();
+    notesController.current = controller;
+    try {
+      await forgetSavedMaterialAnalysis(baseLang, language, controller.signal);
+      if (controller.signal.aborted) return;
+      invalidateSourceSelection();
+      setNotesError('');
+    } catch (cause) {
+      if (!controller.signal.aborted)
+        setNotesError(
+          cause instanceof Error ? cause.message : 'Could not clear this browser resume record.'
+        );
+    } finally {
+      if (notesController.current === controller) notesController.current = null;
+    }
   }
 
   const title =
@@ -382,6 +431,17 @@ export function StepPlacement({
           >
             {notesPhase === 'deducing' ? notesProgress : 'Estimate from material'}
           </button>
+          {!demoMode && (
+            <button
+              type="button"
+              className={c.placementPrimary}
+              disabled={notesPhase === 'deducing'}
+              onClick={() => void deduceFromNotes(true)}
+            >
+              Open saved analysis
+            </button>
+          )}
+          {!demoMode && <MaterialAnalysisCancellation analysis={lastAnalysis} />}
 
           {notesPhase === 'error' && (
             <div className={c.placementNotice} role="alert">
@@ -390,6 +450,21 @@ export function StepPlacement({
           )}
           {notesPhase === 'error' && (
             <MaterialAnalysisRetry analysis={lastAnalysis} onRetry={resumeRetry} />
+          )}
+          {notesPhase === 'error' && (
+            <>
+              <button
+                type="button"
+                className={c.placementPrimary}
+                onClick={() => void forgetSaved()}
+              >
+                Clear this browser&apos;s saved progress
+              </button>
+              <p>
+                Clears the active learner&apos;s resume record. Saved sources and background work
+                stay on the server.
+              </p>
+            </>
           )}
 
           {notesPhase === 'result' && notesDeduction && (

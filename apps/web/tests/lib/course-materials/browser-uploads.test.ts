@@ -1,12 +1,8 @@
+import { UploadServer } from '../../helpers/materials/uploads';
 // @vitest-environment node
-import { createHash, webcrypto } from 'node:crypto';
+import { webcrypto } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  materialUploadLimits,
-  materialUploadPartHeaders,
-  type MaterialUploadBatchReceipt,
-  type MaterialUploadBatchRequest,
-} from '@sotto/shared';
+import { materialUploadLimits } from '@sotto/shared';
 import {
   createMaterialUploadClientState,
   uploadMaterialFiles,
@@ -17,155 +13,11 @@ import {
 } from '@/lib/course-materials/client/uploads';
 
 const id = (n: number) => `00000000-0000-4000-8000-${n.toString(16).padStart(12, '0')}`;
-const hash = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
 const json = (value: unknown, status = 200) => Response.json(structuredClone(value), { status });
 const input = (contents = 'abc', clientId = id(1)): MaterialUploadClientFile => ({
   clientId,
   file: new File([contents], 'notes.txt', { type: 'text/plain' }),
 });
-
-class UploadServer {
-  batch: MaterialUploadBatchReceipt | null = null;
-  calls: string[] = [];
-  partReads: number[] = [];
-  completionBodies: { requestId: string; expectedRevision: number }[] = [];
-  loseAdmission = false;
-  losePart = false;
-  loseCompletion = false;
-  failCompletionBeforeCommit = false;
-  failPoll = false;
-  neverFinish = false;
-  finishDirectly = false;
-  partStatus = 200;
-  courseId: string | null = null;
-  mutateGet?: (upload: MaterialUploadBatchReceipt['uploads'][number]) => void;
-
-  fetch: typeof fetch = vi.fn(async (request, init) => {
-    const url = new URL(String(request), 'https://selfhost.example.com');
-    const method = init?.method ?? 'GET';
-    this.calls.push(`${method} ${url.pathname}`);
-    expect(init?.credentials).toBe('same-origin');
-    expect(init?.cache).toBe('no-store');
-    expect(init?.signal).toBeInstanceOf(AbortSignal);
-    if (method === 'POST' && url.pathname === '/api/v1/materials/uploads') {
-      const declaration = JSON.parse(String(init?.body)) as MaterialUploadBatchRequest;
-      this.courseId = url.searchParams.get('courseId');
-      if (!this.batch)
-        this.batch = {
-          schemaVersion: 1,
-          batchId: id(2),
-          requestId: declaration.requestId,
-          uploads: declaration.files.map((file, index) => ({
-            schemaVersion: 1,
-            batchId: id(2),
-            uploadId: id(10 + index),
-            materialId: id(100 + index),
-            limitsVersion: 1,
-            file,
-            status: 'UPLOADING',
-            revision: 0,
-            expiresAt: '2099-01-01T00:00:00.000Z',
-            parts: [],
-            original: null,
-            failureReason: null,
-          })),
-        };
-      expect(declaration.requestId).toBe(this.batch.requestId);
-      if (this.loseAdmission) {
-        this.loseAdmission = false;
-        throw new TypeError('Admission response lost.');
-      }
-      return json(this.batch, 201);
-    }
-    const segments = url.pathname.split('/');
-    const upload = this.batch?.uploads.find((item) => item.uploadId === segments[5]);
-    if (!upload) return json({}, 404);
-    if (method === 'PUT') {
-      if (this.partStatus !== 200) return json({ error: 'Upload unavailable.' }, this.partStatus);
-      const index = Number(segments[7]);
-      const headers = new Headers(init?.headers);
-      const body = init?.body;
-      if (!(body instanceof ArrayBuffer)) throw new Error('Expected bounded ArrayBuffer body.');
-      this.partReads.push(body.byteLength);
-      const checksum = hash(new Uint8Array(body));
-      expect(headers.get(materialUploadPartHeaders.sha256)).toBe(checksum);
-      expect(Number(headers.get(materialUploadPartHeaders.byteSize))).toBe(body.byteLength);
-      const existing = upload.parts.find((part) => part.index === index);
-      if (existing) expect(existing.sha256).toBe(checksum);
-      else {
-        upload.parts.push({
-          schemaVersion: 1,
-          uploadId: upload.uploadId,
-          index,
-          offset: Number(headers.get(materialUploadPartHeaders.offset)),
-          byteSize: body.byteLength,
-          sha256: checksum,
-          committedAt: '2026-10-20T12:00:00.000Z',
-        });
-        upload.revision += 1;
-      }
-      if (this.losePart) {
-        this.losePart = false;
-        throw new TypeError('Part response lost after commit.');
-      }
-      return json(upload);
-    }
-    if (method === 'POST' && segments[6] === 'complete') {
-      const completion = JSON.parse(String(init?.body));
-      this.completionBodies.push(completion);
-      expect(completion.expectedRevision).toBe(upload.revision);
-      if (this.failCompletionBeforeCommit) {
-        this.failCompletionBeforeCommit = false;
-        throw new TypeError('Completion dispatch interrupted.');
-      }
-      upload.status = 'FINALIZING';
-      upload.revision += 1;
-      if (this.loseCompletion) {
-        this.loseCompletion = false;
-        throw new TypeError('Completion response lost.');
-      }
-      if (this.finishDirectly) {
-        upload.status = 'COMPLETE';
-        upload.revision += 1;
-        upload.original = {
-          schemaVersion: 1,
-          uploadId: upload.uploadId,
-          materialId: upload.materialId,
-          byteSize: upload.file.byteSize,
-          sha256: 'f'.repeat(64),
-          publishedAt: '2026-10-20T12:01:00.000Z',
-        };
-        upload.parts = [];
-        return json(upload, 200);
-      }
-      return json(upload, 202);
-    }
-    if (method === 'GET') {
-      if (upload.status === 'FINALIZING') {
-        if (this.failPoll) {
-          this.failPoll = false;
-          return json({ error: 'Polling unavailable.' }, 503);
-        }
-        if (!this.neverFinish) {
-          upload.status = 'COMPLETE';
-          upload.revision += 1;
-          upload.original = {
-            schemaVersion: 1,
-            uploadId: upload.uploadId,
-            materialId: upload.materialId,
-            byteSize: upload.file.byteSize,
-            sha256: 'f'.repeat(64),
-            publishedAt: '2026-10-20T12:01:00.000Z',
-          };
-          upload.parts = [];
-        }
-      }
-      this.mutateGet?.(upload);
-      return json(upload);
-    }
-    throw new Error('Unexpected request.');
-  });
-}
 
 function run(
   server: UploadServer,
@@ -232,7 +84,10 @@ describe('bounded resumable material browser uploads', () => {
       onProgress: (item) => progress.push(item),
       onState: (item) => checkpoints.push(item),
     });
-    expect(result.batch.uploads[0]).toMatchObject({ status: 'COMPLETE', materialId: id(100) });
+    expect(result.batch.uploads[0]).toMatchObject({
+      status: 'COMPLETE',
+      materialId: id(100),
+    });
     expect(result.batch.uploads[0]!.original?.byteSize).toBe(3);
     expect(server.courseId).toBe('course/owned');
     expect(progress.at(-1)).toMatchObject({
@@ -264,7 +119,10 @@ describe('bounded resumable material browser uploads', () => {
       }
     }
     const files = [
-      { clientId: id(1), file: new LargeFile([], 'large.pdf', { type: 'application/pdf' }) },
+      {
+        clientId: id(1),
+        file: new LargeFile([], 'large.pdf', { type: 'application/pdf' }),
+      },
     ];
     const server = new UploadServer();
     const result = await run(server, files);
@@ -453,7 +311,9 @@ describe('bounded resumable material browser uploads', () => {
   });
   it('surfaces malformed and oversized metadata responses with a resumable checkpoint', async () => {
     const malformed = await interrupted(
-      run(new UploadServer(), [input()], undefined, { fetch: async () => new Response('{invalid') })
+      run(new UploadServer(), [input()], undefined, {
+        fetch: async () => new Response('{invalid'),
+      })
     );
     expect(malformed.code).toBe('PROTOCOL');
     const oversized = await interrupted(
@@ -508,7 +368,10 @@ describe('bounded resumable material browser uploads', () => {
         })
       );
     const error = await interrupted(
-      run(new UploadServer(), [input()], undefined, { fetch, deadlineAt: Date.now() + 5 })
+      run(new UploadServer(), [input()], undefined, {
+        fetch,
+        deadlineAt: Date.now() + 5,
+      })
     );
     expect(error.code).toBe('DEADLINE');
   });

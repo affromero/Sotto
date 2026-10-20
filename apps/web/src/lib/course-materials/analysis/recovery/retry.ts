@@ -107,7 +107,7 @@ export async function retryMaterialAnalysis(
           });
         return response(child.row);
       }
-      if (!['FAILED', 'PARTIAL', 'INSUFFICIENT_SOURCE'].includes(parent.row.status))
+      if (!['FAILED', 'PARTIAL', 'INSUFFICIENT_SOURCE', 'CANCELLED'].includes(parent.row.status))
         throw new MaterialAnalysisConflict(
           'Only confirmed failed analysis work can be retried. Unknown outcomes require recovery.'
         );
@@ -139,7 +139,7 @@ export async function retryMaterialAnalysis(
         where: {
           userId: execution.userId,
           sourceSetDigest: parent.row.sourceSetDigest,
-          status: { in: ['WAITING_SOURCE', 'RUNNING', 'RECOVERY_REQUIRED'] },
+          status: { in: ['WAITING_SOURCE', 'RUNNING', 'RECOVERY_REQUIRED', 'CANCELLING'] },
         },
       });
       if (active)
@@ -214,7 +214,13 @@ export async function retryMaterialAnalysis(
         else if (unit.status === 'READY' && !unit.attemptId) counts.unstarted++;
         else throw new MaterialAnalysisConflict('A unit has no proven retry or reuse outcome.');
       }
-      if (parent.prepared && !counts.failed && !counts.unstarted && !counts.offlineReplay)
+      if (
+        parent.prepared &&
+        parent.row.status !== 'CANCELLED' &&
+        !counts.failed &&
+        !counts.unstarted &&
+        !counts.offlineReplay
+      )
         throw new MaterialAnalysisConflict(
           'No failed source requests remain. Unresolved page coverage needs a new processed source revision.',
           422

@@ -20,6 +20,7 @@ import {
 import { prepareMaterialFocusAnalysis, materialFocusAnalysisHash } from './protocol';
 import { processMaterialAnalysisUnit, MaterialAnalysisOutcomeUnknown } from './units';
 import { publishMaterialAnalysis } from './results';
+import { settleMaterialAnalysisCancellation } from './recovery/cancellation';
 
 /** Redis waiting never consumes paid attempts or changes the selected extraction run. */
 async function defer(job: Job<unknown>, token: string | undefined, delay: number): Promise<never> {
@@ -102,6 +103,14 @@ export async function processMaterialAnalysis(
   const execution = durableJobProviderExecution(bound, payload.userId, signal);
   const context = { analysisId: payload.analysisId, userId: payload.userId, execution };
   const saved = await seal(context, signal);
+  if (saved.row.status === 'CANCELLING') {
+    await sottoTransaction(
+      prismaUnfiltered,
+      (database) => settleMaterialAnalysisCancellation(database, context),
+      { signal, timeoutMs: 60000 }
+    );
+    return;
+  }
   if (saved.row.status === 'WAITING_SOURCE') return defer(job, token, 30_000);
   if (['COMPLETE', 'PARTIAL', 'INSUFFICIENT_SOURCE', 'CANCELLED'].includes(saved.row.status)) {
     await sottoTransaction(
@@ -117,6 +126,7 @@ export async function processMaterialAnalysis(
     );
   let unknown = false;
   let remaining = false;
+  let stopping = false;
   await withSottoJobExecution({
     database: prismaUnfiltered,
     parentId: work.operationId,
@@ -148,16 +158,32 @@ export async function processMaterialAnalysis(
       const batch = pending.slice(0, 8);
       for (const unit of batch) {
         signal.throwIfAborted();
-        await processMaterialAnalysisUnit({
-          context,
-          analysis: saved.prepared!,
-          unit,
-          signal,
-          unresolved: () => {
-            unknown = true;
-            markCleanupUnconfirmed();
-          },
-        });
+        try {
+          await processMaterialAnalysisUnit({
+            context,
+            analysis: saved.prepared!,
+            unit,
+            signal,
+            unresolved: () => {
+              unknown = true;
+              markCleanupUnconfirmed();
+            },
+          });
+        } catch (error) {
+          if (
+            unknown ||
+            error instanceof MaterialAnalysisOutcomeUnknown ||
+            isDurableQueueCleanupFailure(error)
+          )
+            throw error;
+          const current = await prismaUnfiltered.materialAnalysis.findFirst({
+            where: { id: payload.analysisId, userId: payload.userId },
+            select: { status: true },
+          });
+          if (current?.status !== 'CANCELLING') throw error;
+          stopping = true;
+          return;
+        }
         await job.updateProgress({
           processedChunks: done.size + batch.indexOf(unit) + 1,
           expectedChunks: saved.prepared!.units.length,
@@ -168,6 +194,11 @@ export async function processMaterialAnalysis(
       await sottoTransaction(
         prismaUnfiltered,
         async (database) => {
+          const current = await requireMaterialAnalysis(database, context);
+          if (current.row.status === 'CANCELLING') {
+            stopping = true;
+            return;
+          }
           await publishMaterialAnalysis(database, context);
           await completeDurableQueueJob(database, bound);
         },
@@ -175,6 +206,18 @@ export async function processMaterialAnalysis(
       );
     },
   });
+  const cancellation = await prismaUnfiltered.materialAnalysis.findFirst({
+    where: { id: payload.analysisId, userId: payload.userId },
+    select: { status: true },
+  });
+  if (stopping || cancellation?.status === 'CANCELLING') {
+    await sottoTransaction(
+      prismaUnfiltered,
+      (database) => settleMaterialAnalysisCancellation(database, context),
+      { signal, timeoutMs: 60000 }
+    );
+    return;
+  }
   if (remaining) return defer(job, token, 200);
   await sottoTransaction(
     prismaUnfiltered,

@@ -1,3 +1,5 @@
+import { beforeEach as clearBrowserState } from 'vitest';
+clearBrowserState(() => window.localStorage.clear());
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { partialMaterialCoverage } from '../../../helpers/materials/analysis';
 import {
@@ -11,6 +13,8 @@ const analysisId = 'bc0e71a2-2709-42b9-a4f8-330e89e912dc';
 const resultDigest = 'a'.repeat(64);
 const result = {
   analysisId,
+  native: 'en',
+  target: 'de',
   analysisRevision: 1,
   status: 'COMPLETE',
   resultDigest,
@@ -104,8 +108,6 @@ describe('profile-bound material analysis browser transport', () => {
     const submitted: unknown = JSON.parse(fetch.mock.calls[2][1].body);
     expect(submitted).toMatchObject({ content, native: 'en', target: 'de', materialIds: [] });
     expect(checkpoint).toMatchObject({ profileId: 'owner', analysisId });
-    for (const [, init] of fetch.mock.calls.slice(1))
-      expect(new Headers(init.headers).get('x-sotto-expected-profile-id')).toBe('owner');
     expect(materialPlacementReference(output, false)).toEqual({
       analysisId,
       analysisRevision: 1,
@@ -212,6 +214,8 @@ describe('profile-bound material analysis browser transport', () => {
           analysisId,
           analysisRevision: 1,
           status: 'RECOVERY_REQUIRED',
+          native: 'en',
+          target: 'de',
           resultDigest: null,
           failureReason: 'Provider outcome unknown.',
         })

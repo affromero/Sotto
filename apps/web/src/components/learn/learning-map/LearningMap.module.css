@@ -1,0 +1,398 @@
+.root {
+  composes: surface from '../sottoLearn.module.css';
+  width: 100%;
+  min-width: 0;
+  padding-bottom: 120px;
+  color: var(--ink);
+}
+
+.header,
+.requirementsHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.header {
+  padding-bottom: 24px;
+  border-bottom: 2px solid var(--ink);
+}
+
+.header h1 {
+  margin: 8px 0;
+  font-family: var(--serif);
+  font-size: clamp(36px, 6vw, 54px);
+  font-weight: 400;
+  line-height: 1.05;
+  letter-spacing: -0.035em;
+}
+
+.root h2 {
+  margin: 6px 0 12px;
+  font-family: var(--serif);
+  font-size: 26px;
+  font-weight: 400;
+  line-height: 1.2;
+}
+
+.root h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.root p,
+.root li {
+  overflow-wrap: anywhere;
+  line-height: 1.55;
+}
+
+.eyebrow {
+  margin: 0;
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.levelContext {
+  margin: 12px 0 0;
+  color: var(--ink-soft);
+}
+
+.levelField,
+.formatField {
+  display: grid;
+  gap: 8px;
+  min-width: 140px;
+  font-size: 13px;
+}
+
+.root select {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 36px 10px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r);
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+}
+
+.feedback:has(.statusMessage:empty):not(:has(.error)) {
+  display: none;
+}
+
+.statusMessage:empty {
+  margin: 0;
+}
+
+.statusMessage,
+.viewNotice {
+  padding: 12px 16px;
+  background: var(--accent-soft);
+  border-left: 3px solid var(--accent);
+}
+
+.error {
+  padding: 12px 16px;
+  color: var(--bad);
+  background: var(--bad-soft);
+  border-left: 3px solid var(--bad);
+}
+
+.requirements {
+  padding: 24px 0;
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.requirementCount {
+  max-width: 240px;
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 14px;
+}
+
+.requirementCount strong {
+  color: var(--accent);
+  font-family: var(--serif);
+  font-size: 34px;
+  font-weight: 400;
+}
+
+.requirementStates,
+.coverage,
+.gateExplanation,
+.treeHint {
+  color: var(--ink-soft);
+  font-size: 14px;
+}
+
+.remaining summary,
+.sources summary {
+  min-height: 44px;
+  padding: 12px 0;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.blockers {
+  padding: 12px 16px 12px 32px;
+  border-left: 3px solid var(--accent);
+  background: var(--accent-soft);
+}
+
+.workspace {
+  display: grid;
+  min-width: 0;
+}
+
+.tree {
+  min-width: 0;
+  padding: 16px 0;
+}
+
+.treeList,
+.children {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.children {
+  margin-left: 10px;
+  padding-left: 12px;
+  border-left: 1px solid var(--line-strong);
+}
+
+.treeItem {
+  min-width: 0;
+}
+
+.disclosure {
+  border-bottom: 1px solid var(--line);
+}
+
+.disclosure[data-root='true'] {
+  margin-bottom: 20px;
+}
+
+.summary {
+  min-height: 44px;
+  padding: 12px 4px;
+  cursor: pointer;
+}
+
+.summary::marker,
+.remaining summary::marker,
+.sources summary::marker {
+  color: var(--accent);
+}
+
+.branchTitle {
+  font-family: var(--serif);
+  font-size: 26px;
+}
+
+.nodeTitle {
+  font-weight: 500;
+}
+
+.nodeMeta,
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0 0 16px;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.badge,
+.due {
+  padding: 2px 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: 2px;
+}
+
+.due {
+  color: var(--accent);
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+
+.objectiveDetail {
+  padding: 4px 12px 20px 16px;
+}
+
+.criterion {
+  margin-top: 0;
+}
+
+.examples {
+  padding: 12px;
+  border-left: 2px solid var(--accent);
+  background: var(--well);
+}
+
+.examples ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.skillBreakdown {
+  margin: 20px 0 12px;
+}
+
+.skillList {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+  font-size: 13px;
+}
+
+.skillList li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.skillName {
+  font-weight: 600;
+}
+
+.evidenceDetail {
+  flex-basis: 100%;
+  color: var(--ink-soft);
+}
+
+.selectionLabel {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 8px 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.selectionLabel input {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  accent-color: var(--accent);
+}
+
+.practice {
+  align-self: start;
+  min-width: 0;
+  padding: 24px 20px;
+  border: 1px solid var(--line-strong);
+  border-top: 3px solid var(--accent);
+  background: var(--well);
+}
+
+.practice p {
+  font-size: 14px;
+}
+
+.selectedList {
+  padding-left: 20px;
+  font-size: 14px;
+}
+
+.emptySelection {
+  color: var(--ink-soft);
+}
+
+.formatField {
+  margin: 20px 0 12px;
+}
+
+.primary,
+.secondary {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 10px 16px;
+  border: 1px solid var(--accent);
+  border-radius: var(--r);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.primary {
+  color: var(--accent-fg);
+  background: var(--accent);
+}
+
+.practice .primary,
+.practice .secondary {
+  width: 100%;
+}
+
+.secondary {
+  margin-top: 8px;
+  color: var(--ink);
+  border-color: var(--line-strong);
+  background: transparent;
+}
+
+.root :is(button, select, input):disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.root :is(button, select, input, summary, a):focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.sources {
+  margin-top: 28px;
+  border-top: 1px solid var(--line-strong);
+  font-size: 14px;
+}
+
+.sources a {
+  display: inline-flex;
+  align-items: center;
+  min-width: 44px;
+  min-height: 44px;
+  color: var(--accent);
+  text-underline-offset: 3px;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (min-width: 900px) {
+  .workspace {
+    grid-template-columns: minmax(0, 1fr) minmax(240px, 300px);
+    align-items: start;
+    gap: 32px;
+    padding-top: 24px;
+  }
+
+  .tree {
+    padding-top: 0;
+  }
+
+  .children {
+    margin-left: 16px;
+    padding-left: 20px;
+  }
+}
