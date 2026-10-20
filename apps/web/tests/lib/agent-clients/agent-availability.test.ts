@@ -67,4 +67,39 @@ describe('agent readiness', () => {
     });
     expect(mockSpawn.mock.calls[0]?.[0]).toBe('ssh');
   });
+
+  it('probes the captured SSH target independently of readiness and current settings', async () => {
+    vi.stubEnv('CODEX_SSH_HOST', 'cached@example.test');
+    mockSpawn
+      .mockImplementationOnce(() => processResult(0, 'codex-cli 0.159.0'))
+      .mockImplementationOnce(() => processResult(0, 'Authenticated'));
+    const { getAgentStatus, getAgentVersion } = await import('@/lib/agent-availability');
+    const cached = await getAgentStatus('codex');
+    vi.stubEnv('CODEX_SSH_HOST', 'changed@example.test');
+    mockSpawn.mockImplementationOnce(() => processResult(0, 'codex-cli 0.160.0'));
+    await expect(getAgentVersion('codex', 'captured@example.test')).resolves.toBe(
+      'codex-cli 0.160.0'
+    );
+    const invocation = mockSpawn.mock.calls.at(-1)!;
+    expect(invocation[0]).toBe('ssh');
+    expect(invocation[1]).toContain('captured@example.test');
+    expect(invocation[1]).not.toContain('changed@example.test');
+    await expect(getAgentStatus('codex')).resolves.toEqual(cached);
+  });
+
+  it('keeps an explicitly local version probe local despite a configured SSH host', async () => {
+    vi.stubEnv('CODEX_SSH_HOST', 'other@example.test');
+    mockSpawn.mockImplementationOnce(() => processResult(0, 'codex-cli 0.160.0'));
+    const { getAgentVersion } = await import('@/lib/agent-availability');
+    await expect(getAgentVersion('codex', null)).resolves.toBe('codex-cli 0.160.0');
+    expect(mockSpawn.mock.calls[0]?.slice(0, 2)).toEqual(['codex', ['--version']]);
+  });
+
+  it('surfaces a failed captured version probe without using cached readiness', async () => {
+    mockSpawn.mockImplementationOnce(() => processResult(1, '', 'CLI unavailable'));
+    const { getAgentVersion } = await import('@/lib/agent-availability');
+    await expect(getAgentVersion('codex', null)).rejects.toThrow(
+      'codex CLI version could not be verified'
+    );
+  });
 });
