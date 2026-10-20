@@ -65,6 +65,18 @@ test('uploaded words flow through the dictionary, local pronunciation, study, an
     },
     update: { vocabularySupport: 'MEANING_RECALL' },
   });
+  await database.learnerVocab.upsert({
+    where: { courseId_lemma: { courseId: course.id, lemma: 'Gedächtnis' } },
+    create: {
+      courseId: course.id,
+      lemma: 'Gedächtnis',
+      translation: 'memory',
+      mastery: 0.005,
+      reps: 1,
+      lastReviewed: new Date(),
+    },
+    update: { mastery: 0.005, reps: 1, lastReviewed: new Date() },
+  });
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto('/access');
   await page.getByLabel(/password/i).fill('browser test household password');
@@ -156,7 +168,10 @@ test('uploaded words flow through the dictionary, local pronunciation, study, an
     })
   ).toBe(1);
   await page.getByRole('button', { name: 'Back to vocabulary' }).click();
-  await expect(page.getByText('Recall estimate <1%', { exact: false })).toBeVisible();
+  const reviewedWord = page.getByRole('listitem').filter({
+    has: page.getByRole('checkbox', { name: 'Select Bahnhof', exact: true }),
+  });
+  await expect(reviewedWord.getByText('Recall estimate <1%', { exact: false })).toBeVisible();
   for (const [width, height, theme] of [
     [375, 812, 'light'],
     [812, 375, 'light'],
