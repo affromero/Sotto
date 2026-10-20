@@ -92,6 +92,37 @@ home-screen installation and show native downloads only when real URLs are set:
 native downloads explicitly unavailable. Web games need a live connection;
 private game responses and pages are never available from an offline cache.
 
+### Native partner games
+
+The iPhone/iPad client is in `apps/ios`; the native Android phone/tablet client
+is a standalone Kotlin/Compose project in `apps/android`. Android currently
+supports server pairing and partner games. Solo courses remain available in
+web and iOS. Android needs Java 21 and SDK API 37 with build-tools 36.0.0:
+
+```bash
+./apps/android/gradlew -p apps/android lint testDebugUnitTest assembleDebug assembleDebugAndroidTest assembleRelease bundleRelease
+./apps/android/gradlew -p apps/android connectedDebugAndroidTest
+node e2e/android/process.mjs emulator-5580
+```
+
+Select a dedicated emulator explicitly for the last command. It installs the
+debug APKs, force-stops the app and verifies exact request and credential recovery.
+Android 17 also exercises local-network denial, grant and revocation. The normal
+connected gate excludes these externally staged tests. Release APK and AAB builds
+are unsigned until an operator configures real signing credentials.
+
+Native contract tests consume the same `packages/shared/fixtures/play/contract.json`.
+Regenerate it with `npx tsx scripts/play/export-fixtures.ts`; the web parity test
+checks it against actual engine projections. Native CI selects both mobile
+clients on shared Play changes and tests Android 16 phone and Android 17 tablet.
+
+A real phone needs a server address reachable from that phone. `localhost`
+points to the phone itself. Use the host's LAN address or HTTPS domain; the
+Android emulator uses `10.0.2.2` for its host. Android 17 requires app-wide local
+network permission before connecting to a LAN server. A denial preserves saved
+profiles and requests. Private split-DNS servers can use the manual permission
+control in Saved connections. Granting permission never submits saved actions.
+
 ---
 
 ## 5. Provider Paths

@@ -78,19 +78,20 @@ npm run check:affected         # checks for staged changes
 
 ## Subdirectory AGENTS.md Index
 
-| Directory                  | What Is Documented                                                   |
-| -------------------------- | -------------------------------------------------------------------- |
-| `apps/`                    | Application workspace differences                                    |
-| `apps/web/src/app/`        | Pages and API routes                                                 |
-| `apps/web/src/components/` | Component conventions                                                |
-| `apps/web/src/lib/`        | Provider clients, auth helpers, pipeline libraries                   |
-| `apps/web/src/workers/`    | Worker responsibilities and pipeline flow                            |
-| `apps/web/src/types/`      | Type re-exports from `@sotto/shared`                                 |
-| `apps/web/src/styles/`     | Design system tokens                                                 |
-| `apps/web/prisma/`         | Prisma schema and database rules                                     |
-| `apps/ios/`                | Universal iPhone + iPad SwiftUI client: layout, timeouts, submission |
-| `packages/`                | Shared package boundaries                                            |
-| `tui/`                     | Rust `sotto` terminal client: API/audio/contract-codegen conventions |
+| Directory                  | What Is Documented                                                                   |
+| -------------------------- | ------------------------------------------------------------------------------------ |
+| `apps/`                    | Application workspace differences                                                    |
+| `apps/web/src/app/`        | Pages and API routes                                                                 |
+| `apps/web/src/components/` | Component conventions                                                                |
+| `apps/web/src/lib/`        | Provider clients, auth helpers, pipeline libraries                                   |
+| `apps/web/src/workers/`    | Worker responsibilities and pipeline flow                                            |
+| `apps/web/src/types/`      | Type re-exports from `@sotto/shared`                                                 |
+| `apps/web/src/styles/`     | Design system tokens                                                                 |
+| `apps/web/prisma/`         | Prisma schema and database rules                                                     |
+| `apps/ios/`                | Universal iPhone + iPad SwiftUI client: layout, timeouts, submission                 |
+| `apps/android/`            | Native Android phone/tablet games: Gradle, protected storage, lifecycle, permissions |
+| `packages/`                | Shared package boundaries                                                            |
+| `tui/`                     | Rust `sotto` terminal client: API/audio/contract-codegen conventions                 |
 
 ## Design System
 

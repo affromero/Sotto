@@ -67,6 +67,51 @@ rolls back its database transaction and stops the update.
 
 The VPS instructions below are for operators deploying behind their own domain.
 
+## Native invitation distribution
+
+Set the optional `SOTTO_IOS_APP_STORE_URL`, `SOTTO_ANDROID_PLAY_STORE_URL` and
+`SOTTO_ANDROID_APK_URL` only to actual published HTTPS downloads. The invitation
+and download pages leave unavailable stores explicit. Native source builds and
+local emulator installs do not establish App Store or Play publication. Sign
+Android APKs/AABs and iOS archives through your distribution account before
+offering them. The Android application ID and iOS bundle ID are `fm.sotto.app`.
+
+Invitations currently use the browser bridge and registered `sotto://play/join`
+scheme, plus paste, game code and camera QR. They contain a server address and
+expiring invitation code, never credentials. After installing, reopen the original
+link or enter its server and code. The server must be reachable from the guest's
+device. New profiles still require owner approval and a present accepting host.
+
+Verified HTTPS app links require a controlled domain and actual signed app
+identities. They are not enabled by default for arbitrary self-hosted domains.
+To activate them for a distribution you control:
+
+1. Read the Apple application identifier from the signed app's entitlements and
+   add its exact domain to the app's Associated Domains entitlement. Register
+   the matching HTTPS host and `/play/join` route in the Android manifest.
+2. Serve `/.well-known/apple-app-site-association` with that actual application
+   identifier and only `/play/join` in its `paths` or `components`. Serve
+   `/.well-known/assetlinks.json` with `delegate_permission/common.handle_all_urls`,
+   package `fm.sotto.app` and the SHA-256 fingerprints of the installed signing
+   certificates. Play App Signing can use a different certificate from your
+   upload key. Use the certificate that signs users' installed app.
+3. Serve both files as JSON over HTTPS with status 200 and no redirects. Configure
+   the front proxy to serve those exact files outside household authentication.
+   The application does not expose a general public `/.well-known` exception.
+4. Validate your actual files, supplying the signed identifier and certificate
+   values in the named shell variables:
+
+   ```bash
+   node scripts/play/validate-associations.mjs \
+     --aasa "$AASA_FILE" --apple-app-id "$APPLE_APP_ID" \
+     --assetlinks "$ASSETLINKS_FILE" --android-package fm.sotto.app \
+     --android-sha256 "$ANDROID_SIGNING_SHA256"
+   ```
+
+5. Install the signed apps and verify opening the real HTTPS invitation on both
+   device families. JSON validation alone does not prove domain association.
+   Keep the browser's Open in Sotto and paste/code paths available.
+
 ## Before You Start
 
 You need:

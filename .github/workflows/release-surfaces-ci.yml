@@ -1,6 +1,6 @@
 name: Release surfaces
 
-# Select each native surface separately. Manual runs validate both.
+# Select each native surface separately. Manual runs validate all surfaces.
 on:
   workflow_dispatch:
   pull_request:
@@ -9,6 +9,13 @@ on:
     paths:
       - 'apps/desktop/**'
       - 'apps/ios/**'
+      - 'apps/android/**'
+      - 'e2e/android/**'
+      - 'packages/shared/fixtures/play/**'
+      - 'packages/shared/src/play/**'
+      - 'packages/shared/src/contracts/play.ts'
+      - 'scripts/play/**'
+      - 'apps/web/src/lib/play/**'
       - '.github/workflows/release-surfaces-ci.yml'
       - '.github/workflows/desktop-release.yml'
       - 'scripts/ci/test-desktop-appimage.sh'
@@ -19,6 +26,13 @@ on:
     paths:
       - 'apps/desktop/**'
       - 'apps/ios/**'
+      - 'apps/android/**'
+      - 'e2e/android/**'
+      - 'packages/shared/fixtures/play/**'
+      - 'packages/shared/src/play/**'
+      - 'packages/shared/src/contracts/play.ts'
+      - 'scripts/play/**'
+      - 'apps/web/src/lib/play/**'
       - '.github/workflows/release-surfaces-ci.yml'
       - '.github/workflows/desktop-release.yml'
       - 'scripts/ci/test-desktop-appimage.sh'
@@ -38,6 +52,7 @@ jobs:
     outputs:
       desktop: ${{ steps.scope.outputs.desktop }}
       ios: ${{ steps.scope.outputs.ios }}
+      android: ${{ steps.scope.outputs.android }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
@@ -106,6 +121,86 @@ jobs:
           for image in apps/desktop/src-tauri/target/release/bundle/appimage/*.AppImage; do
             bash scripts/ci/test-desktop-appimage.sh "$image"
           done
+
+  android:
+    needs: changes
+    if: needs.changes.outputs.android == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install Android compile SDK
+        run: sdkmanager 'platforms;android-37.0' 'build-tools;36.0.0'
+      - name: Validate Android and build unsigned distributions
+        run: ./apps/android/gradlew -p apps/android --no-daemon lint testDebugUnitTest assembleDebug assembleDebugAndroidTest assembleRelease bundleRelease
+      - name: Preserve Android artifacts and reports
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: android-build-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            apps/android/app/build/outputs/apk/
+            apps/android/app/build/outputs/bundle/
+            apps/android/app/build/reports/
+            apps/android/app/build/test-results/
+          retention-days: 7
+          if-no-files-found: warn
+
+  android-device:
+    needs: [changes, android]
+    if: needs.changes.outputs.android == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - api: '36'
+            profile: pixel_9
+          - api: '37.0'
+            profile: pixel_tablet
+    env:
+      ANDROID_SERIAL: emulator-5554
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 24
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Enable emulator acceleration
+        run: sudo chmod a+rw /dev/kvm
+      - name: Run native Android behavior and process recovery
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
+        env:
+          SOTTO_NATIVE_TEST_OUTPUT: ${{ runner.temp }}/android-process
+        with:
+          api-level: ${{ matrix.api }}
+          target: google_apis
+          arch: x86_64
+          profile: ${{ matrix.profile }}
+          emulator-port: 5554
+          emulator-options: -no-window -gpu swiftshader -no-snapshot -noaudio -no-boot-anim -camera-back emulated
+          script: |
+            ./apps/android/gradlew -p apps/android --no-daemon connectedDebugAndroidTest
+            node e2e/android/process.mjs "$ANDROID_SERIAL"
+      - name: Preserve native Android diagnostics
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: android-device-${{ matrix.api }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            apps/android/app/build/outputs/androidTest-results/
+            apps/android/app/build/reports/androidTests/
+            ${{ runner.temp }}/android-process/
+          retention-days: 7
+          if-no-files-found: warn
 
   ios:
     needs: changes

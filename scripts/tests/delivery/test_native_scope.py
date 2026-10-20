@@ -48,22 +48,24 @@ class NativeScopeTests(unittest.TestCase):
             env={key: value for key, value in os.environ.items()
                  if not key.startswith('GIT_')},
         )
-        return dict(line.split('=') for line in result.stdout.splitlines())
+        selected = dict(line.split('=') for line in result.stdout.splitlines())
+        self.assertIn('android', selected)
+        return selected
 
     def test_ios_only_change_selects_ios_without_desktop(self) -> None:
         self.write('apps/ios/Tests/ProfileTests.swift')
         self.commit()
-        self.assertEqual(self.scope(), {'desktop': 'false', 'ios': 'true'})
+        self.assertEqual(self.scope(), {'desktop': 'false', 'ios': 'true', 'android': 'false'})
 
     def test_desktop_icon_source_selects_desktop(self) -> None:
         self.write('apps/web/public/brand/sotto-mark.svg')
         self.commit()
-        self.assertEqual(self.scope(), {'desktop': 'true', 'ios': 'false'})
+        self.assertEqual(self.scope(), {'desktop': 'true', 'ios': 'false', 'android': 'false'})
 
     def test_web_change_selects_neither_native_surface(self) -> None:
         self.write('apps/web/src/page.tsx')
         self.commit()
-        self.assertEqual(self.scope(), {'desktop': 'false', 'ios': 'false'})
+        self.assertEqual(self.scope(), {'desktop': 'false', 'ios': 'false', 'android': 'false'})
 
     def test_deleted_native_file_still_requires_its_checks(self) -> None:
         self.write('apps/desktop/src/deleted.ts')
@@ -71,7 +73,7 @@ class NativeScopeTests(unittest.TestCase):
         self.base = self.git('rev-parse', 'HEAD')
         (self.root / 'apps/desktop/src/deleted.ts').unlink()
         self.commit()
-        self.assertEqual(self.scope(), {'desktop': 'true', 'ios': 'false'})
+        self.assertEqual(self.scope(), {'desktop': 'true', 'ios': 'false', 'android': 'false'})
 
     def test_rename_across_surfaces_checks_both(self) -> None:
         self.write('apps/ios/Shared.swift')
@@ -80,7 +82,7 @@ class NativeScopeTests(unittest.TestCase):
         (self.root / 'apps/desktop/src').mkdir(parents=True)
         self.git('mv', 'apps/ios/Shared.swift', 'apps/desktop/src/Shared.swift')
         self.commit()
-        self.assertEqual(self.scope(), {'desktop': 'true', 'ios': 'true'})
+        self.assertEqual(self.scope(), {'desktop': 'true', 'ios': 'true', 'android': 'false'})
 
     def test_pull_request_ignores_unrelated_base_branch_changes(self) -> None:
         self.git('checkout', '-b', 'feature')
@@ -92,18 +94,55 @@ class NativeScopeTests(unittest.TestCase):
         self.commit()
         self.base = self.git('rev-parse', 'HEAD')
         self.assertEqual(self.scope('--event', 'pull_request', '--head', head),
-                         {'desktop': 'false', 'ios': 'true'})
+                         {'desktop': 'false', 'ios': 'true', 'android': 'false'})
 
     def test_manual_and_missing_baselines_select_all(self) -> None:
         for args in (('--all',), ('--base', ''), ('--base', '0' * 40)):
             with self.subTest(args=args):
                 self.assertEqual(self.scope(*args),
-                                 {'desktop': 'true', 'ios': 'true'})
+                                 {'desktop': 'true', 'ios': 'true', 'android': 'true'})
 
     def test_selector_changes_require_both_surfaces(self) -> None:
         self.write('scripts/ci/native-scope.mjs')
         self.commit()
-        self.assertEqual(self.scope(), {'desktop': 'true', 'ios': 'true'})
+        self.assertEqual(self.scope(), {'desktop': 'true', 'ios': 'true', 'android': 'true'})
+
+    def test_android_source_and_external_recovery_driver_select_android(self) -> None:
+        for path in ('apps/android/app/MainActivity.kt', 'e2e/android/process.mjs'):
+            with self.subTest(path=path):
+                self.write(path)
+                self.commit()
+                self.assertEqual(self.scope(), {'desktop': 'false', 'ios': 'false', 'android': 'true'})
+                self.base = self.git('rev-parse', 'HEAD')
+
+    def test_shared_play_changes_require_both_mobile_clients(self) -> None:
+        for path in ('packages/shared/fixtures/play/contract.json',
+                     'packages/shared/src/play/types.ts',
+                     'packages/shared/src/contracts/play.ts',
+                     'scripts/play/export-fixtures.ts',
+                     'apps/web/src/lib/play/projection.ts'):
+            with self.subTest(path=path):
+                self.write(path)
+                self.commit()
+                self.assertEqual(self.scope(), {'desktop': 'false', 'ios': 'true', 'android': 'true'})
+                self.base = self.git('rev-parse', 'HEAD')
+
+    def test_deleted_android_source_still_selects_android(self) -> None:
+        self.write('apps/android/Retired.kt')
+        self.commit()
+        self.base = self.git('rev-parse', 'HEAD')
+        (self.root / 'apps/android/Retired.kt').unlink()
+        self.commit()
+        self.assertEqual(self.scope(), {'desktop': 'false', 'ios': 'false', 'android': 'true'})
+
+    def test_move_from_ios_to_android_checks_both(self) -> None:
+        self.write('apps/ios/Shared.swift')
+        self.commit()
+        self.base = self.git('rev-parse', 'HEAD')
+        (self.root / 'apps/android').mkdir(parents=True)
+        self.git('mv', 'apps/ios/Shared.swift', 'apps/android/Shared.swift')
+        self.commit()
+        self.assertEqual(self.scope(), {'desktop': 'false', 'ios': 'true', 'android': 'true'})
 
     def test_invalid_baseline_fails_instead_of_skipping_checks(self) -> None:
         result = subprocess.run(
