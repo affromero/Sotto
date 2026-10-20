@@ -37,6 +37,15 @@ extension PlayCoordinator {
         struct Body: Encodable {
             let roomId: String; let roundId: String; let kind: PlayPhraseKind
             let text: String; let contextText: String?
+            enum CodingKeys: String, CodingKey { case roomId, roundId, kind, text, contextText }
+            func encode(to encoder: Encoder) throws {
+                var container = encoder.container(keyedBy: CodingKeys.self)
+                try container.encode(roomId, forKey: .roomId)
+                try container.encode(roundId, forKey: .roundId)
+                try container.encode(kind, forKey: .kind)
+                try container.encode(text, forKey: .text)
+                try container.encode(contextText, forKey: .contextText)
+            }
         }
         try await operation(path: "/api/v1/play/phrases",
             body: Body(roomId: room.id, roundId: round.id, kind: kind, text: trimmed,

@@ -4,6 +4,47 @@ import XCTest
 
 @MainActor
 final class PlayLifecycleTests: XCTestCase {
+    func testSavingVisibleLanguageSendsRequiredNullOrSelectedContextAndCompletesRecovery() async throws {
+        let room = try PlayTestFixtures.load().room(round: "finished-0-HOST")
+        let round = try XCTUnwrap(room.round)
+        let text = try XCTUnwrap(round.visibleTexts.first)
+        let scenario = PlayHTTPScenario()
+        scenario.set("GET /api/v1/play/rooms/fixture-room", [try .json(room)])
+        let server = try LocalHTTPServer { request in
+            guard request.hasPrefix("POST /api/v1/play/phrases ") else { return scenario.respond(request) }
+            guard let body = request.components(separatedBy: "\r\n\r\n").last?.data(using: .utf8),
+                  var object = (try? JSONSerialization.jsonObject(with: body)) as? [String: Any],
+                  object["contextText"] != nil else { return .denied(400) }
+            object["id"] = "saved-phrase"
+            object["targetLang"] = round.targetLang
+            object["createdAt"] = "2026-10-20T12:00:00Z"
+            guard let data = try? JSONSerialization.data(withJSONObject: object) else { return .denied(400) }
+            return .json(String(decoding: data, as: UTF8.self))
+        }
+        try await server.start()
+        defer { server.stop() }
+        let vault = PlayMemoryStore()
+        let model = SottoAppModel(credentials: PlayTestIdentity.connection(server: server.url),
+            session: URLSession(configuration: .ephemeral), credentialStore: PlayCredentialMemoryStore(), playStore: vault)
+        let coordinator = model.play
+        coordinator.navigate(.room(room.id))
+        let polling = Task { await coordinator.foreground() }
+        defer { polling.cancel(); coordinator.endForeground() }
+        try await waitForPlay("The source round is visible") { coordinator.room == room }
+        for context in ["", text] {
+            try await coordinator.keep(text: text, context: context, kind: .word, round: round)
+            XCTAssertEqual(coordinator.notice, "Saved privately to your notebook.")
+            XCTAssertEqual(coordinator.phrases.first?.text, text)
+            XCTAssertNil(try vault.load().pending)
+        }
+        let bodies = try server.requests.filter { $0.hasPrefix("POST /api/v1/play/phrases ") }.map {
+            try XCTUnwrap(JSONSerialization.jsonObject(with: Data(XCTUnwrap($0.components(separatedBy: "\r\n\r\n").last).utf8)) as? [String: Any])
+        }
+        XCTAssertEqual(bodies.count, 2)
+        XCTAssertTrue(bodies.first?["contextText"] is NSNull)
+        XCTAssertEqual(bodies.last?["contextText"] as? String, text)
+    }
+
     func testWaitingHostReleasesItsNonceAndUsesANewNonceOnForegroundReentry() async throws {
         let template = try PlayTestFixtures.load().room()
         var object = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(template)) as? [String: Any])
