@@ -279,7 +279,10 @@ if args[0] == 'run':
         available = 1024 if mode == 'overlap-memory' else 6291456
         finish('MemTotal: 8388608 kB\nMemAvailable: ' + str(available) + ' kB')
     if 'ALL_QUEUE_NAMES' in args[-1]:
-        finish(json.dumps(sorted(state['queue_flags'])))
+        names = sorted(state['queue_flags'])
+        if mode.startswith('migration-additions') and old in args:
+            names.remove('vocabulary-audio')
+        finish(json.dumps(names))
     if (mode == 'contract' or mode.startswith(('compat-', 'migration-'))) and 'schema.prisma' not in args[-1]:
         if mode == 'migration-schema-only': finish('d' * 64)
         finish(('d' if old in args else 'e') * 64)
@@ -293,6 +296,16 @@ if args[0] == 'exec':
         command = request['command']
         snapshot = {'schemaVersion': 1, 'connectionIdentity': 'f' * 64,
                     'queues': [{'name': key, 'paused': value} for key, value in sorted(state['queue_flags'].items())]}
+        if 'transition' in request:
+            snapshot.update(schemaVersion=2, transition=request['transition'])
+        if command == 'added-empty':
+            state['added_queue_database_url'] = os.environ.get('DATABASE_URL')
+            state['added_queue_checked_after_stop'] = not any(
+                state['running'].get(item, False) for item in (old_web, *old_workers.values()))
+            if not state['added_queue_checked_after_stop'] or mode == 'migration-additions-late':
+                state['retained_added_work'] = True
+                finish(code=1)
+            finish('SOTTO_DEPLOY_QUEUE=' + json.dumps({**snapshot, 'addedQueuesEmpty': True}))
         if command == 'established':
             finish('SOTTO_DEPLOY_QUEUE=' + json.dumps({'schemaVersion': 1, 'connectionIdentity': 'f' * 64,
                                                      'established': True, 'appliedMigrations': 3}))
@@ -321,7 +334,7 @@ if args[0] == 'exec':
             state['queue_flags'] = dict.fromkeys(state['queue_flags'], True)
             snapshot['queues'] = [{'name': key, 'paused': True} for key in sorted(state['queue_flags'])]
         if command == 'restore':
-            if mode in ('compat-restore', 'migration-restore'):
+            if mode in ('compat-restore', 'migration-restore', 'migration-additions-restore'):
                 state['queue_flags']['audio-generation'] = False
                 finish(code=1)
             state['queue_flags'] = {queue['name']: queue['paused'] for queue in request['manifest']['queues']}
@@ -357,6 +370,15 @@ if args[0] == 'stop':
         state['running'][identifier] = False
         state['stopped'].append(identifier)
         if identifier == old_web: state['old_web'] = None
+    if mode in ('migration-additions-missing-proof', 'migration-additions-malformed-proof') and not any(
+            state['running'].get(item, False) for item in (old_web, *old_workers.values())):
+        record_path = next((root / '.local/state/sotto-deploy').rglob('schema-review.json'))
+        if mode == 'migration-additions-missing-proof':
+            record = json.loads(record_path.read_text())
+            del record['queueTransition']
+            record_path.write_text(json.dumps(record))
+        else:
+            record_path.write_text('{')
     finish('\n'.join(identifiers))
 if args[0] in ('volume', 'tag'): finish()
 if args[0] != 'compose': finish(code=2)
@@ -456,6 +478,8 @@ class DeploymentFailureTests(unittest.TestCase):
                      'queue_flags': {'audio-generation': prepaused, 'speaking-grading': False},
                      'active': 1, 'journal_pending': failure == 'unknown-cleanup', 'unsafe_stops': [],
                      'unsafe_starts': [], 'stopped': [], 'worker_generation': 'old'}
+            if failure.startswith('migration-additions'):
+                state['queue_flags']['vocabulary-audio'] = True
             if provider_continuity:
                 activation = root / 'previous-activation'
                 activation.mkdir()
@@ -486,6 +510,8 @@ class DeploymentFailureTests(unittest.TestCase):
                 values['SOTTO_REVIEWED_CANDIDATE_SCHEMA_HASH'] = 'e' * 64
             if failure == 'migration-direct-target':
                 values['DIRECT_DATABASE_URL'] = 'postgresql://another-target'
+            if failure.startswith('migration-additions'):
+                values['DIRECT_DATABASE_URL'] = 'postgresql://verified-direct'
             if reviewed_runtime:
                 evidence = b'Independent review of exact fixture images.'
                 evidence_path = root / 'compatibility-evidence.txt'
@@ -529,7 +555,7 @@ class DeploymentFailureTests(unittest.TestCase):
                     schema_evidence.write_bytes(b'Independent exact fenced migration review.')
                     schema_evidence.chmod(0o600)
                     schema_review = root / 'schema-review.json'
-                    schema_review.write_text(json.dumps({
+                    schema_values = {
                         'schemaVersion': 1, 'procedure': 'fenced-schema-migration',
                         'stack': stack, 'releaseSha': SHA,
                         'candidateWebImage': values['SOTTO_WEB_IMAGE_REF'],
@@ -538,7 +564,12 @@ class DeploymentFailureTests(unittest.TestCase):
                         'compatibilityReviewSha256': hashlib.sha256(review_path.read_bytes()).hexdigest(),
                         'reviewer': 'Independent schema reviewer',
                         'evidenceSha256': hashlib.sha256(schema_evidence.read_bytes()).hexdigest(),
-                    }))
+                    }
+                    if failure.startswith('migration-additions'):
+                        schema_values.update(schemaVersion=2,
+                            previousQueueNames=['audio-generation', 'speaking-grading'],
+                            candidateQueueNames=sorted(state['queue_flags']))
+                    schema_review.write_text(json.dumps(schema_values))
                     schema_review.chmod(0o600)
             (root / '.env.production').write_text(''.join(key + '=' + value + '\n' for key, value in values.items()))
             with serving_fixture(root) as (ports, observations, phase_observations):

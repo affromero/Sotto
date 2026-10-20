@@ -6,7 +6,7 @@ import { createRequire } from 'node:module';
 import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { tmpdir } from 'node:os';
-import { Queue, Worker } from 'bullmq';
+import { FlowProducer, Queue, Worker } from 'bullmq';
 import Redis from 'ioredis';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { prepareJob } from 'thesidedoor-core/runtime/outbox';
@@ -72,7 +72,15 @@ interface Runtime {
 const { run } = createRequire(import.meta.url)(
   resolve(process.cwd(), '../../scripts/deploy/queue-lifecycle.cjs')
 ) as {
-  run: (input: { command: string; manifest?: unknown }, runtime: Runtime) => Promise<Report>;
+  run: (
+    input: {
+      command: string;
+      manifest?: unknown;
+      transition?: { proof: string; sha256: string };
+      role?: 'previous' | 'candidate';
+    },
+    runtime: Runtime
+  ) => Promise<Report>;
 };
 const suite =
   process.env.SIDEDOOR_TEST_DATABASE_URL && process.env.SIDEDOOR_TEST_REDIS_URL
@@ -186,6 +194,229 @@ suite('deployment queue and execution settlement', () => {
       return binding;
     });
   }
+
+  function transition() {
+    const previous = {
+      ...runtime,
+      names: runtime.names.filter((name) => name !== 'vocabulary-audio'),
+    };
+    const proof = JSON.stringify({
+      schemaVersion: 1,
+      stack: 'sotto',
+      releaseSha: 'a'.repeat(40),
+      candidateWebImage: `ghcr.io/fixture/web@sha256:${'b'.repeat(64)}`,
+      candidateWorkersImage: `ghcr.io/fixture/workers@sha256:${'c'.repeat(64)}`,
+      previousRuntimes: Object.fromEntries(
+        ['web', 'workers-heavy', 'workers-light', 'workers-pipeline'].map((service) => [
+          service,
+          {
+            containerId: 'd'.repeat(64),
+            imageId: `sha256:${'e'.repeat(64)}`,
+          },
+        ])
+      ),
+      previousNames: [...previous.names].sort(),
+      candidateNames: [...runtime.names].sort(),
+      compatibilityReviewSha256: 'f'.repeat(64),
+      schemaReviewSha256: '1'.repeat(64),
+    });
+    const envelope = { proof, sha256: createHash('sha256').update(proof).digest('hex') };
+    return {
+      previous,
+      previousInput: { transition: envelope, role: 'previous' as const },
+      candidateInput: { transition: envelope, role: 'candidate' as const },
+    };
+  }
+
+  it('admits explicit queue additions and restores original flags through interrupted pause and restore', async () => {
+    const { previous, previousInput, candidateInput } = transition();
+    await queue('vocabulary-audio').pause();
+    const original = await run({ command: 'snapshot', ...previousInput }, previous);
+    expect(original.schemaVersion).toBe(2);
+    expect(original.queues.find((item) => item.name === 'vocabulary-audio')?.paused).toBe(true);
+    expect(
+      await run({ command: 'observe', manifest: original, ...candidateInput }, runtime)
+    ).toEqual(original);
+    // Redis pause flags survive a controller interruption before all queues are paused.
+    await queue('audio-generation').pause();
+    await run({ command: 'pause', manifest: original, ...previousInput }, previous);
+    expect(
+      (await run({ command: 'drained-all', manifest: original, ...previousInput }, previous))
+        .drained
+    ).toBe(true);
+    await run({ command: 'added-empty', manifest: original, ...candidateInput }, runtime);
+    // Candidate work is legitimate after cutover; restoration must preserve it.
+    const job = await queue('vocabulary-audio').add('candidate-work', { retained: true });
+    await queue('audio-generation').resume();
+    await run({ command: 'restore', manifest: original, ...candidateInput }, runtime);
+    expect(
+      await run({ command: 'observe', manifest: original, ...candidateInput }, runtime)
+    ).toEqual(original);
+    expect((await queue('vocabulary-audio').getJob(job.id!))?.data).toEqual({ retained: true });
+  });
+
+  it('rejects changed proof bytes, transplanted manifests and incorrect actual runtime inventories', async () => {
+    const { previous, previousInput, candidateInput } = transition();
+    const original = await run({ command: 'snapshot', ...previousInput }, previous);
+    await expect(
+      run({ command: 'observe', manifest: original, ...previousInput }, runtime)
+    ).rejects.toThrow();
+    const changed = JSON.parse(previousInput.transition.proof) as { stack: string };
+    changed.stack = 'sotto-personal';
+    const proof = JSON.stringify(changed);
+    for (const sha256 of [
+      previousInput.transition.sha256,
+      createHash('sha256').update(proof).digest('hex'),
+    ])
+      await expect(
+        run(
+          {
+            command: 'pause',
+            manifest: original,
+            ...candidateInput,
+            transition: { proof, sha256 },
+          },
+          runtime
+        )
+      ).rejects.toThrow();
+    await expect(run({ command: 'pause', manifest: original }, runtime)).rejects.toThrow();
+    expect(original.queues.every((item) => !item.paused)).toBe(true);
+    expect(
+      (await run({ command: 'observe', manifest: original, ...candidateInput }, runtime)).queues
+    ).toEqual(original.queues);
+  });
+
+  it.each([
+    'waiting',
+    'paused',
+    'delayed',
+    'prioritized',
+    'completed',
+    'failed',
+    'waiting-children',
+  ] as const)('preserves and rejects existing %s work in an added queue', async (state) => {
+    const added = queue('vocabulary-audio');
+    const { previous, previousInput } = transition();
+    if (state === 'paused') await added.pause();
+    if (state === 'waiting-children') {
+      const flow = new FlowProducer({ connection, prefix });
+      try {
+        await flow.add({
+          name: 'parent',
+          queueName: added.name,
+          children: [{ name: 'child', queueName: 'audio-generation' }],
+        });
+      } finally {
+        await flow.close();
+      }
+    } else {
+      const job = await added.add(
+        'existing-work',
+        { retained: true },
+        {
+          ...(state === 'delayed' ? { delay: 60_000 } : {}),
+          ...(state === 'prioritized' ? { priority: 2 } : {}),
+        }
+      );
+      if (state === 'completed' || state === 'failed') {
+        const worker = new Worker(
+          added.name,
+          async () => {
+            if (state === 'failed') throw new Error('Retained failure');
+            return 'retained result';
+          },
+          { connection, prefix }
+        );
+        try {
+          await vi.waitFor(async () => expect(await job.getState()).toBe(state));
+        } finally {
+          await worker.close();
+        }
+      }
+    }
+    await expect(run({ command: 'snapshot', ...previousInput }, previous)).rejects.toThrow();
+    expect(await added.getJobCountByTypes(state === 'paused' ? 'waiting' : state)).toBeGreaterThan(
+      0
+    );
+  });
+
+  it('rejects schedulers and idle connected workers before changing added queue flags', async () => {
+    const added = queue('vocabulary-audio');
+    const { previous, previousInput } = transition();
+    await added.upsertJobScheduler('future', { every: 60_000 });
+    await expect(run({ command: 'snapshot', ...previousInput }, previous)).rejects.toThrow();
+    await added.removeJobScheduler('future');
+    const worker = new Worker(added.name, async () => 'done', { connection, prefix });
+    try {
+      await vi.waitFor(async () => expect((await added.getWorkers()).length).toBeGreaterThan(0));
+      await expect(run({ command: 'snapshot', ...previousInput }, previous)).rejects.toThrow();
+      expect(await added.isPaused()).toBe(false);
+    } finally {
+      await worker.close();
+    }
+  });
+
+  it('rejects an active added-queue job while leaving its worker and work intact', async () => {
+    const added = queue('vocabulary-audio');
+    const { previous, previousInput } = transition();
+    let finish: () => void = () => {
+      throw new Error('Worker has not started');
+    };
+    const pending = new Promise<void>((resolveWork) => {
+      finish = resolveWork;
+    });
+    const worker = new Worker(added.name, () => pending, { connection, prefix });
+    try {
+      const job = await added.add('active-work', { retained: true });
+      await vi.waitFor(async () => expect(await job.getState()).toBe('active'));
+      await expect(run({ command: 'snapshot', ...previousInput }, previous)).rejects.toThrow();
+      expect(await job.getState()).toBe('active');
+      expect(await added.isPaused()).toBe(false);
+    } finally {
+      finish();
+      await worker.close();
+    }
+  });
+
+  it.each([false, true])(
+    'rejects undelivered added-queue durable work with active execution %s',
+    async (active) => {
+      const { previous, previousInput } = transition();
+      if (active) await execution('vocabulary-audio');
+      else
+        await sottoTransaction(instance.database, (tx) =>
+          sottoJobOutbox(tx).enqueue(
+            prepareJob({
+              namespace: SIDEDOOR_STATE_ID,
+              handler: 'vocabulary-audio',
+              version: 1,
+              payload: {},
+              scopes: [{ subjectId: `deployment:${randomUUID()}`, generation: 0 }],
+              delivery: { attempts: 1, priority: 0, availableAt: 0 },
+            })
+          )
+        );
+      await expect(run({ command: 'snapshot', ...previousInput }, previous)).rejects.toThrow();
+      expect(await queue('vocabulary-audio').getJobCounts()).toMatchObject({
+        waiting: 0,
+        active: 0,
+      });
+      expect(await queue('audio-generation').isPaused()).toBe(false);
+    }
+  );
+
+  it('rejects added work produced during drainage without resnapshotting or deleting it', async () => {
+    const { previous, previousInput, candidateInput } = transition();
+    const original = await run({ command: 'snapshot', ...previousInput }, previous);
+    await run({ command: 'pause', manifest: original, ...previousInput }, previous);
+    const job = await queue('vocabulary-audio').add('late-child-work', { retained: true });
+    await expect(
+      run({ command: 'added-empty', manifest: original, ...candidateInput }, runtime)
+    ).rejects.toThrow();
+    expect(await job.getState()).toBe('waiting');
+    expect(await queue('vocabulary-audio').isPaused()).toBe(true);
+    expect(original.queues.every((item) => !item.paused)).toBe(true);
+  });
 
   it('observes without creating Redis state and restores the exact original pause flags', async () => {
     const snapshot = await run({ command: 'snapshot' }, runtime);

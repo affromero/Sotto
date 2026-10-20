@@ -255,8 +255,8 @@ uses a separate, explicit procedure. The ordinary `scripts/deploy.sh` invocation
 continues to reject different Prisma assets. Both paths use the same committed
 release, immutable images, capacity admission, deployment lock and provider
 continuity checks. The fenced procedure supports added migration SQL while
-preserving every previously published migration file. Queue names must stay
-unchanged, and an existing provider activation must remain enabled.
+preserving every previously published migration file. Schema review version 1
+requires unchanged queue names. Existing provider activation must remain enabled.
 
 Supply the ordinary schema version 2 runtime continuity review through
 `SOTTO_COMPATIBILITY_REVIEW_FILE` and `SOTTO_COMPATIBILITY_EVIDENCE_FILE`.
@@ -308,6 +308,30 @@ SQL application, failed drift checks and errors while restoring queue flags.
 The controller never resolves migration history or restarts old code after a
 migration has started. Before that point, a reviewed recovery may return to the
 captured old release after its execution ownership is proven settled.
+
+Schema review version 2 additionally requires `previousQueueNames` and
+`candidateQueueNames`, each a sorted array of unique queue names. It permits
+strict additions only. The controller probes every captured worker image and
+the candidate image, requires all previous inventories to agree, and matches
+the inventories to the review. Version 1 continues to require unchanged queues.
+The runtime compatibility review remains version 2 and retains its complete
+container, provider and changed-file bindings.
+
+Before fencing, the controller saves a version 2 original queue manifest with
+the pause flags for the union of both inventories. Its transition proof binds
+the stack, release, exact images and accepted review hashes. Every queue command
+checks that proof and the actual runtime's inventory. The injected helper can
+pause added queues from a previous worker without changing its installed code.
+
+Added queues must have no jobs in any state, schedulers, connected workers,
+active execution owners or incomplete durable outbox work. The controller checks
+this before saving the original manifest and again after all four captured old
+services stop, before backup or migration. The final check uses the application
+database connection, whose identity was compared with the direct migration
+connection before fencing. Work found during drainage retains maintenance and
+the original manifest. Recovery never replaces that snapshot or deletes work.
+After candidate startup, restoring flags preserves legitimate candidate work
+and each queue's original paused state.
 
 For recovery, retain `schema-preparation.json`, `schema-stopped.json`, both
 accepted reviews, the original queue manifest, migration/drift logs and the

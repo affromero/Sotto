@@ -30,10 +30,75 @@ function connectionIdentity(environment, namespace) {
     .digest('hex');
 }
 
-function validateManifest(manifest, names, identity) {
+function queueNames(value) {
+  assert(Array.isArray(value) && value.length > 0 && value.length <= 100);
+  assert(value.every((name) => typeof name === 'string' && /^[a-z][a-z0-9-]{0,99}$/.test(name)));
+  assert.equal(new Set(value).size, value.length, 'Duplicate queue name');
+  return [...value].sort();
+}
+
+function transitionBinding(envelope, role, runtime) {
+  assert(envelope && typeof envelope === 'object', 'Admitted queue transition required');
+  assert.deepEqual(Object.keys(envelope).sort(), ['proof', 'sha256']);
+  assert.equal(typeof envelope.proof, 'string');
+  assert.equal(createHash('sha256').update(envelope.proof).digest('hex'), envelope.sha256);
+  const proof = JSON.parse(envelope.proof);
+  assert.deepEqual(
+    Object.keys(proof).sort(),
+    [
+      'schemaVersion',
+      'stack',
+      'releaseSha',
+      'candidateWebImage',
+      'candidateWorkersImage',
+      'previousRuntimes',
+      'previousNames',
+      'candidateNames',
+      'compatibilityReviewSha256',
+      'schemaReviewSha256',
+    ].sort()
+  );
+  assert.equal(proof.schemaVersion, 1);
+  assert(/^[a-z][a-z0-9-]{0,99}$/.test(proof.stack));
+  assert(/^[a-f0-9]{40}$/.test(proof.releaseSha));
+  for (const field of ['compatibilityReviewSha256', 'schemaReviewSha256'])
+    assert(/^[a-f0-9]{64}$/.test(proof[field]));
+  for (const field of ['candidateWebImage', 'candidateWorkersImage'])
+    assert(typeof proof[field] === 'string' && /^.+@sha256:[a-f0-9]{64}$/.test(proof[field]));
+  assert.deepEqual(Object.keys(proof.previousRuntimes).sort(), [
+    'web',
+    'workers-heavy',
+    'workers-light',
+    'workers-pipeline',
+  ]);
+  for (const previous of Object.values(proof.previousRuntimes)) {
+    assert(/^[a-f0-9]{64}$/.test(previous.containerId));
+    assert(/^sha256:[a-f0-9]{64}$/.test(previous.imageId));
+  }
+  const previous = queueNames(proof.previousNames);
+  const candidate = queueNames(proof.candidateNames);
+  assert.deepEqual(proof.previousNames, previous);
+  assert.deepEqual(proof.candidateNames, candidate);
+  assert(
+    previous.length < candidate.length && previous.every((name) => candidate.includes(name)),
+    'Queue transition must be strictly additive'
+  );
+  assert(['previous', 'candidate'].includes(role), 'Exact queue runtime role required');
+  assert.deepEqual(
+    queueNames(runtime.names),
+    role === 'previous' ? previous : candidate,
+    'Actual runtime queue inventory differs from admitted transition'
+  );
+  return { names: candidate, added: candidate.filter((name) => !previous.includes(name)) };
+}
+
+function validateManifest(manifest, names, identity, transition) {
   assert(manifest && typeof manifest === 'object', 'Original queue manifest required');
-  assert.deepEqual(Object.keys(manifest).sort(), ['connectionIdentity', 'queues', 'schemaVersion']);
-  assert.equal(manifest.schemaVersion, 1);
+  const fields = ['connectionIdentity', 'queues', 'schemaVersion'];
+  if (transition !== undefined) fields.push('transition');
+  assert.deepEqual(Object.keys(manifest).sort(), fields.sort());
+  assert.equal(manifest.schemaVersion, transition === undefined ? 1 : 2);
+  if (transition !== undefined) assert.deepEqual(manifest.transition, transition);
   assert.equal(manifest.connectionIdentity, identity, 'Queue connection identity changed');
   assert(Array.isArray(manifest.queues));
   assert.deepEqual(manifest.queues.map((queue) => queue.name).sort(), names);
@@ -138,7 +203,7 @@ async function activationReady(runtime, queues) {
   return { activationReady: true, inspectedCredentials, inspectedJobs };
 }
 
-async function inspectExecutions(runtime) {
+async function inspectExecutions(runtime, forbidden = []) {
   return readOnly(runtime.database, async (transaction) => {
     const rows = await transaction.$queryRawUnsafe(
       'SELECT "state" FROM "SidedoorState" WHERE "state"->>\'kind\' = $1 LIMIT 10001',
@@ -178,6 +243,7 @@ async function inspectExecutions(runtime) {
       assert.equal(parent.job.handler, receipt.handler);
       assert.equal(parent.job.version, receipt.version);
       assert.equal(parent.complete, receipt.status === 'complete');
+      assert(!forbidden.includes(receipt.handler), 'Added queue has an active execution');
       if (runtime.isSottoSynchronousJob(receipt.handler, receipt.version)) {
         assert.equal(receipt.handler, 'learning-writing');
         assert.equal(receipt.version, 1);
@@ -190,6 +256,44 @@ async function inspectExecutions(runtime) {
     }
     return summary;
   });
+}
+
+async function addedQueuesEmpty(runtime, queues, added) {
+  await inspectExecutions(runtime, added);
+  await readOnly(runtime.database, async (transaction) => {
+    const outbox = runtime.sottoJobOutbox(transaction);
+    const seen = new Set();
+    let cursor = null;
+    do {
+      const page = await outbox.listIncomplete(cursor);
+      for (const reference of page.jobs) {
+        assert(!seen.has(reference.id), 'Duplicate incomplete job reference');
+        seen.add(reference.id);
+        assert(seen.size <= LIMIT, 'Incomplete job inspection bound exceeded');
+        const receipt = await outbox.receipt(reference.id);
+        const record = await outbox.read(reference.id);
+        assert(receipt && record && receipt.id === reference.id && record.job.id === reference.id);
+        assert.equal(receipt.fingerprint, reference.fingerprint);
+        assert.equal(record.fingerprint, reference.fingerprint);
+        assert.equal(receipt.status, 'pending');
+        assert.equal(record.complete, false);
+        assert.equal(record.job.handler, receipt.handler);
+        assert.equal(record.job.version, receipt.version);
+        assert(!added.includes(receipt.handler), 'Added queue has incomplete durable work');
+        if (!runtime.isSottoSynchronousJob(receipt.handler, receipt.version))
+          runtime.requireSottoJobVersion(receipt.handler, receipt.version);
+      }
+      if (page.cursor !== null) {
+        assert(typeof page.cursor === 'string' && page.cursor !== cursor && page.jobs.length > 0);
+      }
+      cursor = page.cursor;
+    } while (cursor !== null);
+  });
+  for (const queue of queues.filter((item) => added.includes(item.name))) {
+    assert.equal((await queue.getJobs(undefined, 0, 0)).length, 0, 'Added queue contains work');
+    assert.equal(await queue.getJobSchedulersCount(), 0, 'Added queue has a scheduler');
+    assert.equal((await queue.getWorkers()).length, 0, 'Added queue has connected workers');
+  }
 }
 
 async function established(runtime) {
@@ -265,7 +369,9 @@ async function schemaIndex(runtime) {
 /** Dependencies are the actual database, queue and filesystem boundaries in tests. */
 async function run(input, runtime) {
   assert(input && typeof input === 'object');
-  assert(Object.keys(input).every((key) => ['command', 'manifest'].includes(key)));
+  assert(
+    Object.keys(input).every((key) => ['command', 'manifest', 'transition', 'role'].includes(key))
+  );
   assert(
     [
       'snapshot',
@@ -278,20 +384,44 @@ async function run(input, runtime) {
       'database-identity',
       'schema-index',
       'activation-ready',
+      'added-empty',
     ].includes(input.command)
   );
   const identity = connectionIdentity(runtime.environment, runtime.namespace);
-  const base = { schemaVersion: 1, connectionIdentity: identity };
+  const binding =
+    input.transition === undefined
+      ? null
+      : transitionBinding(input.transition, input.role, runtime);
+  assert(input.role === undefined || binding !== null, 'Role requires admitted queue transition');
+  const base =
+    binding === null
+      ? { schemaVersion: 1, connectionIdentity: identity }
+      : { schemaVersion: 2, connectionIdentity: identity, transition: input.transition };
   if (input.command === 'established') return { ...base, ...(await established(runtime)) };
-  if (input.command === 'database-identity') return { ...base, ...(await databaseIdentity(runtime)) };
-  const names = [...runtime.names].sort();
-  assert(names.length > 0 && new Set(names).size === names.length);
-  if (input.manifest !== undefined || ['pause', 'drained', 'drained-all', 'restore', 'schema-index'].includes(input.command))
-    validateManifest(input.manifest, names, identity);
+  if (input.command === 'database-identity')
+    return { ...base, ...(await databaseIdentity(runtime)) };
+  const names = binding === null ? queueNames(runtime.names) : binding.names;
+  if (
+    input.manifest !== undefined ||
+    ['pause', 'drained', 'drained-all', 'restore', 'schema-index', 'added-empty'].includes(
+      input.command
+    )
+  )
+    validateManifest(input.manifest, names, identity, input.transition);
+  if (input.command === 'snapshot') assert.equal(input.manifest, undefined);
   if (input.command === 'schema-index') return { ...base, ...(await schemaIndex(runtime)) };
   const queues = [];
   try {
     for (const name of names) queues.push(runtime.createQueue(name));
+    if (input.command === 'added-empty')
+      assert(binding !== null, 'Added queue transition required');
+    if (binding !== null && ['snapshot', 'added-empty'].includes(input.command)) {
+      await addedQueuesEmpty(runtime, queues, binding.added);
+      if (input.command === 'added-empty') {
+        for (const queue of queues) assert(await queue.isPaused(), 'Queue fence changed');
+        return { ...base, addedQueuesEmpty: true };
+      }
+    }
     if (input.command === 'activation-ready')
       return { ...base, ...(await activationReady(runtime, queues)) };
     if (input.command === 'pause') {
