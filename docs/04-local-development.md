@@ -92,6 +92,11 @@ home-screen installation and show native downloads only when real URLs are set:
 native downloads explicitly unavailable. Web games need a live connection;
 private game responses and pages are never available from an offline cache.
 
+Set optional `SOTTO_PRIVACY_CONTACT_EMAIL` to the instance operator's public
+contact address to show a deletion-request link at `/privacy#delete-profile`.
+Store submissions for a hosted instance need a reachable deletion contact.
+Independent operators provide their own address and retention details.
+
 ### Native partner games
 
 The iPhone/iPad client is in `apps/ios`; the native Android phone/tablet client
@@ -110,6 +115,23 @@ debug APKs, force-stops the app and verifies exact request and credential recove
 Android 17 also exercises local-network denial, grant and revocation. The normal
 connected gate excludes these externally staged tests. Release APK and AAB builds
 are unsigned until an operator configures real signing credentials.
+
+For a signed Android release, set all four environment variables:
+`SOTTO_ANDROID_KEYSTORE_FILE`, `SOTTO_ANDROID_KEYSTORE_PASSWORD`,
+`SOTTO_ANDROID_KEY_ALIAS`, and `SOTTO_ANDROID_KEY_PASSWORD`. The keystore must
+exist outside the checkout. Partial signing configuration fails the build.
+Keep the keystore and passwords in protected storage. CI builds stay unsigned
+when none of these variables are present.
+
+Privacy and license notices are available before pairing. Profile deletion
+requires confirmation of the selected server and profile. An uncertain response
+preserves local credentials so the learner can recover or contact the operator.
+Unpairing removes local access without deleting the server profile.
+
+Every build verifies the bundled Android notices against the actual release
+dependency bytes and source licenses. See
+[`apps/android/licenses/README.md`](../apps/android/licenses/README.md) for
+regeneration and exact upstream attribution.
 
 Native contract tests consume the same `packages/shared/fixtures/play/contract.json`.
 Regenerate it with `npx tsx scripts/play/export-fixtures.ts`; the web parity test

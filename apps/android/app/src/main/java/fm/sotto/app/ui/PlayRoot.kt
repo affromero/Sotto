@@ -15,16 +15,19 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fm.sotto.app.play.*
 import fm.sotto.app.network.NetworkAccess
+import fm.sotto.app.ui.legal.PrivacyLegal
 
 @Composable fun PlayRoot(coordinator: PlayCoordinator) {
     val state by coordinator.state.collectAsStateWithLifecycle()
     var discardID by remember { mutableStateOf<String?>(null) }
+    var privacy by remember { mutableStateOf(false) }
     BackHandler(state.screen != Screen.Lobby) { coordinator.navigate(Screen.Lobby) }
     Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
         Box(Modifier.fillMaxSize().safeDrawingPadding().imePadding(), contentAlignment = Alignment.TopCenter) {
             Column(Modifier.widthIn(max = 720.dp).fillMaxWidth().verticalScroll(rememberScrollState()).padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 Text("Sotto", style = MaterialTheme.typography.headlineLarge, color = MaterialTheme.colorScheme.primary)
+                Action("Privacy and licenses", secondary = true) { privacy = true }
                 state.vault?.connection?.let { Text("${it.profile.name} · ${it.server}", style = MaterialTheme.typography.labelLarge) }
                 if (state.screen != Screen.Lobby) Action("Back to Play", secondary = true) { coordinator.navigate(Screen.Lobby) }
                 if (state.checking || state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -59,6 +62,7 @@ import fm.sotto.app.network.NetworkAccess
             }
         }
     }
+    if (privacy) PrivacyLegal { privacy = false }
     discardID?.let { id -> AlertDialog(onDismissRequest = { discardID = null },
         title = { Text("Discard this pending action?") },
         text = { Text("It may already have saved. Your draft and original connection are kept. Check the game before submitting again.") },
