@@ -77,7 +77,7 @@ export default function SupportPage() {
                 <div>
                   <strong>Source Code</strong>
                   <p>
-                    Sotto is open source. Read the code, file issues, and follow the project on{' '}
+                    Sotto is source available. Read the code, file issues, and follow the project on{' '}
                     <a
                       href="https://github.com/affromero/Sotto"
                       target="_blank"
@@ -98,10 +98,10 @@ export default function SupportPage() {
               <div className={styles.faqItem}>
                 <h3>How do I get my own instance running?</h3>
                 <p>
-                  Sotto is open source and runs on your own stack. Clone the repository, bring a
-                  local database and queue, and copy the example environment file. The setup script
-                  walks you through the rest. The project README and the local development guide
-                  cover each step.
+                  Sotto is source available and runs on your own stack. Clone the repository, bring
+                  a local database and queue, and copy the example environment file. The setup
+                  script walks you through the rest. The project README and the local development
+                  guide cover each step.
                 </p>
               </div>
               <div className={styles.faqItem}>

@@ -6,11 +6,11 @@
 
 ### Practice a language before the pressure of speaking.
 
-Open source language-learning infrastructure you run yourself, with a full **[CEFR](https://www.coe.int/en/web/common-european-framework-reference-languages/level-descriptions) course** built around _your_ work, interests, and the situations you want to rehearse.<br/>Your progress, your data, your models, on a stack **you** control.
+Source-available language-learning infrastructure you run yourself, with a full **[CEFR](https://www.coe.int/en/web/common-european-framework-reference-languages/level-descriptions) course** built around _your_ work, interests, and the situations you want to rehearse.<br/>Your progress, your data, your models, on a stack **you** control.
 
 <br/>
 
-[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-A42E2B.svg?logo=gnu)](LICENSE)
+[![License: PolyForm Noncommercial](https://img.shields.io/badge/License-PolyForm_Noncommercial-A42E2B.svg)](LICENSE)
 [![Release](https://img.shields.io/github/v/release/affromero/Sotto?label=release)](https://github.com/affromero/Sotto/releases/latest)
 [![Self-hostable](https://img.shields.io/badge/self--hostable-yes-1F8A5B)](#self-host)
 [![BYOK](https://img.shields.io/badge/BYOK-bring%20your%20own%20keys-D97706)](#bring-your-own-claude--codex)
@@ -140,11 +140,11 @@ Everything a learner does, classes and practice alike, feeds one course scoped m
 
 ## How Sotto Compares
 
-The closest peer is genuinely good: [**OpenLingo**](https://github.com/pretzelai/openlingo) is also open source ([MIT](https://github.com/pretzelai/openlingo/blob/main/LICENSE)), can run on your own stack, and supports BYO LLM, with [SM-2](https://super-memory.com/english/ol/sm2.htm) spaced repetition, [Whisper](https://openai.com/research/whisper) speaking exercises, and a similar stack ([Next.js](https://nextjs.org/) 16 / [React](https://react.dev/) 19 / [PostgreSQL](https://www.postgresql.org/) 16). Credit where due. **Where Sotto goes further:** a structured CEFR course [gated by mastery](https://en.wikipedia.org/wiki/Mastery_learning) across five _graded_ skills, including writing with inline corrections and pronunciation scoring by rubric; a **[keyless local agent](#bring-your-own-claude--codex)** path through Claude Code or Codex; a **[fully offline path](#run-it-100-offline)** with local LLM, STT, and TTS; an interactive memory graph; adaptive listening seeded by your due vocabulary; a first party terminal client; and iPad workbooks.
+The closest peer is genuinely good: [**OpenLingo**](https://github.com/pretzelai/openlingo) is open source ([MIT](https://github.com/pretzelai/openlingo/blob/main/LICENSE)), can run on your own stack, and supports BYO LLM, with [SM-2](https://super-memory.com/english/ol/sm2.htm) spaced repetition, [Whisper](https://openai.com/research/whisper) speaking exercises, and a similar stack ([Next.js](https://nextjs.org/) 16 / [React](https://react.dev/) 19 / [PostgreSQL](https://www.postgresql.org/) 16). Credit where due. **Where Sotto goes further:** a structured CEFR course [gated by mastery](https://en.wikipedia.org/wiki/Mastery_learning) across five _graded_ skills, including writing with inline corrections and pronunciation scoring by rubric; a **[keyless local agent](#bring-your-own-claude--codex)** path through Claude Code or Codex; a **[fully offline path](#run-it-100-offline)** with local LLM, STT, and TTS; an interactive memory graph; adaptive listening seeded by your due vocabulary; a first party terminal client; and iPad workbooks.
 
 | Capability                                                                                                                              |               Sotto                | [OpenLingo](https://github.com/pretzelai/openlingo) | [Duolingo](https://www.duolingo.com) | [Speak](https://www.speak.com) | [Praktika](https://praktika.ai) | [TalkPal](https://talkpal.ai) | [Pimsleur](https://www.pimsleur.com) |
 | --------------------------------------------------------------------------------------------------------------------------------------- | :--------------------------------: | :-------------------------------------------------: | :----------------------------------: | :----------------------------: | :-----------------------------: | :---------------------------: | :----------------------------------: |
-| Open source                                                                                                                             |                 ✅                 |                         ✅                          |                  ❌                  |               ❌               |               ❌                |              ❌               |                  ❌                  |
+| Open source                                                                                                                             |                 ❌                 |                         ✅                          |                  ❌                  |               ❌               |               ❌                |              ❌               |                  ❌                  |
 | Run it yourself                                                                                                                         |                 ✅                 |                         ✅                          |                  ❌                  |               ❌               |               ❌                |              ❌               |                  ❌                  |
 | BYOK / own API keys                                                                                                                     |                 ✅                 |                         ✅                          |                  ❌                  |               ❌               |               ❌                |              ❌               |                  ❌                  |
 | Bring your own agent ([Claude Code](https://docs.anthropic.com/en/docs/claude-code) / [Codex](https://github.com/openai/codex), no key) |                 ✅                 |                         n/a                         |                 n/a                  |              n/a               |               n/a               |              n/a              |                 n/a                  |
@@ -396,7 +396,7 @@ Sotto is built around BYOK from the start, surfaced three ways:
 
 The full learning loop ships today and runs on your own stack:
 
-- **Clean OSS core:** AGPL-3.0; `.env.oss.example`, `npm run setup`, local storage default.
+- **Self-hosted core:** PolyForm Noncommercial 1.0.0; `.env.oss.example`, `npm run setup`, local storage default.
 - **BYOK / own agent:** keyless `claude-code`/`codex`, encrypted per account keys, MCP ingestion.
 - **Placement to any language course:** CEFR placement assigns a level and creates a directed course for any native to target pair.
 - **Classes gated by mastery** across all five skills, with similar regeneration on failure.
@@ -453,7 +453,13 @@ See [all contributors](https://github.com/affromero/Sotto/graphs/contributors) a
 
 ## License
 
-[AGPL-3.0](LICENSE) ([full text](https://www.gnu.org/licenses/agpl-3.0.en.html)). Free to run, modify, and redistribute under the same terms. If you run a modified version as a network service, you must publish the source.
+[PolyForm Noncommercial 1.0.0](LICENSE) permits its stated noncommercial,
+personal and institutional uses. Other commercial use requires separate
+permission from the rights holders. Sotto is source available.
+
+[LICENSE-SCOPE.md](LICENSE-SCOPE.md) identifies separately licensed components,
+including the AGPL speech service, MIT submodules and third-party dependencies.
+Earlier AGPL releases and their existing grants remain unchanged.
 
 <div align="center">
 <sub>Built for people who'd rather own their learning than rent it.</sub>

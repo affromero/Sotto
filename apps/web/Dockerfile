@@ -98,6 +98,8 @@ ENV COMMIT_SHA=${COMMIT_SHA}
 # Copy it to /app so paths resolve correctly
 WORKDIR /app
 
+COPY LICENSE LICENSE-SCOPE.md THIRD_PARTY_NOTICES.md ./
+
 # Copy public assets
 COPY --from=builder /app/apps/web/public ./apps/web/public
 

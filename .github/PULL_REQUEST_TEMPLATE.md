@@ -71,3 +71,13 @@ Scope, acceptance criteria, and files or behavior that should stay unchanged:
 
 If the choice is blank or conflicting, maintainers will ask before preparing changes.
 This choice does not approve merging the PR.
+
+## New first-party contribution grant
+
+Applies only to new work covered by CONTRIBUTOR-LICENSE.md. Separately licensed
+components retain their own terms. Identify third-party work and its license.
+
+- [ ] I own, or am authorized by the copyright owner to license, my identified
+      first-party contribution in this PR, and I additionally license it under
+      the MIT License at https://opensource.org/license/mit. I have read
+      CONTRIBUTOR-LICENSE.md and provided the applicable copyright notice.

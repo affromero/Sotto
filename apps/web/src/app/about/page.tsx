@@ -17,9 +17,9 @@ export default function AboutPage() {
           <header className={styles.hero}>
             <h1 className={styles.heroTitle}>{BRAND.tagline}</h1>
             <p className={styles.heroSubtitle}>
-              Sotto is open source language learning you run yourself. It gives learners a private
-              rehearsal space for the language they want to use before class, tutoring, or real
-              conversation, on a stack they control.
+              Sotto is source available language learning you run yourself. It gives learners a
+              private rehearsal space for the language they want to use before class, tutoring, or
+              real conversation, on a stack they control.
             </p>
           </header>
 
@@ -104,9 +104,9 @@ export default function AboutPage() {
           <section className={styles.section}>
             <h2 className={styles.sectionTitle}>Free and Run by You</h2>
             <p className={styles.sectionText}>
-              Sotto is free and open source. There is no subscription standing between you and your
-              courses. You bring your own keys for AI and audio, and you pay those providers
-              directly for what you use.
+              Sotto is source available for permitted uses. There is no subscription standing
+              between you and your courses. You bring your own keys for AI and audio, and you pay
+              those providers directly for what you use.
             </p>
             <p className={styles.sectionText}>
               Your keys are encrypted with AES-256-GCM on the instance you control. Because you run

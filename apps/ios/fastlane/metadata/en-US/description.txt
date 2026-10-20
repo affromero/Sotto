@@ -8,4 +8,4 @@ Export annotated workbooks as PDFs. Your handwriting stays on your device; answe
 
 Sotto requires a running Sotto server. Connect with its address and access password, or scan a pairing code. Server setup and provider configuration happen in the web app. Available features depend on your server configuration. Apple Pencil features require a compatible iPad and Apple Pencil; text-recognition support varies by language.
 
-Sotto is free, open-source, and self-hostable. You control your learning server and its provider choices.
+Sotto is source available and self-hostable. You control your learning server and its provider choices.

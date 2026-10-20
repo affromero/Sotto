@@ -19,7 +19,7 @@ export const BRAND = {
   description:
     'Self-hosted language learning for private rehearsal before class, tutoring, or real conversation, not another AI language chatbot. Choose what your agent may read, then study CEFR courses across grammar, reading, listening, speaking, and writing with your keys, data, and stack.',
   longDescription:
-    'Sotto is open source language learning for private, low-pressure rehearsal, not another AI language chatbot. Connect Claude, Codex, or a local model, choose what it may read, and build a course around your work, interests, and the situations you want to handle before a live conversation: CEFR grammar, reading, adaptive listening, speaking with pronunciation feedback, writing with inline corrections, and a vocabulary memory graph you own. Run it on your stack, with your keys and your data.',
+    'Sotto is source available language learning for private, low-pressure rehearsal, not another AI language chatbot. Connect Claude, Codex, or a local model, choose what it may read, and build a course around your work, interests, and the situations you want to handle before a live conversation: CEFR grammar, reading, adaptive listening, speaking with pronunciation feedback, writing with inline corrections, and a vocabulary memory graph you own. Run it on your stack, with your keys and your data.',
 } as const;
 
 export type Brand = typeof BRAND;

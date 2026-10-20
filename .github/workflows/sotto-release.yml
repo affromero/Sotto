@@ -114,7 +114,8 @@ jobs:
         run: |
           BIN_DIR="target/${{ matrix.target }}/release"
           ARCHIVE="sotto-${{ matrix.target }}.tar.gz"
-          tar czf "$ARCHIVE" -C "$BIN_DIR" sotto
+          cp LICENSE LICENSE-SCOPE.md THIRD_PARTY_NOTICES.md "$BIN_DIR/"
+          tar czf "$ARCHIVE" -C "$BIN_DIR" sotto LICENSE LICENSE-SCOPE.md THIRD_PARTY_NOTICES.md
           if command -v sha256sum >/dev/null 2>&1; then
             sha256sum "$ARCHIVE" > "$ARCHIVE.sha256"
           else

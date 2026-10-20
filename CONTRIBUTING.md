@@ -1,6 +1,6 @@
 # Contributing to Sotto
 
-Sotto is open-source language-learning infrastructure released under the GNU Affero General Public License v3.0. Contributions are welcome.
+Sotto is source-available language-learning infrastructure released under PolyForm Noncommercial 1.0.0, subject to LICENSE-SCOPE.md. New first-party contributions require the affirmative inbound grant described in CONTRIBUTOR-LICENSE.md.
 
 ## Development Setup
 
@@ -69,13 +69,16 @@ If the hook blocks your commit:
 2. Fix the test (or the source) before re-staging.
 3. Never use `--no-verify` to bypass the hook.
 
-## AGPLv3 Network-Use Disclosure
+## Contribution licensing
 
-Sotto is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0-only). The AGPL's network-use clause (Section 13) means:
-
-> If you run a **modified version** of Sotto and let users interact with it over a network, you must make the **complete corresponding source code** of your modified version available to those users under the same license.
-
-Running the unmodified source from this repository is fully compliant. If you fork and deploy a customised instance, publish your changes.
+Before submitting new first-party work, read CONTRIBUTOR-LICENSE.md. Confirm the
+additional MIT grant explicitly in the pull request. The inbound grant allows
+the maintainers to distribute eligible first-party work under PolyForm
+Noncommercial or separate commercial terms. Copyright stays with its owner.
+Identify any third-party material and obtain any necessary employer permission.
+This policy does not apply retroactively. Existing contributions require their
+own permissions; existing AGPL releases keep their original grants.
+Separately licensed components keep their own contribution terms.
 
 ## Code of Conduct
 

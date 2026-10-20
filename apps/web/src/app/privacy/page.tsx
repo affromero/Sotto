@@ -24,7 +24,8 @@ export default function PrivacyPage() {
             <p>
               Sotto is self-hosted software. The person or organization operating this instance
               controls its database, files, configuration, backups, logs, and network access. The
-              Sotto open-source project does not receive data from independently operated instances.
+              Sotto source-available project does not receive data from independently operated
+              instances.
             </p>
 
             <h2>2. Data stored by an instance</h2>
@@ -81,9 +82,10 @@ export default function PrivacyPage() {
 
             <h2>6. Cookies</h2>
             <p>
-              Sotto uses essential cookies for the app password and active profile. The open-source
-              application does not include advertising cookies. An operator may add a reverse proxy,
-              monitoring, or other services with separate cookie or logging behavior.
+              Sotto uses essential cookies for the app password and active profile. The
+              source-available application does not include advertising cookies. An operator may add
+              a reverse proxy, monitoring, or other services with separate cookie or logging
+              behavior.
             </p>
 
             <h2>7. Children and regulated use</h2>
@@ -96,7 +98,8 @@ export default function PrivacyPage() {
             <h2>8. Questions</h2>
             <p>
               Contact the operator of this instance for privacy requests. For issues in the
-              open-source software, use the project&apos;s public security and support channels.
+              source-available software, use the project&apos;s public security and support
+              channels.
             </p>
           </div>
         </div>

@@ -146,23 +146,23 @@ languages, answer a short assessment, and get a course at the right CEFR level.
 
 Press **`?`** on any screen for a help overlay listing that screen's keys.
 
-| Key | Action |
-| --- | --- |
-| `↑`/`↓` or `k`/`j` | move the selection |
-| `1`–`9` | pick an option directly |
-| `Enter` | confirm / answer / continue |
-| `PgUp`/`PgDn` | scroll a long prompt or list |
-| `Space` | play / pause (listening) |
-| `r` | record / stop (speaking) |
-| `a` | ask a question about the current audio (listening) |
-| `Ctrl-D` | submit (writing) |
-| `c` / `e` | next class / mock exam (course home) |
-| `m` / `s` | memory graph / settings (course home) |
-| `?` | toggle the key-help overlay |
-| `t` | toggle the theme picker (mode / palette / accent) |
-| `A` | toggle the account switcher |
-| `q` / `Esc` | back out a screen (or quit at the top) |
-| `Ctrl-C` | quit |
+| Key                | Action                                             |
+| ------------------ | -------------------------------------------------- |
+| `↑`/`↓` or `k`/`j` | move the selection                                 |
+| `1`–`9`            | pick an option directly                            |
+| `Enter`            | confirm / answer / continue                        |
+| `PgUp`/`PgDn`      | scroll a long prompt or list                       |
+| `Space`            | play / pause (listening)                           |
+| `r`                | record / stop (speaking)                           |
+| `a`                | ask a question about the current audio (listening) |
+| `Ctrl-D`           | submit (writing)                                   |
+| `c` / `e`          | next class / mock exam (course home)               |
+| `m` / `s`          | memory graph / settings (course home)              |
+| `?`                | toggle the key-help overlay                        |
+| `t`                | toggle the theme picker (mode / palette / accent)  |
+| `A`                | toggle the account switcher                        |
+| `q` / `Esc`        | back out a screen (or quit at the top)             |
+| `Ctrl-C`           | quit                                               |
 
 ## Audio
 
@@ -234,5 +234,5 @@ The vendored spec is kept byte-for-byte in sync with the canonical
 
 ## License
 
-[AGPL-3.0-only](https://github.com/affromero/Sotto/blob/main/LICENSE), matching
+[PolyForm Noncommercial 1.0.0](https://github.com/affromero/Sotto/blob/main/LICENSE), matching
 the Sotto platform.

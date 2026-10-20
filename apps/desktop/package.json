@@ -3,6 +3,7 @@
   "version": "0.2.0",
   "private": true,
   "description": "Sotto Host — desktop launcher for a self-hosted Sotto stack",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "scripts": {
     "build": "tauri build",
     "dev": "tauri dev",

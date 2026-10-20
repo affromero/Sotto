@@ -5,7 +5,7 @@ import styles from './page.module.css';
 export const metadata = {
   title: 'Join Us. Sotto',
   description:
-    "Help build open source language learning that people can run themselves. We're a small, remote first team working on context aware language learning.",
+    "Help build source available language learning that people can run themselves. We're a small, remote first team working on context aware language learning.",
 };
 
 export default function JoinPage() {
@@ -31,7 +31,7 @@ export default function JoinPage() {
             <p className={styles.sectionText}>
               Sotto changes this. You already use an agent across your projects, domain, and
               interests. Sotto uses the context you share to build CEFR courses around the things
-              you actually care about, gated by mastery. Open source works because people can
+              you actually care about, gated by mastery. Source available works because people can
               inspect, adapt, and run the systems they depend on. We&apos;re bringing that ethos to
               language learning.
             </p>
@@ -79,9 +79,9 @@ export default function JoinPage() {
           <section className={styles.cta}>
             <h2 className={styles.ctaTitle}>Interested?</h2>
             <p className={styles.ctaText}>
-              We don&apos;t have a formal job board. If building open source language learning that
-              people can run themselves interests you, whether you&apos;re an engineer, designer, or
-              something else entirely, we want to hear from you.
+              We don&apos;t have a formal job board. If building source available language learning
+              that people can run themselves interests you, whether you&apos;re an engineer,
+              designer, or something else entirely, we want to hear from you.
             </p>
             <a href="mailto:jobs@example.com" className={styles.ctaButton}>
               Reach out at jobs@example.com
