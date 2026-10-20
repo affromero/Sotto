@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const { createRequire } = require('node:module');
+const { createRequire, findPackageJSON } = require('node:module');
 const { dirname, join, sep } = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { mkdtemp, writeFile, readFile, rm } = require('node:fs/promises');
@@ -9,9 +9,14 @@ async function main() {
   const applicationRequire = createRequire(join(process.cwd(), 'package.json'));
   const parserRequire = createRequire(applicationRequire.resolve('pdf-parse'));
   const assets = dirname(parserRequire.resolve('pdfjs-dist/package.json'));
-  const { PDFParse } = await import(
+  const parserPackageFile = findPackageJSON(
     pathToFileURL(applicationRequire.resolve('pdf-parse')).href
   );
+  assert.ok(parserPackageFile, 'The application PDF parser package metadata is missing.');
+  const parserMetadata = JSON.parse(await readFile(parserPackageFile, 'utf8'));
+  const parserImport = parserMetadata.exports['.'].import.default;
+  assert.equal(typeof parserImport, 'string');
+  const { PDFParse } = await import(new URL(parserImport, pathToFileURL(parserPackageFile)).href);
   const sharp = applicationRequire('sharp');
   const content = 'BT /F1 18 Tf 30 100 Td (Original PDF smoke) Tj ET';
   const objects = [
