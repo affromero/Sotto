@@ -102,6 +102,7 @@
     "eslint-config-next": "^16.4.0",
     "glob": "^13.0.6",
     "jsonc-parser": "^3.3.1",
+    "ts-fsrs": "^5.4.2",
     "vitest": "^4.0.18"
   }
 }

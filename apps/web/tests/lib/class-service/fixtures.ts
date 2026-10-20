@@ -124,6 +124,8 @@ const mockClassSubmissionDeleteMany = vi.fn();
 const mockCourseUpdate = vi.fn();
 const mockCourseUpdateMany = vi.fn().mockResolvedValue({ count: 1 });
 const mockTransaction = vi.fn();
+export const mockEpisodeUpdateMany = vi.fn().mockResolvedValue({ count: 1 });
+export const mockQueueListeningAudio = vi.fn().mockResolvedValue(undefined);
 export const mockDueVocabRows = vi.fn().mockResolvedValue([]);
 export const mockCourseMaterialRows = vi.fn().mockResolvedValue([]);
 export const mockLearnerVocabFindMany = vi
@@ -132,6 +134,7 @@ export const mockLearnerVocabFindMany = vi
 
 vi.mock('@/lib/prisma', () => {
   const database = {
+    episode: { updateMany: (...args: unknown[]) => mockEpisodeUpdateMany(...args) },
     $queryRaw: async (query: TemplateStringsArray, ...values: unknown[]) => {
       const materials = (await mockCourseMaterialRows()) as Array<{
         id: string;
@@ -335,8 +338,14 @@ vi.mock('@/lib/knowledge-graph', async (importOriginal) => ({
   applyReviewOutcome: vi.fn(),
 }));
 
-vi.mock('@/lib/class-listening-generator', () => ({
+vi.mock('@/lib/class-listening-generator', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/class-listening-generator')>()),
   generateClassListening: (...args: unknown[]) => mockGenerateClassListening(...args),
+  prepareClassListening: async (...args: unknown[]) => ({
+    ...(await mockGenerateClassListening(...args)),
+    content: { episodeId: 'episode-listening', turns: [], comprehensionQuestions: [] },
+  }),
+  queueListeningAudio: (...args: unknown[]) => mockQueueListeningAudio(...args),
 }));
 
 vi.mock('@/lib/class-speaking-generator', () => ({

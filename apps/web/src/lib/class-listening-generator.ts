@@ -756,9 +756,30 @@ export async function composeListeningContent(
 
 // Generate the LISTENING section of a class: compose the content, then persist
 // the gated ClassSection + LessonQuestion rows.
-export async function generateClassListening(
+/** Retire only unqueued class audio; admitted or uncertain audio retains its own lifecycle. */
+export async function failUnqueuedClassListening(episodeId: string, userId: string): Promise<void> {
+  await prisma.episode
+    .updateMany({
+      where: {
+        id: episodeId,
+        userId,
+        source: 'CLASS',
+        status: 'SCRIPT_READY',
+        audioGenerationKey: null,
+      },
+      data: { status: 'FAILED' },
+    })
+    .catch((error: unknown) => {
+      logger.error('Failed to retire unqueued class listening', {
+        episodeId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
+}
+
+export async function prepareClassListening(
   p: ClassListeningParams
-): Promise<ClassListeningResult> {
+): Promise<ClassListeningResult & { content: ListeningContent }> {
   const attempt = p.attempt ?? 1;
   const content = await composeListeningContent({
     ttsProvider: p.ttsProvider,
@@ -810,9 +831,6 @@ export async function generateClassListening(
       return section;
     });
 
-    if (!p.deferAudio)
-      await queueListeningAudio(content, p.execution, { classId: p.classId, attempt });
-
     logger.info('Listening section generated', {
       classId: p.classId,
       episodeId,
@@ -820,7 +838,7 @@ export async function generateClassListening(
       questionCount: String(comprehensionQuestions.length),
     });
 
-    return { sectionId: section.id, episodeId };
+    return { sectionId: section.id, episodeId, content };
   } catch (err) {
     // Best-effort cleanup: mark the episode failed so it doesn't linger as PENDING.
     await prisma.episode
@@ -828,4 +846,21 @@ export async function generateClassListening(
       .catch(() => {});
     throw err;
   }
+}
+
+export async function generateClassListening(
+  p: ClassListeningParams
+): Promise<ClassListeningResult> {
+  const prepared = await prepareClassListening(p);
+  try {
+    if (!p.deferAudio)
+      await queueListeningAudio(prepared.content, p.execution, {
+        classId: p.classId,
+        attempt: p.attempt ?? 1,
+      });
+  } catch (error) {
+    await failUnqueuedClassListening(prepared.episodeId, p.userId);
+    throw error;
+  }
+  return { sectionId: prepared.sectionId, episodeId: prepared.episodeId };
 }

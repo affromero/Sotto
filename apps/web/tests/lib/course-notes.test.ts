@@ -3,6 +3,7 @@
  * empty-safe prompt block they render into.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { prismaUnfiltered } from '@/lib/prisma';
 
 const mockFindUnique = vi.fn();
 const mockUpsert = vi.fn();
@@ -61,6 +62,17 @@ beforeEach(() => {
 });
 
 describe('getCourseNote', () => {
+  it('reads the supplied transaction snapshot when editing a note', async () => {
+    mockFindUnique.mockResolvedValue({ body: 'Outside the transaction' });
+    const transaction = {
+      courseNote: {
+        ...prismaUnfiltered.courseNote,
+        findUnique: vi.fn().mockResolvedValue({ body: '  Transaction note  ' }),
+      },
+    };
+    expect(await getEditableCourseNote('c1', transaction)).toBe('Transaction note');
+    expect(await getEditableCourseNote('c1')).toBe('Outside the transaction');
+  });
   it('keeps document extracts in generation context and outside the editable note', async () => {
     mockFindUnique.mockResolvedValue({ body: 'Focus on travel' });
     mockMaterials.mockResolvedValue([

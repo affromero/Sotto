@@ -204,10 +204,14 @@ describe('reference-validator', () => {
       expect(result.passed).toBe(true);
       expect(result.confidence).toBeGreaterThanOrEqual(0.9);
       expect(result.detail).toContain('DOI verified');
-      expect(result.replacement).toBeDefined();
-      expect(result.replacement?.title).toBe('Climate Change Analysis');
-      expect(result.replacement?.authors).toEqual(['John Smith', 'Alice Doe']);
-      expect(result.replacement?.year).toBe(2023);
+      expect(result.replacement).toEqual({
+        title: 'Climate Change Analysis',
+        authors: ['John Smith', 'Alice Doe'],
+        year: 2023,
+        url: ref.url,
+        doi: '10.1234/climate',
+        publisher: 'Nature',
+      });
     });
 
     it('strips https://doi.org/ prefix from DOI', async () => {

@@ -12,6 +12,7 @@ import {
 const {
   mockEpisodeCreate,
   mockEpisodeUpdate,
+  mockEpisodeUpdateMany,
   mockScriptCreate,
   mockVocabEntryCreateMany,
   mockLearnerVocabUpsert,
@@ -33,6 +34,7 @@ const {
   return {
     mockEpisodeCreate: episodeCreate,
     mockEpisodeUpdate: episodeUpdate,
+    mockEpisodeUpdateMany: vi.fn().mockResolvedValue({ count: 1 }),
     mockScriptCreate: scriptCreate,
     mockVocabEntryCreateMany: vocabEntryCreateMany,
     mockLearnerVocabUpsert: learnerVocabUpsert,
@@ -145,6 +147,7 @@ vi.mock('@/lib/prisma', () => {
     episode: {
       create: (...args: unknown[]) => mockEpisodeCreate(...args),
       update: (...args: unknown[]) => mockEpisodeUpdate(...args),
+      updateMany: (...args: unknown[]) => mockEpisodeUpdateMany(...args),
     },
     script: {
       create: (...args: unknown[]) => mockScriptCreate(...args),
@@ -389,6 +392,7 @@ function setupHappyPath() {
 export {
   mockEpisodeCreate,
   mockEpisodeUpdate,
+  mockEpisodeUpdateMany,
   mockScriptCreate,
   mockVocabEntryCreateMany,
   mockLearnerVocabUpsert,

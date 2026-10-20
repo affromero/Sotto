@@ -955,8 +955,8 @@ model Course {
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
-  user             User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  curriculum       Curriculum           @relation(fields: [curriculumId], references: [id])
+  user             User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  curriculum       Curriculum               @relation(fields: [curriculumId], references: [id])
   placement        PlacementResult?
   classes          CourseClass[]
   vocab            LearnerVocab[]
@@ -968,6 +968,7 @@ model Course {
   materials        CourseMaterial[]
   mockExams        MockExam[]
   focusTargets     LearnerFocusTarget[]
+  reviewEvents     LearnerReviewEvent[]
 
   @@unique([userId, nativeLang, targetLang]) // one course per user per language pair
   @@index([userId])
@@ -1078,11 +1079,13 @@ model CourseClass {
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
-  course     Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  lesson     Lesson           @relation(fields: [lessonId], references: [id])
-  sections   ClassSection[]
-  submission ClassSubmission?
+  course       Course               @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lesson       Lesson               @relation(fields: [lessonId], references: [id])
+  sections     ClassSection[]
+  submission   ClassSubmission?
+  reviewEvents LearnerReviewEvent[]
 
+  @@unique([id, courseId])
   @@index([courseId, order])
   @@index([courseId, status])
   @@index([lessonId])
@@ -1445,10 +1448,12 @@ model LearnerVocab {
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
 
-  course   Course      @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  edgesOut VocabEdge[] @relation("EdgeSource")
-  edgesIn  VocabEdge[] @relation("EdgeTarget")
+  course       Course               @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  edgesOut     VocabEdge[]          @relation("EdgeSource")
+  edgesIn      VocabEdge[]          @relation("EdgeTarget")
+  reviewEvents LearnerReviewEvent[]
 
+  @@unique([id, courseId])
   @@unique([courseId, lemma])
   @@index([courseId, dueAt])
   @@index([courseId, mastery])
@@ -1471,11 +1476,43 @@ model LearnerGrammar {
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
-  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  course       Course               @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  reviewEvents LearnerReviewEvent[]
 
+  @@unique([id, courseId])
   @@unique([courseId, topicKey])
   @@index([courseId, dueAt])
   @@index([courseId, mastery])
+}
+
+// Append-only observations commit with their source submission and SRS update.
+model LearnerReviewEvent {
+  sequence          BigInt   @id @default(autoincrement())
+  courseId          String
+  vocabId           String?
+  grammarId         String?
+  classId           String?
+  practiceSessionId String?
+  sourceAttempt     Int
+  assessment        String
+  questionIds       String[]
+  quality           Float
+  reviewedAt        DateTime
+  schedulerVersion  String
+  before            Json
+  after             Json
+
+  course   Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  vocab    LearnerVocab?    @relation(fields: [vocabId, courseId], references: [id, courseId], onDelete: Cascade)
+  grammar  LearnerGrammar?  @relation(fields: [grammarId, courseId], references: [id, courseId], onDelete: Cascade)
+  class    CourseClass?     @relation(fields: [classId, courseId], references: [id, courseId], onDelete: Cascade)
+  practice PracticeSession? @relation(fields: [practiceSessionId, courseId], references: [id, courseId], onDelete: Cascade)
+
+  @@index([courseId, reviewedAt, sequence])
+  @@index([vocabId, sequence])
+  @@index([grammarId, sequence])
+  @@index([classId])
+  @@index([practiceSessionId])
 }
 
 // Polymorphic edge: exactly the endpoints relevant to `type` are non-null.
@@ -1536,13 +1573,15 @@ model PracticeSession {
   startedAt      DateTime       @default(now())
   completedAt    DateTime?
 
-  course           Course              @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  episode          Episode?            @relation(fields: [episodeId], references: [id], onDelete: SetNull)
+  course           Course               @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  episode          Episode?             @relation(fields: [episodeId], references: [id], onDelete: SetNull)
   prompts          SpeakingPrompt[]
   recordings       SpeakingRecording[]
   writingPrompts   WritingPrompt[]
   writingResponses WritingResponse[]
+  reviewEvents     LearnerReviewEvent[]
 
+  @@unique([id, courseId])
   @@index([courseId, kind])
   @@index([courseId, status])
 }
