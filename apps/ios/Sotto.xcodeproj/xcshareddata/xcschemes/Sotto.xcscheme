@@ -47,6 +47,9 @@
       <Testables>
          <TestableReference skipped="NO" parallelizable="NO">
             <BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="C50000000000000000000001" BuildableName="SottoUITests.xctest" BlueprintName="SottoUITests" ReferencedContainer="container:Sotto.xcodeproj"/>
+            <SkippedTests>
+               <Test Identifier="PlayMixedServerUITests"/>
+            </SkippedTests>
          </TestableReference>
          <TestableReference
             skipped = "NO"

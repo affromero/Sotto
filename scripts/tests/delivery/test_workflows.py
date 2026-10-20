@@ -99,6 +99,15 @@ class WorkflowScopeTests(unittest.TestCase):
         ])
         self.assertEqual(self.scope(), {'runtime': 'false', 'source': 'true'})
 
+    def test_integration_harness_changes_validate_without_runtime_images(self) -> None:
+        for path in ('e2e/native/run.mjs', 'e2e/android/process.mjs',
+                     'e2e/run.mjs', 'e2e/provider.mjs'):
+            with self.subTest(path=path):
+                self.add_paths([path])
+                self.assertEqual(self.scope(), {'runtime': 'false', 'source': 'true'})
+                (self.root / 'scope-output').unlink()
+                self.before = self.git('rev-parse', 'HEAD').strip()
+
     def test_hook_changes_validate_without_images(self) -> None:
         self.add_paths(['.pre-commit-config.yaml'])
         self.assertEqual(self.scope(), {'runtime': 'false', 'source': 'true'})
@@ -185,6 +194,7 @@ class AndroidWorkflowTests(unittest.TestCase):
             patterns = self.workflow['on'][event]['paths']
             for path in ('apps/android/app/MainActivity.kt',
                          'e2e/android/process.mjs',
+                         'e2e/native/run.mjs', 'e2e/run.mjs', 'e2e/provider.mjs',
                          'packages/shared/fixtures/play/contract.json',
                          'packages/shared/src/play/types.ts',
                          'packages/shared/src/contracts/play.ts',

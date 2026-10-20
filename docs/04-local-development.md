@@ -116,6 +116,26 @@ Regenerate it with `npx tsx scripts/play/export-fixtures.ts`; the web parity tes
 checks it against actual engine projections. Native CI selects both mobile
 clients on shared Play changes and tests Android 16 phone and Android 17 tablet.
 
+On macOS, the real-server matrix plays six rounds, saves private notebook entries
+and opens the same rematch across web/iOS, web/Android and Android-host/iOS pairs:
+
+```bash
+export SOTTO_NATIVE_ANDROID_SERIAL=emulator-5580
+export SOTTO_NATIVE_IOS_SIMULATOR=YOUR_DEDICATED_SIMULATOR_UUID
+node e2e/run.mjs --native
+node --test e2e/native/*.test.mjs
+```
+
+Use the isolated PostgreSQL and Redis configuration described under Browser tests.
+The runner installs native debug builds on the selected devices and uses real
+pairing and invitation screens. It erases saved game data through those screens;
+use dedicated test devices. Public invitation and round barriers travel through a
+run-scoped loopback controller. Credentials stay with each client. The runner
+removes its own port forwards and processes, and retains logs, screenshots and
+Xcode results under `test-results/native`. Set `SOTTO_NATIVE_MATRIX_OUTPUT` to
+choose another output directory or `SOTTO_NATIVE_IOS_BUILD` to reuse dedicated
+DerivedData. The normal native gates exclude these external matrix cases.
+
 A real phone needs a server address reachable from that phone. `localhost`
 points to the phone itself. Use the host's LAN address or HTTPS domain; the
 Android emulator uses `10.0.2.2` for its host. Android 17 requires app-wide local

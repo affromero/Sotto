@@ -39,7 +39,7 @@ struct PlayRoomView: View {
                         .buttonStyle(SottoSecondaryButtonStyle())
                         .disabled(coordinator.busy || coordinator.state?.pending != nil)
                 }
-            }
+            }.accessibilityElement(children: .contain).accessibilityIdentifier("play.room.\(room.id)")
         } else {
             ProgressView("Opening your game")
         }

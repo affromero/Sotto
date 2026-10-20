@@ -127,6 +127,14 @@ class NativeScopeTests(unittest.TestCase):
                 self.assertEqual(self.scope(), {'desktop': 'false', 'ios': 'true', 'android': 'true'})
                 self.base = self.git('rev-parse', 'HEAD')
 
+    def test_shared_integration_harness_requires_both_mobile_clients(self) -> None:
+        for path in ('e2e/native/run.mjs', 'e2e/run.mjs', 'e2e/provider.mjs'):
+            with self.subTest(path=path):
+                self.write(path)
+                self.commit()
+                self.assertEqual(self.scope(), {'desktop': 'false', 'ios': 'true', 'android': 'true'})
+                self.base = self.git('rev-parse', 'HEAD')
+
     def test_deleted_android_source_still_selects_android(self) -> None:
         self.write('apps/android/Retired.kt')
         self.commit()

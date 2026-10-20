@@ -60,6 +60,8 @@ class PlayInvitationUITest {
             click("Request a profile and join")
             click("Enter accepted game")
             visible("A game for two", absent = true)
+            compose.waitUntil(15_000) { compose.onAllNodesWithTag("play.room.fixture-room").fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithTag("play.room.fixture-room").performScrollTo().assertIsDisplayed()
             val choices = (fixture.round("initial-0-GUEST").content as Prediction).choices
             visible(choices.first().supportText.orEmpty(), absent = true)
             click("Show meanings")

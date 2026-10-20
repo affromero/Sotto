@@ -25,6 +25,7 @@ final class PlayInvitationUITests: XCTestCase {
         tap("Finish joining", app: app, timeout: 15)
         let firstCard = app.buttons["play.choice.A"]
         XCTAssertTrue(firstCard.waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertTrue(app.otherElements["play.room.fixture-room"].exists)
         XCTAssertFalse(app.staticTexts["Go for a walk"].exists)
         tap("Show meanings", app: app)
         XCTAssertTrue(app.staticTexts["Go for a walk"].waitForExistence(timeout: 5))

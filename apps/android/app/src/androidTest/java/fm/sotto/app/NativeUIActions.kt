@@ -13,21 +13,44 @@ class NativeUIActions(private val compose: ComposeTestRule) {
     fun allowLocalNetwork() {
         if (android.os.Build.VERSION.SDK_INT < 37 || NetworkAccess.permissionGranted()) return
         click("Allow local network access")
-        val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
-        val allow = device.wait(Until.findObject(By.res("com.android.permissioncontroller", "permission_allow_button")), 10_000)
-        requireNotNull(allow) { "Android did not show its local network permission request." }.click()
-        compose.waitUntil(10_000) { NetworkAccess.permissionGranted() }
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val device = UiDevice.getInstance(instrumentation)
+        val selector = By.res("com.android.permissioncontroller", "permission_allow_button")
+        val dialog = requireNotNull(device.wait(Until.findObject(selector), 10_000)) {
+            "Android did not show its local network permission request."
+        }
+        val permissionPackage = dialog.applicationPackage
+        val deadline = android.os.SystemClock.uptimeMillis() + 15_000
+        while (!NetworkAccess.permissionGranted() && android.os.SystemClock.uptimeMillis() < deadline) {
+            device.waitForIdle(3000)
+            if (NetworkAccess.permissionGranted()) break
+            compose.waitUntil(5000) {
+                NetworkAccess.permissionGranted() || instrumentation.uiAutomation.windows.any {
+                    it.isFocused && it.root?.packageName == permissionPackage
+                }
+            }
+            if (NetworkAccess.permissionGranted()) break
+            val allow = device.findObject(By.copy(selector).enabled(true).clickable(true))
+            checkNotNull(allow) { "The local network permission dialog closed without granting access." }.click()
+            device.wait(Until.gone(selector), 2000)
+        }
+        check(NetworkAccess.permissionGranted()) { "Android did not grant the requested local network access." }
+        compose.waitUntil(10_000) { !device.hasObject(selector) }
     }
     fun visible(text: String, absent: Boolean = false) {
-        compose.waitUntil(15_000) {
-            val nodes = compose.onAllNodesWithText(text, substring = false).fetchSemanticsNodes()
-            if (absent) nodes.isEmpty() else nodes.isNotEmpty()
+        try {
+            compose.waitUntil(15_000) {
+                val nodes = compose.onAllNodesWithText(text, substring = false).fetchSemanticsNodes()
+                if (absent) nodes.isEmpty() else nodes.isNotEmpty()
+            }
+        } catch (error: ComposeTimeoutException) {
+            throw AssertionError("Expected ${if (absent) "absent" else "visible"} text: $text\n${compose.onRoot().printToString()}", error)
         }
         if (!absent) compose.onAllNodesWithText(text).onFirst().performScrollTo().assertIsDisplayed()
     }
-    fun click(text: String) {
+    fun click(text: String, timeoutMillis: Long = 15_000) {
         val matcher = hasText(text) and hasClickAction() and isEnabled()
-        compose.waitUntil(15_000) { compose.onAllNodes(matcher).fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(timeoutMillis) { compose.onAllNodes(matcher).fetchSemanticsNodes().isNotEmpty() }
         compose.onAllNodes(matcher).onFirst().performScrollTo().assertIsDisplayed().performClick()
     }
     fun fill(label: String, text: String) {

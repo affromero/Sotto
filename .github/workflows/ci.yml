@@ -65,6 +65,7 @@ jobs:
               runtime = any(runtime_path(path) for path in paths if path)
               source = runtime or any(
                   path.startswith('apps/web/') or fnmatch.fnmatch(path, 'vitest*.config.ts')
+                  or path.startswith('e2e/')
                   or path == '.pre-commit-config.yaml'
                   for path in paths if path
               )

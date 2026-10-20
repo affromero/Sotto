@@ -2,6 +2,8 @@ package fm.sotto.app.ui
 
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import fm.sotto.app.model.*
 import fm.sotto.app.play.*
 import fm.sotto.app.ui.games.RoundGame
@@ -13,7 +15,7 @@ import fm.sotto.app.ui.platform.localNetworkAccess
     val room = state.room
     if (room == null) { Text(if (state.accessRevoked) "This profile can no longer open the game." else "Opening game…"); return }
     val ready = state.active && network && !state.busy && !state.checking && !state.accessRevoked && state.vault?.pending == null
-    Text(room.kind.title, style = MaterialTheme.typography.headlineMedium)
+    Text(room.kind.title, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.testTag("play.room.${room.id}"))
     Text("${room.host.name} + ${room.guest?.name ?: "your partner"} · ${room.points} shared points")
     if (room.status == RoomStatus.WAITING) {
         Text("A seat for your partner", style = MaterialTheme.typography.titleLarge)

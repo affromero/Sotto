@@ -51,6 +51,9 @@ try {
         path.startsWith('packages/shared/src/play/') ||
         path === 'packages/shared/src/contracts/play.ts' ||
         path.startsWith('scripts/play/') ||
+        path.startsWith('e2e/native/') ||
+        path === 'e2e/run.mjs' ||
+        path === 'e2e/provider.mjs' ||
         path.startsWith('apps/web/src/lib/play/')
       ) {
         ios = true;
