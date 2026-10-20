@@ -19,8 +19,8 @@ final class SottoAppModel: ObservableObject {
     @Published private(set) var agentUsage: SottoAgentUsageStatus?
     @Published private(set) var isAgentUsageRefreshing = false
     @Published private(set) var agentUsageFailed = false
-    @Published private(set) var classGenerationOperations: [String: SottoLoadingOperation] = [:]
-    @Published private(set) var classGenerationErrors: [String: String] = [:]
+    @Published var classGenerationOperations: [String: SottoLoadingOperation] = [:]
+    @Published var classGenerationErrors: [String: String] = [:]
     @Published var errorMessage: String?
     @Published var courseRefreshError: String?
     var courseRefreshTasks: [SottoLearnerIdentity: SottoCourseRefreshRequest] = [:]
@@ -30,9 +30,10 @@ final class SottoAppModel: ObservableObject {
     private let credentialStore: any SottoCredentialPersistence
     private let session: URLSession
     private var work: Task<Void, Never>?
-    private var activeClassGenerationCourseId: String?
-    private var cancelledClassGenerationCourseIds = Set<String>()
-    private var classGenerationTasks: [String: Task<Void, Never>] = [:]
+    private var workId: UUID?
+    var classGenerationAdmissionId: UUID?
+    var classGenerationTasks: [String: Task<Void, Never>] = [:]
+    var classGenerationObservations: [String: SottoClassGenerationObservation] = [:]
 
     init(credentials: SottoCredentials? = nil, session: URLSession = .shared,
          credentialStore: any SottoCredentialPersistence = CredentialStore()) {
@@ -91,22 +92,25 @@ final class SottoAppModel: ObservableObject {
     /// replaces whatever was still running.
     func run(_ operation: @escaping @MainActor () async -> Void) {
         work?.cancel()
+        classGenerationAdmissionId = nil
+        let id = UUID()
+        workId = id
         work = Task { @MainActor [weak self] in
             await operation()
-            self?.work = nil
+            if self?.workId == id {
+                self?.work = nil
+                self?.workId = nil
+            }
         }
     }
 
-    /// Abandons whatever the overlay is waiting on. A class being generated is
-    /// also stopped server-side, so the queue is not left building something
-    /// nobody is waiting for.
+    /// Abandons the foreground request. Admitted class work has its own
+    /// explicit cancellation action on the course progress panel.
     func cancelWork() async {
-        if let courseId = activeClassGenerationCourseId {
-            await cancelClassGeneration(for: courseId)
-        }
-
         work?.cancel()
         work = nil
+        workId = nil
+        classGenerationAdmissionId = nil
         isLoading = false
         loadingOperation = nil
     }
@@ -118,10 +122,9 @@ final class SottoAppModel: ObservableObject {
         credentials = nil
         profiles = []
         resetLearnerState()
-        activeClassGenerationCourseId = nil
-        cancelledClassGenerationCourseIds.removeAll()
         classGenerationTasks.values.forEach { $0.cancel() }
         classGenerationTasks.removeAll()
+        classGenerationObservations.removeAll()
         errorMessage = nil
         return true
     }
@@ -193,6 +196,9 @@ final class SottoAppModel: ObservableObject {
     }
 
     private func resetLearnerState() {
+        classGenerationAdmissionId = nil
+        isLoading = false
+        loadingOperation = nil
         courseRefreshTasks.values.forEach { $0.task.cancel() }
         courseRefreshTasks.removeAll()
         courseRefreshError = nil
@@ -212,6 +218,7 @@ final class SottoAppModel: ObservableObject {
         classGenerationErrors = [:]
         classGenerationTasks.values.forEach { $0.cancel() }
         classGenerationTasks.removeAll()
+        classGenerationObservations.removeAll()
     }
 
     func closeClass() {
@@ -232,12 +239,11 @@ final class SottoAppModel: ObservableObject {
             if removedIds.contains(selectedClass.courseId) || (wasKnown && !remains) { closeClass() }
         }
         for id in removedIds {
-            cancelledClassGenerationCourseIds.insert(id)
             classGenerationTasks[id]?.cancel()
             classGenerationTasks[id] = nil
             classGenerationOperations[id] = nil
             classGenerationErrors[id] = nil
-            if activeClassGenerationCourseId == id { activeClassGenerationCourseId = nil }
+            classGenerationObservations[id] = nil
         }
         if let sessionId = practiceStart?.sessionId, let courseId = practiceCourses[sessionId], !ids.contains(courseId) {
             practiceStart = nil
@@ -296,112 +302,6 @@ final class SottoAppModel: ObservableObject {
         startClassGeneration(for: course)
     }
 
-    func startClassGeneration(
-        for course: SottoCourse,
-        source: SottoClassGenerationSource = .curriculum
-    ) {
-        guard let client = makeClient() else { return }
-        guard classGenerationTasks[course.id] == nil else { return }
-
-        activeClassGenerationCourseId = course.id
-        cancelledClassGenerationCourseIds.remove(course.id)
-        classGenerationErrors[course.id] = nil
-        let startedAt = Date()
-        classGenerationOperations[course.id] = classGenerationOperation(
-            progress: nil,
-            course: course,
-            elapsedSeconds: 0
-        )
-        errorMessage = nil
-
-        classGenerationTasks[course.id] = Task { [weak self] in
-            await self?.runClassGeneration(
-                client: client,
-                course: course,
-                source: source,
-                startedAt: startedAt
-            )
-        }
-    }
-
-    private func runClassGeneration(
-        client: SottoAPIClient,
-        course: SottoCourse,
-        source: SottoClassGenerationSource,
-        startedAt: Date
-    ) async {
-        let progressTask = startClassGenerationPolling(client: client, course: course, startedAt: startedAt)
-        defer {
-            progressTask.cancel()
-            classGenerationTasks[course.id] = nil
-            if activeClassGenerationCourseId == course.id {
-                activeClassGenerationCourseId = nil
-            }
-        }
-
-        do {
-            try await client.startNextClassGeneration(courseId: course.id, source: source)
-            if try await waitForGeneratedClassAfterRequestFailure(
-                client: client,
-                course: course,
-                startedAt: startedAt,
-                originalError: SottoAPIError.message("Class generation did not finish.")
-            ) != nil {
-                guard !isClassGenerationCancelled(course.id) else { return }
-                await finishBackgroundClassGeneration(courseId: course.id, client: client)
-                return
-            }
-
-            guard !Task.isCancelled, !isClassGenerationCancelled(course.id), isCurrentLearningClient(client) else { return }
-            classGenerationErrors[course.id] = "Class generation did not finish."
-            classGenerationOperations[course.id] = nil
-        } catch {
-            if isClassGenerationCancelled(course.id) {
-                return
-            }
-
-            do {
-                if try await waitForGeneratedClassAfterRequestFailure(
-                    client: client,
-                    course: course,
-                    startedAt: startedAt,
-                    originalError: error
-                ) != nil {
-                    guard !isClassGenerationCancelled(course.id) else { return }
-                    await finishBackgroundClassGeneration(courseId: course.id, client: client)
-                    return
-                }
-            } catch {
-                if isClassGenerationCancelled(course.id) {
-                    return
-                }
-            }
-
-            guard !Task.isCancelled, !isClassGenerationCancelled(course.id), isCurrentLearningClient(client) else { return }
-            classGenerationErrors[course.id] = error.localizedDescription
-            classGenerationOperations[course.id] = nil
-        }
-    }
-
-    private func finishBackgroundClassGeneration(
-        courseId: String,
-        client: SottoAPIClient
-    ) async {
-        do {
-            let refreshed = try await client.listCourses()
-            guard !Task.isCancelled, !isClassGenerationCancelled(courseId), isCurrentLearningClient(client) else { return }
-            applyCourseRefresh(refreshed)
-            guard !isClassGenerationCancelled(courseId) else { return }
-            classGenerationErrors[courseId] = nil
-            classGenerationOperations[courseId] = nil
-            refreshAgentUsageInBackground()
-        } catch {
-            guard !Task.isCancelled, !isClassGenerationCancelled(courseId), isCurrentLearningClient(client) else { return }
-            classGenerationErrors[courseId] = error.localizedDescription
-            classGenerationOperations[courseId] = nil
-        }
-    }
-
     func openClass(_ classId: String) async {
         guard let client = makeClient() else { return }
         pencilWorkbook = false
@@ -410,8 +310,15 @@ final class SottoAppModel: ObservableObject {
 
         do {
             var classDetail = try await client.fetchClass(classId: classId)
+            if !classDetail.submitted, classDetail.status == "GENERATING" {
+                guard isCurrentLearningClient(client) else { return }
+                observePreparingClass(classDetail, client: client)
+                loadingOperation = nil
+                isLoading = false
+                return
+            }
             if !classDetail.submitted,
-               classDetail.status == "GENERATING" || isClassPresentationStillRendering(classDetail) {
+               isClassPresentationStillRendering(classDetail) {
                 let startedAt = Date()
                 loadingOperation = SottoLoadingOperation(
                     title: "Preparing class",
@@ -548,41 +455,6 @@ final class SottoAppModel: ObservableObject {
             remainingSeconds: nil,
             activity: "Cannot refresh progress. Check your connection to the server."
         )
-    }
-
-    func regenerateSelectedClass() async {
-        guard let client = makeClient(), let selectedClass else { return }
-        isLoading = true
-        loadingOperation = SottoLoadingOperation(
-            title: "Regenerating class",
-            detail: "Building a fresh version of the current class.",
-            progress: nil,
-            currentStep: nil,
-            totalSteps: nil,
-            elapsedSeconds: nil,
-            remainingSeconds: nil
-        )
-        errorMessage = nil
-
-        do {
-            let startedAt = Date()
-            try await client.startClassRegeneration(classId: selectedClass.id, expectedAttempt: selectedClass.attempt ?? 1)
-            self.selectedClass = try await waitForRefreshedClass(
-                client: client,
-                classId: selectedClass.id,
-                courseId: selectedClass.courseId,
-                startedAt: startedAt,
-                initialIssues: []
-            )
-            classResult = nil
-            courses = try await client.listCourses()
-            refreshAgentUsageInBackground()
-        } catch {
-            report(error)
-        }
-
-        loadingOperation = nil
-        isLoading = false
     }
 
     func deleteSelectedClass() async {
@@ -819,36 +691,6 @@ final class SottoAppModel: ObservableObject {
         return try await client.fetchEpisode(episodeId: episodeId)
     }
 
-    func cancelClassGeneration(for courseId: String) async {
-        guard let client = makeClient() else { return }
-
-        cancelledClassGenerationCourseIds.insert(courseId)
-        classGenerationTasks[courseId]?.cancel()
-        classGenerationTasks[courseId] = nil
-        classGenerationOperations[courseId] = SottoLoadingOperation(
-            title: "Cancelling class generation",
-            detail: "Stopping the current class build and clearing the retry state.",
-            progress: nil,
-            currentStep: nil,
-            totalSteps: nil,
-            elapsedSeconds: nil,
-            remainingSeconds: nil
-        )
-
-        do {
-            try await client.cancelClassGeneration(courseId: courseId)
-            courses = try await client.listCourses()
-            classGenerationErrors[courseId] = nil
-        } catch {
-            classGenerationErrors[courseId] = error.localizedDescription
-        }
-
-        if activeClassGenerationCourseId == courseId {
-            activeClassGenerationCourseId = nil
-        }
-        classGenerationOperations[courseId] = nil
-    }
-
     func makeClient(usesSelectedProfile: Bool = true) -> SottoAPIClient? {
         guard let credentials else { return nil }
         return SottoAPIClient(
@@ -859,108 +701,10 @@ final class SottoAppModel: ObservableObject {
         )
     }
 
-    private func refreshAgentUsageInBackground() {
+    func refreshAgentUsageInBackground() {
         Task { [weak self] in
             await self?.loadAgentUsage()
         }
     }
 
-    private func isClassGenerationCancelled(_ courseId: String) -> Bool {
-        cancelledClassGenerationCourseIds.contains(courseId)
-    }
-
-    private func waitForGeneratedClassAfterRequestFailure(
-        client: SottoAPIClient,
-        course: SottoCourse,
-        startedAt: Date,
-        originalError: Error
-    ) async throws -> String? {
-        let deadline = Date().addingTimeInterval(900)
-        let idleGraceDeadline = startedAt.addingTimeInterval(30)
-
-        while !Task.isCancelled && !isClassGenerationCancelled(course.id) {
-            let elapsedSeconds = Int(Date().timeIntervalSince(startedAt))
-            let progress = try? await client.fetchClassGenerationProgress(courseId: course.id)
-            guard !Task.isCancelled, !isClassGenerationCancelled(course.id), isCurrentLearningClient(client) else { return nil }
-
-            classGenerationOperations[course.id] = classGenerationOperation(
-                progress: progress,
-                course: course,
-                elapsedSeconds: elapsedSeconds,
-                previous: classGenerationOperations[course.id]
-            )
-
-            if let progress, let classId = progress.classId {
-                if progress.status != "GENERATING" && progress.status != "IDLE" {
-                    return classId
-                }
-            }
-
-            if Date() >= deadline || (progress?.status == "IDLE" && Date() >= idleGraceDeadline) {
-                throw originalError
-            }
-
-            try? await Task.sleep(nanoseconds: 1_500_000_000)
-        }
-
-        return nil
-    }
-
-    private func startClassGenerationPolling(
-        client: SottoAPIClient,
-        course: SottoCourse,
-        startedAt: Date
-    ) -> Task<Void, Never> {
-        Task { [weak self] in
-            while !Task.isCancelled {
-                let elapsedSeconds = Int(Date().timeIntervalSince(startedAt))
-                do {
-                    let progress = try await client.fetchClassGenerationProgress(courseId: course.id)
-                    await MainActor.run {
-                        guard let self, !Task.isCancelled, !self.isClassGenerationCancelled(course.id), self.isCurrentLearningClient(client) else { return }
-                        self.classGenerationOperations[course.id] = self.classGenerationOperation(
-                            progress: progress,
-                            course: course,
-                            elapsedSeconds: elapsedSeconds
-                        )
-                    }
-                } catch {
-                    await MainActor.run {
-                        guard let self, !Task.isCancelled, !self.isClassGenerationCancelled(course.id), self.isCurrentLearningClient(client) else { return }
-                        self.classGenerationOperations[course.id] = self.classGenerationOperation(
-                            progress: nil,
-                            course: course,
-                            elapsedSeconds: elapsedSeconds,
-                            previous: self.classGenerationOperations[course.id]
-                        )
-                    }
-                }
-
-                try? await Task.sleep(nanoseconds: 1_500_000_000)
-            }
-        }
-    }
-
-    private func classGenerationOperation(
-        progress: SottoGenerationProgress?,
-        course: SottoCourse,
-        elapsedSeconds: Int,
-        previous: SottoLoadingOperation? = nil
-    ) -> SottoLoadingOperation {
-        if let progress {
-            let title = progress.lessonTitle.map { "Generating \($0)" } ?? "Generating class"
-            return progress.loadingOperation(title: title, elapsedSeconds: elapsedSeconds)
-        }
-        if let previous { return previous.progressUnavailable(elapsedSeconds: elapsedSeconds) }
-        return SottoLoadingOperation(
-            title: "Generating \(course.curriculum?.title ?? "class")",
-            detail: "Contacting your Sotto server and preparing the lesson plan.",
-            progress: nil,
-            currentStep: nil,
-            totalSteps: nil,
-            elapsedSeconds: elapsedSeconds,
-            remainingSeconds: nil,
-            activity: "Waiting for a progress report from the server."
-        )
-    }
 }

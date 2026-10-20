@@ -73,7 +73,9 @@ final class APITransportPrivacyTests: XCTestCase {
         try await server.start()
         defer { server.stop() }
         let client = SottoAPIClient(serverURL: server.url, apiKey: "class-secret", profileId: "learner", session: URLSession(configuration: .ephemeral))
-        try await client.startClassRegeneration(classId: "class-saved", expectedAttempt: 4)
+        let accepted = try await client.startClassRegeneration(classId: "class-saved", expectedAttempt: 4)
+        XCTAssertEqual(accepted.operationId, "9ad1cf1c-ec3a-4605-8a85-d0a5b95160ac")
+        XCTAssertEqual(accepted.courseId, "course")
         let request = try XCTUnwrap(server.requests.first)
         XCTAssertTrue(request.hasPrefix("POST /api/v1/classes/class-saved?background=1 "))
         let json = try XCTUnwrap(request.components(separatedBy: "\r\n\r\n").last).data(using: .utf8)

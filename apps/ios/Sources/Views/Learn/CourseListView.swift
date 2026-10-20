@@ -368,15 +368,16 @@ private struct CourseDetailPane: View {
                 )
 
                 if let generation {
-                    ClassGenerationStatusPanel(operation: generation) {
+                    ClassGenerationStatusPanel(operation: generation, canCancel: model.canCancelClassGeneration(for: course.id)) {
                         Task {
                             await model.cancelClassGeneration(for: course.id)
                         }
                     }
                 } else if let generationError {
-                    ClassGenerationErrorPanel(message: generationError) {
-                        model.startClassGeneration(for: course)
-                    }
+                    ClassGenerationErrorPanel(message: generationError,
+                        retryTitle: model.classGenerationRetryTitle(for: course.id),
+                        onRetry: { model.retryClassGeneration(for: course) },
+                        onCheckStatus: { model.checkClassGenerationStatus(for: course) })
                 }
 
                 CourseActionGrid(
@@ -499,6 +500,7 @@ private struct CourseDetailPane: View {
 
 private struct ClassGenerationStatusPanel: View {
     let operation: SottoLoadingOperation
+    let canCancel: Bool
     let onCancel: () -> Void
 
     var body: some View {
@@ -555,6 +557,7 @@ private struct ClassGenerationStatusPanel: View {
                     Button(role: .destructive, action: onCancel) {
                         Label("Cancel", systemImage: "xmark.circle")
                     }
+                    .disabled(!canCancel)
                     .buttonStyle(.bordered)
                     .controlSize(.small)
                     .frame(minHeight: 44)
@@ -583,14 +586,16 @@ private struct ClassGenerationStatusPanel: View {
 
 private struct ClassGenerationErrorPanel: View {
     let message: String
+    let retryTitle: String?
     let onRetry: () -> Void
+    let onCheckStatus: () -> Void
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: "exclamationmark.triangle")
                 .foregroundStyle(.red)
             VStack(alignment: .leading, spacing: 6) {
-                Text("Class generation failed")
+                Text("Class preparation needs attention")
                     .font(.headline)
                     .foregroundStyle(SottoTheme.ink)
                 Text(message)
@@ -599,8 +604,14 @@ private struct ClassGenerationErrorPanel: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
-            Button("Retry", action: onRetry)
-                .buttonStyle(.bordered)
+            VStack {
+                Button("Check status", action: onCheckStatus)
+                    .buttonStyle(.bordered)
+                if let retryTitle {
+                    Button(retryTitle, action: onRetry)
+                        .buttonStyle(.bordered)
+                }
+            }
         }
         .padding(18)
         .background(SottoTheme.surface)

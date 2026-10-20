@@ -46,6 +46,7 @@ extension SottoAppModel {
             if request.task.isCancelled { throw CancellationError() }
             guard isCurrentLearningClient(client) else { return }
             applyCourseRefresh(refreshed)
+            resumeClassGenerationMonitoring()
             courseRefreshError = nil
         } catch {
             guard isCurrentLearningClient(client), !(error is CancellationError),

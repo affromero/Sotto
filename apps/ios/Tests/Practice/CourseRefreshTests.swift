@@ -232,10 +232,10 @@ private actor CourseRefreshServer {
             return (200, #"{"status":"ready","sessionId":"late-practice"}"#)
         }
         if mode == "final-generation", request.httpMethod == "POST" {
-            return (202, #"{"started":true}"#)
+            return (202, #"{"started":true,"operationId":"preparation"}"#)
         }
         if mode == "final-generation", request.url?.path.hasSuffix("/generation") == true {
-            return (200, #"{"status":"AVAILABLE","classId":"class-1","stage":"Ready","detail":"Ready","progress":1,"currentStep":6,"totalSteps":6,"sections":[]}"#)
+            return (200, #"{"operationId":"preparation","operationStatus":"COMPLETED","status":"AVAILABLE","classId":"class-1","stage":"Ready","detail":"Ready","progress":1,"currentStep":6,"totalSteps":6,"sections":[]}"#)
         }
         if mode == "failed" { return (503, #"{"error":"Server unavailable"}"#) }
         if request.url?.path == "/api/v1/courses" {
