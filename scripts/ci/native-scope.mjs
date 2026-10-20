@@ -45,7 +45,10 @@ try {
         path === 'scripts/ci/test-desktop-appimage.sh' ||
         path === 'apps/web/public/brand/sotto-mark.svg';
       ios ||= path.startsWith('apps/ios/');
-      android ||= path.startsWith('apps/android/') || path.startsWith('e2e/android/');
+      android ||=
+        path.startsWith('apps/android/') ||
+        path.startsWith('e2e/android/') ||
+        path === 'scripts/ci/android-results.py';
       if (
         path.startsWith('packages/shared/fixtures/play/') ||
         path.startsWith('packages/shared/src/play/') ||
