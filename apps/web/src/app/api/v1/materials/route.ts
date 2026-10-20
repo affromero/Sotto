@@ -21,7 +21,7 @@ export function POST(request: NextRequest) {
     } catch (error) {
       if (isAccessError(error)) throw error;
       if (error instanceof RequestBodyTooLargeError)
-        return errorResponse('Materials must total 10MB or less.', 413);
+        return errorResponse('Materials must total 50MB or less.', 413);
       return errorResponse('Could not retain the uploaded materials.', 500);
     }
   });

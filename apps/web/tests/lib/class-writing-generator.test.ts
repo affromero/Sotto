@@ -1,5 +1,6 @@
 // Writing content, bounded repair and class persistence through canonical processing.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { SourceDocuments } from '@/lib/providers/ai';
 import {
   emptyTeachingCriticFixture,
   novelFindingCorroborationFixture,
@@ -29,9 +30,13 @@ vi.mock('@/lib/prisma', () => {
 const mockResolveLearningAi = vi.fn();
 vi.mock('@/lib/learning-ai', () => ({
   resolveCapturedLearningAi: (...a: unknown[]) => mockResolveLearningAi(...a),
-  capturedLearningAiOptions: async (ai: { model: string; apiKey?: string }) => ({
+  capturedLearningAiOptions: async (
+    ai: { model: string; apiKey?: string; execution?: { sourceDocuments?: SourceDocuments } },
+    scope?: { includeSourceDocuments?: boolean }
+  ) => ({
     model: ai.model,
     apiKeyOverride: ai.apiKey,
+    ...(scope?.includeSourceDocuments ? { sourceDocuments: ai.execution?.sourceDocuments } : {}),
   }),
 }));
 
@@ -121,6 +126,28 @@ beforeEach(() => {
 });
 
 describe('composeWritingPrompts', () => {
+  it('uses original material for writing authors while keeping independent review inputs restricted', async () => {
+    const sourceDocuments: SourceDocuments = {
+      parts: [
+        {
+          type: 'document',
+          mediaType: 'application/pdf',
+          name: 'Workbook.pdf',
+          data: Buffer.from('%PDF-1.7'),
+        },
+      ],
+      validate: async () => {},
+    };
+    mockResolveLearningAi.mockResolvedValue({
+      provider: 'anthropic',
+      model: 'm',
+      execution: { ...PARAMS.execution, sourceDocuments },
+    });
+    await composeWritingPrompts(PARAMS);
+    expect(mockGenerateResponse.mock.calls[0][2].sourceDocuments).toBe(sourceDocuments);
+    for (const request of mockTeachingResponse.mock.calls)
+      expect(request[2]?.sourceDocuments).toBeUndefined();
+  });
   it.each([null, undefined, 'Different beginning'])(
     'rejects incompatible fixed starters within the existing replacement budget',
     async (starterText) => {

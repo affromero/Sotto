@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -16,6 +17,7 @@ import { createAIProvider } from '@/lib/providers/ai';
 import { ClaudeCodeProvider } from '@/lib/providers/claude-code';
 import { streamResponse } from '@/lib/llm';
 import { isolatedFixture } from './agent-clients/isolated-fixture';
+import { originalPdf } from '../helpers/learning/pdf';
 
 describe('Claude CLI execution', () => {
   it('rejects unsupported isolated search before using subscription credentials', async () => {
@@ -78,7 +80,13 @@ describe('Claude CLI execution', () => {
     signal = AbortSignal.any([controller.signal, context.signal]);
     originalEnv = process.env;
     directory = mkdtempSync(join(tmpdir(), 'sotto-claude-fixture-'));
-    process.env = { NODE_ENV: 'test', PATH: directory, HOME: directory, TMPDIR: directory };
+    process.env = {
+      NODE_ENV: 'test',
+      PATH: directory,
+      HOME: directory,
+      TMPDIR: directory,
+      SIDEDOOR_EXECUTION_DIR: join(directory, 'executions'),
+    };
     resetClaudeRuntimeForTests();
   });
   afterEach(async () => {
@@ -452,7 +460,7 @@ describe('Claude CLI execution', () => {
     expect(request.args.join(' ')).not.toContain('Private prompt');
   });
 
-  it.each(['client', 'provider', 'factory'])(
+  it.each(['client', 'provider', 'factory', 'factory-pdf'])(
     'retains cleanup failure and measured usage when closing a pending %s read',
     async (entry) => {
       seed();
@@ -472,13 +480,28 @@ describe('Claude CLI execution', () => {
       const stream = ownStream(
         entry === 'client'
           ? streamClaudeCode('', 'Prompt', { onUsage: () => observed(), signal })
-          : entry === 'factory'
+          : entry.startsWith('factory')
             ? createAIProvider('claude-code').streamResponse(
                 '',
                 [{ role: 'user', content: 'Prompt' }],
                 {
                   onUsage: () => observed(),
                   signal,
+                  ...(entry === 'factory-pdf'
+                    ? {
+                        sourceDocuments: {
+                          parts: [
+                            {
+                              type: 'document' as const,
+                              mediaType: 'application/pdf' as const,
+                              name: 'Original.pdf',
+                              data: originalPdf(1),
+                            },
+                          ],
+                          validate: async () => {},
+                        },
+                      }
+                    : {}),
                 }
               )
             : new ClaudeCodeProvider().streamResponse('', [{ role: 'user', content: 'Prompt' }], {

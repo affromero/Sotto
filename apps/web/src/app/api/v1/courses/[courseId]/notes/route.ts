@@ -175,7 +175,7 @@ async function importNotes(request: NextRequest, { params }: RouteParams) {
     });
   } catch (error: unknown) {
     if (error instanceof RequestBodyTooLargeError)
-      return errorResponse('Materials must total 10MB or less.', 413);
+      return errorResponse('Materials must total 50MB or less.', 413);
     if (isAccessError(error)) throw error;
     logger.error('Failed to import course notes', {
       error: error instanceof Error ? error.message : String(error),

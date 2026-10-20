@@ -298,7 +298,7 @@ export async function composeListeningContent(
           cachedResult ??
           (await generateScript({
             learningRepair,
-            ...(await capturedLearningAiOptions(ai)),
+            ...(await capturedLearningAiOptions(ai, { includeSourceDocuments: true })),
             topic: p.objective,
             learnerContext: p.note,
             teaching: p.teaching,

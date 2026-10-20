@@ -76,6 +76,10 @@ try {
     'packages/learning-model/src',
   ])
     include(relative);
+  if (hasDirectory('apps/web/src/lib/providers/documents')) {
+    include('apps/web/src/lib/providers/documents');
+    include('apps/web/scripts/pdf-render');
+  }
   const coreDirectory = packageDirectory('thesidedoor-core', 'apps/web');
   for (const directory of [packageDirectory('thesidedoor', 'apps/web'), coreDirectory]) {
     include(directory + '/package.json');

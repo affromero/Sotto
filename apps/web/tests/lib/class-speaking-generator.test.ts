@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { SourceDocuments } from '@/lib/providers/ai';
 import { sampleTeaching } from '../helpers/learning/class-teaching';
 import { authorizedLearnerExecution } from '../helpers/runtime/provider-execution';
 import {
@@ -103,9 +104,13 @@ vi.mock('@/lib/byok', () => ({
 }));
 vi.mock('@/lib/learning-ai', () => ({
   resolveCapturedLearningAi: (...args: unknown[]) => mockResolveCapturedLearningAi(...args),
-  capturedLearningAiOptions: async (ai: { model: string; apiKey?: string }) => ({
+  capturedLearningAiOptions: async (
+    ai: { model: string; apiKey?: string; execution?: { sourceDocuments?: SourceDocuments } },
+    scope?: { includeSourceDocuments?: boolean }
+  ) => ({
     model: ai.model,
     apiKeyOverride: ai.apiKey,
+    ...(scope?.includeSourceDocuments ? { sourceDocuments: ai.execution?.sourceDocuments } : {}),
   }),
 }));
 
@@ -249,6 +254,29 @@ function setupHappyPath({ withTts = true }: { withTts?: boolean } = {}) {
 // ---- Tests ----
 
 describe('generateClassSpeaking', () => {
+  it('uses original PDF material for phrase authoring without attaching it to independent reviews', async () => {
+    setupHappyPath({ withTts: false });
+    const sourceDocuments: SourceDocuments = {
+      parts: [
+        {
+          type: 'document',
+          mediaType: 'application/pdf',
+          name: 'Workbook.pdf',
+          data: Buffer.from('%PDF-1.7'),
+        },
+      ],
+      validate: async () => {},
+    };
+    mockResolveCapturedLearningAi.mockResolvedValue({
+      provider: 'anthropic',
+      model: 'm',
+      execution: { ...PARAMS.execution, sourceDocuments },
+    });
+    await generateClassSpeaking(PARAMS);
+    expect(mockGenerateResponse.mock.calls[0][2].sourceDocuments).toBe(sourceDocuments);
+    for (const request of mockTeachingResponse.mock.calls)
+      expect(request[2]?.sourceDocuments).toBeUndefined();
+  });
   it('omits optional reference audio when the learner explicitly disables speech', async () => {
     setupHappyPath({ withTts: true });
     mockUserFindUnique.mockResolvedValue({

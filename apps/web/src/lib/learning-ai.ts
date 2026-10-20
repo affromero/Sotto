@@ -142,7 +142,10 @@ export function captureLearningModerationCredential(execution: SottoProviderExec
   );
 }
 
-export async function capturedLearningAiOptions(ai: CapturedLearningAi) {
+export async function capturedLearningAiOptions(
+  ai: CapturedLearningAi,
+  options: { includeSourceDocuments?: boolean } = {}
+) {
   const moderationCredential = await captureLearningModerationCredential(ai.execution);
   const expectedModeration = ai.execution.learningSelection?.moderationCredentialFingerprint;
   if (
@@ -171,11 +174,15 @@ export async function capturedLearningAiOptions(ai: CapturedLearningAi) {
     : undefined;
   return {
     model: ai.model,
+    ...(options.includeSourceDocuments && ai.execution.sourceDocuments
+      ? { sourceDocuments: ai.execution.sourceDocuments }
+      : {}),
     apiKeyOverride: ai.apiKey,
     endpoint: ai.endpoint,
     fetch: await capturedLearningAiFetch(ai),
     moderation,
     signal: ai.execution.signal,
+    ...(ai.execution.onCleanupError ? { onCleanupError: ai.execution.onCleanupError } : {}),
     ...(ai.isolatedImage
       ? {
           isolated: await (

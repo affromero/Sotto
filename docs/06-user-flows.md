@@ -193,9 +193,17 @@ Placement can raise a learner's current course level. It should not lower a leve
 
 After the course exists, use the course notes panel on `/learn` to paste goals, classroom notes, official course material, or interests. Course notes shape placement, class generation, practice, and vocabulary extraction for that course only.
 
-The vocabulary support question is also editable on the course card on `/learn`. The choice guides explanations and exercises in subsequent classes and practices. It does not change mastery scores or enable audio. Choose `I’m not sure yet` to clear the preference.
-
-Classes and practices select vocabulary from the course dictionary and curriculum. They prioritize review and introduce more unseen words as the active vocabulary becomes solid. Imported words remain unmastered until assessed. Upload extraction currently produces a limited vocabulary sample, so uploading a vocabulary PDF does not guarantee every word is indexed.
+Original PDF uploads remain downloadable separately from editable notes. Placement
+and class authors receive the original document, including page layout and
+handwriting. Native PDF APIs receive the file; other selected vision providers
+receive every numbered page as an image. Visual input supports up to 100 pages
+and 20 MiB of page images, and uploads accept up to 50 MiB in total. Unsupported
+input fails explicitly. Provider and remote-agent request limits can require
+smaller PDFs. Embedded text can supply vocabulary indexing, while blind
+reviews retain their restricted inputs. A document-based level estimates the
+material's difficulty; workbook answers alone do not establish learner mastery.
+Visual conversion admits one active and one waiting request per process. If it
+is busy, retry after the current documents finish.
 
 ### Course creation sequence
 
@@ -229,6 +237,12 @@ sequenceDiagram
     P-->>W: Course ready
     W-->>L: Redirect to /learn
 ```
+
+### Vocabulary support
+
+The vocabulary support question is also editable on the course card on `/learn`. The choice guides explanations and exercises in subsequent classes and practices. It does not change mastery scores or enable audio. Choose `I’m not sure yet` to clear the preference.
+
+Classes and practices select vocabulary from the course dictionary and curriculum. They prioritize review and introduce more unseen words as the active vocabulary becomes solid. Imported words remain unmastered until assessed. Upload extraction currently produces a limited vocabulary sample, so uploading a vocabulary PDF does not guarantee every word is indexed.
 
 ## 4. Normal Class Flow
 

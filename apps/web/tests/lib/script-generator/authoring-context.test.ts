@@ -31,6 +31,22 @@ const params = {
 };
 
 describe('listening authoring context', () => {
+  it('passes original PDF input unchanged to the selected script author', async () => {
+    const sourceDocuments = {
+      parts: [
+        {
+          type: 'document' as const,
+          mediaType: 'application/pdf' as const,
+          name: 'Workbook.pdf',
+          data: Buffer.from('%PDF-1.7'),
+        },
+      ],
+      validate: async () => {},
+    };
+    await generateScript({ ...params, forLearning: true, sourceDocuments });
+    const options = generateResponse.mock.calls[0][2] as AIOptions;
+    expect(options.sourceDocuments).toBe(sourceDocuments);
+  });
   beforeEach(() => {
     generateResponse.mockReset();
     generateResponse.mockResolvedValue({

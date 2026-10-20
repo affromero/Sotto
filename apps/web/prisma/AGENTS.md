@@ -72,7 +72,7 @@ npx prisma studio      # Visual database browser
 ## Modifying the Schema
 
 1. Edit `schema.prisma`
-2. Run `npx prisma db push` (dev) or `npx prisma migrate dev` (production)
+2. Use `npx prisma db push` or `npx prisma migrate dev` for development. Production uses `npx prisma migrate deploy` through the reviewed fenced schema-transition procedure in `docs/03-self-host-deployment.md`.
 3. Run `npx prisma generate`
 4. Update this AGENTS.md if models/enums changed
 5. Update `src/types/` if API response shapes changed

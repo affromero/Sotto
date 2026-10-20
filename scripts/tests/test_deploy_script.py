@@ -52,6 +52,11 @@ def serving_fixture(root):
         def do_GET(self):
             try:
                 route = json.loads((root / 'state.json').read_text())['active_route']
+                if route == 'maintenance':
+                    self.send_response(503)
+                    self.end_headers()
+                    self.wfile.write(b'Sotto schema maintenance')
+                    return
                 target = candidate if route == 'candidate' else old
                 with urlopen(f'http://127.0.0.1:{target.server_port}/api/v1/health', timeout=1) as response:
                     body = response.read()
@@ -114,6 +119,8 @@ state = json.loads(state_path.read_text())
 mode = os.environ['TEST_FAILURE']
 with (root / 'calls.jsonl').open('a') as stream:
     stream.write(json.dumps([name, *args]) + '\n')
+if name == 'docker' and args[0] == 'compose' and 'run' in args and 'SOTTO_DEPLOY_QUEUE=' in args[-1]:
+    args = ['exec', '-i', 'candidate-control', 'node', '--import', 'tsx', '-e', args[-1]]
 def finish(value='', code=0):
     pending = state_path.with_suffix('.next')
     pending.write_text(json.dumps(state))
@@ -148,7 +155,10 @@ def runtime_row(identifier):
         'Config': {'Labels': {'org.opencontainers.image.revision': sha if candidate else 'd' * 40,
             'com.docker.compose.project': project, 'com.docker.compose.service': service},
             'Env': ['SOTTO_RELEASE_SHA=' + (sha if candidate else 'd' * 40),
-                'SOTTO_PROVIDER_ACTIVATION_FILE=/run/sotto-provider-activation/fish.json']},
+                'SOTTO_PROVIDER_ACTIVATION_FILE=/run/sotto-provider-activation/fish.json',
+                'DATABASE_URL=' + ('postgresql://another' if mode == 'migration-old-web-config' and identifier == old_web else 'postgresql://fixture'),
+                'REDIS_URL=redis://fixture']
+                + (['PGOPTIONS=-c search_path=another'] if mode == 'migration-old-pg-options' and identifier == old_web else [])},
         'Mounts': [{'Type': 'bind', 'Source': source, 'Destination': '/run/sotto-provider-activation',
             'RW': (mode == 'compat-provider-old-mount' and not candidate)
                 or (mode == 'compat-provider-overlap' and candidate and state['worker_generation'] == 'new')}]}
@@ -172,12 +182,18 @@ if name == 'sudo':
     elif args[:2] == ['rm', '-f']: pathlib.Path(args[-1]).unlink(missing_ok=True)
     elif args[:2] == ['caddy', 'reload']:
         config = (root / 'caddy.conf').read_text()
-        first_port = int(re.search(r'reverse_proxy\s+localhost:(\d+)', config).group(1))
-        route = 'candidate' if first_port == state['candidate_port'] else 'old'
+        if 'Sotto schema maintenance' in config:
+            route = 'maintenance'
+        else:
+            first_port = int(re.search(r'reverse_proxy\s+localhost:(\d+)', config).group(1))
+            route = 'candidate' if first_port == state['candidate_port'] else 'old'
         if mode == 'caddy-rollback' and state['active_route'] == 'candidate' and route == 'old':
             delayed('rollback-route-failed')
             finish(code=1)
         state['active_route'] = route
+        if mode == 'migration-fence-lost' and route == 'maintenance' and not state.get('lost_fence_response'):
+            state['lost_fence_response'] = True
+            finish(code=1)
         if mode.startswith('compat-') and route == 'candidate':
             marker = root / '.local/state/sotto-deploy/unresolved.json'
             state['cutover_marker_before_reload'] = json.loads(marker.read_text())
@@ -187,6 +203,11 @@ if name == 'sudo':
     finish()
 if name == 'curl':
     url = args[-1]
+    if url.startswith('https://') and state['active_route'] == 'maintenance':
+        if '-o' in args:
+            pathlib.Path(args[args.index('-o') + 1]).write_text('Sotto schema maintenance')
+        finish('503' if '%{http_code}' in args else 'Sotto schema maintenance',
+               code=22 if '-f' in args or '-fsS' in args else 0)
     if url.endswith('/api/v1/tags'): finish('401')
     public = url.startswith('https://')
     if public:
@@ -216,8 +237,9 @@ if args[0] == 'ps':
     service = next((arg.split('=', 2)[-1] for arg in args if 'compose.service=' in arg), None)
     project = next((arg.split('=', 2)[-1] for arg in args if 'compose.project=' in arg), '')
     if service:
-        finish((old_web if project.endswith('-' + state['old_slot']) else (candidate_web if state['web'] else ''))
-               if service == 'web' else state['worker_ids'].get(service, service))
+        identifier = ((old_web if project.endswith('-' + state['old_slot']) else (candidate_web if state['web'] else ''))
+                      if service == 'web' else state['worker_ids'].get(service, service))
+        finish(identifier if state['running'].get(identifier, False) else '')
     finish(old_web if project.endswith('-' + state['old_slot']) else (state['worker_ids']['workers-heavy'] if project in ('sotto-test', 'sotto') else ''))
 if args[0] == 'inspect':
     if '--format' not in args and '-f' not in args:
@@ -246,14 +268,22 @@ if args[0] == 'run':
         candidate = old not in args
         files = {'apps/web/src/lib/providers/fish.ts': ('b' if candidate else 'a') * 64,
                  'apps/web/src/lib/sidedoor/authority.ts': 'f' * 64}
+        if mode.startswith('migration-'):
+            files['apps/web/prisma/schema.prisma'] = ('e' if candidate else 'd') * 64
+            if candidate:
+                files['apps/web/prisma/migrations/20261020120000_learner_review_events/migration.sql'] = '9' * 64
         if mode == 'compat-provider-assets' and candidate:
             files['apps/web/src/lib/sidedoor/unreviewed.ts'] = 'c' * 64
         finish(json.dumps({'protectedHash': ('2' if candidate else '1') * 64, 'files': files}))
     if '/proc/meminfo' in args[-1]:
         available = 1024 if mode == 'overlap-memory' else 6291456
         finish('MemTotal: 8388608 kB\nMemAvailable: ' + str(available) + ' kB')
-    if (mode == 'contract' or mode.startswith('compat-')) and 'schema.prisma' not in args[-1]:
+    if 'ALL_QUEUE_NAMES' in args[-1]:
+        finish(json.dumps(sorted(state['queue_flags'])))
+    if (mode == 'contract' or mode.startswith(('compat-', 'migration-'))) and 'schema.prisma' not in args[-1]:
+        if mode == 'migration-schema-only': finish('d' * 64)
         finish(('d' if old in args else 'e') * 64)
+    if mode.startswith('migration-'): finish(('d' if old in args else 'e') * 64)
     if mode.startswith('schema-'): finish(('d' if old in args else 'e') * 64)
     finish('same')
 if args[0] == 'exec':
@@ -266,6 +296,23 @@ if args[0] == 'exec':
         if command == 'established':
             finish('SOTTO_DEPLOY_QUEUE=' + json.dumps({'schemaVersion': 1, 'connectionIdentity': 'f' * 64,
                                                      'established': True, 'appliedMigrations': 3}))
+        if command == 'database-identity':
+            database = 'another' if mode == 'migration-direct-target' and os.environ.get('DATABASE_URL') == 'postgresql://another-target' else 'fixture'
+            schema = 'another' if mode == 'migration-old-target' and 'candidate-control' not in args else 'public'
+            finish('SOTTO_DEPLOY_QUEUE=' + json.dumps({**snapshot, 'databaseIdentity': {
+                'databaseName': database, 'schemaName': schema, 'serverAddress': '127.0.0.1',
+                'serverPort': 5432, 'databaseOid': '12345'}}))
+        if command == 'schema-index':
+            finish('SOTTO_DEPLOY_QUEUE=' + json.dumps({**snapshot, 'indexProof': {
+                'schemaName': 'public', 'quotedSchema': 'public', 'tableName': 'SidedoorState',
+                'indexName': 'SidedoorState_id_pattern_idx', 'accessMethod': 'btree',
+                'isValid': True, 'isReady': True, 'isLive': True, 'isUnique': False,
+                'isPrimary': False, 'isExclusion': False, 'keyCount': 1, 'attributeCount': 1,
+                'noExpressions': True, 'noPredicate': True, 'columnName': 'id',
+                'operatorClass': 'text_pattern_ops', 'operatorNamespace': 'pg_catalog',
+                'ordering': 0, 'defaultCollation': True, 'sameSchema': True,
+                'definition': 'CREATE INDEX "SidedoorState_id_pattern_idx" ON public."SidedoorState" USING btree (id text_pattern_ops)',
+            }}))
         if command == 'activation-ready':
             if mode == 'compat-existing-fish': finish(code=1)
             finish('SOTTO_DEPLOY_QUEUE=' + json.dumps({'schemaVersion': 1, 'connectionIdentity': 'f' * 64,
@@ -274,12 +321,12 @@ if args[0] == 'exec':
             state['queue_flags'] = dict.fromkeys(state['queue_flags'], True)
             snapshot['queues'] = [{'name': key, 'paused': True} for key in sorted(state['queue_flags'])]
         if command == 'restore':
-            if mode == 'compat-restore':
+            if mode in ('compat-restore', 'migration-restore'):
                 state['queue_flags']['audio-generation'] = False
                 finish(code=1)
             state['queue_flags'] = {queue['name']: queue['paused'] for queue in request['manifest']['queues']}
             snapshot['queues'] = request['manifest']['queues']
-        if command == 'drained':
+        if command in ('drained', 'drained-all'):
             if state['journal_pending']: finish(code=1)
             active = state['active']
             snapshot.update({'drained': active == 0, 'activeJobs': active,
@@ -290,7 +337,9 @@ if args[0] == 'exec':
     if 'pg_database_size' in script:
         delayed('backup')
         finish('1024', code=1 if mode in ('backup', 'schema-reviewed') else 0)
-    if 'pg_dump' in script: finish('verified fixture dump')
+    if 'pg_dump' in script:
+        state['backup_while_old_writers_running'] = any(state['running'].get(item, False) for item in (old_web, *old_workers.values()))
+        finish('verified fixture dump')
     finish()
 if args[0] == 'top':
     processes = 'PID PPID COMMAND\n100 1 node --max-old-space-size=1024 --import tsx src/workers/index.ts\n101 100 /app/node_modules/@esbuild/linux-x64/bin/esbuild --service=0.25.0 --ping'
@@ -314,6 +363,21 @@ if args[0] != 'compose': finish(code=2)
 project = args[args.index('-p') + 1] if '-p' in args else ''
 overrides = [args[index + 1] for index, value in enumerate(args[:-1]) if value == '-f' and args[index + 1].endswith('.json')]
 config = json.loads(pathlib.Path(overrides[-1]).read_text()) if overrides else {}
+if 'run' in args and 'migrate' in args:
+    if 'deploy' in args:
+        state['migration_started'] = True
+        state['migration_admitted_safely'] = (state['active_route'] == 'maintenance'
+            and all(state['queue_flags'].values()) and not state['active']
+            and not any(state['running'].get(item, False) for item in (old_web, *old_workers.values()))
+            and bool(list((root / 'backups').glob('*.dump.sha256'))))
+        state['migration_partial'] = mode == 'migration-partial'
+        state['migration_complete'] = mode != 'migration-partial'
+        finish(code=1 if mode == 'migration-partial' else 0)
+    if 'diff' in args:
+        if mode == 'migration-drift': finish('ALTER TABLE "LearnerReviewEvent" ADD COLUMN "unexpected" TEXT;', code=2)
+        if mode == 'migration-sdk-index':
+            finish('-- DropIndex\nDROP INDEX "SidedoorState_id_pattern_idx";\n\n-- CreateIndex\nCREATE INDEX "SidedoorState_id_pattern_idx" ON "SidedoorState"("id" text_pattern_ops);\n', code=2)
+        finish('-- This is an empty migration.')
 if 'ps' in args:
     finish((old_web if project.endswith('-' + state['old_slot']) else candidate_web) if args[-1] == 'web' else state['worker_ids'].get(args[-1], args[-1]))
 if 'exec' in args:
@@ -367,7 +431,10 @@ finish()
 class DeploymentFailureTests(unittest.TestCase):
     def run_deployment(self, failure, stack='sotto-test', reviewed_schema=False, success=False,
                        expect_rollback=True, prepaused=False, retained_candidate=False, rollback_blocked=False,
-                       old_slot='blue', reviewed_runtime=False, stale_review=False, provider_continuity=False):
+                       old_slot='blue', reviewed_runtime=False, stale_review=False, provider_continuity=False,
+                       schema_transition=False):
+        if schema_transition:
+            reviewed_runtime = provider_continuity = True
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()
             source = Path(__file__).parents[2]
@@ -417,6 +484,8 @@ class DeploymentFailureTests(unittest.TestCase):
             if reviewed_schema:
                 values['SOTTO_REVIEWED_PREVIOUS_SCHEMA_HASH'] = 'd' * 64
                 values['SOTTO_REVIEWED_CANDIDATE_SCHEMA_HASH'] = 'e' * 64
+            if failure == 'migration-direct-target':
+                values['DIRECT_DATABASE_URL'] = 'postgresql://another-target'
             if reviewed_runtime:
                 evidence = b'Independent review of exact fixture images.'
                 evidence_path = root / 'compatibility-evidence.txt'
@@ -432,7 +501,7 @@ class DeploymentFailureTests(unittest.TestCase):
                     'candidateWorkersImage': values['SOTTO_WORKERS_IMAGE_REF'],
                     'previousWebImage': OLD,
                     'previousWorkerContracts': {OLD: 'd' * 64},
-                    'candidateContract': ('f' if stale_review else 'e') * 64,
+                    'candidateContract': ('f' if stale_review else 'd' if failure == 'migration-schema-only' else 'e') * 64,
                     'reviewer': 'Independent fixture reviewer',
                     'evidenceSha256': hashlib.sha256(evidence).hexdigest(),
                 }
@@ -445,14 +514,38 @@ class DeploymentFailureTests(unittest.TestCase):
                         'reviewedRuntimeFiles': {'apps/web/src/lib/providers/fish.ts': {
                             'previousSha256': 'a' * 64, 'candidateSha256': 'b' * 64}},
                     })
+                    if schema_transition:
+                        review['providerActivation']['reviewedRuntimeFiles'].update({
+                            'apps/web/prisma/schema.prisma': {'previousSha256': 'd' * 64, 'candidateSha256': 'e' * 64},
+                            'apps/web/prisma/migrations/20261020120000_learner_review_events/migration.sql': {
+                                'previousSha256': None, 'candidateSha256': '9' * 64},
+                        })
                 review_path.write_text(json.dumps(review))
                 review_path.chmod(0o600)
                 values['SOTTO_COMPATIBILITY_REVIEW_FILE'] = str(review_path)
                 values['SOTTO_COMPATIBILITY_EVIDENCE_FILE'] = str(evidence_path)
+                if schema_transition:
+                    schema_evidence = root / 'schema-evidence.txt'
+                    schema_evidence.write_bytes(b'Independent exact fenced migration review.')
+                    schema_evidence.chmod(0o600)
+                    schema_review = root / 'schema-review.json'
+                    schema_review.write_text(json.dumps({
+                        'schemaVersion': 1, 'procedure': 'fenced-schema-migration',
+                        'stack': stack, 'releaseSha': SHA,
+                        'candidateWebImage': values['SOTTO_WEB_IMAGE_REF'],
+                        'candidateWorkersImage': values['SOTTO_WORKERS_IMAGE_REF'],
+                        'candidateSchemaHash': 'e' * 64, 'previousSchemaHashes': {OLD: 'd' * 64},
+                        'compatibilityReviewSha256': hashlib.sha256(review_path.read_bytes()).hexdigest(),
+                        'reviewer': 'Independent schema reviewer',
+                        'evidenceSha256': hashlib.sha256(schema_evidence.read_bytes()).hexdigest(),
+                    }))
+                    schema_review.chmod(0o600)
             (root / '.env.production').write_text(''.join(key + '=' + value + '\n' for key, value in values.items()))
             with serving_fixture(root) as (ports, observations, phase_observations):
                 environment.update(ports)
                 command = ['bash', str(root / 'scripts/deploy.sh')]
+                if schema_transition:
+                    command = ['bash', str(root / 'scripts/deploy/schema/deploy.sh'), str(schema_review), str(schema_evidence)]
                 if retained_candidate:
                     unresolved = root / '.local/state/sotto-deploy/unresolved.json'
                     stdout = root / 'controller.stdout'
@@ -462,7 +555,7 @@ class DeploymentFailureTests(unittest.TestCase):
                                                    stderr=errors, start_new_session=True)
                         try:
                             deadline = time.monotonic() + 30
-                            while (not unresolved.exists() or 'Unresolved deployment.' not in stdout.read_text()) and process.poll() is None and time.monotonic() < deadline:
+                            while (not unresolved.exists() or 'Unresolved deployment.' not in stdout.read_text() + stderr.read_text()) and process.poll() is None and time.monotonic() < deadline:
                                 time.sleep(0.02)
                             self.assertTrue(unresolved.exists(), stdout.read_text() + stderr.read_text())
                             self.assertIsNone(process.poll(), stdout.read_text() + stderr.read_text())
@@ -483,8 +576,13 @@ class DeploymentFailureTests(unittest.TestCase):
                     result = subprocess.CompletedProcess(command, process.returncode,
                                                          stdout.read_text(), stderr.read_text())
                 else:
-                    result = subprocess.run(command, env=environment, text=True,
-                                            capture_output=True, timeout=30)
+                    try:
+                        result = subprocess.run(command, env=environment, text=True,
+                                                capture_output=True, timeout=30)
+                    except subprocess.TimeoutExpired as error:
+                        streams = [value.decode() if isinstance(value, bytes) else value or ''
+                                   for value in (error.stdout, error.stderr)]
+                        self.fail('Controller timed out:\n' + ''.join(streams))
             if success:
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             else:
@@ -506,7 +604,11 @@ class DeploymentFailureTests(unittest.TestCase):
             after['observations'] = observations
             after['phase_observations'] = phase_observations
             after['calls'] = [json.loads(line) for line in (root / 'calls.jsonl').read_text().splitlines()]
-            if expect_rollback:
+            if schema_transition:
+                after['active_slot'] = slot_file.read_text().strip()
+                proofs = list((root / '.local/state/sotto-deploy').glob('*/schema-drift-proof.json'))
+                after['drift_proof'] = json.loads(proofs[0].read_text()) if proofs else None
+            elif expect_rollback:
                 self.assertEqual(after['old_web'], OLD, result.stdout + result.stderr)
                 self.assertEqual(after['workers'], NEW if rollback_blocked else OLD, result.stdout + result.stderr)
                 self.assertEqual(after['web'], NEW if retained_candidate else None, result.stdout + result.stderr)
@@ -519,7 +621,8 @@ class DeploymentFailureTests(unittest.TestCase):
                 self.assertEqual(slot_file.read_text(), new_slot + '\n')
             self.assertFalse(after['premature_route'], result.stdout + result.stderr)
             self.assertTrue(observations, result.stdout + result.stderr)
-            self.assertTrue(all(status == 200 for status, version in observations), observations)
+            if not schema_transition:
+                self.assertTrue(all(status == 200 for status, version in observations), observations)
             self.assertFalse(after['unsafe_stops'], result.stdout + result.stderr)
             self.assertFalse(after['unsafe_starts'], result.stdout + result.stderr)
             return after, result.stdout + result.stderr
