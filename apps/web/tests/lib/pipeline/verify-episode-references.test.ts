@@ -54,7 +54,7 @@ describe('verifyEpisodeReferences', () => {
     });
   });
 
-  it('marks an episode reference verified only after the pipeline verifies it', async () => {
+  it('persists verified claim evidence with the episode reference', async () => {
     mockRunReferenceVerification.mockResolvedValue({
       results: new Map([
         [
@@ -86,6 +86,9 @@ describe('verifyEpisodeReferences', () => {
       data: expect.objectContaining({
         contentDomain: 'NEWS',
         verificationStatus: 'VERIFIED',
+        verificationDetails: expect.objectContaining({
+          checks: [expect.objectContaining({ layer: 'ai', passed: true })],
+        }),
       }),
     });
   });

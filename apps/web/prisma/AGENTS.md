@@ -85,6 +85,14 @@ npx prisma studio      # Visual database browser
 learner-reported support for future generation, separately from assessed mastery.
 Null means no preference. Onboarding preserves the stored choice when omitted.
 
+`LearnerReviewEvent` records each committed vocabulary or grammar SRS update with
+its assessment mode, source attempt, question identities, timestamp and scheduler
+snapshots. Composite foreign keys bind both the target and source to the same
+course. SQL constraints require exactly one target and one class/practice source.
+Course, target and source deletion cascade to these private observations. Event
+sequence resolves equal timestamps; offline comparison must detect missing history.
+Events contain no question text, learner answers or provider payloads.
+
 `CourseMaterial` retains an immutable original document reference, a bounded text
 extract and profile ownership. Its optional course association lets onboarding
 stage files before creating a course. Note edits leave these records untouched.

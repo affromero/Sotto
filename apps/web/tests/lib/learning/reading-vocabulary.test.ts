@@ -338,8 +338,11 @@ describe('reading vocabulary extraction', () => {
       reps: 0,
       lapses: 0,
       mastery: 0,
+      dueAt: new Date('2026-10-01T00:00:00Z'),
+      lastReviewed: null,
     }));
     const database = {
+      learnerReviewEvent: { create: async () => ({}) },
       learnerVocab: {
         findMany: async ({ where }: { where: { lemma: { in: string[] } } }) =>
           states.filter((state) => where.lemma.in.includes(state.lemma)),
@@ -357,7 +360,8 @@ describe('reading vocabulary extraction', () => {
         'course',
         result,
         new Map([['reading-purchase', true]]),
-        new Date('2026-10-05T00:00:00Z')
+        new Date('2026-10-05T00:00:00Z'),
+        { practiceSessionId: 'practice-1', attempt: 1 }
       )
     ).toEqual(new Set(['Apfel']));
     expect(states.map(({ lemma, reps }) => ({ lemma, reps }))).toEqual([
@@ -422,7 +426,8 @@ describe('reading vocabulary extraction', () => {
         'course',
         snapshot,
         new Map([['r0', true]]),
-        new Date()
+        new Date(),
+        { practiceSessionId: 'practice-1', attempt: 1 }
       )
     ).toEqual(new Set());
   });
@@ -629,7 +634,8 @@ describe('reading vocabulary extraction', () => {
         'course',
         snapshot,
         new Map([['reading-1', true]]),
-        new Date()
+        new Date(),
+        { practiceSessionId: 'practice-1', attempt: 1 }
       )
     ).toEqual(new Set());
   });
@@ -680,8 +686,12 @@ describe('reading vocabulary extraction', () => {
         reps: 0,
         lapses: 0,
         mastery: 0,
+        dueAt: new Date('2026-10-01T00:00:00Z'),
+        lastReviewed: null,
       }));
+      const persistReview = vi.fn().mockResolvedValue({});
       const database = {
+        learnerReviewEvent: { create: persistReview },
         learnerVocab: {
           findMany: async ({ where }: { where: { lemma: { in: string[] } } }) =>
             states.filter((state) => where.lemma.in.includes(state.lemma)),
@@ -699,9 +709,20 @@ describe('reading vocabulary extraction', () => {
           'course',
           snapshot,
           new Map([['reading-1', true]]),
-          new Date('2026-10-05T00:00:00Z')
+          new Date('2026-10-05T00:00:00Z'),
+          { practiceSessionId: 'practice-1', attempt: 1 }
         )
       ).toEqual(new Set(['bestellen']));
+      expect(persistReview).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          vocabId: 'word-0',
+          practiceSessionId: 'practice-1',
+          sourceAttempt: 1,
+          assessment: 'READING_VOCABULARY',
+          questionIds: [question.id],
+          quality: 1,
+        }),
+      });
       expect(states[0]).toMatchObject({ lemma: 'bestellen', reps: 1 });
       expect(states[1]).toEqual({
         id: 'word-1',
@@ -711,6 +732,8 @@ describe('reading vocabulary extraction', () => {
         reps: 0,
         lapses: 0,
         mastery: 0,
+        dueAt: new Date('2026-10-01T00:00:00Z'),
+        lastReviewed: null,
       });
     }
   );

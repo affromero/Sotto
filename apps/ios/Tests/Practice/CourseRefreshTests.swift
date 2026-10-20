@@ -129,12 +129,25 @@ final class CourseRefreshTests: XCTestCase {
             if let original { try? store.save(original) }
             else { try? store.delete() }
         }
-        let model = model()
+        let session = makeSession()
+        let model = model(session: session)
         let credentials = model.credentials!
         let host = model.credentials!.serverURL.host!
-        await CourseRefreshServer.shared.set("profile-refresh", host: host)
+        let arrival = expectation(description: "Course refresh reaches its held response")
+        await CourseRefreshServer.shared.set("profile-refresh", host: host, arrival: arrival)
+        addTeardownBlock {
+            await CourseRefreshServer.shared.release(host: host)
+            session.invalidateAndCancel()
+        }
         let previous = Task { await model.loadCourses(showLoading: false) }
-        await CourseRefreshServer.shared.waitForBlockedRequest(host: host)
+        guard await XCTWaiter.fulfillment(of: [arrival], timeout: 5) == .completed else {
+            await CourseRefreshServer.shared.release(host: host)
+            previous.cancel()
+            model.applyCourseRefresh([])
+            session.invalidateAndCancel()
+            XCTFail("Course refresh did not arrive within five seconds.")
+            return
+        }
         model.clearSelectedProfile()
         await CourseRefreshServer.shared.release(host: host)
         await previous.value
@@ -148,12 +161,25 @@ final class CourseRefreshTests: XCTestCase {
 
     @MainActor
     func testPracticeAdmissionCannotReopenSessionsAfterTheirCourseWasRemoved() async {
-        let model = model()
+        let session = makeSession()
+        let model = model(session: session)
         await model.loadCourses(showLoading: false)
         let host = model.credentials!.serverURL.host!
-        await CourseRefreshServer.shared.set("practice-admission", host: host)
+        let arrival = expectation(description: "Practice admission reaches its held response")
+        await CourseRefreshServer.shared.set("practice-admission", host: host, arrival: arrival)
+        addTeardownBlock {
+            await CourseRefreshServer.shared.release(host: host)
+            session.invalidateAndCancel()
+        }
         let pending = Task { await model.startPractice(courseId: "course-1", kind: "FULL") }
-        await CourseRefreshServer.shared.waitForBlockedRequest(host: host)
+        guard await XCTWaiter.fulfillment(of: [arrival], timeout: 5) == .completed else {
+            await CourseRefreshServer.shared.release(host: host)
+            pending.cancel()
+            model.applyCourseRefresh([])
+            session.invalidateAndCancel()
+            XCTFail("Practice admission did not arrive within five seconds.")
+            return
+        }
         model.applyCourseRefresh([])
         await CourseRefreshServer.shared.release(host: host)
         await pending.value
@@ -164,13 +190,25 @@ final class CourseRefreshTests: XCTestCase {
 
     @MainActor
     func testFinalGenerationRefreshCannotRestoreADeletedCourseOrItsError() async throws {
-        let model = model()
+        let session = makeSession()
+        let model = model(session: session)
         await model.loadCourses(showLoading: false)
         let course = try XCTUnwrap(model.courses.first)
         let host = model.credentials!.serverURL.host!
-        await CourseRefreshServer.shared.set("final-generation", host: host)
+        let arrival = expectation(description: "Completed generation reaches its final course refresh")
+        await CourseRefreshServer.shared.set("final-generation", host: host, arrival: arrival)
+        addTeardownBlock {
+            await CourseRefreshServer.shared.release(host: host)
+            session.invalidateAndCancel()
+        }
         model.startClassGeneration(for: course)
-        await CourseRefreshServer.shared.waitForBlockedRequest(host: host)
+        guard await XCTWaiter.fulfillment(of: [arrival], timeout: 5) == .completed else {
+            await CourseRefreshServer.shared.release(host: host)
+            model.applyCourseRefresh([])
+            session.invalidateAndCancel()
+            XCTFail("Final course refresh did not arrive within five seconds.")
+            return
+        }
         model.applyCourseRefresh([])
         let reintroduced = expectation(description: "Deleted course generation remains cleared")
         reintroduced.isInverted = true
@@ -185,13 +223,17 @@ final class CourseRefreshTests: XCTestCase {
     }
 
     @MainActor
-    private func model() -> SottoAppModel {
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.protocolClasses = [CourseRefreshProtocol.self]
-        return SottoAppModel(credentials: SottoCredentials(
+    private func model(session: URLSession? = nil) -> SottoAppModel {
+        SottoAppModel(credentials: SottoCredentials(
             serverURL: URL(string: "https://\(UUID().uuidString.lowercased()).example")!,
             apiKey: "test-key", user: nil, selectedProfile: profile("alice")),
-            session: URLSession(configuration: configuration))
+            session: session ?? makeSession())
+    }
+
+    private func makeSession() -> URLSession {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [CourseRefreshProtocol.self]
+        return URLSession(configuration: configuration)
     }
 
     private func profile(_ id: String) -> SottoProfile {
@@ -203,24 +245,24 @@ final class CourseRefreshTests: XCTestCase {
 private actor CourseRefreshServer {
     static let shared = CourseRefreshServer()
     private var modes: [String: String] = [:]
-    private var blocked = Set<String>()
-    private var started: [String: CheckedContinuation<Void, Never>] = [:]
+    private var arrivals: [String: XCTestExpectation] = [:]
     private var releases: [String: CheckedContinuation<Void, Never>] = [:]
 
-    func set(_ mode: String, host: String) { modes[host] = mode }
-
-    func waitForBlockedRequest(host: String) async {
-        if blocked.contains(host) { return }
-        await withCheckedContinuation { started[host] = $0 }
+    func set(_ mode: String, host: String, arrival: XCTestExpectation? = nil) {
+        modes[host] = mode
+        arrivals[host] = arrival
     }
 
-    func release(host: String) { releases.removeValue(forKey: host)?.resume() }
+    func release(host: String) {
+        arrivals[host] = nil
+        releases.removeValue(forKey: host)?.resume()
+    }
 
     private func block(host: String) async {
+        guard let arrival = arrivals.removeValue(forKey: host) else { return }
         await withCheckedContinuation { continuation in
             releases[host] = continuation
-            blocked.insert(host)
-            started.removeValue(forKey: host)?.resume()
+            arrival.fulfill()
         }
     }
 
@@ -232,10 +274,10 @@ private actor CourseRefreshServer {
             return (200, #"{"status":"ready","sessionId":"late-practice"}"#)
         }
         if mode == "final-generation", request.httpMethod == "POST" {
-            return (202, #"{"started":true}"#)
+            return (202, #"{"started":true,"operationId":"preparation"}"#)
         }
         if mode == "final-generation", request.url?.path.hasSuffix("/generation") == true {
-            return (200, #"{"status":"AVAILABLE","classId":"class-1","stage":"Ready","detail":"Ready","progress":1,"currentStep":6,"totalSteps":6,"sections":[]}"#)
+            return (200, #"{"operationId":"preparation","operationStatus":"COMPLETED","status":"AVAILABLE","classId":"class-1","stage":"Ready","detail":"Ready","progress":1,"currentStep":6,"totalSteps":6,"sections":[]}"#)
         }
         if mode == "failed" { return (503, #"{"error":"Server unavailable"}"#) }
         if request.url?.path == "/api/v1/courses" {

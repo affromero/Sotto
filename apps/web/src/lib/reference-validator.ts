@@ -17,7 +17,7 @@ export interface VerificationCheck {
   replacement?: ReplacementData;
 }
 
-export interface ReplacementData {
+interface ReplacementData {
   title: string;
   authors: string[];
   year: number | null;

@@ -255,7 +255,6 @@ struct ClassSessionView: View {
             Button {
                 model.run {
                     await model.regenerateSelectedClass()
-                    answers = [:]
                 }
             } label: {
                 Label("Regenerate class", systemImage: "arrow.triangle.2.circlepath")

@@ -394,7 +394,6 @@ describe('open-source language-learning OSS surfaces', () => {
       'apps/web/next.config.js',
       'apps/web/src/lib/AGENTS.md',
       'apps/web/src/lib/reference-verification/ai-layer.ts',
-      'apps/web/src/lib/reference-verification/grounding.ts',
       'apps/web/src/lib/reference-verification/pipeline.ts',
       'AGENTS.md',
       'package-lock.json',

@@ -469,6 +469,45 @@ suite('durable preparation admission and provider accounting', () => {
     expect(JSON.stringify(activity)).not.toContain('Private input');
   });
 
+  it('accounts for overlapping provider requests and refuses work beyond their shared cap', async () => {
+    const operation = await running(2);
+    const release = Promise.withResolvers<void>();
+    const admitted = Promise.withResolvers<void>();
+    let dispatched = 0;
+    const provider = preparationProviderRequest(operation, new AbortController().signal, () => {
+      throw new Error('Unexpected uncertainty');
+    });
+    const request = () =>
+      new Request('https://api.openai.com/v1/responses', {
+        method: 'POST',
+        body: JSON.stringify({ model: operation.selection.model, input: 'fixture' }),
+      });
+    const dispatch = async () => {
+      if (++dispatched === 2) admitted.resolve();
+      await release.promise;
+      return Response.json({ output: 'fixture' });
+    };
+    const active = Promise.all([provider(request(), dispatch), provider(request(), dispatch)]);
+    try {
+      await admitted.promise;
+      await expect(provider(request(), dispatch)).rejects.toMatchObject({ code: 'budget' });
+      expect(await readPreparationActivity(courseId, execution)).toMatchObject({
+        providerRequestsAdmitted: 2,
+        providerRequestsCompleted: 0,
+        providerRequestInFlight: true,
+      });
+    } finally {
+      release.resolve();
+      await active;
+    }
+    expect(dispatched).toBe(2);
+    expect(await readPreparationActivity(courseId, execution)).toMatchObject({
+      providerRequestsAdmitted: 2,
+      providerRequestsCompleted: 2,
+      providerRequestInFlight: false,
+    });
+  });
+
   it('keeps a saved local key when resolving the admitted class model', async () => {
     const endpoint = 'http://localhost:8000/v1';
     await instance.configureInfrastructure({
