@@ -9,6 +9,44 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class PlayLifecycleTest {
+    @Test fun returningToGamesKeepsInvitationRecoveryWithoutReopeningJoinOnNavigationOrResume() = runBlocking {
+        PlayScenario().use { server ->
+            val invite = PlayInvitation(server.origin, "ABCDEFGH2345")
+            val command = JoinCommand(newID(), invite.code, "Android test",
+                JoinCandidate(CandidateKind.NEW, Settings(), name = "Sam", consentToProfile = true))
+            val recovery = Admission(invite, command, PlayInvitation.proof())
+            server.respond = { request -> when {
+                request.path == "/api/v1/play/invitations" -> HttpReply(200,
+                    SottoJson.encodeToString(Preview("fixture-room", "Alex", GameKind.MIXED, Theme.EVERYDAY,
+                        QuestionStyle.CHOICES, true, "2099-01-01T00:00:00Z", "2026-10-20T00:00:00Z")))
+                request.path.startsWith("/api/v1/play/join-requests/") -> HttpReply(200,
+                    SottoJson.encodeToString(JoinStatusView(command.requestId, JoinStatus.WAITING_FOR_HOST,
+                        "2099-01-01T00:00:00Z", "2026-10-20T00:00:00Z")))
+                else -> server.normal(request)
+            } }
+            for (admission in listOf(null, recovery)) {
+                val original = Vault(connection = server.connection(), invitation = invite, admission = admission)
+                val disk = MemoryVault(original)
+                val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+                try {
+                    val coordinator = PlayCoordinator(disk, scope, "Android test")
+                    coordinator.setForeground(true)
+                    coordinator.awaitState { it.screen == Screen.Join && !it.checking }
+                    coordinator.navigate(Screen.Lobby)
+                    coordinator.awaitState { it.screen == Screen.Lobby && !it.checking }
+                    coordinator.setForeground(false)
+                    coordinator.setForeground(true)
+                    coordinator.awaitState { it.screen == Screen.Lobby && !it.checking }
+                    coordinator.navigate(Screen.Saved)
+                    coordinator.awaitState { it.screen == Screen.Saved && !it.checking }
+                    assertEquals(original, disk.load())
+                    assertEquals(original, coordinator.state.value.vault)
+                } finally { scope.cancel() }
+            }
+            assertTrue(server.received.none { it.method == "POST" })
+        }
+    }
+
     @Test fun anInvitationResponseCannotRestoreWaitingControlsAfterTheGameStarts() = runBlocking {
         PlayScenario().use { server ->
             val playing = server.room().copy(revision = 3)

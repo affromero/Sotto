@@ -42,12 +42,13 @@ internal fun PlayCoordinator.stopLifetime(cancelWork: Boolean = true) {
 
 internal fun PlayCoordinator.startLifetime() {
     val generation = epoch
+    val restoreInvitation = state.value.vault == null
     mutable.update { it.copy(accessRevoked = false, owner = null, checking = true) }
     polling = scope.launch {
         try {
             publish(store.load())
             checkEpoch(generation)
-            if (state.value.vault?.admission != null || state.value.vault?.invitation != null)
+            if (restoreInvitation && (state.value.vault?.admission != null || state.value.vault?.invitation != null))
                 mutable.update { if (it.screen == Screen.Lobby) it.copy(screen = Screen.Join) else it }
             var failures = 0
             while (isActive && epoch == generation && !state.value.accessRevoked) {
