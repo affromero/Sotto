@@ -23,6 +23,7 @@ on:
       - '.github/workflows/desktop-release.yml'
       - 'scripts/ci/test-desktop-appimage.sh'
       - 'scripts/ci/native-scope.mjs'
+      - 'scripts/ci/android-results.py'
       - 'apps/web/public/brand/sotto-mark.svg'
   push:
     branches: [main]
@@ -43,6 +44,7 @@ on:
       - '.github/workflows/desktop-release.yml'
       - 'scripts/ci/test-desktop-appimage.sh'
       - 'scripts/ci/native-scope.mjs'
+      - 'scripts/ci/android-results.py'
       - 'apps/web/public/brand/sotto-mark.svg'
 
 concurrency:
@@ -143,6 +145,7 @@ jobs:
         uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
         with:
           packages: platform-tools
+          cmdline-tools-version: '16111833'
       - name: Install Android compile SDK
         run: sdkmanager 'platforms;android-37.0' 'build-tools;36.0.0'
       - name: Validate Android and build unsigned distributions
@@ -188,6 +191,7 @@ jobs:
         uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
         with:
           packages: platform-tools
+          cmdline-tools-version: '16111833'
       - name: Enable emulator acceleration
         run: sudo chmod a+rw /dev/kvm
       - name: Run native Android behavior and process recovery
@@ -200,9 +204,11 @@ jobs:
           arch: x86_64
           profile: ${{ matrix.profile }}
           emulator-port: 5554
-          emulator-options: -no-window -gpu swiftshader -no-snapshot -noaudio -no-boot-anim -camera-back emulated
+          disk-size: 6G
+          emulator-options: -no-window -gpu swiftshader -no-snapshot -noaudio -no-boot-anim -camera-back emulated -wipe-data
           script: |
             ./apps/android/gradlew -p apps/android --no-daemon connectedDebugAndroidTest
+            python3 scripts/ci/android-results.py apps/android/app/build/outputs/androidTest-results/connected
             node e2e/android/process.mjs "$ANDROID_SERIAL"
       - name: Preserve native Android diagnostics
         if: always()

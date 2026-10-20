@@ -194,6 +194,7 @@ class AndroidWorkflowTests(unittest.TestCase):
             patterns = self.workflow['on'][event]['paths']
             for path in ('apps/android/app/MainActivity.kt',
                          'e2e/android/process.mjs',
+                         'scripts/ci/android-results.py',
                          'e2e/native/run.mjs', 'e2e/run.mjs', 'e2e/provider.mjs',
                          'packages/shared/fixtures/play/contract.json',
                          'packages/shared/src/play/types.ts',
@@ -219,6 +220,7 @@ class AndroidWorkflowTests(unittest.TestCase):
                 packages = steps[setup]['with']['packages'].split()
                 self.assertIn('platform-tools', packages)
                 self.assertNotIn('tools', packages)
+                self.assertRegex(steps[setup]['with']['cmdline-tools-version'], r'^\d+$')
 
     def test_android_build_produces_both_unsigned_distribution_formats(self) -> None:
         steps = self.workflow['jobs']['android']['steps']
@@ -243,9 +245,14 @@ class AndroidWorkflowTests(unittest.TestCase):
                       if 'android-emulator-runner@' in step.get('uses', ''))
         self.assertEqual(runner['with']['arch'], 'x86_64')
         self.assertEqual(job['env']['ANDROID_SERIAL'], 'emulator-5554')
+        self.assertEqual(runner['with']['disk-size'], '6G')
+        self.assertIn('-wipe-data', runner['with']['emulator-options'].split())
         script = runner['with']['script']
-        self.assertIn('connectedDebugAndroidTest', script)
-        self.assertIn('node e2e/android/process.mjs "$ANDROID_SERIAL"', script)
+        connected = script.index('connectedDebugAndroidTest')
+        verified = script.index('python3 scripts/ci/android-results.py ')
+        recovery = script.index('node e2e/android/process.mjs "$ANDROID_SERIAL"')
+        self.assertLess(connected, verified)
+        self.assertLess(verified, recovery)
         upload = next(step for step in job['steps']
                       if 'upload-artifact@' in step.get('uses', ''))
         self.assertEqual(upload['if'], 'always()')
