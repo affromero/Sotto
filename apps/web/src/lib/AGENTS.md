@@ -14,6 +14,12 @@ acknowledges them separately. A missing attached workspace fails closed.
 
 All shared business logic and external service integrations live here.
 
+`learning-map/` publishes immutable language catalogs and pins each course band's
+requirements. `evidence/` deduplicates qualified task observations and rebuilds
+bounded session projections with the canonical mastery model and SRS scheduler.
+`progression/` records replayable level-completion receipts under a course lock.
+Read projections never create requirements or manufacture assessment evidence.
+
 `providers/tts/fish/fish.provider.ts` uses Fish Audio's captured JSON transport and
 verified official voice pool. Fish defaults to `s2.1-pro-free`; explicit paid
 models require a separate API balance. Unknown models and unsupported languages

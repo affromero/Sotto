@@ -80,6 +80,13 @@ npx prisma studio      # Visual database browser
 
 ## Scope
 
+LearningMapRevision stores immutable shared target-language catalogs. LearningNodeIdentity
+keeps stable identities across releases. LearningLevelBinding pins each course band's
+catalog and legitimate skill coverage; LearningLevelCompletion records earned transitions.
+LearningObservation contains deduplicated criterion-bound assessment evidence, and
+LearnerObjectiveState is its rebuildable per-skill projection. LessonLearningObjective
+links curricula to precise objectives. Private uploads never enter shared catalog content.
+
 `CourseMaterial` retains an immutable original document reference, a bounded text
 extract and profile ownership. Its optional course association lets onboarding
 stage files before creating a course. Note edits leave these records untouched.

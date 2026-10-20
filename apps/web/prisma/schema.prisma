@@ -932,6 +932,7 @@ model Lesson {
   parent     Lesson?       @relation("LessonTree", fields: [parentId], references: [id], onDelete: SetNull)
   children   Lesson[]      @relation("LessonTree")
   classes    CourseClass[]
+  learningObjectives LessonLearningObjective[]
 
   @@unique([curriculumId, slug])
   @@unique([curriculumId, order])
@@ -968,6 +969,10 @@ model Course {
   materials        CourseMaterial[]
   mockExams        MockExam[]
   focusTargets     LearnerFocusTarget[]
+  levelBindings    LearningLevelBinding[]
+  levelCompletions LearningLevelCompletion[]
+  objectiveStates  LearnerObjectiveState[]
+  observations     LearningObservation[]
 
   @@unique([userId, nativeLang, targetLang]) // one course per user per language pair
   @@index([userId])
@@ -1056,6 +1061,7 @@ enum FocusTargetSource {
 // A ~1h class instantiated from a Lesson for a specific course. Mastery-gated:
 // the next class only unlocks once this one is PASSED.
 model CourseClass {
+  learningSelection Json? // immutable language-map objectives and criteria for this class
   readingVocabulary Json? // exact reading source and assessed vocabulary provenance
   id              String      @id @default(cuid())
   courseId        String
@@ -1118,6 +1124,7 @@ model ClassSection {
 // MC question for a GRAMMAR/READING/LISTENING section. Forked from the old
 // post-listen quiz question shape, but supports retries and has no episode.
 model LessonQuestion {
+  learningAssessment Json? // reviewed private objective attribution for this exact question
   id           String    @id @default(cuid())
   sectionId    String
   order        Int
@@ -1185,6 +1192,7 @@ enum SpeakingGradeStatus {
 // A speaking prompt hangs off EXACTLY ONE parent: a class section (gated class)
 // or a practice session (ungated). The XOR is enforced in app code.
 model SpeakingPrompt {
+  learningObjectives Json? // exact criteria the speaking task is intended to assess
   id                String   @id @default(cuid())
   sectionId         String?
   practiceSessionId String?
@@ -1211,6 +1219,7 @@ model SpeakingPrompt {
 
 // A learner's recorded attempt at a SpeakingPrompt, graded asynchronously.
 model SpeakingRecording {
+  objectiveEvidence Json? // criterion-specific findings supported by this recording's transcript
   attempt           Int                 @default(1)
   sttProvider       String? // provider selected by the immutable learning contract
   sttSelection      Json?   // immutable model, endpoint and credential revision metadata, never secrets
@@ -1244,6 +1253,7 @@ model SpeakingRecording {
 // A writing task. Hangs off EXACTLY ONE parent (a class section or a practice
 // session), like SpeakingPrompt; XOR enforced in app code.
 model WritingPrompt {
+  learningObjectives Json? // exact criteria the writing task is intended to assess
   id                String   @id @default(cuid())
   sectionId         String?
   practiceSessionId String?
@@ -1272,6 +1282,7 @@ model WritingPrompt {
 // A learner's writing response, graded synchronously by the LLM (corrections +
 // score), unlike speaking which is graded async by a worker.
 model WritingResponse {
+  objectiveEvidence Json? // criterion-specific findings supported by the exact learner response
   gradingState      Json? // durable synchronous grade and provider outcome journal
   attempt           Int      @default(1)
   id                String   @id @default(cuid())
@@ -1513,6 +1524,7 @@ model PracticeRequestReceipt {
 }
 
 model PracticeSession {
+  learningSelection Json? // immutable language-map selection; distinct from lexical focusTargetIds
   listeningScriptHash String? // binds comprehension questions to the preserved listening script
   generationSpec    Json? // captured private context, frozen requirements and source identity
   generationState   Json? // nonsecret durable preparation and delegation metadata
@@ -1608,4 +1620,141 @@ model CourseMaterial {
 
   @@index([userId, courseId])
   @@index([courseId])
+}
+
+// Shared immutable target-language catalog releases. No uploaded learner text belongs here.
+model LearningMapRevision {
+  id          String   @id @default(cuid())
+  targetLang  String
+  version     Int
+  catalogHash String
+  definition  Json
+  createdAt   DateTime @default(now())
+
+  bindings     LearningLevelBinding[]
+  observations LearningObservation[]
+
+  @@unique([targetLang, version])
+  @@unique([targetLang, catalogHash])
+}
+
+// Stable identities outlive labels and display-parent changes. Meaning changes use criterionVersion.
+model LearningNodeIdentity {
+  id         String   @id
+  targetLang String
+  branch     String
+  kind       String
+  createdAt  DateTime @default(now())
+
+  states       LearnerObjectiveState[]
+  observations LearningObservation[]
+  lessons      LessonLearningObjective[]
+
+  @@index([targetLang, kind])
+}
+
+// Each active/completed band pins a release and genuine skill exemptions until explicitly upgraded.
+model LearningLevelBinding {
+  id            String    @id @default(cuid())
+  courseId      String
+  level         CefrLevel
+  revisionId    String
+  policyVersion Int       @default(1)
+  coverage      Json
+  createdAt     DateTime  @default(now())
+
+  course     Course                    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  revision   LearningMapRevision       @relation(fields: [revisionId], references: [id], onDelete: Restrict)
+  completion LearningLevelCompletion?
+
+  @@unique([courseId, level])
+  @@index([revisionId])
+}
+
+// Durable transition receipt; a due review never deletes or rewrites an earned completion.
+model LearningLevelCompletion {
+  id            String    @id @default(cuid())
+  requestId     String    @unique
+  courseId      String
+  level         CefrLevel
+  nextLevel     CefrLevel?
+  bindingId     String    @unique
+  intentHash    String
+  evidenceHash  String
+  receipt       Json
+  completedAt   DateTime  @default(now())
+
+  course  Course                @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  binding LearningLevelBinding  @relation(fields: [bindingId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, level])
+}
+
+// Immutable qualified evidence. Source/response identities prevent repair and submission replay credit.
+model LearningObservation {
+  id               String    @id @default(cuid())
+  deduplicationKey  String    @unique
+  courseId         String
+  objectiveId      String
+  criterionVersion Int
+  policyVersion    Int
+  level            CefrLevel
+  skill            SkillType
+  revisionId       String
+  sourceType       String
+  sessionId        String
+  taskId           String
+  responseIdentity String
+  quality          Float
+  evidence         Json
+  observedAt       DateTime  @default(now())
+
+  course    Course               @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  objective LearningNodeIdentity @relation(fields: [objectiveId], references: [id], onDelete: Restrict)
+  revision  LearningMapRevision  @relation(fields: [revisionId], references: [id], onDelete: Restrict)
+
+  @@index([courseId, objectiveId, criterionVersion, policyVersion, level, skill])
+  @@index([courseId, sessionId])
+  @@index([courseId, observedAt, id])
+}
+
+// Rebuildable projections. Initial posterior is neutral; zero observations remain visibly unassessed.
+model LearnerObjectiveState {
+  id               String    @id @default(cuid())
+  courseId         String
+  objectiveId      String
+  criterionVersion Int
+  policyVersion    Int
+  level            CefrLevel
+  skill            SkillType
+  mastery          Float     @default(0.5)
+  assessedTasks    Int       @default(0)
+  assessedSessions Int       @default(0)
+  lastQuality      Float?
+  lastReviewed     DateTime?
+  dueAt            DateTime?
+  ease             Float     @default(2.5)
+  intervalDays     Float     @default(0)
+  reps             Int       @default(0)
+  lapses           Int       @default(0)
+  updatedAt        DateTime  @updatedAt
+
+  course    Course               @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  objective LearningNodeIdentity @relation(fields: [objectiveId], references: [id], onDelete: Restrict)
+
+  @@unique([courseId, objectiveId, criterionVersion, policyVersion, level, skill], map: "LearnerObjectiveState_criterion_key")
+  @@index([courseId, dueAt])
+}
+
+model LessonLearningObjective {
+  lessonId         String
+  objectiveId      String
+  criterionVersion Int
+  role             String
+
+  lesson    Lesson               @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  objective LearningNodeIdentity @relation(fields: [objectiveId], references: [id], onDelete: Restrict)
+
+  @@id([lessonId, objectiveId])
+  @@index([objectiveId])
 }
