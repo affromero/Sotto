@@ -24,7 +24,7 @@ export const playRoomStatusSchema = z.enum([
 ]);
 export const playMemberSchema = z.strictObject({
   id,
-  name: z.string().min(1).max(80),
+  name: z.string().min(1).max(100),
   settings: playSettingsSchema,
 });
 export const createPlayRoomSchema = z.strictObject({
@@ -99,7 +99,7 @@ export const playJoinStatusViewSchema = z.strictObject({
   expiresAt: instant,
   serverTime: instant,
 });
-export const playDeliverySchema = z.discriminatedUnion('kind', [
+export const playCredentialDeliverySchema = z.discriminatedUnion('kind', [
   z.strictObject({
     kind: z.literal('BROWSER'),
     deliveryId: id,
@@ -115,6 +115,11 @@ export const playDeliverySchema = z.discriminatedUnion('kind', [
     token: z.string().min(20).max(512),
     expiresAt: instant,
   }),
+]);
+
+export const playDeliverySchema = z.discriminatedUnion('kind', [
+  ...playCredentialDeliverySchema.options,
+  z.strictObject({ kind: z.literal('EXISTING'), roomId: id, profile: playMemberSchema }),
 ]);
 
 export type PlayRoomView = z.infer<typeof playRoomViewSchema>;

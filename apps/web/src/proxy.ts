@@ -3,6 +3,7 @@ import { isSelfHosted } from './lib/self-hosted';
 import { prismaUnfiltered } from './lib/prisma';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 import { resolveSottoRequest } from '@/lib/sidedoor/access/core/request-identity';
+import { isPublicPlayRequest } from '@/lib/play/perimeter';
 
 const HOSTED_MOCK_ROUTES = [
   '/classes',
@@ -77,6 +78,7 @@ export async function proxy(request: NextRequest) {
   }
   if (
     pathname === '/access' ||
+    isPublicPlayRequest(pathname, request.method) ||
     PUBLIC_API_ROUTES.has(pathname) ||
     within(pathname, '/api/v1/access')
   )

@@ -86,6 +86,10 @@ partial unique index permitting one accepted entrant per room. These SQL rules
 must survive subsequent migrations. Both participant relations cascade shared
 rooms and admission secrets on profile deletion. Phrase provenance uses a
 composite round/room foreign key. Courses have no dependency on game records.
+Released host-view leases retain a tombstone until the room ends. An old nonce
+cannot renew after release, including a delayed first heartbeat. New enrollment
+requests keep every profile/approval field null until canonical owner approval
+commits the prepared profile and all approval metadata together.
 
 `LearnerReviewEvent` records each committed vocabulary or grammar SRS update with
 its assessment mode, source attempt, question identities, timestamp and scheduler

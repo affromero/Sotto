@@ -56,6 +56,10 @@ export function ComponentName({ variant = 'primary', children }: ComponentNamePr
 
 ## Rules
 
+`ProfilePicker.canCreateProfiles` comes from canonical server-owner authority.
+Show creation only when true. Existing profile management and selection retain
+their own permissions; a profile's displayed role is not creation authority.
+
 - **CSS Modules only** — every component gets `ComponentName.module.css`
 - **Server Components by default** — only add `'use client'` when needed
 - **No inline styles** — all styling in CSS Modules

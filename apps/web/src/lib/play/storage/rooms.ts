@@ -5,6 +5,7 @@ import {
   playRoomActionSchema,
   playRoundActionRequestSchema,
   playSettingsSchema,
+  playPageQuerySchema,
   type PlayRoomView,
 } from '@sotto/shared';
 import { Prisma, type PrismaClient } from '@/generated/prisma/client';
@@ -23,6 +24,8 @@ import {
 } from './room-view';
 
 export const PLAY_ROOM_TTL_MS = 2 * 60 * 60 * 1000;
+
+export type PlayClock = () => Date;
 
 export type PlayActor = {
   database: PrismaClient;
@@ -86,7 +89,11 @@ async function mutate(
   }
 }
 
-export function createStoredPlayRoom(actor: PlayActor, input: unknown, now = new Date()) {
+export function createStoredPlayRoom(
+  actor: PlayActor,
+  input: unknown,
+  clock: PlayClock = () => new Date()
+) {
   const command = createPlayRoomSchema.parse(input);
   const roomId = randomUUID();
   return mutate(
@@ -97,6 +104,7 @@ export function createStoredPlayRoom(actor: PlayActor, input: unknown, now = new
       fingerprint: playFingerprint(command),
     },
     async (database) => {
+      const now = clock();
       await database.playRoom.create({
         data: {
           id: roomId,
@@ -119,15 +127,58 @@ export function createStoredPlayRoom(actor: PlayActor, input: unknown, now = new
   );
 }
 
-export function readStoredPlayRoom(actor: PlayActor, roomId: string, now = new Date()) {
+export function readStoredPlayRoom(
+  actor: PlayActor,
+  roomId: string,
+  clock: PlayClock = () => new Date()
+) {
   return sottoTransaction(actor.database, async (database) => {
     await requireOriginalSottoAdmission(database, actor.request, actor.identity);
     return projectStoredPlayRoom(
       database,
       await loadPlayRoom(database, roomId),
       actor.identity.userId,
-      now
+      clock()
     );
+  });
+}
+
+export function listStoredPlayRooms(
+  actor: PlayActor,
+  input: unknown = {},
+  clock: PlayClock = () => new Date()
+) {
+  const query = playPageQuerySchema.parse(input);
+  return sottoTransaction(actor.database, async (database) => {
+    await requireOriginalSottoAdmission(database, actor.request, actor.identity);
+    const member = {
+      OR: [{ hostUserId: actor.identity.userId }, { guestUserId: actor.identity.userId }],
+    };
+    if (
+      query.beforeId &&
+      !(await database.playRoom.findFirst({ where: { id: query.beforeId, ...member } }))
+    )
+      throw new PlayRuleError('forbidden', 'Game page unavailable.');
+    const rooms = await database.playRoom.findMany({
+      where: member,
+      select: { id: true },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: query.limit + 1,
+      ...(query.beforeId ? { cursor: { id: query.beforeId }, skip: 1 } : {}),
+    });
+    const page = rooms.slice(0, query.limit);
+    const now = clock();
+    const views: PlayRoomView[] = [];
+    for (const room of page)
+      views.push(
+        await projectStoredPlayRoom(
+          database,
+          await loadPlayRoom(database, room.id),
+          actor.identity.userId,
+          now
+        )
+      );
+    return { rooms: views, nextCursor: rooms.length > query.limit ? page.at(-1)!.id : null };
   });
 }
 
@@ -162,7 +213,7 @@ export function actOnStoredPlayRoom(
   actor: PlayActor,
   roomId: string,
   input: unknown,
-  now = new Date()
+  clock: PlayClock = () => new Date()
 ) {
   const parsedRound = playRoundActionRequestSchema.safeParse(input);
   const command = parsedRound.success ? parsedRound.data : playRoomActionSchema.parse(input);
@@ -178,6 +229,7 @@ export function actOnStoredPlayRoom(
     },
     async (database) => {
       const room = await loadPlayRoom(database, roomId);
+      const now = clock();
       const seat = requirePlaySeat(room, actor.identity.userId);
       requireCurrent(room, command.expectedRevision, now);
       const view = await projectStoredPlayRoom(database, room, actor.identity.userId, now);

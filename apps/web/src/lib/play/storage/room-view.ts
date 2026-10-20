@@ -38,7 +38,7 @@ export async function playHostWaiting(
   now: Date
 ): Promise<boolean> {
   const leases = await database.playPresenceLease.findMany({
-    where: { roomId, expiresAt: { gt: now }, credentialExpiresAt: { gt: now } },
+    where: { roomId, releasedAt: null, expiresAt: { gt: now }, credentialExpiresAt: { gt: now } },
     select: { accessFingerprint: true },
   });
   if (leases.length === 0) return false;

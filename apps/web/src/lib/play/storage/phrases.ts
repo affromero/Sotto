@@ -6,7 +6,7 @@ import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 import { PlayRuleError } from '../errors';
 import { playFingerprint } from './fingerprint';
 import { loadPlayRoom, projectStoredPlayRoom } from './room-view';
-import type { PlayActor } from './rooms';
+import type { PlayActor, PlayClock } from './rooms';
 
 function visiblePhrases(round: PlayRoundView): (string | null)[] {
   const shared = [...round.hints.map((hint) => hint.text), round.result?.correction ?? null];
@@ -36,11 +36,12 @@ export function saveStoredPlayPhrase(
   actor: PlayActor,
   roomId: string,
   input: unknown,
-  now = new Date()
+  clock: PlayClock = () => new Date()
 ) {
   const command = playPhraseInputSchema.parse(input);
   return sottoTransaction(actor.database, async (database) => {
     await requireOriginalSottoAdmission(database, actor.request, actor.identity);
+    const now = clock();
     const room = await projectStoredPlayRoom(
       database,
       await loadPlayRoom(database, roomId),

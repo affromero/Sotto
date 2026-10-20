@@ -1,5 +1,12 @@
 # src/app/ — Next.js App Router Pages & API Routes
 
+`/api/v1/play` serves independent two-player games. Member routes revalidate
+canonical content admission in their tool-layer transactions. Only exact
+invitation intake, proof-bound status/claim/ACK paths and `/play/join` bypass
+perimeter admission. An owner approves persistent profiles; a foreground host
+accepts entry. Browser claims require canonical origin policy and place the
+session only in an HttpOnly cookie. Every Play response is private and uncached.
+
 Class preparation is durably admitted through `courses/[courseId]/next-class`.
 The `courses/[courseId]/preparation` route exposes explicit scheduling (POST),
 sanitized activity (GET), and acknowledged recovery after verified cleanup (PATCH).

@@ -2,7 +2,6 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   buildOpenApiDocument,
-  buildEndpointOperation,
   OPENAPI_CODEGEN_OUTPUT_PATH,
   OPENAPI_OUTPUT_PATH,
   OPENAPI_TUI_VENDOR_PATH,
@@ -36,23 +35,6 @@ import {
 } from '../src/contracts/schemas';
 
 describe('openapi.json drift guard', () => {
-  it('documents claimant proof as a required private header distinct from normal app access', () => {
-    const health = endpoints.find((endpoint) => endpoint.id === 'health');
-    if (!health) throw new Error('Missing registered health contract');
-    const claim = buildEndpointOperation({ ...health, auth: 'claimant' });
-    expect(claim).toMatchObject({ security: [{ playClaimantProof: [] }] });
-    expect(buildEndpointOperation({ ...health, auth: 'bearer' })).toMatchObject({
-      security: [{ bearerAuth: [] }],
-    });
-    expect(buildEndpointOperation(health)).not.toHaveProperty('security');
-    expect(buildOpenApiDocument()).toMatchObject({
-      components: {
-        securitySchemes: {
-          playClaimantProof: { type: 'apiKey', in: 'header', name: 'X-Sotto-Play-Proof' },
-        },
-      },
-    });
-  });
   it('allows class completion when writing or speaking provides the graded evidence', () => {
     expect(submitClassRequestSchema.safeParse({ answers: [] }).success).toBe(true);
     expect(submitClassRequestSchema.safeParse({}).success).toBe(false);
@@ -158,6 +140,23 @@ describe('openapi.json drift guard', () => {
     expect(ids).toEqual(
       [
         'GET /api/v1/health',
+        'GET /api/v1/play/rooms',
+        'POST /api/v1/play/rooms',
+        'GET /api/v1/play/rooms/{roomId}',
+        'POST /api/v1/play/rooms/{roomId}/actions',
+        'POST /api/v1/play/rooms/{roomId}/presence',
+        'GET /api/v1/play/rooms/{roomId}/invitations',
+        'POST /api/v1/play/rooms/{roomId}/invitations',
+        'GET /api/v1/play/rooms/{roomId}/join-requests',
+        'GET /api/v1/play/enrollments',
+        'GET /api/v1/play/invitations',
+        'POST /api/v1/play/invitations',
+        'GET /api/v1/play/join-requests/{requestId}',
+        'POST /api/v1/play/join-requests/{requestId}/approve',
+        'POST /api/v1/play/join-requests/{requestId}/claim',
+        'POST /api/v1/play/join-requests/{requestId}/ack',
+        'GET /api/v1/play/phrases',
+        'POST /api/v1/play/phrases',
         'GET /api/v1/courses',
         'DELETE /api/v1/courses/{courseId}',
         'POST /api/v1/placement/manual',

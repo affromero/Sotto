@@ -154,11 +154,13 @@ model PlayPresenceLease {
   credentialExpiresAt DateTime
   renewedAt           DateTime
   expiresAt           DateTime
+  releasedAt          DateTime?
 
   room PlayRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
 
   @@unique([roomId, credentialKind, credentialId, viewHash])
   @@index([roomId, expiresAt])
+  @@index([expiresAt])
 }
 
 model PlayJoinRequest {
@@ -196,6 +198,8 @@ model PlayJoinRequest {
   @@index([candidateUserId])
   @@index([provisionedUserId])
   @@index([approvedByUserId])
+  @@index([status, expiresAt])
+  @@index([deliveryExpiresAt])
 }
 
 model PlayRound {

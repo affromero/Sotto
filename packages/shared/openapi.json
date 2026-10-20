@@ -4403,10 +4403,2938 @@
         },
         "required": ["id", "name", "email", "image", "role"],
         "additionalProperties": false
+      },
+      "PlayCreateRoom": {
+        "type": "object",
+        "properties": {
+          "actionId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["DESCRIBE", "MISSION", "KNOW_ME", "MIXED"]
+          },
+          "theme": {
+            "type": "string",
+            "enum": ["EVERYDAY", "FOOD", "TRAVEL", "SILLY", "GET_TO_KNOW_YOU", "AFFECTIONATE"]
+          },
+          "questionStyle": {
+            "type": "string",
+            "enum": ["CHOICES", "OPEN"]
+          },
+          "settings": {
+            "type": "object",
+            "properties": {
+              "nativeLang": {
+                "type": "string",
+                "pattern": "^[a-z]{2,3}$"
+              },
+              "targetLang": {
+                "type": "string",
+                "pattern": "^[a-z]{2,3}$"
+              },
+              "level": {
+                "type": "string",
+                "enum": ["A1", "A2", "B1", "B2", "C1", "C2"]
+              }
+            },
+            "required": ["nativeLang", "targetLang", "level"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["actionId", "kind", "theme", "settings"],
+        "additionalProperties": false
+      },
+      "PlayRoom": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "status": {
+            "type": "string",
+            "enum": ["WAITING", "PLAYING", "COMPLETED", "CANCELLED", "EXPIRED"]
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "rematchRoomId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "nullable": true
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["DESCRIBE", "MISSION", "KNOW_ME", "MIXED"]
+          },
+          "theme": {
+            "type": "string",
+            "enum": ["EVERYDAY", "FOOD", "TRAVEL", "SILLY", "GET_TO_KNOW_YOU", "AFFECTIONATE"]
+          },
+          "questionStyle": {
+            "type": "string",
+            "enum": ["CHOICES", "OPEN"]
+          },
+          "ownSeat": {
+            "type": "string",
+            "enum": ["HOST", "GUEST"]
+          },
+          "host": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "settings": {
+                "type": "object",
+                "properties": {
+                  "nativeLang": {
+                    "type": "string",
+                    "pattern": "^[a-z]{2,3}$"
+                  },
+                  "targetLang": {
+                    "type": "string",
+                    "pattern": "^[a-z]{2,3}$"
+                  },
+                  "level": {
+                    "type": "string",
+                    "enum": ["A1", "A2", "B1", "B2", "C1", "C2"]
+                  }
+                },
+                "required": ["nativeLang", "targetLang", "level"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["id", "name", "settings"],
+            "additionalProperties": false
+          },
+          "guest": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "settings": {
+                "type": "object",
+                "properties": {
+                  "nativeLang": {
+                    "type": "string",
+                    "pattern": "^[a-z]{2,3}$"
+                  },
+                  "targetLang": {
+                    "type": "string",
+                    "pattern": "^[a-z]{2,3}$"
+                  },
+                  "level": {
+                    "type": "string",
+                    "enum": ["A1", "A2", "B1", "B2", "C1", "C2"]
+                  }
+                },
+                "required": ["nativeLang", "targetLang", "level"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["id", "name", "settings"],
+            "additionalProperties": false,
+            "nullable": true
+          },
+          "hostWaiting": {
+            "type": "boolean"
+          },
+          "allowedActions": {
+            "maxItems": 5,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["START", "NEXT_ROUND", "REMATCH", "LEAVE", "CANCEL"]
+            }
+          },
+          "round": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "order": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 5
+                  },
+                  "learner": {
+                    "type": "string",
+                    "enum": ["HOST", "GUEST"]
+                  },
+                  "targetLang": {
+                    "type": "string",
+                    "pattern": "^[a-z]{2,3}$"
+                  },
+                  "supportLang": {
+                    "type": "string",
+                    "pattern": "^[a-z]{2,3}$"
+                  },
+                  "level": {
+                    "type": "string",
+                    "enum": ["A1", "A2", "B1", "B2", "C1", "C2"]
+                  },
+                  "prompt": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  },
+                  "guidance": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  },
+                  "phase": {
+                    "type": "string",
+                    "enum": ["SETUP", "CLUE", "GUESS", "ANSWER", "EXCHANGE", "FEEDBACK", "FINISHED"]
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": ["LEARNER", "PARTNER"]
+                  },
+                  "instruction": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  },
+                  "revealed": {
+                    "type": "boolean"
+                  },
+                  "allowedActions": {
+                    "maxItems": 10,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "SET_TARGET",
+                        "GIVE_CLUE",
+                        "GUESS",
+                        "ANSWER",
+                        "CHOOSE",
+                        "MESSAGE",
+                        "MISSION_DONE",
+                        "HINT",
+                        "FEEDBACK",
+                        "SKIP"
+                      ]
+                    }
+                  },
+                  "hints": {
+                    "maxItems": 3,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "seat": {
+                          "type": "string",
+                          "enum": ["HOST", "GUEST"]
+                        },
+                        "text": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        }
+                      },
+                      "required": ["seat", "text"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "result": {
+                    "type": "object",
+                    "properties": {
+                      "skipped": {
+                        "type": "boolean"
+                      },
+                      "understood": {
+                        "type": "boolean",
+                        "nullable": true
+                      },
+                      "matched": {
+                        "type": "boolean",
+                        "nullable": true
+                      },
+                      "correction": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 500,
+                        "nullable": true
+                      },
+                      "points": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2
+                      }
+                    },
+                    "required": ["skipped", "understood", "matched", "correction", "points"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
+                  "mode": {
+                    "type": "string",
+                    "enum": ["DESCRIBE"]
+                  },
+                  "target": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500,
+                    "nullable": true
+                  },
+                  "clue": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500,
+                    "nullable": true
+                  },
+                  "guess": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500,
+                    "nullable": true
+                  },
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  }
+                },
+                "required": [
+                  "order",
+                  "learner",
+                  "targetLang",
+                  "supportLang",
+                  "level",
+                  "prompt",
+                  "guidance",
+                  "phase",
+                  "role",
+                  "instruction",
+                  "revealed",
+                  "allowedActions",
+                  "hints",
+                  "result",
+                  "mode",
+                  "target",
+                  "clue",
+                  "guess",
+                  "id"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "order": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 5
+                  },
+                  "learner": {
+                    "type": "string",
+                    "enum": ["HOST", "GUEST"]
+                  },
+                  "targetLang": {
+                    "type": "string",
+                    "pattern": "^[a-z]{2,3}$"
+                  },
+                  "supportLang": {
+                    "type": "string",
+                    "pattern": "^[a-z]{2,3}$"
+                  },
+                  "level": {
+                    "type": "string",
+                    "enum": ["A1", "A2", "B1", "B2", "C1", "C2"]
+                  },
+                  "prompt": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  },
+                  "guidance": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  },
+                  "phase": {
+                    "type": "string",
+                    "enum": ["SETUP", "CLUE", "GUESS", "ANSWER", "EXCHANGE", "FEEDBACK", "FINISHED"]
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": ["LEARNER", "PARTNER"]
+                  },
+                  "instruction": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  },
+                  "revealed": {
+                    "type": "boolean"
+                  },
+                  "allowedActions": {
+                    "maxItems": 10,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "SET_TARGET",
+                        "GIVE_CLUE",
+                        "GUESS",
+                        "ANSWER",
+                        "CHOOSE",
+                        "MESSAGE",
+                        "MISSION_DONE",
+                        "HINT",
+                        "FEEDBACK",
+                        "SKIP"
+                      ]
+                    }
+                  },
+                  "hints": {
+                    "maxItems": 3,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "seat": {
+                          "type": "string",
+                          "enum": ["HOST", "GUEST"]
+                        },
+                        "text": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        }
+                      },
+                      "required": ["seat", "text"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "result": {
+                    "type": "object",
+                    "properties": {
+                      "skipped": {
+                        "type": "boolean"
+                      },
+                      "understood": {
+                        "type": "boolean",
+                        "nullable": true
+                      },
+                      "matched": {
+                        "type": "boolean",
+                        "nullable": true
+                      },
+                      "correction": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 500,
+                        "nullable": true
+                      },
+                      "points": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2
+                      }
+                    },
+                    "required": ["skipped", "understood", "matched", "correction", "points"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
+                  "mode": {
+                    "type": "string",
+                    "enum": ["KNOW_ME"]
+                  },
+                  "questionStyle": {
+                    "type": "string",
+                    "enum": ["CHOICES", "OPEN"]
+                  },
+                  "choices": {
+                    "maxItems": 4,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "enum": ["A", "B", "C", "D"]
+                        },
+                        "text": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "supportText": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500,
+                          "nullable": true
+                        },
+                        "symbol": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 8
+                        }
+                      },
+                      "required": ["id", "text", "supportText", "symbol"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "ownAnswer": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500,
+                    "nullable": true
+                  },
+                  "otherAnswer": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500,
+                    "nullable": true
+                  },
+                  "otherCommitted": {
+                    "type": "boolean"
+                  },
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  }
+                },
+                "required": [
+                  "order",
+                  "learner",
+                  "targetLang",
+                  "supportLang",
+                  "level",
+                  "prompt",
+                  "guidance",
+                  "phase",
+                  "role",
+                  "instruction",
+                  "revealed",
+                  "allowedActions",
+                  "hints",
+                  "result",
+                  "mode",
+                  "questionStyle",
+                  "choices",
+                  "ownAnswer",
+                  "otherAnswer",
+                  "otherCommitted",
+                  "id"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "order": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 5
+                  },
+                  "learner": {
+                    "type": "string",
+                    "enum": ["HOST", "GUEST"]
+                  },
+                  "targetLang": {
+                    "type": "string",
+                    "pattern": "^[a-z]{2,3}$"
+                  },
+                  "supportLang": {
+                    "type": "string",
+                    "pattern": "^[a-z]{2,3}$"
+                  },
+                  "level": {
+                    "type": "string",
+                    "enum": ["A1", "A2", "B1", "B2", "C1", "C2"]
+                  },
+                  "prompt": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  },
+                  "guidance": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  },
+                  "phase": {
+                    "type": "string",
+                    "enum": ["SETUP", "CLUE", "GUESS", "ANSWER", "EXCHANGE", "FEEDBACK", "FINISHED"]
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": ["LEARNER", "PARTNER"]
+                  },
+                  "instruction": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  },
+                  "revealed": {
+                    "type": "boolean"
+                  },
+                  "allowedActions": {
+                    "maxItems": 10,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "SET_TARGET",
+                        "GIVE_CLUE",
+                        "GUESS",
+                        "ANSWER",
+                        "CHOOSE",
+                        "MESSAGE",
+                        "MISSION_DONE",
+                        "HINT",
+                        "FEEDBACK",
+                        "SKIP"
+                      ]
+                    }
+                  },
+                  "hints": {
+                    "maxItems": 3,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "seat": {
+                          "type": "string",
+                          "enum": ["HOST", "GUEST"]
+                        },
+                        "text": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        }
+                      },
+                      "required": ["seat", "text"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "result": {
+                    "type": "object",
+                    "properties": {
+                      "skipped": {
+                        "type": "boolean"
+                      },
+                      "understood": {
+                        "type": "boolean",
+                        "nullable": true
+                      },
+                      "matched": {
+                        "type": "boolean",
+                        "nullable": true
+                      },
+                      "correction": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 500,
+                        "nullable": true
+                      },
+                      "points": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2
+                      }
+                    },
+                    "required": ["skipped", "understood", "matched", "correction", "points"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
+                  "mode": {
+                    "type": "string",
+                    "enum": ["MISSION"]
+                  },
+                  "ownObjective": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  },
+                  "otherObjective": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500,
+                    "nullable": true
+                  },
+                  "messages": {
+                    "maxItems": 24,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "seat": {
+                          "type": "string",
+                          "enum": ["HOST", "GUEST"]
+                        },
+                        "text": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        }
+                      },
+                      "required": ["seat", "text"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "ownOutcome": {
+                    "type": "boolean",
+                    "nullable": true
+                  },
+                  "otherOutcome": {
+                    "type": "boolean",
+                    "nullable": true
+                  },
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  }
+                },
+                "required": [
+                  "order",
+                  "learner",
+                  "targetLang",
+                  "supportLang",
+                  "level",
+                  "prompt",
+                  "guidance",
+                  "phase",
+                  "role",
+                  "instruction",
+                  "revealed",
+                  "allowedActions",
+                  "hints",
+                  "result",
+                  "mode",
+                  "ownObjective",
+                  "otherObjective",
+                  "messages",
+                  "ownOutcome",
+                  "otherOutcome",
+                  "id"
+                ],
+                "additionalProperties": false
+              }
+            ],
+            "nullable": true
+          },
+          "completedRounds": {
+            "maxItems": 6,
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "order": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 5
+                    },
+                    "learner": {
+                      "type": "string",
+                      "enum": ["HOST", "GUEST"]
+                    },
+                    "targetLang": {
+                      "type": "string",
+                      "pattern": "^[a-z]{2,3}$"
+                    },
+                    "supportLang": {
+                      "type": "string",
+                      "pattern": "^[a-z]{2,3}$"
+                    },
+                    "level": {
+                      "type": "string",
+                      "enum": ["A1", "A2", "B1", "B2", "C1", "C2"]
+                    },
+                    "prompt": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 1000
+                    },
+                    "guidance": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 500
+                    },
+                    "phase": {
+                      "type": "string",
+                      "enum": [
+                        "SETUP",
+                        "CLUE",
+                        "GUESS",
+                        "ANSWER",
+                        "EXCHANGE",
+                        "FEEDBACK",
+                        "FINISHED"
+                      ]
+                    },
+                    "role": {
+                      "type": "string",
+                      "enum": ["LEARNER", "PARTNER"]
+                    },
+                    "instruction": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 500
+                    },
+                    "revealed": {
+                      "type": "boolean"
+                    },
+                    "allowedActions": {
+                      "maxItems": 10,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "SET_TARGET",
+                          "GIVE_CLUE",
+                          "GUESS",
+                          "ANSWER",
+                          "CHOOSE",
+                          "MESSAGE",
+                          "MISSION_DONE",
+                          "HINT",
+                          "FEEDBACK",
+                          "SKIP"
+                        ]
+                      }
+                    },
+                    "hints": {
+                      "maxItems": 3,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "seat": {
+                            "type": "string",
+                            "enum": ["HOST", "GUEST"]
+                          },
+                          "text": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          }
+                        },
+                        "required": ["seat", "text"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "result": {
+                      "type": "object",
+                      "properties": {
+                        "skipped": {
+                          "type": "boolean"
+                        },
+                        "understood": {
+                          "type": "boolean",
+                          "nullable": true
+                        },
+                        "matched": {
+                          "type": "boolean",
+                          "nullable": true
+                        },
+                        "correction": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500,
+                          "nullable": true
+                        },
+                        "points": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 2
+                        }
+                      },
+                      "required": ["skipped", "understood", "matched", "correction", "points"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "mode": {
+                      "type": "string",
+                      "enum": ["DESCRIBE"]
+                    },
+                    "target": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 500,
+                      "nullable": true
+                    },
+                    "clue": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 500,
+                      "nullable": true
+                    },
+                    "guess": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 500,
+                      "nullable": true
+                    },
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    }
+                  },
+                  "required": [
+                    "order",
+                    "learner",
+                    "targetLang",
+                    "supportLang",
+                    "level",
+                    "prompt",
+                    "guidance",
+                    "phase",
+                    "role",
+                    "instruction",
+                    "revealed",
+                    "allowedActions",
+                    "hints",
+                    "result",
+                    "mode",
+                    "target",
+                    "clue",
+                    "guess",
+                    "id"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "order": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 5
+                    },
+                    "learner": {
+                      "type": "string",
+                      "enum": ["HOST", "GUEST"]
+                    },
+                    "targetLang": {
+                      "type": "string",
+                      "pattern": "^[a-z]{2,3}$"
+                    },
+                    "supportLang": {
+                      "type": "string",
+                      "pattern": "^[a-z]{2,3}$"
+                    },
+                    "level": {
+                      "type": "string",
+                      "enum": ["A1", "A2", "B1", "B2", "C1", "C2"]
+                    },
+                    "prompt": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 1000
+                    },
+                    "guidance": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 500
+                    },
+                    "phase": {
+                      "type": "string",
+                      "enum": [
+                        "SETUP",
+                        "CLUE",
+                        "GUESS",
+                        "ANSWER",
+                        "EXCHANGE",
+                        "FEEDBACK",
+                        "FINISHED"
+                      ]
+                    },
+                    "role": {
+                      "type": "string",
+                      "enum": ["LEARNER", "PARTNER"]
+                    },
+                    "instruction": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 500
+                    },
+                    "revealed": {
+                      "type": "boolean"
+                    },
+                    "allowedActions": {
+                      "maxItems": 10,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "SET_TARGET",
+                          "GIVE_CLUE",
+                          "GUESS",
+                          "ANSWER",
+                          "CHOOSE",
+                          "MESSAGE",
+                          "MISSION_DONE",
+                          "HINT",
+                          "FEEDBACK",
+                          "SKIP"
+                        ]
+                      }
+                    },
+                    "hints": {
+                      "maxItems": 3,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "seat": {
+                            "type": "string",
+                            "enum": ["HOST", "GUEST"]
+                          },
+                          "text": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          }
+                        },
+                        "required": ["seat", "text"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "result": {
+                      "type": "object",
+                      "properties": {
+                        "skipped": {
+                          "type": "boolean"
+                        },
+                        "understood": {
+                          "type": "boolean",
+                          "nullable": true
+                        },
+                        "matched": {
+                          "type": "boolean",
+                          "nullable": true
+                        },
+                        "correction": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500,
+                          "nullable": true
+                        },
+                        "points": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 2
+                        }
+                      },
+                      "required": ["skipped", "understood", "matched", "correction", "points"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "mode": {
+                      "type": "string",
+                      "enum": ["KNOW_ME"]
+                    },
+                    "questionStyle": {
+                      "type": "string",
+                      "enum": ["CHOICES", "OPEN"]
+                    },
+                    "choices": {
+                      "maxItems": 4,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "enum": ["A", "B", "C", "D"]
+                          },
+                          "text": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          },
+                          "supportText": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500,
+                            "nullable": true
+                          },
+                          "symbol": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 8
+                          }
+                        },
+                        "required": ["id", "text", "supportText", "symbol"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "ownAnswer": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 500,
+                      "nullable": true
+                    },
+                    "otherAnswer": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 500,
+                      "nullable": true
+                    },
+                    "otherCommitted": {
+                      "type": "boolean"
+                    },
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    }
+                  },
+                  "required": [
+                    "order",
+                    "learner",
+                    "targetLang",
+                    "supportLang",
+                    "level",
+                    "prompt",
+                    "guidance",
+                    "phase",
+                    "role",
+                    "instruction",
+                    "revealed",
+                    "allowedActions",
+                    "hints",
+                    "result",
+                    "mode",
+                    "questionStyle",
+                    "choices",
+                    "ownAnswer",
+                    "otherAnswer",
+                    "otherCommitted",
+                    "id"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "order": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 5
+                    },
+                    "learner": {
+                      "type": "string",
+                      "enum": ["HOST", "GUEST"]
+                    },
+                    "targetLang": {
+                      "type": "string",
+                      "pattern": "^[a-z]{2,3}$"
+                    },
+                    "supportLang": {
+                      "type": "string",
+                      "pattern": "^[a-z]{2,3}$"
+                    },
+                    "level": {
+                      "type": "string",
+                      "enum": ["A1", "A2", "B1", "B2", "C1", "C2"]
+                    },
+                    "prompt": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 1000
+                    },
+                    "guidance": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 500
+                    },
+                    "phase": {
+                      "type": "string",
+                      "enum": [
+                        "SETUP",
+                        "CLUE",
+                        "GUESS",
+                        "ANSWER",
+                        "EXCHANGE",
+                        "FEEDBACK",
+                        "FINISHED"
+                      ]
+                    },
+                    "role": {
+                      "type": "string",
+                      "enum": ["LEARNER", "PARTNER"]
+                    },
+                    "instruction": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 500
+                    },
+                    "revealed": {
+                      "type": "boolean"
+                    },
+                    "allowedActions": {
+                      "maxItems": 10,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "SET_TARGET",
+                          "GIVE_CLUE",
+                          "GUESS",
+                          "ANSWER",
+                          "CHOOSE",
+                          "MESSAGE",
+                          "MISSION_DONE",
+                          "HINT",
+                          "FEEDBACK",
+                          "SKIP"
+                        ]
+                      }
+                    },
+                    "hints": {
+                      "maxItems": 3,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "seat": {
+                            "type": "string",
+                            "enum": ["HOST", "GUEST"]
+                          },
+                          "text": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          }
+                        },
+                        "required": ["seat", "text"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "result": {
+                      "type": "object",
+                      "properties": {
+                        "skipped": {
+                          "type": "boolean"
+                        },
+                        "understood": {
+                          "type": "boolean",
+                          "nullable": true
+                        },
+                        "matched": {
+                          "type": "boolean",
+                          "nullable": true
+                        },
+                        "correction": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500,
+                          "nullable": true
+                        },
+                        "points": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 2
+                        }
+                      },
+                      "required": ["skipped", "understood", "matched", "correction", "points"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "mode": {
+                      "type": "string",
+                      "enum": ["MISSION"]
+                    },
+                    "ownObjective": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 500
+                    },
+                    "otherObjective": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 500,
+                      "nullable": true
+                    },
+                    "messages": {
+                      "maxItems": 24,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "seat": {
+                            "type": "string",
+                            "enum": ["HOST", "GUEST"]
+                          },
+                          "text": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          }
+                        },
+                        "required": ["seat", "text"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "ownOutcome": {
+                      "type": "boolean",
+                      "nullable": true
+                    },
+                    "otherOutcome": {
+                      "type": "boolean",
+                      "nullable": true
+                    },
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    }
+                  },
+                  "required": [
+                    "order",
+                    "learner",
+                    "targetLang",
+                    "supportLang",
+                    "level",
+                    "prompt",
+                    "guidance",
+                    "phase",
+                    "role",
+                    "instruction",
+                    "revealed",
+                    "allowedActions",
+                    "hints",
+                    "result",
+                    "mode",
+                    "ownObjective",
+                    "otherObjective",
+                    "messages",
+                    "ownOutcome",
+                    "otherOutcome",
+                    "id"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            }
+          },
+          "points": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 12
+          },
+          "serverTime": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "revision",
+          "rematchRoomId",
+          "kind",
+          "theme",
+          "questionStyle",
+          "ownSeat",
+          "host",
+          "guest",
+          "hostWaiting",
+          "allowedActions",
+          "round",
+          "completedRounds",
+          "points",
+          "serverTime"
+        ],
+        "additionalProperties": false
+      },
+      "PlayRoomList": {
+        "type": "object",
+        "properties": {
+          "rooms": {
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlayRoom"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "nullable": true
+          }
+        },
+        "required": ["rooms", "nextCursor"],
+        "additionalProperties": false
+      },
+      "PlayAction": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "actionId": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "expectedRevision": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "type": {
+                "type": "string",
+                "enum": ["START", "NEXT_ROUND", "REMATCH", "LEAVE", "CANCEL"]
+              }
+            },
+            "required": ["actionId", "expectedRevision", "type"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "actionId": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "expectedRevision": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "command": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": ["SET_TARGET"]
+                      },
+                      "text": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 500
+                      }
+                    },
+                    "required": ["type", "text"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": ["GIVE_CLUE"]
+                      },
+                      "text": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 500
+                      }
+                    },
+                    "required": ["type", "text"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": ["GUESS"]
+                      },
+                      "text": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 500
+                      }
+                    },
+                    "required": ["type", "text"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": ["ANSWER"]
+                      },
+                      "text": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 500
+                      }
+                    },
+                    "required": ["type", "text"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": ["CHOOSE"]
+                      },
+                      "optionId": {
+                        "type": "string",
+                        "enum": ["A", "B", "C", "D"]
+                      }
+                    },
+                    "required": ["type", "optionId"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": ["MESSAGE"]
+                      },
+                      "text": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 500
+                      }
+                    },
+                    "required": ["type", "text"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": ["MISSION_DONE"]
+                      },
+                      "achieved": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": ["type", "achieved"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": ["HINT"]
+                      },
+                      "text": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 500
+                      }
+                    },
+                    "required": ["type", "text"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": ["FEEDBACK"]
+                      },
+                      "understood": {
+                        "type": "boolean"
+                      },
+                      "correction": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 500,
+                        "nullable": true
+                      }
+                    },
+                    "required": ["type", "understood", "correction"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": ["SKIP"]
+                      }
+                    },
+                    "required": ["type"],
+                    "additionalProperties": false
+                  }
+                ]
+              }
+            },
+            "required": ["actionId", "expectedRevision", "command"],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "PlayPresenceInput": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["RENEW", "RELEASE"]
+          },
+          "viewNonce": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{43}$"
+          }
+        },
+        "required": ["type", "viewNonce"],
+        "additionalProperties": false
+      },
+      "PlayPresence": {
+        "type": "object",
+        "properties": {
+          "hostWaiting": {
+            "type": "boolean"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+            "nullable": true
+          },
+          "serverTime": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          }
+        },
+        "required": ["hostWaiting", "expiresAt", "serverTime"],
+        "additionalProperties": false
+      },
+      "PlayInvitationAction": {
+        "type": "object",
+        "properties": {
+          "actionId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": ["actionId", "expectedRevision"],
+        "additionalProperties": false
+      },
+      "PlayInvitation": {
+        "type": "object",
+        "properties": {
+          "roomId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^[A-HJ-NP-Z2-9]{12}$"
+          },
+          "generation": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "maximum": 9007199254740991
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          }
+        },
+        "required": ["roomId", "code", "generation", "expiresAt"],
+        "additionalProperties": false
+      },
+      "PlayCurrentInvitation": {
+        "nullable": true,
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/PlayInvitation"
+          }
+        ]
+      },
+      "PlayInvitationPreview": {
+        "type": "object",
+        "properties": {
+          "roomId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "hostName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["DESCRIBE", "MISSION", "KNOW_ME", "MIXED"]
+          },
+          "theme": {
+            "type": "string",
+            "enum": ["EVERYDAY", "FOOD", "TRAVEL", "SILLY", "GET_TO_KNOW_YOU", "AFFECTIONATE"]
+          },
+          "questionStyle": {
+            "type": "string",
+            "enum": ["CHOICES", "OPEN"]
+          },
+          "hostWaiting": {
+            "type": "boolean"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "serverTime": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          }
+        },
+        "required": [
+          "roomId",
+          "hostName",
+          "kind",
+          "theme",
+          "questionStyle",
+          "hostWaiting",
+          "expiresAt",
+          "serverTime"
+        ],
+        "additionalProperties": false
+      },
+      "PlayJoinRequest": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^[A-HJ-NP-Z2-9]{12}$"
+          },
+          "client": {
+            "type": "string",
+            "enum": ["BROWSER", "NATIVE"]
+          },
+          "deviceName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "candidate": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": ["EXISTING"]
+                  },
+                  "settings": {
+                    "type": "object",
+                    "properties": {
+                      "nativeLang": {
+                        "type": "string",
+                        "pattern": "^[a-z]{2,3}$"
+                      },
+                      "targetLang": {
+                        "type": "string",
+                        "pattern": "^[a-z]{2,3}$"
+                      },
+                      "level": {
+                        "type": "string",
+                        "enum": ["A1", "A2", "B1", "B2", "C1", "C2"]
+                      }
+                    },
+                    "required": ["nativeLang", "targetLang", "level"],
+                    "additionalProperties": false
+                  }
+                },
+                "required": ["kind", "settings"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": ["NEW"]
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "settings": {
+                    "type": "object",
+                    "properties": {
+                      "nativeLang": {
+                        "type": "string",
+                        "pattern": "^[a-z]{2,3}$"
+                      },
+                      "targetLang": {
+                        "type": "string",
+                        "pattern": "^[a-z]{2,3}$"
+                      },
+                      "level": {
+                        "type": "string",
+                        "enum": ["A1", "A2", "B1", "B2", "C1", "C2"]
+                      }
+                    },
+                    "required": ["nativeLang", "targetLang", "level"],
+                    "additionalProperties": false
+                  },
+                  "consentToProfile": {
+                    "type": "boolean",
+                    "enum": [true]
+                  }
+                },
+                "required": ["kind", "name", "settings", "consentToProfile"],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "required": ["requestId", "code", "client", "deviceName", "candidate"],
+        "additionalProperties": false
+      },
+      "PlayJoinStatus": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "WAITING_FOR_OWNER",
+              "WAITING_FOR_HOST",
+              "HOST_UNAVAILABLE",
+              "ACCEPTED",
+              "CLAIMED",
+              "DECLINED",
+              "EXPIRED",
+              "REVOKED"
+            ]
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "serverTime": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          }
+        },
+        "required": ["requestId", "status", "expiresAt", "serverTime"],
+        "additionalProperties": false
+      },
+      "PlayApproval": {
+        "type": "object",
+        "properties": {
+          "actionId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["APPROVE_PROFILE", "ACCEPT", "DECLINE"]
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": ["actionId", "type", "expectedRevision"],
+        "additionalProperties": false
+      },
+      "PlayPendingRequest": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "roomId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "roomRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "candidateKind": {
+            "type": "string",
+            "enum": ["EXISTING", "NEW"]
+          },
+          "settings": {
+            "type": "object",
+            "properties": {
+              "nativeLang": {
+                "type": "string",
+                "pattern": "^[a-z]{2,3}$"
+              },
+              "targetLang": {
+                "type": "string",
+                "pattern": "^[a-z]{2,3}$"
+              },
+              "level": {
+                "type": "string",
+                "enum": ["A1", "A2", "B1", "B2", "C1", "C2"]
+              }
+            },
+            "required": ["nativeLang", "targetLang", "level"],
+            "additionalProperties": false
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "WAITING_FOR_OWNER",
+              "WAITING_FOR_HOST",
+              "HOST_UNAVAILABLE",
+              "ACCEPTED",
+              "CLAIMED",
+              "DECLINED",
+              "EXPIRED",
+              "REVOKED"
+            ]
+          },
+          "profileId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "nullable": true
+          },
+          "allowedActions": {
+            "maxItems": 3,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["APPROVE_PROFILE", "ACCEPT", "DECLINE"]
+            }
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "serverTime": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          }
+        },
+        "required": [
+          "requestId",
+          "roomId",
+          "roomRevision",
+          "name",
+          "candidateKind",
+          "settings",
+          "status",
+          "profileId",
+          "allowedActions",
+          "expiresAt",
+          "serverTime"
+        ],
+        "additionalProperties": false
+      },
+      "PlayPendingRequestList": {
+        "type": "object",
+        "properties": {
+          "requests": {
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlayPendingRequest"
+            }
+          }
+        },
+        "required": ["requests"],
+        "additionalProperties": false
+      },
+      "PlayDelivery": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": ["BROWSER"]
+              },
+              "deliveryId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "roomId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "profile": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "settings": {
+                    "type": "object",
+                    "properties": {
+                      "nativeLang": {
+                        "type": "string",
+                        "pattern": "^[a-z]{2,3}$"
+                      },
+                      "targetLang": {
+                        "type": "string",
+                        "pattern": "^[a-z]{2,3}$"
+                      },
+                      "level": {
+                        "type": "string",
+                        "enum": ["A1", "A2", "B1", "B2", "C1", "C2"]
+                      }
+                    },
+                    "required": ["nativeLang", "targetLang", "level"],
+                    "additionalProperties": false
+                  }
+                },
+                "required": ["id", "name", "settings"],
+                "additionalProperties": false
+              },
+              "expiresAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              }
+            },
+            "required": ["kind", "deliveryId", "roomId", "profile", "expiresAt"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": ["NATIVE"]
+              },
+              "deliveryId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "roomId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "profile": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "settings": {
+                    "type": "object",
+                    "properties": {
+                      "nativeLang": {
+                        "type": "string",
+                        "pattern": "^[a-z]{2,3}$"
+                      },
+                      "targetLang": {
+                        "type": "string",
+                        "pattern": "^[a-z]{2,3}$"
+                      },
+                      "level": {
+                        "type": "string",
+                        "enum": ["A1", "A2", "B1", "B2", "C1", "C2"]
+                      }
+                    },
+                    "required": ["nativeLang", "targetLang", "level"],
+                    "additionalProperties": false
+                  }
+                },
+                "required": ["id", "name", "settings"],
+                "additionalProperties": false
+              },
+              "token": {
+                "type": "string",
+                "minLength": 20,
+                "maxLength": 512
+              },
+              "expiresAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              }
+            },
+            "required": ["kind", "deliveryId", "roomId", "profile", "token", "expiresAt"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": ["EXISTING"]
+              },
+              "roomId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "profile": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "settings": {
+                    "type": "object",
+                    "properties": {
+                      "nativeLang": {
+                        "type": "string",
+                        "pattern": "^[a-z]{2,3}$"
+                      },
+                      "targetLang": {
+                        "type": "string",
+                        "pattern": "^[a-z]{2,3}$"
+                      },
+                      "level": {
+                        "type": "string",
+                        "enum": ["A1", "A2", "B1", "B2", "C1", "C2"]
+                      }
+                    },
+                    "required": ["nativeLang", "targetLang", "level"],
+                    "additionalProperties": false
+                  }
+                },
+                "required": ["id", "name", "settings"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["kind", "roomId", "profile"],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "PlayEmptyBody": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "PlayAcknowledgment": {
+        "type": "object",
+        "properties": {
+          "deliveryId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": ["deliveryId"],
+        "additionalProperties": false
+      },
+      "PlayAcknowledged": {
+        "type": "object",
+        "properties": {
+          "acknowledged": {
+            "type": "boolean",
+            "enum": [true]
+          }
+        },
+        "required": ["acknowledged"],
+        "additionalProperties": false
+      },
+      "PlaySavePhrase": {
+        "type": "object",
+        "properties": {
+          "roundId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["WORD", "PHRASE", "SENTENCE"]
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "contextText": {
+            "type": "string",
+            "maxLength": 2000,
+            "nullable": true
+          },
+          "roomId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": ["roundId", "kind", "text", "contextText", "roomId"],
+        "additionalProperties": false
+      },
+      "PlayPhrase": {
+        "type": "object",
+        "properties": {
+          "roundId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["WORD", "PHRASE", "SENTENCE"]
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "contextText": {
+            "type": "string",
+            "maxLength": 2000,
+            "nullable": true
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "roomId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "targetLang": {
+            "type": "string",
+            "pattern": "^[a-z]{2,3}$"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          }
+        },
+        "required": [
+          "roundId",
+          "kind",
+          "text",
+          "contextText",
+          "id",
+          "roomId",
+          "targetLang",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      },
+      "PlayPhraseList": {
+        "type": "object",
+        "properties": {
+          "phrases": {
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlayPhrase"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "nullable": true
+          }
+        },
+        "required": ["phrases", "nextCursor"],
+        "additionalProperties": false
       }
     }
   },
   "paths": {
+    "/api/v1/play/rooms": {
+      "get": {
+        "operationId": "playRooms",
+        "summary": "List only my rooms, including expired and completed games.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayRoomList"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "beforeId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "playCreateRoom",
+        "summary": "Create a private room idempotently.",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayRoom"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlayCreateRoom"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/play/rooms/{roomId}": {
+      "get": {
+        "operationId": "playRoom",
+        "summary": "Read my personalized game state. Hidden partner content is omitted.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayRoom"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "roomId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/play/rooms/{roomId}/actions": {
+      "post": {
+        "operationId": "playAction",
+        "summary": "Apply a revision-checked room or round action idempotently.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayRoom"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "roomId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlayAction"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/play/rooms/{roomId}/presence": {
+      "post": {
+        "operationId": "playPresence",
+        "summary": "Renew or release this foreground host view. A released nonce cannot be reused.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayPresence"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "roomId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlayPresenceInput"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/play/rooms/{roomId}/invitations": {
+      "get": {
+        "operationId": "playCurrentInvitation",
+        "summary": "Host-only recovery of the current code. Returns null if unavailable.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayCurrentInvitation"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "roomId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "playRotateInvitation",
+        "summary": "Host-only invitation rotation. Revokes old pending admissions.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayInvitation"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "roomId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlayInvitationAction"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/play/rooms/{roomId}/join-requests": {
+      "get": {
+        "operationId": "playPendingRequests",
+        "summary": "Host-only list of pending entry requests.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayPendingRequestList"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "roomId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/play/enrollments": {
+      "get": {
+        "operationId": "playEnrollments",
+        "summary": "Server-owner-only list of pending persistent profile enrollments.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayPendingRequestList"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/play/invitations": {
+      "get": {
+        "operationId": "playPreview",
+        "summary": "Preview a valid invitation without creating a profile or request.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayInvitationPreview"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "code",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "post": {
+        "operationId": "playRequestEntry",
+        "summary": "Request admission with a fresh claimant proof. EXISTING additionally requires current app admission. BROWSER requires canonical browser origin.",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayJoinStatus"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlayJoinRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "playClaimantProof": []
+          }
+        ]
+      }
+    },
+    "/api/v1/play/join-requests/{requestId}": {
+      "get": {
+        "operationId": "playEntryStatus",
+        "summary": "Read only the proof-bound claimant status.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayJoinStatus"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "playClaimantProof": []
+          }
+        ]
+      }
+    },
+    "/api/v1/play/join-requests/{requestId}/approve": {
+      "post": {
+        "operationId": "playApproveEntry",
+        "summary": "Explicit server-owner enrollment or live game-host entry approval.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayPendingRequest"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlayApproval"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/play/join-requests/{requestId}/claim": {
+      "post": {
+        "operationId": "playClaimEntry",
+        "summary": "Claim or recover the exact proof-bound admission. EXISTING also requires its current app credential. BROWSER requires canonical origin and sets only an HttpOnly session cookie. NATIVE returns one app-only credential.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayDelivery"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlayEmptyBody"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "playClaimantProof": []
+          }
+        ]
+      }
+    },
+    "/api/v1/play/join-requests/{requestId}/ack": {
+      "post": {
+        "operationId": "playAcknowledge",
+        "summary": "Erase retained credential-delivery material after durable client receipt.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayAcknowledged"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlayAcknowledgment"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "playClaimantProof": []
+          }
+        ]
+      }
+    },
+    "/api/v1/play/phrases": {
+      "get": {
+        "operationId": "playPhrases",
+        "summary": "Read my private phrase notebook.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayPhraseList"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "beforeId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "playSavePhrase",
+        "summary": "Save a bounded selection of visible game language to my notebook.",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayPhrase"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlaySavePhrase"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
     "/api/v1/health": {
       "get": {
         "operationId": "health",

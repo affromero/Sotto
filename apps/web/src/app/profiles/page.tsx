@@ -4,6 +4,7 @@ import { headers } from 'next/headers';
 import { isAccessError } from 'thesidedoor-core/access';
 import { getHouseholdProfiles } from '@/lib/profiles';
 import { ProfilePicker } from '@/components/profiles/ProfilePicker';
+import { auth } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,10 +23,12 @@ export default async function ProfilesPage() {
     if (isAccessError(error) && error.code === 'unauthorized') redirect('/access');
     throw error;
   }
+  const session = await auth();
   return (
     <ProfilePicker
       profiles={profiles}
       activeId={profiles.find((profile) => profile.isActive)?.id ?? null}
+      canCreateProfiles={session?.isOwner ?? false}
     />
   );
 }

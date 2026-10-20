@@ -11,6 +11,7 @@ import {
   createStoredPlayRoom,
   PLAY_ROOM_TTL_MS,
   readStoredPlayRoom,
+  listStoredPlayRooms,
 } from '@/lib/play/storage/rooms';
 import {
   createSharedTestInstance,
@@ -79,6 +80,31 @@ suite('persistent private games on PostgreSQL', () => {
   function roundAction(view: PlayRoomView, command: PlayRoundCommand) {
     return { actionId: randomUUID(), expectedRevision: view.revision, command };
   }
+
+  it("paginates only my rooms and rejects another player's page cursor", async () => {
+    const host = await actor(authority.ownerToken);
+    const first = await createStoredPlayRoom(
+      host,
+      createInput(),
+      () => new Date('2026-10-20T12:00:00Z')
+    );
+    const second = await createStoredPlayRoom(
+      host,
+      createInput(),
+      () => new Date('2026-10-20T12:01:00Z')
+    );
+    const page = await listStoredPlayRooms(host, { limit: 1 });
+    expect(page.rooms.map((room) => room.id)).toEqual([second.id]);
+    expect(page.nextCursor).toBe(second.id);
+    const last = await listStoredPlayRooms(host, { limit: 1, beforeId: page.nextCursor });
+    expect(last.rooms.map((room) => room.id)).toEqual([first.id]);
+    expect(last.nextCursor).toBeNull();
+    const stranger = await actor((await authority.household('Stranger')).token);
+    expect(await listStoredPlayRooms(stranger)).toEqual({ rooms: [], nextCursor: null });
+    await expect(listStoredPlayRooms(stranger, { beforeId: first.id })).rejects.toMatchObject({
+      code: 'forbidden',
+    });
+  });
 
   it('creates an independent game without courses or providers and replays its exact receipt', async () => {
     const host = await actor(authority.ownerToken);
@@ -249,7 +275,7 @@ suite('persistent private games on PostgreSQL', () => {
       type: 'REMATCH',
     };
     const expiredAt = new Date(Date.now() + PLAY_ROOM_TTL_MS + 1000);
-    const rematch = await actOnStoredPlayRoom(host, room.id, rematchAction, expiredAt);
+    const rematch = await actOnStoredPlayRoom(host, room.id, rematchAction, () => expiredAt);
     expect(rematch).toMatchObject({
       status: 'WAITING',
       points: 0,
@@ -260,7 +286,7 @@ suite('persistent private games on PostgreSQL', () => {
     const recap = await readStoredPlayRoom(guest, room.id);
     expect(recap.completedRounds).toHaveLength(2);
     expect(recap.rematchRoomId).toBe(rematch.id);
-    const hostRecap = await readStoredPlayRoom(host, room.id, expiredAt);
+    const hostRecap = await readStoredPlayRoom(host, room.id, () => expiredAt);
     expect(hostRecap.allowedActions).toEqual([]);
     await expect(
       actOnStoredPlayRoom(
@@ -271,7 +297,7 @@ suite('persistent private games on PostgreSQL', () => {
           expectedRevision: hostRecap.revision,
           type: 'REMATCH',
         },
-        expiredAt
+        () => expiredAt
       )
     ).rejects.toMatchObject({ code: 'forbidden' });
     expect(await instance.database.playRoom.count()).toBe(2);
@@ -283,7 +309,7 @@ suite('persistent private games on PostgreSQL', () => {
     const { host, room } = await waitingPair();
     const stored = await instance.database.playRoom.findUniqueOrThrow({ where: { id: room.id } });
     const expiredAt = new Date(stored.createdAt.getTime() + PLAY_ROOM_TTL_MS + 1);
-    expect(await readStoredPlayRoom(host, room.id, expiredAt)).toMatchObject({
+    expect(await readStoredPlayRoom(host, room.id, () => expiredAt)).toMatchObject({
       status: 'EXPIRED',
       allowedActions: [],
     });
@@ -292,7 +318,7 @@ suite('persistent private games on PostgreSQL', () => {
         host,
         room.id,
         { actionId: randomUUID(), expectedRevision: 0, type: 'START' },
-        expiredAt
+        () => expiredAt
       )
     ).rejects.toMatchObject({ code: 'conflict' });
   });
@@ -591,7 +617,6 @@ suite('persistent private games on PostgreSQL', () => {
       deviceName: 'Test phone',
       proofHash: playFingerprint(id),
       fingerprint: playFingerprint({ id }),
-      plannedProfileId: randomUUID(),
       status: 'WAITING_FOR_OWNER',
       expiresAt: new Date(Date.now() + 60_000),
     };
@@ -608,5 +633,18 @@ suite('persistent private games on PostgreSQL', () => {
       })
     ).rejects.toThrow(/PlayJoinRequest_valid_state/);
     expect(await instance.database.playJoinRequest.count()).toBe(0);
+    expect(
+      await instance.database.playJoinRequest.create({
+        data: {
+          ...request,
+          proposedName: 'Pending learner',
+        },
+      })
+    ).toMatchObject({
+      plannedProfileId: null,
+      provisionedUserId: null,
+      approvedByUserId: null,
+      approvedAt: null,
+    });
   });
 });
