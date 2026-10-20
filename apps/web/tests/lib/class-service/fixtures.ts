@@ -1,4 +1,5 @@
 import { learningScriptHash } from '@/lib/learning/script-hash';
+import type { VocabularyMemory } from '@/lib/learning/vocabulary/selection';
 import { createHash } from 'node:crypto';
 import { createSkillRequirements, learningSkills } from '@sotto/shared';
 import { expect, vi } from 'vitest';
@@ -285,8 +286,38 @@ vi.mock('@/lib/prisma', () => {
       deleteMany: (...args: unknown[]) => mockLessonQuestionDeleteMany(...args),
     },
     learnerVocab: {
-      findMany: (...args: unknown[]) => {
-        const query = args[0] as { select?: { dueAt?: boolean } };
+      findMany: async (...args: unknown[]) => {
+        const query = args[0] as {
+          select?: { dueAt?: boolean; firstSeenClassId?: boolean };
+          where: { reps?: number; lemma?: { in: string[] } };
+        };
+        if (query.select?.firstSeenClassId) {
+          const saved = (await mockLearnerVocabFindMany(...args)) as Array<
+            Partial<VocabularyMemory> & { lemma: string }
+          >;
+          const due = (await mockDueVocabRows()) as VocabularyMemory[];
+          const memory = new Map(
+            [...saved, ...due].map((row) => [
+              row.lemma,
+              {
+                translation: row.lemma === 'hola' ? 'hello' : row.lemma,
+                partOfSpeech: null,
+                mastery: 0,
+                reps: 0,
+                lastReviewed: null,
+                firstSeenClassId: null,
+                dueAt: new Date('2100-01-01'),
+                ...row,
+              },
+            ])
+          );
+          return [...memory.values()].filter((word) => {
+            if (query.where.lemma) return query.where.lemma.in.includes(word.lemma);
+            const active =
+              word.reps > 0 || word.lastReviewed !== null || word.firstSeenClassId !== null;
+            return query.where.reps === 0 ? !active : active;
+          });
+        }
         return query.select?.dueAt ? mockDueVocabRows(...args) : mockLearnerVocabFindMany(...args);
       },
     },

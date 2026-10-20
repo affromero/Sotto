@@ -24,7 +24,9 @@ import { ensureCurriculumHasLevelLessons } from './curriculum-generator';
 import { cefrRank } from './cefr-levels';
 import { generateClassIntro } from './classes/class-intro';
 import { generateClassTeaching, teachingFromSeed } from './classes/lesson/teaching';
-import { classTargetsFromSeed, selectClassVocabulary } from './classes/lesson/class-targets';
+import { classTargetsFromSeed } from './classes/lesson/class-targets';
+import { getVocabularyTargets } from './learning/vocabulary/targets';
+import { getVocabularySupportContext } from './learning/vocabulary/support';
 import { getCourseVocabularyTargets } from './course-materials/vocabulary-context';
 import { logger } from './logger';
 import { resolveSkillRequirements, readSkillRequirements } from './learning/skill-requirements';
@@ -278,7 +280,9 @@ async function buildClassContent(p: ClassContentBuildParams): Promise<Prisma.Inp
       : corpus.context;
   const note = noteForAttempt(
     buildLearnerContext(
-      capturedContext,
+      [await getVocabularySupportContext(p.courseId, p.userId), capturedContext]
+        .filter(Boolean)
+        .join('\n\n'),
       p.course.pedagogy as Parameters<typeof buildLearnerContext>[1]
     ),
     p.classId,
@@ -291,18 +295,9 @@ async function buildClassContent(p: ClassContentBuildParams): Promise<Prisma.Inp
   };
   if (corpus) {
     const candidates = corpus.imported ? corpus.vocab : targets.vocab;
-    const memory = await prisma.learnerVocab.findMany({
-      where: {
-        courseId: p.courseId,
-        lemma: {
-          in: [...candidates.map(({ lemma }) => lemma), ...due.vocab.map(({ lemma }) => lemma)],
-        },
-      },
-      select: { lemma: true, mastery: true, reps: true, lastReviewed: true },
-    });
     targets = {
       ...targets,
-      vocab: selectClassVocabulary(candidates, due.vocab, memory, corpus.imported),
+      vocab: await getVocabularyTargets(p.courseId, due.vocab, candidates, 8),
     };
     if (corpus.imported && !targets.vocab.length)
       throw new Error('No new or due vocabulary was available in the imported material.');

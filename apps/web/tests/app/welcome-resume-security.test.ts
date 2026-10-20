@@ -2,6 +2,22 @@ import { expect, it } from 'vitest';
 import { resumeEndpoint, resumeEndpoints } from '@/app/welcome/session/resume-security';
 import { parseStoredSnapshot } from '@/app/welcome/session/welcome-snapshot';
 
+it.each(['MEANING_RECALL', 'WORD_RECALL', 'LISTENING_RECOGNITION', null])(
+  'retains the learner vocabulary support choice when resuming: %s',
+  (vocabularySupport) => {
+    expect(parseStoredSnapshot(JSON.stringify({ vocabularySupport }))?.vocabularySupport).toBe(
+      vocabularySupport
+    );
+  }
+);
+
+it('leaves old or invalid vocabulary support choices unset', () => {
+  expect(parseStoredSnapshot('{}')?.vocabularySupport).toBeUndefined();
+  expect(
+    parseStoredSnapshot(JSON.stringify({ vocabularySupport: 'visual learner' }))?.vocabularySupport
+  ).toBeUndefined();
+});
+
 it('preserves owned attachment identifiers when resuming onboarding', () => {
   const materialId = 'a604f52a-d011-4a21-9c6c-23de4930eeed';
   const snapshot = parseStoredSnapshot(

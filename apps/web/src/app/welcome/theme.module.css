@@ -112,7 +112,7 @@
 @media (max-width: 880px) {
   .root {
     grid-template-columns: 1fr;
-    grid-template-rows: auto 1fr;
+    grid-template-rows: minmax(0, 30dvh) minmax(0, 1fr);
   }
 }
 

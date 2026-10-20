@@ -1,6 +1,8 @@
 'use client';
 
 import type { GlyphName } from '@/components/Glyph';
+import type { VocabularySupport } from '@sotto/shared';
+import { VocabularySupportPicker } from '@/components/learn/vocabulary/VocabularySupportPicker';
 import { BASE_LANGS, LANGUAGES, PLACEMENT_LEVEL_GUIDES, type CefrLevel } from '../data';
 import type { ContextItem, ContextItemKind } from '../WelcomeFlow';
 import { Glyph } from '../Glyph';
@@ -12,6 +14,8 @@ interface Props {
   language: string;
   level: CefrLevel | null;
   contextItems: ContextItem[];
+  vocabularySupport?: VocabularySupport | null;
+  onVocabularySupportChange?: (value: VocabularySupport | null) => void;
   onNext: () => void;
   onBack: () => void;
 }
@@ -187,6 +191,8 @@ export function StepContextReview({
   language,
   level,
   contextItems,
+  vocabularySupport,
+  onVocabularySupportChange,
   onNext,
   onBack,
 }: Props) {
@@ -211,6 +217,15 @@ export function StepContextReview({
         Before composing, Sotto reads only the context you gave it and turns that into a practice
         brief: what to rehearse, how hard to push, and where the first lessons should begin.
       </p>
+
+      {onVocabularySupportChange && (
+        <section className={c.reviewTopics} aria-label="Vocabulary support">
+          <VocabularySupportPicker
+            value={vocabularySupport ?? null}
+            onChange={onVocabularySupportChange}
+          />
+        </section>
+      )}
 
       <section className={c.reviewShell} aria-label="Context practice brief">
         <div className={c.reviewPanel}>

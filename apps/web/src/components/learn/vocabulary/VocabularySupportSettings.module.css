@@ -1,0 +1,11 @@
+.root {
+  width: 100%;
+  padding-block: 12px;
+}
+
+.status {
+  margin-block: 8px 0;
+  min-height: 1.5em;
+  font-size: 0.875rem;
+  color: var(--ink-mute);
+}

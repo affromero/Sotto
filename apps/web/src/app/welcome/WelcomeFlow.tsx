@@ -4,6 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { ANIMAL_AVATARS } from '@/lib/avatars';
+import type { VocabularySupport } from '@sotto/shared';
 import { STEPS, WHISPERS, LEVELS } from './data';
 import type { CefrLevel } from './data';
 import { Glyph } from './Glyph';
@@ -195,6 +196,7 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
   const [timezone, setTimezone] = useState('');
   const [baseLang, setBaseLang] = useState('en');
   const [language, setLanguage] = useState('');
+  const [vocabularySupport, setVocabularySupport] = useState<VocabularySupport | null>();
   const [agent, setAgent] = useState<AgentState>({ ...DEFAULT_AGENT });
   const [voice, setVoice] = useState<VoiceState>({ ...DEFAULT_VOICE });
   const [storage, setStorage] = useState<StorageState>({ ...DEFAULT_STORAGE });
@@ -384,6 +386,7 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
     setAvatarSlug(snapshot.avatarSlug);
     setBaseLang(snapshot.baseLang);
     setLanguage(snapshot.language);
+    setVocabularySupport(snapshot.vocabularySupport);
     setAgent(snapshot.agent);
     setVoice(snapshot.voice);
     setTimezone(snapshot.timezone);
@@ -463,6 +466,7 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
         timezone,
         baseLang,
         language,
+        vocabularySupport,
         agent: {
           ...agent,
           value: agent.method === 'url' ? resumeEndpoint(agent.value) : '',
@@ -485,6 +489,7 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
     contextItems,
     deepLinkMode,
     language,
+    vocabularySupport,
     profileName,
     sources,
     step,
@@ -550,6 +555,7 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
     setAvatarSlug(ANIMAL_AVATARS[0].slug);
     setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone);
     setLanguage('');
+    setVocabularySupport(undefined);
     setBaseLang('en');
     setAgent({ ...DEFAULT_AGENT });
     setVoice({ ...DEFAULT_VOICE });
@@ -784,6 +790,8 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
           language={language}
           level={level}
           contextItems={contextItems}
+          vocabularySupport={vocabularySupport}
+          onVocabularySupportChange={setVocabularySupport}
           onNext={() => go(10)}
           onBack={() => go(8)}
         />
@@ -814,6 +822,7 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
           config={config}
           saveCredentials={saveCredentials}
           submitSetup={submitSetup}
+          vocabularySupport={vocabularySupport}
           onRestart={reset}
           onJump={go}
         />

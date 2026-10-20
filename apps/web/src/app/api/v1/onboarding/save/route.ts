@@ -220,8 +220,14 @@ async function save(request: NextRequest) {
         curriculumId: curriculum.id,
         placementSource: 'MANUAL',
         ...(course.level && { currentLevel: course.level, startLevel: course.level }),
+        ...(course.vocabularySupport !== undefined && {
+          vocabularySupport: course.vocabularySupport,
+        }),
       },
-      update: {},
+      update:
+        course.vocabularySupport !== undefined
+          ? { vocabularySupport: course.vocabularySupport }
+          : {},
       select: { id: true },
     });
     if (note?.trim()) await setCourseNote(created.id, note, database);

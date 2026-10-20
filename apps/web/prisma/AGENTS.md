@@ -80,6 +80,11 @@ npx prisma studio      # Visual database browser
 
 ## Scope
 
+`Course.vocabularySupport` is an optional `VocabularySupport` enum:
+`MEANING_RECALL`, `WORD_RECALL`, or `LISTENING_RECOGNITION`. It records
+learner-reported support for future generation, separately from assessed mastery.
+Null means no preference. Onboarding preserves the stored choice when omitted.
+
 `LearnerReviewEvent` records each committed vocabulary or grammar SRS update with
 its assessment mode, source attempt, question identities, timestamp and scheduler
 snapshots. Composite foreign keys bind both the target and source to the same
