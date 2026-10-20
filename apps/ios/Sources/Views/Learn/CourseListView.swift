@@ -61,6 +61,12 @@ struct CourseListView: View {
                 .padding(.horizontal, 18)
                 .padding(.top, 16)
 
+                Button { model.openPlay() } label: {
+                    Label("Play together", systemImage: "person.2").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(SottoSecondaryButtonStyle())
+                .padding(.horizontal, 18)
+
                 AgentUsageStatusCard()
                     .padding(.horizontal, 18)
 

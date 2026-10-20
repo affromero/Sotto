@@ -1,0 +1,3209 @@
+{
+  "version": 1,
+  "rounds": [
+    {
+      "name": "initial-0-HOST",
+      "seat": "HOST",
+      "round": {
+        "order": 0,
+        "learner": "HOST",
+        "targetLang": "de",
+        "supportLang": "en",
+        "level": "A1",
+        "prompt": "You have an unexpected free hour. What would you pick?",
+        "guidance": "Read the cards in the target language. You can reveal their meanings when you need help.",
+        "phase": "ANSWER",
+        "role": "LEARNER",
+        "instruction": "Pick the card your partner will choose. Your picks stay hidden until both commit.",
+        "revealed": false,
+        "allowedActions": ["SKIP", "HINT", "CHOOSE"],
+        "hints": [],
+        "result": null,
+        "mode": "KNOW_ME",
+        "questionStyle": "CHOICES",
+        "choices": [
+          {
+            "id": "A",
+            "text": "Spazieren gehen",
+            "supportText": "Go for a walk",
+            "symbol": "🚶"
+          },
+          {
+            "id": "B",
+            "text": "Etwas kochen",
+            "supportText": "Cook something",
+            "symbol": "🍳"
+          },
+          {
+            "id": "C",
+            "text": "Ein Buch lesen",
+            "supportText": "Read a book",
+            "symbol": "📖"
+          },
+          {
+            "id": "D",
+            "text": "Sich ausruhen",
+            "supportText": "Have a rest",
+            "symbol": "🛋️"
+          }
+        ],
+        "ownAnswer": null,
+        "otherAnswer": null,
+        "otherCommitted": false,
+        "id": "fixture-KNOW_ME-0"
+      },
+      "visibleTexts": ["Spazieren gehen", "Etwas kochen", "Ein Buch lesen", "Sich ausruhen"]
+    },
+    {
+      "name": "initial-0-GUEST",
+      "seat": "GUEST",
+      "round": {
+        "order": 0,
+        "learner": "HOST",
+        "targetLang": "de",
+        "supportLang": "en",
+        "level": "A1",
+        "prompt": "You have an unexpected free hour. What would you pick?",
+        "guidance": "Read the cards in the target language. You can reveal their meanings when you need help.",
+        "phase": "ANSWER",
+        "role": "PARTNER",
+        "instruction": "Pick your own answer. Your partner is trying to predict your choice.",
+        "revealed": false,
+        "allowedActions": ["SKIP", "HINT", "CHOOSE"],
+        "hints": [],
+        "result": null,
+        "mode": "KNOW_ME",
+        "questionStyle": "CHOICES",
+        "choices": [
+          {
+            "id": "A",
+            "text": "Spazieren gehen",
+            "supportText": "Go for a walk",
+            "symbol": "🚶"
+          },
+          {
+            "id": "B",
+            "text": "Etwas kochen",
+            "supportText": "Cook something",
+            "symbol": "🍳"
+          },
+          {
+            "id": "C",
+            "text": "Ein Buch lesen",
+            "supportText": "Read a book",
+            "symbol": "📖"
+          },
+          {
+            "id": "D",
+            "text": "Sich ausruhen",
+            "supportText": "Have a rest",
+            "symbol": "🛋️"
+          }
+        ],
+        "ownAnswer": null,
+        "otherAnswer": null,
+        "otherCommitted": false,
+        "id": "fixture-KNOW_ME-0"
+      },
+      "visibleTexts": ["Spazieren gehen", "Etwas kochen", "Ein Buch lesen", "Sich ausruhen"]
+    },
+    {
+      "name": "one-pick-0-HOST",
+      "seat": "HOST",
+      "round": {
+        "order": 0,
+        "learner": "HOST",
+        "targetLang": "de",
+        "supportLang": "en",
+        "level": "A1",
+        "prompt": "You have an unexpected free hour. What would you pick?",
+        "guidance": "Read the cards in the target language. You can reveal their meanings when you need help.",
+        "phase": "ANSWER",
+        "role": "LEARNER",
+        "instruction": "Pick the card your partner will choose. Your picks stay hidden until both commit.",
+        "revealed": false,
+        "allowedActions": ["SKIP", "HINT"],
+        "hints": [],
+        "result": null,
+        "mode": "KNOW_ME",
+        "questionStyle": "CHOICES",
+        "choices": [
+          {
+            "id": "A",
+            "text": "Spazieren gehen",
+            "supportText": "Go for a walk",
+            "symbol": "🚶"
+          },
+          {
+            "id": "B",
+            "text": "Etwas kochen",
+            "supportText": "Cook something",
+            "symbol": "🍳"
+          },
+          {
+            "id": "C",
+            "text": "Ein Buch lesen",
+            "supportText": "Read a book",
+            "symbol": "📖"
+          },
+          {
+            "id": "D",
+            "text": "Sich ausruhen",
+            "supportText": "Have a rest",
+            "symbol": "🛋️"
+          }
+        ],
+        "ownAnswer": "A",
+        "otherAnswer": null,
+        "otherCommitted": false,
+        "id": "fixture-KNOW_ME-0"
+      },
+      "visibleTexts": ["Spazieren gehen", "Etwas kochen", "Ein Buch lesen", "Sich ausruhen"]
+    },
+    {
+      "name": "one-pick-0-GUEST",
+      "seat": "GUEST",
+      "round": {
+        "order": 0,
+        "learner": "HOST",
+        "targetLang": "de",
+        "supportLang": "en",
+        "level": "A1",
+        "prompt": "You have an unexpected free hour. What would you pick?",
+        "guidance": "Read the cards in the target language. You can reveal their meanings when you need help.",
+        "phase": "ANSWER",
+        "role": "PARTNER",
+        "instruction": "Pick your own answer. Your partner is trying to predict your choice.",
+        "revealed": false,
+        "allowedActions": ["SKIP", "HINT", "CHOOSE"],
+        "hints": [],
+        "result": null,
+        "mode": "KNOW_ME",
+        "questionStyle": "CHOICES",
+        "choices": [
+          {
+            "id": "A",
+            "text": "Spazieren gehen",
+            "supportText": "Go for a walk",
+            "symbol": "🚶"
+          },
+          {
+            "id": "B",
+            "text": "Etwas kochen",
+            "supportText": "Cook something",
+            "symbol": "🍳"
+          },
+          {
+            "id": "C",
+            "text": "Ein Buch lesen",
+            "supportText": "Read a book",
+            "symbol": "📖"
+          },
+          {
+            "id": "D",
+            "text": "Sich ausruhen",
+            "supportText": "Have a rest",
+            "symbol": "🛋️"
+          }
+        ],
+        "ownAnswer": null,
+        "otherAnswer": null,
+        "otherCommitted": true,
+        "id": "fixture-KNOW_ME-0"
+      },
+      "visibleTexts": ["Spazieren gehen", "Etwas kochen", "Ein Buch lesen", "Sich ausruhen"]
+    },
+    {
+      "name": "finished-0-HOST",
+      "seat": "HOST",
+      "round": {
+        "order": 0,
+        "learner": "HOST",
+        "targetLang": "de",
+        "supportLang": "en",
+        "level": "A1",
+        "prompt": "You have an unexpected free hour. What would you pick?",
+        "guidance": "Read the cards in the target language. You can reveal their meanings when you need help.",
+        "phase": "FINISHED",
+        "role": "LEARNER",
+        "instruction": "Pick the card your partner will choose. Your picks stay hidden until both commit.",
+        "revealed": true,
+        "allowedActions": [],
+        "hints": [],
+        "result": {
+          "skipped": false,
+          "understood": null,
+          "matched": true,
+          "correction": null,
+          "points": 2
+        },
+        "mode": "KNOW_ME",
+        "questionStyle": "CHOICES",
+        "choices": [
+          {
+            "id": "A",
+            "text": "Spazieren gehen",
+            "supportText": "Go for a walk",
+            "symbol": "🚶"
+          },
+          {
+            "id": "B",
+            "text": "Etwas kochen",
+            "supportText": "Cook something",
+            "symbol": "🍳"
+          },
+          {
+            "id": "C",
+            "text": "Ein Buch lesen",
+            "supportText": "Read a book",
+            "symbol": "📖"
+          },
+          {
+            "id": "D",
+            "text": "Sich ausruhen",
+            "supportText": "Have a rest",
+            "symbol": "🛋️"
+          }
+        ],
+        "ownAnswer": "A",
+        "otherAnswer": "A",
+        "otherCommitted": true,
+        "id": "fixture-KNOW_ME-0"
+      },
+      "visibleTexts": ["Spazieren gehen", "Etwas kochen", "Ein Buch lesen", "Sich ausruhen"]
+    },
+    {
+      "name": "finished-0-GUEST",
+      "seat": "GUEST",
+      "round": {
+        "order": 0,
+        "learner": "HOST",
+        "targetLang": "de",
+        "supportLang": "en",
+        "level": "A1",
+        "prompt": "You have an unexpected free hour. What would you pick?",
+        "guidance": "Read the cards in the target language. You can reveal their meanings when you need help.",
+        "phase": "FINISHED",
+        "role": "PARTNER",
+        "instruction": "Pick your own answer. Your partner is trying to predict your choice.",
+        "revealed": true,
+        "allowedActions": [],
+        "hints": [],
+        "result": {
+          "skipped": false,
+          "understood": null,
+          "matched": true,
+          "correction": null,
+          "points": 2
+        },
+        "mode": "KNOW_ME",
+        "questionStyle": "CHOICES",
+        "choices": [
+          {
+            "id": "A",
+            "text": "Spazieren gehen",
+            "supportText": "Go for a walk",
+            "symbol": "🚶"
+          },
+          {
+            "id": "B",
+            "text": "Etwas kochen",
+            "supportText": "Cook something",
+            "symbol": "🍳"
+          },
+          {
+            "id": "C",
+            "text": "Ein Buch lesen",
+            "supportText": "Read a book",
+            "symbol": "📖"
+          },
+          {
+            "id": "D",
+            "text": "Sich ausruhen",
+            "supportText": "Have a rest",
+            "symbol": "🛋️"
+          }
+        ],
+        "ownAnswer": "A",
+        "otherAnswer": "A",
+        "otherCommitted": true,
+        "id": "fixture-KNOW_ME-0"
+      },
+      "visibleTexts": ["Spazieren gehen", "Etwas kochen", "Ein Buch lesen", "Sich ausruhen"]
+    },
+    {
+      "name": "initial-1-HOST",
+      "seat": "HOST",
+      "round": {
+        "order": 1,
+        "learner": "GUEST",
+        "targetLang": "es",
+        "supportLang": "en",
+        "level": "B1",
+        "prompt": "It is raining all afternoon. What would you pick?",
+        "guidance": "Read the cards in the target language. You can reveal their meanings when you need help.",
+        "phase": "ANSWER",
+        "role": "PARTNER",
+        "instruction": "Pick your own answer. Your partner is trying to predict your choice.",
+        "revealed": false,
+        "allowedActions": ["SKIP", "HINT", "CHOOSE"],
+        "hints": [],
+        "result": null,
+        "mode": "KNOW_ME",
+        "questionStyle": "CHOICES",
+        "choices": [
+          {
+            "id": "A",
+            "text": "Dar un paseo",
+            "supportText": "Go for a walk",
+            "symbol": "🚶"
+          },
+          {
+            "id": "B",
+            "text": "Cocinar algo",
+            "supportText": "Cook something",
+            "symbol": "🍳"
+          },
+          {
+            "id": "C",
+            "text": "Leer un libro",
+            "supportText": "Read a book",
+            "symbol": "📖"
+          },
+          {
+            "id": "D",
+            "text": "Descansar",
+            "supportText": "Have a rest",
+            "symbol": "🛋️"
+          }
+        ],
+        "ownAnswer": null,
+        "otherAnswer": null,
+        "otherCommitted": false,
+        "id": "fixture-KNOW_ME-1"
+      },
+      "visibleTexts": ["Dar un paseo", "Cocinar algo", "Leer un libro", "Descansar"]
+    },
+    {
+      "name": "initial-1-GUEST",
+      "seat": "GUEST",
+      "round": {
+        "order": 1,
+        "learner": "GUEST",
+        "targetLang": "es",
+        "supportLang": "en",
+        "level": "B1",
+        "prompt": "It is raining all afternoon. What would you pick?",
+        "guidance": "Read the cards in the target language. You can reveal their meanings when you need help.",
+        "phase": "ANSWER",
+        "role": "LEARNER",
+        "instruction": "Pick the card your partner will choose. Your picks stay hidden until both commit.",
+        "revealed": false,
+        "allowedActions": ["SKIP", "HINT", "CHOOSE"],
+        "hints": [],
+        "result": null,
+        "mode": "KNOW_ME",
+        "questionStyle": "CHOICES",
+        "choices": [
+          {
+            "id": "A",
+            "text": "Dar un paseo",
+            "supportText": "Go for a walk",
+            "symbol": "🚶"
+          },
+          {
+            "id": "B",
+            "text": "Cocinar algo",
+            "supportText": "Cook something",
+            "symbol": "🍳"
+          },
+          {
+            "id": "C",
+            "text": "Leer un libro",
+            "supportText": "Read a book",
+            "symbol": "📖"
+          },
+          {
+            "id": "D",
+            "text": "Descansar",
+            "supportText": "Have a rest",
+            "symbol": "🛋️"
+          }
+        ],
+        "ownAnswer": null,
+        "otherAnswer": null,
+        "otherCommitted": false,
+        "id": "fixture-KNOW_ME-1"
+      },
+      "visibleTexts": ["Dar un paseo", "Cocinar algo", "Leer un libro", "Descansar"]
+    },
+    {
+      "name": "one-pick-1-HOST",
+      "seat": "HOST",
+      "round": {
+        "order": 1,
+        "learner": "GUEST",
+        "targetLang": "es",
+        "supportLang": "en",
+        "level": "B1",
+        "prompt": "It is raining all afternoon. What would you pick?",
+        "guidance": "Read the cards in the target language. You can reveal their meanings when you need help.",
+        "phase": "ANSWER",
+        "role": "PARTNER",
+        "instruction": "Pick your own answer. Your partner is trying to predict your choice.",
+        "revealed": false,
+        "allowedActions": ["SKIP", "HINT"],
+        "hints": [],
+        "result": null,
+        "mode": "KNOW_ME",
+        "questionStyle": "CHOICES",
+        "choices": [
+          {
+            "id": "A",
+            "text": "Dar un paseo",
+            "supportText": "Go for a walk",
+            "symbol": "🚶"
+          },
+          {
+            "id": "B",
+            "text": "Cocinar algo",
+            "supportText": "Cook something",
+            "symbol": "🍳"
+          },
+          {
+            "id": "C",
+            "text": "Leer un libro",
+            "supportText": "Read a book",
+            "symbol": "📖"
+          },
+          {
+            "id": "D",
+            "text": "Descansar",
+            "supportText": "Have a rest",
+            "symbol": "🛋️"
+          }
+        ],
+        "ownAnswer": "A",
+        "otherAnswer": null,
+        "otherCommitted": false,
+        "id": "fixture-KNOW_ME-1"
+      },
+      "visibleTexts": ["Dar un paseo", "Cocinar algo", "Leer un libro", "Descansar"]
+    },
+    {
+      "name": "one-pick-1-GUEST",
+      "seat": "GUEST",
+      "round": {
+        "order": 1,
+        "learner": "GUEST",
+        "targetLang": "es",
+        "supportLang": "en",
+        "level": "B1",
+        "prompt": "It is raining all afternoon. What would you pick?",
+        "guidance": "Read the cards in the target language. You can reveal their meanings when you need help.",
+        "phase": "ANSWER",
+        "role": "LEARNER",
+        "instruction": "Pick the card your partner will choose. Your picks stay hidden until both commit.",
+        "revealed": false,
+        "allowedActions": ["SKIP", "HINT", "CHOOSE"],
+        "hints": [],
+        "result": null,
+        "mode": "KNOW_ME",
+        "questionStyle": "CHOICES",
+        "choices": [
+          {
+            "id": "A",
+            "text": "Dar un paseo",
+            "supportText": "Go for a walk",
+            "symbol": "🚶"
+          },
+          {
+            "id": "B",
+            "text": "Cocinar algo",
+            "supportText": "Cook something",
+            "symbol": "🍳"
+          },
+          {
+            "id": "C",
+            "text": "Leer un libro",
+            "supportText": "Read a book",
+            "symbol": "📖"
+          },
+          {
+            "id": "D",
+            "text": "Descansar",
+            "supportText": "Have a rest",
+            "symbol": "🛋️"
+          }
+        ],
+        "ownAnswer": null,
+        "otherAnswer": null,
+        "otherCommitted": true,
+        "id": "fixture-KNOW_ME-1"
+      },
+      "visibleTexts": ["Dar un paseo", "Cocinar algo", "Leer un libro", "Descansar"]
+    },
+    {
+      "name": "finished-1-HOST",
+      "seat": "HOST",
+      "round": {
+        "order": 1,
+        "learner": "GUEST",
+        "targetLang": "es",
+        "supportLang": "en",
+        "level": "B1",
+        "prompt": "It is raining all afternoon. What would you pick?",
+        "guidance": "Read the cards in the target language. You can reveal their meanings when you need help.",
+        "phase": "FINISHED",
+        "role": "PARTNER",
+        "instruction": "Pick your own answer. Your partner is trying to predict your choice.",
+        "revealed": true,
+        "allowedActions": [],
+        "hints": [],
+        "result": {
+          "skipped": false,
+          "understood": null,
+          "matched": true,
+          "correction": null,
+          "points": 2
+        },
+        "mode": "KNOW_ME",
+        "questionStyle": "CHOICES",
+        "choices": [
+          {
+            "id": "A",
+            "text": "Dar un paseo",
+            "supportText": "Go for a walk",
+            "symbol": "🚶"
+          },
+          {
+            "id": "B",
+            "text": "Cocinar algo",
+            "supportText": "Cook something",
+            "symbol": "🍳"
+          },
+          {
+            "id": "C",
+            "text": "Leer un libro",
+            "supportText": "Read a book",
+            "symbol": "📖"
+          },
+          {
+            "id": "D",
+            "text": "Descansar",
+            "supportText": "Have a rest",
+            "symbol": "🛋️"
+          }
+        ],
+        "ownAnswer": "A",
+        "otherAnswer": "A",
+        "otherCommitted": true,
+        "id": "fixture-KNOW_ME-1"
+      },
+      "visibleTexts": ["Dar un paseo", "Cocinar algo", "Leer un libro", "Descansar"]
+    },
+    {
+      "name": "finished-1-GUEST",
+      "seat": "GUEST",
+      "round": {
+        "order": 1,
+        "learner": "GUEST",
+        "targetLang": "es",
+        "supportLang": "en",
+        "level": "B1",
+        "prompt": "It is raining all afternoon. What would you pick?",
+        "guidance": "Read the cards in the target language. You can reveal their meanings when you need help.",
+        "phase": "FINISHED",
+        "role": "LEARNER",
+        "instruction": "Pick the card your partner will choose. Your picks stay hidden until both commit.",
+        "revealed": true,
+        "allowedActions": [],
+        "hints": [],
+        "result": {
+          "skipped": false,
+          "understood": null,
+          "matched": true,
+          "correction": null,
+          "points": 2
+        },
+        "mode": "KNOW_ME",
+        "questionStyle": "CHOICES",
+        "choices": [
+          {
+            "id": "A",
+            "text": "Dar un paseo",
+            "supportText": "Go for a walk",
+            "symbol": "🚶"
+          },
+          {
+            "id": "B",
+            "text": "Cocinar algo",
+            "supportText": "Cook something",
+            "symbol": "🍳"
+          },
+          {
+            "id": "C",
+            "text": "Leer un libro",
+            "supportText": "Read a book",
+            "symbol": "📖"
+          },
+          {
+            "id": "D",
+            "text": "Descansar",
+            "supportText": "Have a rest",
+            "symbol": "🛋️"
+          }
+        ],
+        "ownAnswer": "A",
+        "otherAnswer": "A",
+        "otherCommitted": true,
+        "id": "fixture-KNOW_ME-1"
+      },
+      "visibleTexts": ["Dar un paseo", "Cocinar algo", "Leer un libro", "Descansar"]
+    },
+    {
+      "name": "initial-2-HOST",
+      "seat": "HOST",
+      "round": {
+        "order": 2,
+        "learner": "HOST",
+        "targetLang": "de",
+        "supportLang": "en",
+        "level": "A1",
+        "prompt": "Pick a secret everyday word.",
+        "guidance": "Use a short sentence. Ask your partner for a word or a hint when you need one.",
+        "phase": "SETUP",
+        "role": "LEARNER",
+        "instruction": "Pick a secret card or your own word. Give one clue without naming it.",
+        "revealed": false,
+        "allowedActions": ["SKIP", "HINT", "SET_TARGET"],
+        "hints": [],
+        "result": null,
+        "mode": "DESCRIBE",
+        "targetSuggestions": [
+          {
+            "id": "A",
+            "text": "Handy",
+            "supportText": "phone",
+            "symbol": "✦"
+          },
+          {
+            "id": "B",
+            "text": "Schlüssel",
+            "supportText": "key",
+            "symbol": "✦"
+          },
+          {
+            "id": "C",
+            "text": "Buch",
+            "supportText": "book",
+            "symbol": "✦"
+          },
+          {
+            "id": "D",
+            "text": "Regenschirm",
+            "supportText": "umbrella",
+            "symbol": "✦"
+          }
+        ],
+        "target": null,
+        "clue": null,
+        "guess": null,
+        "id": "fixture-DESCRIBE-2"
+      },
+      "visibleTexts": ["Handy", "Schlüssel", "Buch", "Regenschirm"]
+    },
+    {
+      "name": "initial-2-GUEST",
+      "seat": "GUEST",
+      "round": {
+        "order": 2,
+        "learner": "HOST",
+        "targetLang": "de",
+        "supportLang": "en",
+        "level": "A1",
+        "prompt": "Pick a secret everyday word.",
+        "guidance": "Use a short sentence. Ask your partner for a word or a hint when you need one.",
+        "phase": "SETUP",
+        "role": "PARTNER",
+        "instruction": "Read your partner’s clue and guess their secret word or phrase.",
+        "revealed": false,
+        "allowedActions": ["SKIP", "HINT"],
+        "hints": [],
+        "result": null,
+        "mode": "DESCRIBE",
+        "targetSuggestions": null,
+        "target": null,
+        "clue": null,
+        "guess": null,
+        "id": "fixture-DESCRIBE-2"
+      },
+      "visibleTexts": []
+    },
+    {
+      "name": "clue-2-HOST",
+      "seat": "HOST",
+      "round": {
+        "order": 2,
+        "learner": "HOST",
+        "targetLang": "de",
+        "supportLang": "en",
+        "level": "A1",
+        "prompt": "Pick a secret everyday word.",
+        "guidance": "Use a short sentence. Ask your partner for a word or a hint when you need one.",
+        "phase": "GUESS",
+        "role": "LEARNER",
+        "instruction": "Pick a secret card or your own word. Give one clue without naming it.",
+        "revealed": false,
+        "allowedActions": ["SKIP", "HINT"],
+        "hints": [],
+        "result": null,
+        "mode": "DESCRIBE",
+        "targetSuggestions": [
+          {
+            "id": "A",
+            "text": "Handy",
+            "supportText": "phone",
+            "symbol": "✦"
+          },
+          {
+            "id": "B",
+            "text": "Schlüssel",
+            "supportText": "key",
+            "symbol": "✦"
+          },
+          {
+            "id": "C",
+            "text": "Buch",
+            "supportText": "book",
+            "symbol": "✦"
+          },
+          {
+            "id": "D",
+            "text": "Regenschirm",
+            "supportText": "umbrella",
+            "symbol": "✦"
+          }
+        ],
+        "target": "Geheimwort",
+        "clue": "Ein Tier mit langem Hals.",
+        "guess": null,
+        "id": "fixture-DESCRIBE-2"
+      },
+      "visibleTexts": [
+        "Handy",
+        "Schlüssel",
+        "Buch",
+        "Regenschirm",
+        "Geheimwort",
+        "Ein Tier mit langem Hals."
+      ]
+    },
+    {
+      "name": "clue-2-GUEST",
+      "seat": "GUEST",
+      "round": {
+        "order": 2,
+        "learner": "HOST",
+        "targetLang": "de",
+        "supportLang": "en",
+        "level": "A1",
+        "prompt": "Pick a secret everyday word.",
+        "guidance": "Use a short sentence. Ask your partner for a word or a hint when you need one.",
+        "phase": "GUESS",
+        "role": "PARTNER",
+        "instruction": "Read your partner’s clue and guess their secret word or phrase.",
+        "revealed": false,
+        "allowedActions": ["SKIP", "HINT", "GUESS"],
+        "hints": [],
+        "result": null,
+        "mode": "DESCRIBE",
+        "targetSuggestions": null,
+        "target": null,
+        "clue": "Ein Tier mit langem Hals.",
+        "guess": null,
+        "id": "fixture-DESCRIBE-2"
+      },
+      "visibleTexts": ["Ein Tier mit langem Hals."]
+    },
+    {
+      "name": "guessed-2-HOST",
+      "seat": "HOST",
+      "round": {
+        "order": 2,
+        "learner": "HOST",
+        "targetLang": "de",
+        "supportLang": "en",
+        "level": "A1",
+        "prompt": "Pick a secret everyday word.",
+        "guidance": "Use a short sentence. Ask your partner for a word or a hint when you need one.",
+        "phase": "FEEDBACK",
+        "role": "LEARNER",
+        "instruction": "Pick a secret card or your own word. Give one clue without naming it.",
+        "revealed": true,
+        "allowedActions": ["SKIP"],
+        "hints": [],
+        "result": null,
+        "mode": "DESCRIBE",
+        "targetSuggestions": [
+          {
+            "id": "A",
+            "text": "Handy",
+            "supportText": "phone",
+            "symbol": "✦"
+          },
+          {
+            "id": "B",
+            "text": "Schlüssel",
+            "supportText": "key",
+            "symbol": "✦"
+          },
+          {
+            "id": "C",
+            "text": "Buch",
+            "supportText": "book",
+            "symbol": "✦"
+          },
+          {
+            "id": "D",
+            "text": "Regenschirm",
+            "supportText": "umbrella",
+            "symbol": "✦"
+          }
+        ],
+        "target": "Geheimwort",
+        "clue": "Ein Tier mit langem Hals.",
+        "guess": "Giraffe",
+        "id": "fixture-DESCRIBE-2"
+      },
+      "visibleTexts": [
+        "Handy",
+        "Schlüssel",
+        "Buch",
+        "Regenschirm",
+        "Geheimwort",
+        "Ein Tier mit langem Hals.",
+        "Giraffe"
+      ]
+    },
+    {
+      "name": "guessed-2-GUEST",
+      "seat": "GUEST",
+      "round": {
+        "order": 2,
+        "learner": "HOST",
+        "targetLang": "de",
+        "supportLang": "en",
+        "level": "A1",
+        "prompt": "Pick a secret everyday word.",
+        "guidance": "Use a short sentence. Ask your partner for a word or a hint when you need one.",
+        "phase": "FEEDBACK",
+        "role": "PARTNER",
+        "instruction": "Read your partner’s clue and guess their secret word or phrase.",
+        "revealed": true,
+        "allowedActions": ["SKIP", "FEEDBACK"],
+        "hints": [],
+        "result": null,
+        "mode": "DESCRIBE",
+        "targetSuggestions": null,
+        "target": "Geheimwort",
+        "clue": "Ein Tier mit langem Hals.",
+        "guess": "Giraffe",
+        "id": "fixture-DESCRIBE-2"
+      },
+      "visibleTexts": ["Geheimwort", "Ein Tier mit langem Hals.", "Giraffe"]
+    },
+    {
+      "name": "finished-2-HOST",
+      "seat": "HOST",
+      "round": {
+        "order": 2,
+        "learner": "HOST",
+        "targetLang": "de",
+        "supportLang": "en",
+        "level": "A1",
+        "prompt": "Pick a secret everyday word.",
+        "guidance": "Use a short sentence. Ask your partner for a word or a hint when you need one.",
+        "phase": "FINISHED",
+        "role": "LEARNER",
+        "instruction": "Pick a secret card or your own word. Give one clue without naming it.",
+        "revealed": true,
+        "allowedActions": [],
+        "hints": [],
+        "result": {
+          "skipped": false,
+          "understood": true,
+          "matched": null,
+          "correction": null,
+          "points": 2
+        },
+        "mode": "DESCRIBE",
+        "targetSuggestions": [
+          {
+            "id": "A",
+            "text": "Handy",
+            "supportText": "phone",
+            "symbol": "✦"
+          },
+          {
+            "id": "B",
+            "text": "Schlüssel",
+            "supportText": "key",
+            "symbol": "✦"
+          },
+          {
+            "id": "C",
+            "text": "Buch",
+            "supportText": "book",
+            "symbol": "✦"
+          },
+          {
+            "id": "D",
+            "text": "Regenschirm",
+            "supportText": "umbrella",
+            "symbol": "✦"
+          }
+        ],
+        "target": "Geheimwort",
+        "clue": "Ein Tier mit langem Hals.",
+        "guess": "Giraffe",
+        "id": "fixture-DESCRIBE-2"
+      },
+      "visibleTexts": [
+        "Handy",
+        "Schlüssel",
+        "Buch",
+        "Regenschirm",
+        "Geheimwort",
+        "Ein Tier mit langem Hals.",
+        "Giraffe"
+      ]
+    },
+    {
+      "name": "finished-2-GUEST",
+      "seat": "GUEST",
+      "round": {
+        "order": 2,
+        "learner": "HOST",
+        "targetLang": "de",
+        "supportLang": "en",
+        "level": "A1",
+        "prompt": "Pick a secret everyday word.",
+        "guidance": "Use a short sentence. Ask your partner for a word or a hint when you need one.",
+        "phase": "FINISHED",
+        "role": "PARTNER",
+        "instruction": "Read your partner’s clue and guess their secret word or phrase.",
+        "revealed": true,
+        "allowedActions": [],
+        "hints": [],
+        "result": {
+          "skipped": false,
+          "understood": true,
+          "matched": null,
+          "correction": null,
+          "points": 2
+        },
+        "mode": "DESCRIBE",
+        "targetSuggestions": null,
+        "target": "Geheimwort",
+        "clue": "Ein Tier mit langem Hals.",
+        "guess": "Giraffe",
+        "id": "fixture-DESCRIBE-2"
+      },
+      "visibleTexts": ["Geheimwort", "Ein Tier mit langem Hals.", "Giraffe"]
+    },
+    {
+      "name": "initial-3-HOST",
+      "seat": "HOST",
+      "round": {
+        "order": 3,
+        "learner": "GUEST",
+        "targetLang": "es",
+        "supportLang": "en",
+        "level": "B1",
+        "prompt": "Choose an everyday word or phrase to describe.",
+        "guidance": "Add a reason or a follow-up question. Your partner can suggest a natural expression.",
+        "phase": "SETUP",
+        "role": "PARTNER",
+        "instruction": "Read your partner’s clue and guess their secret word or phrase.",
+        "revealed": false,
+        "allowedActions": ["SKIP", "HINT"],
+        "hints": [],
+        "result": null,
+        "mode": "DESCRIBE",
+        "targetSuggestions": null,
+        "target": null,
+        "clue": null,
+        "guess": null,
+        "id": "fixture-DESCRIBE-3"
+      },
+      "visibleTexts": []
+    },
+    {
+      "name": "initial-3-GUEST",
+      "seat": "GUEST",
+      "round": {
+        "order": 3,
+        "learner": "GUEST",
+        "targetLang": "es",
+        "supportLang": "en",
+        "level": "B1",
+        "prompt": "Choose an everyday word or phrase to describe.",
+        "guidance": "Add a reason or a follow-up question. Your partner can suggest a natural expression.",
+        "phase": "SETUP",
+        "role": "LEARNER",
+        "instruction": "Pick a secret card or your own word. Give one clue without naming it.",
+        "revealed": false,
+        "allowedActions": ["SKIP", "HINT", "SET_TARGET"],
+        "hints": [],
+        "result": null,
+        "mode": "DESCRIBE",
+        "targetSuggestions": [
+          {
+            "id": "A",
+            "text": "llave",
+            "supportText": "key",
+            "symbol": "✦"
+          },
+          {
+            "id": "B",
+            "text": "libro",
+            "supportText": "book",
+            "symbol": "✦"
+          },
+          {
+            "id": "C",
+            "text": "paraguas",
+            "supportText": "umbrella",
+            "symbol": "✦"
+          },
+          {
+            "id": "D",
+            "text": "teléfono",
+            "supportText": "phone",
+            "symbol": "✦"
+          }
+        ],
+        "target": null,
+        "clue": null,
+        "guess": null,
+        "id": "fixture-DESCRIBE-3"
+      },
+      "visibleTexts": ["llave", "libro", "paraguas", "teléfono"]
+    },
+    {
+      "name": "clue-3-HOST",
+      "seat": "HOST",
+      "round": {
+        "order": 3,
+        "learner": "GUEST",
+        "targetLang": "es",
+        "supportLang": "en",
+        "level": "B1",
+        "prompt": "Choose an everyday word or phrase to describe.",
+        "guidance": "Add a reason or a follow-up question. Your partner can suggest a natural expression.",
+        "phase": "GUESS",
+        "role": "PARTNER",
+        "instruction": "Read your partner’s clue and guess their secret word or phrase.",
+        "revealed": false,
+        "allowedActions": ["SKIP", "HINT", "GUESS"],
+        "hints": [],
+        "result": null,
+        "mode": "DESCRIBE",
+        "targetSuggestions": null,
+        "target": null,
+        "clue": "Ein Tier mit langem Hals.",
+        "guess": null,
+        "id": "fixture-DESCRIBE-3"
+      },
+      "visibleTexts": ["Ein Tier mit langem Hals."]
+    },
+    {
+      "name": "clue-3-GUEST",
+      "seat": "GUEST",
+      "round": {
+        "order": 3,
+        "learner": "GUEST",
+        "targetLang": "es",
+        "supportLang": "en",
+        "level": "B1",
+        "prompt": "Choose an everyday word or phrase to describe.",
+        "guidance": "Add a reason or a follow-up question. Your partner can suggest a natural expression.",
+        "phase": "GUESS",
+        "role": "LEARNER",
+        "instruction": "Pick a secret card or your own word. Give one clue without naming it.",
+        "revealed": false,
+        "allowedActions": ["SKIP", "HINT"],
+        "hints": [],
+        "result": null,
+        "mode": "DESCRIBE",
+        "targetSuggestions": [
+          {
+            "id": "A",
+            "text": "llave",
+            "supportText": "key",
+            "symbol": "✦"
+          },
+          {
+            "id": "B",
+            "text": "libro",
+            "supportText": "book",
+            "symbol": "✦"
+          },
+          {
+            "id": "C",
+            "text": "paraguas",
+            "supportText": "umbrella",
+            "symbol": "✦"
+          },
+          {
+            "id": "D",
+            "text": "teléfono",
+            "supportText": "phone",
+            "symbol": "✦"
+          }
+        ],
+        "target": "Geheimwort",
+        "clue": "Ein Tier mit langem Hals.",
+        "guess": null,
+        "id": "fixture-DESCRIBE-3"
+      },
+      "visibleTexts": [
+        "llave",
+        "libro",
+        "paraguas",
+        "teléfono",
+        "Geheimwort",
+        "Ein Tier mit langem Hals."
+      ]
+    },
+    {
+      "name": "guessed-3-HOST",
+      "seat": "HOST",
+      "round": {
+        "order": 3,
+        "learner": "GUEST",
+        "targetLang": "es",
+        "supportLang": "en",
+        "level": "B1",
+        "prompt": "Choose an everyday word or phrase to describe.",
+        "guidance": "Add a reason or a follow-up question. Your partner can suggest a natural expression.",
+        "phase": "FEEDBACK",
+        "role": "PARTNER",
+        "instruction": "Read your partner’s clue and guess their secret word or phrase.",
+        "revealed": true,
+        "allowedActions": ["SKIP", "FEEDBACK"],
+        "hints": [],
+        "result": null,
+        "mode": "DESCRIBE",
+        "targetSuggestions": null,
+        "target": "Geheimwort",
+        "clue": "Ein Tier mit langem Hals.",
+        "guess": "Giraffe",
+        "id": "fixture-DESCRIBE-3"
+      },
+      "visibleTexts": ["Geheimwort", "Ein Tier mit langem Hals.", "Giraffe"]
+    },
+    {
+      "name": "guessed-3-GUEST",
+      "seat": "GUEST",
+      "round": {
+        "order": 3,
+        "learner": "GUEST",
+        "targetLang": "es",
+        "supportLang": "en",
+        "level": "B1",
+        "prompt": "Choose an everyday word or phrase to describe.",
+        "guidance": "Add a reason or a follow-up question. Your partner can suggest a natural expression.",
+        "phase": "FEEDBACK",
+        "role": "LEARNER",
+        "instruction": "Pick a secret card or your own word. Give one clue without naming it.",
+        "revealed": true,
+        "allowedActions": ["SKIP"],
+        "hints": [],
+        "result": null,
+        "mode": "DESCRIBE",
+        "targetSuggestions": [
+          {
+            "id": "A",
+            "text": "llave",
+            "supportText": "key",
+            "symbol": "✦"
+          },
+          {
+            "id": "B",
+            "text": "libro",
+            "supportText": "book",
+            "symbol": "✦"
+          },
+          {
+            "id": "C",
+            "text": "paraguas",
+            "supportText": "umbrella",
+            "symbol": "✦"
+          },
+          {
+            "id": "D",
+            "text": "teléfono",
+            "supportText": "phone",
+            "symbol": "✦"
+          }
+        ],
+        "target": "Geheimwort",
+        "clue": "Ein Tier mit langem Hals.",
+        "guess": "Giraffe",
+        "id": "fixture-DESCRIBE-3"
+      },
+      "visibleTexts": [
+        "llave",
+        "libro",
+        "paraguas",
+        "teléfono",
+        "Geheimwort",
+        "Ein Tier mit langem Hals.",
+        "Giraffe"
+      ]
+    },
+    {
+      "name": "finished-3-HOST",
+      "seat": "HOST",
+      "round": {
+        "order": 3,
+        "learner": "GUEST",
+        "targetLang": "es",
+        "supportLang": "en",
+        "level": "B1",
+        "prompt": "Choose an everyday word or phrase to describe.",
+        "guidance": "Add a reason or a follow-up question. Your partner can suggest a natural expression.",
+        "phase": "FINISHED",
+        "role": "PARTNER",
+        "instruction": "Read your partner’s clue and guess their secret word or phrase.",
+        "revealed": true,
+        "allowedActions": [],
+        "hints": [],
+        "result": {
+          "skipped": false,
+          "understood": true,
+          "matched": null,
+          "correction": null,
+          "points": 2
+        },
+        "mode": "DESCRIBE",
+        "targetSuggestions": null,
+        "target": "Geheimwort",
+        "clue": "Ein Tier mit langem Hals.",
+        "guess": "Giraffe",
+        "id": "fixture-DESCRIBE-3"
+      },
+      "visibleTexts": ["Geheimwort", "Ein Tier mit langem Hals.", "Giraffe"]
+    },
+    {
+      "name": "finished-3-GUEST",
+      "seat": "GUEST",
+      "round": {
+        "order": 3,
+        "learner": "GUEST",
+        "targetLang": "es",
+        "supportLang": "en",
+        "level": "B1",
+        "prompt": "Choose an everyday word or phrase to describe.",
+        "guidance": "Add a reason or a follow-up question. Your partner can suggest a natural expression.",
+        "phase": "FINISHED",
+        "role": "LEARNER",
+        "instruction": "Pick a secret card or your own word. Give one clue without naming it.",
+        "revealed": true,
+        "allowedActions": [],
+        "hints": [],
+        "result": {
+          "skipped": false,
+          "understood": true,
+          "matched": null,
+          "correction": null,
+          "points": 2
+        },
+        "mode": "DESCRIBE",
+        "targetSuggestions": [
+          {
+            "id": "A",
+            "text": "llave",
+            "supportText": "key",
+            "symbol": "✦"
+          },
+          {
+            "id": "B",
+            "text": "libro",
+            "supportText": "book",
+            "symbol": "✦"
+          },
+          {
+            "id": "C",
+            "text": "paraguas",
+            "supportText": "umbrella",
+            "symbol": "✦"
+          },
+          {
+            "id": "D",
+            "text": "teléfono",
+            "supportText": "phone",
+            "symbol": "✦"
+          }
+        ],
+        "target": "Geheimwort",
+        "clue": "Ein Tier mit langem Hals.",
+        "guess": "Giraffe",
+        "id": "fixture-DESCRIBE-3"
+      },
+      "visibleTexts": [
+        "llave",
+        "libro",
+        "paraguas",
+        "teléfono",
+        "Geheimwort",
+        "Ein Tier mit langem Hals.",
+        "Giraffe"
+      ]
+    },
+    {
+      "name": "initial-4-HOST",
+      "seat": "HOST",
+      "round": {
+        "order": 4,
+        "learner": "HOST",
+        "targetLang": "de",
+        "supportLang": "en",
+        "level": "A1",
+        "prompt": "Plan an evening together.",
+        "guidance": "Use a short sentence. Ask your partner for a word or a hint when you need one.",
+        "phase": "EXCHANGE",
+        "role": "LEARNER",
+        "instruction": "You have six messages together. Work toward your secret objective and react to the twist.",
+        "revealed": false,
+        "allowedActions": ["SKIP", "HINT", "MESSAGE"],
+        "hints": [],
+        "result": null,
+        "mode": "MISSION",
+        "ownObjective": "You want to go outside without spending money.",
+        "otherObjective": null,
+        "messages": [],
+        "remainingMessages": 6,
+        "twist": null,
+        "ownOutcome": null,
+        "otherOutcome": null,
+        "id": "fixture-MISSION-4"
+      },
+      "visibleTexts": []
+    },
+    {
+      "name": "initial-4-GUEST",
+      "seat": "GUEST",
+      "round": {
+        "order": 4,
+        "learner": "HOST",
+        "targetLang": "de",
+        "supportLang": "en",
+        "level": "A1",
+        "prompt": "Plan an evening together.",
+        "guidance": "Use a short sentence. Ask your partner for a word or a hint when you need one.",
+        "phase": "EXCHANGE",
+        "role": "PARTNER",
+        "instruction": "Use your partner’s target language. You share six messages and each have a secret objective.",
+        "revealed": false,
+        "allowedActions": ["SKIP", "HINT", "MESSAGE"],
+        "hints": [],
+        "result": null,
+        "mode": "MISSION",
+        "ownObjective": "You want somewhere quiet where you can sit down.",
+        "otherObjective": null,
+        "messages": [],
+        "remainingMessages": 6,
+        "twist": null,
+        "ownOutcome": null,
+        "otherOutcome": null,
+        "id": "fixture-MISSION-4"
+      },
+      "visibleTexts": []
+    },
+    {
+      "name": "message-1-4-HOST",
+      "seat": "HOST",
+      "round": {
+        "order": 4,
+        "learner": "HOST",
+        "targetLang": "de",
+        "supportLang": "en",
+        "level": "A1",
+        "prompt": "Plan an evening together.",
+        "guidance": "Use a short sentence. Ask your partner for a word or a hint when you need one.",
+        "phase": "EXCHANGE",
+        "role": "LEARNER",
+        "instruction": "You have six messages together. Work toward your secret objective and react to the twist.",
+        "revealed": false,
+        "allowedActions": ["SKIP", "HINT"],
+        "hints": [],
+        "result": null,
+        "mode": "MISSION",
+        "ownObjective": "You want to go outside without spending money.",
+        "otherObjective": null,
+        "messages": [
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 1"
+          }
+        ],
+        "remainingMessages": 5,
+        "twist": null,
+        "ownOutcome": null,
+        "otherOutcome": null,
+        "id": "fixture-MISSION-4"
+      },
+      "visibleTexts": ["Gemeinsame Zeile 1"]
+    },
+    {
+      "name": "message-1-4-GUEST",
+      "seat": "GUEST",
+      "round": {
+        "order": 4,
+        "learner": "HOST",
+        "targetLang": "de",
+        "supportLang": "en",
+        "level": "A1",
+        "prompt": "Plan an evening together.",
+        "guidance": "Use a short sentence. Ask your partner for a word or a hint when you need one.",
+        "phase": "EXCHANGE",
+        "role": "PARTNER",
+        "instruction": "Use your partner’s target language. You share six messages and each have a secret objective.",
+        "revealed": false,
+        "allowedActions": ["SKIP", "HINT", "MESSAGE"],
+        "hints": [],
+        "result": null,
+        "mode": "MISSION",
+        "ownObjective": "You want somewhere quiet where you can sit down.",
+        "otherObjective": null,
+        "messages": [
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 1"
+          }
+        ],
+        "remainingMessages": 5,
+        "twist": null,
+        "ownOutcome": null,
+        "otherOutcome": null,
+        "id": "fixture-MISSION-4"
+      },
+      "visibleTexts": ["Gemeinsame Zeile 1"]
+    },
+    {
+      "name": "message-2-4-HOST",
+      "seat": "HOST",
+      "round": {
+        "order": 4,
+        "learner": "HOST",
+        "targetLang": "de",
+        "supportLang": "en",
+        "level": "A1",
+        "prompt": "Plan an evening together.",
+        "guidance": "Use a short sentence. Ask your partner for a word or a hint when you need one.",
+        "phase": "EXCHANGE",
+        "role": "LEARNER",
+        "instruction": "You have six messages together. Work toward your secret objective and react to the twist.",
+        "revealed": false,
+        "allowedActions": ["SKIP", "HINT", "MESSAGE"],
+        "hints": [],
+        "result": null,
+        "mode": "MISSION",
+        "ownObjective": "You want to go outside without spending money.",
+        "otherObjective": null,
+        "messages": [
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 1"
+          },
+          {
+            "seat": "GUEST",
+            "text": "Gemeinsame Zeile 2"
+          }
+        ],
+        "remainingMessages": 4,
+        "twist": null,
+        "ownOutcome": null,
+        "otherOutcome": null,
+        "id": "fixture-MISSION-4"
+      },
+      "visibleTexts": ["Gemeinsame Zeile 1", "Gemeinsame Zeile 2"]
+    },
+    {
+      "name": "message-2-4-GUEST",
+      "seat": "GUEST",
+      "round": {
+        "order": 4,
+        "learner": "HOST",
+        "targetLang": "de",
+        "supportLang": "en",
+        "level": "A1",
+        "prompt": "Plan an evening together.",
+        "guidance": "Use a short sentence. Ask your partner for a word or a hint when you need one.",
+        "phase": "EXCHANGE",
+        "role": "PARTNER",
+        "instruction": "Use your partner’s target language. You share six messages and each have a secret objective.",
+        "revealed": false,
+        "allowedActions": ["SKIP", "HINT"],
+        "hints": [],
+        "result": null,
+        "mode": "MISSION",
+        "ownObjective": "You want somewhere quiet where you can sit down.",
+        "otherObjective": null,
+        "messages": [
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 1"
+          },
+          {
+            "seat": "GUEST",
+            "text": "Gemeinsame Zeile 2"
+          }
+        ],
+        "remainingMessages": 4,
+        "twist": null,
+        "ownOutcome": null,
+        "otherOutcome": null,
+        "id": "fixture-MISSION-4"
+      },
+      "visibleTexts": ["Gemeinsame Zeile 1", "Gemeinsame Zeile 2"]
+    },
+    {
+      "name": "message-3-4-HOST",
+      "seat": "HOST",
+      "round": {
+        "order": 4,
+        "learner": "HOST",
+        "targetLang": "de",
+        "supportLang": "en",
+        "level": "A1",
+        "prompt": "Plan an evening together.",
+        "guidance": "Use a short sentence. Ask your partner for a word or a hint when you need one.",
+        "phase": "EXCHANGE",
+        "role": "LEARNER",
+        "instruction": "You have six messages together. Work toward your secret objective and react to the twist.",
+        "revealed": false,
+        "allowedActions": ["SKIP", "HINT"],
+        "hints": [],
+        "result": null,
+        "mode": "MISSION",
+        "ownObjective": "You want to go outside without spending money.",
+        "otherObjective": null,
+        "messages": [
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 1"
+          },
+          {
+            "seat": "GUEST",
+            "text": "Gemeinsame Zeile 2"
+          },
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 3"
+          }
+        ],
+        "remainingMessages": 3,
+        "twist": "A friend wants to join. Include them in the plan.",
+        "ownOutcome": null,
+        "otherOutcome": null,
+        "id": "fixture-MISSION-4"
+      },
+      "visibleTexts": ["Gemeinsame Zeile 1", "Gemeinsame Zeile 2", "Gemeinsame Zeile 3"]
+    },
+    {
+      "name": "message-3-4-GUEST",
+      "seat": "GUEST",
+      "round": {
+        "order": 4,
+        "learner": "HOST",
+        "targetLang": "de",
+        "supportLang": "en",
+        "level": "A1",
+        "prompt": "Plan an evening together.",
+        "guidance": "Use a short sentence. Ask your partner for a word or a hint when you need one.",
+        "phase": "EXCHANGE",
+        "role": "PARTNER",
+        "instruction": "Use your partner’s target language. You share six messages and each have a secret objective.",
+        "revealed": false,
+        "allowedActions": ["SKIP", "HINT", "MESSAGE"],
+        "hints": [],
+        "result": null,
+        "mode": "MISSION",
+        "ownObjective": "You want somewhere quiet where you can sit down.",
+        "otherObjective": null,
+        "messages": [
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 1"
+          },
+          {
+            "seat": "GUEST",
+            "text": "Gemeinsame Zeile 2"
+          },
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 3"
+          }
+        ],
+        "remainingMessages": 3,
+        "twist": "A friend wants to join. Include them in the plan.",
+        "ownOutcome": null,
+        "otherOutcome": null,
+        "id": "fixture-MISSION-4"
+      },
+      "visibleTexts": ["Gemeinsame Zeile 1", "Gemeinsame Zeile 2", "Gemeinsame Zeile 3"]
+    },
+    {
+      "name": "message-4-4-HOST",
+      "seat": "HOST",
+      "round": {
+        "order": 4,
+        "learner": "HOST",
+        "targetLang": "de",
+        "supportLang": "en",
+        "level": "A1",
+        "prompt": "Plan an evening together.",
+        "guidance": "Use a short sentence. Ask your partner for a word or a hint when you need one.",
+        "phase": "EXCHANGE",
+        "role": "LEARNER",
+        "instruction": "You have six messages together. Work toward your secret objective and react to the twist.",
+        "revealed": false,
+        "allowedActions": ["SKIP", "HINT", "MESSAGE", "MISSION_DONE"],
+        "hints": [],
+        "result": null,
+        "mode": "MISSION",
+        "ownObjective": "You want to go outside without spending money.",
+        "otherObjective": null,
+        "messages": [
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 1"
+          },
+          {
+            "seat": "GUEST",
+            "text": "Gemeinsame Zeile 2"
+          },
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 3"
+          },
+          {
+            "seat": "GUEST",
+            "text": "Gemeinsame Zeile 4"
+          }
+        ],
+        "remainingMessages": 2,
+        "twist": "A friend wants to join. Include them in the plan.",
+        "ownOutcome": null,
+        "otherOutcome": null,
+        "id": "fixture-MISSION-4"
+      },
+      "visibleTexts": [
+        "Gemeinsame Zeile 1",
+        "Gemeinsame Zeile 2",
+        "Gemeinsame Zeile 3",
+        "Gemeinsame Zeile 4"
+      ]
+    },
+    {
+      "name": "message-4-4-GUEST",
+      "seat": "GUEST",
+      "round": {
+        "order": 4,
+        "learner": "HOST",
+        "targetLang": "de",
+        "supportLang": "en",
+        "level": "A1",
+        "prompt": "Plan an evening together.",
+        "guidance": "Use a short sentence. Ask your partner for a word or a hint when you need one.",
+        "phase": "EXCHANGE",
+        "role": "PARTNER",
+        "instruction": "Use your partner’s target language. You share six messages and each have a secret objective.",
+        "revealed": false,
+        "allowedActions": ["SKIP", "HINT", "MISSION_DONE"],
+        "hints": [],
+        "result": null,
+        "mode": "MISSION",
+        "ownObjective": "You want somewhere quiet where you can sit down.",
+        "otherObjective": null,
+        "messages": [
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 1"
+          },
+          {
+            "seat": "GUEST",
+            "text": "Gemeinsame Zeile 2"
+          },
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 3"
+          },
+          {
+            "seat": "GUEST",
+            "text": "Gemeinsame Zeile 4"
+          }
+        ],
+        "remainingMessages": 2,
+        "twist": "A friend wants to join. Include them in the plan.",
+        "ownOutcome": null,
+        "otherOutcome": null,
+        "id": "fixture-MISSION-4"
+      },
+      "visibleTexts": [
+        "Gemeinsame Zeile 1",
+        "Gemeinsame Zeile 2",
+        "Gemeinsame Zeile 3",
+        "Gemeinsame Zeile 4"
+      ]
+    },
+    {
+      "name": "message-5-4-HOST",
+      "seat": "HOST",
+      "round": {
+        "order": 4,
+        "learner": "HOST",
+        "targetLang": "de",
+        "supportLang": "en",
+        "level": "A1",
+        "prompt": "Plan an evening together.",
+        "guidance": "Use a short sentence. Ask your partner for a word or a hint when you need one.",
+        "phase": "EXCHANGE",
+        "role": "LEARNER",
+        "instruction": "You have six messages together. Work toward your secret objective and react to the twist.",
+        "revealed": false,
+        "allowedActions": ["SKIP", "HINT", "MISSION_DONE"],
+        "hints": [],
+        "result": null,
+        "mode": "MISSION",
+        "ownObjective": "You want to go outside without spending money.",
+        "otherObjective": null,
+        "messages": [
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 1"
+          },
+          {
+            "seat": "GUEST",
+            "text": "Gemeinsame Zeile 2"
+          },
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 3"
+          },
+          {
+            "seat": "GUEST",
+            "text": "Gemeinsame Zeile 4"
+          },
+          {
+            "seat": "HOST",
+            "text": "Eine weitere Zeile"
+          }
+        ],
+        "remainingMessages": 1,
+        "twist": "A friend wants to join. Include them in the plan.",
+        "ownOutcome": null,
+        "otherOutcome": null,
+        "id": "fixture-MISSION-4"
+      },
+      "visibleTexts": [
+        "Gemeinsame Zeile 1",
+        "Gemeinsame Zeile 2",
+        "Gemeinsame Zeile 3",
+        "Gemeinsame Zeile 4",
+        "Eine weitere Zeile"
+      ]
+    },
+    {
+      "name": "message-5-4-GUEST",
+      "seat": "GUEST",
+      "round": {
+        "order": 4,
+        "learner": "HOST",
+        "targetLang": "de",
+        "supportLang": "en",
+        "level": "A1",
+        "prompt": "Plan an evening together.",
+        "guidance": "Use a short sentence. Ask your partner for a word or a hint when you need one.",
+        "phase": "EXCHANGE",
+        "role": "PARTNER",
+        "instruction": "Use your partner’s target language. You share six messages and each have a secret objective.",
+        "revealed": false,
+        "allowedActions": ["SKIP", "HINT", "MESSAGE", "MISSION_DONE"],
+        "hints": [],
+        "result": null,
+        "mode": "MISSION",
+        "ownObjective": "You want somewhere quiet where you can sit down.",
+        "otherObjective": null,
+        "messages": [
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 1"
+          },
+          {
+            "seat": "GUEST",
+            "text": "Gemeinsame Zeile 2"
+          },
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 3"
+          },
+          {
+            "seat": "GUEST",
+            "text": "Gemeinsame Zeile 4"
+          },
+          {
+            "seat": "HOST",
+            "text": "Eine weitere Zeile"
+          }
+        ],
+        "remainingMessages": 1,
+        "twist": "A friend wants to join. Include them in the plan.",
+        "ownOutcome": null,
+        "otherOutcome": null,
+        "id": "fixture-MISSION-4"
+      },
+      "visibleTexts": [
+        "Gemeinsame Zeile 1",
+        "Gemeinsame Zeile 2",
+        "Gemeinsame Zeile 3",
+        "Gemeinsame Zeile 4",
+        "Eine weitere Zeile"
+      ]
+    },
+    {
+      "name": "one-outcome-4-HOST",
+      "seat": "HOST",
+      "round": {
+        "order": 4,
+        "learner": "HOST",
+        "targetLang": "de",
+        "supportLang": "en",
+        "level": "A1",
+        "prompt": "Plan an evening together.",
+        "guidance": "Use a short sentence. Ask your partner for a word or a hint when you need one.",
+        "phase": "EXCHANGE",
+        "role": "LEARNER",
+        "instruction": "You have six messages together. Work toward your secret objective and react to the twist.",
+        "revealed": false,
+        "allowedActions": ["SKIP", "HINT", "MESSAGE"],
+        "hints": [],
+        "result": null,
+        "mode": "MISSION",
+        "ownObjective": "You want to go outside without spending money.",
+        "otherObjective": null,
+        "messages": [
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 1"
+          },
+          {
+            "seat": "GUEST",
+            "text": "Gemeinsame Zeile 2"
+          },
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 3"
+          },
+          {
+            "seat": "GUEST",
+            "text": "Gemeinsame Zeile 4"
+          }
+        ],
+        "remainingMessages": 2,
+        "twist": "A friend wants to join. Include them in the plan.",
+        "ownOutcome": true,
+        "otherOutcome": null,
+        "id": "fixture-MISSION-4"
+      },
+      "visibleTexts": [
+        "Gemeinsame Zeile 1",
+        "Gemeinsame Zeile 2",
+        "Gemeinsame Zeile 3",
+        "Gemeinsame Zeile 4"
+      ]
+    },
+    {
+      "name": "one-outcome-4-GUEST",
+      "seat": "GUEST",
+      "round": {
+        "order": 4,
+        "learner": "HOST",
+        "targetLang": "de",
+        "supportLang": "en",
+        "level": "A1",
+        "prompt": "Plan an evening together.",
+        "guidance": "Use a short sentence. Ask your partner for a word or a hint when you need one.",
+        "phase": "EXCHANGE",
+        "role": "PARTNER",
+        "instruction": "Use your partner’s target language. You share six messages and each have a secret objective.",
+        "revealed": false,
+        "allowedActions": ["SKIP", "HINT", "MISSION_DONE"],
+        "hints": [],
+        "result": null,
+        "mode": "MISSION",
+        "ownObjective": "You want somewhere quiet where you can sit down.",
+        "otherObjective": null,
+        "messages": [
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 1"
+          },
+          {
+            "seat": "GUEST",
+            "text": "Gemeinsame Zeile 2"
+          },
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 3"
+          },
+          {
+            "seat": "GUEST",
+            "text": "Gemeinsame Zeile 4"
+          }
+        ],
+        "remainingMessages": 2,
+        "twist": "A friend wants to join. Include them in the plan.",
+        "ownOutcome": null,
+        "otherOutcome": null,
+        "id": "fixture-MISSION-4"
+      },
+      "visibleTexts": [
+        "Gemeinsame Zeile 1",
+        "Gemeinsame Zeile 2",
+        "Gemeinsame Zeile 3",
+        "Gemeinsame Zeile 4"
+      ]
+    },
+    {
+      "name": "both-outcomes-4-HOST",
+      "seat": "HOST",
+      "round": {
+        "order": 4,
+        "learner": "HOST",
+        "targetLang": "de",
+        "supportLang": "en",
+        "level": "A1",
+        "prompt": "Plan an evening together.",
+        "guidance": "Use a short sentence. Ask your partner for a word or a hint when you need one.",
+        "phase": "FEEDBACK",
+        "role": "LEARNER",
+        "instruction": "You have six messages together. Work toward your secret objective and react to the twist.",
+        "revealed": true,
+        "allowedActions": ["SKIP"],
+        "hints": [],
+        "result": null,
+        "mode": "MISSION",
+        "ownObjective": "You want to go outside without spending money.",
+        "otherObjective": "You want somewhere quiet where you can sit down.",
+        "messages": [
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 1"
+          },
+          {
+            "seat": "GUEST",
+            "text": "Gemeinsame Zeile 2"
+          },
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 3"
+          },
+          {
+            "seat": "GUEST",
+            "text": "Gemeinsame Zeile 4"
+          }
+        ],
+        "remainingMessages": 2,
+        "twist": "A friend wants to join. Include them in the plan.",
+        "ownOutcome": true,
+        "otherOutcome": true,
+        "id": "fixture-MISSION-4"
+      },
+      "visibleTexts": [
+        "Gemeinsame Zeile 1",
+        "Gemeinsame Zeile 2",
+        "Gemeinsame Zeile 3",
+        "Gemeinsame Zeile 4"
+      ]
+    },
+    {
+      "name": "both-outcomes-4-GUEST",
+      "seat": "GUEST",
+      "round": {
+        "order": 4,
+        "learner": "HOST",
+        "targetLang": "de",
+        "supportLang": "en",
+        "level": "A1",
+        "prompt": "Plan an evening together.",
+        "guidance": "Use a short sentence. Ask your partner for a word or a hint when you need one.",
+        "phase": "FEEDBACK",
+        "role": "PARTNER",
+        "instruction": "Use your partner’s target language. You share six messages and each have a secret objective.",
+        "revealed": true,
+        "allowedActions": ["SKIP", "FEEDBACK"],
+        "hints": [],
+        "result": null,
+        "mode": "MISSION",
+        "ownObjective": "You want somewhere quiet where you can sit down.",
+        "otherObjective": "You want to go outside without spending money.",
+        "messages": [
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 1"
+          },
+          {
+            "seat": "GUEST",
+            "text": "Gemeinsame Zeile 2"
+          },
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 3"
+          },
+          {
+            "seat": "GUEST",
+            "text": "Gemeinsame Zeile 4"
+          }
+        ],
+        "remainingMessages": 2,
+        "twist": "A friend wants to join. Include them in the plan.",
+        "ownOutcome": true,
+        "otherOutcome": true,
+        "id": "fixture-MISSION-4"
+      },
+      "visibleTexts": [
+        "Gemeinsame Zeile 1",
+        "Gemeinsame Zeile 2",
+        "Gemeinsame Zeile 3",
+        "Gemeinsame Zeile 4"
+      ]
+    },
+    {
+      "name": "finished-4-HOST",
+      "seat": "HOST",
+      "round": {
+        "order": 4,
+        "learner": "HOST",
+        "targetLang": "de",
+        "supportLang": "en",
+        "level": "A1",
+        "prompt": "Plan an evening together.",
+        "guidance": "Use a short sentence. Ask your partner for a word or a hint when you need one.",
+        "phase": "FINISHED",
+        "role": "LEARNER",
+        "instruction": "You have six messages together. Work toward your secret objective and react to the twist.",
+        "revealed": true,
+        "allowedActions": [],
+        "hints": [],
+        "result": {
+          "skipped": false,
+          "understood": true,
+          "matched": null,
+          "correction": null,
+          "points": 2
+        },
+        "mode": "MISSION",
+        "ownObjective": "You want to go outside without spending money.",
+        "otherObjective": "You want somewhere quiet where you can sit down.",
+        "messages": [
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 1"
+          },
+          {
+            "seat": "GUEST",
+            "text": "Gemeinsame Zeile 2"
+          },
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 3"
+          },
+          {
+            "seat": "GUEST",
+            "text": "Gemeinsame Zeile 4"
+          }
+        ],
+        "remainingMessages": 2,
+        "twist": "A friend wants to join. Include them in the plan.",
+        "ownOutcome": true,
+        "otherOutcome": true,
+        "id": "fixture-MISSION-4"
+      },
+      "visibleTexts": [
+        "Gemeinsame Zeile 1",
+        "Gemeinsame Zeile 2",
+        "Gemeinsame Zeile 3",
+        "Gemeinsame Zeile 4"
+      ]
+    },
+    {
+      "name": "finished-4-GUEST",
+      "seat": "GUEST",
+      "round": {
+        "order": 4,
+        "learner": "HOST",
+        "targetLang": "de",
+        "supportLang": "en",
+        "level": "A1",
+        "prompt": "Plan an evening together.",
+        "guidance": "Use a short sentence. Ask your partner for a word or a hint when you need one.",
+        "phase": "FINISHED",
+        "role": "PARTNER",
+        "instruction": "Use your partner’s target language. You share six messages and each have a secret objective.",
+        "revealed": true,
+        "allowedActions": [],
+        "hints": [],
+        "result": {
+          "skipped": false,
+          "understood": true,
+          "matched": null,
+          "correction": null,
+          "points": 2
+        },
+        "mode": "MISSION",
+        "ownObjective": "You want somewhere quiet where you can sit down.",
+        "otherObjective": "You want to go outside without spending money.",
+        "messages": [
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 1"
+          },
+          {
+            "seat": "GUEST",
+            "text": "Gemeinsame Zeile 2"
+          },
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 3"
+          },
+          {
+            "seat": "GUEST",
+            "text": "Gemeinsame Zeile 4"
+          }
+        ],
+        "remainingMessages": 2,
+        "twist": "A friend wants to join. Include them in the plan.",
+        "ownOutcome": true,
+        "otherOutcome": true,
+        "id": "fixture-MISSION-4"
+      },
+      "visibleTexts": [
+        "Gemeinsame Zeile 1",
+        "Gemeinsame Zeile 2",
+        "Gemeinsame Zeile 3",
+        "Gemeinsame Zeile 4"
+      ]
+    },
+    {
+      "name": "initial-5-HOST",
+      "seat": "HOST",
+      "round": {
+        "order": 5,
+        "learner": "GUEST",
+        "targetLang": "es",
+        "supportLang": "en",
+        "level": "B1",
+        "prompt": "You are sharing a home for a week.",
+        "guidance": "Add a reason or a follow-up question. Your partner can suggest a natural expression.",
+        "phase": "EXCHANGE",
+        "role": "PARTNER",
+        "instruction": "Use your partner’s target language. You share six messages and each have a secret objective.",
+        "revealed": false,
+        "allowedActions": ["SKIP", "HINT", "MESSAGE"],
+        "hints": [],
+        "result": null,
+        "mode": "MISSION",
+        "ownObjective": "You need the kitchen free before seven in the evening.",
+        "otherObjective": null,
+        "messages": [],
+        "remainingMessages": 6,
+        "twist": null,
+        "ownOutcome": null,
+        "otherOutcome": null,
+        "id": "fixture-MISSION-5"
+      },
+      "visibleTexts": []
+    },
+    {
+      "name": "initial-5-GUEST",
+      "seat": "GUEST",
+      "round": {
+        "order": 5,
+        "learner": "GUEST",
+        "targetLang": "es",
+        "supportLang": "en",
+        "level": "B1",
+        "prompt": "You are sharing a home for a week.",
+        "guidance": "Add a reason or a follow-up question. Your partner can suggest a natural expression.",
+        "phase": "EXCHANGE",
+        "role": "LEARNER",
+        "instruction": "You have six messages together. Work toward your secret objective and react to the twist.",
+        "revealed": false,
+        "allowedActions": ["SKIP", "HINT", "MESSAGE"],
+        "hints": [],
+        "result": null,
+        "mode": "MISSION",
+        "ownObjective": "Arrange time to cook while keeping the morning free.",
+        "otherObjective": null,
+        "messages": [],
+        "remainingMessages": 6,
+        "twist": null,
+        "ownOutcome": null,
+        "otherOutcome": null,
+        "id": "fixture-MISSION-5"
+      },
+      "visibleTexts": []
+    },
+    {
+      "name": "message-1-5-HOST",
+      "seat": "HOST",
+      "round": {
+        "order": 5,
+        "learner": "GUEST",
+        "targetLang": "es",
+        "supportLang": "en",
+        "level": "B1",
+        "prompt": "You are sharing a home for a week.",
+        "guidance": "Add a reason or a follow-up question. Your partner can suggest a natural expression.",
+        "phase": "EXCHANGE",
+        "role": "PARTNER",
+        "instruction": "Use your partner’s target language. You share six messages and each have a secret objective.",
+        "revealed": false,
+        "allowedActions": ["SKIP", "HINT"],
+        "hints": [],
+        "result": null,
+        "mode": "MISSION",
+        "ownObjective": "You need the kitchen free before seven in the evening.",
+        "otherObjective": null,
+        "messages": [
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 1"
+          }
+        ],
+        "remainingMessages": 5,
+        "twist": null,
+        "ownOutcome": null,
+        "otherOutcome": null,
+        "id": "fixture-MISSION-5"
+      },
+      "visibleTexts": ["Gemeinsame Zeile 1"]
+    },
+    {
+      "name": "message-1-5-GUEST",
+      "seat": "GUEST",
+      "round": {
+        "order": 5,
+        "learner": "GUEST",
+        "targetLang": "es",
+        "supportLang": "en",
+        "level": "B1",
+        "prompt": "You are sharing a home for a week.",
+        "guidance": "Add a reason or a follow-up question. Your partner can suggest a natural expression.",
+        "phase": "EXCHANGE",
+        "role": "LEARNER",
+        "instruction": "You have six messages together. Work toward your secret objective and react to the twist.",
+        "revealed": false,
+        "allowedActions": ["SKIP", "HINT", "MESSAGE"],
+        "hints": [],
+        "result": null,
+        "mode": "MISSION",
+        "ownObjective": "Arrange time to cook while keeping the morning free.",
+        "otherObjective": null,
+        "messages": [
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 1"
+          }
+        ],
+        "remainingMessages": 5,
+        "twist": null,
+        "ownOutcome": null,
+        "otherOutcome": null,
+        "id": "fixture-MISSION-5"
+      },
+      "visibleTexts": ["Gemeinsame Zeile 1"]
+    },
+    {
+      "name": "message-2-5-HOST",
+      "seat": "HOST",
+      "round": {
+        "order": 5,
+        "learner": "GUEST",
+        "targetLang": "es",
+        "supportLang": "en",
+        "level": "B1",
+        "prompt": "You are sharing a home for a week.",
+        "guidance": "Add a reason or a follow-up question. Your partner can suggest a natural expression.",
+        "phase": "EXCHANGE",
+        "role": "PARTNER",
+        "instruction": "Use your partner’s target language. You share six messages and each have a secret objective.",
+        "revealed": false,
+        "allowedActions": ["SKIP", "HINT", "MESSAGE"],
+        "hints": [],
+        "result": null,
+        "mode": "MISSION",
+        "ownObjective": "You need the kitchen free before seven in the evening.",
+        "otherObjective": null,
+        "messages": [
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 1"
+          },
+          {
+            "seat": "GUEST",
+            "text": "Gemeinsame Zeile 2"
+          }
+        ],
+        "remainingMessages": 4,
+        "twist": null,
+        "ownOutcome": null,
+        "otherOutcome": null,
+        "id": "fixture-MISSION-5"
+      },
+      "visibleTexts": ["Gemeinsame Zeile 1", "Gemeinsame Zeile 2"]
+    },
+    {
+      "name": "message-2-5-GUEST",
+      "seat": "GUEST",
+      "round": {
+        "order": 5,
+        "learner": "GUEST",
+        "targetLang": "es",
+        "supportLang": "en",
+        "level": "B1",
+        "prompt": "You are sharing a home for a week.",
+        "guidance": "Add a reason or a follow-up question. Your partner can suggest a natural expression.",
+        "phase": "EXCHANGE",
+        "role": "LEARNER",
+        "instruction": "You have six messages together. Work toward your secret objective and react to the twist.",
+        "revealed": false,
+        "allowedActions": ["SKIP", "HINT"],
+        "hints": [],
+        "result": null,
+        "mode": "MISSION",
+        "ownObjective": "Arrange time to cook while keeping the morning free.",
+        "otherObjective": null,
+        "messages": [
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 1"
+          },
+          {
+            "seat": "GUEST",
+            "text": "Gemeinsame Zeile 2"
+          }
+        ],
+        "remainingMessages": 4,
+        "twist": null,
+        "ownOutcome": null,
+        "otherOutcome": null,
+        "id": "fixture-MISSION-5"
+      },
+      "visibleTexts": ["Gemeinsame Zeile 1", "Gemeinsame Zeile 2"]
+    },
+    {
+      "name": "message-3-5-HOST",
+      "seat": "HOST",
+      "round": {
+        "order": 5,
+        "learner": "GUEST",
+        "targetLang": "es",
+        "supportLang": "en",
+        "level": "B1",
+        "prompt": "You are sharing a home for a week.",
+        "guidance": "Add a reason or a follow-up question. Your partner can suggest a natural expression.",
+        "phase": "EXCHANGE",
+        "role": "PARTNER",
+        "instruction": "Use your partner’s target language. You share six messages and each have a secret objective.",
+        "revealed": false,
+        "allowedActions": ["SKIP", "HINT"],
+        "hints": [],
+        "result": null,
+        "mode": "MISSION",
+        "ownObjective": "You need the kitchen free before seven in the evening.",
+        "otherObjective": null,
+        "messages": [
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 1"
+          },
+          {
+            "seat": "GUEST",
+            "text": "Gemeinsame Zeile 2"
+          },
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 3"
+          }
+        ],
+        "remainingMessages": 3,
+        "twist": "There is only one pan. Adjust the plan.",
+        "ownOutcome": null,
+        "otherOutcome": null,
+        "id": "fixture-MISSION-5"
+      },
+      "visibleTexts": ["Gemeinsame Zeile 1", "Gemeinsame Zeile 2", "Gemeinsame Zeile 3"]
+    },
+    {
+      "name": "message-3-5-GUEST",
+      "seat": "GUEST",
+      "round": {
+        "order": 5,
+        "learner": "GUEST",
+        "targetLang": "es",
+        "supportLang": "en",
+        "level": "B1",
+        "prompt": "You are sharing a home for a week.",
+        "guidance": "Add a reason or a follow-up question. Your partner can suggest a natural expression.",
+        "phase": "EXCHANGE",
+        "role": "LEARNER",
+        "instruction": "You have six messages together. Work toward your secret objective and react to the twist.",
+        "revealed": false,
+        "allowedActions": ["SKIP", "HINT", "MESSAGE"],
+        "hints": [],
+        "result": null,
+        "mode": "MISSION",
+        "ownObjective": "Arrange time to cook while keeping the morning free.",
+        "otherObjective": null,
+        "messages": [
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 1"
+          },
+          {
+            "seat": "GUEST",
+            "text": "Gemeinsame Zeile 2"
+          },
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 3"
+          }
+        ],
+        "remainingMessages": 3,
+        "twist": "There is only one pan. Adjust the plan.",
+        "ownOutcome": null,
+        "otherOutcome": null,
+        "id": "fixture-MISSION-5"
+      },
+      "visibleTexts": ["Gemeinsame Zeile 1", "Gemeinsame Zeile 2", "Gemeinsame Zeile 3"]
+    },
+    {
+      "name": "message-4-5-HOST",
+      "seat": "HOST",
+      "round": {
+        "order": 5,
+        "learner": "GUEST",
+        "targetLang": "es",
+        "supportLang": "en",
+        "level": "B1",
+        "prompt": "You are sharing a home for a week.",
+        "guidance": "Add a reason or a follow-up question. Your partner can suggest a natural expression.",
+        "phase": "EXCHANGE",
+        "role": "PARTNER",
+        "instruction": "Use your partner’s target language. You share six messages and each have a secret objective.",
+        "revealed": false,
+        "allowedActions": ["SKIP", "HINT", "MESSAGE", "MISSION_DONE"],
+        "hints": [],
+        "result": null,
+        "mode": "MISSION",
+        "ownObjective": "You need the kitchen free before seven in the evening.",
+        "otherObjective": null,
+        "messages": [
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 1"
+          },
+          {
+            "seat": "GUEST",
+            "text": "Gemeinsame Zeile 2"
+          },
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 3"
+          },
+          {
+            "seat": "GUEST",
+            "text": "Gemeinsame Zeile 4"
+          }
+        ],
+        "remainingMessages": 2,
+        "twist": "There is only one pan. Adjust the plan.",
+        "ownOutcome": null,
+        "otherOutcome": null,
+        "id": "fixture-MISSION-5"
+      },
+      "visibleTexts": [
+        "Gemeinsame Zeile 1",
+        "Gemeinsame Zeile 2",
+        "Gemeinsame Zeile 3",
+        "Gemeinsame Zeile 4"
+      ]
+    },
+    {
+      "name": "message-4-5-GUEST",
+      "seat": "GUEST",
+      "round": {
+        "order": 5,
+        "learner": "GUEST",
+        "targetLang": "es",
+        "supportLang": "en",
+        "level": "B1",
+        "prompt": "You are sharing a home for a week.",
+        "guidance": "Add a reason or a follow-up question. Your partner can suggest a natural expression.",
+        "phase": "EXCHANGE",
+        "role": "LEARNER",
+        "instruction": "You have six messages together. Work toward your secret objective and react to the twist.",
+        "revealed": false,
+        "allowedActions": ["SKIP", "HINT", "MISSION_DONE"],
+        "hints": [],
+        "result": null,
+        "mode": "MISSION",
+        "ownObjective": "Arrange time to cook while keeping the morning free.",
+        "otherObjective": null,
+        "messages": [
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 1"
+          },
+          {
+            "seat": "GUEST",
+            "text": "Gemeinsame Zeile 2"
+          },
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 3"
+          },
+          {
+            "seat": "GUEST",
+            "text": "Gemeinsame Zeile 4"
+          }
+        ],
+        "remainingMessages": 2,
+        "twist": "There is only one pan. Adjust the plan.",
+        "ownOutcome": null,
+        "otherOutcome": null,
+        "id": "fixture-MISSION-5"
+      },
+      "visibleTexts": [
+        "Gemeinsame Zeile 1",
+        "Gemeinsame Zeile 2",
+        "Gemeinsame Zeile 3",
+        "Gemeinsame Zeile 4"
+      ]
+    },
+    {
+      "name": "message-5-5-HOST",
+      "seat": "HOST",
+      "round": {
+        "order": 5,
+        "learner": "GUEST",
+        "targetLang": "es",
+        "supportLang": "en",
+        "level": "B1",
+        "prompt": "You are sharing a home for a week.",
+        "guidance": "Add a reason or a follow-up question. Your partner can suggest a natural expression.",
+        "phase": "EXCHANGE",
+        "role": "PARTNER",
+        "instruction": "Use your partner’s target language. You share six messages and each have a secret objective.",
+        "revealed": false,
+        "allowedActions": ["SKIP", "HINT", "MISSION_DONE"],
+        "hints": [],
+        "result": null,
+        "mode": "MISSION",
+        "ownObjective": "You need the kitchen free before seven in the evening.",
+        "otherObjective": null,
+        "messages": [
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 1"
+          },
+          {
+            "seat": "GUEST",
+            "text": "Gemeinsame Zeile 2"
+          },
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 3"
+          },
+          {
+            "seat": "GUEST",
+            "text": "Gemeinsame Zeile 4"
+          },
+          {
+            "seat": "HOST",
+            "text": "Eine weitere Zeile"
+          }
+        ],
+        "remainingMessages": 1,
+        "twist": "There is only one pan. Adjust the plan.",
+        "ownOutcome": null,
+        "otherOutcome": null,
+        "id": "fixture-MISSION-5"
+      },
+      "visibleTexts": [
+        "Gemeinsame Zeile 1",
+        "Gemeinsame Zeile 2",
+        "Gemeinsame Zeile 3",
+        "Gemeinsame Zeile 4",
+        "Eine weitere Zeile"
+      ]
+    },
+    {
+      "name": "message-5-5-GUEST",
+      "seat": "GUEST",
+      "round": {
+        "order": 5,
+        "learner": "GUEST",
+        "targetLang": "es",
+        "supportLang": "en",
+        "level": "B1",
+        "prompt": "You are sharing a home for a week.",
+        "guidance": "Add a reason or a follow-up question. Your partner can suggest a natural expression.",
+        "phase": "EXCHANGE",
+        "role": "LEARNER",
+        "instruction": "You have six messages together. Work toward your secret objective and react to the twist.",
+        "revealed": false,
+        "allowedActions": ["SKIP", "HINT", "MESSAGE", "MISSION_DONE"],
+        "hints": [],
+        "result": null,
+        "mode": "MISSION",
+        "ownObjective": "Arrange time to cook while keeping the morning free.",
+        "otherObjective": null,
+        "messages": [
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 1"
+          },
+          {
+            "seat": "GUEST",
+            "text": "Gemeinsame Zeile 2"
+          },
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 3"
+          },
+          {
+            "seat": "GUEST",
+            "text": "Gemeinsame Zeile 4"
+          },
+          {
+            "seat": "HOST",
+            "text": "Eine weitere Zeile"
+          }
+        ],
+        "remainingMessages": 1,
+        "twist": "There is only one pan. Adjust the plan.",
+        "ownOutcome": null,
+        "otherOutcome": null,
+        "id": "fixture-MISSION-5"
+      },
+      "visibleTexts": [
+        "Gemeinsame Zeile 1",
+        "Gemeinsame Zeile 2",
+        "Gemeinsame Zeile 3",
+        "Gemeinsame Zeile 4",
+        "Eine weitere Zeile"
+      ]
+    },
+    {
+      "name": "one-outcome-5-HOST",
+      "seat": "HOST",
+      "round": {
+        "order": 5,
+        "learner": "GUEST",
+        "targetLang": "es",
+        "supportLang": "en",
+        "level": "B1",
+        "prompt": "You are sharing a home for a week.",
+        "guidance": "Add a reason or a follow-up question. Your partner can suggest a natural expression.",
+        "phase": "EXCHANGE",
+        "role": "PARTNER",
+        "instruction": "Use your partner’s target language. You share six messages and each have a secret objective.",
+        "revealed": false,
+        "allowedActions": ["SKIP", "HINT", "MESSAGE"],
+        "hints": [],
+        "result": null,
+        "mode": "MISSION",
+        "ownObjective": "You need the kitchen free before seven in the evening.",
+        "otherObjective": null,
+        "messages": [
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 1"
+          },
+          {
+            "seat": "GUEST",
+            "text": "Gemeinsame Zeile 2"
+          },
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 3"
+          },
+          {
+            "seat": "GUEST",
+            "text": "Gemeinsame Zeile 4"
+          }
+        ],
+        "remainingMessages": 2,
+        "twist": "There is only one pan. Adjust the plan.",
+        "ownOutcome": true,
+        "otherOutcome": null,
+        "id": "fixture-MISSION-5"
+      },
+      "visibleTexts": [
+        "Gemeinsame Zeile 1",
+        "Gemeinsame Zeile 2",
+        "Gemeinsame Zeile 3",
+        "Gemeinsame Zeile 4"
+      ]
+    },
+    {
+      "name": "one-outcome-5-GUEST",
+      "seat": "GUEST",
+      "round": {
+        "order": 5,
+        "learner": "GUEST",
+        "targetLang": "es",
+        "supportLang": "en",
+        "level": "B1",
+        "prompt": "You are sharing a home for a week.",
+        "guidance": "Add a reason or a follow-up question. Your partner can suggest a natural expression.",
+        "phase": "EXCHANGE",
+        "role": "LEARNER",
+        "instruction": "You have six messages together. Work toward your secret objective and react to the twist.",
+        "revealed": false,
+        "allowedActions": ["SKIP", "HINT", "MISSION_DONE"],
+        "hints": [],
+        "result": null,
+        "mode": "MISSION",
+        "ownObjective": "Arrange time to cook while keeping the morning free.",
+        "otherObjective": null,
+        "messages": [
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 1"
+          },
+          {
+            "seat": "GUEST",
+            "text": "Gemeinsame Zeile 2"
+          },
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 3"
+          },
+          {
+            "seat": "GUEST",
+            "text": "Gemeinsame Zeile 4"
+          }
+        ],
+        "remainingMessages": 2,
+        "twist": "There is only one pan. Adjust the plan.",
+        "ownOutcome": null,
+        "otherOutcome": null,
+        "id": "fixture-MISSION-5"
+      },
+      "visibleTexts": [
+        "Gemeinsame Zeile 1",
+        "Gemeinsame Zeile 2",
+        "Gemeinsame Zeile 3",
+        "Gemeinsame Zeile 4"
+      ]
+    },
+    {
+      "name": "both-outcomes-5-HOST",
+      "seat": "HOST",
+      "round": {
+        "order": 5,
+        "learner": "GUEST",
+        "targetLang": "es",
+        "supportLang": "en",
+        "level": "B1",
+        "prompt": "You are sharing a home for a week.",
+        "guidance": "Add a reason or a follow-up question. Your partner can suggest a natural expression.",
+        "phase": "FEEDBACK",
+        "role": "PARTNER",
+        "instruction": "Use your partner’s target language. You share six messages and each have a secret objective.",
+        "revealed": true,
+        "allowedActions": ["SKIP", "FEEDBACK"],
+        "hints": [],
+        "result": null,
+        "mode": "MISSION",
+        "ownObjective": "You need the kitchen free before seven in the evening.",
+        "otherObjective": "Arrange time to cook while keeping the morning free.",
+        "messages": [
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 1"
+          },
+          {
+            "seat": "GUEST",
+            "text": "Gemeinsame Zeile 2"
+          },
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 3"
+          },
+          {
+            "seat": "GUEST",
+            "text": "Gemeinsame Zeile 4"
+          }
+        ],
+        "remainingMessages": 2,
+        "twist": "There is only one pan. Adjust the plan.",
+        "ownOutcome": true,
+        "otherOutcome": true,
+        "id": "fixture-MISSION-5"
+      },
+      "visibleTexts": [
+        "Gemeinsame Zeile 1",
+        "Gemeinsame Zeile 2",
+        "Gemeinsame Zeile 3",
+        "Gemeinsame Zeile 4"
+      ]
+    },
+    {
+      "name": "both-outcomes-5-GUEST",
+      "seat": "GUEST",
+      "round": {
+        "order": 5,
+        "learner": "GUEST",
+        "targetLang": "es",
+        "supportLang": "en",
+        "level": "B1",
+        "prompt": "You are sharing a home for a week.",
+        "guidance": "Add a reason or a follow-up question. Your partner can suggest a natural expression.",
+        "phase": "FEEDBACK",
+        "role": "LEARNER",
+        "instruction": "You have six messages together. Work toward your secret objective and react to the twist.",
+        "revealed": true,
+        "allowedActions": ["SKIP"],
+        "hints": [],
+        "result": null,
+        "mode": "MISSION",
+        "ownObjective": "Arrange time to cook while keeping the morning free.",
+        "otherObjective": "You need the kitchen free before seven in the evening.",
+        "messages": [
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 1"
+          },
+          {
+            "seat": "GUEST",
+            "text": "Gemeinsame Zeile 2"
+          },
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 3"
+          },
+          {
+            "seat": "GUEST",
+            "text": "Gemeinsame Zeile 4"
+          }
+        ],
+        "remainingMessages": 2,
+        "twist": "There is only one pan. Adjust the plan.",
+        "ownOutcome": true,
+        "otherOutcome": true,
+        "id": "fixture-MISSION-5"
+      },
+      "visibleTexts": [
+        "Gemeinsame Zeile 1",
+        "Gemeinsame Zeile 2",
+        "Gemeinsame Zeile 3",
+        "Gemeinsame Zeile 4"
+      ]
+    },
+    {
+      "name": "finished-5-HOST",
+      "seat": "HOST",
+      "round": {
+        "order": 5,
+        "learner": "GUEST",
+        "targetLang": "es",
+        "supportLang": "en",
+        "level": "B1",
+        "prompt": "You are sharing a home for a week.",
+        "guidance": "Add a reason or a follow-up question. Your partner can suggest a natural expression.",
+        "phase": "FINISHED",
+        "role": "PARTNER",
+        "instruction": "Use your partner’s target language. You share six messages and each have a secret objective.",
+        "revealed": true,
+        "allowedActions": [],
+        "hints": [],
+        "result": {
+          "skipped": false,
+          "understood": true,
+          "matched": null,
+          "correction": null,
+          "points": 2
+        },
+        "mode": "MISSION",
+        "ownObjective": "You need the kitchen free before seven in the evening.",
+        "otherObjective": "Arrange time to cook while keeping the morning free.",
+        "messages": [
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 1"
+          },
+          {
+            "seat": "GUEST",
+            "text": "Gemeinsame Zeile 2"
+          },
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 3"
+          },
+          {
+            "seat": "GUEST",
+            "text": "Gemeinsame Zeile 4"
+          }
+        ],
+        "remainingMessages": 2,
+        "twist": "There is only one pan. Adjust the plan.",
+        "ownOutcome": true,
+        "otherOutcome": true,
+        "id": "fixture-MISSION-5"
+      },
+      "visibleTexts": [
+        "Gemeinsame Zeile 1",
+        "Gemeinsame Zeile 2",
+        "Gemeinsame Zeile 3",
+        "Gemeinsame Zeile 4"
+      ]
+    },
+    {
+      "name": "finished-5-GUEST",
+      "seat": "GUEST",
+      "round": {
+        "order": 5,
+        "learner": "GUEST",
+        "targetLang": "es",
+        "supportLang": "en",
+        "level": "B1",
+        "prompt": "You are sharing a home for a week.",
+        "guidance": "Add a reason or a follow-up question. Your partner can suggest a natural expression.",
+        "phase": "FINISHED",
+        "role": "LEARNER",
+        "instruction": "You have six messages together. Work toward your secret objective and react to the twist.",
+        "revealed": true,
+        "allowedActions": [],
+        "hints": [],
+        "result": {
+          "skipped": false,
+          "understood": true,
+          "matched": null,
+          "correction": null,
+          "points": 2
+        },
+        "mode": "MISSION",
+        "ownObjective": "Arrange time to cook while keeping the morning free.",
+        "otherObjective": "You need the kitchen free before seven in the evening.",
+        "messages": [
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 1"
+          },
+          {
+            "seat": "GUEST",
+            "text": "Gemeinsame Zeile 2"
+          },
+          {
+            "seat": "HOST",
+            "text": "Gemeinsame Zeile 3"
+          },
+          {
+            "seat": "GUEST",
+            "text": "Gemeinsame Zeile 4"
+          }
+        ],
+        "remainingMessages": 2,
+        "twist": "There is only one pan. Adjust the plan.",
+        "ownOutcome": true,
+        "otherOutcome": true,
+        "id": "fixture-MISSION-5"
+      },
+      "visibleTexts": [
+        "Gemeinsame Zeile 1",
+        "Gemeinsame Zeile 2",
+        "Gemeinsame Zeile 3",
+        "Gemeinsame Zeile 4"
+      ]
+    }
+  ],
+  "rooms": [
+    {
+      "name": "playing-HOST",
+      "room": {
+        "id": "fixture-room",
+        "status": "PLAYING",
+        "revision": 4,
+        "rematchRoomId": null,
+        "kind": "MIXED",
+        "theme": "EVERYDAY",
+        "questionStyle": "CHOICES",
+        "ownSeat": "HOST",
+        "host": {
+          "id": "host-profile",
+          "name": "Alex",
+          "settings": {
+            "nativeLang": "en",
+            "targetLang": "de",
+            "level": "A1"
+          }
+        },
+        "guest": {
+          "id": "guest-profile",
+          "name": "Sam",
+          "settings": {
+            "nativeLang": "en",
+            "targetLang": "es",
+            "level": "B1"
+          }
+        },
+        "hostWaiting": false,
+        "allowedActions": ["LEAVE", "CANCEL"],
+        "round": {
+          "order": 0,
+          "learner": "HOST",
+          "targetLang": "de",
+          "supportLang": "en",
+          "level": "A1",
+          "prompt": "You have an unexpected free hour. What would you pick?",
+          "guidance": "Read the cards in the target language. You can reveal their meanings when you need help.",
+          "phase": "ANSWER",
+          "role": "LEARNER",
+          "instruction": "Pick the card your partner will choose. Your picks stay hidden until both commit.",
+          "revealed": false,
+          "allowedActions": ["SKIP", "HINT", "CHOOSE"],
+          "hints": [],
+          "result": null,
+          "mode": "KNOW_ME",
+          "questionStyle": "CHOICES",
+          "choices": [
+            {
+              "id": "A",
+              "text": "Spazieren gehen",
+              "supportText": "Go for a walk",
+              "symbol": "🚶"
+            },
+            {
+              "id": "B",
+              "text": "Etwas kochen",
+              "supportText": "Cook something",
+              "symbol": "🍳"
+            },
+            {
+              "id": "C",
+              "text": "Ein Buch lesen",
+              "supportText": "Read a book",
+              "symbol": "📖"
+            },
+            {
+              "id": "D",
+              "text": "Sich ausruhen",
+              "supportText": "Have a rest",
+              "symbol": "🛋️"
+            }
+          ],
+          "ownAnswer": null,
+          "otherAnswer": null,
+          "otherCommitted": false,
+          "id": "fixture-KNOW_ME-0"
+        },
+        "completedRounds": [],
+        "points": 0,
+        "serverTime": "2026-10-20T12:00:00.000Z"
+      }
+    },
+    {
+      "name": "playing-GUEST",
+      "room": {
+        "id": "fixture-room",
+        "status": "PLAYING",
+        "revision": 4,
+        "rematchRoomId": null,
+        "kind": "MIXED",
+        "theme": "EVERYDAY",
+        "questionStyle": "CHOICES",
+        "ownSeat": "GUEST",
+        "host": {
+          "id": "host-profile",
+          "name": "Alex",
+          "settings": {
+            "nativeLang": "en",
+            "targetLang": "de",
+            "level": "A1"
+          }
+        },
+        "guest": {
+          "id": "guest-profile",
+          "name": "Sam",
+          "settings": {
+            "nativeLang": "en",
+            "targetLang": "es",
+            "level": "B1"
+          }
+        },
+        "hostWaiting": false,
+        "allowedActions": ["LEAVE", "CANCEL"],
+        "round": {
+          "order": 0,
+          "learner": "HOST",
+          "targetLang": "de",
+          "supportLang": "en",
+          "level": "A1",
+          "prompt": "You have an unexpected free hour. What would you pick?",
+          "guidance": "Read the cards in the target language. You can reveal their meanings when you need help.",
+          "phase": "ANSWER",
+          "role": "PARTNER",
+          "instruction": "Pick your own answer. Your partner is trying to predict your choice.",
+          "revealed": false,
+          "allowedActions": ["SKIP", "HINT", "CHOOSE"],
+          "hints": [],
+          "result": null,
+          "mode": "KNOW_ME",
+          "questionStyle": "CHOICES",
+          "choices": [
+            {
+              "id": "A",
+              "text": "Spazieren gehen",
+              "supportText": "Go for a walk",
+              "symbol": "🚶"
+            },
+            {
+              "id": "B",
+              "text": "Etwas kochen",
+              "supportText": "Cook something",
+              "symbol": "🍳"
+            },
+            {
+              "id": "C",
+              "text": "Ein Buch lesen",
+              "supportText": "Read a book",
+              "symbol": "📖"
+            },
+            {
+              "id": "D",
+              "text": "Sich ausruhen",
+              "supportText": "Have a rest",
+              "symbol": "🛋️"
+            }
+          ],
+          "ownAnswer": null,
+          "otherAnswer": null,
+          "otherCommitted": false,
+          "id": "fixture-KNOW_ME-0"
+        },
+        "completedRounds": [],
+        "points": 0,
+        "serverTime": "2026-10-20T12:00:00.000Z"
+      }
+    }
+  ]
+}

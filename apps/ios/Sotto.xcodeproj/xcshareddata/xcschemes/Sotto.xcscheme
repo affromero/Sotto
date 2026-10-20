@@ -6,6 +6,9 @@
       parallelizeBuildables = "YES"
       buildImplicitDependencies = "YES">
       <BuildActionEntries>
+         <BuildActionEntry buildForTesting="YES" buildForRunning="NO" buildForProfiling="NO" buildForArchiving="NO" buildForAnalyzing="NO">
+            <BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="C50000000000000000000001" BuildableName="SottoUITests.xctest" BlueprintName="SottoUITests" ReferencedContainer="container:Sotto.xcodeproj"/>
+         </BuildActionEntry>
          <BuildActionEntry
             buildForTesting = "YES"
             buildForRunning = "NO"
@@ -42,6 +45,9 @@
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
       shouldUseLaunchSchemeArgsEnv = "YES">
       <Testables>
+         <TestableReference skipped="NO" parallelizable="NO">
+            <BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="C50000000000000000000001" BuildableName="SottoUITests.xctest" BlueprintName="SottoUITests" ReferencedContainer="container:Sotto.xcodeproj"/>
+         </TestableReference>
          <TestableReference
             skipped = "NO"
             parallelizable = "YES">

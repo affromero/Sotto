@@ -51,6 +51,7 @@ struct PrivacyConsentView: View {
     let serverURL: URL
     let onAccept: () -> Void
     let onDecline: () -> Void
+    var onPlay: (() -> Void)? = nil
 
     var body: some View {
         ScrollView {
@@ -60,6 +61,11 @@ struct PrivacyConsentView: View {
                 Text("Your learning requests, written answers, exercise images with your Pencil marks, recordings, and transcripts may be sent to the AI and speech providers configured by this server's operator. They process this information to generate lessons, read your marks, recognize speech, and provide feedback. Your server stores your learning activity and results.")
                 Text("Ask your server operator which providers are enabled and review their policies before continuing. Live translation asks separately before sending audio to Google Gemini.")
                 PrivacyPolicyLink()
+                if let onPlay {
+                    Button("Play together", action: onPlay)
+                        .buttonStyle(SottoSecondaryButtonStyle())
+                    Text("Partner games work without AI processing.").font(.caption)
+                }
                 Button("Allow AI processing", action: onAccept)
                     .buttonStyle(SottoPrimaryButtonStyle())
                 Button("Unpair this device", action: onDecline)
