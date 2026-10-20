@@ -4,6 +4,31 @@ import XCTest
 
 @MainActor
 final class PlayActionRecoveryTests: XCTestCase {
+    func testConflictReconciliationCannotSubmitAgainstAnOlderRoomThanAlreadyDisplayed() async throws {
+        let fixtures = try PlayTestFixtures.load()
+        let displayed = try fixtures.room(revision: 2)
+        let latest = try fixtures.room(revision: 4)
+        let older = try fixtures.room(revision: 3)
+        let scenario = PlayHTTPScenario()
+        scenario.set("GET /api/v1/play/rooms/fixture-room", [try .json(latest), try .json(older)])
+        scenario.set("POST /api/v1/play/rooms/fixture-room/actions", [.denied(409)])
+        let server = try LocalHTTPServer { scenario.respond($0) }
+        try await server.start()
+        defer { server.stop() }
+        let model = SottoAppModel(credentials: PlayTestIdentity.connection(server: server.url),
+            session: URLSession(configuration: .ephemeral), credentialStore: PlayCredentialMemoryStore(), playStore: PlayMemoryStore())
+        let coordinator = model.play
+        coordinator.navigate(.room(latest.id))
+        let polling = Task { await coordinator.foreground() }
+        defer { polling.cancel(); coordinator.endForeground() }
+        try await waitForPlay("The newer room is already displayed") { coordinator.room == latest }
+        do { try await coordinator.command(.choose(.A), in: displayed); XCTFail("An older reconciliation baseline must be refused.") }
+        catch { guard case SottoAPIError.http(409, _) = error else { throw error } }
+        XCTAssertEqual(coordinator.room, latest)
+        XCTAssertNil(coordinator.state?.pending)
+        XCTAssertEqual(server.requests.filter { $0.hasPrefix("POST ") }.count, 1)
+    }
+
     func testExplicitlyDiscardingAnUnrecoverableActionKeepsItsDraftAndCredentialAndRefusesStaleConfirmation() async throws {
         let server = try LocalHTTPServer { _ in .denied() }
         try await server.start()

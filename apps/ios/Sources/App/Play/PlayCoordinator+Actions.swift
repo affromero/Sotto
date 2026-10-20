@@ -159,7 +159,7 @@ extension PlayCoordinator {
         let refreshed = try await client(pending.connection).playRoom(baseline.id)
         try requireCurrent(generation, connection: pending.connection)
         guard state?.pending?.id == pending.id else { return false }
-        apply(refreshed)
+        guard apply(refreshed) else { return false }
         guard refreshed.revision > baseline.revision,
               refreshed.ownSeat == baseline.ownSeat, refreshed.ownMember?.id == baseline.ownMember?.id,
               refreshed.status == .playing, let after = refreshed.round, after.id == before.id,
@@ -173,7 +173,6 @@ extension PlayCoordinator {
         let replacement = PlayPendingOperation(id: UUID(), connection: pending.connection, path: pending.path,
             body: try JSONEncoder().encode(retry), response: .room, baseline: refreshed, reconciliationUsed: true)
         try save { $0.pending = replacement }
-        apply(refreshed)
         try await retryAction()
         return true
     }

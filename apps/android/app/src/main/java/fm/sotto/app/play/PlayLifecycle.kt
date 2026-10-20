@@ -140,16 +140,21 @@ internal suspend fun PlayCoordinator.refresh(generation: Long) {
                 require(value.ownMember?.id == connection.profile.id) { "The server returned another profile's room." }
                 if (!applyRoom(value)) return
                 renewPresence(value, generation, connection)
+                current()
+                if (state.value.room != value) return
                 if (value.status == RoomStatus.WAITING && value.ownSeat == Seat.HOST) {
                     val previous = state.value.invitation?.generation
                     val link = api(connection).get<InvitationView?>("$path/invitations")
                     current()
+                    if (state.value.room != value) return
                     mutable.update {
                         if (link != null && link.generation >= (it.invitation?.generation ?: 0)) it.copy(invitation = link)
                         else if (link == null && previous == it.invitation?.generation) it.copy(invitation = null) else it
                     }
                     val pending = api(connection).get<PendingList>("$path/join-requests")
-                    current(); mutable.update { it.copy(requests = pending.requests) }
+                    current()
+                    if (state.value.room != value) return
+                    mutable.update { it.copy(requests = pending.requests) }
                 }
             }
             Screen.Notebook -> {

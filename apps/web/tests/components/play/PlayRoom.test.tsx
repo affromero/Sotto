@@ -43,6 +43,65 @@ afterEach(() => {
 });
 
 describe('game waiting room and reconnect', () => {
+  it('keeps expiry when a historical action receipt has the same revision and an older server time', async () => {
+    const privateRound = createPlayRounds({
+      kind: 'KNOW_ME',
+      theme: 'FOOD',
+      players: { HOST: settings, GUEST: settings },
+    })[0];
+    const old: PlayRoomView = {
+      ...waiting(),
+      status: 'PLAYING',
+      revision: 3,
+      guest: { id: 'guest', name: 'Partner', settings },
+      round: { ...projectPlayRound(privateRound, 'HOST'), id: 'round', order: 0 },
+    };
+    let view = old;
+    let deliver: ((response: Response) => void) | undefined;
+    let holdRefresh = false;
+    let finishRefresh: ((response: Response) => void) | undefined;
+    vi.stubGlobal('fetch', async (path: string) => {
+      if (path.endsWith('/actions'))
+        return new Promise<Response>((resolve) => {
+          deliver = resolve;
+        });
+      if (holdRefresh)
+        return new Promise<Response>((resolve) => {
+          finishRefresh = resolve;
+        });
+      return Response.json(view);
+    });
+    render(<PlayRoom roomId="game" />);
+    await screen.findByText('Connected');
+    const card = screen
+      .getAllByRole('button')
+      .find((button) => button.textContent?.startsWith('A'));
+    if (!card) throw new Error('Expected a prediction card');
+    fireEvent.click(card);
+    await waitFor(() => expect(deliver).toBeDefined());
+    view = {
+      ...old,
+      status: 'EXPIRED',
+      round: null,
+      allowedActions: [],
+      serverTime: new Date(Date.parse(old.serverTime) + 1000).toISOString(),
+    };
+    act(() => {
+      window.dispatchEvent(new Event('online'));
+    });
+    await screen.findByRole('heading', { name: 'This game has expired.' });
+    holdRefresh = true;
+    await act(async () => {
+      deliver?.(Response.json(old));
+    });
+    await waitFor(() => expect(finishRefresh).toBeDefined());
+    expect(screen.getByRole('heading', { name: 'This game has expired.' })).toBeVisible();
+    expect(screen.queryByRole('region', { name: 'Pick & predict' })).not.toBeInTheDocument();
+    await act(async () => {
+      finishRefresh?.(Response.json(view));
+    });
+  });
+
   it('does not restore private game data from a late mutation after admission is revoked', async () => {
     const privateRound = createPlayRounds({
       kind: 'KNOW_ME',

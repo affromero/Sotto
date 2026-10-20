@@ -110,16 +110,19 @@ extension PlayCoordinator {
                 let value = try await api.playRoom(id)
                 try requireCurrent(generation, connection: connection)
                 guard screen == .room(id) else { return }
-                apply(value)
+                guard apply(value) else { return }
                 try await renewPresence(value, client: api, generation: generation)
+                guard screen == .room(id), room == value else { return }
                 if value.status == .waiting, value.ownSeat == .host {
                     let previousGeneration = invitation?.generation
                     let link: PlayInvitationView? = try await api.play("/api/v1/play/rooms/\(SottoAPIClient.playID(id))/invitations")
                     try requireCurrent(generation, connection: connection)
+                    guard screen == .room(id), room == value else { return }
                     if let link, link.generation >= (invitation?.generation ?? 0) { invitation = link }
                     else if link == nil, invitation?.generation == previousGeneration { invitation = nil }
                     let pending: PlayPendingList = try await api.play("/api/v1/play/rooms/\(SottoAPIClient.playID(id))/join-requests")
                     try requireCurrent(generation, connection: connection)
+                    guard screen == .room(id), room == value else { return }
                     requests = pending.requests
                 }
             } catch { try handleMemberFailure(error, generation: generation, connection: connection) }

@@ -9,6 +9,49 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class PlayLifecycleTest {
+    @Test fun anInvitationResponseCannotRestoreWaitingControlsAfterTheGameStarts() = runBlocking {
+        PlayScenario().use { server ->
+            val playing = server.room().copy(revision = 3)
+            val waiting = playing.copy(status = RoomStatus.WAITING, revision = 2, round = null,
+                allowedActions = listOf(RoomAction.START, RoomAction.CANCEL))
+            val invitationStarted = CompletableDeferred<Unit>()
+            val releaseInvitation = java.util.concurrent.CountDownLatch(1)
+            val roomReads = java.util.concurrent.atomic.AtomicInteger()
+            server.respond = { request -> when {
+                request.path.endsWith("/presence") -> HttpReply(200,
+                    "{\"hostWaiting\":true,\"expiresAt\":null,\"serverTime\":\"2026-10-20T12:00:00Z\"}")
+                request.path.endsWith("/invitations") -> {
+                    invitationStarted.complete(Unit)
+                    if (releaseInvitation.await(5, java.util.concurrent.TimeUnit.SECONDS)) HttpReply(200,
+                        "{\"roomId\":\"${playing.id}\",\"code\":\"ABCDEFGH2345\",\"generation\":1,\"expiresAt\":\"2099-01-01T00:00:00Z\"}")
+                    else HttpReply(500, "{\"error\":\"Fixture barrier timed out\"}")
+                }
+                request.path.endsWith("/join-requests") -> HttpReply(200, "{\"requests\":[]}")
+                request.path.endsWith("/actions") -> HttpReply(200, SottoJson.encodeToString(playing))
+                request.path == "/api/v1/play/rooms/${playing.id}" -> HttpReply(200,
+                    SottoJson.encodeToString(if (roomReads.incrementAndGet() == 1) waiting else playing))
+                else -> server.normal(request)
+            } }
+            val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+            try {
+                val coordinator = PlayCoordinator(MemoryVault(Vault(connection = server.connection())), scope, "Android test")
+                coordinator.setForeground(true)
+                coordinator.awaitState { it.vault != null && !it.checking }
+                coordinator.navigate(Screen.Room(playing.id))
+                withTimeout(5000) { invitationStarted.await() }
+                coordinator.roomAction(RoomAction.START, waiting)
+                assertEquals(playing, coordinator.state.value.room)
+                releaseInvitation.countDown()
+                withTimeout(5000) { while (roomReads.get() < 2) delay(10) }
+                coordinator.awaitState { it.room == playing && !it.leaseReady && !it.checking }
+                assertNull(coordinator.state.value.invitation)
+                assertTrue(coordinator.state.value.requests.isEmpty())
+                assertFalse(coordinator.state.value.leaseReady)
+                assertTrue(server.received.none { it.path.endsWith("/join-requests") })
+            } finally { releaseInvitation.countDown(); scope.cancel() }
+        }
+    }
+
     @Test fun erasingSavedDataClearsTheActiveCredentialEvenWhenBackgroundingCancelsCompletion() = runBlocking {
         PlayScenario().use { server ->
             val disk = MemoryVault(Vault(serial = 20, connection = server.connection(), drafts = mapOf("a" to "Private draft")))

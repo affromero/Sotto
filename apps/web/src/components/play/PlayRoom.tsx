@@ -81,14 +81,15 @@ export function PlayRoom({ roomId }: { roomId: string }) {
   const applyView = useCallback((view: PlayRoomView) => {
     if (lifetime.current.signal.aborted) return false;
     const previous = currentView.current;
-    if (previous && previous.ownSeat !== view.ownSeat) admissionEpoch.current++;
     if (
       previous &&
       previous.id === view.id &&
-      previous.ownSeat === view.ownSeat &&
-      previous.revision > view.revision
+      (previous.revision > view.revision ||
+        (previous.revision === view.revision &&
+          Date.parse(previous.serverTime) > Date.parse(view.serverTime)))
     )
       return false;
+    if (previous && previous.ownSeat !== view.ownSeat) admissionEpoch.current++;
     currentView.current = view;
     setRoom(view);
     return true;

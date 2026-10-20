@@ -82,11 +82,20 @@ final class PlayCoordinator: ObservableObject {
             catch { if self.epoch == generation { self.report(error) } }
         }
     }
-    func apply(_ value: PlayRoom) {
-        guard value.ownMember?.id == model?.credentials?.selectedProfile?.id else { return }
-        if room?.id == value.id, let room, value.revision < room.revision { return }
+    @discardableResult func apply(_ value: PlayRoom) -> Bool {
+        guard value.ownMember?.id == model?.credentials?.selectedProfile?.id else { return false }
+        if room?.id == value.id, let room {
+            guard value.revision >= room.revision else { return false }
+            if value.revision == room.revision {
+                let formatter = ISO8601DateFormatter()
+                guard let before = ISO8601DateFormatter.sottoInternet.date(from: room.serverTime) ?? formatter.date(from: room.serverTime),
+                      let after = ISO8601DateFormatter.sottoInternet.date(from: value.serverTime) ?? formatter.date(from: value.serverTime),
+                      after >= before else { return false }
+            }
+        }
         room = value
         if value.status != .waiting { releasePresence() }
+        return true
     }
     func clearMemberData() {
         room = nil
