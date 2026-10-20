@@ -3,6 +3,18 @@ import { ALL_QUEUE_NAMES } from '@/lib/queue';
 import { QUEUE_METADATA, PIPELINE_STAGE_ORDER } from '@/app/(admin)/admin/queues/queue-metadata';
 
 describe('queue-metadata', () => {
+  it('explains complete page extraction and unresolved visual content', () => {
+    expect(QUEUE_METADATA['material-extraction'].stage).toBe('Content Pipeline');
+    expect(QUEUE_METADATA['material-extraction'].description).toMatch(
+      /complete page text.*visual coverage gaps/
+    );
+  });
+  it('describes optional compression as a complete-content verification step', () => {
+    expect(QUEUE_METADATA['material-optimization']).toMatchObject({ stage: 'Content Pipeline' });
+    expect(QUEUE_METADATA['material-optimization'].description).toMatch(
+      /complete PDF content.*lossless compression/
+    );
+  });
   it('explains original material verification in the content pipeline', () => {
     expect(QUEUE_METADATA['material-finalization'].stage).toBe('Content Pipeline');
     expect(QUEUE_METADATA['material-finalization'].description).toMatch(

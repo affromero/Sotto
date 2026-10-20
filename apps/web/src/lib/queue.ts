@@ -193,6 +193,8 @@ const QUEUE_DEFINITIONS: Record<string, QueueDefinition> = {
   'worksheet-pdf': { attempts: 2, skipEvents: true },
   'pencil-homework': { attempts: 1, skipEvents: true },
   'material-finalization': { attempts: 3, skipEvents: true },
+  'material-extraction': { attempts: 2, skipEvents: true },
+  'material-optimization': { attempts: 2, skipEvents: true },
 };
 
 const queueInstances = new Map<string, Queue>();
@@ -436,9 +438,13 @@ export function createWorker<T>(
   worker.on('failed', (job, err) => {
     logWorkerJobFailure(queueName, job as Job<unknown> | undefined, err);
     if (!job || job.attemptsMade < (job.opts.attempts ?? queueDefinition.attempts ?? 1)) return;
-    if (queueName === 'material-finalization') {
+    if (
+      queueName === 'material-finalization' ||
+      queueName === 'material-extraction' ||
+      queueName === 'material-optimization'
+    ) {
       void sottoTransaction(prisma, (database) =>
-        settleFailedMaterialJob(database, job as Job<unknown>)
+        settleFailedMaterialJob(database, job as Job<unknown>, queueName)
       ).catch((error) =>
         logger.error('Material failure recovery remains pending', {
           jobId: job.id,
@@ -493,6 +499,8 @@ export const pdfGenerationQueue = createQueueReference('pdf-generation');
 export const keyValidationQueue = createQueueReference('key-validation');
 export const pricingFetchQueue = createQueueReference('pricing-fetch');
 export const materialFinalizationQueue = createQueueReference('material-finalization');
+export const materialExtractionQueue = createQueueReference('material-extraction');
+export const materialOptimizationQueue = createQueueReference('material-optimization');
 
 export interface SpeakingGradingPayload {
   recordingId: string;

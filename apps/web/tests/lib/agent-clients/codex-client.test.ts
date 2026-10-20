@@ -1,8 +1,10 @@
+// @vitest-environment node
 import { mkdtempSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { createHash } from 'node:crypto';
 import { beforeEach, afterEach, describe, expect, it } from 'vitest';
-import { executeCodex, streamCodex } from '@/lib/codex-client';
+import { captureCodexMaterialInvocation, executeCodex, streamCodex } from '@/lib/codex-client';
 import { CodexProvider } from '@/lib/providers/codex';
 import {
   buildTeachingAdjudicatorJsonSchema,
@@ -109,6 +111,44 @@ describe('Codex CLI execution', () => {
       model: 'codex:chosen#effort=xhigh',
     });
     expect(existsSync(request.args[request.args.indexOf('-o') + 1])).toBe(false);
+  });
+
+  it('captures a concrete recognition model, effort and canonical restricted invocation policy', async () => {
+    const selected = captureCodexMaterialInvocation({ model: 'codex:chosen#effort=high' });
+    expect(selected).toEqual({
+      model: 'chosen',
+      effort: 'high',
+      configurationSha256: expect.stringMatching(/^[a-f0-9]{64}$/),
+    });
+    executable('fs.writeFileSync(output,JSON.stringify(args));' + event(done));
+    const args: string[] = JSON.parse(
+      (await executeCodex('', 'Prompt', { model: 'codex:chosen#effort=high' })).content
+    );
+    args.splice(args.indexOf('-o'), 2);
+    expect(createHash('sha256').update(JSON.stringify(args)).digest('hex')).toBe(
+      selected.configurationSha256
+    );
+    process.env.CODEX_MODEL = 'unrelated';
+    process.env.CODEX_MODEL_REASONING_EFFORT = 'low';
+    expect(captureCodexMaterialInvocation({ model: 'codex:chosen#effort=high' })).toEqual(selected);
+    expect(captureCodexMaterialInvocation({ model: 'codex:chosen#effort=xhigh' })).not.toEqual(
+      selected
+    );
+    expect(captureCodexMaterialInvocation({ model: 'codex:other#effort=high' })).not.toEqual(
+      selected
+    );
+  });
+
+  it('refuses unresolved recognition selection while preserving general CLI default behavior', () => {
+    expect(() => captureCodexMaterialInvocation({ model: 'codex' })).toThrow(
+      'explicit Codex model and effort'
+    );
+    expect(() => captureCodexMaterialInvocation({ model: 'codex:chosen' })).toThrow(
+      'explicit Codex model and effort'
+    );
+    expect(() =>
+      captureCodexMaterialInvocation({ model: 'claude-code:chosen#effort=high' })
+    ).toThrow('explicit Codex model and effort');
   });
 
   it('returns the final file instead of intermediate messages', async () => {
@@ -694,5 +734,65 @@ describe('Codex CLI execution', () => {
 
   it('reports a missing CLI installation', async () => {
     await expect(executeCodex('', 'Prompt')).rejects.toThrow('installed');
+  });
+  it.each(['client', 'provider', 'factory'])(
+    'bounds cumulative protocol output through the %s entry point and reaps its process',
+    async (entry) => {
+      const pidFile = join(directory, 'bounded-pid');
+      executable(
+        'fs.writeFileSync(' +
+          JSON.stringify(pidFile) +
+          ',String(process.pid));process.stdout.write("x".repeat(4096));setInterval(()=>{},1000);'
+      );
+      const options = { maxOutputBytes: 1024 };
+      const work =
+        entry === 'client'
+          ? executeCodex('', 'Prompt', options)
+          : entry === 'provider'
+            ? new CodexProvider().generateResponse(
+                '',
+                [{ role: 'user', content: 'Prompt' }],
+                options
+              )
+            : (await import('@/lib/providers/ai'))
+                .createAIProvider('codex')
+                .generateResponse('', [{ role: 'user', content: 'Prompt' }], options);
+      await expect(work).rejects.toThrow(/output.*limit|limit.*output/i);
+      expect(() => process.kill(Number(readFileSync(pidFile, 'utf8')), 0)).toThrow();
+    }
+  );
+  it('bounds the final answer file even when protocol output remains small', async () => {
+    executable('fs.writeFileSync(output,"x".repeat(2048));' + event(done));
+    await expect(executeCodex('', 'Prompt', { maxOutputBytes: 1024 })).rejects.toThrow(
+      /output.*limit|limit.*output/i
+    );
+  });
+  it('accepts a complete bounded Unicode answer and preserves measured usage', async () => {
+    const text = '漢🙂e\u0301';
+    executable('fs.writeFileSync(output,' + JSON.stringify(text) + ');' + event(done));
+    expect(await executeCodex('', 'Prompt', { maxOutputBytes: 1024 })).toMatchObject({
+      content: text,
+      inputTokens: 20,
+      outputTokens: 7,
+    });
+  });
+  it.each([0, -1, Infinity, 16 * 1024 * 1024 + 1])(
+    'rejects invalid per-call output limit %s before starting a child',
+    async (maxOutputBytes) => {
+      await expect(executeCodex('', 'Prompt', { maxOutputBytes })).rejects.toThrow(
+        'output byte limit'
+      );
+    }
+  );
+  it('enforces the per-call output ceiling for streaming clients', async () => {
+    executable(event(answer('x'.repeat(4096))) + event(done));
+    const stream = new CodexProvider().streamResponse('', [{ role: 'user', content: 'Prompt' }], {
+      maxOutputBytes: 1024,
+    });
+    await expect(
+      (async () => {
+        for await (const chunk of stream) expect(chunk.length).toBeLessThanOrEqual(1024);
+      })()
+    ).rejects.toThrow(/output.*limit|limit.*output/i);
   });
 });

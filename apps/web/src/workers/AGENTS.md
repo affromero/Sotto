@@ -15,6 +15,12 @@ access/device migrations and storage-instance initialization must precede dispat
 
 ## Worker Index
 
+Material finalization, extraction and optional optimization own their durable
+execution lifetime. Keep them outside the generic queue contract wrapper.
+Extraction runs sequential bounded PDF parsing and retains unresolved coverage.
+Recognition requires an explicitly admitted reviewed provider policy. Unknown
+provider or storage outcomes preserve their workspace for canonical recovery.
+
 `classes/class-preparation.worker.ts` consumes the `class-preparation` queue with concurrency 2.
 Admission and outbox writes precede all generation. It pins learner/course identity and
 model credentials, preserves unknown outcomes, and validates inherited audio authority.

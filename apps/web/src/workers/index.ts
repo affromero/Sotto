@@ -36,6 +36,8 @@ import { processWorksheetPdf } from '@/workers/worksheet-pdf.worker';
 import { processPencilHomework } from '@/workers/pencil/pencil-homework.worker';
 import { startPricingRefreshInterval } from '@/lib/pricing';
 import { processMaterialFinalization } from '@/lib/course-materials/uploads/finalization';
+import { processMaterialExtraction } from '@/lib/course-materials/extraction/processing';
+import { processMaterialOptimization } from '@/lib/course-materials/optimization/processing';
 import { maintainMaterialUploads } from '@/lib/course-materials/uploads/cleanup';
 import { runTaskLoop } from 'thesidedoor-core/runtime/task-loop';
 
@@ -83,6 +85,16 @@ logger.info('Starting Sotto workers...', {
 
 // Create workers filtered by WORKER_PROFILE
 const workers = [
+  shouldRun('material-optimization') &&
+    createWorker('material-optimization', processMaterialOptimization, {
+      concurrency: 1,
+      lockDuration: 1200000,
+    }),
+  shouldRun('material-extraction') &&
+    createWorker('material-extraction', processMaterialExtraction, {
+      concurrency: 1,
+      lockDuration: 1200000,
+    }),
   shouldRun('material-finalization') &&
     createWorker('material-finalization', processMaterialFinalization, {
       concurrency: 1,

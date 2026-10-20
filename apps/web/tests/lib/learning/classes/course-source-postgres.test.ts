@@ -6,6 +6,12 @@ import { getCourseVocabularyTargets } from '@/lib/course-materials/vocabulary-co
 import { formatNotesForPrompt, getCourseNote } from '@/lib/course-notes';
 import { buildLearnerContext } from '@/lib/pedagogy';
 import { planCourseContext } from '@/lib/course-materials/context';
+import { prepareMaterialPageText } from '@/lib/course-materials/extraction/chunks';
+import {
+  initializeMaterialPages,
+  publishMaterialPageText,
+  finishMaterialExtraction,
+} from '@/lib/course-materials/extraction/persistence';
 import { materialStorageScopes } from '@/lib/course-materials';
 import { writeStorageReference } from '@/lib/sidedoor/storage/core/storage-write';
 import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
@@ -188,6 +194,68 @@ suite('owned imported course source against PostgreSQL', () => {
       (await instance.database.courseMaterial.findUniqueOrThrow({ where: { id: second } }))
         .extractedText
     ).toBe(sourceB);
+  });
+
+  it('reads complete chunk-backed source endings while the legacy preview stays empty', async () => {
+    const id = await material('Complete pages.pdf', '');
+    const originalSha256 = 'a'.repeat(64);
+    await instance.database.courseMaterial.update({
+      where: { id },
+      data: {
+        originalSha256,
+        processingStatus: 'EXTRACTING',
+      },
+    });
+    const run = await instance.database.materialExtractionRun.create({
+      data: {
+        materialId: id,
+        processingRevision: 1,
+        runKey: randomUUID(),
+        originalSha256,
+        extractorVersion: 'fixture-1',
+        rendererVersion: 'fixture-1',
+        recognitionPolicy: {},
+      },
+    });
+    const input = { materialId: id, userId, runId: run.id, processingRevision: 1, originalSha256 };
+    const source = 'complete page text '.repeat(60000) + 'FINAL_CHUNK_EXPLAINS_OBWOHL_TROTZDEM';
+    const prepared = prepareMaterialPageText({
+      text: source,
+      pageNumber: 1,
+      source: { origin: 'EMBEDDED_TEXT', method: 'FIXTURE', version: '1' },
+    });
+    await instance.database.$transaction(
+      async (database) => {
+        await initializeMaterialPages(database, input, 1);
+        await publishMaterialPageText(database, input, prepared.manifest, prepared.chunks);
+        const uncertain = prepareMaterialPageText({
+          text: '',
+          pageNumber: 1,
+          source: { origin: 'VISUAL_RECOGNITION', method: 'UNRESOLVED_FIXTURE', version: '1' },
+        });
+        await publishMaterialPageText(database, input, uncertain.manifest, uncertain.chunks);
+        await database.materialPage.updateMany({
+          where: { runId: run.id },
+          data: {
+            visualCoverage: {
+              state: 'UNAVAILABLE',
+              diagnostic: 'No recognition provider selected.',
+            },
+          },
+        });
+        await finishMaterialExtraction(database, input);
+      },
+      { timeout: 60000 }
+    );
+    const context = await getCourseNote(courseId, 'chunk-reader');
+    expect(context).toContain('FINAL_CHUNK_EXPLAINS_OBWOHL_TROTZDEM');
+    expect(context.length).toBeLessThanOrEqual(12000);
+    expect(
+      await instance.database.courseMaterial.findUniqueOrThrow({ where: { id } })
+    ).toMatchObject({
+      extractedText: '',
+      processingStatus: 'PARTIAL',
+    });
   });
 
   it('does not invent PDF content from a historical filename placeholder', async () => {

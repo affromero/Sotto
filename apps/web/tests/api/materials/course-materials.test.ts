@@ -148,6 +148,20 @@ suite('owned original course materials', () => {
     expect(response.status).toBe(200);
     expect(await response.text()).toBe('Original German notes\nBahnhof means station.');
     expect(response.headers.get('content-disposition')).toContain('Vocab%20Deutsch.TXT');
+    expect(
+      (
+        await download(request(`materials/${material.id}/file?variant=unknown`), {
+          params: Promise.resolve({ materialId: material.id }),
+        })
+      ).status
+    ).toBe(400);
+    expect(
+      (
+        await download(request(`materials/${material.id}/file?variant=optimized`), {
+          params: Promise.resolve({ materialId: material.id }),
+        })
+      ).status
+    ).toBe(404);
   });
   it('bounds placement input and cached excerpts while retaining all uploaded endings and originals', async () => {
     const first =

@@ -1,5 +1,5 @@
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { randomUUID } from 'node:crypto';
+import { mkdtemp, open, readFile, rm, writeFile } from 'node:fs/promises';
+import { createHash, randomUUID } from 'node:crypto';
 import { ProcessRunner, ProcessExecutionError } from 'thesidedoor-core/runtime/process';
 import { interruptibleStream } from 'thesidedoor-core/runtime/stream';
 import {
@@ -45,6 +45,8 @@ interface CodexOptions {
   onUsage?: (usage: TokenUsage & { model: string }) => void;
   model?: string;
   timeoutMs?: number;
+  /** Optional cumulative protocol output and final answer byte ceiling. */
+  maxOutputBytes?: number;
   effort?: AgentEffortLevel;
   useWebSearch?: boolean;
 }
@@ -113,6 +115,23 @@ function codexArgs(
   return effort ? { args, model, effort } : { args, model };
 }
 
+/** Material recognition must pin a concrete selection and the canonical no-search CLI policy. */
+export function captureCodexMaterialInvocation(options: {
+  model: string;
+  effort?: AgentEffortLevel;
+}) {
+  const requested = parseAgentModelId(options.model, 'codex');
+  const selection = resolveSelection(options);
+  if (!requested?.model || requested.provider !== 'codex' || !selection.model || !selection.effort)
+    throw new Error('Material recognition requires an explicit Codex model and effort.');
+  const invocation = codexArgs({ ...options, useWebSearch: false }, undefined, selection);
+  return Object.freeze({
+    model: selection.model,
+    effort: selection.effort,
+    configurationSha256: createHash('sha256').update(JSON.stringify(invocation.args)).digest('hex'),
+  });
+}
+
 /**
  * Turn a raw codex CLI failure into a message the UI can act on. Route
  * handlers surface `error.message` directly to the learner, so rate limits and
@@ -173,6 +192,35 @@ async function releaseOutput(
   }
 }
 
+function codexOutputLimit(supplied?: number): number {
+  if (supplied === undefined) return Number.MAX_SAFE_INTEGER;
+  if (!Number.isSafeInteger(supplied) || supplied < 1 || supplied > 16 * 1024 * 1024)
+    throw new Error('Codex output byte limit must be between 1 and 16 MiB.');
+  return supplied;
+}
+
+async function readBoundedCodexAnswer(pathname: string, maxBytes: number): Promise<string> {
+  const file = await open(pathname, 'r');
+  try {
+    const metadata = await file.stat();
+    if (!metadata.isFile()) throw new Error('Codex final answer is not a regular file.');
+    if (metadata.size > maxBytes) throw new ProcessExecutionError('output_limit');
+    const chunks: Buffer[] = [];
+    let total = 0;
+    while (true) {
+      const bytes = Buffer.alloc(Math.min(64 * 1024, maxBytes - total + 1));
+      const read = await file.read(bytes, 0, bytes.length, null);
+      if (read.bytesRead === 0) break;
+      total += read.bytesRead;
+      if (total > maxBytes) throw new ProcessExecutionError('output_limit');
+      chunks.push(bytes.subarray(0, read.bytesRead));
+    }
+    return new TextDecoder('utf-8', { fatal: true }).decode(Buffer.concat(chunks, total));
+  } finally {
+    await file.close();
+  }
+}
+
 /** Return the final local answer, or decoded assistant messages over SSH. */
 export async function executeCodex(
   systemPrompt: string,
@@ -181,6 +229,8 @@ export async function executeCodex(
 ): Promise<CodexResponse> {
   opts?.signal?.throwIfAborted();
   const selection = resolveSelection(opts);
+  const maxOutputBytes = opts?.maxOutputBytes;
+  const outputLimit = codexOutputLimit(maxOutputBytes);
   const host = getCodexSshHost();
   let directory: string | undefined;
   let usage: TokenUsage = { inputTokens: null, outputTokens: null };
@@ -194,6 +244,7 @@ export async function executeCodex(
       prompt,
       {
         ...opts,
+        maxOutputBytes,
         onUsage(value) {
           usage = { ...value };
           opts?.onUsage?.({ ...value });
@@ -206,7 +257,11 @@ export async function executeCodex(
       content += text;
     if (output) {
       try {
-        const final = (await readFile(output, 'utf8')).trim();
+        const final = (
+          await (maxOutputBytes === undefined
+            ? readFile(output, 'utf8')
+            : readBoundedCodexAnswer(output, outputLimit))
+        ).trim();
         if (final) content = final;
       } catch (error) {
         if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error;
@@ -347,7 +402,8 @@ async function* runCodexProcess(
       : {}),
   });
   const environment = codexEnvironment();
-  const decoder = new CodexOutputDecoder(Number.MAX_SAFE_INTEGER);
+  const outputLimit = codexOutputLimit(opts.maxOutputBytes);
+  const decoder = new CodexOutputDecoder(outputLimit);
   let usage: TokenUsage | undefined;
   let stderr = '';
   let stdout = '';
@@ -403,7 +459,7 @@ async function* runCodexProcess(
         (remoteImages
           ? remoteImages.images.map((image) => image.bytes.toString('base64') + '\n').join('')
           : '') + JSON.stringify({ applicationInstructions: systemPrompt, input: prompt }),
-      maxOutputBytes: Number.MAX_SAFE_INTEGER,
+      maxOutputBytes: outputLimit,
     })) {
       if (chunk.channel === 'stderr') {
         stderr = (stderr + chunk.text).slice(-4000);

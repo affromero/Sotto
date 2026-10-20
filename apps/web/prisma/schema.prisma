@@ -1615,6 +1615,7 @@ model CourseMaterial {
   originalUrl        String?
   originalSha256     String?
   optimizedUrl       String?
+  optimizationReceipt Json?
   processingStatus   String   @default("LEGACY")
   processingRevision Int      @default(1)
   processingError    String?
@@ -1624,9 +1625,85 @@ model CourseMaterial {
   user   User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   course Course?         @relation(fields: [courseId], references: [id], onDelete: Cascade)
   upload MaterialUpload?
+  extractionRuns MaterialExtractionRun[]
 
   @@index([userId, courseId])
   @@index([courseId])
+}
+
+model MaterialExtractionRun {
+  id                 String   @id @default(uuid())
+  materialId         String
+  processingRevision Int
+  runKey             String   @unique
+  requestId          String?
+  originalSha256     String
+  extractorVersion   String
+  rendererVersion    String
+  recognitionPolicy  Json
+  providerSelection  Json?
+  status             String   @default("PENDING")
+  pageCount          Int?
+  coverage           Json?
+  failureReason      String?
+  completedAt        DateTime?
+  createdAt          DateTime @default(now())
+
+  material CourseMaterial @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  pages    MaterialPage[]
+
+  @@unique([materialId, processingRevision])
+  @@unique([materialId, requestId])
+  @@index([status, createdAt])
+}
+
+model MaterialPage {
+  id              String   @id @default(uuid())
+  runId           String
+  pageNumber      Int
+  width           Float?
+  height          Float?
+  rotation        Int?
+  pageImageSha256 String?
+  renderIdentity  Json?
+  embeddedText    Json
+  visualCoverage  Json
+  failureReason   String?
+  createdAt       DateTime @default(now())
+
+  run                 MaterialExtractionRun        @relation(fields: [runId], references: [id], onDelete: Cascade)
+  textStreams         MaterialPageText[]
+  recognitions        MaterialRecognitionOperation[]
+
+  @@unique([runId, pageNumber])
+}
+
+model MaterialPageText {
+  id       String @id @default(uuid())
+  pageId   String
+  origin   String
+  manifest Json
+
+  page   MaterialPage        @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  chunks MaterialTextChunk[]
+
+  @@unique([pageId, origin])
+}
+
+model MaterialTextChunk {
+  id             String @id @default(uuid())
+  streamId       String
+  index          Int
+  codePointStart Int
+  codePointEnd   Int
+  utf8ByteStart  Int
+  utf8ByteEnd    Int
+  sha256         String
+  textBytes      Bytes
+
+  stream MaterialPageText @relation(fields: [streamId], references: [id], onDelete: Cascade)
+
+  @@unique([streamId, index])
 }
 
 model MaterialUploadBatch {
@@ -1819,4 +1896,42 @@ model LessonLearningObjective {
 
   @@id([lessonId, objectiveId])
   @@index([objectiveId])
+}
+
+model MaterialRecognitionOperation {
+  id                 String   @id @default(uuid())
+  runId              String
+  pageNumber         Int
+  mode               String
+  identityDigest     String
+  inputDigest        String
+  originalSha256     String
+  pageImageSha256    String
+  identity           Json
+  grant              Json
+  status             String   @default("READY")
+  attemptId          String?  @unique
+  attemptFingerprint String?
+  admittedAt         DateTime?
+  settledAt          DateTime?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  page     MaterialPage                 @relation(fields: [runId, pageNumber], references: [runId, pageNumber], onDelete: Cascade)
+  response MaterialRecognitionResponse?
+
+  @@unique([runId, identityDigest])
+  @@index([status, updatedAt])
+}
+
+model MaterialRecognitionResponse {
+  operationId String   @id
+  kind        String
+  metadata    Json
+  body        Bytes    @db.ByteA
+  bodySha256  String
+  bodyBytes   Int
+  createdAt   DateTime @default(now())
+
+  operation MaterialRecognitionOperation @relation(fields: [operationId], references: [id], onDelete: Cascade)
 }

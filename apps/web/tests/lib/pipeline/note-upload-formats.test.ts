@@ -1,8 +1,14 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
-import { extractUploadTexts, MAX_IMPORTED_FILE_CHARS } from '@/lib/note-upload';
+import { extractUploadTexts, MAX_IMPORTED_FILE_CHARS, isTextMaterial } from '@/lib/note-upload';
 
 describe('learner note text imports', () => {
+  it('shares explicit text-format classification with asynchronous complete extraction', () => {
+    expect(isTextMaterial('Notes.TXT', 'application/octet-stream')).toBe(true);
+    expect(isTextMaterial('captions.srt', 'text/plain')).toBe(true);
+    expect(isTextMaterial('handwriting.pdf', 'application/pdf')).toBe(false);
+    expect(isTextMaterial('archive.zip', 'application/zip')).toBe(false);
+  });
   it('retains the final exercise instructions beyond the former 3000-character prefix', async () => {
     const text = `${'Wort vocabulary\n'.repeat(1000)}END: Explain the contrast, then translate the supplied phrases.`;
     const result = await extractUploadTexts([

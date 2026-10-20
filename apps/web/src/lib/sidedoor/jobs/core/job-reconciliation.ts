@@ -99,7 +99,9 @@ export async function reconcileSottoJobs(options: ReconciliationOptions) {
         if (
           error instanceof SottoTerminalDeliveryError &&
           error.observation.state === 'failed' &&
-          error.observation.handler === 'material-finalization' &&
+          ['material-finalization', 'material-extraction', 'material-optimization'].includes(
+            error.observation.handler
+          ) &&
           error.observation.version === 1
         ) {
           await sottoTransaction(

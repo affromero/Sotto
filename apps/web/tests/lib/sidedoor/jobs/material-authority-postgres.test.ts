@@ -5,6 +5,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import type { PrismaClient } from '@/generated/prisma/client';
 import {
   admitDurableQueueBatch,
+  enqueueDurableQueueJob,
   durableEnvelopeSchema,
   durableQueueOperationId,
   validateDurableAuthority,
@@ -65,6 +66,36 @@ suite('durable material ownership and publication', () => {
       },
     });
   }
+
+  it('commits extraction admission with its retained original and rolls back failed publication', async () => {
+    const original = await material();
+    const options = {
+      handler: 'material-extraction',
+      type: 'extract_material_pages',
+      jobId: randomUUID(),
+      payload: { materialId: original.id, processingRevision: 1, inputSha256: digest },
+    };
+    const receipt = await sottoTransaction(instance.database, (database) =>
+      enqueueDurableQueueJob(database, options)
+    );
+    expect(
+      await sottoTransaction(instance.database, (database) =>
+        sottoJobOutbox(database).read(receipt.job.id)
+      )
+    ).toMatchObject({ complete: false });
+    const failed = { ...options, jobId: randomUUID() };
+    await expect(
+      sottoTransaction(instance.database, async (database) => {
+        await enqueueDurableQueueJob(database, failed);
+        throw new Error('Publication was rolled back.');
+      })
+    ).rejects.toThrow('Publication was rolled back.');
+    expect(
+      await sottoTransaction(instance.database, (database) =>
+        sottoJobOutbox(database).read(durableQueueOperationId(failed.handler, failed.jobId))
+      )
+    ).toBeNull();
+  });
 
   async function finalizer() {
     const original = await material(false);

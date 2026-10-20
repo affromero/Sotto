@@ -14,6 +14,14 @@ acknowledges them separately. A missing attached workspace fails closed.
 
 All shared business logic and external service integrations live here.
 
+`course-materials/extraction/` publishes immutable page inventories and byte-exact
+UTF-8 chunks. Embedded text and visual transcription retain separate provenance.
+The worker accounts for unresolved pages explicitly and never grants mastery.
+`recognition/` requires an operator-reviewed exact model capability and explicit
+learner admission. Saved response receipts replay without another provider call;
+unknown outcomes fence further dispatch. `optimization/` retains the original
+and publishes a smaller derivative only after complete semantic comparison.
+
 `course-materials/uploads/` reserves resumable file batches, verifies bounded parts,
 and publishes complete originals through the canonical storage journal. Transfer
 scopes protect temporary parts independently of retained originals. Failed or

@@ -60,6 +60,44 @@ function chunks<Value>(values: readonly Value[], size: number) {
   return result;
 }
 
+/** Erasure removes exact grant rows before their page/operation foreign keys cascade. */
+async function eraseMaterialRecognitionGrants(
+  database: Prisma.TransactionClient,
+  scope: StorageDeletionScope
+) {
+  // Retiring completed transfer parts preserves the retained document and its journal.
+  if (scope.kind === 'material-upload') return;
+  const material: Prisma.CourseMaterialWhereInput =
+    scope.kind === 'instance'
+      ? {}
+      : scope.kind === 'profile'
+        ? { userId: scope.id }
+        : scope.kind === 'material'
+          ? { id: scope.id }
+          : { courseId: scope.id };
+  let after: string | null = null;
+  while (true) {
+    const operations: Array<{ id: string }> = await database.materialRecognitionOperation.findMany({
+      where: { ...(after ? { id: { gt: after } } : {}), page: { run: { material } } },
+      select: { id: true },
+      orderBy: { id: 'asc' },
+      take: 100,
+    });
+    if (!operations.length) return;
+    await database.sidedoorState.deleteMany({
+      where: {
+        id: {
+          in: operations.map(
+            (operation) => `${SIDEDOOR_STATE_ID}:material-recognition-grant:${operation.id}`
+          ),
+        },
+      },
+    });
+    if (operations.length < 100) return;
+    after = operations[operations.length - 1]!.id;
+  }
+}
+
 /**
  * Permanently revoke entity storage scopes and retain exact cleanup evidence in the
  * same transaction that removes their application rows.
@@ -210,5 +248,9 @@ export async function admitLearningStorageDeletion(options: {
       });
     }
   }
-  return Promise.all([...jobs.values()].map((job) => state.cleanup.get(job.id)));
+  const admitted = await Promise.all([...jobs.values()].map((job) => state.cleanup.get(job.id)));
+  // Tombstones and complete reference manifests already exist. The caller's cascade
+  // shares this transaction, so any failure restores both grant metadata and rows.
+  await eraseMaterialRecognitionGrants(database, options.scope);
+  return admitted;
 }

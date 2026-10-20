@@ -22,6 +22,14 @@ export const PIPELINE_STAGE_ORDER: PipelineStage[] = [
 ];
 
 export const QUEUE_METADATA: Record<string, QueueMeta> = {
+  'material-optimization': {
+    description: 'Verifies complete PDF content before publishing optional lossless compression',
+    stage: 'Content Pipeline',
+  },
+  'material-extraction': {
+    description: 'Extracts complete page text and records visual coverage gaps',
+    stage: 'Content Pipeline',
+  },
   'material-finalization': {
     description: 'Verifies uploaded parts and publishes the complete original document',
     stage: 'Content Pipeline',

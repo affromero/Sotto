@@ -21,11 +21,15 @@ import { POST as complete } from '@/app/api/v1/materials/uploads/[uploadId]/comp
 import { GET as download } from '@/app/api/v1/materials/[materialId]/file/route';
 import { processMaterialFinalization } from '@/lib/course-materials/uploads/finalization';
 import { maintainMaterialUploads } from '@/lib/course-materials/uploads/cleanup';
-import { materialFinalizationQueue } from '@/lib/queue';
+import { materialFinalizationQueue, materialExtractionQueue } from '@/lib/queue';
+import { processMaterialExtraction } from '@/lib/course-materials/extraction/processing';
+import { deliverSottoJob } from '@/lib/sidedoor/jobs/core/job-delivery';
+import { syntheticMaterialPdf } from '../../helpers/materials/pdf';
 import { closeRedis } from '@/lib/redis';
 import { planMaterialUploadParts } from '@/lib/course-materials/uploads/protocol';
 import { settleFailedMaterialJob } from '@/lib/course-materials/jobs/failure';
 import { sottoJobOutbox } from '@/lib/sidedoor/jobs/core/job-delivery';
+import { durableQueueOperationId } from '@/lib/sidedoor/jobs/core/durable-queue';
 import { SIDEDOOR_STATE_ID } from '@/lib/sidedoor/access/state/store';
 import {
   createSharedTestInstance,
@@ -84,12 +88,16 @@ suite('resumable owned material originals', () => {
     identity = await instance.reset();
   });
   afterEach(async () => {
-    for (const id of jobs) await (await materialFinalizationQueue.getJob(id))?.remove();
+    for (const id of jobs) {
+      await (await materialFinalizationQueue.getJob(id))?.remove();
+      await (await materialExtractionQueue.getJob(id))?.remove();
+    }
     jobs.clear();
     vi.unstubAllEnvs();
   });
   afterAll(async () => {
     await materialFinalizationQueue.close();
+    await materialExtractionQueue.close();
     await closeRedis();
     await instance?.close();
     await rm(executionDirectory, { recursive: true, force: true });
@@ -175,6 +183,134 @@ suite('resumable owned material originals', () => {
     }
     return response;
   }
+  it('retains every page through upload, outbox delivery and exact chunk publication without claiming handwriting coverage', async () => {
+    const bytes = syntheticMaterialPdf(
+      Array.from(
+        { length: 65 },
+        (_, index) =>
+          `BT /F1 2 Tf 10 50 Td (Page ${index + 1} ${index === 64 ? 'FINAL_OBWOHL_TROTZDEM' : 'complete source'}) Tj ET`
+      ),
+      { ink: true }
+    );
+    let upload = await create(bytes);
+    for (const item of planMaterialUploadParts(bytes.length))
+      upload = materialUploadResumeSchema.parse(
+        await (
+          await part(upload, bytes.subarray(item.offset, item.offset + item.byteSize), item.index)
+        ).json()
+      );
+    expect((await finalize(upload)).status).toBe(202);
+    const row = await instance.database.materialUpload.findUniqueOrThrow({
+      where: { id: upload.uploadId },
+    });
+    const finalizer = await materialFinalizationQueue.getJob(row.finalizationOperationId!);
+    if (!finalizer) throw new Error('Missing admitted original finalizer.');
+    await processMaterialFinalization(finalizer);
+    const operationId = durableQueueOperationId(
+      'material-extraction',
+      `material-extraction-${upload.materialId}-1`
+    );
+    jobs.add(operationId);
+    const receipt = await instance.database.$transaction((database) =>
+      sottoJobOutbox(database).read(operationId)
+    );
+    if (!receipt) throw new Error('Missing admitted extraction receipt.');
+    await deliverSottoJob({
+      database: instance.database,
+      queue: materialExtractionQueue,
+      operationId,
+      fingerprint: receipt.fingerprint,
+      version: 1,
+    });
+    const job = await materialExtractionQueue.getJob(operationId);
+    if (!job) throw new Error('Missing delivered extraction.');
+    await processMaterialExtraction(job);
+    await processMaterialExtraction(job);
+    const run = await instance.database.materialExtractionRun.findFirstOrThrow({
+      where: { materialId: upload.materialId },
+    });
+    expect(run).toMatchObject({
+      status: 'PARTIAL',
+      pageCount: 65,
+      originalSha256: sha256(bytes),
+      coverage: {
+        visitedPageCount: 65,
+        readablePageCount: 65,
+        processingComplete: true,
+        coverageComplete: false,
+      },
+    });
+    expect(await instance.database.materialPage.count({ where: { runId: run.id } })).toBe(65);
+    const last = await instance.database.materialPage.findUniqueOrThrow({
+      where: { runId_pageNumber: { runId: run.id, pageNumber: 65 } },
+      include: { textStreams: { include: { chunks: true } } },
+    });
+    expect(last.visualCoverage).toMatchObject({ state: 'UNAVAILABLE' });
+    expect(
+      Buffer.concat(
+        last.textStreams.flatMap((stream) =>
+          stream.chunks.map((chunk) => Buffer.from(chunk.textBytes))
+        )
+      ).toString('utf8')
+    ).toContain('FINAL_OBWOHL_TROTZDEM');
+    expect(
+      await instance.database.$transaction((database) => sottoJobOutbox(database).read(operationId))
+    ).toMatchObject({ complete: true });
+  }, 120000);
+
+  it('publishes complete text-only originals beyond a million characters without inventing a visual page assessment', async () => {
+    const text = '\uFEFF' + 'é 😀\u0000 '.repeat(180000) + 'FINAL_COMPLETE_TEXT';
+    const bytes = Buffer.from(text);
+    const input = declaration(bytes);
+    input.files[0]!.name = 'complete.TXT';
+    input.files[0]!.mimeType = 'text/plain';
+    const reserved = await reserve(request('', { method: 'POST', body: JSON.stringify(input) }));
+    expect(reserved.status).toBe(201);
+    let upload = materialUploadBatchReceiptSchema.parse(await reserved.json()).uploads[0]!;
+    upload = materialUploadResumeSchema.parse(await (await part(upload, bytes, 0)).json());
+    expect((await finalize(upload)).status).toBe(202);
+    const row = await instance.database.materialUpload.findUniqueOrThrow({
+      where: { id: upload.uploadId },
+    });
+    const finalizer = await materialFinalizationQueue.getJob(row.finalizationOperationId!);
+    if (!finalizer) throw new Error('Missing admitted original finalizer.');
+    await processMaterialFinalization(finalizer);
+    const operationId = durableQueueOperationId(
+      'material-extraction',
+      `material-extraction-${upload.materialId}-1`
+    );
+    jobs.add(operationId);
+    const receipt = await instance.database.$transaction((database) =>
+      sottoJobOutbox(database).read(operationId)
+    );
+    if (!receipt) throw new Error('Missing admitted extraction.');
+    await deliverSottoJob({
+      database: instance.database,
+      queue: materialExtractionQueue,
+      operationId,
+      fingerprint: receipt.fingerprint,
+      version: 1,
+    });
+    const job = await materialExtractionQueue.getJob(operationId);
+    if (!job) throw new Error('Missing delivered extraction.');
+    await processMaterialExtraction(job);
+    const run = await instance.database.materialExtractionRun.findFirstOrThrow({
+      where: { materialId: upload.materialId },
+    });
+    expect(run).toMatchObject({
+      status: 'COMPLETE',
+      pageCount: 1,
+      coverage: { processingComplete: true, coverageComplete: true },
+    });
+    const chunks = await instance.database.materialTextChunk.findMany({
+      where: { stream: { page: { runId: run.id } } },
+      orderBy: { index: 'asc' },
+    });
+    expect(
+      Buffer.concat(chunks.map((chunk) => Buffer.from(chunk.textBytes))).toString('utf8')
+    ).toBe(text);
+  }, 120000);
+
   it('replays a reservation and rejects another file set under the same request key', async () => {
     const input = declaration(Buffer.from('original'));
     const send = () => reserve(request('', { method: 'POST', body: JSON.stringify(input) }));
@@ -229,6 +365,24 @@ suite('resumable owned material originals', () => {
     const completed = materialUploadResumeSchema.parse(await (await state(upload)).json());
     expect(completed.original?.sha256).toBe(sha256(bytes));
     expect(completed.status).toBe('COMPLETE');
+    const extraction = await instance.database.materialExtractionRun.findFirstOrThrow({
+      where: { materialId: upload.materialId, processingRevision: 1 },
+    });
+    expect(extraction.originalSha256).toBe(sha256(bytes));
+    expect(
+      await instance.database.materialExtractionRun.count({
+        where: { materialId: upload.materialId },
+      })
+    ).toBe(1);
+    const extractionReceipt = await instance.database.$transaction((database) =>
+      sottoJobOutbox(database).read(
+        durableQueueOperationId('material-extraction', `material-extraction-${upload.materialId}-1`)
+      )
+    );
+    expect(extractionReceipt).toMatchObject({
+      complete: false,
+      job: { handler: 'material-extraction' },
+    });
     await maintainMaterialUploads(new AbortController().signal);
     expect(
       await instance.database.materialUploadPart.count({ where: { uploadId: upload.uploadId } })

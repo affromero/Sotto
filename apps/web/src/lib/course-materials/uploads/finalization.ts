@@ -6,13 +6,12 @@ import { Readable } from 'node:stream';
 import { isDeepStrictEqual } from 'node:util';
 import type { Job } from 'bullmq';
 import { z } from 'zod';
-import { StorageReadCleanupError, StorageWriteJournal } from 'thesidedoor-core/storage';
+import { StorageReadCleanupError } from 'thesidedoor-core/storage';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { restoreStorageBackend } from '@/lib/r2';
 import { materialStorageScopes } from '@/lib/course-materials';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 import { withSottoJobExecution } from '@/lib/sidedoor/jobs/core/job-execution-lifetime';
-import { SIDEDOOR_STATE_ID } from '@/lib/sidedoor/access/state/store';
 import {
   loadDurableQueueJob,
   bindDurableQueueJob,
@@ -26,6 +25,8 @@ import {
 import { writeStorageReference } from '@/lib/sidedoor/storage/core/storage-write';
 import { readOwnedUpload, uploadResponse } from './state';
 import { validateMaterialUploadCompletion } from './protocol';
+import { enqueueMaterialExtraction } from '../extraction/admission';
+import { assertKnownMaterialWrites } from '../jobs/storage-outcome';
 
 const finalizationPayload = z
   .object({
@@ -44,31 +45,7 @@ class MaterialFinalizationCleanupError extends Error {
 }
 
 async function assertKnownOriginalWrites(materialId: string, prefix: string) {
-  await sottoTransaction(prisma, async (database) => {
-    const writes = new StorageWriteJournal(
-      {
-        query: (sql, values) => database.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...values),
-      },
-      'postgres',
-      SIDEDOOR_STATE_ID
-    );
-    let after: string | null = null;
-    do {
-      const page = await writes.list(`material:${materialId}`, {
-        after: after ?? undefined,
-        limit: 1000,
-      });
-      if (
-        page.intents.some(
-          (intent) =>
-            intent.target.key.startsWith(prefix + '/') &&
-            (intent.status !== 'settled' || intent.outcome === 'uncertain')
-        )
-      )
-        throw new MaterialFinalizationCleanupError();
-      after = page.cursor;
-    } while (after !== null);
-  });
+  return assertKnownMaterialWrites(materialId, prefix);
 }
 
 async function readFinalization(
@@ -262,6 +239,7 @@ export async function processMaterialFinalization(
               where: { id: captured.payload.uploadId },
               data: { status: 'COMPLETE', completedAt: new Date(), revision: { increment: 1 } },
             });
+            await enqueueMaterialExtraction(database, captured.payload.materialId);
             await completeDurableQueueJob(database, bound);
           },
         });

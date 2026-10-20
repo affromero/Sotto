@@ -375,6 +375,45 @@ export async function validateDurableAuthority(
 }
 
 /** Authorize a source operation and commit its application claim with outbox admission. */
+/** Enqueue inside an existing publication transaction. Delivery follows the committed outbox. */
+export async function enqueueDurableQueueJob<Payload>(
+  database: Prisma.TransactionClient,
+  options: {
+    handler: string;
+    type: string;
+    payload: Payload;
+    jobId: string;
+    attempts?: number;
+    priority?: number;
+    version?: number;
+  }
+) {
+  const operationId = durableQueueOperationId(options.handler, options.jobId);
+  const captured = await captureAuthority(database, options.payload, operationId);
+  await validateDurableAuthority(database, captured.authority);
+  const outbox = sottoJobOutbox(database);
+  const existing = await outbox.read(operationId);
+  return outbox.enqueue(
+    prepareJob({
+      id: operationId,
+      namespace: SIDEDOOR_STATE_ID,
+      handler: options.handler,
+      version: options.version ?? 1,
+      payload: jsonClone({
+        type: options.type,
+        payload: jsonClone(options.payload),
+        authority: captured.authority,
+      }),
+      scopes: captured.scopes,
+      delivery: {
+        attempts: options.attempts ?? 3,
+        priority: options.priority ?? 0,
+        availableAt: existing?.job.delivery.availableAt ?? Date.now(),
+      },
+    })
+  );
+}
+
 export async function admitDurableQueueJob<Payload>(options: {
   queue: Queue;
   type: string;
@@ -395,27 +434,15 @@ export async function admitDurableQueueJob<Payload>(options: {
     const recipient = await validateDurableAuthority(database, captured.authority);
     if (authorized?.userId && recipient?.userId !== authorized.userId)
       throw new Error('Durable source recipient differs from its authorization');
-    const outbox = sottoJobOutbox(database);
-    const existing = await outbox.read(operationId);
-    return outbox.enqueue(
-      prepareJob({
-        id: operationId,
-        namespace: SIDEDOOR_STATE_ID,
-        handler: options.queue.name,
-        version,
-        payload: jsonClone({
-          type: options.type,
-          payload: jsonClone(options.payload),
-          authority: captured.authority,
-        }),
-        scopes: captured.scopes,
-        delivery: {
-          attempts: options.attempts ?? 3,
-          priority: options.priority ?? 0,
-          availableAt: existing?.job.delivery.availableAt ?? Date.now(),
-        },
-      })
-    );
+    return enqueueDurableQueueJob(database, {
+      handler: options.queue.name,
+      type: options.type,
+      payload: options.payload,
+      jobId: options.jobId,
+      version,
+      attempts: options.attempts,
+      priority: options.priority,
+    });
   });
   await deliverSottoJob({
     database: prisma,
