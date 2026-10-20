@@ -2,6 +2,7 @@ const path = require('path');
 const { createRequire } = require('node:module');
 const coreRequire = createRequire(require.resolve('thesidedoor-core/storage'));
 const nativeBinding = coreRequire.resolve('thesidedoor-flock/build/Release/fs_ext.node');
+const coreZodFiles = path.join(path.dirname(coreRequire.resolve('zod/package.json')), '**/*');
 const parserEntry = require.resolve('pdf-parse');
 const parserRequire = createRequire(parserEntry);
 const pdfAssets = path.dirname(parserRequire.resolve('pdfjs-dist/package.json'));
@@ -30,7 +31,7 @@ const nextConfig = {
   output: 'standalone',
   outputFileTracingRoot: path.resolve(__dirname, '../..'),
   outputFileTracingIncludes: {
-    '/*': [nativeBinding, ...pdfRuntimeFiles].map((file) =>
+    '/*': [nativeBinding, coreZodFiles, ...pdfRuntimeFiles].map((file) =>
       path.relative(__dirname, file).split(path.sep).join('/')
     ),
   },
