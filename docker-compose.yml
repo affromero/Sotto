@@ -112,7 +112,7 @@ services:
       - sotto_whisper_data:/root/.cache/huggingface
 
   local-tts:
-    # Explicit optional engine. Kokoro remains the default; Piper supplies German.
+    # Optional bundled Kokoro service. Unsupported engine selections fail.
     # Context is the service dir (its Dockerfile uses bare `COPY app.py`, matching
     # `docker build ... services/local-tts` in services/local-tts/AGENTS.md).
     build:

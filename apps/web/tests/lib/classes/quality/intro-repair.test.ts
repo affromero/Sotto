@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { blockedProviderExecution } from '../../../helpers/runtime/provider-execution';
 import {
+  introAiOptionsFixture,
+  introSourceDocuments,
   novelFindingCorroborationFixture,
   scopedIntroFixture,
   shapeIntroProviderFixture,
@@ -26,10 +28,7 @@ vi.mock('@/lib/providers/ai', () => ({
 }));
 vi.mock('@/lib/learning-ai', () => ({
   resolveCapturedLearningAi: boundary.resolve,
-  capturedLearningAiOptions: async (ai: { model: string; signal: AbortSignal }) => ({
-    model: ai.model,
-    signal: ai.signal,
-  }),
+  capturedLearningAiOptions: introAiOptionsFixture,
 }));
 vi.mock('@/lib/usage-logger', () => ({ logUsage: vi.fn() }));
 import { generateClassIntro } from '@/lib/classes/class-intro';
@@ -222,6 +221,12 @@ beforeEach(() => {
 
 describe('field-local A1 intro repair', () => {
   it('derives the overview from the selected example meaning before either review role', async () => {
+    const sourceDocuments = introSourceDocuments();
+    boundary.resolve.mockResolvedValue({
+      provider: 'fixture',
+      model: 'captured-model',
+      execution: { ...params.execution, sourceDocuments },
+    });
     const raw = {
       ...scopedIntroFixture(candidate),
       about: { exampleIndex: 1 },
@@ -235,16 +240,25 @@ describe('field-local A1 intro repair', () => {
     queueReview(framed);
 
     await expect(generateClassIntro(params)).resolves.toEqual(framed);
+    expect(boundary.generate.mock.calls[0][2].sourceDocuments).toBe(sourceDocuments);
     const reviews = boundary.generate.mock.calls.filter(([, , options]) =>
       ['class_intro_critic', 'class_intro_adjudicator'].includes(options.jsonSchema?.name)
     );
-    for (const [, messages] of reviews)
+    for (const [, messages, options] of reviews) {
+      expect(options.sourceDocuments).toBeUndefined();
       expect(JSON.parse(messages[0].content).introContext.about).toBe(framed.about);
+    }
   });
 
   it.each([false, true])(
     'renders a replaced target consistently when overview rejection is %s',
     async (rejectAbout) => {
+      const sourceDocuments = introSourceDocuments();
+      boundary.resolve.mockResolvedValue({
+        provider: 'fixture',
+        model: 'captured-model',
+        execution: { ...params.execution, sourceDocuments },
+      });
       const correctedExample = {
         target: 'Ich habe heute Brot gekauft.',
         meaning: 'I bought bread today.',
@@ -281,6 +295,15 @@ describe('field-local A1 intro repair', () => {
       queueReview(expectedIntro);
 
       await expect(generateClassIntro(params)).resolves.toEqual(expectedIntro);
+      expect(boundary.generate.mock.calls[0][2].sourceDocuments).toBe(sourceDocuments);
+      const repair = boundary.generate.mock.calls.find(
+        ([, , options]) => options.jsonSchema?.name === 'class_intro_repair'
+      );
+      expect(repair?.[2].sourceDocuments).toBe(sourceDocuments);
+      const reviews = boundary.generate.mock.calls.filter(([, , options]) =>
+        ['class_intro_critic', 'class_intro_adjudicator'].includes(options.jsonSchema?.name)
+      );
+      for (const [, , options] of reviews) expect(options.sourceDocuments).toBeUndefined();
       const finalReviews = boundary.generate.mock.calls
         .filter(([, , options]) => options.jsonSchema?.name === 'class_intro_adjudicator')
         .slice(2);

@@ -72,13 +72,18 @@ npx prisma studio      # Visual database browser
 ## Modifying the Schema
 
 1. Edit `schema.prisma`
-2. Run `npx prisma db push` (dev) or `npx prisma migrate dev` (production)
+2. Use `npx prisma db push` or `npx prisma migrate dev` for development. Production uses `npx prisma migrate deploy` through the reviewed fenced schema-transition procedure in `docs/03-self-host-deployment.md`.
 3. Run `npx prisma generate`
 4. Update this AGENTS.md if models/enums changed
 5. Update `src/types/` if API response shapes changed
 6. If adding/changing enums, also update `packages/shared/src/types/enums.ts` (string union equivalents)
 
 ## Scope
+
+`Course.vocabularySupport` is an optional `VocabularySupport` enum:
+`MEANING_RECALL`, `WORD_RECALL`, or `LISTENING_RECOGNITION`. It records
+learner-reported support for future generation, separately from assessed mastery.
+Null means no preference. Onboarding preserves the stored choice when omitted.
 
 `LearnerReviewEvent` records each committed vocabulary or grammar SRS update with
 its assessment mode, source attempt, question identities, timestamp and scheduler

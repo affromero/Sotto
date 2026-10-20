@@ -42,6 +42,7 @@ Path("sotto-model-provenance.json").write_text(json.dumps(provenance, indent=2) 
 PY
 
 COPY --chown=1000:1000 smoke.py /home/ubuntu/speaches/smoke.py
+COPY --chown=1000:1000 fixtures /home/ubuntu/speaches/fixtures
 
 ENV HF_HUB_OFFLINE=1 \
     ENABLE_UI=false \

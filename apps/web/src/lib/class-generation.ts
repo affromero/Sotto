@@ -761,7 +761,7 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
           },
         ],
         {
-          ...(await capturedLearningAiOptions(ai)),
+          ...(await capturedLearningAiOptions(ai, { includeSourceDocuments: true })),
           maxTokens: 4096,
           temperature: 0.8,
           jsonSchema: generationSchema,
@@ -917,7 +917,7 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
           },
         ],
         {
-          ...(await capturedLearningAiOptions(ai)),
+          ...(await capturedLearningAiOptions(ai, { includeSourceDocuments: true })),
           maxTokens: 4096,
           temperature: 0,
           jsonSchema: generationSchema,

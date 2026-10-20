@@ -1,12 +1,15 @@
 import {
   prepareCredentialSave,
   sameCredentialEditContext,
+  type CredentialRemovalRequest,
   type CredentialSaveDraft,
   type CredentialSettingsSnapshot,
 } from 'thesidedoor-core/configuration/credential-client';
 import { providerCredentials, providerIdentity } from 'thesidedoor-core/providers/catalog';
+import { CredentialDraftDigest } from '@/lib/sidedoor/credentials/config/credential-digest';
 import {
   CredentialReconciliationError,
+  captureCredentialReceipt,
   loadCredentialSettings,
   reconcileCredentialSettings,
   saveCredentialSettings,
@@ -23,7 +26,8 @@ interface Entry {
   endpoint: CredentialEndpoint;
   expectedEndpoint?: string;
   signature: string;
-  draft: CredentialSaveDraft;
+  receipt: CredentialRemovalRequest;
+  draft?: CredentialSaveDraft;
   state: 'editing' | 'confirmation' | 'uncertain' | 'saved';
 }
 export type WelcomeCredentialResult =
@@ -94,7 +98,24 @@ function groupedEdits(posts: readonly KeyPost[]) {
 export class WelcomeCredentialSession {
   private readonly snapshots = new Map<CredentialEndpoint, CredentialSettingsSnapshot>();
   private readonly entries = new Map<string, Entry>();
+  private pendingSlots = new Set<string>();
   private busy = false;
+  private editVersion = 0;
+  private readonly drafts = new CredentialDraftDigest();
+
+  private signature(edit: {
+    endpoint: CredentialEndpoint;
+    provider: string;
+    baseUrl?: string;
+    values: Record<string, string | number | boolean>;
+  }): string {
+    return this.drafts.digest([
+      edit.endpoint,
+      edit.provider,
+      edit.baseUrl ?? null,
+      Object.entries(edit.values).sort(([left], [right]) => left.localeCompare(right)),
+    ]);
+  }
 
   savedProviders(endpoint: CredentialEndpoint): string[] {
     return (
@@ -118,13 +139,10 @@ export class WelcomeCredentialSession {
     if (
       !edit ||
       entry?.state !== 'saved' ||
-      this.snapshots.get(post.endpoint)?.heads[post.provider] !== entry.draft.operationId
+      this.snapshots.get(post.endpoint)?.heads[post.provider] !== entry.receipt.operationId
     )
       return null;
-    const signature = JSON.stringify([
-      edit.baseUrl ?? null,
-      Object.entries(edit.values).sort(([left], [right]) => left.localeCompare(right)),
-    ]);
+    const signature = this.signature(edit);
     return entry.signature === signature ? this.savedStatus(post.endpoint, post.provider) : null;
   }
 
@@ -191,6 +209,7 @@ export class WelcomeCredentialSession {
   }
 
   invalidateConfirmations() {
+    this.editVersion++;
     for (const [slot, entry] of this.entries) {
       if (entry.state === 'confirmation') this.entries.delete(slot);
     }
@@ -198,7 +217,7 @@ export class WelcomeCredentialSession {
 
   private async reconcile(entry: Entry, signal: AbortSignal) {
     try {
-      return await reconcileCredentialSettings(entry.endpoint, entry.draft, 'save', signal);
+      return await reconcileCredentialSettings(entry.endpoint, entry.receipt, 'save', signal);
     } catch (error) {
       signal.throwIfAborted();
       entry.state = 'uncertain';
@@ -246,22 +265,24 @@ export class WelcomeCredentialSession {
     for (const [slot, entry] of this.entries) {
       if (
         entry.state !== 'saved' ||
-        this.snapshots.get(entry.endpoint)?.heads[entry.draft.provider] !== entry.draft.operationId
+        this.snapshots.get(entry.endpoint)?.heads[entry.receipt.provider] !==
+          entry.receipt.operationId
       )
         this.entries.delete(slot);
     }
   }
 
   private accept(entry: Entry, result: CredentialMutationResult): WelcomeCredentialResult {
+    if (result.status !== 'needs_confirmation') delete entry.draft;
     if (result.status === 'confirmed') {
       entry.state = 'saved';
       const displayed = this.snapshots.get(entry.endpoint)!;
       // Only our own committed slot advances. Other dirty forms retain their displayed heads.
       this.snapshots.set(entry.endpoint, {
         ...displayed,
-        heads: { ...displayed.heads, [entry.draft.provider]: entry.draft.operationId },
+        heads: { ...displayed.heads, [entry.receipt.provider]: entry.receipt.operationId },
         keys: [
-          ...displayed.keys.filter((key) => key.provider !== entry.draft.provider),
+          ...displayed.keys.filter((key) => key.provider !== entry.receipt.provider),
           ...(result.key ? [result.key] : []),
         ],
       });
@@ -269,15 +290,22 @@ export class WelcomeCredentialSession {
         ? { status: 'ready' }
         : {
             status: 'review',
-            message: `The saved ${entry.draft.provider} key is disabled. Review its credentials before continuing.`,
+            message: `The saved ${entry.receipt.provider} key is disabled. Review its credentials before continuing.`,
           };
     }
     if (result.status === 'needs_confirmation') {
+      if (!entry.draft) {
+        this.entries.delete(`${entry.endpoint}:${entry.receipt.provider}`);
+        return {
+          status: 'review',
+          message: 'Credentials changed. Review them before saving again.',
+        };
+      }
       entry.state = 'confirmation';
       return {
         status: 'confirmation',
-        operationId: entry.draft.operationId,
-        message: `The provider could not verify ${entry.draft.provider}. Review the credentials or explicitly save without verification.`,
+        operationId: entry.receipt.operationId,
+        message: `The provider could not verify ${entry.receipt.provider}. Review the credentials or explicitly save without verification.`,
       };
     }
     if (result.status === 'context_changed') {
@@ -293,13 +321,13 @@ export class WelcomeCredentialSession {
       entry.state = 'editing';
       return {
         status: 'review',
-        message: `The ${entry.draft.provider} key changed. Reload credentials and review your selections.`,
+        message: `The ${entry.receipt.provider} key changed. Reload credentials and review your selections.`,
       };
     }
     entry.state = 'uncertain';
     return {
       status: 'uncertain',
-      message: `The ${entry.draft.provider} change needs its status checked before continuing.`,
+      message: `The ${entry.receipt.provider} change needs its status checked before continuing.`,
     };
   }
 
@@ -320,21 +348,22 @@ export class WelcomeCredentialSession {
         if (accepted.status !== 'ready' && (edits.has(slot) || result.status !== 'confirmed'))
           return accepted;
       }
+      this.pendingSlots = new Set(edits.keys());
       for (const [slot, edit] of edits) {
         signal.throwIfAborted();
         const snapshot = this.snapshots.get(edit.endpoint);
         if (!snapshot) throw new Error('Load credential settings before entering keys.');
-        const signature = JSON.stringify([
-          edit.baseUrl ?? null,
-          Object.entries(edit.values).sort(([left], [right]) => left.localeCompare(right)),
-        ]);
+        const signature = this.signature(edit);
         let entry = this.entries.get(slot);
         if (entry && (entry.state === 'saved' || entry.state === 'uncertain')) {
           const previous = this.accept(entry, await this.reconcile(entry, signal));
           if (previous.status !== 'ready') return previous;
-          if (entry.signature === signature) continue;
+          if (entry.signature === signature) {
+            this.pendingSlots.delete(slot);
+            continue;
+          }
         }
-        if (!entry || entry.signature !== signature) {
+        if (!entry || entry.signature !== signature || entry.state === 'editing') {
           const current = this.snapshots.get(edit.endpoint)!;
           const patch = {
             ...edit.values,
@@ -344,6 +373,13 @@ export class WelcomeCredentialSession {
               ? { monthlyCreditLimit: null }
               : {}),
           };
+          const draft = prepareCredentialSave(
+            current,
+            edit.provider,
+            current.keys.some((key) => key.provider === edit.provider)
+              ? { patch }
+              : { values: edit.values }
+          );
           entry = {
             endpoint: edit.endpoint,
             ...(edit.endpoint === 'ai-keys' && edit.provider === 'local' && edit.baseUrl
@@ -351,37 +387,76 @@ export class WelcomeCredentialSession {
               : {}),
             signature,
             state: 'editing',
-            draft: prepareCredentialSave(
-              current,
-              edit.provider,
-              current.keys.some((key) => key.provider === edit.provider)
-                ? { patch }
-                : { values: edit.values }
-            ),
+            receipt: captureCredentialReceipt(draft),
+            draft,
           };
           this.entries.set(slot, entry);
         }
         const confirmed =
-          entry.state === 'confirmation' && consentOperationId === entry.draft.operationId;
-        entry.state = 'uncertain';
-        let result: CredentialMutationResult;
-        try {
-          result = await saveCredentialSettings(
-            entry.endpoint,
-            entry.draft,
-            confirmed,
-            signal,
-            entry.expectedEndpoint
-          );
-        } catch (error) {
-          if (!signal.aborted && !(error instanceof CredentialReconciliationError))
-            entry.state = 'editing';
-          throw error;
-        }
-        signal.throwIfAborted();
-        const accepted = this.accept(entry, result);
+          entry.state === 'confirmation' && consentOperationId === entry.receipt.operationId;
+        const accepted = await this.submit(entry, confirmed, signal);
         if (accepted.status !== 'ready') return accepted;
+        this.pendingSlots.delete(slot);
       }
+      return { status: 'ready' };
+    } finally {
+      this.busy = false;
+    }
+  }
+
+  private async submit(entry: Entry, confirmed: boolean, signal: AbortSignal) {
+    const draft = entry.draft;
+    if (!draft) throw new Error('Review credentials before saving again.');
+    const version = this.editVersion;
+    delete entry.draft;
+    entry.state = 'uncertain';
+    try {
+      const result = await saveCredentialSettings(
+        entry.endpoint,
+        draft,
+        confirmed,
+        signal,
+        entry.expectedEndpoint
+      );
+      signal.throwIfAborted();
+      if (result.status === 'needs_confirmation' && version === this.editVersion)
+        entry.draft = draft;
+      return this.accept(entry, result);
+    } catch (error) {
+      if (!signal.aborted && !(error instanceof CredentialReconciliationError))
+        entry.state = 'editing';
+      throw error;
+    }
+  }
+
+  async continuePending(
+    signal: AbortSignal,
+    operationId?: string
+  ): Promise<WelcomeCredentialResult> {
+    if (this.busy)
+      return { status: 'review', message: 'Wait for the current credential change to finish.' };
+    this.busy = true;
+    try {
+      for (const [slot, entry] of this.entries) {
+        signal.throwIfAborted();
+        if (entry.state === 'uncertain') {
+          const result = this.accept(entry, await this.reconcile(entry, signal));
+          if (result.status !== 'ready') return result;
+          this.pendingSlots.delete(slot);
+        } else if (entry.state === 'confirmation' && entry.receipt.operationId === operationId) {
+          const result = await this.submit(entry, true, signal);
+          if (result.status !== 'ready') return result;
+          this.pendingSlots.delete(slot);
+        } else if (entry.state === 'confirmation') {
+          return this.accept(entry, { status: 'needs_confirmation' });
+        }
+      }
+      if (this.pendingSlots.size)
+        return {
+          status: 'review',
+          message:
+            'Some selected credentials still need saving. Review the selections and save again.',
+        };
       return { status: 'ready' };
     } finally {
       this.busy = false;

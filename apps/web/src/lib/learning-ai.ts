@@ -22,6 +22,7 @@ import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 import { aiProviderRules } from './providers/ai';
 import { createSottoProviderTransport } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import { learningCredentialFingerprint } from '@/lib/classes/preparation-selection';
+import { selectLearningAi, type LearningAiRequest } from '@/lib/learning/ai/selection';
 
 interface ResolvedLearningAi {
   provider: string;
@@ -142,7 +143,10 @@ export function captureLearningModerationCredential(execution: SottoProviderExec
   );
 }
 
-export async function capturedLearningAiOptions(ai: CapturedLearningAi) {
+export async function capturedLearningAiOptions(
+  ai: CapturedLearningAi,
+  options: { includeSourceDocuments?: boolean } = {}
+) {
   const moderationCredential = await captureLearningModerationCredential(ai.execution);
   const expectedModeration = ai.execution.learningSelection?.moderationCredentialFingerprint;
   if (
@@ -171,11 +175,15 @@ export async function capturedLearningAiOptions(ai: CapturedLearningAi) {
     : undefined;
   return {
     model: ai.model,
+    ...(options.includeSourceDocuments && ai.execution.sourceDocuments
+      ? { sourceDocuments: ai.execution.sourceDocuments }
+      : {}),
     apiKeyOverride: ai.apiKey,
     endpoint: ai.endpoint,
     fetch: await capturedLearningAiFetch(ai),
     moderation,
     signal: ai.execution.signal,
+    ...(ai.execution.onCleanupError ? { onCleanupError: ai.execution.onCleanupError } : {}),
     ...(ai.isolatedImage
       ? {
           isolated: await (
@@ -190,7 +198,7 @@ export async function capturedLearningAiOptions(ai: CapturedLearningAi) {
 export async function resolveCapturedLearningAi(
   userId: string,
   execution: Omit<SottoProviderExecution, 'userId' | 'credential'>,
-  pendingSelection?: { provider: string; model: string; endpoint?: string; isolatedImage?: string }
+  pendingSelection?: LearningAiRequest
 ): Promise<CapturedLearningAi> {
   if (execution.learningSelection) {
     const selected = execution.learningSelection;
@@ -226,55 +234,34 @@ export async function resolveCapturedLearningAi(
       select: { preferredAiProvider: true, preferredAiModel: true },
     });
   });
-  const preferred =
-    pendingSelection ??
-    (learner?.preferredAiProvider && learner.preferredAiModel
-      ? { provider: learner.preferredAiProvider, model: learner.preferredAiModel }
-      : null);
-  if (preferred?.provider === 'local' && preferred.model.startsWith('local:')) {
-    return resolveCapturedLearningAiForProvider(
-      userId,
-      'local',
-      preferred.model,
-      execution,
-      false,
-      pendingSelection?.endpoint
-    );
-  }
-  if (preferred && getProviderForModel(preferred.model) === preferred.provider) {
-    if (preferred.provider === 'codex' || preferred.provider === 'claude-code') {
-      if (await isSystemAiProviderDisabled(preferred.provider))
-        throw new Error(`${preferred.provider} is disabled in admin provider settings.`);
-      if (
-        preferred.provider === 'claude-code' &&
-        (process.env.SOTTO_ISOLATED_CLAUDE_IMAGE?.trim() || pendingSelection?.isolatedImage)
-      ) {
-        const { captureIsolatedLearningAi } =
-          await import('./agents/isolated/isolated-learning-ai');
-        const isolated = await captureIsolatedLearningAi(
-          userId,
-          preferred.model,
-          execution,
-          pendingSelection?.isolatedImage
-        );
-        if (isolated) return isolated;
-      }
-      return {
-        provider: preferred.provider,
-        model: preferred.model,
-        execution: { ...execution, userId },
-      };
+  const requested = selectLearningAi(pendingSelection, learner);
+  if (requested) {
+    const { provider, model } = requested;
+    if (provider !== 'codex' && provider !== 'claude-code')
+      return resolveCapturedLearningAiForProvider(
+        userId,
+        provider,
+        model,
+        execution,
+        false,
+        requested.endpoint
+      );
+    if (await isSystemAiProviderDisabled(provider))
+      throw new Error(provider + ' is disabled in admin provider settings.');
+    if (
+      provider === 'claude-code' &&
+      (process.env.SOTTO_ISOLATED_CLAUDE_IMAGE?.trim() || requested.isolatedImage)
+    ) {
+      const { captureIsolatedLearningAi } = await import('./agents/isolated/isolated-learning-ai');
+      const isolated = await captureIsolatedLearningAi(
+        userId,
+        model,
+        execution,
+        requested.isolatedImage
+      );
+      if (isolated) return isolated;
     }
-    return resolveCapturedLearningAiForProvider(
-      userId,
-      preferred.provider as AiProviderId,
-      preferred.model,
-      execution,
-      false
-    );
-  }
-  if (pendingSelection) {
-    throw new Error('The selected AI model does not belong to the selected provider.');
+    return { provider, model, execution: { ...execution, userId } };
   }
   const configured = await getAutoModelConfig();
   if (configured.model.aiProvider === 'codex' || configured.model.aiProvider === 'claude-code') {

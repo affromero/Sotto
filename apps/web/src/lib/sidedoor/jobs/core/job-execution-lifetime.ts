@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto';
-import { resolve } from 'node:path';
 import { JobExecutionJournal, runJobExecution } from 'thesidedoor-core/runtime/outbox';
 import { openExecutionLocation } from 'thesidedoor-core/storage';
 import type { Prisma, PrismaClient } from '@/generated/prisma/client';
 import { SIDEDOOR_STATE_ID } from '@/lib/sidedoor/access/state/store';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
+import { resolveSottoExecutionDirectory } from './execution-directory';
+export { resolveSottoExecutionDirectory } from './execution-directory';
 
 const executorId = randomUUID();
 const executor = (database: Prisma.TransactionClient) => ({
@@ -13,13 +14,6 @@ const executor = (database: Prisma.TransactionClient) => ({
 });
 export function sottoJobExecutions(database: Prisma.TransactionClient) {
   return new JobExecutionJournal(executor(database), 'postgres', SIDEDOOR_STATE_ID);
-}
-
-export function resolveSottoExecutionDirectory(): string {
-  return resolve(
-    /* turbopackIgnore: true */ process.cwd(),
-    process.env.SIDEDOOR_EXECUTION_DIR || '.sotto/executions'
-  );
 }
 
 /** Application authority and transactions adapt the shared execution lifecycle. */

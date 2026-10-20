@@ -15,6 +15,7 @@ import {
   type AgentProviderId,
 } from '@/lib/agent-models/id';
 import type { AgentStatus } from '@/lib/agent-availability';
+import { CredentialDraftDigest } from '@/lib/sidedoor/credentials/config/credential-digest';
 
 interface Props {
   agent: AgentState;
@@ -57,8 +58,9 @@ export function StepAgent({
     status: 'verified' | 'saved' | 'configured';
   } | null>(null);
   const [saveError, setSaveError] = useState(false);
+  const [drafts] = useState(() => new CredentialDraftDigest());
   const fingerprint = (value: AgentState) =>
-    JSON.stringify([value.provider, value.method, value.value, value.model, value.apiKey]);
+    drafts.digest([value.provider, value.method, value.value, value.model, value.apiKey]);
   const proof = savedOutcome
     ? { status: savedOutcome }
     : savedProof?.fingerprint === fingerprint(agent)

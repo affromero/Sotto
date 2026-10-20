@@ -216,19 +216,24 @@ describe('POST /api/v1/courses/[courseId]/notes', () => {
     expect(body).toMatchObject({ imported: 1, failed: 0, addedVocabulary: 3 });
   });
 
-  it('uses Markit for document uploads', async () => {
+  it('imports office documents through Markit while retaining their originals', async () => {
     mockGetCourseNote.mockResolvedValue('');
     mockExtractViaMarkit.mockResolvedValue({ markdown: '# Capitolo\nciao', text: 'Capitolo ciao' });
 
-    const file = { content: 'pdf bytes', name: 'course.pdf', type: 'application/pdf' };
+    const file = {
+      content: 'office bytes',
+      name: 'course.docx',
+      type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    };
     const res = await POST(postReq([file]), PARAMS);
 
     expect(res.status).toBe(200);
     expect(mockExtractViaMarkit).toHaveBeenCalledWith(
       expect.any(Buffer),
-      expect.objectContaining({ extension: '.pdf', url: 'upload://course.pdf' })
+      expect.objectContaining({ extension: '.docx', url: 'upload://course.docx' })
     );
     expect((await res.json()).materials[0].extractedText).toContain('# Capitolo');
+    expect(Buffer.from(mockWriteReference.mock.calls[0][0].body).toString()).toBe(file.content);
   });
 
   it('400s when no files are uploaded', async () => {

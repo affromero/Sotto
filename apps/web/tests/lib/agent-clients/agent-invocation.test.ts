@@ -59,6 +59,21 @@ describe('agent invocation', () => {
     ).toThrow('Invalid remote Codex image input names');
   });
 
+  it('passes every numbered PDF page to remote Codex without accepting arbitrary paths', () => {
+    const invocation = buildAgentInvocation('codex', ['exec', '-'], 'fixture-host', {
+      remoteImageInputs: {
+        names: Array.from({ length: 65 }, (_, index) => `image-${index}.jpeg`),
+        cleanupToken: randomUUID(),
+      },
+    });
+    expect(invocation.args.at(-1)).toContain('image-64.jpeg');
+    expect(() =>
+      buildAgentInvocation('codex', ['exec', '-'], 'fixture-host', {
+        remoteImageInputs: { names: ['image-100.jpeg'], cleanupToken: randomUUID() },
+      })
+    ).toThrow('Invalid remote Codex image input names');
+  });
+
   it.each([
     { name: 'array', json: '[]' },
     { name: 'null', json: 'null' },

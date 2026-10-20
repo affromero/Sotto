@@ -189,7 +189,7 @@ export async function composeSpeakingPrompts(
   ) => {
     p.execution.signal?.throwIfAborted();
     const res = await client.generateResponse(systemPrompt, [{ role: 'user', content: request }], {
-      ...(await capturedLearningAiOptions(ai)),
+      ...(await capturedLearningAiOptions(ai, { includeSourceDocuments: true })),
       maxTokens: 2048,
       temperature,
       jsonSchema: SPEAKING_PROMPTS_JSON_SCHEMA,

@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "language": "de",
+  "conversion": "ffmpeg -map_metadata -1 -fflags +bitexact -flags:a +bitexact -ac 1 -c:a pcm_s16le; native sample rate preserved",
+  "samples": [
+    {
+      "id": "kerstin-weather",
+      "speaker": "kerstin",
+      "license": "CC0-1.0",
+      "provenance": "https://github.com/rhasspy/dataset-voice-kerstin/blob/f73127135cf80d6ef52aef6af58c49774f4fd625/README.md",
+      "transcriptSource": "https://github.com/rhasspy/dataset-voice-kerstin/blob/f73127135cf80d6ef52aef6af58c49774f4fd625/metadata.csv",
+      "source": "https://raw.githubusercontent.com/rhasspy/dataset-voice-kerstin/f73127135cf80d6ef52aef6af58c49774f4fd625/verified/de_rhasspy-0018.flac",
+      "sourceSha256": "722b1aa85dc536df3aa4ac9189bb1d4bf6ddff07486c4b573852bc4fa308ccfa",
+      "sha256": "ce3b6971762530e693911f22ebac740f545f7518971aaf545bdde741fe8f7615",
+      "sampleRate": 48000,
+      "audioSeconds": 4.6935,
+      "referenceText": "Durch schlechtes Wetter am vorgesehenen Landeort wurde die Rückkehr mehrfach verschoben."
+    },
+    {
+      "id": "thorsten-geography",
+      "speaker": "thorsten",
+      "license": "CC0-1.0",
+      "provenance": "https://github.com/thorstenMueller/Thorsten-Voice/blob/29d0c153c55d8ffaa0ebf8ed1ecc879bff9fdf27/README.md",
+      "transcriptSource": "https://github.com/thorstenMueller/Thorsten-Voice/blob/29d0c153c55d8ffaa0ebf8ed1ecc879bff9fdf27/docs/audio_compare.md",
+      "source": "https://raw.githubusercontent.com/thorstenMueller/Thorsten-Voice/29d0c153c55d8ffaa0ebf8ed1ecc879bff9fdf27/docs/samples/sample03-gt.wav",
+      "sourceSha256": "1892697190fe190f41037a1c5ac4e02b60d6f4a490408ab3b1b88a490b3b6750",
+      "sha256": "69a849188b905f551db5465adab1eb68a9904c76b362cafb4644bd8f9c65951a",
+      "sampleRate": 22050,
+      "audioSeconds": 4.929977324263039,
+      "referenceText": "Europa und Asien zusammengenommen wird auch als Eurasien bezeichnet."
+    }
+  ]
+}

@@ -529,6 +529,9 @@ describe('welcome hosted-demo mode', () => {
     pending.resolve(Response.json({ success: true }));
     expect(await screen.findByText('Endpoint configured')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^Continue/i })).toBeEnabled();
+    await user.type(screen.getByLabelText('Local model name'), '-changed');
+    expect(screen.queryByText('Endpoint configured')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Continue/i })).toBeDisabled();
   });
 
   it.each(['local', 'custom'])(

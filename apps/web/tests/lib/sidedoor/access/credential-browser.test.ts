@@ -2,8 +2,10 @@
 import { randomUUID } from 'node:crypto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { prepareCredentialSave } from 'thesidedoor-core/configuration/credential-client';
+import { CredentialDraftDigest } from '@/lib/sidedoor/credentials/config/credential-digest';
 import {
   CredentialHttpError,
+  captureCredentialReceipt,
   saveCredentialSettings,
 } from '@/lib/sidedoor/credentials/config/credential-browser';
 
@@ -19,14 +21,36 @@ const displayed = {
 const draft = () =>
   prepareCredentialSave(displayed, 'openai', { values: { apiKey: 'private-test-key' } });
 const localDraft = () =>
-  prepareCredentialSave(
-    { ...displayed, heads: { local: null } },
-    'local',
-    { values: { apiKey: 'private-local-test-key' } }
-  );
+  prepareCredentialSave({ ...displayed, heads: { local: null } }, 'local', {
+    values: { apiKey: 'private-local-test-key' },
+  });
 afterEach(() => vi.unstubAllGlobals());
 
 describe('credential browser transport', () => {
+  it('compares draft values only within the session that captured them', () => {
+    const session = new CredentialDraftDigest();
+    const draft = ['local', 'https://models.example/v1', 'test-secret'];
+    const captured = session.digest(draft);
+    expect(session.digest([...draft])).toBe(captured);
+    expect(session.digest([...draft, 'changed'])).not.toBe(captured);
+    expect(new CredentialDraftDigest().digest(draft)).not.toBe(captured);
+    expect(captured).not.toContain('test-secret');
+  });
+  it('projects an immutable receipt without submitted credential values', () => {
+    const command = localDraft();
+    const captured = captureCredentialReceipt(command);
+    expect(captured).toEqual({
+      context: command.context,
+      provider: command.provider,
+      expectedRevision: command.expectedRevision,
+      operationId: command.operationId,
+    });
+    expect(JSON.stringify(captured)).not.toContain('private-local-test-key');
+    expect(() => {
+      captured.context.owner.subjectId = 'another-owner';
+    }).toThrow();
+    expect(command.context.owner.subjectId).toBe('alice');
+  });
   it('reconciles a lost save response without sending a second mutation', async () => {
     const command = draft();
     const requests: string[] = [];

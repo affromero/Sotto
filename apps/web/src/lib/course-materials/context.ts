@@ -74,11 +74,13 @@ export function buildCourseSourceContext(
   seed: string
 ) {
   const planned = planCourseContext(
-    documents.map((document) => ({
-      id: document.id,
-      name: document.name,
-      length: [...document.text].length,
-    })),
+    documents
+      .filter((document) => document.text.trim())
+      .map((document) => ({
+        id: document.id,
+        name: document.name,
+        length: [...document.text].length,
+      })),
     seed
   );
   const fragments = planned.flatMap((document) => {
@@ -116,7 +118,7 @@ export async function readCourseMaterialContext(
     ...(editableNote
       ? [{ id: noteId, name: 'Editable course note', length: [...editableNote].length }]
       : []),
-    ...materials,
+    ...materials.filter((material) => material.length > 0),
   ];
   const planned = planCourseContext(documents, seed);
   const fragments: CourseSourceFragment[] = [];

@@ -1,66 +1,46 @@
-.card {
-  display: flex;
-  flex-direction: column;
+.root {
+  display: grid;
   gap: var(--spacing-lg);
   padding: var(--spacing-lg);
-  background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
+  background: var(--color-surface);
 }
-
-.header,
-.keySection,
-.fields {
-  display: flex;
-  flex-direction: column;
+.introduction,
+.fields,
+.credentials {
+  display: grid;
   gap: var(--spacing-sm);
+  min-width: 0;
 }
-
-.title {
+.root h2,
+.root h3,
+.root p {
   margin: 0;
+}
+.root h2 {
   color: var(--color-text-primary);
   font: var(--text-h3);
 }
-
-.keyTitle {
-  margin: 0 0 var(--spacing-xs);
-  color: var(--color-text-primary);
+.root h3 {
   font: var(--text-body);
   font-weight: 600;
 }
-
-.description {
-  margin: 0;
+.root p {
   color: var(--color-text-secondary);
   font: var(--text-body-sm);
 }
-
-.keySection {
-  padding-top: var(--spacing-md);
-  border-top: 1px solid var(--color-border);
+.credentials {
+  padding-block-start: var(--spacing-md);
+  border-block-start: 1px solid var(--color-border);
 }
-
-.actions {
+.actions,
+.feedback {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
   gap: var(--spacing-sm);
-}
-
-.actions span,
-.credentialFeedback p {
-  margin: 0;
-  color: var(--color-text-secondary);
-  font: var(--text-body-sm);
-}
-
-.error {
-  color: var(--color-error) !important;
-}
-
-.credentialFeedback {
-  display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: var(--spacing-sm);
+}
+.root .error {
+  color: var(--color-error);
 }

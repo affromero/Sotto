@@ -279,6 +279,18 @@ describe('resolveLearningAi', () => {
     expect(resolved).toMatchObject({ provider: 'openai', model: 'gpt-5', apiKey: 'sk-user-123' });
   });
 
+  it('rejects an invalid pending selection even when a configured backend is available', async () => {
+    stubInfra('codex');
+    stubAutoConfig('codex', 'codex:gpt-5.5#effort=xhigh');
+    await expect(
+      resolveCapturedLearningAi(
+        'user-1',
+        { ...blockedProviderExecution('user-1'), authorize: async () => ({ userId: 'user-1' }) },
+        { provider: 'anthropic', model: 'gpt-5' }
+      )
+    ).rejects.toThrow('does not belong');
+  });
+
   it('keeps the unsaved local model and endpoint together', async () => {
     mockGetLearnerPreference.mockResolvedValue(null);
     stubAutoConfig('codex', 'codex:gpt-5.5#effort=xhigh');
@@ -313,6 +325,41 @@ describe('resolveLearningAi', () => {
 
     const init = mockAuthenticatedFetch.mock.calls[0][1] as RequestInit;
     expect(new Headers(init.headers).get('Authorization')).toBe('Bearer sk-moderation');
+  });
+  it('attaches original materials only when an author opts in and keeps blind reviewers isolated', async () => {
+    const sourceDocuments = {
+      parts: [
+        {
+          type: 'document' as const,
+          mediaType: 'application/pdf' as const,
+          name: 'Answer key.pdf',
+          data: Buffer.from('%PDF-1.7'),
+        },
+      ],
+      validate: async () => {},
+    };
+    const ai = {
+      provider: 'codex',
+      model: 'codex',
+      execution: {
+        userId: 'user-1',
+        authorize: async () => ({ userId: 'user-1' }),
+        sourceDocuments,
+        onCleanupError: (error: unknown) => {
+          received = error;
+        },
+      },
+    };
+    let received: unknown;
+    expect((await capturedLearningAiOptions(ai)).sourceDocuments).toBeUndefined();
+    expect(
+      (await capturedLearningAiOptions(ai, { includeSourceDocuments: true })).sourceDocuments
+    ).toBe(sourceDocuments);
+    const failure = new Error('Unconfirmed PDF cleanup');
+    (await capturedLearningAiOptions(ai, { includeSourceDocuments: true })).onCleanupError?.(
+      failure
+    );
+    expect(received).toBe(failure);
   });
 
   it('honors the owner-selected keyless provider over the infra AI_PROVIDER', async () => {

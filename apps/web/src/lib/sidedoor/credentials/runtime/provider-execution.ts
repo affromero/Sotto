@@ -25,8 +25,10 @@ import type { AuthenticatedRequest } from '@/lib/api-keys';
 import { requireOriginalSottoAdmission } from '@/lib/sidedoor/access/core/request-identity';
 import { captureSpeechAvailability } from '@/lib/providers/shared/speech-availability';
 import { assertProviderActivated } from '@/lib/providers/shared/runtime-activation';
+import type { SourceDocuments } from '@/lib/providers/ai';
 
 export interface SottoProviderExecution {
+  sourceDocuments?: SourceDocuments;
   userId: string;
   authorize: CredentialExecutionAuthority;
   credential?: SottoExecutionCredential | null;

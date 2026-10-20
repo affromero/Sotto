@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   credentialEditContextSchema,
+  credentialRemovalRequestSchema,
   credentialSaveRequest,
   credentialSettingsSnapshotSchema,
   reconcileCredentialMutation,
@@ -13,6 +14,19 @@ import {
 
 export type CredentialEndpoint = 'ai-keys' | 'byok' | 'visual-cues';
 const endpoints = new Set<CredentialEndpoint>(['ai-keys', 'byok', 'visual-cues']);
+
+/** Retain operation identity without retaining submitted credential values. */
+export function captureCredentialReceipt(command: CredentialRemovalRequest) {
+  const receipt = credentialRemovalRequestSchema.parse({
+    context: command.context,
+    provider: command.provider,
+    expectedRevision: command.expectedRevision,
+    operationId: command.operationId,
+  });
+  Object.freeze(receipt.context.owner);
+  Object.freeze(receipt.context);
+  return Object.freeze(receipt);
+}
 
 function path(endpoint: CredentialEndpoint) {
   if (!endpoints.has(endpoint)) throw new Error('Invalid credential settings endpoint');
@@ -95,7 +109,7 @@ export async function reconcileCredentialSettings(
   return { status: 'confirmed', snapshot, key: result.key };
 }
 
-/** Callers retain the draft until the outcome is known, including after cancellation. */
+/** Uncertain writes are reconciled with their receipt, without resubmitting values. */
 async function mutate(
   endpoint: CredentialEndpoint,
   command: CredentialRemovalRequest,

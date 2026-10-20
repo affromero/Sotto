@@ -4,6 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { ANIMAL_AVATARS } from '@/lib/avatars';
+import type { VocabularySupport } from '@sotto/shared';
 import { STEPS, WHISPERS, LEVELS } from './data';
 import type { CefrLevel } from './data';
 import { Glyph } from './Glyph';
@@ -195,6 +196,7 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
   const [timezone, setTimezone] = useState('');
   const [baseLang, setBaseLang] = useState('en');
   const [language, setLanguage] = useState('');
+  const [vocabularySupport, setVocabularySupport] = useState<VocabularySupport | null>();
   const [agent, setAgent] = useState<AgentState>({ ...DEFAULT_AGENT });
   const [voice, setVoice] = useState<VoiceState>({ ...DEFAULT_VOICE });
   const [storage, setStorage] = useState<StorageState>({ ...DEFAULT_STORAGE });
@@ -217,7 +219,6 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
   );
   const credentialBusy =
     credentialPending || (config.selfHosted && !credentialReady && credentialFeedback === null);
-  const pendingCredentialPosts = useRef<readonly KeyPost[]>([]);
   const clearCredentialSecrets = useCallback(() => {
     setAgent((previous) => ({
       ...previous,
@@ -228,7 +229,6 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
     }));
     setVoice((previous) => ({ ...previous, keys: {} }));
     setStorage((previous) => ({ ...previous, accessKeyId: '', secretAccessKey: '' }));
-    pendingCredentialPosts.current = [];
     setCredentialReady(false);
   }, []);
 
@@ -267,18 +267,22 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
     const lifetime = new AbortController();
     credentialLifetime.current = lifetime;
     void loadCredentials(lifetime.signal);
-    return () => lifetime.abort();
-  }, [config.selfHosted, loadCredentials]);
+    return () => {
+      credentialSession.invalidateConfirmations();
+      lifetime.abort();
+    };
+  }, [config.selfHosted, credentialSession, loadCredentials]);
 
-  async function saveCredentials(posts: readonly KeyPost[], consentOperationId?: string) {
+  async function saveCredentials(posts?: readonly KeyPost[], consentOperationId?: string) {
     if (!config.selfHosted) return true;
     const signal = credentialLifetime.current?.signal;
     if (!signal || signal.aborted || credentialLock.current || !credentialReady) return false;
     credentialLock.current = true;
     setCredentialBusy(true);
-    pendingCredentialPosts.current = structuredClone(posts);
     try {
-      const result = await credentialSession.save(posts, signal, consentOperationId);
+      const result = posts
+        ? await credentialSession.save(posts, signal, consentOperationId)
+        : await credentialSession.continuePending(signal, consentOperationId);
       if (result.status === 'ready')
         await credentialSession.verifySelections(welcomeCredentialSelections(agent, voice), signal);
       signal.throwIfAborted();
@@ -373,10 +377,15 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
     return best;
   }, [understood]);
 
-  const go = useCallback((n: number) => {
-    if (credentialLock.current) return;
-    setStep(clampStep(n));
-  }, []);
+  const go = useCallback(
+    (n: number) => {
+      if (credentialLock.current) return;
+      credentialSession.invalidateConfirmations();
+      setCredentialFeedback((previous) => (previous?.status === 'confirmation' ? null : previous));
+      setStep(clampStep(n));
+    },
+    [credentialSession]
+  );
 
   function applySnapshot(snapshot: WelcomeSnapshot) {
     setStep(snapshot.step);
@@ -384,6 +393,7 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
     setAvatarSlug(snapshot.avatarSlug);
     setBaseLang(snapshot.baseLang);
     setLanguage(snapshot.language);
+    setVocabularySupport(snapshot.vocabularySupport);
     setAgent(snapshot.agent);
     setVoice(snapshot.voice);
     setTimezone(snapshot.timezone);
@@ -463,6 +473,7 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
         timezone,
         baseLang,
         language,
+        vocabularySupport,
         agent: {
           ...agent,
           value: agent.method === 'url' ? resumeEndpoint(agent.value) : '',
@@ -485,6 +496,7 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
     contextItems,
     deepLinkMode,
     language,
+    vocabularySupport,
     profileName,
     sources,
     step,
@@ -550,6 +562,7 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
     setAvatarSlug(ANIMAL_AVATARS[0].slug);
     setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone);
     setLanguage('');
+    setVocabularySupport(undefined);
     setBaseLang('en');
     setAgent({ ...DEFAULT_AGENT });
     setVoice({ ...DEFAULT_VOICE });
@@ -784,6 +797,8 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
           language={language}
           level={level}
           contextItems={contextItems}
+          vocabularySupport={vocabularySupport}
+          onVocabularySupportChange={setVocabularySupport}
           onNext={() => go(10)}
           onBack={() => go(8)}
         />
@@ -814,6 +829,7 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
           config={config}
           saveCredentials={saveCredentials}
           submitSetup={submitSetup}
+          vocabularySupport={vocabularySupport}
           onRestart={reset}
           onJump={go}
         />
@@ -904,7 +920,7 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
                     }
                   } else {
                     void saveCredentials(
-                      pendingCredentialPosts.current,
+                      undefined,
                       credentialFeedback.status === 'confirmation'
                         ? credentialFeedback.operationId
                         : undefined

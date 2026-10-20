@@ -7,6 +7,7 @@ import {
   type CredentialSettingsSnapshot,
 } from 'thesidedoor-core/configuration/credential-client';
 import { LocalAiSettings } from '@/components/settings/LocalAiSettings';
+import { createWelcomeCredentialBoundary } from '../../helpers/setup/welcome-credentials';
 
 function emptySettings(): CredentialSettingsSnapshot {
   return {
@@ -23,6 +24,48 @@ function emptySettings(): CredentialSettingsSnapshot {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('local AI settings', () => {
+  it('keeps key submission unavailable after a rejected server configuration', async () => {
+    const boundary = createWelcomeCredentialBoundary();
+    const credentialWrites: string[] = [];
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input) === '/api/v1/admin/site-config') return Response.json({}, { status: 409 });
+      if (init?.method) credentialWrites.push(String(input));
+      return boundary.handle(input, init);
+    });
+    const user = userEvent.setup();
+    render(<LocalAiSettings initialBaseUrl="https://models.example/v1" initialModel="demo" />);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Add API key' })).toBeEnabled());
+    await user.clear(screen.getByLabelText('Model ID'));
+    await user.type(screen.getByLabelText('Model ID'), 'another-model');
+    await user.click(screen.getByRole('button', { name: 'Save server settings' }));
+    await screen.findByRole('alert');
+    expect(screen.getByRole('button', { name: 'Add API key' })).toBeDisabled();
+    expect(credentialWrites).toEqual([]);
+  });
+
+  it('locks configuration while saving and aborts the request on unmount', async () => {
+    const boundary = createWelcomeCredentialBoundary();
+    const response = Promise.withResolvers<Response>();
+    let signal: AbortSignal | null | undefined;
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input) !== '/api/v1/admin/site-config') return boundary.handle(input, init);
+      signal = init?.signal;
+      return response.promise;
+    });
+    const user = userEvent.setup();
+    const { unmount } = render(
+      <LocalAiSettings initialBaseUrl="https://models.example/v1" initialModel="demo" />
+    );
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Add API key' })).toBeEnabled());
+    await user.type(screen.getByLabelText('Model ID'), '-new');
+    await user.click(screen.getByRole('button', { name: 'Save server settings' }));
+    expect(screen.getByLabelText('Endpoint URL')).toBeDisabled();
+    expect(screen.getByLabelText('Model ID')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Add API key' })).toBeDisabled();
+    unmount();
+    expect(signal?.aborted).toBe(true);
+    response.resolve(Response.json({}));
+  });
   it('saves a compatible endpoint and model, then an optional encrypted key', async () => {
     const user = userEvent.setup();
     let settings = emptySettings();
@@ -40,9 +83,7 @@ describe('local AI settings', () => {
 
       const command = credentialSaveRequestSchema.parse(JSON.parse(String(init.body)));
       submittedKeys.push(command);
-      reviewedEndpoints.push(
-        new Headers(init.headers).get('x-sotto-reviewed-ai-endpoint') ?? ''
-      );
+      reviewedEndpoints.push(new Headers(init.headers).get('x-sotto-reviewed-ai-endpoint') ?? '');
       if (!command.allowUnverified)
         return Response.json({
           status: 'needs_confirmation',
@@ -98,12 +139,12 @@ describe('local AI settings', () => {
     await screen.findByText('Key saved without verification.');
 
     expect(submittedKeys).toHaveLength(2);
-    expect(submittedKeys[0]).toMatchObject({ provider: 'local', values: { apiKey: 'local-secret' } });
+    expect(submittedKeys[0]).toMatchObject({
+      provider: 'local',
+      values: { apiKey: 'local-secret' },
+    });
     expect(submittedKeys[1]).toEqual({ ...submittedKeys[0], allowUnverified: true });
-    expect(reviewedEndpoints).toEqual([
-      'http://localhost:8000/v1',
-      'http://localhost:8000/v1',
-    ]);
+    expect(reviewedEndpoints).toEqual(['http://localhost:8000/v1', 'http://localhost:8000/v1']);
     expect(screen.queryByLabelText('New API key')).not.toBeInTheDocument();
   });
 
@@ -118,9 +159,7 @@ describe('local AI settings', () => {
         return Response.json({});
       }
       if (!init.method) return Response.json(emptySettings());
-      submittedEndpoints.push(
-        new Headers(init.headers).get('x-sotto-reviewed-ai-endpoint') ?? ''
-      );
+      submittedEndpoints.push(new Headers(init.headers).get('x-sotto-reviewed-ai-endpoint') ?? '');
       const command = credentialSaveRequestSchema.parse(JSON.parse(String(init.body)));
       return Response.json({
         status: 'needs_confirmation',
@@ -139,7 +178,9 @@ describe('local AI settings', () => {
 
     await user.clear(screen.getByLabelText('Endpoint URL'));
     await user.type(screen.getByLabelText('Endpoint URL'), 'http://localhost:8000/v1');
-    expect(screen.queryByRole('button', { name: 'Save without verification' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Save without verification' })
+    ).not.toBeInTheDocument();
     expect(screen.queryByLabelText('New API key')).not.toBeInTheDocument();
     expect(submittedEndpoints).toEqual(['http://localhost:11434/v1']);
 
