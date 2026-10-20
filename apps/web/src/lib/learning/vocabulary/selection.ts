@@ -19,7 +19,7 @@ type RankedWord = { lemma: string; translation: string; mastery: number };
 const SOLID_MASTERY = 0.85;
 const WEAK_MASTERY = 0.5;
 
-export function isIntroducedWord(word: VocabularyMemory): boolean {
+function isIntroducedWord(word: VocabularyMemory): boolean {
   return word.reps > 0 || word.lastReviewed !== null || word.firstSeenClassId !== null;
 }
 

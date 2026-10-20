@@ -71,13 +71,15 @@ describe('adaptive vocabulary selection', () => {
     ]);
   });
 
-  it('keeps words introduced in a class active until they have assessment evidence', () => {
+  it.each([
+    { reps: 1, lastReviewed: null, firstSeenClassId: null },
+    { reps: 0, lastReviewed: now, firstSeenClassId: null },
+    { reps: 0, lastReviewed: null, firstSeenClassId: 'class-1' },
+  ])('keeps introduced words active until recall is solid: %j', (provenance) => {
     const memory = [
       word('taught', {
         mastery: 0,
-        reps: 0,
-        lastReviewed: null,
-        firstSeenClassId: 'class-1',
+        ...provenance,
       }),
     ];
     expect(select(memory).map(({ lemma }) => lemma)).toEqual(['taught']);
