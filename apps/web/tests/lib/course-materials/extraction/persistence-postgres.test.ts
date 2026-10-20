@@ -374,6 +374,11 @@ suite('owned material page text persistence', () => {
       coverage
     );
     expect(
+      await instance.database.materialVocabularyIndex.findMany({
+        where: { materialId: input.materialId },
+      })
+    ).toEqual([]);
+    expect(
       await instance.database.materialExtractionRun.findUniqueOrThrow({
         where: { id: input.runId },
       })

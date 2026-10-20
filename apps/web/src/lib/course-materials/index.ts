@@ -8,13 +8,15 @@ import type { AuthenticatedRequest } from '../api-keys';
 import { prismaUnfiltered } from '../prisma';
 import { writeStorageReference } from '../sidedoor/storage/core/storage-write';
 import { requireOriginalSottoAdmission } from '../sidedoor/access/core/request-identity';
-import { sottoStorageInstance } from '../sidedoor/access/state/store';
+import { materialStorageScopes } from './scopes';
+export { materialStorageScopes } from './scopes';
 import { extractUploadTexts, isUploadFile } from '../note-upload';
 import { getEditableCourseNote, mergeCourseNote, setCourseNote } from '../course-notes';
 import { sottoTransaction } from '../sidedoor/access/state/transaction';
 import type { SottoProviderExecution } from '../sidedoor/credentials/runtime/provider-execution';
+import { enqueueMaterialVocabularyIndex } from '../vocabulary/index-admission';
 
-const MAX_MATERIAL_BYTES = 10 * 1024 * 1024;
+const MAX_MATERIAL_BYTES = 50 * 1024 * 1024;
 const MAX_MATERIAL_FILES = 10;
 export const materialSelect = {
   id: true,
@@ -43,26 +45,6 @@ export async function readMaterialForm(request: Request) {
   if (files.reduce((total, file) => total + file.size, 0) > MAX_MATERIAL_BYTES)
     throw new RequestBodyTooLargeError(MAX_MATERIAL_BYTES);
   return { form, files };
-}
-
-export async function materialStorageScopes(
-  database: Prisma.TransactionClient,
-  input: { id: string; userId: string; createdAt: Date }
-) {
-  const instance = await sottoStorageInstance(database).read();
-  const user = await database.user.findUnique({
-    where: { id: input.userId },
-    select: { createdAt: true },
-  });
-  if (!user) throw new AccessError('unauthorized');
-  return {
-    instanceId: instance.instanceId,
-    scopes: [
-      { subjectId: instance.subjectId, generation: instance.generation },
-      { subjectId: `profile:${input.userId}`, generation: user.createdAt.getTime() },
-      { subjectId: `material:${input.id}`, generation: input.createdAt.getTime() },
-    ].sort((left, right) => left.subjectId.localeCompare(right.subjectId)),
-  };
 }
 
 export function materialResponse(material: {
@@ -104,7 +86,9 @@ export async function importCourseMaterials(
     const id = randomUUID();
     const createdAt = new Date();
     const name = file.name.replace(/[\u0000-\u001f\/\\]/g, '_').slice(0, 240) || 'course-material';
-    const mimeType = file.type || 'application/octet-stream';
+    const mimeType = name.toLowerCase().endsWith('.pdf')
+      ? 'application/pdf'
+      : file.type || 'application/octet-stream';
     const extension = extname(name)
       .slice(1)
       .toLowerCase()
@@ -179,6 +163,7 @@ export async function importCourseMaterials(
           data: { originalUrl },
         });
         if (published.count !== 1) throw new AccessError('conflict');
+        if (courseId) await enqueueMaterialVocabularyIndex(database, id, admission.userId);
       },
     });
     materials.push(
@@ -206,6 +191,11 @@ export async function attachCourseMaterials(
   if (!ids.length) return;
   if (!(await database.course.findFirst({ where: { id: courseId, userId }, select: { id: true } })))
     throw new AccessError('conflict');
+  for (const id of [...ids].sort())
+    await database.$queryRaw`
+      SELECT id FROM "CourseMaterial"
+      WHERE id = ${id} AND "userId" = ${userId} FOR UPDATE
+    `;
   const materials = await database.courseMaterial.findMany({
     where: {
       id: { in: ids },
@@ -213,7 +203,7 @@ export async function attachCourseMaterials(
       originalUrl: { not: null },
       OR: [{ courseId: null }, { courseId }],
     },
-    select: { id: true },
+    select: { id: true, originalSha256: true, processingStatus: true },
   });
   if (materials.length !== ids.length)
     throw new AccessError(
@@ -230,6 +220,9 @@ export async function attachCourseMaterials(
     data: { courseId },
   });
   if (attached.count !== ids.length) throw new AccessError('conflict');
+  for (const material of materials)
+    if (!material.originalSha256 || ['READY', 'PARTIAL'].includes(material.processingStatus))
+      await enqueueMaterialVocabularyIndex(database, material.id, userId);
 }
 
 export async function persistPlacementMaterials(

@@ -31,6 +31,19 @@ import {
   materialAnalysisCancellationRequestSchema,
   materialAnalysisCancellationResponseSchema,
 } from '../course-materials/cancellation';
+import {
+  dictionaryResponseSchema,
+  dictionaryMeaningSchema,
+  dictionaryMeaningResponseSchema,
+  vocabularyWorkRequestSchema,
+  vocabularyIndexResponseSchema,
+  vocabularyAudioResponseSchema,
+} from '../learning/dictionary';
+import {
+  vocabularyStudyRequestSchema,
+  vocabularyStudySessionSchema,
+  vocabularyStudyActionSchema,
+} from '../learning/vocabulary-study';
 import { pencilHomeworkRequestSchema, pencilHomeworkResponseSchema } from './pencil-homework';
 import {
   classRegenerationRequestSchema,
@@ -269,6 +282,75 @@ export const endpoints: EndpointDef[] = [
     summary: 'Read a private source focus with verified citations and coverage.',
     auth: 'bearer',
     response: sourceFocusDetailSchema,
+  },
+  {
+    id: 'getVocabulary',
+    method: 'GET',
+    path: '/api/v1/courses/{courseId}/vocabulary',
+    summary:
+      'Read the owned dictionary, assessed recall, source provenance, and complete import progress.',
+    auth: 'bearer',
+    response: dictionaryResponseSchema,
+    query: [
+      { name: 'search', required: false },
+      { name: 'state', required: false },
+      { name: 'page', required: false },
+    ],
+  },
+  {
+    id: 'updateVocabularyMeaning',
+    method: 'PATCH',
+    path: '/api/v1/courses/{courseId}/vocabulary/{wordId}',
+    summary: 'Save dictionary meanings for future recall sessions without changing mastery.',
+    auth: 'bearer',
+    request: dictionaryMeaningSchema,
+    response: dictionaryMeaningResponseSchema,
+  },
+  {
+    id: 'startVocabularyStudy',
+    method: 'POST',
+    path: '/api/v1/courses/{courseId}/vocabulary/study',
+    summary: 'Start deterministic flashcards or recall from dictionary words without an LLM call.',
+    auth: 'bearer',
+    request: vocabularyStudyRequestSchema,
+    response: vocabularyStudySessionSchema,
+  },
+  {
+    id: 'answerVocabularyStudy',
+    method: 'POST',
+    path: '/api/v1/practice/{sessionId}/vocabulary',
+    summary: 'Check or reveal the first response once, or finish a saved vocabulary study.',
+    auth: 'bearer',
+    request: vocabularyStudyActionSchema,
+    response: vocabularyStudySessionSchema,
+  },
+  {
+    id: 'indexMaterialVocabulary',
+    method: 'POST',
+    path: '/api/v1/materials/{materialId}/vocabulary-index',
+    summary: 'Queue complete vocabulary indexing or retry verified failed source sections.',
+    auth: 'bearer',
+    request: vocabularyWorkRequestSchema,
+    response: vocabularyIndexResponseSchema,
+    successStatuses: [202],
+  },
+  {
+    id: 'prepareVocabularyPronunciation',
+    method: 'POST',
+    path: '/api/v1/courses/{courseId}/vocabulary/{wordId}/audio',
+    summary: 'Prepare or reuse persistent local pronunciation for an owned dictionary word.',
+    auth: 'bearer',
+    request: vocabularyWorkRequestSchema,
+    response: vocabularyAudioResponseSchema,
+  },
+  {
+    id: 'prepareStudyPronunciation',
+    method: 'POST',
+    path: '/api/v1/practice/{sessionId}/vocabulary/{cardId}/audio',
+    summary: 'Prepare or reuse local pronunciation without disclosing a listening answer.',
+    auth: 'bearer',
+    request: vocabularyWorkRequestSchema,
+    response: vocabularyAudioResponseSchema,
   },
   {
     id: 'resumePractice',

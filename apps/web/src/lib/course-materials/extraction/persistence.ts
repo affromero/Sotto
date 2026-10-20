@@ -11,6 +11,7 @@ import type { Prisma } from '@/generated/prisma/client';
 import { createMaterialTextChunkValidator } from './chunks';
 import { materialExtractionCoverage } from './coverage';
 import { materialPdfPageSchema } from './pdf-protocol';
+import { enqueueMaterialVocabularyIndex } from '@/lib/vocabulary/index-admission';
 
 const renderIdentitySchema = z
   .object({
@@ -161,6 +162,18 @@ export async function publishMaterialPageText(
   return stream;
 }
 
+async function enqueueAttachedVocabulary(
+  database: Prisma.TransactionClient,
+  input: MaterialRunIdentity
+) {
+  const material = await database.courseMaterial.findUniqueOrThrow({
+    where: { id: input.materialId },
+    select: { courseId: true },
+  });
+  if (material.courseId)
+    await enqueueMaterialVocabularyIndex(database, input.materialId, input.userId);
+}
+
 /** Completeness comes from every page's saved coverage, independently of readable previews. */
 export async function finishMaterialExtraction(
   database: Prisma.TransactionClient,
@@ -206,6 +219,7 @@ export async function finishMaterialExtraction(
   if (terminalStatuses.has(run.status)) {
     if (!['COMPLETE', 'PARTIAL'].includes(run.status) || !isDeepStrictEqual(run.coverage, coverage))
       throw new Error('A completed extraction coverage receipt changed.');
+    await enqueueAttachedVocabulary(database, input);
     return coverage;
   }
   await database.materialExtractionRun.update({
@@ -228,5 +242,6 @@ export async function finishMaterialExtraction(
         : 'Some original page content remains unresolved.',
     },
   });
+  await enqueueAttachedVocabulary(database, input);
   return coverage;
 }

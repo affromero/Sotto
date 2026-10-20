@@ -30,9 +30,9 @@ path = "src/main.rs"
 rustdoc-args = ["--deny", "warnings"]
 
 [package.metadata.cargo-machete]
-# progenitor emits regex and date-time types inside generate_api!.
+# progenitor emits regress::Regex patterns and chrono timestamps in generate_api!.
 # cargo-machete scans source before macro expansion and cannot see these uses.
-ignored = ["regress", "chrono"]
+ignored = ["chrono", "regress"]
 
 [dependencies]
 ratatui = { version = "0.30", features = ["serde"] }
@@ -63,7 +63,7 @@ async-trait = "0.1.92"
 # Generated API client + its runtime requirements.
 progenitor = "0.14"
 regress = "0.11"
-chrono = { version = "0.4.45", default-features = false, features = ["serde"] }
+chrono = { version = "0.4.45", default-features = false, features = ["serde", "std"] }
 
 # Audio: playback (rodio), capture (cpal), and WAV encoding (hound).
 rodio = "0.22"

@@ -140,6 +140,14 @@ async function currentConsumer(
       scopes: (await captureCourseStorage(database, item.courseId)).scopes,
     };
   }
+  if (kind === 'vocabulary-audio' && slot === 'audio') {
+    const item = await database.vocabularyPronunciation.findUnique({ where: { id } });
+    if (!item) return { reference: null, scopes: [] };
+    return {
+      reference: item.audioUrl,
+      scopes: (await captureCourseStorage(database, item.courseId)).scopes,
+    };
+  }
   if (kind === 'speaking-prompt' && slot === 'reference') {
     if (!(await database.speakingPrompt.findUnique({ where: { id }, select: { id: true } })))
       return { reference: null, scopes: [] };

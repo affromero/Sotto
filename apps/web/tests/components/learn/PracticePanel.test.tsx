@@ -3,9 +3,8 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { PracticePanel } from '@/components/learn/PracticePanel';
 import { StrictMode } from 'react';
 
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
-}));
+const navigation = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn() }));
+vi.mock('next/navigation', () => ({ useRouter: () => navigation }));
 
 const savedExercises = (sessionId: string) => ({
   status: 'ready',
@@ -72,6 +71,12 @@ describe('PracticePanel recent sessions', () => {
     expect(screen.getByRole('button', { name: 'Practice Reading, 2 due' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Practice Writing, 1 due' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Practice Vocabulary, 3 due' })).toBeInTheDocument();
+  });
+  it('opens the course dictionary for vocabulary practice without generating a quiz', async () => {
+    render(<PracticePanel courseId="course-1" courseName="German" />);
+    fireEvent.click(await screen.findByRole('button', { name: /Practice Vocabulary/ }));
+    expect(navigation.push).toHaveBeenCalledWith('/learn/vocabulary?course=course-1');
+    expect(fetchMock.mock.calls.every(([, options]) => options?.method !== 'POST')).toBe(true);
   });
   it('badges each past session by how it ended', async () => {
     render(<PracticePanel courseId="course-1" courseName="German" />);

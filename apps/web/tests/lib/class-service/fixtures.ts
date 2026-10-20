@@ -1,4 +1,5 @@
 import { learningScriptHash } from '@/lib/learning/script-hash';
+import type { VocabularyMemory } from '@/lib/learning/vocabulary/selection';
 import { createHash } from 'node:crypto';
 import { createSkillRequirements, learningSkills } from '@sotto/shared';
 import { expect, vi } from 'vitest';
@@ -126,6 +127,8 @@ const mockClassSubmissionDeleteMany = vi.fn();
 const mockCourseUpdate = vi.fn();
 const mockCourseUpdateMany = vi.fn().mockResolvedValue({ count: 1 });
 const mockTransaction = vi.fn();
+export const mockEpisodeUpdateMany = vi.fn().mockResolvedValue({ count: 1 });
+export const mockQueueListeningAudio = vi.fn().mockResolvedValue(undefined);
 export const mockDueVocabRows = vi.fn().mockResolvedValue([]);
 export const mockCourseMaterialRows = vi.fn().mockResolvedValue([]);
 export const mockLearnerVocabFindMany = vi
@@ -134,6 +137,7 @@ export const mockLearnerVocabFindMany = vi
 
 vi.mock('@/lib/prisma', () => {
   const database = {
+    episode: { updateMany: (...args: unknown[]) => mockEpisodeUpdateMany(...args) },
     $queryRaw: async (query: TemplateStringsArray, ...values: unknown[]) => {
       const materials = (await mockCourseMaterialRows()) as Array<{
         id: string;
@@ -293,8 +297,38 @@ vi.mock('@/lib/prisma', () => {
       deleteMany: (...args: unknown[]) => mockLessonQuestionDeleteMany(...args),
     },
     learnerVocab: {
-      findMany: (...args: unknown[]) => {
-        const query = args[0] as { select?: { dueAt?: boolean } };
+      findMany: async (...args: unknown[]) => {
+        const query = args[0] as {
+          select?: { dueAt?: boolean; firstSeenClassId?: boolean };
+          where: { reps?: number; lemma?: { in: string[] } };
+        };
+        if (query.select?.firstSeenClassId) {
+          const saved = (await mockLearnerVocabFindMany(...args)) as Array<
+            Partial<VocabularyMemory> & { lemma: string }
+          >;
+          const due = (await mockDueVocabRows()) as VocabularyMemory[];
+          const memory = new Map(
+            [...saved, ...due].map((row) => [
+              row.lemma,
+              {
+                translation: row.lemma === 'hola' ? 'hello' : row.lemma,
+                partOfSpeech: null,
+                mastery: 0,
+                reps: 0,
+                lastReviewed: null,
+                firstSeenClassId: null,
+                dueAt: new Date('2100-01-01'),
+                ...row,
+              },
+            ])
+          );
+          return [...memory.values()].filter((word) => {
+            if (query.where.lemma) return query.where.lemma.in.includes(word.lemma);
+            const active =
+              word.reps > 0 || word.lastReviewed !== null || word.firstSeenClassId !== null;
+            return query.where.reps === 0 ? !active : active;
+          });
+        }
         return query.select?.dueAt ? mockDueVocabRows(...args) : mockLearnerVocabFindMany(...args);
       },
     },
@@ -346,8 +380,14 @@ vi.mock('@/lib/knowledge-graph', async (importOriginal) => ({
   applyReviewOutcome: vi.fn(),
 }));
 
-vi.mock('@/lib/class-listening-generator', () => ({
+vi.mock('@/lib/class-listening-generator', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/class-listening-generator')>()),
   generateClassListening: (...args: unknown[]) => mockGenerateClassListening(...args),
+  prepareClassListening: async (...args: unknown[]) => ({
+    ...(await mockGenerateClassListening(...args)),
+    content: { episodeId: 'episode-listening', turns: [], comprehensionQuestions: [] },
+  }),
+  queueListeningAudio: (...args: unknown[]) => mockQueueListeningAudio(...args),
 }));
 
 vi.mock('@/lib/class-speaking-generator', () => ({

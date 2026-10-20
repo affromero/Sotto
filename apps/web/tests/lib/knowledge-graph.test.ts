@@ -11,6 +11,7 @@ const mockLearnerGrammarFindMany = vi.fn();
 const mockLearnerGrammarUpdate = vi.fn();
 const mockLearnerFocusTargetFindMany = vi.fn();
 const mockVocabEdgeFindMany = vi.fn();
+const mockReviewEventCreate = vi.fn();
 
 vi.mock('@/lib/prisma', () => {
   const database = {
@@ -20,6 +21,7 @@ vi.mock('@/lib/prisma', () => {
         .mockResolvedValue({ nativeLang: 'en', targetLang: 'es', currentLevel: 'A1' }),
     },
     learningLevelBinding: { findMany: vi.fn().mockResolvedValue([]) },
+    learnerReviewEvent: { create: (...args: unknown[]) => mockReviewEventCreate(...args) },
     learnerVocab: {
       upsert: (...args: unknown[]) => mockLearnerVocabUpsert(...args),
       findMany: (...args: unknown[]) => mockLearnerVocabFindMany(...args),
@@ -52,10 +54,19 @@ import {
   upsertCourseGrammar,
   upsertLiveVocab,
 } from '@/lib/knowledge-graph';
+import { prismaUnfiltered } from '@/lib/prisma';
 
 // ---- Helpers ----
 
 const NOW = new Date('2026-06-08T00:00:00.000Z');
+const reviewEvidence = {
+  source: { practiceSessionId: 'practice-1', attempt: 1 as const },
+  assessment: 'SECTION_AGGREGATE' as const,
+  questionIdsByTarget: new Map([
+    ['vocab:hola', ['q1']],
+    ['grammar:articles', ['q2']],
+  ]),
+};
 
 const FRESH_SRS = {
   ease: 2.5,
@@ -212,7 +223,16 @@ describe('applyReviewOutcome', () => {
     const initialMastery = 0.1;
     mockLearnerVocabFindMany.mockResolvedValue([makeFreshVocabRow({ mastery: initialMastery })]);
 
-    await applyReviewOutcome('course-1', ['hola'], [], 0.8, 0.8, NOW);
+    await applyReviewOutcome(
+      'course-1',
+      ['hola'],
+      [],
+      0.8,
+      0.8,
+      NOW,
+      prismaUnfiltered,
+      reviewEvidence
+    );
 
     expect(mockLearnerVocabUpdate).toHaveBeenCalledTimes(1);
     const callData = mockLearnerVocabUpdate.mock.calls[0][0];
@@ -220,13 +240,34 @@ describe('applyReviewOutcome', () => {
     // reviewCard with quality=0.8 (pass) must raise mastery above initial
     expect(callData.data.mastery).toBeGreaterThan(initialMastery);
     expect(callData.data.lastReviewed).toBe(NOW);
+    expect(mockReviewEventCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        vocabId: 'v1',
+        quality: 0.8,
+        questionIds: ['q1'],
+        before: expect.objectContaining({ mastery: initialMastery }),
+        after: expect.objectContaining({
+          mastery: callData.data.mastery,
+          lastReviewed: NOW.toISOString(),
+        }),
+      }),
+    });
   });
 
   it('calls learnerVocab.update with lowered mastery for a failing quality (<0.6)', async () => {
     const initialMastery = 0.4;
     mockLearnerVocabFindMany.mockResolvedValue([makeFreshVocabRow({ mastery: initialMastery })]);
 
-    await applyReviewOutcome('course-1', ['hola'], [], 0.2, 0.2, NOW);
+    await applyReviewOutcome(
+      'course-1',
+      ['hola'],
+      [],
+      0.2,
+      0.2,
+      NOW,
+      prismaUnfiltered,
+      reviewEvidence
+    );
 
     expect(mockLearnerVocabUpdate).toHaveBeenCalledTimes(1);
     const callData = mockLearnerVocabUpdate.mock.calls[0][0];
@@ -241,7 +282,16 @@ describe('applyReviewOutcome', () => {
       makeFreshGrammarRow({ mastery: initialMastery }),
     ]);
 
-    await applyReviewOutcome('course-1', [], ['articles'], 1.0, 1.0, NOW);
+    await applyReviewOutcome(
+      'course-1',
+      [],
+      ['articles'],
+      1.0,
+      1.0,
+      NOW,
+      prismaUnfiltered,
+      reviewEvidence
+    );
 
     expect(mockLearnerGrammarUpdate).toHaveBeenCalledTimes(1);
     const callData = mockLearnerGrammarUpdate.mock.calls[0][0];
@@ -256,7 +306,16 @@ describe('applyReviewOutcome', () => {
       makeFreshGrammarRow({ mastery: initialMastery }),
     ]);
 
-    await applyReviewOutcome('course-1', [], ['articles'], 0.0, 0.0, NOW);
+    await applyReviewOutcome(
+      'course-1',
+      [],
+      ['articles'],
+      0.0,
+      0.0,
+      NOW,
+      prismaUnfiltered,
+      reviewEvidence
+    );
 
     expect(mockLearnerGrammarUpdate).toHaveBeenCalledTimes(1);
     const callData = mockLearnerGrammarUpdate.mock.calls[0][0];
@@ -267,7 +326,16 @@ describe('applyReviewOutcome', () => {
     mockLearnerVocabFindMany.mockResolvedValue([]);
     mockLearnerGrammarFindMany.mockResolvedValue([]);
 
-    await applyReviewOutcome('course-1', ['hola'], ['articles'], 1.0, 1.0, NOW);
+    await applyReviewOutcome(
+      'course-1',
+      ['hola'],
+      ['articles'],
+      1.0,
+      1.0,
+      NOW,
+      prismaUnfiltered,
+      reviewEvidence
+    );
 
     expect(mockLearnerVocabUpdate).not.toHaveBeenCalled();
     expect(mockLearnerGrammarUpdate).not.toHaveBeenCalled();
@@ -326,6 +394,29 @@ describe('getDueItems', () => {
     expect(result.grammar).toEqual([]);
   });
 
+  it('reads lexical review from the supplied transaction while retaining the qualified objective projection', async () => {
+    const transaction = {
+      ...prismaUnfiltered,
+      learnerVocab: {
+        ...prismaUnfiltered.learnerVocab,
+        findMany: vi
+          .fn()
+          .mockResolvedValue([makeFreshVocabRow({ id: 'owned-transaction-word', lemma: 'hola' })]),
+      },
+      learnerGrammar: {
+        ...prismaUnfiltered.learnerGrammar,
+        findMany: vi.fn().mockResolvedValue([]),
+      },
+      learnerFocusTarget: {
+        ...prismaUnfiltered.learnerFocusTarget,
+        findMany: vi.fn().mockResolvedValue([]),
+      },
+    };
+    const result = await getDueItems('course-1', 8, transaction);
+    expect(result.vocab.map((item) => item.id)).toEqual(['owned-transaction-word']);
+    expect(result.objectives).toEqual([]);
+  });
+
   it('passes the limit to the findMany take option', async () => {
     mockLearnerVocabFindMany.mockResolvedValue([]);
     mockLearnerGrammarFindMany.mockResolvedValue([]);
@@ -339,14 +430,26 @@ describe('getDueItems', () => {
     expect(mockLearnerGrammarFindMany).toHaveBeenCalledWith(expect.objectContaining({ take: 16 }));
   });
 
-  it('uses courseId in the where clause', async () => {
+  it('scopes due vocabulary to the course and previously introduced words', async () => {
     mockLearnerVocabFindMany.mockResolvedValue([]);
     mockLearnerGrammarFindMany.mockResolvedValue([]);
 
     await getDueItems('course-xyz');
 
     expect(mockLearnerVocabFindMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: expect.objectContaining({ courseId: 'course-xyz' }) })
+      expect.objectContaining({
+        where: expect.objectContaining({
+          courseId: 'course-xyz',
+          AND: expect.arrayContaining([
+            expect.objectContaining({
+              OR: expect.arrayContaining([
+                { introducedAt: { not: null } },
+                { lastReviewed: { not: null } },
+              ]),
+            }),
+          ]),
+        }),
+      })
     );
   });
 

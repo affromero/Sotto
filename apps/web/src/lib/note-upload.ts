@@ -1,9 +1,12 @@
 // Shared helpers for importing learner-uploaded note/material files. Used by the
 // course-notes import route and by notes-based placement. Text files are read
-// directly; office/PDF/epub go through Markit. Oversized extracts fail explicitly.
+// directly; office/epub go through Markit. PDFs retain originals and an embedded
+// text index. Oversized extracts fail explicitly.
 import { extname } from 'path';
 import { CompleteTextLimitError, extractViaMarkit } from '@/lib/extractors/markit';
 import { AccessError, isAccessError } from 'thesidedoor-core/access';
+import { validatePdfDocument } from './providers/documents/pdf-input';
+import { createPdfParser } from './providers/documents/parser';
 
 export const MAX_IMPORTED_FILE_CHARS = 1000000;
 
@@ -23,7 +26,7 @@ const TEXT_EXTENSIONS = new Set([
   '.yaml',
   '.yml',
 ]);
-const MARKIT_EXTENSIONS = new Set(['.pdf', '.docx', '.pptx', '.xlsx', '.epub']);
+const MARKIT_EXTENSIONS = new Set(['.docx', '.pptx', '.xlsx', '.epub']);
 
 export function isTextMaterial(name: string, mimeType: string): boolean {
   return mimeType.startsWith('text/') || TEXT_EXTENSIONS.has(extname(name).toLowerCase());
@@ -53,6 +56,24 @@ async function extractUploadText(file: File): Promise<{ text: string; sourceText
   const name = file.name || 'uploaded-notes';
   const extension = extname(name).toLowerCase();
   const buffer = Buffer.from(await file.arrayBuffer());
+
+  if (extension === '.pdf' || file.type === 'application/pdf') {
+    validatePdfDocument({ type: 'document', mediaType: 'application/pdf', name, data: buffer });
+    const { parser, releaseCanvases } = await createPdfParser(buffer);
+    let sourceText = '';
+    try {
+      const info = await parser.getInfo();
+      if (info.total < 1) throw new Error('The PDF contains no pages.');
+      sourceText = normalizeImportedText((await parser.getText({ pageJoiner: '' })).text);
+    } finally {
+      try {
+        await parser.destroy();
+      } finally {
+        releaseCanvases();
+      }
+    }
+    return { text: `Original course PDF: ${name}`, sourceText };
+  }
 
   if (isTextMaterial(name, file.type)) {
     const text = normalizeImportedText(buffer.toString('utf8'));

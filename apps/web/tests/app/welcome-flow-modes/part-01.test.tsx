@@ -15,7 +15,6 @@ import { StepAgent } from '@/app/welcome/steps/StepAgent';
 import { StepContext } from '@/app/welcome/steps/StepContext';
 import { StepContextReview } from '@/app/welcome/steps/StepContextReview';
 import { StepPlacement } from '@/app/welcome/steps/StepPlacement';
-import { StepWelcome } from '@/app/welcome/steps/StepWelcome';
 import { StepReady } from '@/app/welcome/steps/StepReady';
 import {
   createWelcomeCredentialBoundary,
@@ -98,25 +97,6 @@ describe('welcome hosted-demo mode', () => {
     vi.unstubAllGlobals();
     window.localStorage.clear();
     window.history.pushState({}, '', '/welcome');
-  });
-
-  it('offers Russian as the native language for a German course', async () => {
-    const user = userEvent.setup();
-    const setBaseLang = vi.fn();
-
-    render(
-      <StepWelcome
-        state={{ baseLang: 'en', language: 'de' }}
-        demoMode={false}
-        setBaseLang={setBaseLang}
-        setLanguage={vi.fn()}
-        onNext={vi.fn()}
-        onBack={vi.fn()}
-      />
-    );
-
-    await user.click(screen.getByRole('button', { name: 'Русский' }));
-    expect(setBaseLang).toHaveBeenCalledWith('ru');
   });
 
   it('offers placement choices inside the welcome flow instead of linking to /learn', async () => {
@@ -952,6 +932,7 @@ describe('welcome hosted-demo mode', () => {
           accessKeyId: 'test-access',
           secretAccessKey: 'test-secret',
         }}
+        vocabularySupport="MEANING_RECALL"
         config={{ selfHosted: true, isOwner: true }}
         onRestart={vi.fn()}
         onJump={vi.fn()}
@@ -970,7 +951,7 @@ describe('welcome hosted-demo mode', () => {
       })
     );
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
-      course: { native: 'en', target: 'it', level: 'A2' },
+      course: { native: 'en', target: 'it', level: 'A2', vocabularySupport: 'MEANING_RECALL' },
       preferred: { language: 'it' },
       infra: {
         storageProvider: 's3',

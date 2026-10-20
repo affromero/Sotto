@@ -557,6 +557,26 @@ describe('durable material recognition execution', () => {
         signal: signal(),
       })
     ).rejects.toThrow();
+    other.messages = [
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'document',
+            mediaType: 'application/pdf',
+            name: 'Unexpected original.pdf',
+            data: Uint8Array.of(37, 80, 68, 70),
+          },
+        ],
+      },
+    ];
+    await expect(
+      replayMaterialRecognitionHttp({
+        prepared: other,
+        receipt: record.state.http!,
+        signal: signal(),
+      })
+    ).rejects.toThrow('text and page images only');
     expect(boundary.network).toHaveBeenCalledTimes(1);
   });
   it('does not dispatch when cancelled or when immutable request content changed', async () => {
@@ -764,7 +784,7 @@ describe('canonical optional preparation response receipts', () => {
       hook(
         new Request('https://owned.invalid/ai', {
           method: 'POST',
-          body: 'x'.repeat(4 * 1024 * 1024 + 1),
+          body: 'x'.repeat(72 * 1024 * 1024 + 1),
         }),
         async () => {
           dispatched = true;

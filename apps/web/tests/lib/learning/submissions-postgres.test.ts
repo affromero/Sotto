@@ -467,6 +467,9 @@ suite('Complete learning submissions against PostgreSQL', () => {
       ).reps
     ).toBe(1);
     expect(await fixture.instance.database.classSubmission.count()).toBe(1);
+    expect(
+      await fixture.instance.database.learnerReviewEvent.count({ where: { classId: cls.id } })
+    ).toBe(2);
   });
   it('serializes duplicate practice submissions and reopens the same result', async () => {
     const session = await fixture.seedPractice(fixture.requirements('FULL', false, false));
@@ -483,6 +486,11 @@ suite('Complete learning submissions against PostgreSQL', () => {
       ).reps
     ).toBe(1);
     expect((await resumePractice(session.id, fixture.userId)).submissionResult).toEqual(first);
+    expect(
+      await fixture.instance.database.learnerReviewEvent.count({
+        where: { practiceSessionId: session.id },
+      })
+    ).toBe(2);
   });
   it('rolls back grades, submissions and course advancement when SRS persistence fails', async () => {
     const cls = await fixture.seedClass(fixture.requirements('CLASS', false, false));

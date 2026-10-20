@@ -319,7 +319,7 @@ def activate_provider(directory: Path, release: str) -> None:
     atomic_json(path, {**expected, 'fishEnabled': True}, 0o444)
 
 
-def runtime_command(arguments: list[str]) -> bytes:
+def command_output(arguments: list[str], timeout: int | None = 120) -> bytes:
     descriptors: tuple[int, ...]
     try:
         os.fstat(9)
@@ -327,9 +327,13 @@ def runtime_command(arguments: list[str]) -> bytes:
     except OSError:
         descriptors = ()
     return subprocess.run(
-        ['docker', *arguments], capture_output=True, check=True,
-        timeout=120, pass_fds=descriptors,
+        arguments, capture_output=True, check=True,
+        timeout=timeout, pass_fds=descriptors,
     ).stdout
+
+
+def runtime_command(arguments: list[str]) -> bytes:
+    return command_output(['docker', *arguments])
 
 
 def enabled_activation(directory: Path, release: str) -> None:
@@ -553,9 +557,333 @@ def overlap_continuity(bound: Path, directory: Path, old_slot: str, slot: str) -
     candidate_continuity(directory, slot)
 
 
+def schema_transition(
+    review: Mapping[str, object], evidence: bytes, bound: Mapping[str, object],
+    continuity: Mapping[str, object], candidate: str, previous: bytes,
+    environment: Mapping[str, str],
+) -> None:
+    fields = {
+        'schemaVersion', 'procedure', 'stack', 'releaseSha',
+        'candidateWebImage', 'candidateWorkersImage', 'candidateSchemaHash',
+        'previousSchemaHashes', 'compatibilityReviewSha256',
+        'reviewer', 'evidenceSha256',
+    }
+    version = review.get('schemaVersion')
+    if version == 2:
+        fields.add('queueTransition')
+    if set(review) != fields or type(version) is not int or (
+        version not in {1, 2}
+        or review['procedure'] != 'fenced-schema-migration'
+    ):
+        raise ValueError('Exact fenced schema transition review required')
+    if version == 2:
+        validate_queue_transition(review['queueTransition'])
+    expected: dict[str, object] = {
+        'stack': environment['SOTTO_STACK'],
+        'releaseSha': environment['SOTTO_RELEASE_SHA'],
+        'candidateWebImage': environment['SOTTO_WEB_IMAGE_REF'],
+        'candidateWorkersImage': environment['SOTTO_WORKERS_IMAGE_REF'],
+        'candidateSchemaHash': candidate,
+        'evidenceSha256': hashlib.sha256(evidence).hexdigest(),
+        'compatibilityReviewSha256': hashlib.sha256(
+            cast(str, bound['review']).encode()
+        ).hexdigest(),
+    }
+    old = {}
+    for line in previous.decode().splitlines():
+        image, digest = line.split()
+        if image in old or not re.fullmatch(r'sha256:[a-f0-9]{64}', image):
+            raise ValueError('Unique previous schema image required')
+        if not re.fullmatch(r'[a-f0-9]{64}', digest):
+            raise ValueError('Exact previous schema hash required')
+        old[image] = digest
+    contracts = mapping(cast(str, bound['review']).encode())[
+        'previousWorkerContracts'
+    ]
+    if not old or set(old) != set(cast(dict[str, object], contracts)):
+        raise ValueError('Previous schema inventory differs from runtime review')
+    if not re.fullmatch(r'[a-f0-9]{64}', candidate) or all(
+        digest == candidate for digest in old.values()
+    ):
+        raise ValueError('Reviewed schema change required')
+    expected['previousSchemaHashes'] = old
+    if any(review[field] != value for field, value in expected.items()):
+        raise ValueError('Schema review differs from exact deployment inputs')
+    if not isinstance(review['reviewer'], str) or not review['reviewer'].strip():
+        raise ValueError('Independent schema reviewer required')
+    if not evidence.strip() or continuity.get('mode') != 'preserve-existing':
+        raise ValueError('Existing provider continuity and schema evidence required')
+    files = cast(dict[str, dict[str, object]], continuity['reviewedRuntimeFiles'])
+    added = 0
+    for name, pair in files.items():
+        if not name.startswith('apps/web/prisma/migrations/'):
+            continue
+        if pair['previousSha256'] is not None or not re.fullmatch(
+            r'apps/web/prisma/migrations/[A-Za-z0-9_]+/migration.sql', name
+        ) or pair['candidateSha256'] is None:
+            raise ValueError('Previously published migration files must remain unchanged')
+        added += 1
+    if not 1 <= added <= 16:
+        raise ValueError('Bounded added migration inventory required')
+
+
+def validate_queue_transition(value: object) -> dict[str, list[str]]:
+    fields = {'previousQueues', 'candidateQueues', 'addedQueues'}
+    if not isinstance(value, dict) or set(value) != fields:
+        raise ValueError('Exact additive queue transition review required')
+    for names in value.values():
+        if (not isinstance(names, list) or not names or len(names) > 100
+                or any(not isinstance(name, str) or not re.fullmatch(
+                    r'[a-z][a-z-]*', name) for name in names)
+                or names != sorted(set(names))):
+            raise ValueError('Bounded sorted unique queue names required')
+    previous, candidate = set(value['previousQueues']), set(value['candidateQueues'])
+    if not previous < candidate or value['addedQueues'] != sorted(candidate - previous):
+        raise ValueError('Only exact additive queue transitions are supported')
+    return cast(dict[str, list[str]], value)
+
+
+def unchanged_queue_contract(
+    bound: Mapping[str, object], transition: object = None,
+) -> None:
+    review = mapping(cast(str, bound['review']).encode())
+    contracts = cast(dict[str, str], review['previousWorkerContracts'])
+    directory = Path(__file__).parent / 'images'
+    inventories = []
+    for image in [os.environ['SOTTO_WORKERS_IMAGE_REF'], *contracts]:
+        try:
+            raw = command_output([
+                sys.executable, str(directory / 'probe.py'),
+                '--reference', image,
+                '--source', str(directory / 'queue-names.cjs'), '--tsx',
+            ], timeout=None)
+        except subprocess.CalledProcessError as error:
+            detail = error.stderr.decode(errors='replace').strip()
+            raise ValueError('Queue inventory probe failed: ' + detail) from None
+        names = json.loads(raw)
+        if not isinstance(names, list) or not names or any(
+            not isinstance(name, str) for name in names
+        ) or len(names) != len(set(names)):
+            raise ValueError('Complete unique queue inventory required')
+        inventories.append(sorted(names))
+    if transition is None:
+        if any(names != inventories[0] for names in inventories):
+            raise ValueError('Schema transition requires unchanged queue names')
+        return
+    reviewed = validate_queue_transition(transition)
+    if (inventories[0] != reviewed['candidateQueues']
+            or any(names != reviewed['previousQueues'] for names in inventories[1:])):
+        raise ValueError('Image queue inventories differ from the reviewed transition')
+
+
+def schema_drift(status: str, directory: Path) -> None:
+    if status not in {'0', '2'}:
+        raise ValueError('Prisma schema comparison failed')
+    preparation = mapping(read_bytes(
+        directory / 'schema-preparation.json', private=True,
+    ))
+    report = mapping(read_bytes(directory / 'schema-index.json', private=True))
+    if report.get('connectionIdentity') != preparation.get('applicationConnectionIdentity'):
+        raise ValueError('Index proof database connection changed')
+    proof = report.get('indexProof')
+    schema = cast(dict[str, object], preparation['databaseIdentity'])['schemaName']
+    if not isinstance(proof, dict) or proof.get('schemaName') != schema:
+        raise ValueError('Exact schema index proof required')
+    quoted = proof.get('quotedSchema')
+    if not isinstance(quoted, str) or not (
+        quoted == schema or (
+            quoted.startswith('"') and quoted.endswith('"')
+            and quoted[1:-1].replace('""', '"') == schema
+        )
+    ):
+        raise ValueError('Exact PostgreSQL schema identifier required')
+    expected = {
+        'schemaName': schema, 'quotedSchema': quoted,
+        'tableName': 'SidedoorState',
+        'indexName': 'SidedoorState_id_pattern_idx',
+        'accessMethod': 'btree',
+        'isValid': True, 'isReady': True, 'isLive': True,
+        'isUnique': False, 'isPrimary': False, 'isExclusion': False,
+        'keyCount': 1, 'attributeCount': 1,
+        'noExpressions': True, 'noPredicate': True,
+        'columnName': 'id', 'operatorClass': 'text_pattern_ops',
+        'operatorNamespace': 'pg_catalog', 'ordering': 0,
+        'defaultCollation': True, 'sameSchema': True,
+        'definition': 'CREATE INDEX "SidedoorState_id_pattern_idx" ON '
+        + quoted + '."SidedoorState" USING btree (id text_pattern_ops)',
+    }
+    if proof != expected or any(
+        type(proof[key]) is not type(value)
+        for key, value in expected.items()
+    ):
+        raise ValueError('Shared-state index definition or validity differs')
+    sql = read_bytes(directory / 'schema-drift.sql', private=True)
+    known = (
+        b'-- DropIndex\nDROP INDEX "SidedoorState_id_pattern_idx";\n\n'
+        b'-- CreateIndex\nCREATE INDEX "SidedoorState_id_pattern_idx" '
+        b'ON "SidedoorState"("id" text_pattern_ops);\n'
+    )
+    if status == '2' and sql not in {known, known + b'\n'}:
+        raise ValueError('Database drift differs from verified Prisma BTree limitation')
+    if status == '0' and sql.strip() not in {
+        b'', b'-- This is an empty migration.',
+    }:
+        raise ValueError('Unexpected SQL from an empty schema comparison')
+    atomic_json(directory / 'schema-drift-proof.json', {
+        'diffExitCode': int(status), 'sdkLimitationVerified': status == '2',
+        'sqlSha256': hashlib.sha256(sql).hexdigest(), 'indexProof': proof,
+        'preparationSha256': hashlib.sha256(read_bytes(
+            directory / 'schema-preparation.json', private=True,
+        )).hexdigest(),
+    })
+    print('Prisma schema comparison and PostgreSQL index integrity verified.'
+          + (' Exact BTree introspection limitation recorded.' if status == '2' else ''))
+
+
+def schema_connections(bound: Path, old_slot: str) -> dict[str, object]:
+    existing_continuity(bound, old_slot)
+    runtimes = captured_runtime(Path(os.environ['PREVIOUS_WORKER_IMAGES']))
+    runtimes.update(captured_runtime(Path(os.environ['PREVIOUS_APP_IMAGES'])))
+    configurations = []
+    containers = {}
+    for service, (identifier, _) in runtimes.items():
+        rows = json.loads(runtime_command(['inspect', identifier]))
+        entries = rows[0]['Config']['Env']
+        if any(entry.startswith('PG') and entry.partition('=')[2] for entry in entries):
+            raise ValueError('PostgreSQL environment overrides require separate review')
+        configuration = []
+        for name in ('DATABASE_URL', 'REDIS_URL'):
+            values = [entry.partition('=')[2] for entry in entries
+                      if entry.partition('=')[0] == name]
+            if len(values) != 1 or not values[0]:
+                raise ValueError('Unique previous database and Redis configuration required')
+            configuration.append(values[0])
+        configurations.append(configuration)
+        containers[service] = identifier
+    if any(value != configurations[0] for value in configurations):
+        raise ValueError('Previous database or Redis configuration differs')
+    return {'configurationMatches': True, 'containers': containers}
+
+
+def schema_preparation(directory: Path) -> None:
+    def read(name: str) -> dict[str, object]:
+        return mapping(read_bytes(directory / name, private=True))
+
+    queues = read('queues-original.json')
+    if read('schema-connection-proof.json') != queues:
+        raise ValueError('Candidate queue connection or original pause state differs')
+    app = read('schema-app-database.json')
+    direct = read('schema-direct-database.json')
+    previous = read('schema-previous-database.json')
+    configurations = read('schema-previous-connections.json')
+    containers = configurations.get('containers')
+    if configurations.get('configurationMatches') is not True or not isinstance(
+        containers, dict
+    ) or set(containers) != WORKERS | {'web'} or previous.get(
+        'controlContainerId'
+    ) not in [containers[service] for service in WORKERS]:
+        raise ValueError('Captured previous database proof required')
+    identity = app.get('databaseIdentity')
+    if not isinstance(identity, dict) or set(identity) != {
+        'databaseName', 'schemaName', 'serverAddress', 'serverPort', 'databaseOid',
+    } or identity != direct.get('databaseIdentity') or identity != previous.get('databaseIdentity'):
+        raise ValueError('App and migration database/schema identities differ')
+    if app.get('connectionIdentity') != queues.get('connectionIdentity'):
+        raise ValueError('Application database proof differs from queue identity')
+    if previous.get('connectionIdentity') != queues.get('connectionIdentity'):
+        raise ValueError('Previous database proof differs from queue identity')
+    proof = {
+        'schemaVersion': 1,
+        'releaseSha': os.environ['SOTTO_RELEASE_SHA'],
+        'stack': os.environ['SOTTO_STACK'],
+        'queueManifest': queues,
+        'databaseIdentity': identity,
+        'applicationConnectionIdentity': app['connectionIdentity'],
+        'migrationConnectionIdentity': direct['connectionIdentity'],
+        'previousConnectionIdentity': previous['connectionIdentity'],
+        'previousControlContainerId': previous['controlContainerId'],
+        'previousConfiguration': configurations,
+        'schemaReviewSha256': hashlib.sha256(
+            read_bytes(directory / 'schema-review.json', private=True)
+        ).hexdigest(),
+        'runtimeReviewSha256': hashlib.sha256(
+            read_bytes(directory / 'compatibility-review.json', private=True)
+        ).hexdigest(),
+    }
+    atomic_json(directory / 'schema-preparation.json', proof)
+
+
+def stopped_continuity(bound: Path, old_slot: str) -> dict[str, object]:
+    continuity = bound_continuity(bound)
+    runtimes = captured_runtime(Path(os.environ['PREVIOUS_WORKER_IMAGES']))
+    runtimes.update(captured_runtime(Path(os.environ['PREVIOUS_APP_IMAGES'])))
+    if set(runtimes) != WORKERS | {'web'} or old_slot not in {'blue', 'green'}:
+        raise ValueError('All four previous runtimes required')
+    reviewed = cast(dict[str, dict[str, str]], continuity['previousRuntimes'])
+    proof: dict[str, object] = {}
+    for service, (identifier, image) in runtimes.items():
+        if (identifier, image) != (
+            reviewed[service]['containerId'], reviewed[service]['imageId']
+        ):
+            raise ValueError('Stopped runtime differs from review')
+        rows = json.loads(runtime_command(['inspect', identifier]))
+        if not isinstance(rows, list) or len(rows) != 1:
+            raise ValueError('Unique stopped runtime required')
+        row = rows[0]
+        state = row.get('State', {})
+        if row.get('Id') != identifier or row.get('Image') != image or (
+            state.get('Running') is not False
+            or state.get('OOMKilled') is not False
+            or state.get('ExitCode') not in ((0, 143) if service == 'web' else (0,))
+        ):
+            raise ValueError('Graceful captured runtime settlement required')
+        project = os.environ['SOTTO_STACK']
+        if service == 'web':
+            project += '-' + old_slot
+        running = runtime_command([
+            'ps', '-q', '--no-trunc', '--filter',
+            'label=com.docker.compose.project=' + project,
+            '--filter', 'label=com.docker.compose.service=' + service,
+        ])
+        if running.strip():
+            raise ValueError('A replacement previous service remains running')
+        proof[service] = {
+            'containerId': identifier, 'imageId': image,
+            'exitCode': state['ExitCode'],
+        }
+    return proof
+
+
 def main() -> int:
     try:
         arguments = sys.argv[1:]
+        if arguments and arguments[0] == 'schema-drift' and len(arguments) == 3:
+            schema_drift(arguments[1], Path(arguments[2]))
+            return 0
+        if arguments and arguments[0] == 'schema-connections' and len(arguments) == 3:
+            print(json.dumps(schema_connections(Path(arguments[1]), arguments[2])))
+            return 0
+        if arguments and arguments[0] == 'schema-validate' and len(arguments) == 6:
+            raw = read_bytes(Path(arguments[1]), private=True)
+            evidence = read_bytes(Path(arguments[2]), private=True)
+            bound = mapping(read_bytes(Path(arguments[3]), private=True))
+            continuity = bound_continuity(Path(arguments[3]))
+            review = mapping(raw)
+            schema_transition(
+                review, evidence, bound, continuity, arguments[4],
+                read_bytes(Path(arguments[5])), os.environ,
+            )
+            unchanged_queue_contract(bound, review.get('queueTransition'))
+            print(json.dumps({'review': raw.decode(), 'evidence': evidence.decode()}))
+            return 0
+        if arguments and arguments[0] == 'schema-preparation' and len(arguments) == 2:
+            schema_preparation(Path(arguments[1]))
+            return 0
+        if arguments and arguments[0] == 'continuity-stopped' and len(arguments) in (3, 4):
+            proof = stopped_continuity(Path(arguments[1]), arguments[2])
+            if len(arguments) == 4:
+                atomic_json(Path(arguments[3]), proof)
+            return 0
         if arguments and arguments[0] == 'activation-mode' and len(arguments) == 2:
             bound = mapping(read_bytes(Path(arguments[1]), private=True))
             review = mapping(cast(str, bound['review']).encode())

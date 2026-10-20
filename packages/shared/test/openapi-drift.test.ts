@@ -116,6 +116,13 @@ describe('openapi.json drift guard', () => {
         'GET /api/v1/courses/{courseId}/material-analyses',
         'POST /api/v1/courses/{courseId}/learning-map/advance',
         'POST /api/v1/courses/{courseId}/learning-map/selection',
+        'GET /api/v1/courses/{courseId}/vocabulary',
+        'PATCH /api/v1/courses/{courseId}/vocabulary/{wordId}',
+        'POST /api/v1/courses/{courseId}/vocabulary/study',
+        'POST /api/v1/courses/{courseId}/vocabulary/{wordId}/audio',
+        'POST /api/v1/practice/{sessionId}/vocabulary',
+        'POST /api/v1/practice/{sessionId}/vocabulary/{cardId}/audio',
+        'POST /api/v1/materials/{materialId}/vocabulary-index',
         'POST /api/v1/courses/{courseId}/learning-targets',
         'POST /api/v1/courses/{courseId}/learning-targets/{targetId}/pronunciation',
         'POST /api/v1/courses/{courseId}/learning-targets/{targetId}/visual-cue',
@@ -305,6 +312,7 @@ describe('progenitor-ready OpenAPI 3.0.3 invariants', () => {
       { $ref: '#/components/schemas/StartPracticeReadySpeaking' },
       { $ref: '#/components/schemas/StartPracticeReadyWriting' },
       { $ref: '#/components/schemas/StartPracticeReadyFull' },
+      { $ref: '#/components/schemas/StartPracticeReadyVocabulary' },
     ]);
     expect(response.discriminator).toEqual({
       propertyName: 'status',
@@ -315,6 +323,7 @@ describe('progenitor-ready OpenAPI 3.0.3 invariants', () => {
         ready_speaking: '#/components/schemas/StartPracticeReadySpeaking',
         ready_writing: '#/components/schemas/StartPracticeReadyWriting',
         ready_full: '#/components/schemas/StartPracticeReadyFull',
+        ready_vocabulary: '#/components/schemas/StartPracticeReadyVocabulary',
       },
     });
     for (const variant of Object.values(response.discriminator.mapping)) {

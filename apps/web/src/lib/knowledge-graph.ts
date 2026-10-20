@@ -3,6 +3,7 @@
 // due/weak items that drive the next class's adaptive content and the graph viz.
 import { prisma, prismaUnfiltered } from './prisma';
 import { reviewCard } from './srs';
+import { recordReviewEvent, reviewSnapshot, type ReviewEvidence } from './learning/review/events';
 import { normalizeLearningTargetText } from './learning-targets';
 import { rankLearningTargets } from '@sotto/learning-model';
 import type { CefrLevel, LearningObjectiveMemory } from '@sotto/shared';
@@ -12,6 +13,7 @@ import {
   objectiveReviewTargets,
   type ObjectiveReviewScope,
 } from './learning-map/adaptation/review';
+import { introducedVocabularyWhere } from './learning/vocabulary/memory';
 
 export interface VocabItem {
   lemma: string;
@@ -155,12 +157,14 @@ export async function applyReviewOutcome(
   vocabQuality: number,
   grammarQuality: number,
   now: Date,
-  database: LearningDatabase = prismaUnfiltered
+  database: LearningDatabase,
+  evidence: ReviewEvidence
 ): Promise<void> {
   const vocab = await database.learnerVocab.findMany({
     where: { courseId, lemma: { in: vocabLemmas } },
   });
   for (const v of vocab) {
+    const before = reviewSnapshot(v);
     const u = reviewCard(
       {
         ease: v.ease,
@@ -173,12 +177,23 @@ export async function applyReviewOutcome(
       now
     );
     await database.learnerVocab.update({ where: { id: v.id }, data: { ...u, lastReviewed: now } });
+    await recordReviewEvent(database, {
+      courseId,
+      vocabId: v.id,
+      targetKey: `vocab:${v.lemma}`,
+      quality: Math.max(0, Math.min(1, vocabQuality)),
+      reviewedAt: now,
+      before,
+      after: reviewSnapshot({ ...u, lastReviewed: now }),
+      evidence,
+    });
   }
 
   const grammar = await database.learnerGrammar.findMany({
     where: { courseId, topicKey: { in: grammarPoints } },
   });
   for (const g of grammar) {
+    const before = reviewSnapshot(g);
     const u = reviewCard(
       {
         ease: g.ease,
@@ -194,6 +209,16 @@ export async function applyReviewOutcome(
       where: { id: g.id },
       data: { ...u, lastReviewed: now },
     });
+    await recordReviewEvent(database, {
+      courseId,
+      grammarId: g.id,
+      targetKey: `grammar:${g.topicKey}`,
+      quality: Math.max(0, Math.min(1, grammarQuality)),
+      reviewedAt: now,
+      before,
+      after: reviewSnapshot({ ...u, lastReviewed: now }),
+      evidence,
+    });
   }
 }
 
@@ -207,21 +232,27 @@ export interface DueItems {
 export async function getDueItems(
   courseId: string,
   limit = 8,
-  objectiveScope?: ObjectiveReviewScope
+  scopeOrDatabase?:
+    | ObjectiveReviewScope
+    | Pick<LearningDatabase, 'learnerFocusTarget' | 'learnerVocab' | 'learnerGrammar'>
 ): Promise<DueItems> {
+  const objectiveScope =
+    scopeOrDatabase && 'level' in scopeOrDatabase ? scopeOrDatabase : undefined;
+  const database =
+    scopeOrDatabase && 'learnerVocab' in scopeOrDatabase ? scopeOrDatabase : prismaUnfiltered;
   const now = new Date();
   const objectiveMemory = await readCourseObjectiveMemory(courseId, now);
   const dueOrWeak = { OR: [{ dueAt: { lte: now } }, { mastery: { lt: 0.5 } }] };
   const candidateLimit = Math.max(limit, limit * 4);
   const [focusTargets, vocab, grammar] = await Promise.all([
-    prisma.learnerFocusTarget.findMany({
+    database.learnerFocusTarget.findMany({
       where: { courseId, kind: { in: ['WORD', 'PHRASE'] } },
       orderBy: [{ priorityBoost: 'desc' }, { lastSelectedAt: 'desc' }],
       take: candidateLimit,
       select: { normalizedText: true, priorityBoost: true },
     }),
-    prisma.learnerVocab.findMany({
-      where: { courseId, ...dueOrWeak },
+    database.learnerVocab.findMany({
+      where: { courseId, AND: [dueOrWeak, introducedVocabularyWhere()] },
       orderBy: [{ dueAt: 'asc' }, { mastery: 'asc' }],
       take: candidateLimit,
       select: {
@@ -235,7 +266,7 @@ export async function getDueItems(
         lastReviewed: true,
       },
     }),
-    prisma.learnerGrammar.findMany({
+    database.learnerGrammar.findMany({
       where: {
         courseId,
         ...dueOrWeak,

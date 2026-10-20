@@ -139,3 +139,6 @@ export * from './course-materials/analysis';
 export * from './course-materials/legacy';
 export * from './course-materials/cancellation';
 export * from './placement/contracts';
+export * from './learning/vocabulary-support';
+export * from './learning/vocabulary-study';
+export * from './learning/dictionary';

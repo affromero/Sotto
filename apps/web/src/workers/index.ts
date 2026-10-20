@@ -16,6 +16,8 @@ import { closeRedis } from '@/lib/redis';
 import { processContentExtraction } from '@/workers/content-extraction.worker';
 import { processClassPreparation } from '@/workers/classes/class-preparation.worker';
 import { processPracticePreparation } from '@/workers/practice/practice-preparation.worker';
+import { processVocabularyAudio } from '@/workers/vocabulary/audio.worker';
+import { processVocabularyIndex } from '@/workers/vocabulary/index.worker';
 import { processDeepResearch } from '@/workers/deep-research.worker';
 import { processCreativePlanning } from '@/workers/creative-planning.worker';
 import { processScriptWriting } from '@/workers/script-writing.worker';
@@ -111,6 +113,13 @@ const workers = [
     createWorker('material-finalization', processMaterialFinalization, {
       concurrency: 1,
       lockDuration: 600000,
+    }),
+  shouldRun('vocabulary-audio') &&
+    createWorker('vocabulary-audio', processVocabularyAudio, { concurrency: 2 }),
+  shouldRun('vocabulary-index') &&
+    createWorker('vocabulary-index', processVocabularyIndex, {
+      concurrency: 2,
+      lockDuration: 300000,
     }),
   shouldRun('practice-preparation') &&
     createWorker('practice-preparation', processPracticePreparation, {

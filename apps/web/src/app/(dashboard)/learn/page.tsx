@@ -9,6 +9,7 @@ import { SourcedClassEntry } from '@/components/learn/SourcedClassEntry';
 import { CefrDisclaimer } from '@/components/learn/CefrDisclaimer';
 import { PedagogySelector } from '@/components/learn/PedagogySelector';
 import { CourseNotesPanel } from '@/components/learn/CourseNotesPanel';
+import { VocabularySupportSettings } from '@/components/learn/vocabulary/VocabularySupportSettings';
 import { LANG_LABELS, langLabel } from '@/lib/languages';
 import styles from './page.module.css';
 
@@ -60,6 +61,7 @@ export default async function LearnPage() {
       placementSource: true,
       activeClassId: true,
       pedagogy: true,
+      vocabularySupport: true,
       curriculum: { select: { title: true } },
       classes: {
         orderBy: [{ createdAt: 'desc' }],
@@ -207,6 +209,12 @@ export default async function LearnPage() {
                         Practice
                       </Link>
                       <Link
+                        href={`/learn/vocabulary?course=${course.id}`}
+                        className={styles.practiceLink}
+                      >
+                        Vocabulary
+                      </Link>
+                      <Link
                         href={`/learn/live?course=${course.id}`}
                         className={styles.practiceLink}
                         aria-label={`Live conversation for ${courseTitle}`}
@@ -242,6 +250,12 @@ export default async function LearnPage() {
                 </div>
                 <div className={styles.sourcedRow}>
                   <PedagogySelector courseId={course.id} current={course.pedagogy} />
+                </div>
+                <div className={styles.sourcedRow}>
+                  <VocabularySupportSettings
+                    courseId={course.id}
+                    current={course.vocabularySupport}
+                  />
                 </div>
                 <div className={styles.sourcedRow}>
                   <CourseNotesPanel

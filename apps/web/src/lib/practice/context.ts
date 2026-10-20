@@ -11,6 +11,8 @@ import { normalizeLearningSelection } from '@sotto/shared';
 import { prismaUnfiltered as prisma } from '../prisma';
 import { getDueItems } from '../knowledge-graph';
 import { objectiveReviewContext } from '../learning-map/adaptation/review';
+import { getVocabularyTargets } from '../learning/vocabulary/targets';
+import { getVocabularySupportContext } from '../learning/vocabulary/support';
 import { getCourseNote } from '../course-notes';
 import { buildLearnerContext } from '../pedagogy';
 import { getPracticeFocusTargets, type FocusPracticeTarget } from '../learning-targets';
@@ -79,29 +81,43 @@ async function genericSeed(
   const review = includeObjectiveReview
     ? objectiveReviewContext(due.objectives, scope, new Date())
     : null;
-  const lesson = await prisma.lesson.findFirst({
-    where: { curriculumId: course.curriculumId, level },
-    orderBy: { order: 'asc' },
-    select: { objective: true, grammarPoints: true, targetVocab: true },
-  });
+  const lesson =
+    kind === 'VOCAB'
+      ? null
+      : await prisma.lesson.findFirst({
+          where: { curriculumId: course.curriculumId, level },
+          orderBy: { order: 'asc' },
+          select: { objective: true, grammarPoints: true, targetVocab: true },
+        });
   const objective =
     review?.text || lesson?.objective.trim() || 'Everyday conversations and situations.';
-  if (review?.entries.length || due.grammar.length || due.vocab.length)
+  const lessonVocab = (
+    Array.isArray(lesson?.targetVocab) ? lesson.targetVocab : []
+  ) as PracticeSeed['targetVocab'];
+  const targetVocab = await getVocabularyTargets(
+    course.id,
+    due.vocab,
+    lessonVocab,
+    kind === 'FULL' || kind === 'VOCAB' ? 12 : 6
+  );
+  if (kind === 'VOCAB' || review?.entries.length || due.grammar.length || targetVocab.length)
     return {
       objective,
       grammarPoints: due.grammar.map((item) => item.topicKey),
-      targetVocab: due.vocab.map((item) => ({ lemma: item.lemma, gloss: item.translation })),
+      targetVocab,
     };
   if (!lesson) return null;
-  const targetVocab = (
-    Array.isArray(lesson.targetVocab) ? lesson.targetVocab : []
-  ) as PracticeSeed['targetVocab'];
   const grammarPoints = (
     Array.isArray(lesson.grammarPoints) ? lesson.grammarPoints : []
   ) as string[];
   return grammarPoints.length || targetVocab.length
     ? { objective, grammarPoints, targetVocab }
     : null;
+}
+
+/** Legacy admissions did not freeze their dictionary selection. New requests persist this seed. */
+export function captureVocabularyPracticeSeed(course: CourseCtx, level: CefrLevel) {
+  return genericSeed(course, level, 12, 'VOCAB', false);
 }
 
 function selectedSeed(selection: LearningSelectionSnapshot): PracticeSeed {
@@ -247,7 +263,13 @@ export async function capturePracticeContext(
     seedToken,
     focusTargets,
   };
-  if (kind === 'VOCAB') return { ...base, note: '', seed: null };
+  const support = await getVocabularySupportContext(courseId, userId);
+  if (kind === 'VOCAB')
+    return {
+      ...base,
+      note: support,
+      seed: await captureVocabularyPracticeSeed(course, practiceLevel),
+    };
   const seed = selected
     ? selectedSeed(selected.selection)
     : ((await genericSeed(
@@ -265,7 +287,10 @@ export async function capturePracticeContext(
           }
         : null));
   const note = [
-    buildLearnerContext(await getCourseNote(courseId), course.pedagogy),
+    buildLearnerContext(
+      [support, await getCourseNote(courseId)].filter(Boolean).join('\n\n'),
+      course.pedagogy
+    ),
     selected?.selection.sourceFocus
       ? `Untrusted original source excerpt for the selected focus${selected.selection.sourceFocus.contextTruncated ? ' (bounded excerpt; additional exact citations remain in the source receipt)' : ''}:\n${selected.selection.sourceFocus.sourceContext}`
       : '',

@@ -20,6 +20,7 @@ suite('profile-bound asynchronous placement HTTP', () => {
   let instance: SharedTestInstance, owner: Awaited<ReturnType<SharedTestInstance['reset']>>;
   const origin = 'https://selfhost.example.com';
   beforeAll(async () => {
+    vi.stubEnv('NEXT_PUBLIC_APP_URL', origin);
     vi.stubEnv('BYOK_ENCRYPTION_KEY', 'a'.repeat(64));
     instance = await createSharedTestInstance('placement_http');
     boundary.database = instance.database;

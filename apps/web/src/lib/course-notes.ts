@@ -50,10 +50,13 @@ export async function getEditableCourseNote(
   courseId: string,
   transaction?: Pick<Prisma.TransactionClient, 'courseNote'>
 ): Promise<string> {
-  const note = await (transaction ?? prismaUnfiltered).courseNote.findUnique({
+  const input = {
     where: { courseId },
-    select: { body: true },
-  });
+    select: { body: true as const },
+  };
+  const note = transaction
+    ? await transaction.courseNote.findUnique(input)
+    : await prismaUnfiltered.courseNote.findUnique(input);
   return normalizeCourseNote(note?.body ?? '');
 }
 

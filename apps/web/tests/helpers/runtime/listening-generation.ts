@@ -12,6 +12,7 @@ import {
 const {
   mockEpisodeCreate,
   mockEpisodeUpdate,
+  mockEpisodeUpdateMany,
   mockScriptCreate,
   mockVocabEntryCreateMany,
   mockLearnerVocabUpsert,
@@ -33,6 +34,7 @@ const {
   return {
     mockEpisodeCreate: episodeCreate,
     mockEpisodeUpdate: episodeUpdate,
+    mockEpisodeUpdateMany: vi.fn().mockResolvedValue({ count: 1 }),
     mockScriptCreate: scriptCreate,
     mockVocabEntryCreateMany: vocabEntryCreateMany,
     mockLearnerVocabUpsert: learnerVocabUpsert,
@@ -65,9 +67,17 @@ vi.mock('@/lib/learning-ai', () => ({
       };
     throw new Error('No AI provider available');
   },
-  capturedLearningAiOptions: async (ai: { model: string; apiKey?: string }) => ({
+  capturedLearningAiOptions: async (
+    ai: {
+      model: string;
+      apiKey?: string;
+      execution?: { sourceDocuments?: import('@/lib/providers/ai').SourceDocuments };
+    },
+    scope?: { includeSourceDocuments?: boolean }
+  ) => ({
     model: ai.model,
     apiKeyOverride: ai.apiKey,
+    ...(scope?.includeSourceDocuments ? { sourceDocuments: ai.execution?.sourceDocuments } : {}),
   }),
 }));
 const { mockCreateSegmentsAndQueueAudio } = vi.hoisted(() => ({
@@ -138,6 +148,7 @@ vi.mock('@/lib/prisma', () => {
     episode: {
       create: (...args: unknown[]) => mockEpisodeCreate(...args),
       update: (...args: unknown[]) => mockEpisodeUpdate(...args),
+      updateMany: (...args: unknown[]) => mockEpisodeUpdateMany(...args),
     },
     script: {
       create: (...args: unknown[]) => mockScriptCreate(...args),
@@ -382,6 +393,7 @@ function setupHappyPath() {
 export {
   mockEpisodeCreate,
   mockEpisodeUpdate,
+  mockEpisodeUpdateMany,
   mockScriptCreate,
   mockVocabEntryCreateMany,
   mockLearnerVocabUpsert,

@@ -81,6 +81,29 @@ const PARAMS = {
 };
 
 describe('keyed reading extraction requests', () => {
+  it('requests complete source coverage with its exact owned range instead of a 12-word sample', async () => {
+    await requestVocabularyExtraction({
+      ...PARAMS,
+      text: 'Bahnhof\nFahrkarte',
+      label: 'COURSE_NOTES',
+      usageCategory: 'material-vocabulary-index',
+      sourceVocabulary: true,
+      sourceInventory: true,
+      sourceInventoryRange: { start: 0, end: 7 },
+    });
+    const [prompt, messages, options] = mockGenerateResponse.mock.calls.at(-1)!;
+    expect(prompt).toContain('no CEFR selection');
+    expect(JSON.parse(messages[0].content)).toMatchObject({
+      requiredSpan: { start: 0, end: 7 },
+      lines: [
+        { index: 0, text: 'Bahnhof', start: 0, end: 7 },
+        { index: 1, text: 'Fahrkarte', start: 8, end: 17 },
+      ],
+    });
+    expect(options.jsonSchema.name).toBe('source_vocabulary_inventory');
+    expect(options.jsonSchema.schema.properties.words.maxItems).toBe(64);
+    expect(options.jsonSchema.schema.properties.coverage.minItems).toBe(2);
+  });
   it('uses indexed source vocabulary without inventing keyed questions or assessment links', async () => {
     mockGenerateResponse.mockResolvedValue({ content: '{"words":[]}', model: 'captured' });
     await requestVocabularyExtraction({

@@ -78,6 +78,10 @@ describe('complete immutable diagnostic questions', () => {
   });
 });
 describe('diagnostic score without earned mastery', () => {
+  it('normalizes native uncertainty labels and uses the English label for unknown codes', () => {
+    expect(idkLabel(' ES ')).toBe('No lo sé');
+    expect(idkLabel('xx')).toBe("I don't know");
+  });
   it('walks the complete band staircase and stops at the first failed band', () => {
     const items = questions(),
       all = items.map((question) => ({ id: question.id, selectedIndex: 0 }));

@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { Prisma } from '@/generated/prisma/client';
 import { prismaUnfiltered as prisma } from './prisma';
 import { capturedLearningAiOptions, resolveCapturedLearningAi } from './learning-ai';
+import type { LearningAiRequest } from '@/lib/learning/ai/selection';
 import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import { createAIProvider } from './providers/ai';
 import { loadAndRender } from './prompt-loader';
@@ -87,7 +88,7 @@ export async function getOrCreateCurriculum(
   execution: SottoProviderExecution,
   nativeLang: string,
   targetLang: string,
-  pendingSelection?: { provider: string; model: string; endpoint?: string }
+  pendingSelection?: LearningAiRequest
 ): Promise<{ id: string }> {
   const existing = await prisma.curriculum.findUnique({
     where: { nativeLang_targetLang: { nativeLang, targetLang } },

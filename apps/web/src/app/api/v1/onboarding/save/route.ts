@@ -16,6 +16,7 @@ import { acceptPlacementInTransaction } from '@/lib/placement/confirmation';
 import { readPlacementAnalysis } from '@/lib/placement/analysis';
 import { MaterialAnalysisConflict } from '@/lib/course-materials/analysis/inventory';
 import { normalizeCourseNote, setCourseNote } from '@/lib/course-notes';
+import { learningAiSetupSelection } from '@/lib/learning/ai/selection';
 import { attachCourseMaterials } from '@/lib/course-materials';
 import { setSiteConfig } from '@/lib/site-config';
 import { invalidateServerInfra } from '@/lib/server-config';
@@ -223,15 +224,7 @@ async function save(request: NextRequest) {
     { userId: authed.userId, authorize, signal: request.signal },
     course.native,
     course.target,
-    preferred?.aiProvider && preferred.aiModel
-      ? {
-          provider: preferred.aiProvider,
-          model: preferred.aiModel,
-          ...(preferred.aiProvider === 'local' && infra?.aiBaseUrl
-            ? { endpoint: infra.aiBaseUrl }
-            : {}),
-        }
-      : undefined
+    learningAiSetupSelection(preferred, infra)
   );
   const courseId = await sottoTransaction(prismaUnfiltered, async (database) => {
     const current = await authorize(database);
@@ -292,6 +285,11 @@ async function save(request: NextRequest) {
             execution
           )
         ).id;
+    if (course.vocabularySupport !== undefined)
+      await database.course.update({
+        where: { id: createdId },
+        data: { vocabularySupport: course.vocabularySupport },
+      });
     if (note?.trim()) {
       const currentNote = await database.courseNote.findUnique({ where: { courseId: createdId } });
       if (currentNote?.body !== normalizeCourseNote(note)) {

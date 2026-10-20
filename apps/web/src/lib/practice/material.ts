@@ -6,6 +6,7 @@ import { resolveStorageInput } from '../sidedoor/storage/core/storage-inputs';
 import type { LearningDatabase } from '../learning/database';
 import { readSkillRequirements } from '../learning/skill-requirements';
 import { assertLearningMaterial, LearningIncompleteError } from '../learning/session-evaluation';
+import { assertVocabularyStudyOwner, vocabularyStudyStateSchema } from '../vocabulary/study-state';
 
 const storedItemsSchema = z
   .array(
@@ -34,6 +35,11 @@ export async function assertStoredPracticeMaterial(database: LearningDatabase, s
       episode: { include: { script: true } },
     },
   });
+  if (session.vocabularyStudy) {
+    const state = vocabularyStudyStateSchema.parse(session.vocabularyStudy);
+    assertVocabularyStudyOwner(state, session, session.course.userId);
+    return;
+  }
   const requirements = readSkillRequirements(session.skillRequirements);
   if (!requirements) throw new LearningIncompleteError('Practice requirements are unavailable.');
   const parsedItems = storedItemsSchema.safeParse(session.items);

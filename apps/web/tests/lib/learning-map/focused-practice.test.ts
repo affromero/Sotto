@@ -17,6 +17,8 @@ import { POST as preview } from '@/app/api/v1/courses/[courseId]/learning-map/se
 import { createInitialCourse } from '@/lib/placement-course';
 import { getLanguageCatalog } from '@/lib/learning-map/catalogs';
 import { focusedPracticeRequirements } from '@/lib/learning-map/selection';
+import { ensureLearningLevelBinding } from '@/lib/learning-map/binding';
+import { resolveSkillRequirementsInTransaction } from '@/lib/learning/skill-requirements';
 import { readPracticePreparation, requestPracticePreparation } from '@/lib/practice/preparation';
 import {
   practiceGenerationSchema,
@@ -268,25 +270,147 @@ suite('repeatable focused practice with immutable owned difficulty', () => {
     expect(await instance.database.practiceSession.count()).toBe(1);
   });
 
-  it('deduplicates concurrent identical admissions and conflicts on competing different selections', async () => {
-    const requestId = randomUUID();
-    const results = await Promise.all(
-      [0, 1].map(() =>
-        requestPracticePreparation(course.id, 'GRAMMAR', execution(), {
-          requestId,
-          learningSelection: selection(),
-        })
-      )
+  it.each([false, true])(
+    'resolves a forced concurrent request-ID collision with exact selection matching (different: %s)',
+    async (different) => {
+      const requestId = randomUUID();
+      await sottoTransaction(instance.database, async (database) => {
+        const coverage = await resolveSkillRequirementsInTransaction(database, execution(), {
+          scope: 'CLASS',
+          nativeLang: course.nativeLang,
+          targetLang: course.targetLang,
+          level: 'A1',
+        });
+        await ensureLearningLevelBinding(database, course, 'A1', coverage);
+      });
+      const barrierKey = Number.parseInt(randomUUID().slice(0, 7), 16);
+      await instance.database.$executeRawUnsafe(`
+        CREATE FUNCTION wait_for_practice_admission() RETURNS trigger
+        LANGUAGE plpgsql AS $$ BEGIN
+          PERFORM pg_advisory_xact_lock(${barrierKey});
+          RETURN NEW;
+        END; $$
+      `);
+      await instance.database.$executeRawUnsafe(`
+        CREATE TRIGGER wait_for_practice_admission BEFORE INSERT ON "PracticeSession"
+        FOR EACH ROW EXECUTE FUNCTION wait_for_practice_admission()
+      `);
+      const entered = Promise.withResolvers<void>();
+      const release = Promise.withResolvers<void>();
+      const holder = instance.database.$transaction(
+        async (database) => {
+          await database.$executeRaw`SELECT pg_advisory_xact_lock(${barrierKey}::bigint)`;
+          entered.resolve();
+          await release.promise;
+        },
+        { timeout: 10000 }
+      );
+      await entered.promise;
+      const selections = [selection(), selection({ nodeIds: [objectives[different ? 1 : 0]!.id] })];
+      const pending = Promise.all(
+        selections.map((learningSelection) =>
+          start(request({ kind: 'GRAMMAR', requestId, learningSelection }), params())
+        )
+      );
+      try {
+        try {
+          await expect
+            .poll(
+              async () => {
+                const [locks] = await instance.database.$queryRaw<{ waiting: number }[]>`
+            SELECT COUNT(*)::int AS waiting FROM pg_locks
+            WHERE locktype = 'advisory' AND objid = ${barrierKey}::oid AND NOT granted
+          `;
+                return locks?.waiting;
+              },
+              { timeout: 3000 }
+            )
+            .toBe(2);
+        } finally {
+          release.resolve();
+          await holder;
+        }
+        const responses = await pending;
+        expect(responses.map((value) => value.status).sort()).toEqual(
+          different ? [202, 409] : [202, 202]
+        );
+        const winner = responses.findIndex((value) => value.status === 202);
+        const progress = practicePreparingSchema.parse(await responses[winner]!.json());
+        expect(progress.sessionId).toBe(requestId);
+        const work = await saved(requestId);
+        expect(work.generation.learningRequest).toEqual(selections[winner]);
+        expect(await instance.database.practiceSession.count()).toBe(1);
+        expect(await instance.database.practiceRequestReceipt.count()).toBe(1);
+        const outbox = await sottoTransaction(instance.database, (database) =>
+          sottoJobOutbox(database).read(work.operation.id)
+        );
+        expect(outbox?.job.handler).toBe('practice-preparation');
+        if (!different) {
+          expect(practicePreparingSchema.parse(await responses[1]!.json()).sessionId).toBe(
+            requestId
+          );
+        }
+      } finally {
+        release.resolve();
+        await Promise.allSettled([holder, pending]);
+        await instance.database.$executeRawUnsafe(
+          'DROP TRIGGER wait_for_practice_admission ON "PracticeSession"'
+        );
+        await instance.database.$executeRawUnsafe('DROP FUNCTION wait_for_practice_admission()');
+      }
+    }
+  );
+
+  it.each(['PracticeSession_pkey', 'PracticeSession_unrelated_key'])(
+    'preserves a database uniqueness failure without a winning owned request (%s)',
+    async (constraint) => {
+      await instance.database.$executeRawUnsafe(`
+        CREATE FUNCTION reject_practice_admission() RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN RAISE unique_violation USING CONSTRAINT = '${constraint}'; END; $$
+      `);
+      await instance.database.$executeRawUnsafe(`
+        CREATE TRIGGER reject_practice_admission BEFORE INSERT ON "PracticeSession"
+        FOR EACH ROW EXECUTE FUNCTION reject_practice_admission()
+      `);
+      try {
+        const response = await start(
+          request({
+            kind: 'GRAMMAR',
+            requestId: randomUUID(),
+            learningSelection: selection(),
+          }),
+          params()
+        );
+        expect(response.status).toBe(500);
+        expect(await instance.database.practiceSession.count()).toBe(0);
+        expect(await instance.database.practiceRequestReceipt.count()).toBe(0);
+      } finally {
+        await instance.database.$executeRawUnsafe(
+          'DROP TRIGGER reject_practice_admission ON "PracticeSession"'
+        );
+        await instance.database.$executeRawUnsafe('DROP FUNCTION reject_practice_admission()');
+      }
+    }
+  );
+
+  it('rejects replay when the stored operation no longer matches its owned session identity', async () => {
+    const first = await admit();
+    const work = await saved(first.progress.sessionId);
+    await instance.database.practiceSession.update({
+      where: { id: first.progress.sessionId },
+      data: { generationState: { ...work.operation, userId: 'different-profile' } },
+    });
+    const response = await start(
+      request({
+        kind: 'GRAMMAR',
+        requestId: first.requestId,
+        learningSelection: selection(),
+      }),
+      params()
     );
-    expect(new Set(results.map((value) => value.id)).size).toBe(1);
-    const competing = randomUUID();
-    const responses = await Promise.all(
-      [selection(), selection({ nodeIds: [objectives[1]!.id] })].map((learningSelection) =>
-        start(request({ kind: 'GRAMMAR', requestId: competing, learningSelection }), params())
-      )
-    );
-    expect(responses.map((value) => value.status).sort()).toEqual([202, 409]);
-    expect(await instance.database.practiceSession.count()).toBe(2);
+    expect(response.status).toBe(409);
+    expect(await instance.database.practiceSession.count()).toBe(1);
+    expect(await instance.database.practiceRequestReceipt.count()).toBe(1);
   });
 
   it('allows confident objectives to be practised again without requiring due work', async () => {

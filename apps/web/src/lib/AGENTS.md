@@ -1,5 +1,23 @@
 # src/lib/ — Core Libraries
 
+## Vocabulary lifecycle
+
+`vocabulary/` owns dictionary reads, deterministic study admission and actions,
+material-index admission, and local pronunciation. Keep answer keys in private
+study state. Public cards reveal answers only after an immutable response.
+Apply assessed outcomes through the canonical review journal in the same
+transaction as the saved response. Flashcards only record exposure.
+
+Material indexing extends canonical reading vocabulary extraction and metadata
+review. Exact source offsets, independent coverage review, and bounded recursive
+chunk subdivision establish completeness. Imported words retain existing mastery.
+Use durable queue admission and preparation grants; uncertain provider outcomes
+remain fenced until canonical recovery confirms drainage.
+
+Word audio uses explicit local speech selection and canonical provider identity.
+Read endpoints serve owned cached bytes without synthesis. Revalidate selection,
+ownership, and disabled-speech policy before serving or publishing assets.
+
 `agents/isolated/isolated-agent.ts` is the explicit API-key Claude isolation adapter. It requires
 a local Linux Docker host, a reviewed immutable image with Claude 2.1.283, parent
 credential admission and durable container identity callbacks. Provider keys stay
@@ -13,6 +31,9 @@ the local execution journal. Provider outcomes remain unknown until the learner
 acknowledges them separately. A missing attached workspace fails closed.
 
 All shared business logic and external service integrations live here.
+
+`course-materials/scopes.ts` captures owned material generations without importing
+document processing, vocabulary admission or queues. Job authority imports this leaf directly.
 
 `course-materials/extraction/` publishes immutable page inventories and byte-exact
 UTF-8 chunks. Embedded text and visual transcription retain separate provenance.
@@ -47,6 +68,14 @@ profile assertions; raw original bytes and pasted content stay out of localStora
 `learning-map/lessons.ts` records explicit teaching scope and exact reviewed keys;
 ambiguous labels and unavailable language maps remain unresolved. Catalog
 publication serializes by target language and verifies canonical content hashes.
+`classes/generation/stages.ts` runs at most two class text branches and drains
+admitted work before returning a failure. Listening preparation persists the script
+and questions before audio admission. Failed text or speaking generation retires
+only the captured unqueued episode.
+`learning/review/events.ts` records scheduler observations in the submission
+transaction. `learning/review/comparison.ts` replays recognition evidence offline
+with fixed FSRS parameters and the canonical SM-2 scheduler. It never changes live
+review policy or calls a provider.
 
 `providers/tts/fish/fish.provider.ts` uses Fish Audio's captured JSON transport and
 verified official voice pool. Fish defaults to `s2.1-pro-free`; explicit paid
@@ -55,7 +84,27 @@ fail before dispatch. A paid credit error must never block the free model.
 
 `course-materials/index.ts` retains original uploaded documents through the canonical
 storage writer and stages owned materials before course attachment. Editable
-course notes stay separate. Generation reads their extracts through `getCourseNote()`.
+course notes stay separate. `course-materials/documents.ts` captures original PDFs
+through owned storage inputs and revalidates them before provider dispatch and
+result publication. `getCourseNote()` retains bounded text context for lexical indexing.
+`providers/documents/` sends originals to native PDF transports and complete,
+numbered page images to other selected vision transports. Visual input rejects
+unsupported geometry, more than 100 pages or more than 20 MiB of page images.
+Rendering destroys each page's PDF.js document before opening the next page.
+`scripts/pdf-render/` runs as a supervised Node process with a 64 MiB heap and
+disabled core dumps. Its stdin lifetime and deadline fence parent loss.
+The parent records canonical workspace identities before launch, verifies every
+numbered image after confirmed process exit, and clears ownership after cleanup.
+Original staging uses the canonical owned byte copier. Source and image reads
+use one bounded regular-file descriptor and retain uncertain descriptor closure.
+Uncertain cleanup preserves the workspace and blocks reuse. Operator recovery
+requires stopping the exact supervisor/container and all owned I/O; recorded
+PIDs and timestamps alone do not authorize recovery or directory deletion.
+Each process admits one visual conversion and one waiting conversion; excess
+requests fail explicitly and require retry. Native PDF transports skip rendering.
+Authors explicitly opt in through `capturedLearningAiOptions`; blind and masked
+quality reviews keep their restricted inputs. No provider switch or text-only
+substitution is automatic. Material uploads accept up to 50 MiB in total.
 Material scopes stay stable during attachment and storage migration; course
 deletion retires their references and revokes their material scopes.
 
@@ -95,8 +144,9 @@ retain their complete extract; oversized extracts fail explicitly.
 from every attached document. `course-materials/vocabulary-context.ts` selects
 source-backed candidates through the canonical lexical extraction and review
 protocol. Source text and document names remain untrusted educational context.
-Placement analyzes every retained source chunk; prompt excerpts remain limited to
-subsequent course personalization.
+Placement analyzes every retained source chunk under its captured text and explicit OCR policy.
+Prompt excerpts personalize subsequent generation. Class generation supplies
+owned original PDFs through the canonical document transport where supported.
 There is no episode
 subtitle parser or automatic speaker diarization contract. Onboarding readiness
 comes from the live credential session and local speech checks in `/welcome`,
@@ -136,7 +186,7 @@ selection keeps its model and endpoint through canonical credential, transport,
 capacity and preparation admission. Explicit durable provider overrides retain
 their captured bindings. The profile's `disabled` speech policy exempts both oral
 skills and prevents default audio paths from selecting another provider. Speech
-fingerprints also fence changes from exempt to enabled audio. New whole-class
+fingerprints preserve captured no-audio work when speech becomes available. New whole-class
 regeneration captures current requirements; section repair keeps its stored requirements.
 Sidedoor `providers/availability` owns persistent provider account availability,
 scoped by instance, provider, billing origin and exact credential. Its catalogue
@@ -500,14 +550,15 @@ Semantic patches use a reference for rejected about and atoms for rejected
 focus and tip entries. An about-only rejection never expands repair authority to
 an accepted example; select another useful example or fail the final audit closed.
 All example patches merge first; references then resolve against the complete
-merged array. Rejected about, observations and example notes are compiled. Private fresh-generation
-indices retain the original about, focus and tip bindings without changing stored content.
-When a selected example target changes, its linked about is rendered again and only the
-compiler-added prefixes on accepted focus and tips are refreshed. Authored observation
-text and unrelated accepted strings remain exact; duplicate target strings do not
-change index identity. The full final audit checks every retained observation against
-the repaired example. Historical restoration never
-adds framing. Explicit local scope does not prove linguistic correctness.
+merged array. The parser returns a candidate together with immutable private binding
+snapshots from `classes/intro/bindings.ts`. Snapshots retain each observation body,
+its rendered value and its example index. Repair validates this evidence against
+the original candidate before rendering target changes through the compiler.
+Equal target strings at different indices remain distinct examples. Accepted bodies
+and unrelated strings stay exact. A meaning-only repair preserves accepted overview
+text unless that overview was also rejected. The final review evaluates the whole
+candidate again. Restored historical content uses its existing parser without new
+framing. Local example scope alone does not establish linguistic correctness.
 Every fresh visual text, including titles and labels, must exactly reuse a compiled
 observation, complete target or paired meaning. URLs remain typed URL fields.
 Validation precedes visual normalization, so discarded content cannot hide an
@@ -524,8 +575,8 @@ Structural repair receives measured word-limit and address-limit diagnostics,
 may remove redundant whole entries, and aims for 80 raw words to leave room for
 compiled quotes. Semantic repair preserves every accepted entry even when shortening.
 Intro semantic repair returns a strict patch of the actual rejected addresses.
-Accepted authored fields and array entries remain exact apart from those derived
-example references; accepted visuals are retained, and
+Only authorized authored entries and compiler-rendered references can change.
+Accepted visuals remain present, and
 rejected optional visuals are removed. The initial full audit binds its private
 receipt to the captured execution and trusted lesson context. The replacement audit
 reviews every current address again and never reuses prior approvals. Every address

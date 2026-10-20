@@ -106,6 +106,9 @@ describe('CourseNotesPanel', () => {
     await screen.findByText('Saved');
     expect(editor).toHaveValue('');
     expect(screen.getByRole('link', { name: 'Vocab Deutsch.pdf' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'View vocabulary and import progress' })
+    ).toHaveAttribute('href', '/learn/vocabulary?course=c1');
   });
   it('saves the exact edited note through its owned course endpoint', async () => {
     let saved: unknown;

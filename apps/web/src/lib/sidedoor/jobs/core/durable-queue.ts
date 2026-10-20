@@ -20,7 +20,8 @@ import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import { classifyError, userMessage } from '@/lib/byok-errors';
 import { validatePreparationAudio } from '@/lib/classes/preparation-audio';
-import { materialStorageScopes } from '@/lib/course-materials';
+import { settleVocabularyQueueFailure } from '@/lib/vocabulary/recovery/queue-failure';
+import { materialStorageScopes } from '@/lib/course-materials/scopes';
 import {
   materialAnalysisJobAuthoritySchema,
   placementSessionJobAuthoritySchema,
@@ -770,6 +771,20 @@ export async function reconcileDurableQueueFailure(options: {
       options.version
     );
     if (work.complete) return null;
+    if (['vocabulary-audio', 'vocabulary-index'].includes(options.handler)) {
+      const recipient = await validateDurableAuthority(database, work.payload.authority);
+      if (!recipient?.userId) throw new Error('Vocabulary failure recipient is missing.');
+      if (
+        await settleVocabularyQueueFailure(
+          database,
+          options.handler,
+          work.payload.payload,
+          recipient.userId
+        )
+      )
+        await sottoJobOutbox(database).complete(work.operationId, work.fingerprint);
+      return null;
+    }
     const episodeId =
       typeof work.payload.payload.episodeId === 'string' ? work.payload.payload.episodeId : null;
     if (!episodeId) return null;

@@ -97,7 +97,10 @@ export async function getCourseVocabularyTargets(p: {
     { signal: p.execution.signal }
   );
   formatNotesForPrompt(captured.text);
-  if (!captured.materials.length) return { imported: false, vocab: [], context: captured.text };
+  // Image-only originals guide teaching through document input. Only actual text
+  // can supply the literal word spans required by lexical provenance.
+  if (!captured.materials.some((material) => material.length > 0))
+    return { imported: false, vocab: [], context: captured.text };
 
   const sourceFragments = captured.fragments
     .filter((fragment) => fragment.documentId !== 'editable-course-note')
@@ -116,7 +119,7 @@ export async function getCourseVocabularyTargets(p: {
       return end > start ? [text.slice(start, end)] : [];
     })
     .filter((fragment) => /[\p{L}\p{N}]/u.test(fragment));
-  if (!sourceFragments.length) throw new Error('Course excerpts contain no complete source words.');
+  if (!sourceFragments.length) return { imported: false, vocab: [], context: captured.text };
   const due = await getDueItems(p.courseId);
   const rankedMemory = await sottoTransaction(
     prismaUnfiltered,

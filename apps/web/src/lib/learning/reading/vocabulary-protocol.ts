@@ -30,9 +30,10 @@ export type ReadingPassageWord = { surface: string; start: number; end: number }
 /** Private indices retain exact UTF16 offsets into the original passage. */
 export function buildReadingVocabularyWordTable(
   passageText: string,
-  targetLang: string
+  targetLang: string,
+  maxChars = 12000
 ): ReadingPassageWord[] {
-  if (passageText.length > 12000)
+  if (!Number.isSafeInteger(maxChars) || maxChars < 1 || passageText.length > maxChars)
     throw new Error('The reading passage exceeds the vocabulary extraction limit.');
   if (!targetLang || !Intl.Segmenter.supportedLocalesOf(targetLang).length)
     throw new Error('Reading vocabulary requires a supported segmentation language.');

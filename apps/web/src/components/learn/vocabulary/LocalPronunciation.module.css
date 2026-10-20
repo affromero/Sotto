@@ -1,0 +1,22 @@
+.root {
+  display: grid;
+  gap: 0.5rem;
+}
+.root button {
+  min-height: 44px;
+  background: transparent;
+  color: var(--color-primary);
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  padding: 0.65rem 0.9rem;
+  font: inherit;
+  cursor: pointer;
+}
+.root button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+.root small {
+  color: var(--color-error);
+  line-height: 1.5;
+}

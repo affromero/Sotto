@@ -230,6 +230,8 @@ struct NextClassCreatedResponse: Decodable {
 
 struct NextClassBackgroundResponse: Decodable {
     let started: Bool
+    let operationId: String?
+    let courseId: String?
 }
 
 struct SottoGenerationProgress: Decodable, Equatable {
@@ -247,6 +249,9 @@ struct SottoGenerationProgress: Decodable, Equatable {
     let updatedAt: String?
     let providerRequestsCompleted: Int?
     let providerRequestInFlight: Bool?
+    var operationId: String? = nil
+    var operationStatus: String? = nil
+    var result: String? = nil
 }
 
 struct SottoGenerationSection: Decodable, Equatable {

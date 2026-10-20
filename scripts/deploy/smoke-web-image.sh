@@ -4,6 +4,8 @@ set -euo pipefail
 image="${1:?Usage: smoke-web-image.sh IMAGE}"
 bash "$(dirname "${BASH_SOURCE[0]}")/checks/cli-home.sh" "$image" "${2:-1001}"
 bash "$(dirname "${BASH_SOURCE[0]}")/checks/native-runtime.sh" "$image" musl
+docker run --rm -i --network none --entrypoint node "$image" \
+  < "$(dirname "${BASH_SOURCE[0]}")/checks/pdf-input.cjs"
 suffix="sotto-web-smoke-$$"
 cleanup() {
   status=$?

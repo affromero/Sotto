@@ -12,7 +12,6 @@ import { logger } from '@/lib/logger';
 import { classifyEpisodeReference } from './classify-episode-reference';
 import { extractClaimContexts, type ClaimContext } from './claim-extractor';
 import { aiEvaluateWithDomainContext } from './ai-layer';
-import { groundFailedReferences, type GroundingInput } from './grounding';
 import type { CapturedLearningAi } from '@/lib/learning-ai';
 
 const MAX_CONCURRENT = 10;
@@ -48,8 +47,7 @@ export async function runReferenceVerification(
   refs: ReferenceInput[],
   scriptTurns: Array<{ speaker: string; text: string }>,
   topic: string,
-  ai: CapturedLearningAi,
-  requiredRefCount = Infinity
+  ai: CapturedLearningAi
 ): Promise<{
   results: Map<string, VerificationResult>;
   rejectedRefIds: Set<string>;
@@ -151,62 +149,16 @@ export async function runReferenceVerification(
     allChecks.set(refId, existing);
   }
 
-  // Early-exit: skip grounding if we already have enough verified refs
-  let skipGrounding = false;
-  if (requiredRefCount < Infinity) {
-    let preliminaryPassCount = 0;
-    for (const ref of acceptedRefs) {
-      const domain = domainMap.get(ref.id)!;
-      const checks = allChecks.get(ref.id) ?? [];
-      const layerResults: LayerResult[] = checks
-        .filter((c) => c.layer !== 'grounding')
-        .map((c) => ({
-          layerId: c.layer as LayerResult['layerId'],
-          passed: c.passed,
-          confidence: c.confidence,
-        }));
-      const { verdict } = computeBayesianScore(domain, layerResults);
-      if (verdict === 'VERIFIED') preliminaryPassCount++;
-    }
-    if (preliminaryPassCount >= requiredRefCount) {
-      skipGrounding = true;
-      logger.info('Skipping grounding — enough refs already verified', {
-        verified: String(preliminaryPassCount),
-        required: String(requiredRefCount),
-      });
-    }
-  }
-
-  // Grounding step: search for real sources for refs where all checks failed
-  if (!skipGrounding) {
-    const groundingInputs: GroundingInput[] = acceptedRefs.map((ref) => ({
-      ref,
-      domain: domainMap.get(ref.id)!,
-      claimContext: claimContexts.get(ref.number) ?? { sentences: [], speakerTurns: [] },
-      allChecks: allChecks.get(ref.id) ?? [],
-    }));
-    const groundingResults = await groundFailedReferences(groundingInputs, topic, ai);
-    for (const [refId, check] of groundingResults) {
-      const existing = allChecks.get(refId) ?? [];
-      existing.push(check);
-      allChecks.set(refId, existing);
-    }
-  }
-
   // Compute domain-aware verdicts
   for (const ref of acceptedRefs) {
     const domain = domainMap.get(ref.id)!;
     const checks = allChecks.get(ref.id) ?? [];
 
-    // Convert VerificationCheck[] → LayerResult[] for Bayesian scoring
-    // Filter out grounding layer — it only provides replacement data, not a scoring signal
-    const layerResults: LayerResult[] = checks
-      .filter((c) => c.layer !== 'grounding')
-      .map((c) => ({
-        layerId: c.layer as LayerResult['layerId'],
-        passed: c.passed,
-        confidence: c.confidence,
-      }));
+    const layerResults: LayerResult[] = checks.map((check) => ({
+      layerId: check.layer as LayerResult['layerId'],
+      passed: check.passed,
+      confidence: check.confidence,
+    }));
 
     const {
       posterior,
@@ -226,9 +178,8 @@ export async function runReferenceVerification(
     if (rawVerdict === 'VERIFIED' && claimsSupported) {
       verdict = { status: 'VERIFIED', confidence: posterior };
     } else {
-      // Replacement suggestions are evidence for an editorial retry, not proof
-      // that the current numbered citation supports its claims. Fail closed and
-      // require the script/references to be regenerated and re-verified.
+      // Require the current numbered citation to support its claims. A failed
+      // citation needs regenerated content and fresh verification.
       verdict = { status: 'REMOVED', confidence: posterior };
     }
 

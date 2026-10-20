@@ -16,6 +16,10 @@ import {
 } from './knowledge-graph';
 import type { CefrLevel } from '@sotto/shared';
 import {
+  sourceInventoryJsonSchema,
+  sourceInventoryLines,
+} from './learning/reading/source-inventory';
+import {
   buildReadingVocabularyJsonSchema,
   buildSourceVocabularyJsonSchema,
   buildReadingVocabularyWordTable,
@@ -58,6 +62,8 @@ export async function requestVocabularyExtraction(p: {
   usageCategory: string;
   readingQuestions?: readonly ReadingVocabularyQuestion[];
   sourceVocabulary?: boolean;
+  sourceInventory?: boolean;
+  sourceInventoryRange?: { start: number; end: number };
   preferredLemmas?: readonly string[];
   readingCorrection?: {
     words: readonly unknown[];
@@ -70,6 +76,18 @@ export async function requestVocabularyExtraction(p: {
     violations: readonly ReadingAttributionViolation[];
   };
 }): Promise<string> {
+  if (p.sourceInventory && !p.sourceVocabulary)
+    throw new Error('Complete inventory requires source vocabulary attribution.');
+  if (
+    p.sourceInventoryRange &&
+    (!p.sourceInventory ||
+      !Number.isSafeInteger(p.sourceInventoryRange.start) ||
+      !Number.isSafeInteger(p.sourceInventoryRange.end) ||
+      p.sourceInventoryRange.start < 0 ||
+      p.sourceInventoryRange.end > p.text.length ||
+      p.sourceInventoryRange.start >= p.sourceInventoryRange.end)
+  )
+    throw new Error('Complete inventory requires a valid owned source range.');
   if (
     p.sourceVocabulary &&
     (p.readingQuestions || p.readingCorrection || p.readingProtocolCorrection)
@@ -132,16 +150,18 @@ export async function requestVocabularyExtraction(p: {
       : undefined;
   const ai = await resolveCapturedLearningAi(p.userId, p.execution);
   const systemPrompt = loadAndRender(
-    p.sourceVocabulary
-      ? 'live/extract-source-vocab.md'
-      : p.readingQuestions
-        ? 'live/extract-reading-vocab.md'
-        : 'live/extract-vocab.md',
+    p.sourceInventory
+      ? 'live/index-source-vocab.md'
+      : p.sourceVocabulary
+        ? 'live/extract-source-vocab.md'
+        : p.readingQuestions
+          ? 'live/extract-reading-vocab.md'
+          : 'live/extract-vocab.md',
     {
       TARGET: p.targetLang,
       NATIVE: p.nativeLang,
       LEVEL: p.level,
-      MAX: String(MAX_ITEMS),
+      MAX: String(p.sourceInventory ? 64 : MAX_ITEMS),
       ...(p.readingQuestions ? { MAX_QUESTION_INDEX: String(p.readingQuestions.length - 1) } : {}),
     }
   );
@@ -154,6 +174,8 @@ export async function requestVocabularyExtraction(p: {
           ? JSON.stringify({
               passageText: p.text,
               passageWords: passageWords!.map(({ surface }, index) => ({ index, surface })),
+              ...(p.sourceInventory ? { lines: sourceInventoryLines(p.text) } : {}),
+              ...(p.sourceInventoryRange ? { requiredSpan: p.sourceInventoryRange } : {}),
               ...(p.preferredLemmas ? { preferredLemmas: p.preferredLemmas } : {}),
             })
           : p.readingQuestions
@@ -175,17 +197,24 @@ export async function requestVocabularyExtraction(p: {
     ],
     {
       ...(await capturedLearningAiOptions(ai)),
-      ...(p.sourceVocabulary
-        ? { jsonSchema: buildSourceVocabularyJsonSchema(passageWords!.length) }
-        : p.readingQuestions
-          ? {
-              jsonSchema: buildReadingVocabularyJsonSchema(
-                p.readingQuestions.length,
-                passageWords!.length
-              ),
-            }
-          : {}),
-      maxTokens: p.readingQuestions || p.sourceVocabulary ? 2048 : 1024,
+      ...(p.sourceInventory
+        ? {
+            jsonSchema: sourceInventoryJsonSchema(
+              passageWords!.length,
+              sourceInventoryLines(p.text).length
+            ),
+          }
+        : p.sourceVocabulary
+          ? { jsonSchema: buildSourceVocabularyJsonSchema(passageWords!.length) }
+          : p.readingQuestions
+            ? {
+                jsonSchema: buildReadingVocabularyJsonSchema(
+                  p.readingQuestions.length,
+                  passageWords!.length
+                ),
+              }
+            : {}),
+      maxTokens: p.sourceInventory ? 12000 : p.readingQuestions || p.sourceVocabulary ? 2048 : 1024,
       temperature: 0.2,
     }
   );

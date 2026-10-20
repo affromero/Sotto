@@ -339,13 +339,15 @@ export async function submitClass(
       };
       const reviewReading = newlyReviewed('READING');
       const reviewGrammar = newlyReviewed('GRAMMAR');
+      const source = { classId, attempt: cls.attempt };
       const assessedReading = reviewReading
         ? await reviewReadingVocabulary(
             tx,
             cls.courseId,
             cls.readingVocabulary,
             new Map(graded.map((answer) => [answer.questionId, answer.isCorrect])),
-            now
+            now,
+            source
           )
         : new Set<string>();
       await applyReviewOutcome(
@@ -359,7 +361,43 @@ export async function submitClass(
         sectionResults.find((section) => section.skill === 'READING')!.score,
         sectionResults.find((section) => section.skill === 'GRAMMAR')!.score,
         now,
-        tx
+        tx,
+        {
+          source,
+          assessment: 'SECTION_AGGREGATE',
+          questionIdsByTarget: new Map([
+            ...(Array.isArray(vocab)
+              ? vocab.map(
+                  (item) =>
+                    [
+                      `vocab:${item.lemma}`,
+                      graded
+                        .filter(
+                          (answer) =>
+                            answer.sectionId ===
+                            sectionResults.find((section) => section.skill === 'READING')?.id
+                        )
+                        .map((answer) => answer.questionId),
+                    ] as const
+                )
+              : []),
+            ...(Array.isArray(grammar)
+              ? grammar.map(
+                  (key) =>
+                    [
+                      `grammar:${key}`,
+                      graded
+                        .filter(
+                          (answer) =>
+                            answer.sectionId ===
+                            sectionResults.find((section) => section.skill === 'GRAMMAR')?.id
+                        )
+                        .map((answer) => answer.questionId),
+                    ] as const
+                )
+              : []),
+          ]),
+        }
       );
       return receipt;
     },

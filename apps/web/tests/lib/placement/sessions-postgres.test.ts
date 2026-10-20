@@ -48,6 +48,7 @@ import { replayLearningProviderResponse } from '@/lib/learning/preparation/provi
 import { createAIProvider, type AIOptions } from '@/lib/providers/ai';
 import { enqueueDurableQueueJob } from '@/lib/sidedoor/jobs/core/durable-queue';
 import { settleAnalysisFailure } from '@/lib/course-materials/jobs/analysis-failure';
+import { finishMaterialExtraction } from '@/lib/course-materials/extraction/persistence';
 
 const boundary = vi.hoisted(() => ({ database: null as PrismaClient | null }));
 vi.mock('@/lib/prisma', async () => {
@@ -168,7 +169,7 @@ suite('immutable private placement receipts against PostgreSQL', () => {
             extractorVersion: 'owned-1',
             rendererVersion: 'owned-1',
             recognitionPolicy: { kind: 'EMBEDDED_TEXT_ONLY', version: 1 },
-            status: 'PARTIAL',
+            status: 'EXTRACTING',
             pageCount: 1,
             pages: {
               create: {
@@ -186,6 +187,16 @@ suite('immutable private placement receipts against PostgreSQL', () => {
           },
         })
       : null;
+    if (material && run)
+      await tx((database) =>
+        finishMaterialExtraction(database, {
+          userId,
+          materialId: material.id,
+          runId: run.id,
+          processingRevision: 1,
+          originalSha256: material.originalSha256!,
+        })
+      );
     const materialSnapshot =
       material && run
         ? {
@@ -475,6 +486,25 @@ suite('immutable private placement receipts against PostgreSQL', () => {
       (await instance.database.courseMaterial.findUniqueOrThrow({ where: { id: f.material!.id } }))
         .courseId
     ).toBe(accepted.courseId);
+    const run = await instance.database.materialExtractionRun.findFirstOrThrow({
+      where: { materialId: f.material!.id },
+    });
+    expect(run.status).toBe('PARTIAL');
+    expect(run.coverage).toMatchObject({
+      processingComplete: true,
+      coverageComplete: false,
+      unresolvedPageNumbers: [1],
+      unavailablePageNumbers: [1],
+    });
+    const index = await instance.database.materialVocabularyIndex.findFirstOrThrow({
+      where: { materialId: f.material!.id },
+    });
+    expect(index).toMatchObject({ protocol: 2, status: 'NEEDS_TEXT', textLength: 0 });
+    expect(
+      await instance.database.vocabularyIndexChunk.count({ where: { indexId: index.id } })
+    ).toBe(0);
+    expect(await instance.database.learningObservation.count()).toBe(0);
+    expect(await instance.database.learnerVocab.count()).toBe(0);
   });
   it('rolls the source decision, course and initial requirement band back when the surrounding transaction fails', async () => {
     const f = await source();

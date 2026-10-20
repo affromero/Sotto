@@ -5,6 +5,7 @@ export const storageConsumerFields = [
   ['CourseMaterial', 'originalUrl', 'material', 'original', 'material'],
   ['CourseMaterial', 'optimizedUrl', 'material', 'optimized', 'material'],
   ['MaterialUploadPart', 'originalUrl', 'upload-part', 'original', 'upload-part'],
+  ['VocabularyPronunciation', 'audioUrl', 'vocabulary-audio', 'audio', 'vocabulary-audio'],
   ['Episode', 'audioUrl', 'episode', 'audio', 'episode'],
   ['Episode', 'pdfUrl', 'episode', 'transcript', 'episode'],
   ['Episode', 'waveformUrl', 'episode', 'waveform', 'episode'],

@@ -362,7 +362,7 @@ suite('durable reconciliation with PostgreSQL and Redis', () => {
   });
 
   it('does not report a canceled pass as failed during shutdown', async () => {
-    await fixture();
+    const record = await fixture();
     let resolveStarted!: () => void;
     const started = new Promise<void>((resolve) => {
       resolveStarted = resolve;
@@ -390,6 +390,9 @@ suite('durable reconciliation with PostgreSQL and Redis', () => {
     await loop.stop();
     expect(results).toEqual([]);
     expect(failures).toEqual([]);
+    expect(
+      await sottoTransaction(instance.database, (tx) => sottoJobOutbox(tx).receipt(record.job.id))
+    ).toMatchObject({ status: 'pending', fingerprint: record.fingerprint });
   });
 });
 

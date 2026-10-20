@@ -1,5 +1,5 @@
 [project]
-name = "sotto-local-piper-tts"
+name = "sotto-local-tts-checks"
 version = "1.0.0"
 requires-python = ">=3.11,<3.14"
 dependencies = [
@@ -7,7 +7,6 @@ dependencies = [
   "uvicorn>=0.29,<1",
   "numpy>=1.26,<3",
   "soundfile>=0.12,<1",
-  "piper-tts==1.8.0",
 ]
 
 [dependency-groups]

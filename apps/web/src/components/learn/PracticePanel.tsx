@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { SottoSpinner } from '@/components/ui/SottoSpinner';
 import { PracticeRunner, type PracticeStart } from './PracticeRunner';
 import styles from './PracticePanel.module.css';
@@ -98,6 +99,7 @@ export function PracticePanel({
   initialLearningSelection,
   onComplete,
 }: PracticePanelProps) {
+  const router = useRouter();
   const autoStarted = useRef(false);
   const [overview, setOverview] = useState<Overview | null>(null);
   const [phase, setPhase] = useState<Phase>('overview');
@@ -138,6 +140,10 @@ export function PracticePanel({
 
   const startKind = useCallback(
     async (kind: string, focusTargetId?: string | null) => {
+      if (kind === 'VOCAB' && !focusTargetId) {
+        router.push(`/learn/vocabulary?course=${courseId}`);
+        return;
+      }
       setPhase('starting');
       setSelectedKind(kind);
       setError('');
@@ -192,7 +198,7 @@ export function PracticePanel({
         if (startController.current === controller) startController.current = null;
       }
     },
-    [courseId, acceptPreparation, initialLearningSelection]
+    [courseId, acceptPreparation, initialLearningSelection, router]
   );
 
   const [deletingId, setDeletingId] = useState<string | null>(null);

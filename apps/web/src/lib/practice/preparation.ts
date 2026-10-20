@@ -56,6 +56,26 @@ function sameLearningRequest(previous: PracticePreparation, input?: LearningSele
     materialRecognitionHash(input ? normalizeLearningSelection(input) : null)
   );
 }
+function isPracticeSessionIdConflict(error: unknown) {
+  if (
+    !(error instanceof Prisma.PrismaClientKnownRequestError) ||
+    error.code !== 'P2002' ||
+    error.meta?.modelName !== 'PracticeSession'
+  )
+    return false;
+  const target = error.meta.target;
+  return (
+    target === 'PracticeSession_pkey' ||
+    (Array.isArray(target) && target.length === 1 && target[0] === 'id') ||
+    z
+      .object({
+        driverAdapterError: z.object({
+          cause: z.object({ constraint: z.object({ index: z.literal('PracticeSession_pkey') }) }),
+        }),
+      })
+      .safeParse(error.meta).success
+  );
+}
 export const practicePreparationGrant = (
   database: Prisma.TransactionClient,
   operation: Pick<PracticePreparation, 'id' | 'courseId' | 'userId'>
@@ -228,44 +248,52 @@ export async function requestPracticePreparation(
 ) {
   const sessionId = input.requestId ?? randomUUID();
   z.uuid().parse(sessionId);
-  const existing = await sottoTransaction(
-    prisma,
-    async (database) => {
-      const actor = await execution.authorize(database);
-      const session = await database.practiceSession.findFirst({
-        where: { id: sessionId, course: { userId: actor.userId } },
-        select: { courseId: true, kind: true, generationState: true },
-      });
-      if (!session) {
+  const readExisting = () =>
+    sottoTransaction(
+      prisma,
+      async (database) => {
+        const actor = await execution.authorize(database);
+        const session = await database.practiceSession.findFirst({
+          where: { id: sessionId, course: { userId: actor.userId } },
+          select: { courseId: true, kind: true, generationState: true },
+        });
+        if (!session) {
+          if (
+            await database.practiceRequestReceipt.findUnique({
+              where: { id: sessionId },
+              select: { id: true },
+            })
+          )
+            throw new PreparationConflictError(
+              'This admitted practice request was discarded. Start new work with a new request ID.'
+            );
+          return null;
+        }
+        if (session.courseId !== courseId || session.kind !== kind || !session.generationState)
+          throw new PreparationConflictError('This practice request ID belongs to different work.');
+        const operation = practicePreparationSchema.parse(session.generationState);
         if (
-          await database.practiceRequestReceipt.findUnique({
-            where: { id: sessionId },
-            select: { id: true },
-          })
+          operation.userId !== actor.userId ||
+          operation.courseId !== courseId ||
+          operation.sessionId !== sessionId
+        )
+          throw new PreparationConflictError('The owned practice request identity changed.');
+        if (operation.sourceRetired)
+          throw new PreparationConflictError(
+            'The original source was removed. Start new practice with an available source.'
+          );
+        if (
+          operation.focusTargetId !== (input.focusTargetId ?? null) ||
+          !sameLearningRequest(operation, input.learningSelection)
         )
           throw new PreparationConflictError(
-            'This admitted practice request was discarded. Start new work with a new request ID.'
+            'This practice request ID belongs to a different focus target.'
           );
-        return null;
-      }
-      if (session.courseId !== courseId || session.kind !== kind || !session.generationState)
-        throw new PreparationConflictError('This practice request ID belongs to different work.');
-      const operation = practicePreparationSchema.parse(session.generationState);
-      if (operation.sourceRetired)
-        throw new PreparationConflictError(
-          'The original source was removed. Start new practice with an available source.'
-        );
-      if (
-        operation.focusTargetId !== (input.focusTargetId ?? null) ||
-        !sameLearningRequest(operation, input.learningSelection)
-      )
-        throw new PreparationConflictError(
-          'This practice request ID belongs to a different focus target.'
-        );
-      return operation;
-    },
-    { signal: execution.signal }
-  );
+        return operation;
+      },
+      { signal: execution.signal }
+    );
+  const existing = await readExisting();
   if (existing) return existing;
   const generation = practiceGenerationSchema.parse(
     await capturePracticeContext(courseId, execution.userId, kind, execution, input)
@@ -464,7 +492,12 @@ export async function requestPracticePreparation(
       return operation;
     },
     { signal: execution.signal }
-  );
+  ).catch(async (error: unknown) => {
+    if (!isPracticeSessionIdConflict(error)) throw error;
+    const winner = await readExisting();
+    if (!winner) throw error;
+    return winner;
+  });
 }
 
 async function settlePracticeCancellation(

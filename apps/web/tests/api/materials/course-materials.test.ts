@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { NextRequest } from 'next/server';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PrismaClient } from '@/generated/prisma/client';
@@ -7,8 +7,15 @@ import { POST as upload } from '@/app/api/v1/materials/route';
 import { POST as placementUpload } from '@/app/api/v1/placement/from-notes/upload/route';
 import { closeRedis } from '@/lib/redis';
 import { GET as download } from '@/app/api/v1/materials/[materialId]/file/route';
-import { GET as notes, PUT as saveNotes } from '@/app/api/v1/courses/[courseId]/notes/route';
+import {
+  GET as notes,
+  PUT as saveNotes,
+  POST as uploadNotes,
+} from '@/app/api/v1/courses/[courseId]/notes/route';
 import { getCourseNote } from '@/lib/course-notes';
+import { captureMaterialDocuments } from '@/lib/course-materials/documents';
+import { originalPdf } from '../../helpers/learning/pdf';
+import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import { attachCourseMaterials, persistPlacementMaterials } from '@/lib/course-materials';
 import { factoryReset } from '@/lib/admin/factory-reset';
 import { resolveSottoRequest } from '@/lib/sidedoor/access/core/request-identity';
@@ -32,8 +39,14 @@ const boundary = vi.hoisted(() => ({
   generate: vi.fn(),
 }));
 vi.mock('@/lib/learning-ai', () => ({
-  resolveCapturedLearningAi: async () => ({ provider: 'anthropic', model: 'captured' }),
-  capturedLearningAiOptions: async () => ({}),
+  resolveCapturedLearningAi: async (_userId: string, execution: SottoProviderExecution) => ({
+    provider: 'anthropic',
+    model: 'captured',
+    execution,
+  }),
+  capturedLearningAiOptions: async (ai: { execution: SottoProviderExecution }) => ({
+    sourceDocuments: ai.execution.sourceDocuments,
+  }),
 }));
 vi.mock('@/lib/providers/ai', () => ({
   createAIProvider: () => ({ generateResponse: boundary.generate }),
@@ -138,6 +151,118 @@ suite('owned original course materials', () => {
     expect(body.materials[0]).not.toHaveProperty('originalUrl');
     return body.materials[0] as { id: string; name: string; extractedText: string };
   }
+  function execution(userId = identity.ownerId, token = identity.ownerToken) {
+    return {
+      userId,
+      authorize: async (database: Parameters<typeof resolveSottoRequest>[0]) => {
+        const actor = await resolveSottoRequest(database, request('materials', token));
+        if (!actor || actor.kind !== 'content') throw new Error('Missing learner');
+        return actor;
+      },
+    };
+  }
+  it('retains original course notes and admits their full vocabulary index atomically', async () => {
+    const text = 'Bahnhof = station\nFahrkarte = ticket';
+    const form = new FormData();
+    form.append('files', new File([text], 'Official German.md', { type: 'text/markdown' }));
+    const response = await uploadNotes(
+      request(`courses/${courseId}/notes`, identity.ownerToken, { method: 'POST', body: form }),
+      { params: Promise.resolve({ courseId }) }
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toMatchObject({ body: '', imported: 1, failed: 0, vocabularyIndexing: 'queued' });
+    expect(body.materials[0]).toMatchObject({
+      name: 'Official German.md',
+      extractedText: '',
+      textRetained: true,
+    });
+    expect(body.materials[0]).not.toHaveProperty('originalUrl');
+    expect(
+      await instance.database.materialVocabularyIndex.findFirst({
+        where: { materialId: body.materials[0].id },
+      })
+    ).toMatchObject({ courseId, status: 'PENDING', textLength: text.length });
+    expect(await instance.database.learnerVocab.count({ where: { courseId } })).toBe(0);
+    const original = await download(request(`materials/${body.materials[0].id}/file`), {
+      params: Promise.resolve({ materialId: body.materials[0].id }),
+    });
+    expect(await original.text()).toBe(text);
+    expect(await getCourseNote(courseId)).toContain(text);
+  });
+
+  it('attaches a pending retained source without admitting vocabulary before extraction', async () => {
+    const material = await retained('Pending original.txt');
+    const original = 'Original German notes\nBahnhof means station.';
+    await instance.database.courseMaterial.update({
+      where: { id: material.id },
+      data: {
+        originalSha256: createHash('sha256').update(original).digest('hex'),
+        extractedText: '',
+        processingStatus: 'QUEUED',
+      },
+    });
+    await sottoTransaction(instance.database, (database) =>
+      attachCourseMaterials(database, identity.ownerId, courseId, [material.id])
+    );
+    expect(
+      await instance.database.courseMaterial.findUnique({
+        where: { id: material.id },
+        select: { courseId: true, processingStatus: true },
+      })
+    ).toEqual({ courseId, processingStatus: 'QUEUED' });
+    expect(
+      await instance.database.materialVocabularyIndex.count({
+        where: { materialId: material.id },
+      })
+    ).toBe(0);
+  });
+
+  it('retains a PDF without transcription, reads its exact original for AI, and fences removal', async () => {
+    const bytes = originalPdf(2, { text: false });
+    const form = new FormData();
+    form.append(
+      'files',
+      new File([new Uint8Array(bytes)], 'Original course.PDF', { type: 'application/pdf' })
+    );
+    const response = await upload(
+      request('materials', identity.ownerToken, { method: 'POST', body: form })
+    );
+    expect(response.status).toBe(201);
+    const { materials } = await response.json();
+    expect(materials[0].extractedText).toBe('');
+    const captured = await captureMaterialDocuments(execution(), {
+      materialIds: [materials[0].id],
+    });
+    expect(captured.parts[0]?.data).toEqual(bytes);
+    await instance.database.courseMaterial.update({
+      where: { id: materials[0].id },
+      data: { byteSize: bytes.length + 1 },
+    });
+    await expect(
+      captureMaterialDocuments(execution(), { materialIds: [materials[0].id] })
+    ).rejects.toThrow('type or size');
+    await instance.database.courseMaterial.update({
+      where: { id: materials[0].id },
+      data: { byteSize: bytes.length },
+    });
+    const other = await identity.household('Other learner');
+    await expect(
+      captureMaterialDocuments(execution(other.id, other.token), { materialIds: [materials[0].id] })
+    ).rejects.toThrow('unavailable');
+    await sottoTransaction(instance.database, (database) =>
+      attachCourseMaterials(database, identity.ownerId, courseId, [materials[0].id])
+    );
+    const courseDocuments = await captureMaterialDocuments(execution(), { courseId });
+    expect(courseDocuments.parts[0]?.data).toEqual(bytes);
+    expect(await getCourseNote(courseId)).toBe('');
+    const original = await download(request(`materials/${materials[0].id}/file`), {
+      params: Promise.resolve({ materialId: materials[0].id }),
+    });
+    expect(Buffer.from(await original.arrayBuffer())).toEqual(bytes);
+    await deleteCourseCompletely(courseId);
+    await expect(courseDocuments.validate()).rejects.toThrow('changed');
+  });
   it('retains uppercase file extensions and preserves the original displayed filename', async () => {
     const material = await retained('Vocab Deutsch.TXT');
     expect(material.name).toBe('Vocab Deutsch.TXT');
@@ -162,28 +287,39 @@ suite('owned original course materials', () => {
       ).status
     ).toBe(404);
   });
-  it('rejects obsolete multipart placement before retaining files or starting analysis', async () => {
-    const form = new FormData();
-    form.append('native', 'en');
-    form.append('target', 'de');
-    form.append('content', 'Untrimmed source text');
-    form.append(
-      'files',
-      new File(['Complete source ending'], 'Vocab Deutsch.txt', { type: 'text/plain' })
-    );
-    const response = await placementUpload(
-      request('placement/from-notes/upload', identity.ownerToken, { method: 'POST', body: form })
-    );
-    expect(response.status).toBe(415);
-    expect((await response.json()).error).toContain('resumable material uploader');
-    expect(await instance.database.courseMaterial.count()).toBe(0);
-    expect(await instance.database.materialAnalysis.count()).toBe(0);
-  });
+  it.each([
+    {
+      name: 'Vocab Deutsch.txt',
+      content: new TextEncoder().encode('Complete source ending'),
+      type: 'text/plain',
+    },
+    {
+      name: 'Original course.pdf',
+      content: new Uint8Array(originalPdf()),
+      type: 'application/pdf',
+    },
+  ])(
+    'rejects obsolete $type placement before retaining files or starting analysis',
+    async (file) => {
+      const form = new FormData();
+      form.append('native', 'en');
+      form.append('target', 'de');
+      form.append('content', 'Untrimmed source text');
+      form.append('files', new File([file.content], file.name, { type: file.type }));
+      const response = await placementUpload(
+        request('placement/from-notes/upload', identity.ownerToken, { method: 'POST', body: form })
+      );
+      expect(response.status).toBe(415);
+      expect((await response.json()).error).toContain('resumable material uploader');
+      expect(await instance.database.courseMaterial.count()).toBe(0);
+      expect(await instance.database.materialAnalysis.count()).toBe(0);
+    }
+  );
   it('rejects oversized originals before retaining files or extracting content', async () => {
     const form = new FormData();
     form.append(
       'files',
-      new File([new Uint8Array(10 * 1024 * 1024 + 1)], 'too-large.txt', { type: 'text/plain' })
+      new File([new Uint8Array(50 * 1024 * 1024 + 1)], 'too-large.txt', { type: 'text/plain' })
     );
     const response = await upload(
       request('materials', identity.ownerToken, { method: 'POST', body: form })

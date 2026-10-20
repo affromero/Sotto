@@ -48,6 +48,12 @@ suite('storage ownership collection with PostgreSQL', () => {
     );
     for (const statement of uploadsMigration.split(';').filter((sql) => sql.trim()))
       await database.$executeRawUnsafe(statement);
+    const audioMigration = await readFile(
+      'prisma/migrations/20261020151000_vocabulary_pronunciation/migration.sql',
+      'utf8'
+    );
+    for (const statement of audioMigration.split(';').filter((sql) => sql.trim()))
+      await database.$executeRawUnsafe(statement);
     for (const owner of ['first', 'second']) {
       await insert('User', {
         id: owner,
@@ -93,6 +99,15 @@ suite('storage ownership collection with PostgreSQL', () => {
         lessonId: 'lesson',
         order: 0,
         worksheetPdfUrl: `${owner}/worksheet.pdf`,
+        updatedAt: new Date(),
+      });
+      await insert('VocabularyPronunciation', {
+        id: owner,
+        courseId: owner,
+        fingerprint: owner,
+        text: 'Hola',
+        language: 'es',
+        audioUrl: `${owner}/vocabulary.wav`,
         updatedAt: new Date(),
       });
       await insert('ClassSection', {
@@ -229,6 +244,9 @@ suite('storage ownership collection with PostgreSQL', () => {
         })
       );
       expect(prompts.map((row) => row.id)).not.toContain('second-sectionId');
+      expect(
+        pages.filter((page) => page.source === 'vocabulary-audio').flatMap((page) => page.rows)
+      ).toEqual([{ id: 'first', references: { audioUrl: 'first/vocabulary.wav' } }]);
       expect(
         pages.filter((page) => page.source === 'recording').flatMap((page) => page.rows)
       ).toContainEqual(

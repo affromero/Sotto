@@ -179,7 +179,7 @@ export async function composeWritingPrompts(
     attempt: 1 | 2
   ) => {
     const res = await client.generateResponse(systemPrompt, [{ role: 'user', content: request }], {
-      ...(await capturedLearningAiOptions(ai)),
+      ...(await capturedLearningAiOptions(ai, { includeSourceDocuments: true })),
       maxTokens: 2048,
       temperature,
       jsonSchema: writingResponseSchema(translation),

@@ -1,5 +1,17 @@
 # src/workers/ — Background Job Processors
 
+`vocabulary/index.worker.ts` dispatches durable PREPARE and CHUNK work. Preparation
+captures original material storage, source revision, and bounded provider grants.
+Chunks run canonical full-inventory extraction and coverage review, recursively
+subdivide incomplete inventories, and publish source occurrences atomically.
+Completed chunks are reused. Unknown provider outcomes require confirmed cleanup
+before retry. Never infer completeness merely from successful model responses.
+
+`vocabulary/audio.worker.ts` claims course-owned pronunciation generations and
+uses explicit local speech through canonical provider execution and storage.
+Heartbeat and cleanup state fence uncertain work. Playback never enqueues or
+synthesizes audio, and profile/course erasure retires these cached references.
+
 BullMQ workers that process async jobs. Each worker runs in a separate thread with its own Redis connection.
 
 PDF generation accepts canonical v1 stitching children and v2 export requests.

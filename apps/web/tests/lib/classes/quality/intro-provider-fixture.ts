@@ -1,9 +1,36 @@
+import type { SourceDocuments } from '@/lib/providers/ai';
+import { originalPdf } from '../../../helpers/learning/pdf';
 import { withReadingSupportFixture } from './teaching/reading-support-fixture';
 import { withListeningWitnessFixture } from '../listening/witness-fixture';
 
 interface FixtureResponse {
   content: string;
   model: string;
+}
+
+export function introSourceDocuments(): SourceDocuments {
+  return {
+    parts: [
+      {
+        type: 'document',
+        mediaType: 'application/pdf',
+        name: 'Workbook.pdf',
+        data: originalPdf(1),
+      },
+    ],
+    validate: async () => {},
+  };
+}
+
+export async function introAiOptionsFixture(
+  ai: { model: string; signal: AbortSignal; execution?: { sourceDocuments?: SourceDocuments } },
+  scope?: { includeSourceDocuments?: boolean }
+) {
+  return {
+    model: ai.model,
+    signal: ai.signal,
+    ...(scope?.includeSourceDocuments ? { sourceDocuments: ai.execution?.sourceDocuments } : {}),
+  };
 }
 
 /** Existing rejection fixtures explicitly retain their discovered defects at the model boundary. */

@@ -229,11 +229,13 @@ export async function replayMaterialRecognitionHttp(options: {
     content:
       typeof message.content === 'string'
         ? message.content
-        : message.content.map((part) =>
-            part.type === 'text'
-              ? { type: 'text' as const, text: part.text }
-              : { type: 'image_url' as const, url: part.url }
-          ),
+        : message.content.map((part) => {
+            if (part.type === 'text') return { type: 'text' as const, text: part.text };
+            if (part.type === 'image_url') return { type: 'image_url' as const, url: part.url };
+            throw new MaterialRecognitionUnsupported(
+              'Saved page recognition supports text and page images only.'
+            );
+          }),
   }));
   const receipt = structuredClone(options.receipt);
   if (

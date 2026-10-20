@@ -11,6 +11,14 @@ final class PracticeSessionContentTests: XCTestCase {
         XCTAssertEqual(session.learningSelection?.objectives.first?.title, "Finite verb in second position")
         XCTAssertEqual(session.learningSelection?.nodeIds, ["de.a1.order"])
     }
+
+    func testVocabularyStudyContinuesAtItsSavedWebSession() throws {
+        let session = try start(#"{"status":"ready_vocabulary","sessionId":"saved-study","courseId":"german-course","kind":"VOCAB","mode":"MEANING_RECALL","cards":[]}"#)
+        XCTAssertTrue(session.requiresWebVocabulary)
+        let url = try XCTUnwrap(session.vocabularyStudyURL(serverURL: URL(string: "https://sotto.example")!))
+        XCTAssertEqual(url.absoluteString, "https://sotto.example/learn/vocabulary?course=german-course&session=saved-study")
+        XCTAssertNil(session.submissionResult)
+    }
     func testReadingPracticePreservesTheSourceAndAcceptsHistoricalQuestions() throws {
         let item = try JSONDecoder().decode(SottoPracticeItem.self, from: Data(
             #"{"id":"r0","prompt":"Wo ist Mia?","options":["Berlin","Bonn"],"passageText":"Mia ist in Berlin."}"#.utf8

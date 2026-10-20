@@ -32,15 +32,60 @@ function connectionIdentity(environment, namespace) {
 
 function validateManifest(manifest, names, identity) {
   assert(manifest && typeof manifest === 'object', 'Original queue manifest required');
-  assert.deepEqual(Object.keys(manifest).sort(), ['connectionIdentity', 'queues', 'schemaVersion']);
-  assert.equal(manifest.schemaVersion, 1);
+  const additive = manifest.schemaVersion === 2;
+  assert.deepEqual(
+    Object.keys(manifest).sort(),
+    additive
+      ? ['connectionIdentity', 'queueTransition', 'queues', 'schemaVersion']
+      : ['connectionIdentity', 'queues', 'schemaVersion']
+  );
+  assert.equal(manifest.schemaVersion, additive ? 2 : 1);
   assert.equal(manifest.connectionIdentity, identity, 'Queue connection identity changed');
+  if (additive) {
+    validateTransition(manifest.queueTransition, names);
+    names = manifest.queueTransition.candidateQueues;
+  }
   assert(Array.isArray(manifest.queues));
   assert.deepEqual(manifest.queues.map((queue) => queue.name).sort(), names);
   for (const queue of manifest.queues) {
     assert.deepEqual(Object.keys(queue).sort(), ['name', 'paused']);
     assert.equal(typeof queue.paused, 'boolean');
   }
+}
+
+function validateTransition(transition, names, snapshot = false) {
+  assert(
+    transition && typeof transition === 'object',
+    'Reviewed additive queue transition required'
+  );
+  assert.deepEqual(Object.keys(transition).sort(), [
+    'addedQueues',
+    'candidateQueues',
+    'previousQueues',
+  ]);
+  for (const list of Object.values(transition)) {
+    assert(Array.isArray(list) && list.length > 0 && list.length <= 100);
+    assert(list.every((name) => typeof name === 'string' && /^[a-z][a-z-]*$/.test(name)));
+    assert.deepEqual(list, [...new Set(list)].sort(), 'Queue names must be sorted and unique');
+  }
+  const { previousQueues, candidateQueues, addedQueues } = transition;
+  assert(
+    previousQueues.every((name) => candidateQueues.includes(name)),
+    'Queue removal is unsupported'
+  );
+  assert.deepEqual(
+    addedQueues,
+    candidateQueues.filter((name) => !previousQueues.includes(name)),
+    'Exact added queues required'
+  );
+  assert(
+    snapshot ||
+      JSON.stringify(names) === JSON.stringify(candidateQueues) ||
+      JSON.stringify(names) === JSON.stringify(previousQueues),
+    'Runtime queue inventory changed'
+  );
+  if (snapshot)
+    assert.deepEqual(names, previousQueues, 'Snapshot requires the captured previous runtime');
 }
 
 async function readOnly(database, operation, isolationLevel = 'RepeatableRead') {
@@ -236,28 +281,76 @@ async function established(runtime) {
   });
 }
 
+async function databaseIdentity(runtime) {
+  return readOnly(runtime.database, async (transaction) => {
+    const rows = await transaction.$queryRawUnsafe(
+      'SELECT current_database() AS "databaseName", current_schema() AS "schemaName", inet_server_addr()::text AS "serverAddress", inet_server_port() AS "serverPort", (SELECT oid::text FROM pg_database WHERE datname = current_database()) AS "databaseOid"'
+    );
+    assert.equal(rows.length, 1, 'Unique database identity required');
+    const identity = rows[0];
+    for (const key of ['databaseName', 'schemaName', 'serverAddress', 'databaseOid'])
+      assert(typeof identity[key] === 'string' && identity[key].length > 0);
+    assert(Number.isInteger(identity.serverPort) && identity.serverPort > 0);
+    const schema = new URL(runtime.environment.DATABASE_URL).searchParams.get('schema');
+    if (schema !== null) assert.equal(identity.schemaName, schema, 'Configured schema differs');
+    return { databaseIdentity: identity };
+  });
+}
+
+async function schemaIndex(runtime) {
+  return readOnly(runtime.database, async (transaction) => {
+    const rows = await transaction.$queryRawUnsafe(
+      'SELECT n.nspname AS "schemaName", quote_ident(n.nspname) AS "quotedSchema", t.relname AS "tableName", x.relname AS "indexName", am.amname AS "accessMethod", i.indisvalid AS "isValid", i.indisready AS "isReady", i.indislive AS "isLive", i.indisunique AS "isUnique", i.indisprimary AS "isPrimary", i.indisexclusion AS "isExclusion", i.indnkeyatts::integer AS "keyCount", i.indnatts::integer AS "attributeCount", i.indexprs IS NULL AS "noExpressions", i.indpred IS NULL AS "noPredicate", a.attname AS "columnName", o.opcname AS "operatorClass", ons.nspname AS "operatorNamespace", i.indoption[0]::integer AS "ordering", i.indcollation[0] = a.attcollation AS "defaultCollation", x.relnamespace = t.relnamespace AS "sameSchema", pg_get_indexdef(x.oid) AS "definition" FROM pg_catalog.pg_index i JOIN pg_catalog.pg_class x ON x.oid = i.indexrelid JOIN pg_catalog.pg_class t ON t.oid = i.indrelid JOIN pg_catalog.pg_namespace n ON n.oid = t.relnamespace JOIN pg_catalog.pg_am am ON am.oid = x.relam JOIN pg_catalog.pg_attribute a ON a.attrelid = t.oid AND a.attnum = i.indkey[0] JOIN pg_catalog.pg_opclass o ON o.oid = i.indclass[0] JOIN pg_catalog.pg_namespace ons ON ons.oid = o.opcnamespace WHERE n.nspname = current_schema() AND t.relname = \'SidedoorState\' AND x.relname = \'SidedoorState_id_pattern_idx\''
+    );
+    assert.equal(rows.length, 1, 'Exact shared-state index required');
+    return { indexProof: rows[0] };
+  });
+}
+
 /** Dependencies are the actual database, queue and filesystem boundaries in tests. */
 async function run(input, runtime) {
   assert(input && typeof input === 'object');
-  assert(Object.keys(input).every((key) => ['command', 'manifest'].includes(key)));
+  assert(
+    Object.keys(input).every((key) => ['command', 'manifest', 'queueTransition'].includes(key))
+  );
+  if (input.queueTransition !== undefined)
+    assert(
+      input.command === 'snapshot' && input.manifest === undefined,
+      'Transition is admitted only by an original snapshot'
+    );
   assert(
     [
       'snapshot',
       'observe',
       'pause',
       'drained',
+      'drained-all',
       'restore',
       'established',
+      'database-identity',
+      'schema-index',
       'activation-ready',
     ].includes(input.command)
   );
   const identity = connectionIdentity(runtime.environment, runtime.namespace);
-  const base = { schemaVersion: 1, connectionIdentity: identity };
+  let base = { schemaVersion: 1, connectionIdentity: identity };
   if (input.command === 'established') return { ...base, ...(await established(runtime)) };
-  const names = [...runtime.names].sort();
+  if (input.command === 'database-identity')
+    return { ...base, ...(await databaseIdentity(runtime)) };
+  let names = [...runtime.names].sort();
   assert(names.length > 0 && new Set(names).size === names.length);
-  if (input.manifest !== undefined || ['pause', 'drained', 'restore'].includes(input.command))
+  if (
+    input.manifest !== undefined ||
+    ['pause', 'drained', 'drained-all', 'restore', 'schema-index'].includes(input.command)
+  )
     validateManifest(input.manifest, names, identity);
+  const transition = input.queueTransition ?? input.manifest?.queueTransition;
+  if (transition !== undefined) {
+    validateTransition(transition, names, input.command === 'snapshot');
+    names = transition.candidateQueues;
+    base = { schemaVersion: 2, connectionIdentity: identity, queueTransition: transition };
+  }
+  if (input.command === 'schema-index') return { ...base, ...(await schemaIndex(runtime)) };
   const queues = [];
   try {
     for (const name of names) queues.push(runtime.createQueue(name));
@@ -275,7 +368,7 @@ async function run(input, runtime) {
     }
     const snapshot = [];
     for (const queue of queues) snapshot.push({ name: queue.name, paused: await queue.isPaused() });
-    if (['pause', 'drained'].includes(input.command))
+    if (['pause', 'drained', 'drained-all'].includes(input.command))
       assert(
         snapshot.every((queue) => queue.paused),
         'Queues must remain paused'
@@ -284,7 +377,7 @@ async function run(input, runtime) {
       const expected = [...input.manifest.queues].sort((a, b) => a.name.localeCompare(b.name));
       assert.deepEqual(snapshot, expected, 'Original queue pause states were not restored');
     }
-    if (input.command !== 'drained') return { ...base, queues: snapshot };
+    if (!['drained', 'drained-all'].includes(input.command)) return { ...base, queues: snapshot };
     const executions = await inspectExecutions(runtime);
     let activeJobs = 0;
     for (const queue of queues) {
@@ -296,7 +389,10 @@ async function run(input, runtime) {
       queues: snapshot,
       activeJobs,
       executions,
-      drained: activeJobs === 0 && executions.workerActive === 0,
+      drained:
+        activeJobs === 0 &&
+        executions.workerActive === 0 &&
+        (input.command !== 'drained-all' || executions.synchronousActive === 0),
     };
   } finally {
     const closed = await Promise.allSettled(queues.map((queue) => queue.close()));

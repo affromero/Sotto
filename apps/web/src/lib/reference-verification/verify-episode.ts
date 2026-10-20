@@ -75,13 +75,7 @@ export async function verifyEpisodeReferences(
     type: reference.type,
   }));
 
-  const { results, rejectedRefIds } = await runReferenceVerification(
-    inputs,
-    turns,
-    topic,
-    ai,
-    references.length
-  );
+  const { results, rejectedRefIds } = await runReferenceVerification(inputs, turns, topic, ai);
 
   const verifiedAt = new Date().toISOString();
   let allVerified = rejectedRefIds.size === 0;

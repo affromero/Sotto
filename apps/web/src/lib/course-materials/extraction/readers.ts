@@ -2,6 +2,15 @@ import { materialPageTextManifestSchema, materialVisualCoverageSchema } from '@s
 import { createHash } from 'node:crypto';
 import type { Prisma } from '@/generated/prisma/client';
 
+export interface MaterialTextChunkIdentity {
+  index: number;
+  sha256: string;
+  codePointStart: number;
+  codePointEnd: number;
+  utf8ByteStart: number;
+  utf8ByteEnd: number;
+}
+
 export function decodeMaterialTextChunk(chunk: {
   textBytes: Uint8Array;
   sha256: string;
@@ -67,7 +76,13 @@ export async function materialTextInventory(
 /** Read only chunks intersecting the planned code-point range, preserving exact UTF-8 bytes. */
 export async function readMaterialTextRange(
   database: Prisma.TransactionClient,
-  inventory: Awaited<ReturnType<typeof materialTextInventory>>,
+  inventory: Omit<Awaited<ReturnType<typeof materialTextInventory>>, 'streams'> & {
+    streams: Array<
+      Awaited<ReturnType<typeof materialTextInventory>>['streams'][number] & {
+        chunks?: readonly MaterialTextChunkIdentity[];
+      }
+    >;
+  },
   start: number,
   end: number
 ) {
@@ -96,6 +111,18 @@ export async function readMaterialTextRange(
       });
       let cursor = localStart;
       for (const chunk of chunks) {
+        if (stream.chunks) {
+          const pinned = stream.chunks.find((item) => item.index === chunk.index);
+          if (
+            !pinned ||
+            pinned.sha256 !== chunk.sha256 ||
+            pinned.codePointStart !== chunk.codePointStart ||
+            pinned.codePointEnd !== chunk.codePointEnd ||
+            pinned.utf8ByteStart !== chunk.utf8ByteStart ||
+            pinned.utf8ByteEnd !== chunk.utf8ByteEnd
+          )
+            throw new Error('The pinned material source chunk identity changed.');
+        }
         if (chunk.codePointStart > cursor)
           throw new Error('A material source range has missing chunks.');
         const text = decodeMaterialTextChunk(chunk);

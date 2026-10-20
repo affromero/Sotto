@@ -70,7 +70,12 @@ export async function generateClassTeaching(p: TeachingParams): Promise<ClassTea
             : 'Teach the lesson before the learner answers any assessment questions.',
         },
       ],
-      { ...(await capturedLearningAiOptions(ai)), maxTokens: 3000, temperature: 0.5, jsonSchema }
+      {
+        ...(await capturedLearningAiOptions(ai, { includeSourceDocuments: true })),
+        maxTokens: 3000,
+        temperature: 0.5,
+        jsonSchema,
+      }
     );
     await logUsage({
       service: ai.provider,

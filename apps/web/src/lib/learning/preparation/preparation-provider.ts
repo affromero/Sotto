@@ -19,7 +19,8 @@ export async function learningPreparationRequestFingerprint(
   selection: unknown,
   signal: AbortSignal
 ): Promise<string> {
-  const bytes = await readResponseBytes(request.clone(), { signal, maxBytes: 4 * 1024 * 1024 });
+  // A 50 MiB original expands to 67 MiB of base64, plus bounded prompt text.
+  const bytes = await readResponseBytes(request.clone(), { signal, maxBytes: 72 * 1024 * 1024 });
   return createHash('sha256')
     .update(JSON.stringify({ url: request.url, method: request.method, selection }))
     .update(bytes)

@@ -248,6 +248,91 @@ A failed candidate leaves the old slot serving. Failures during replacement rest
 
 Matching schema-review hashes cannot bypass this restriction. Additive enum changes can still make newly written rows unreadable by older Prisma clients. Before a separate schema-changing rollout, fence HTTP admissions, preserve and pause the affected queues, verify that active jobs and provider executions have settled, and only then stop the old services. Worker shutdown cancels active jobs; it does not safely drain them. The migration procedure must define the point after which recovery keeps admissions fenced and proceeds with compatible code instead of restarting the previous release.
 
+### Fenced schema transitions
+
+For an established stack, `bash scripts/deploy/schema/deploy.sh REVIEW EVIDENCE`
+uses a separate, explicit procedure. The ordinary `scripts/deploy.sh` invocation
+continues to reject different Prisma assets. Both paths use the same committed
+release, immutable images, capacity admission, deployment lock and provider
+continuity checks. The fenced procedure supports added migration SQL while
+preserving every previously published migration file. An existing provider
+activation must remain enabled. Schema review version 1 requires unchanged
+queue names. Version 2 supports an explicitly reviewed addition of queues.
+
+Supply the ordinary schema version 2 runtime continuity review through
+`SOTTO_COMPATIBILITY_REVIEW_FILE` and `SOTTO_COMPATIBILITY_EVIDENCE_FILE`.
+The additional private schema review has exactly these fields:
+
+| Field                                        | Required value                                                                   |
+| -------------------------------------------- | -------------------------------------------------------------------------------- |
+| `schemaVersion`                              | Integer `1`, or `2` for an additive queue transition                             |
+| `procedure`                                  | `fenced-schema-migration`                                                        |
+| `stack`, `releaseSha`                        | Exact stack and full candidate source SHA                                        |
+| `candidateWebImage`, `candidateWorkersImage` | Exact digest-pinned references                                                   |
+| `candidateSchemaHash`                        | Candidate's canonical Prisma asset hash                                          |
+| `previousSchemaHashes`                       | Object mapping every captured worker image ID to its canonical Prisma asset hash |
+| `compatibilityReviewSha256`                  | SHA-256 of the exact schema version 2 review file bytes                          |
+| `reviewer`, `evidenceSha256`                 | Independent schema reviewer and SHA-256 of the exact schema evidence bytes       |
+
+Version 2 additionally requires `queueTransition`, containing exactly
+`previousQueues`, `candidateQueues`, and `addedQueues`. Each is a sorted,
+unique, nonempty list of at most 100 queue names. The candidate must retain
+every previous queue, and `addedQueues` must equal the exact difference.
+Canonical probes of the immutable candidate and every previous worker image
+must match these inventories. Removing or renaming queues is unsupported.
+
+The captured old runtime saves the actual original pause state of every queue
+in the candidate inventory, including newly added names. Snapshot reads avoid
+updating queue metadata. Both old and candidate runtimes use that complete
+version 2 manifest for pausing, drain checks, recovery and state restoration.
+An unrelated queue or a changed runtime inventory stops the transition.
+
+The runtime review binds all four previous containers, both complete provider
+inventories and every changed runtime file, including Prisma assets. Schema
+evidence must review the actual SQL, retained queued work, generated clients,
+storage and provider ownership, and recovery after a partial migration. Both
+accepted reviews are saved and fsynced before service changes.
+
+Before maintenance, the controller saves the original queue flags and proves
+that application and direct migration connections reach the same actual
+PostgreSQL server, database and schema. It then persists the preparation
+receipt, installs and verifies a full HTTP 503 response, pauses delivery, and
+waits for both asynchronous and synchronous executions to settle. It gracefully
+retires the exact old web and workers and rejects replacement processes under
+their Compose labels. The authoritative backup is taken and verified after
+those writers stop, so it includes their final accepted writes.
+
+The controller records irreversible cutover before running the candidate's
+`prisma migrate deploy`. It then verifies the complete applied migration
+inventory with the canonical access check and runs `prisma migrate diff`
+against the candidate schema. The current Prisma introspector loses BTree
+operator-class metadata. The controller accepts its exact repeated drop/create
+pair for `SidedoorState_id_pattern_idx` only after separately verifying the full
+PostgreSQL definition, `text_pattern_ops`, ordering, collation, key count and
+valid/ready/live flags. Any additional SQL, different index metadata or other
+comparison failure retains maintenance. This specific limitation is recorded in
+a fsynced drift receipt and reported visibly. SQL-only constraints also require
+migration regression coverage. Candidate
+services start with queues paused. Health, smoke checks and enabled provider
+continuity must pass before routing and the original queue flags are restored.
+
+Any failure after fencing retains maintenance, paused delivery, the shared lock
+and the unresolved attempt marker. This includes a lost Caddy response, partial
+SQL application, failed drift checks and errors while restoring queue flags.
+The controller never resolves migration history or restarts old code after a
+migration has started. Before that point, a reviewed recovery may return to the
+captured old release after its execution ownership is proven settled.
+
+For recovery, retain `schema-preparation.json`, `schema-stopped.json`, both
+accepted reviews, the original queue manifest, migration/drift logs and the
+verified backup from the attempt directory. Inspect the exact migration state
+and captured containers before preparing recovery. After migration starts,
+finish with compatible code and the same admitted images and saved overrides;
+keep HTTP and delivery fenced until database checks and all four candidate
+services pass. Verify routing and restore the saved queue flags before clearing
+the exact resolved marker. An automatic database restore, migration-history
+resolution or marker deletion is never a retry strategy.
+
 ### Reviewed runtime compatibility
 
 For a runtime upgrade with unchanged Prisma assets, independently review the

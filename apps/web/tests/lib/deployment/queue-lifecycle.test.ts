@@ -1,8 +1,11 @@
 // @vitest-environment node
 import { createHash, randomUUID } from 'node:crypto';
-import { readdir, readFile } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
+import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { join, resolve } from 'node:path';
+import { promisify } from 'node:util';
+import { tmpdir } from 'node:os';
 import { Queue, Worker } from 'bullmq';
 import Redis from 'ioredis';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -42,6 +45,14 @@ interface Report extends Manifest {
   established?: boolean;
   activeJobs?: number;
   executions?: { workerActive: number; synchronousActive: number; settled: number };
+  databaseIdentity?: {
+    databaseName: string;
+    schemaName: string;
+    serverAddress: string;
+    serverPort: number;
+    databaseOid: string;
+  };
+  indexProof?: Record<string, unknown>;
 }
 interface Runtime {
   database: SharedTestInstance['database'];
@@ -61,7 +72,10 @@ interface Runtime {
 const { run } = createRequire(import.meta.url)(
   resolve(process.cwd(), '../../scripts/deploy/queue-lifecycle.cjs')
 ) as {
-  run: (input: { command: string; manifest?: unknown }, runtime: Runtime) => Promise<Report>;
+  run: (
+    input: { command: string; manifest?: unknown; queueTransition?: unknown },
+    runtime: Runtime
+  ) => Promise<Report>;
 };
 const suite =
   process.env.SIDEDOOR_TEST_DATABASE_URL && process.env.SIDEDOOR_TEST_REDIS_URL
@@ -194,6 +208,36 @@ suite('deployment queue and execution settlement', () => {
     expect(await run({ command: 'snapshot' }, runtime)).toEqual(original);
     expect(original.queues.find((entry) => entry.name === 'pricing-fetch')?.paused).toBe(true);
     expect(snapshot.queues.every((entry) => !entry.paused)).toBe(true);
+  });
+
+  it('fences added queues from the previous runtime and restores their exact flags on the candidate', async () => {
+    const addedQueues = ['material-analysis', 'vocabulary-audio'];
+    const candidateQueues = [...ALL_QUEUE_NAMES].sort();
+    expect(addedQueues.every((name) => candidateQueues.includes(name))).toBe(true);
+    const previousQueues = candidateQueues.filter((name) => !addedQueues.includes(name));
+    await queue('material-analysis').pause();
+    await queue('pricing-fetch').pause();
+    const keys = (await connection.keys(`${prefix}:*`)).sort();
+    const original = await run(
+      {
+        command: 'snapshot',
+        queueTransition: {
+          previousQueues,
+          candidateQueues,
+          addedQueues,
+        },
+      },
+      { ...runtime, names: previousQueues }
+    );
+    expect((await connection.keys(`${prefix}:*`)).sort()).toEqual(keys);
+    await run({ command: 'pause', manifest: original }, { ...runtime, names: previousQueues });
+    expect((await run({ command: 'drained-all', manifest: original }, runtime)).drained).toBe(true);
+    await run({ command: 'restore', manifest: original }, runtime);
+    const restored = await run({ command: 'snapshot' }, runtime);
+    expect(restored.queues).toEqual(original.queues);
+    expect(await queue('material-analysis').isPaused()).toBe(true);
+    expect(await queue('vocabulary-audio').isPaused()).toBe(false);
+    expect(await queue('pricing-fetch').isPaused()).toBe(true);
   });
 
   it('checks empty Fish state without writing credentials or queue metadata', async () => {
@@ -352,6 +396,23 @@ suite('deployment queue and execution settlement', () => {
     });
   });
 
+  it('requires synchronous writing to settle before a schema transition drains', async () => {
+    const writing = await execution('learning-writing');
+    const manifest = await run({ command: 'snapshot' }, runtime);
+    await run({ command: 'pause', manifest }, runtime);
+    expect(await run({ command: 'drained-all', manifest }, runtime)).toMatchObject({
+      drained: false,
+      executions: { synchronousActive: 1, workerActive: 0 },
+    });
+    await sottoTransaction(instance.database, (transaction) =>
+      sottoJobExecutions(transaction).settle(writing)
+    );
+    expect(await run({ command: 'drained-all', manifest }, runtime)).toMatchObject({
+      drained: true,
+      executions: { synchronousActive: 0, workerActive: 0, settled: 1 },
+    });
+  });
+
   it.each(['learning-writing', 'audio-stitching'])(
     'never exempts unconfirmed cleanup for %s',
     async (handler) => {
@@ -362,6 +423,7 @@ suite('deployment queue and execution settlement', () => {
       const manifest = await run({ command: 'snapshot' }, runtime);
       await run({ command: 'pause', manifest }, runtime);
       await expect(run({ command: 'drained', manifest }, runtime)).rejects.toThrow();
+      await expect(run({ command: 'drained-all', manifest }, runtime)).rejects.toThrow();
     }
   );
 
@@ -400,6 +462,131 @@ suite('deployment queue and execution settlement', () => {
       before
     );
   });
+
+  it('proves the actual database and schema behind the configured connection', async () => {
+    const report = await run({ command: 'database-identity' }, runtime);
+    expect(report.databaseIdentity).toMatchObject({
+      databaseName: 'sidedoor_test',
+      schemaName: instance.schema,
+      serverAddress: expect.any(String),
+      databaseOid: expect.any(String),
+    });
+    expect(report.databaseIdentity!.serverPort).toBeGreaterThan(0);
+    const original = runtime.environment.DATABASE_URL;
+    const url = new URL(original);
+    url.searchParams.set('schema', 'another_schema');
+    runtime.environment.DATABASE_URL = url.href;
+    try {
+      await expect(run({ command: 'database-identity' }, runtime)).rejects.toThrow(
+        'Configured schema differs'
+      );
+    } finally {
+      runtime.environment.DATABASE_URL = original;
+    }
+  });
+
+  it('checks the migrated schema with the generated client and detects database drift', async () => {
+    const execute = promisify(execFile);
+    const connection = new URL(process.env.SIDEDOOR_TEST_DATABASE_URL!);
+    connection.searchParams.set('schema', instance.schema);
+    const command = [
+      createRequire(import.meta.url).resolve('prisma/build/index.js'),
+      'migrate',
+      'diff',
+      '--config',
+      resolve(process.cwd(), '../../prisma.config.ts'),
+      '--from-config-datasource',
+      '--to-schema',
+      resolve(process.cwd(), 'prisma/schema.prisma'),
+      '--script',
+      '--exit-code',
+    ];
+    const options = {
+      env: { ...process.env, DATABASE_URL: connection.href, DIRECT_DATABASE_URL: connection.href },
+    };
+    const manifest = await run({ command: 'snapshot' }, runtime);
+    const identity = await run({ command: 'database-identity' }, runtime);
+    const compare = async (indexChange?: Record<string, unknown>) => {
+      const directory = await mkdtemp(join(tmpdir(), 'sotto-schema-drift-'));
+      try {
+        const diff = await execute(process.execPath, command, options).then(
+          ({ stdout }) => ({ code: 0, stdout }),
+          (error: unknown) => {
+            if (
+              error instanceof Error &&
+              'code' in error &&
+              typeof error.code === 'number' &&
+              'stdout' in error &&
+              typeof error.stdout === 'string'
+            )
+              return { code: error.code, stdout: error.stdout };
+            throw error;
+          }
+        );
+        const index = await run({ command: 'schema-index', manifest }, runtime);
+        if (indexChange) index.indexProof = { ...index.indexProof, ...indexChange };
+        await writeFile(
+          join(directory, 'schema-preparation.json'),
+          JSON.stringify({
+            databaseIdentity: identity.databaseIdentity,
+            applicationConnectionIdentity: identity.connectionIdentity,
+          }),
+          { mode: 0o600, flag: 'wx' }
+        );
+        await writeFile(join(directory, 'schema-index.json'), JSON.stringify(index), {
+          mode: 0o600,
+          flag: 'wx',
+        });
+        await writeFile(join(directory, 'schema-drift.sql'), diff.stdout, {
+          mode: 0o600,
+          flag: 'wx',
+        });
+        return await execute('python3', [
+          resolve(process.cwd(), '../../scripts/deploy/compatibility-review.py'),
+          'schema-drift',
+          String(diff.code),
+          directory,
+        ]).catch((cause: unknown) => {
+          if (cause instanceof Error && 'code' in cause)
+            throw Object.assign(
+              new Error(`Schema comparison rejected:\n${JSON.stringify(diff.stdout)}`, { cause }),
+              {
+                code: cause.code,
+              }
+            );
+          throw cause;
+        });
+      } finally {
+        await rm(directory, { recursive: true, force: true });
+      }
+    };
+    await compare();
+    for (const flag of ['isValid', 'isReady', 'isLive'])
+      await expect(compare({ [flag]: false })).rejects.toMatchObject({ code: 1 });
+    expect(await instance.database.learnerReviewEvent.count()).toBe(0);
+    await instance.database.$executeRawUnsafe(
+      'ALTER TABLE "LearnerReviewEvent" ADD COLUMN "unexpected" TEXT'
+    );
+    try {
+      await expect(compare()).rejects.toMatchObject({ code: 1 });
+    } finally {
+      await instance.database.$executeRawUnsafe(
+        'ALTER TABLE "LearnerReviewEvent" DROP COLUMN "unexpected"'
+      );
+    }
+    await instance.database.$executeRawUnsafe('DROP INDEX "SidedoorState_id_pattern_idx"');
+    await instance.database.$executeRawUnsafe(
+      'CREATE INDEX "SidedoorState_id_pattern_idx" ON "SidedoorState" ("id")'
+    );
+    try {
+      await expect(compare()).rejects.toMatchObject({ code: 1 });
+    } finally {
+      await instance.database.$executeRawUnsafe('DROP INDEX "SidedoorState_id_pattern_idx"');
+      await instance.database.$executeRawUnsafe(
+        'CREATE INDEX "SidedoorState_id_pattern_idx" ON "SidedoorState" ("id" text_pattern_ops)'
+      );
+    }
+  }, 30000);
 
   it.each([
     'missing-table',

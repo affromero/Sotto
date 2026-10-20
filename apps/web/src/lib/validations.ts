@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { placementConfirmRequestSchema } from '@sotto/shared';
+import { placementConfirmRequestSchema, vocabularySupportSchema } from '@sotto/shared';
 import { isAnimalSlug } from './avatars';
 import { credentialSelectionEnvelopeSchema } from '@/lib/sidedoor/credentials/config/credential-selection-contract';
 
@@ -460,6 +460,7 @@ export const onboardingSaveSchema = z.object({
     native: langCode2,
     target: langCode2,
     level: cefrLevel.optional(),
+    vocabularySupport: vocabularySupportSchema.nullable().optional(),
   }),
   note: z.string().trim().max(4000).optional(),
   materialIds: z.array(z.uuid()).max(30).optional(),

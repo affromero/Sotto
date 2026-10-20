@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type { Prisma } from '@/generated/prisma/client';
 import { sottoStorageInstance } from '@/lib/sidedoor/access/state/store';
 import { captureCourseStorage } from '@/lib/sidedoor/storage/core/course-storage';
-import { materialStorageScopes } from '@/lib/course-materials';
+import { materialStorageScopes } from '../scopes';
 
 const scopeSchema = z
   .object({ subjectId: z.string().min(1), generation: z.number().int().nonnegative() })

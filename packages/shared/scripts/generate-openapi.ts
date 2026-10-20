@@ -8,6 +8,19 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
+import { vocabularyStudySessionSchema } from '../src/learning/vocabulary-study';
+import {
+  vocabularyStudyRequestSchema,
+  vocabularyStudyActionSchema,
+} from '../src/learning/vocabulary-study';
+import {
+  dictionaryResponseSchema,
+  dictionaryMeaningSchema,
+  dictionaryMeaningResponseSchema,
+  vocabularyWorkRequestSchema,
+  vocabularyIndexResponseSchema,
+  vocabularyAudioResponseSchema,
+} from '../src/learning/dictionary';
 import {
   applyLearningUpgradeRequestSchema,
   learningUpgradeReportSchema,
@@ -152,6 +165,7 @@ const startPracticeVariants: Record<string, string> = {
   ready_speaking: 'StartPracticeReadySpeaking',
   ready_writing: 'StartPracticeReadyWriting',
   ready_full: 'StartPracticeReadyFull',
+  ready_vocabulary: 'StartPracticeReadyVocabulary',
 };
 
 // Named component schemas. Reusable leaves are registered so they emit `$ref`
@@ -175,6 +189,14 @@ const namedSchemas: Record<string, z.ZodType> = {
   SourceFocusDetail: sourceFocusDetailSchema,
   AdmitPlacementRequest: placementGenerateRequestSchema,
   MaterialAnalysisStatusResponse: placementSourceStatusSchema,
+  DictionaryResponse: dictionaryResponseSchema,
+  DictionaryMeaningRequest: dictionaryMeaningSchema,
+  DictionaryMeaningResponse: dictionaryMeaningResponseSchema,
+  VocabularyWorkRequest: vocabularyWorkRequestSchema,
+  VocabularyIndexResponse: vocabularyIndexResponseSchema,
+  VocabularyAudioResponse: vocabularyAudioResponseSchema,
+  VocabularyStudyRequest: vocabularyStudyRequestSchema,
+  VocabularyStudyAction: vocabularyStudyActionSchema,
   PencilHomeworkRequest: pencilHomeworkRequestSchema,
   PencilHomeworkResponse: pencilHomeworkResponseSchema,
   ClassRegenerationRequest: classRegenerationRequestSchema,
@@ -208,6 +230,7 @@ const namedSchemas: Record<string, z.ZodType> = {
   StartPracticeReadySpeaking: startPracticeReadySpeakingSchema,
   StartPracticeReadyWriting: startPracticeReadyWritingSchema,
   StartPracticeReadyFull: startPracticeReadyFullSchema,
+  StartPracticeReadyVocabulary: vocabularyStudySessionSchema,
   [START_PRACTICE_RESPONSE_NAME]: startPracticeResponseSchema,
   SubmitPracticeRequest: submitPracticeRequestSchema,
   SubmitPracticeResponse: submitPracticeResponseSchema,

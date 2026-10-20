@@ -9,7 +9,12 @@ import {
 } from './classes/regeneration/pristine';
 import { getDueItems } from './knowledge-graph';
 import { objectiveReviewContext } from './learning-map/adaptation/review';
-import { generateClassListening } from './class-listening-generator';
+import {
+  prepareClassListening,
+  queueListeningAudio,
+  failUnqueuedClassListening,
+} from './class-listening-generator';
+import { runClassGenerationStages } from './classes/generation/stages';
 import { prepareClassSource, type PreparedClassSource } from './class-source';
 import { generateClassSpeaking } from './class-speaking-generator';
 import { generateClassWriting } from './class-writing-generator';
@@ -19,8 +24,11 @@ import { Prisma } from '@/generated/prisma/client';
 import { ensureCurriculumHasLevelLessons } from './curriculum-generator';
 import { generateClassIntro } from './classes/class-intro';
 import { generateClassTeaching, teachingFromSeed } from './classes/lesson/teaching';
-import { classTargetsFromSeed, selectClassVocabulary } from './classes/lesson/class-targets';
+import { classTargetsFromSeed } from './classes/lesson/class-targets';
+import { getVocabularyTargets } from './learning/vocabulary/targets';
+import { getVocabularySupportContext } from './learning/vocabulary/support';
 import { getCourseVocabularyTargets } from './course-materials/vocabulary-context';
+import { captureMaterialDocuments } from './course-materials/documents';
 import { logger } from './logger';
 import { resolveSkillRequirements, readSkillRequirements } from './learning/skill-requirements';
 import { extractReadingVocabulary } from './learning/reading-vocabulary';
@@ -257,6 +265,13 @@ interface ClassContentBuildParams {
 
 async function buildClassContent(p: ClassContentBuildParams): Promise<Prisma.InputJsonObject> {
   await assertClassStillGenerating(p.classId, p.attempt);
+  p = {
+    ...p,
+    execution: {
+      ...p.execution,
+      sourceDocuments: await captureMaterialDocuments(p.execution, { courseId: p.courseId }),
+    },
+  };
   const reviewScope = {
     level: p.requirements.level,
     targetLang: p.requirements.targetLang,
@@ -282,7 +297,9 @@ async function buildClassContent(p: ClassContentBuildParams): Promise<Prisma.Inp
   const note = noteForAttempt(
     [
       buildLearnerContext(
-        capturedContext,
+        [await getVocabularySupportContext(p.courseId, p.userId), capturedContext]
+          .filter(Boolean)
+          .join('\n\n'),
         p.course.pedagogy as Parameters<typeof buildLearnerContext>[1]
       ),
       objectiveReview.text,
@@ -299,18 +316,9 @@ async function buildClassContent(p: ClassContentBuildParams): Promise<Prisma.Inp
   };
   if (corpus) {
     const candidates = corpus.imported ? corpus.vocab : targets.vocab;
-    const memory = await prisma.learnerVocab.findMany({
-      where: {
-        courseId: p.courseId,
-        lemma: {
-          in: [...candidates.map(({ lemma }) => lemma), ...due.vocab.map(({ lemma }) => lemma)],
-        },
-      },
-      select: { lemma: true, mastery: true, reps: true, lastReviewed: true },
-    });
     targets = {
       ...targets,
-      vocab: selectClassVocabulary(candidates, due.vocab, memory, corpus.imported),
+      vocab: await getVocabularyTargets(p.courseId, due.vocab, candidates, 8),
     };
     if (corpus.imported && !targets.vocab.length)
       throw new Error('No new or due vocabulary was available in the imported material.');
@@ -356,126 +364,145 @@ async function buildClassContent(p: ClassContentBuildParams): Promise<Prisma.Inp
     }));
   await assertClassStillGenerating(p.classId, p.attempt);
 
+  const stages: Array<Parameters<typeof runClassGenerationStages>[0][number]> = [];
   for (const skill of MC_SKILLS) {
     if (p.skills && !p.skills.has(skill)) continue;
-    await buildSection(
-      p.classId,
-      p.userId,
-      p.execution,
-      skill,
-      { ...p.lesson, grammarPoints, targetVocab, level: p.requirements.level },
-      p.requirements.nativeLang,
-      p.requirements.targetLang,
-      note,
-      p.attempt,
-      { ...p.override, level: p.requirements.level },
-      p.retry,
-      teaching
-    );
+    stages.push({
+      stage: skill === 'GRAMMAR' ? 'grammar' : 'reading',
+      run: async () => {
+        await buildSection(
+          p.classId,
+          p.userId,
+          p.execution,
+          skill,
+          { ...p.lesson, grammarPoints, targetVocab, level: p.requirements.level },
+          p.requirements.nativeLang,
+          p.requirements.targetLang,
+          note,
+          p.attempt,
+          { ...p.override, level: p.requirements.level },
+          p.retry,
+          teaching
+        );
+      },
+    });
   }
-  await assertClassStillGenerating(p.classId, p.attempt);
-
-  // These generated skills are required class surfaces. If one fails, the class
-  // is not published; createNextClass rolls back, regenerateCurrentClass marks
-  // the attempt FAILED, and the learner can regenerate a real class.
+  let listening: Awaited<ReturnType<typeof prepareClassListening>> | undefined;
   if (
     p.requirements.skills.LISTENING.state === 'REQUIRED' &&
     (!p.skills || p.skills.has('LISTENING'))
   )
-    try {
-      await assertClassStillGenerating(p.classId, p.attempt);
-      await generateClassListening({
-        ttsProvider: p.requirements.ttsProvider as Parameters<
-          typeof generateClassListening
-        >[0]['ttsProvider'],
-        deferAudio: p.deferAudio,
-        userId: p.userId,
-        execution: p.execution,
-        classId: p.classId,
-        courseId: p.courseId,
-        attempt: p.attempt,
-        level: lessonLevel,
-        nativeLang: p.requirements.nativeLang,
-        targetLang: p.requirements.targetLang,
-        objective: lessonObjective,
-        mustIncludeVocab: targetVocab.map((v) => ({ word: v.lemma, translation: v.gloss })),
-        note,
-        teaching,
-        sourceContent: p.listeningSource?.sourceContent,
-        sourceMetadata: p.listeningSource?.sourceMetadata,
-        sourceUrl: p.listeningSource?.sourceUrl,
-        retry: p.retry,
-      });
-      await assertClassStillGenerating(p.classId, p.attempt);
-    } catch (err) {
-      await rethrowIfGenerationWasCancelled(p.classId, p.attempt, err);
-      logger.error('Required listening section generation failed', {
-        classId: p.classId,
-        error: err instanceof Error ? err.message : String(err),
-      });
-      throw err;
-    }
-
-  if (
-    p.requirements.skills.SPEAKING.state === 'REQUIRED' &&
-    (!p.skills || p.skills.has('SPEAKING'))
-  )
-    try {
-      await assertClassStillGenerating(p.classId, p.attempt);
-      await generateClassSpeaking({
-        ttsProvider: p.requirements.ttsProvider as Parameters<
-          typeof generateClassSpeaking
-        >[0]['ttsProvider'],
-        referenceAudioRequired: p.requirements.referenceAudioRequired,
-        execution: p.execution,
-        userId: p.userId,
-        classId: p.classId,
-        attempt: p.attempt,
-        level: lessonLevel,
-        nativeLang: p.requirements.nativeLang,
-        targetLang: p.requirements.targetLang,
-        objective: lessonObjective,
-        targetVocab,
-        note,
-        teaching,
-      });
-      await assertClassStillGenerating(p.classId, p.attempt);
-    } catch (err) {
-      await rethrowIfGenerationWasCancelled(p.classId, p.attempt, err);
-      logger.error('Required speaking section generation failed', {
-        classId: p.classId,
-        error: err instanceof Error ? err.message : String(err),
-      });
-      throw err;
-    }
+    stages.push({
+      stage: 'listening',
+      run: async () => {
+        await assertClassStillGenerating(p.classId, p.attempt);
+        listening = await prepareClassListening({
+          ttsProvider: p.requirements.ttsProvider as Parameters<
+            typeof prepareClassListening
+          >[0]['ttsProvider'],
+          deferAudio: p.deferAudio,
+          userId: p.userId,
+          execution: p.execution,
+          classId: p.classId,
+          courseId: p.courseId,
+          attempt: p.attempt,
+          level: lessonLevel,
+          nativeLang: p.requirements.nativeLang,
+          targetLang: p.requirements.targetLang,
+          objective: lessonObjective,
+          mustIncludeVocab: targetVocab.map((v) => ({ word: v.lemma, translation: v.gloss })),
+          note,
+          teaching,
+          sourceContent: p.listeningSource?.sourceContent,
+          sourceMetadata: p.listeningSource?.sourceMetadata,
+          sourceUrl: p.listeningSource?.sourceUrl,
+          retry: p.retry,
+        });
+        await assertClassStillGenerating(p.classId, p.attempt);
+      },
+    });
 
   if (!p.skills || p.skills.has('WRITING'))
+    stages.push({
+      stage: 'writing',
+      run: async () => {
+        await assertClassStillGenerating(p.classId, p.attempt);
+        await generateClassWriting({
+          userId: p.userId,
+          execution: p.execution,
+          classId: p.classId,
+          attempt: p.attempt,
+          level: lessonLevel,
+          nativeLang: p.requirements.nativeLang,
+          targetLang: p.requirements.targetLang,
+          objective: lessonObjective,
+          targetVocab,
+          note,
+          teaching,
+        });
+        await assertClassStillGenerating(p.classId, p.attempt);
+      },
+    });
+
+  try {
+    await runClassGenerationStages(stages, {
+      classId: p.classId,
+      attempt: p.attempt,
+      signal: p.execution.signal,
+      onCleanupError: p.execution.onCleanupError,
+    });
+    await assertClassStillGenerating(p.classId, p.attempt);
+
+    if (
+      p.requirements.skills.SPEAKING.state === 'REQUIRED' &&
+      (!p.skills || p.skills.has('SPEAKING'))
+    )
+      try {
+        await assertClassStillGenerating(p.classId, p.attempt);
+        await generateClassSpeaking({
+          ttsProvider: p.requirements.ttsProvider as Parameters<
+            typeof generateClassSpeaking
+          >[0]['ttsProvider'],
+          referenceAudioRequired: p.requirements.referenceAudioRequired,
+          execution: p.execution,
+          userId: p.userId,
+          classId: p.classId,
+          attempt: p.attempt,
+          level: lessonLevel,
+          nativeLang: p.requirements.nativeLang,
+          targetLang: p.requirements.targetLang,
+          objective: lessonObjective,
+          targetVocab,
+          note,
+          teaching,
+        });
+        await assertClassStillGenerating(p.classId, p.attempt);
+      } catch (err) {
+        await rethrowIfGenerationWasCancelled(p.classId, p.attempt, err);
+        logger.error('Required speaking section generation failed', {
+          classId: p.classId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        throw err;
+      }
+  } catch (error) {
+    if (listening) await failUnqueuedClassListening(listening.episodeId, p.userId);
+    throw error;
+  }
+
+  if (listening && !p.deferAudio)
     try {
-      await assertClassStillGenerating(p.classId, p.attempt);
-      await generateClassWriting({
-        userId: p.userId,
-        execution: p.execution,
+      await queueListeningAudio(listening.content, p.execution, {
         classId: p.classId,
         attempt: p.attempt,
-        level: lessonLevel,
-        nativeLang: p.requirements.nativeLang,
-        targetLang: p.requirements.targetLang,
-        objective: lessonObjective,
-        targetVocab,
-        note,
-        teaching,
       });
-      await assertClassStillGenerating(p.classId, p.attempt);
-    } catch (err) {
-      await rethrowIfGenerationWasCancelled(p.classId, p.attempt, err);
-      logger.error('Required writing section generation failed', {
-        classId: p.classId,
-        error: err instanceof Error ? err.message : String(err),
-      });
-      throw err;
+    } catch (error) {
+      await failUnqueuedClassListening(listening.episodeId, p.userId);
+      throw error;
     }
 
   await assertClassStillGenerating(p.classId, p.attempt);
+  await p.execution.sourceDocuments?.validate();
   return {
     ...p.existingSeed,
     vocabIds: due.vocab.map((v) => v.id),

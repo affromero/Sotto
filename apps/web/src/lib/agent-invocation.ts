@@ -93,8 +93,8 @@ export function buildAgentInvocation(
       throw new Error('Output schema must be a JSON object');
     const names = options.remoteImageInputs?.names ?? [];
     if (
-      names.length > 5 ||
-      names.some((name) => !/^image-[0-4]\.(?:png|jpeg)$/.test(name)) ||
+      names.length > 100 ||
+      names.some((name) => !/^image-(?:[0-9]|[1-9][0-9])\.(?:png|jpeg)$/.test(name)) ||
       new Set(names).size !== names.length
     )
       throw new Error('Invalid remote Codex image input names');

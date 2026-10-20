@@ -175,6 +175,8 @@ const DEFAULT_QUEUE_OPTIONS: QueueConfig = {
 const QUEUE_DEFINITIONS: Record<string, QueueDefinition> = {
   'class-preparation': { attempts: 1 },
   'practice-preparation': { attempts: 1 },
+  'vocabulary-audio': { attempts: 1, skipEvents: true },
+  'vocabulary-index': { attempts: 1, skipEvents: true },
   'content-extraction': { attempts: 3 },
   'deep-research': { attempts: 3 },
   'creative-planning': { attempts: 3 },
@@ -299,6 +301,8 @@ function logWorkerJobFailure(queueName: string, job: Job<unknown> | undefined, e
 
 function genericContractVersion(queueName: string): number | null {
   return new Set([
+    'vocabulary-audio',
+    'vocabulary-index',
     'content-extraction',
     'deep-research',
     'creative-planning',

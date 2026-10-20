@@ -1,8 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { SourceDocuments } from '@/lib/providers/ai';
 import { sampleTeaching } from '../helpers/learning/class-teaching';
 import {
   mockEpisodeCreate,
   mockEpisodeUpdate,
+  mockEpisodeUpdateMany,
   mockScriptCreate,
   mockVocabEntryCreateMany,
   mockLearnerVocabUpsert,
@@ -36,6 +38,7 @@ import {
 
 import {
   generateClassListening,
+  prepareClassListening,
   composeListeningContent,
   minimumVerifiedReferences,
   queueListeningAudio,
@@ -264,6 +267,27 @@ describe('generateClassListening', () => {
   });
 
   describe('happy path', () => {
+    it('supplies original PDFs to the script author while preserving restricted quiz and review inputs', async () => {
+      setupHappyPath();
+      const sourceDocuments: SourceDocuments = {
+        parts: [
+          {
+            type: 'document',
+            mediaType: 'application/pdf',
+            name: 'Workbook.pdf',
+            data: Buffer.from('%PDF-1.7'),
+          },
+        ],
+        validate: async () => {},
+      };
+      await generateClassListening({
+        ...PARAMS,
+        execution: { ...PARAMS.execution, sourceDocuments },
+      });
+      expect(mockGenerateScript.mock.calls[0][0].sourceDocuments).toBe(sourceDocuments);
+      for (const request of mockGenerateResponse.mock.calls)
+        expect(request[2]?.sourceDocuments).toBeUndefined();
+    });
     it('pins the admin model when listening audio is deferred for learner review', async () => {
       setupHappyPath();
       await generateClassListening({ ...PARAMS, deferAudio: true });
@@ -460,6 +484,36 @@ describe('generateClassListening', () => {
       mockLessonQuestionCreateMany.mockRejectedValueOnce(new Error('Question persistence failed'));
       await expect(generateClassListening(PARAMS)).rejects.toThrow('Question persistence failed');
       expect(mockCreateSegmentsAndQueueAudio).not.toHaveBeenCalled();
+    });
+
+    it('prepares a class script and questions without admitting audio', async () => {
+      setupHappyPath();
+      const prepared = await prepareClassListening(PARAMS);
+      expect(prepared).toMatchObject({
+        sectionId: 'section-1',
+        episodeId: 'episode-1',
+        content: { turns: SAMPLE_TURNS },
+      });
+      expect(mockClassSectionCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ status: 'READY' }) })
+      );
+      expect(mockCreateSegmentsAndQueueAudio).not.toHaveBeenCalled();
+    });
+
+    it('marks a prepared episode failed when admitting its audio fails', async () => {
+      setupHappyPath();
+      mockCreateSegmentsAndQueueAudio.mockRejectedValueOnce(new Error('Audio admission failed'));
+      await expect(generateClassListening(PARAMS)).rejects.toThrow('Audio admission failed');
+      expect(mockEpisodeUpdateMany).toHaveBeenCalledWith({
+        where: {
+          id: 'episode-1',
+          userId: PARAMS.userId,
+          source: 'CLASS',
+          status: 'SCRIPT_READY',
+          audioGenerationKey: null,
+        },
+        data: { status: 'FAILED' },
+      });
     });
 
     it('retains episode vocabulary without adding unseen course memory before class publication', async () => {

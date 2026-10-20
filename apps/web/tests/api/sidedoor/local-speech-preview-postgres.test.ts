@@ -7,7 +7,7 @@ import type { PrismaClient } from '@/generated/prisma/client';
 import { useProviderCredentialDatabase } from '../../helpers/runtime/provider-credentials-postgres';
 import { sidedoorStateStore } from '@/lib/sidedoor/access/state/store';
 import { EMPTY_INFRA, getSiteConfig } from '@/lib/site-config';
-import { createTtsProviderAsync } from '@/lib/providers/tts';
+import { createTtsProviderAsync, ttsCacheIdentity } from '@/lib/providers/tts';
 import { sottoRequestExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import type { LocalTtsConnection } from '@/lib/providers/shared/local-tts-connection';
 import {
@@ -319,6 +319,25 @@ suite('owner-only draft speech discovery and audio without saving', () => {
     connection.endpoint = 'http://changed.test/tts';
     connection.model = 'changed-model';
     const speech = await constructing;
+    const repeated = await createTtsProviderAsync(
+      'local',
+      execution,
+      undefined,
+      undefined,
+      'local',
+      { endpoint: `${endpoint}/tts`, model: 'local', voices: [] }
+    );
+    const changed = await createTtsProviderAsync(
+      'local',
+      execution,
+      undefined,
+      undefined,
+      'local',
+      { endpoint: 'http://changed.test/tts', model: 'local', voices: [] }
+    );
+    expect(ttsCacheIdentity(speech)).toMatch(/^[a-f0-9]{64}$/);
+    expect(ttsCacheIdentity(speech)).toBe(ttsCacheIdentity(repeated));
+    expect(ttsCacheIdentity(changed)).not.toBe(ttsCacheIdentity(speech));
     expect(
       await speech.generateSpeech({ text: selection.text, voiceId: selection.voiceId })
     ).toEqual(audio);

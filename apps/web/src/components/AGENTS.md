@@ -24,6 +24,13 @@ All React components, organized by feature domain. CSS Modules only — NO Tailw
 
 ### Learn Component Notes
 
+- `learn/vocabulary/` contains the Aula dictionary, import progress, flashcards,
+  direct recall, and cached local pronunciation controls. Keep unseen words
+  distinct from introduced words and assessed recall estimates.
+- Study retries preserve the original admission and answer requests. Flush
+  typed drafts before leaving. Word-recall and listening cards must not reveal
+  their answer through labels, audio URLs, or surrounding content.
+
 - `LessonAudioPlayer` uses the owned episode detail endpoint for native seeking,
   existing turn replay and ordered speaker playback. Switching audio or leaving
   the section pauses playback; replay never generates speech or changes answers.
@@ -77,8 +84,9 @@ explicit unverified consent, cancellation, and uncertain-outcome reconciliation.
 Form edits invalidate pending confirmation. A pending uncertain write blocks edits
 until the user checks its status.
 
-`settings/LocalAiSettings` is shown to admins on `/settings`; it updates the shared
-OpenAI-compatible AI endpoint and model and manages its optional encrypted key.
+Admin model-server settings use `settings/local-ai/useLocalAiController.ts` to
+coordinate configuration and credentials. Save the address and model before
+binding an optional key. Keep receipt handling in the shared credential editor.
 
 `settings/LocalSpeechSettings` lets each learner explicitly disable audio or return to
 configured speech. It also appears on Admin's Providers & models page, with recovery

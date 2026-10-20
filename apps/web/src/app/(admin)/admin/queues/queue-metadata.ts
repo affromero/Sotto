@@ -43,6 +43,14 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
     description: 'Verifies uploaded parts and publishes the complete original document',
     stage: 'Content Pipeline',
   },
+  'vocabulary-index': {
+    description: 'Indexes complete course materials with reviewed vocabulary coverage',
+    stage: 'Content Pipeline',
+  },
+  'vocabulary-audio': {
+    description: 'Prepares reusable local pronunciation for dictionary study',
+    stage: 'Audio Pipeline',
+  },
   'class-preparation': {
     description: 'Prepares learner classes from durable scheduled or immediate requests',
     stage: 'Content Pipeline',

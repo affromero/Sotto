@@ -220,6 +220,51 @@ material and extraction ledger. Keep the older material and its source links.
 `ORIGINAL_UNAVAILABLE` requires obtaining the source file again; retained text
 alone cannot prove or reconstruct the original. These steps do not change mastery.
 
+---
+
+### 5.5 Vocabulary study and materials
+
+Open a course's **Vocabulary** page to search its dictionary, inspect source
+quotes, edit accepted meanings, and practice selected words. Course notes files
+start a durable background vocabulary index after attachment to a course. Use
+**Import vocabulary** for older materials. Progress distinguishes queued work,
+reviewed coverage, failures, and sources that need readable text. Image-only
+documents need a reviewed transcription before vocabulary can be indexed.
+
+Indexing processes the complete extracted text in bounded chunks, checks entry
+coverage independently, and preserves existing mastery. Importing a word does
+not demonstrate knowledge. New words remain unseen until studied or assessed.
+Class and practice selection reuse due and weak dictionary words and pace new
+introductions using demonstrated recall.
+
+Flashcards reveal meanings without increasing mastery. Meaning, word, and
+listening recall record each first response once, with feedback and spaced
+review. Answers use dictionary meanings and explicitly saved aliases; editing
+them affects future sessions. Recall estimates describe the current scheduler,
+and one correct answer does not mean a word is mastered. Learners can optionally
+describe vocabulary difficulties during onboarding and change that preference
+in course settings. This guides practice support, rather than diagnosing a
+fixed learning style.
+
+Spaced practice and retrieval with feedback inform this approach. See the
+[second-language spacing meta-analysis](https://doi.org/10.1111/lang.12479) and
+[retrieval-practice experiment](https://doi.org/10.1126/science.1152408).
+Sotto's exact pacing thresholds are product heuristics, not validated individual
+memory measurements.
+
+Pronunciation requires explicitly configured local speech. The first request
+creates a course-owned cached asset; repeated playback reuses it. Changing the
+local model, endpoint, voice, or word creates a different cache identity.
+Disabled or unavailable local speech reports its configuration error. No paid
+speech provider is selected automatically. Uncertain indexing or audio outcomes
+remain visible and fenced until execution recovery confirms they can be retried.
+
+Apply the vocabulary study, pronunciation, and material-index Prisma migrations
+and regenerate Prisma when upgrading. No new environment variables are required.
+iOS links these study sessions to the web; the terminal reports web continuation.
+
+---
+
 ## 6. Live Provider Checks
 
 Use the test action on each saved provider card in Admin. The request uses the same captured Sidedoor credential and endpoint policy as production work and reports the provider error directly.
@@ -279,6 +324,34 @@ merge. Production and OSS images share the main revision's validation. Native
 and documentation changes avoid backend validation. Run `npm run ci` locally
 to investigate broader failures or qualify an offline release. A passing focused
 check does not replace applicable remote checks for the exact release revision.
+
+### Offline scheduler comparison
+
+New class and practice submissions record private review observations alongside
+their existing SM-2 updates. Apply the additive Prisma migration before running
+updated web and worker processes. No historical events are fabricated. Deleting
+a course, memory target, class or practice session also deletes its observations.
+
+Run an owned course comparison with a fixed held-out cutoff:
+
+```bash
+npm run learning:compare -- --course-id COURSE_ID --user-id USER_ID --test-after 2026-10-20T00:00:00Z
+```
+
+Add `--export /private/path/reviews.json` to create a new private snapshot, or
+use `--input /private/path/reviews.json` for an offline replay without database
+access. The command refuses to overwrite an export. Snapshots contain private
+target and question identifiers; keep them local.
+
+The report compares fixed-default FSRS recall predictions with the existing
+mastery estimate on single-question vocabulary recognition events. It scores
+each answer before updating either history. Earlier observations warm the model;
+same-day reviews update history but are excluded from held-out metrics. Replay
+stops at the first aggregate, missing or invalid transition and preserves earlier
+predictions. Left-truncated histories are excluded and counted. SM-2 replay
+checks use the canonical scheduler. The mastery baseline is not an SM-2 recall
+probability. These metrics do not establish fewer required reviews, improved
+learning, or the effect of a different review policy. Live scheduling is unchanged.
 
 ### Browser tests
 

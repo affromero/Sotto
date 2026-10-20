@@ -121,16 +121,30 @@ suite('qualified objective memory reads against PostgreSQL', () => {
         },
       ],
     });
-    await instance.database.learnerVocab.create({
-      data: {
-        courseId,
-        lemma: 'Owned word',
-        translation: 'Owned gloss',
-        mastery: 0.1,
-        dueAt: past,
-      },
+    await instance.database.learnerVocab.createMany({
+      data: [
+        {
+          courseId,
+          lemma: 'Owned word',
+          translation: 'Owned gloss',
+          mastery: 0.1,
+          dueAt: past,
+          introducedAt: past,
+        },
+        {
+          courseId,
+          lemma: 'Unseen source word',
+          translation: 'Not yet introduced',
+          mastery: 0.1,
+          dueAt: past,
+        },
+      ],
     });
     const before = await instance.database.learnerObjectiveState.findMany({ where: { courseId } });
+    const wordsBefore = await instance.database.learnerVocab.findMany({
+      where: { courseId },
+      orderBy: { id: 'asc' },
+    });
     const revisions = await instance.database.learningMapRevision.count();
     const due = await getDueItems(courseId);
     expect(due.vocab.map((item) => item.lemma)).toEqual(['Owned word']);
@@ -157,6 +171,12 @@ suite('qualified objective memory reads against PostgreSQL', () => {
     );
     expect(await instance.database.learningMapRevision.count()).toBe(revisions);
     expect(await instance.database.learningObservation.count()).toBe(0);
+    expect(
+      await instance.database.learnerVocab.findMany({
+        where: { courseId },
+        orderBy: { id: 'asc' },
+      })
+    ).toEqual(wordsBefore);
   });
 
   it('does not turn stale criterion projections or high legacy grammar strength into qualified memory', async () => {

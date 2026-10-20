@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { SourceDocuments } from '@/lib/providers/ai';
 import { sampleTeaching } from '../../../helpers/learning/class-teaching';
 import { blockedProviderExecution } from '../../../helpers/runtime/provider-execution';
 import {
@@ -14,7 +15,13 @@ vi.mock('@/lib/learning-ai', () => ({
     model: 'captured-model',
     execution: args[1],
   }),
-  capturedLearningAiOptions: async () => ({ model: 'captured-model' }),
+  capturedLearningAiOptions: async (
+    ai: { execution: { sourceDocuments?: SourceDocuments } },
+    scope?: { includeSourceDocuments?: boolean }
+  ) => ({
+    model: 'captured-model',
+    ...(scope?.includeSourceDocuments ? { sourceDocuments: ai.execution.sourceDocuments } : {}),
+  }),
 }));
 vi.mock('@/lib/usage-logger', () => ({ logUsage: vi.fn() }));
 vi.mock('@/lib/providers/ai', () => ({
@@ -83,6 +90,29 @@ beforeEach(() => {
 });
 
 describe('class teaching', () => {
+  it('reads the original workbook when authoring while keeping critic and adjudicator inputs isolated', async () => {
+    const sourceDocuments: SourceDocuments = {
+      parts: [
+        {
+          type: 'document',
+          mediaType: 'application/pdf',
+          name: 'Workbook.pdf',
+          data: Buffer.from('%PDF-1.7'),
+        },
+      ],
+      validate: async () => {},
+    };
+    expect(
+      await generateClassTeaching({
+        ...params,
+        execution: { ...params.execution, sourceDocuments },
+      })
+    ).toEqual(sampleTeaching);
+    expect(boundary.author.mock.calls[0][2].sourceDocuments).toBe(sourceDocuments);
+    for (const [, , options] of boundary.requests.mock.calls)
+      if (options.jsonSchema?.name !== 'class_teaching_generation')
+        expect(options.sourceDocuments).toBeUndefined();
+  });
   it('publishes a complete reviewed unit with worked reasoning before assessment', async () => {
     expect(await generateClassTeaching(params)).toEqual(sampleTeaching);
     for (const [, messages, options] of boundary.requests.mock.calls) {

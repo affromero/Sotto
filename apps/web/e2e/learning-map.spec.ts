@@ -80,6 +80,7 @@ test('the authenticated learning map shows real A1 requirements and rejects unea
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true
   );
+  await page.screenshot({ path: test.info().outputPath('learning-map-375.png') });
   const refused = await page.request.post(`/api/v1/courses/${course.id}/learning-map/advance`, {
     headers: { origin: process.env.NEXT_PUBLIC_APP_URL! },
     data: { requestId: randomUUID(), expectedLevel: 'A1', catalogHash: map.catalogHash },
