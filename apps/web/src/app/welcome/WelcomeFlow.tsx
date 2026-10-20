@@ -1,6 +1,8 @@
 'use client';
 
 import Image from 'next/image';
+import { planAgentPersistence } from './session/agent-save-plan';
+import { saveAiServerConfiguration } from '@/lib/site-configuration/client';
 import Link from 'next/link';
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { ANIMAL_AVATARS } from '@/lib/avatars';
@@ -219,7 +221,6 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
   );
   const credentialBusy =
     credentialPending || (config.selfHosted && !credentialReady && credentialFeedback === null);
-  const pendingCredentialPosts = useRef<readonly KeyPost[]>([]);
   const clearCredentialSecrets = useCallback(() => {
     setAgent((previous) => ({
       ...previous,
@@ -230,7 +231,6 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
     }));
     setVoice((previous) => ({ ...previous, keys: {} }));
     setStorage((previous) => ({ ...previous, accessKeyId: '', secretAccessKey: '' }));
-    pendingCredentialPosts.current = [];
     setCredentialReady(false);
   }, []);
 
@@ -269,18 +269,22 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
     const lifetime = new AbortController();
     credentialLifetime.current = lifetime;
     void loadCredentials(lifetime.signal);
-    return () => lifetime.abort();
-  }, [config.selfHosted, loadCredentials]);
+    return () => {
+      credentialSession.invalidateConfirmations();
+      lifetime.abort();
+    };
+  }, [config.selfHosted, credentialSession, loadCredentials]);
 
-  async function saveCredentials(posts: readonly KeyPost[], consentOperationId?: string) {
+  async function saveCredentials(posts?: readonly KeyPost[], consentOperationId?: string) {
     if (!config.selfHosted) return true;
     const signal = credentialLifetime.current?.signal;
     if (!signal || signal.aborted || credentialLock.current || !credentialReady) return false;
     credentialLock.current = true;
     setCredentialBusy(true);
-    pendingCredentialPosts.current = structuredClone(posts);
     try {
-      const result = await credentialSession.save(posts, signal, consentOperationId);
+      const result = posts
+        ? await credentialSession.save(posts, signal, consentOperationId)
+        : await credentialSession.continuePending(signal, consentOperationId);
       if (result.status === 'ready')
         await credentialSession.verifySelections(welcomeCredentialSelections(agent, voice), signal);
       signal.throwIfAborted();
@@ -375,10 +379,15 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
     return best;
   }, [understood]);
 
-  const go = useCallback((n: number) => {
-    if (credentialLock.current) return;
-    setStep(clampStep(n));
-  }, []);
+  const go = useCallback(
+    (n: number) => {
+      if (credentialLock.current) return;
+      credentialSession.invalidateConfirmations();
+      setCredentialFeedback((previous) => (previous?.status === 'confirmation' ? null : previous));
+      setStep(clampStep(n));
+    },
+    [credentialSession]
+  );
 
   function applySnapshot(snapshot: WelcomeSnapshot) {
     setStep(snapshot.step);
@@ -579,51 +588,57 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
     setUnderstood(new Set([lvl]));
   }
 
-  async function persistAgentSelection() {
-    if (!config.selfHosted) return true;
-    if (agent.method === 'url' && !config.isOwner) {
-      setCredentialFeedback({
-        status: 'review',
-        message: 'Only the owner can save a server endpoint. Ask the owner to configure it.',
-      });
-      return false;
-    }
-    const ai = resolveAi(agent.provider, agent.method, agent.value, agent.model, agent.apiKey);
-    const posts = ai.keyPost ? [ai.keyPost] : [];
-    if (agent.method !== 'url' && !(await saveCredentials(posts))) return false;
-    if (!config.isOwner || Object.keys(ai.infra).length === 0) return true;
-    const signal = credentialLifetime.current?.signal;
-    if (!signal || signal.aborted || credentialLock.current) return false;
+  async function persistServerConfiguration(configuration: ReturnType<typeof resolveAi>['infra']) {
+    if (!Object.keys(configuration).length) return true;
+    const lifetime = credentialLifetime.current;
+    if (!lifetime || lifetime.signal.aborted || credentialLock.current) return false;
+    const active = () => credentialLifetime.current === lifetime && !lifetime.signal.aborted;
     credentialLock.current = true;
     setCredentialBusy(true);
     try {
-      const response = await fetch('/api/v1/admin/site-config', {
-        method: 'PATCH',
-        credentials: 'include',
-        signal,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(ai.infra),
-      });
-      signal.throwIfAborted();
-      if (!response.ok)
-        throw new Error(
-          'Could not save the selected AI configuration. Review it and continue again.'
-        );
+      await saveAiServerConfiguration(configuration, lifetime.signal);
+      return active();
     } catch (error) {
-      if (!signal.aborted)
+      if (active())
         setCredentialFeedback({
           status: 'review',
-          message: error instanceof Error ? error.message : 'Could not save AI configuration.',
+          message: error instanceof Error ? error.message : 'The AI configuration was not saved.',
         });
       return false;
     } finally {
-      if (!signal.aborted) {
+      if (active()) {
         credentialLock.current = false;
         setCredentialBusy(false);
       }
     }
-    // Bind optional endpoint credentials only after the URL has been saved.
-    return agent.method !== 'url' || saveCredentials(posts);
+  }
+
+  async function persistAgentSelection() {
+    if (!config.selfHosted) return true;
+    const selection = resolveAi(
+      agent.provider,
+      agent.method,
+      agent.value,
+      agent.model,
+      agent.apiKey
+    );
+    const plan = planAgentPersistence(
+      agent.method,
+      config.isOwner,
+      Object.keys(selection.infra).length > 0
+    );
+    if (!plan.allowed) {
+      setCredentialFeedback({ status: 'review', message: plan.message });
+      return false;
+    }
+    for (const step of plan.steps) {
+      const saved =
+        step === 'configuration'
+          ? await persistServerConfiguration(selection.infra)
+          : await saveCredentials(selection.keyPost ? [selection.keyPost] : []);
+      if (!saved) return false;
+    }
+    return true;
   }
 
   function addContextItems(items: Array<Omit<ContextItem, 'id'>>) {
@@ -913,7 +928,7 @@ export function WelcomeFlow({ initialConfig, modelMeta = EMPTY_MODEL_META }: Wel
                     }
                   } else {
                     void saveCredentials(
-                      pendingCredentialPosts.current,
+                      undefined,
                       credentialFeedback.status === 'confirmation'
                         ? credentialFeedback.operationId
                         : undefined

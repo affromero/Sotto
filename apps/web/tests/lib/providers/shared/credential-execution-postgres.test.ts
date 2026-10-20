@@ -169,37 +169,43 @@ suite('credential execution admission with PostgreSQL', () => {
     }
   });
 
-  it('captures the configured local URL and key and rejects endpoint changes before dispatch', async () => {
+  it('withholds admission and usage metadata until a captured destination is configured again', async () => {
+    const original = 'https://execution.example/teacher/v1';
+    await setSiteConfig({ aiBaseUrl: original }, identity.ownerId, instance.database);
+    await instance.seedAiCredential(identity.ownerId, 'local', 'bound-execution-key');
+    const admission = await authority();
+    const command = await sottoTransaction(instance.database, (tx) =>
+      captureSottoExecutionCredential(tx, admission, 'ai', 'local', false)
+    );
+    if (!command) throw new Error('Expected the personal compatible credential');
+    const storage = () =>
+      sottoTransaction(instance.database, async (tx) => {
+        const slot = await sottoCredentialStorage(tx, 'ai', 'local');
+        return slot.owned.head({
+          ...slot.slot,
+          owner: await captureSottoCredentialOwner(tx, identity.ownerId),
+        });
+      });
     await setSiteConfig(
-      { aiBaseUrl: 'http://localhost:11434/v1', aiModel: 'served-model' },
+      { aiBaseUrl: 'https://other.example/v1' },
       identity.ownerId,
       instance.database
     );
-    await instance.seedAiCredential(identity.ownerId, 'local', 'endpoint-key');
-    const authorize = await authority();
-    const captured = await sottoTransaction(instance.database, (tx) =>
-      captureSottoExecutionCredential(tx, authorize, 'ai', 'local', false)
-    );
-    expect(captured?.binding).toEqual({
-      protocol: 'compatible',
-      endpoint: 'http://localhost:11434/v1',
-    });
-    expect(captured?.selected.credential.values).toEqual({ apiKey: 'endpoint-key' });
-    await sottoTransaction(instance.database, (tx) =>
-      validateSottoExecutionCredential(tx, authorize, captured!)
-    );
-    await setSiteConfig(
-      { aiBaseUrl: 'http://localhost:9999/v1' },
-      identity.ownerId,
-      instance.database
-    );
-    const usedAt = Date.now();
     await expect(
       sottoTransaction(instance.database, (tx) =>
-        admitSottoExecutionCredential(tx, authorize, captured!, usedAt)
+        admitSottoExecutionCredential(tx, admission, command, 42100)
       )
-    ).rejects.toThrow('endpoint changed');
-    expect(captured?.binding.endpoint).toBe('http://localhost:11434/v1');
+    ).rejects.toMatchObject({ code: 'conflict' });
+    expect((await storage()).credential?.metadata.lastUsedAt).toBeNull();
+    await setSiteConfig({ aiBaseUrl: original }, identity.ownerId, instance.database);
+    await sottoTransaction(instance.database, (tx) =>
+      admitSottoExecutionCredential(tx, admission, command, 42200)
+    );
+    expect((await storage()).credential).toMatchObject({
+      binding: { protocol: 'compatible', endpoint: original },
+      metadata: { lastUsedAt: 42200 },
+    });
+    expect(command.binding.endpoint).toBe(original);
   });
 
   it.each(['rotate', 'remove', 'cancel'] as const)(

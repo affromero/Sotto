@@ -22,6 +22,7 @@ import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 import { aiProviderRules } from './providers/ai';
 import { createSottoProviderTransport } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import { learningCredentialFingerprint } from '@/lib/classes/preparation-selection';
+import { selectLearningAi, type LearningAiRequest } from '@/lib/learning/ai/selection';
 
 interface ResolvedLearningAi {
   provider: string;
@@ -155,23 +156,21 @@ export async function capturedLearningAiOptions(
     throw new Error(
       'The moderation credential changed after preparation was admitted. Start a new task.'
     );
-  const moderation = moderationCredential
-    ? {
-        fetch: (async (input: RequestInfo | URL, init?: RequestInit) => {
-          const headers = new Headers(init?.headers);
-          headers.set(
-            'Authorization',
-            `Bearer ${sottoExecutionCredentialFields(moderationCredential).apiKey}`
-          );
-          return (
-            await createSottoProviderTransport(
-              { ...ai.execution, credential: moderationCredential },
-              [{ method: 'POST', url: 'https://api.openai.com/v1/moderations' }]
-            )
-          ).authenticatedFetch(input, { ...init, headers });
-        }) as typeof fetch,
-      }
-    : undefined;
+  let moderation: { fetch: typeof fetch } | undefined;
+  if (moderationCredential) {
+    const execution = { ...ai.execution, credential: moderationCredential };
+    const authorization = `Bearer ${sottoExecutionCredentialFields(moderationCredential).apiKey}`;
+    const dispatch: typeof fetch = async (input, init) => {
+      const inherited = input instanceof Request ? input.headers : undefined;
+      const authenticated = new Headers(init?.headers ?? inherited);
+      authenticated.set('authorization', authorization);
+      const transport = await createSottoProviderTransport(execution, [
+        { url: 'https://api.openai.com/v1/moderations', method: 'POST' },
+      ]);
+      return transport.authenticatedFetch(input, { ...init, headers: authenticated });
+    };
+    moderation = { fetch: dispatch };
+  }
   return {
     model: ai.model,
     ...(options.includeSourceDocuments && ai.execution.sourceDocuments
@@ -197,126 +196,140 @@ export async function capturedLearningAiOptions(
 export async function resolveCapturedLearningAi(
   userId: string,
   execution: Omit<SottoProviderExecution, 'userId' | 'credential'>,
-  pendingSelection?: { provider: string; model: string; endpoint?: string; isolatedImage?: string }
+  pendingSelection?: LearningAiRequest
 ): Promise<CapturedLearningAi> {
-  if (execution.learningSelection) {
-    const selected = execution.learningSelection;
-    const resolved = await resolveCapturedLearningAi(
-      userId,
-      {
-        ...execution,
-        learningSelection: undefined,
-      },
-      {
-        provider: selected.provider,
-        model: selected.model,
-        endpoint: selected.endpoint,
-        isolatedImage: selected.isolatedImage,
+  const captured = execution.learningSelection;
+  const request = captured
+    ? {
+        model: captured.model,
+        provider: captured.provider,
+        endpoint: captured.endpoint,
+        isolatedImage: captured.isolatedImage,
       }
-    );
-    if (
-      resolved.provider !== selected.provider ||
-      resolved.model !== selected.model ||
-      resolved.endpoint !== selected.endpoint ||
-      resolved.isolatedImage !== selected.isolatedImage ||
-      learningCredentialFingerprint(resolved.execution.credential) !==
-        selected.credentialFingerprint
-    )
-      throw new Error('The AI selection changed after preparation was admitted. Start a new task.');
-    return { ...resolved, execution: { ...resolved.execution, learningSelection: selected } };
-  }
-  const learner = await sottoTransaction(prismaUnfiltered, async (database) => {
-    const current = await execution.authorize(database);
-    if (current.userId !== userId) throw new Error('The selected AI user changed');
-    return database.user.findUnique({
-      where: { id: userId },
-      select: { preferredAiProvider: true, preferredAiModel: true },
-    });
-  });
-  const preferred =
-    pendingSelection ??
-    (learner?.preferredAiProvider && learner.preferredAiModel
-      ? { provider: learner.preferredAiProvider, model: learner.preferredAiModel }
-      : null);
-  if (preferred?.provider === 'local' && preferred.model.startsWith('local:')) {
-    return resolveCapturedLearningAiForProvider(
-      userId,
-      'local',
-      preferred.model,
-      execution,
-      false,
-      pendingSelection?.endpoint
-    );
-  }
-  if (preferred && getProviderForModel(preferred.model) === preferred.provider) {
-    if (preferred.provider === 'codex' || preferred.provider === 'claude-code') {
-      if (await isSystemAiProviderDisabled(preferred.provider))
-        throw new Error(`${preferred.provider} is disabled in admin provider settings.`);
-      if (
-        preferred.provider === 'claude-code' &&
-        (process.env.SOTTO_ISOLATED_CLAUDE_IMAGE?.trim() || pendingSelection?.isolatedImage)
-      ) {
+    : pendingSelection;
+  const unbound = { ...execution, learningSelection: undefined };
+  const preferences = await readLearningAiPreference(userId, unbound);
+  const chosen = selectLearningAi(request, preferences);
+  const resolved = chosen
+    ? await captureRequestedLearningAi(userId, unbound, chosen)
+    : await captureConfiguredLearningAi(userId, unbound);
+  if (!captured) return resolved;
+
+  const identity = {
+    model: resolved.model,
+    provider: resolved.provider,
+    endpoint: resolved.endpoint,
+    isolatedImage: resolved.isolatedImage,
+    credentialFingerprint: learningCredentialFingerprint(resolved.execution.credential),
+  };
+  const unchanged =
+    identity.model === captured.model &&
+    identity.provider === captured.provider &&
+    identity.endpoint === captured.endpoint &&
+    identity.isolatedImage === captured.isolatedImage &&
+    identity.credentialFingerprint === captured.credentialFingerprint;
+  if (!unchanged)
+    throw new Error('The AI selection changed after preparation was admitted. Start a new task.');
+  return { ...resolved, execution: { ...resolved.execution, learningSelection: captured } };
+}
+
+async function readLearningAiPreference(
+  userId: string,
+  execution: Omit<SottoProviderExecution, 'userId' | 'credential'>
+) {
+  return sottoTransaction(
+    prismaUnfiltered,
+    async (database) => {
+      execution.signal?.throwIfAborted();
+      const authorized = await execution.authorize(database);
+      if (authorized.userId !== userId) throw new Error('The selected AI user changed');
+      const preference = await database.user.findUnique({
+        select: { preferredAiModel: true, preferredAiProvider: true },
+        where: { id: authorized.userId },
+      });
+      execution.signal?.throwIfAborted();
+      return preference;
+    },
+    { signal: execution.signal }
+  );
+}
+
+async function captureRequestedLearningAi(
+  userId: string,
+  execution: Omit<SottoProviderExecution, 'userId' | 'credential'>,
+  chosen: LearningAiRequest & { provider: AiProviderId }
+): Promise<CapturedLearningAi> {
+  switch (chosen.provider) {
+    case 'claude-code':
+    case 'codex': {
+      if (await isSystemAiProviderDisabled(chosen.provider))
+        throw new Error(`${chosen.provider} is disabled in admin provider settings.`);
+      const image = chosen.isolatedImage || process.env.SOTTO_ISOLATED_CLAUDE_IMAGE?.trim();
+      if (chosen.provider === 'claude-code' && image) {
         const { captureIsolatedLearningAi } =
           await import('./agents/isolated/isolated-learning-ai');
         const isolated = await captureIsolatedLearningAi(
           userId,
-          preferred.model,
+          chosen.model,
           execution,
-          pendingSelection?.isolatedImage
+          chosen.isolatedImage
         );
         if (isolated) return isolated;
       }
       return {
-        provider: preferred.provider,
-        model: preferred.model,
+        model: chosen.model,
+        provider: chosen.provider,
         execution: { ...execution, userId },
       };
     }
-    return resolveCapturedLearningAiForProvider(
-      userId,
-      preferred.provider as AiProviderId,
-      preferred.model,
-      execution,
-      false
-    );
+    default:
+      return resolveCapturedLearningAiForProvider(
+        userId,
+        chosen.provider,
+        chosen.model,
+        execution,
+        false,
+        chosen.endpoint
+      );
   }
-  if (pendingSelection) {
-    throw new Error('The selected AI model does not belong to the selected provider.');
-  }
+}
+
+async function captureConfiguredLearningAi(
+  userId: string,
+  execution: Omit<SottoProviderExecution, 'userId' | 'credential'>
+): Promise<CapturedLearningAi> {
   const configured = await getAutoModelConfig();
-  if (configured.model.aiProvider === 'codex' || configured.model.aiProvider === 'claude-code') {
-    const selected = await resolveLearningAiWithKey(null);
-    if (selected.provider === 'claude-code' && process.env.SOTTO_ISOLATED_CLAUDE_IMAGE?.trim()) {
-      const { captureIsolatedLearningAi } = await import('./agents/isolated/isolated-learning-ai');
-      const isolated = await captureIsolatedLearningAi(userId, selected.model, execution);
-      if (isolated) return isolated;
-    }
-    return { ...selected, execution: { ...execution, userId } };
+  const cli = configured.model.aiProvider;
+  if (cli === 'claude-code' || cli === 'codex') {
+    const defaults = await resolveLearningAiWithKey(null, configured);
+    return captureRequestedLearningAi(userId, execution, {
+      provider: cli,
+      model: defaults.model,
+    });
   }
-  const credential = await sottoTransaction(prismaUnfiltered, (database) =>
-    capturePreferredSottoExecutionCredential(
-      database,
-      execution.authorize,
-      'ai',
-      false,
-      'anthropic',
-      execution.signal
-    )
+  const credential = await sottoTransaction(
+    prismaUnfiltered,
+    (database) =>
+      capturePreferredSottoExecutionCredential(
+        database,
+        execution.authorize,
+        'ai',
+        false,
+        'anthropic',
+        execution.signal
+      ),
+    { signal: execution.signal }
   );
-  const selected = credential
-    ? await resolveLearningAiWithKey({
-        provider: credential.provider as AiProviderId,
-        apiKey: sottoExecutionCredentialFields(credential).apiKey,
-      })
-    : await resolveLearningAiWithKey(null);
-  if (!credential) return { ...selected, execution: { ...execution, userId } };
-  if (credential.recipient.userId !== userId)
+  if (credential && credential.recipient.userId !== userId)
     throw new Error('The selected AI credential recipient changed');
-  return {
-    provider: selected.provider,
-    model: selected.model,
-    endpoint: credential.binding.endpoint,
+  const key = credential && {
     apiKey: sottoExecutionCredentialFields(credential).apiKey,
+    provider: credential.provider as AiProviderId,
+  };
+  const selected = await resolveLearningAiWithKey(key);
+  return {
+    ...selected,
+    ...(credential ? { endpoint: credential.binding.endpoint } : {}),
     execution: { ...execution, userId, credential },
   };
 }
@@ -326,8 +339,13 @@ export async function resolveCapturedLearningAi(
  * or /admin/providers), or null if none is configured for this provider, the
  * configured model belongs to a different provider, or the config can't be read.
  */
-async function configuredModelFor(provider: string): Promise<string | null> {
-  const cfg = await getAutoModelConfig();
+type LearningModelConfiguration = Awaited<ReturnType<typeof getAutoModelConfig>>;
+
+async function configuredModelFor(
+  provider: string,
+  snapshot?: LearningModelConfiguration
+): Promise<string | null> {
+  const cfg = snapshot ?? (await getAutoModelConfig());
   if (cfg.model.aiProvider === provider && getProviderForModel(cfg.model.aiModel) === provider) {
     return cfg.model.aiModel;
   }
@@ -340,7 +358,8 @@ async function isSystemAiProviderDisabled(provider: 'claude-code' | 'codex'): Pr
 }
 
 async function resolveLearningAiWithKey(
-  aiKey: { provider: AiProviderId; apiKey: string } | null
+  aiKey: { provider: AiProviderId; apiKey: string } | null,
+  snapshot?: LearningModelConfiguration
 ): Promise<ResolvedLearningAi> {
   if (aiKey) {
     if (aiKey.provider === 'local') {
@@ -365,33 +384,33 @@ async function resolveLearningAiWithKey(
 
   // A keyless backend must be explicitly selected in the saved configuration.
   await getServerInfra();
-  const configured = await getAutoModelConfig();
+  const configured = snapshot ?? (await getAutoModelConfig());
   const selectedKeylessProvider =
     configured.model.aiProvider === 'claude-code' || configured.model.aiProvider === 'codex'
       ? configured.model.aiProvider
       : null;
   const selectedProvider = selectedKeylessProvider ?? (infra('aiProvider') ?? '').trim();
   if (selectedProvider === 'claude-code') {
-    if (await isSystemAiProviderDisabled('claude-code')) {
+    if (resolveDisabledSystemAiProviders(configured).has('claude-code')) {
       throw new Error('Claude Code is disabled in admin provider settings.');
     }
     // Use the saved model, then the provider default.
-    const configured = await configuredModelFor('claude-code');
+    const modelFromConfiguration = await configuredModelFor('claude-code', configured);
     const infraModel = infra('aiModel');
     const model =
-      normalizeAgentModelId('claude-code', configured ?? infraModel) ??
+      normalizeAgentModelId('claude-code', modelFromConfiguration ?? infraModel) ??
       getAiProviderMeta('claude-code').defaultModel;
     if (!model) throw new Error('No default model configured for claude-code.');
     return { provider: 'claude-code', model };
   }
 
   if (selectedProvider === 'codex') {
-    if (await isSystemAiProviderDisabled('codex')) {
+    if (resolveDisabledSystemAiProviders(configured).has('codex')) {
       throw new Error('Codex is disabled in admin provider settings.');
     }
-    const configured = await configuredModelFor('codex');
+    const modelFromConfiguration = await configuredModelFor('codex', configured);
     const infraModel = infra('aiModel');
-    const model = normalizeAgentModelId('codex', configured ?? infraModel) ?? 'codex';
+    const model = normalizeAgentModelId('codex', modelFromConfiguration ?? infraModel) ?? 'codex';
     return { provider: 'codex', model };
   }
 

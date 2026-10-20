@@ -206,137 +206,94 @@ beforeEach(() => {
 });
 
 describe('strict scoped A1 intro wire', () => {
-  it('refreshes an accepted focus quote when the Spanish example is repaired', async () => {
-    const original = {
-      purpose: 'Describe tu casa y tu barrio usando palabras sencillas.',
-      about: { exampleIndex: 0 },
-      focus: [
-        { text: 'Usa "hay" para decir que algo existe en un lugar.', exampleIndex: 0 },
-        { text: 'Usa "este" o "esta" para señalar algo muy cerca.', exampleIndex: 1 },
-        { text: 'Usa "enfrente de" para indicar la posición de un lugar.', exampleIndex: 2 },
-      ],
-      examples: [
-        {
-          target: 'En el salón hay un sofá blanco.',
-          note: 'La palabra "hay" indica existencia en una oración afirmativa.',
-        },
-        {
-          target: 'Esta cocina es pequeña.',
-          note: 'El adjetivo demostrativo "esta" concuerda en género con el sustantivo femenino "cocina".',
-        },
-        {
-          target: 'El parque está enfrente de mi barrio.',
-          note: 'La frase "enfrente de" describe la ubicación relativa entre dos lugares.',
-        },
-      ],
-      tips: [
-        {
-          text: 'Recuerda que "hay" no cambia si hablas de una cosa o de muchas cosas.',
-          exampleIndex: 0,
-        },
-      ],
-      visuals: null,
-    };
-    const patch = {
-      examples: {
-        2: {
-          target: 'El parque está enfrente de mi casa.',
-          note: '„El parque está enfrente de mi casa.“: La frase "enfrente de" describe la ubicación relativa entre dos lugares.',
-        },
-      },
-    };
-    respond(original, patch, ['examples:2'], ({ content }, intro) => {
-      if (content.address.field !== 'focus' || content.address.index !== 2) return;
-      const prefix = `„${intro.examples[2]!.target}“: `;
-      if ((content.fields.focus as string).startsWith(prefix)) return;
-      return {
-        defect: 'The focus quotation differs from its repaired example.',
-        correction: 'Quote the current example about mi casa.',
+  it.each([
+    { level: 'A1', index: 0 },
+    { level: 'A1', index: 2 },
+    { level: 'A1', index: 4 },
+    { level: 'A2', index: 0 },
+    { level: 'A2', index: 2 },
+    { level: 'A2', index: 4 },
+  ])(
+    'repairs occurrence $index without confusing equal targets at $level',
+    async ({ level, index }) => {
+      const original = {
+        target: 'Nous arrivons ensemble.',
+        note: 'Le sujet accompagne le verbe.',
+        ...(level === 'A1' ? { meaning: 'We arrive together.' } : {}),
       };
-    });
-    const result = await generateClassIntro({
-      ...params,
-      level: 'A2',
-      targetLang: 'es',
-      title: 'Casa y barrio',
-      objective: original.purpose,
-    });
-    expect(result.focus[2]).toBe(
-      '„El parque está enfrente de mi casa.“: Usa "enfrente de" para indicar la posición de un lugar.'
-    );
-    expect(result.focus[0]).toBe(
-      '„En el salón hay un sofá blanco.“: Usa "hay" para decir que algo existe en un lugar.'
-    );
-    expect(result.about).toBe('En el salón hay un sofá blanco.');
-    for (const context of reviewContexts().slice(2)) expect(context).toEqual(result);
-  });
-
-  it.each(['A1', 'A2'])(
-    'refreshes only references to the repaired index among duplicate %s targets',
-    async (level) => {
-      const initial = {
-        ...wire,
-        about: { exampleIndex: 0 },
-        examples:
-          level === 'A1'
-            ? [wire.examples[0], wire.examples[0]]
-            : [wire.examples[0], wire.examples[0]].map(({ target, note }) => ({ target, note })),
-        focus: [wire.focus[0], { ...wire.focus[0], exampleIndex: 1 }],
+      const changed = {
+        ...original,
+        target: 'Nous repartons ensemble.',
+        ...(level === 'A1' ? { meaning: 'We depart together.' } : {}),
       };
-      const example =
-        level === 'A1'
-          ? wire.examples[1]
-          : { target: wire.examples[1].target, note: wire.examples[1].note };
-      respond(initial, { examples: { 1: example } }, ['examples:1']);
-      const result = await generateClassIntro({ ...params, level });
-      expect(result.about).toBe(
-        level === 'A1' ? '„Ich habe gekocht.“: I cooked.' : 'Ich habe gekocht.'
+      const focusOrder = [4, 0];
+      const tipOrder = [2];
+      const draft = {
+        purpose: 'Préparer une arrivée ensemble.',
+        examples: Array.from({ length: 5 }, () => ({ ...original })),
+        about: { exampleIndex: index },
+        focus: focusOrder.map((exampleIndex) => ({ exampleIndex, text: 'Repérez le sujet.' })),
+        tips: tipOrder.map((exampleIndex) => ({
+          exampleIndex,
+          text: 'Prononcez la terminaison.',
+        })),
+        visuals: null,
+      };
+      respond(draft, { examples: { [index]: changed } }, ['examples:' + index]);
+      const published = await generateClassIntro({ ...params, level, targetLang: 'fr' });
+      expect(published.examples.map((example) => example.target)).toEqual(
+        draft.examples.map((example, occurrence) =>
+          occurrence === index ? changed.target : example.target
+        )
       );
-      expect(result.focus).toEqual([
-        '„Ich habe gekocht.“: Kochen verwendet haben.',
-        '„Wir sind gegangen.“: Kochen verwendet haben.',
-      ]);
-      expect(result.tips).toEqual(['„Wir sind gegangen.“: Lerne das Hilfsverb.']);
-      expect(result.examples[0].target).toBe('Ich habe gekocht.');
+      for (const [field, positions, body] of [
+        ['focus', focusOrder, 'Repérez le sujet.'],
+        ['tips', tipOrder, 'Prononcez la terminaison.'],
+      ] as const) {
+        expect(published[field]).toEqual(
+          positions.map(
+            (position) =>
+              '„' + (position === index ? changed.target : original.target) + '“: ' + body
+          )
+        );
+      }
+      expect(published.about).toContain(changed.target);
+      const audited = reviewContexts().slice(2);
+      expect(audited.length).toBeGreaterThan(0);
+      for (const context of audited) expect(context).toEqual(published);
     }
   );
 
-  it('refreshes an accepted immersion overview from its repaired example', async () => {
-    const initial = {
-      ...wire,
-      examples: wire.examples.map(({ target, note }) => ({ target, note })),
-    };
-    respond(
-      initial,
-      { examples: { 1: { target: 'Wir sind gestern gegangen.', note: 'Gehen verwendet sein.' } } },
-      ['examples:1']
-    );
-    const result = await generateClassIntro({ ...params, level: 'A2' });
-    expect(result.about).toBe('Wir sind gestern gegangen.');
-    expect(result.focus[0]).toBe(compiled.focus[0]);
-    expect(result.focus[1]).toBe('„Wir sind gestern gegangen.“: Gehen verwendet sein.');
-  });
-
-  it('still rejects a retained observation that is invalid for the repaired example', async () => {
-    respond(wire, { examples: { 0: shortExample } }, ['examples:0'], ({ content }, intro) => {
-      if (
-        content.address.field !== 'focus' ||
-        content.address.index !== 0 ||
-        intro.examples[0].target !== 'Guten Morgen' ||
-        !(content.fields.focus as string).includes('Kochen')
-      )
-        return;
-      return {
-        defect: 'The greeting contains no form of kochen.',
-        correction: 'This is a morning greeting.',
+  it.each(['focus', 'tips'] as const)(
+    'withholds the whole intro when a retained %s observation becomes false',
+    async (field) => {
+      const draft = {
+        ...wire,
+        focus: [{ text: 'Das Beispiel ist im Perfekt.', exampleIndex: 1 }],
+        tips: [{ text: 'Achte auf das Partizip.', exampleIndex: 1 }],
       };
-    });
-    await expect(generateClassIntro(params)).rejects.toMatchObject({
-      name: 'TeachingQualityRejectionError',
-      issues: ['incorrect'],
-    });
-    expect(schemas().filter((name) => name === 'class_intro_repair')).toHaveLength(1);
-  });
+      const changed = {
+        target: 'Wir gehen morgen ins Kino.',
+        meaning: 'We go to the cinema tomorrow.',
+        note: 'Das Beispiel steht im Präsens.',
+      };
+      const finalAudits: string[] = [];
+      respond(draft, { examples: { 1: changed } }, ['examples:1'], (item, intro) => {
+        if (intro.examples[1].target !== changed.target) return;
+        finalAudits.push(item.content.address.field);
+        if (item.content.address.field === field)
+          return {
+            defect: 'The observation describes a tense absent from the replacement.',
+            correction: 'Describe the present tense example accurately.',
+          };
+      });
+      await expect(generateClassIntro(params)).rejects.toMatchObject({
+        name: 'TeachingQualityRejectionError',
+        issues: ['incorrect'],
+      });
+      expect(finalAudits).toContain(field);
+    }
+  );
 
   it('repairs teaching after a size repair and re-audits the complete merged intro', async () => {
     const example = { ...wire.examples[1]!, meaning: 'The group went.' };
@@ -438,14 +395,17 @@ describe('strict scoped A1 intro wire', () => {
     }
   );
 
-  it('retains a rejected example whose compiled note becomes equivalent to its meaning', async () => {
-    respond(wire, { examples: { 0: shortExample } }, ['examples:0']);
+  it('keeps useful two-word replacements when their notes were already framed', async () => {
+    const replacement = {
+      target: 'Vielen Dank',
+      meaning: 'A polite expression of gratitude.',
+      note: '„Vielen Dank“: Diese Wendung drückt Dankbarkeit aus.',
+    };
+    respond(wire, { examples: { 0: replacement } }, ['examples:0']);
     const result = await generateClassIntro(params);
-    expect(result).toEqual({
-      ...compiled,
-      focus: ['„Guten Morgen“: Kochen verwendet haben.', compiled.focus[1]],
-      examples: [shortCompiledExample, compiled.examples[1]],
-    });
+    expect(result.examples).toEqual([replacement, compiled.examples[1]]);
+    expect(result.focus[0]).toBe('„Vielen Dank“: Kochen verwendet haben.');
+    expect(result.about).toBe(compiled.about);
     for (const context of reviewContexts().slice(2)) expect(context).toEqual(result);
     expect(classIntroFromSeed(JSON.parse(JSON.stringify({ intro: result })), params)).toEqual(
       result
@@ -454,21 +414,21 @@ describe('strict scoped A1 intro wire', () => {
 
   it('preserves an accepted short example and stable later indices when its sibling changes', async () => {
     const example = {
-      target: 'Wir sind gestern gefahren.',
-      meaning: 'We travelled yesterday.',
-      note: 'Fahren verwendet hier sein.',
+      target: 'Wir sind nach Hause gekommen.',
+      meaning: 'We came home.',
+      note: 'Kommen steht in diesem Satz mit sein.',
     };
     respond(shortExampleWire, { examples: { 1: example } }, ['examples:1']);
     const result = await generateClassIntro(params);
-    expect(result).toEqual({
-      ...shortExampleIntro,
-      about: '„Wir sind gestern gefahren.“: We travelled yesterday.',
-      focus: [shortExampleIntro.focus[0], '„Wir sind gestern gefahren.“: Gehen verwendet sein.'],
-      tips: ['„Wir sind gestern gefahren.“: Lerne das Hilfsverb.'],
-      examples: [
-        shortCompiledExample,
-        { ...example, note: '„Wir sind gestern gefahren.“: Fahren verwendet hier sein.' },
-      ],
+    expect(result.examples[0]).toEqual(shortCompiledExample);
+    expect(result.examples[1]).toEqual({
+      ...example,
+      note: '„Wir sind nach Hause gekommen.“: Kommen steht in diesem Satz mit sein.',
+    });
+    expect(result).toMatchObject({
+      about: '„Wir sind nach Hause gekommen.“: We came home.',
+      focus: [shortExampleIntro.focus[0], '„Wir sind nach Hause gekommen.“: Gehen verwendet sein.'],
+      tips: ['„Wir sind nach Hause gekommen.“: Lerne das Hilfsverb.'],
     });
     expect(result.focus[0]).toBe(shortExampleIntro.focus[0]);
     for (const context of reviewContexts().slice(2)) expect(context).toEqual(result);
@@ -725,34 +685,31 @@ describe('strict scoped A1 intro wire', () => {
     expect(schemas().slice(0, 2)).toEqual(['class_intro_generation', 'class_intro_repair']);
   });
 
-  it('compiles rejected observations after example replacements and refreshes accepted quotes', async () => {
+  it('applies authorized observation corrections after rendering the retained observations', async () => {
     const example = {
-      target: 'Wir sind gestern gefahren.',
-      meaning: 'We travelled yesterday.',
-      note: 'Fahren verwendet hier sein.',
+      target: 'Wir sind heute angekommen.',
+      meaning: 'We arrived today.',
+      note: 'Ankommen steht hier im Perfekt.',
     };
     const patch = {
       about: { exampleIndex: 1 },
       focus: {
-        0: { text: '„Wir sind gestern gefahren.“: Das Partizip lautet gefahren.', exampleIndex: 1 },
+        0: { text: 'Das Partizip heißt angekommen.', exampleIndex: 1 },
       },
-      tips: { 0: { text: 'Lerne fahren mit sein.', exampleIndex: 1 } },
+      tips: { 0: { text: 'Merke dir ankommen und sein.', exampleIndex: 1 } },
       examples: { 1: example },
     };
     respond(wire, patch, ['about', 'focus:0', 'tips:0', 'examples:1']);
     const result = await generateClassIntro(params);
-    expect(result).toEqual({
-      ...compiled,
-      about: '„Wir sind gestern gefahren.“: We travelled yesterday.',
-      focus: [
-        '„Wir sind gestern gefahren.“: Das Partizip lautet gefahren.',
-        '„Wir sind gestern gefahren.“: Gehen verwendet sein.',
-      ],
-      tips: ['„Wir sind gestern gefahren.“: Lerne fahren mit sein.'],
-      examples: [
-        compiled.examples[0],
-        { ...example, note: '„Wir sind gestern gefahren.“: Fahren verwendet hier sein.' },
-      ],
+    expect(result.about).toBe('„Wir sind heute angekommen.“: We arrived today.');
+    expect(result.focus).toEqual([
+      '„Wir sind heute angekommen.“: Das Partizip heißt angekommen.',
+      '„Wir sind heute angekommen.“: Gehen verwendet sein.',
+    ]);
+    expect(result.tips).toEqual(['„Wir sind heute angekommen.“: Merke dir ankommen und sein.']);
+    expect(result.examples[1]).toEqual({
+      ...example,
+      note: '„Wir sind heute angekommen.“: Ankommen steht hier im Perfekt.',
     });
     expect(result.examples[0]).toEqual(compiled.examples[0]);
     for (const context of reviewContexts().slice(2)) expect(context).toEqual(result);

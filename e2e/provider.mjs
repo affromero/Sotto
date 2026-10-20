@@ -28,7 +28,7 @@ export function fixtureAudio() {
 export async function startProvider() {
   const unexpected = [];
   const audio = fixtureAudio();
-  let selectedAiKey;
+  let expectedConnection = { token: 'local', model: 'browser-fixture' };
   const server = createServer(async (request, response) => {
     try {
       const chunks = [];
@@ -38,11 +38,22 @@ export async function startProvider() {
         response.end(JSON.stringify(body));
       };
       if (request.method === 'GET' && request.url === '/health') return send({ status: 'ok' });
+      if (request.method === 'POST' && request.url === '/fixture/connection') {
+        const proposed = JSON.parse(Buffer.concat(chunks).toString());
+        if (
+          typeof proposed.token !== 'string' ||
+          !proposed.token ||
+          typeof proposed.model !== 'string' ||
+          !proposed.model
+        )
+          throw new Error('Invalid fixture connection expectation');
+        expectedConnection = { token: proposed.token, model: proposed.model };
+        return send({ configured: true });
+      }
       if (request.method === 'GET' && request.url === '/v1/models') {
-        selectedAiKey = request.headers.authorization;
-        if (!['Bearer browser-local-key', 'Bearer browser-custom-key'].includes(selectedAiKey))
-          throw new Error('Expected the configured compatible API key');
-        return send({ object: 'list', data: [{ id: 'browser-fixture' }] });
+        if (request.headers.authorization !== `Bearer ${expectedConnection.token}`)
+          throw new Error('Model discovery did not match the fixture expectation');
+        return send({ object: 'list', data: [{ id: expectedConnection.model }] });
       }
       if (request.method === 'GET' && request.url === '/voices')
         return send({ voices: [{ id: 'fixture-voice', name: 'Fixture voice' }] });
@@ -53,11 +64,12 @@ export async function startProvider() {
       if (request.method === 'POST' && request.url === '/v1/audio/transcriptions')
         return send({ text: 'Guten Morgen.' });
       if (request.method === 'POST' && request.url === '/v1/chat/completions') {
-        if (selectedAiKey && request.headers.authorization !== selectedAiKey)
-          throw new Error('Generation did not use the configured compatible API key');
         const body = JSON.parse(Buffer.concat(chunks).toString());
-        if (body.model !== 'browser-fixture')
-          throw new Error('Generation did not use the configured model');
+        if (
+          request.headers.authorization !== `Bearer ${expectedConnection.token}` ||
+          body.model !== expectedConnection.model
+        )
+          throw new Error('Generation did not match the fixture connection expectation');
         const messages = body.messages.map((message) => message.content).join('\n');
         const system = body.messages.find((message) => message.role === 'system')?.content || '';
         let content;

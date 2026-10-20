@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { SourceDocuments } from '@/lib/providers/ai';
 import { blockedProviderExecution } from '../../../helpers/runtime/provider-execution';
 import {
+  introAiOptionsFixture,
+  introSourceDocuments,
   novelFindingCorroborationFixture,
   scopedIntroFixture,
   shapeIntroProviderFixture,
@@ -27,14 +28,7 @@ vi.mock('@/lib/providers/ai', () => ({
 }));
 vi.mock('@/lib/learning-ai', () => ({
   resolveCapturedLearningAi: boundary.resolve,
-  capturedLearningAiOptions: async (
-    ai: { model: string; signal: AbortSignal; execution?: { sourceDocuments?: SourceDocuments } },
-    scope?: { includeSourceDocuments?: boolean }
-  ) => ({
-    model: ai.model,
-    signal: ai.signal,
-    ...(scope?.includeSourceDocuments ? { sourceDocuments: ai.execution?.sourceDocuments } : {}),
-  }),
+  capturedLearningAiOptions: introAiOptionsFixture,
 }));
 vi.mock('@/lib/usage-logger', () => ({ logUsage: vi.fn() }));
 import { generateClassIntro } from '@/lib/classes/class-intro';
@@ -227,17 +221,7 @@ beforeEach(() => {
 
 describe('field-local A1 intro repair', () => {
   it('derives the overview from the selected example meaning before either review role', async () => {
-    const sourceDocuments: SourceDocuments = {
-      parts: [
-        {
-          type: 'document',
-          mediaType: 'application/pdf',
-          name: 'Workbook.pdf',
-          data: Buffer.from('%PDF-1.7'),
-        },
-      ],
-      validate: async () => {},
-    };
+    const sourceDocuments = introSourceDocuments();
     boundary.resolve.mockResolvedValue({
       provider: 'fixture',
       model: 'captured-model',
@@ -267,12 +251,18 @@ describe('field-local A1 intro repair', () => {
   });
 
   it.each([false, true])(
-    'refreshes references to the first repaired example with an overview rejection of %s',
+    'renders a replaced target consistently when overview rejection is %s',
     async (rejectAbout) => {
+      const sourceDocuments = introSourceDocuments();
+      boundary.resolve.mockResolvedValue({
+        provider: 'fixture',
+        model: 'captured-model',
+        execution: { ...params.execution, sourceDocuments },
+      });
       const correctedExample = {
-        target: 'Ich habe gestern einen Film gesehen.',
-        meaning: 'Yesterday I watched a film.',
-        note: '„Ich habe gestern einen Film gesehen.“: „Sehen“ steht hier mit „haben“.',
+        target: 'Ich habe heute Brot gekauft.',
+        meaning: 'I bought bread today.',
+        note: '„Ich habe heute Brot gekauft.“: Kaufen bildet das Perfekt mit haben.',
       };
       const rejected: Record<string, ReviewIssue> = {
         'examples:0': { issues: ['unsupported'], feedback: ['Correct the example.'] },
@@ -280,17 +270,17 @@ describe('field-local A1 intro repair', () => {
           ? { about: { issues: ['incorrect'], feedback: ['Correct the rule.'] } }
           : {}),
       };
-      const repaired = {
+      const expectedIntro = {
         ...candidate,
-        about: '„Ich habe gestern einen Film gesehen.“: Yesterday I watched a film.',
+        about: '„Ich habe heute Brot gekauft.“: I bought bread today.',
         focus: [
-          '„Ich habe gestern einen Film gesehen.“: Wähle das passende Hilfsverb.',
-          '„Ich habe gestern einen Film gesehen.“: Beachte die Wortstellung.',
+          '„Ich habe heute Brot gekauft.“: Wähle das passende Hilfsverb.',
+          '„Ich habe heute Brot gekauft.“: Beachte die Wortstellung.',
         ],
         tips: [
-          '„Ich habe gestern einen Film gesehen.“: Lerne das Hilfsverb.',
-          '„Ich habe gestern einen Film gesehen.“: Nenne die vergangene Zeit.',
-          '„Ich habe gestern einen Film gesehen.“: Vergleiche vollständige Sätze.',
+          '„Ich habe heute Brot gekauft.“: Lerne das Hilfsverb.',
+          '„Ich habe heute Brot gekauft.“: Nenne die vergangene Zeit.',
+          '„Ich habe heute Brot gekauft.“: Vergleiche vollständige Sätze.',
         ],
         examples: [correctedExample, ...candidate.examples.slice(1)],
       };
@@ -302,14 +292,23 @@ describe('field-local A1 intro repair', () => {
           examples: { '0': correctedExample },
         }),
       });
-      queueReview(repaired);
+      queueReview(expectedIntro);
 
-      await expect(generateClassIntro(params)).resolves.toEqual(repaired);
+      await expect(generateClassIntro(params)).resolves.toEqual(expectedIntro);
+      expect(boundary.generate.mock.calls[0][2].sourceDocuments).toBe(sourceDocuments);
+      const repair = boundary.generate.mock.calls.find(
+        ([, , options]) => options.jsonSchema?.name === 'class_intro_repair'
+      );
+      expect(repair?.[2].sourceDocuments).toBe(sourceDocuments);
+      const reviews = boundary.generate.mock.calls.filter(([, , options]) =>
+        ['class_intro_critic', 'class_intro_adjudicator'].includes(options.jsonSchema?.name)
+      );
+      for (const [, , options] of reviews) expect(options.sourceDocuments).toBeUndefined();
       const finalReviews = boundary.generate.mock.calls
         .filter(([, , options]) => options.jsonSchema?.name === 'class_intro_adjudicator')
         .slice(2);
       for (const [, messages] of finalReviews)
-        expect(JSON.parse(messages[0].content).introContext.about).toBe(repaired.about);
+        expect(JSON.parse(messages[0].content).introContext.about).toBe(expectedIntro.about);
     }
   );
   it.each(['größer', 'größer'.normalize('NFD'), '42'])(

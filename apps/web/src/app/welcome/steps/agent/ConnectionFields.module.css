@@ -1,0 +1,36 @@
+.root {
+  min-inline-size: 0;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  row-gap: var(--spacing-md);
+}
+
+.root legend {
+  font: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  padding: 0;
+  margin-block-end: var(--spacing-sm);
+}
+
+.saved {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.saved p,
+.hint {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+}

@@ -4,7 +4,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { PROVIDERS } from '../data';
 import type { AgentState, ModelOption } from '../WelcomeFlow';
 import { aiModelProviderId } from '../providerMap';
-import { resumeEndpoint } from '../session/resume-security';
+import { DEFAULT_AGENT } from '../session/welcome-snapshot';
+import { ConnectionFields } from './agent/ConnectionFields';
 import { Glyph } from '../Glyph';
 import t from '../theme.module.css';
 import c from '@/app/welcome/components.styles';
@@ -15,6 +16,7 @@ import {
   type AgentProviderId,
 } from '@/lib/agent-models/id';
 import type { AgentStatus } from '@/lib/agent-availability';
+import { CredentialDraftDigest } from '@/lib/sidedoor/credentials/config/credential-digest';
 
 interface Props {
   agent: AgentState;
@@ -51,14 +53,15 @@ export function StepAgent({
 
   const savedReady = savedDetected.includes(agent.provider);
   const savedCredentialReady = !demoMode && agent.method === 'key' && !agent.value && savedReady;
-  const [keyOverrides, setKeyOverrides] = useState<Record<string, boolean>>({});
+  const [keyOverrides, setKeyOverrides] = useState(() => new Set<string>());
   const [savedProof, setSavedProof] = useState<{
     fingerprint: string;
     status: 'verified' | 'saved' | 'configured';
   } | null>(null);
   const [saveError, setSaveError] = useState(false);
+  const [drafts] = useState(() => new CredentialDraftDigest());
   const fingerprint = (value: AgentState) =>
-    JSON.stringify([value.provider, value.method, value.value, value.model, value.apiKey]);
+    drafts.digest([value.provider, value.method, value.value, value.model, value.apiKey]);
   const proof = savedOutcome
     ? { status: savedOutcome }
     : savedProof?.fingerprint === fingerprint(agent)
@@ -71,7 +74,7 @@ export function StepAgent({
       mounted.current = false;
     };
   }, []);
-  const showDetectedKey = savedCredentialReady && !keyOverrides[agent.provider];
+  const showDetectedKey = savedCredentialReady && !keyOverrides.has(agent.provider);
   useEffect(() => {
     if ((savedCredentialReady || savedOutcome) && agent.status === 'idle') {
       setAgent((a) => ({ ...a, status: 'connected' }));
@@ -177,11 +180,9 @@ export function StepAgent({
     if (!p) return;
     onCredentialEdit?.();
     setAgent((prev) => ({
+      ...DEFAULT_AGENT,
       provider: id,
       method: p.cli ? 'cli' : p.kind === 'key' ? 'key' : 'url',
-      value: '',
-      apiKey: '',
-      model: '',
       liveTranslationKey: prev.liveTranslationKey ?? '',
       status: demoMode ? 'connected' : 'idle',
     }));
@@ -190,6 +191,11 @@ export function StepAgent({
   function setMethod(m: AgentState['method']) {
     onCredentialEdit?.();
     setAgent((a) => ({ ...a, method: m, value: '', apiKey: '', status: 'idle' }));
+  }
+
+  function changeConnection(field: 'value' | 'model' | 'apiKey', value: string) {
+    onCredentialEdit?.();
+    setAgent((current) => ({ ...current, [field]: value, status: 'idle' }));
   }
 
   async function saveConfiguration() {
@@ -214,14 +220,6 @@ export function StepAgent({
       );
     }
   }
-
-  const inputMethod = !demoMode && prov && (agent.method === 'key' || agent.method === 'url');
-  const saveDisabled =
-    !agent.value.trim() ||
-    (agent.method === 'url' && (!resumeEndpoint(agent.value) || !agent.model.trim())) ||
-    !onSave ||
-    agent.status === 'verifying' ||
-    proof !== null;
 
   return (
     <div className={t.stepEnter}>
@@ -331,58 +329,24 @@ export function StepAgent({
             </div>
           )}
 
-          {inputMethod && (
-            <div>
-              <label className={c.fieldLabel} htmlFor="welcome-agent-value">
-                {agent.method === 'key' ? 'API key' : 'Endpoint URL'}
-              </label>
-              <div className={c.field}>
-                {showDetectedKey ? (
-                  <>
-                    <span className={c.vkDetected}>
-                      <Glyph name="check" size={13} />
-                      Saved for your profile
-                    </span>
-                    <button
-                      type="button"
-                      className={c.vkActionLink}
-                      onClick={() => setKeyOverrides((s) => ({ ...s, [agent.provider]: true }))}
-                      aria-label={`Override the detected ${prov.name} API key`}
-                    >
-                      Override
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <input
-                      id="welcome-agent-value"
-                      name="agentValue"
-                      className={c.fieldInput}
-                      type={agent.method === 'key' ? 'password' : 'url'}
-                      autoComplete={agent.method === 'key' ? 'off' : 'url'}
-                      spellCheck={false}
-                      placeholder={agent.method === 'key' ? prov.keyHint : prov.hint}
-                      value={agent.value}
-                      onChange={(e) => {
-                        onCredentialEdit?.();
-                        setAgent((a) => ({ ...a, value: e.target.value, status: 'idle' }));
-                      }}
-                      aria-label={agent.method === 'key' ? `${prov.name} API key` : 'Endpoint URL'}
-                      autoFocus={agent.method === 'key' && Boolean(keyOverrides[agent.provider])}
-                    />
-                    {agent.method === 'key' && (
-                      <button
-                        className={`${t.btn} ${t.btnGhost}`}
-                        disabled={saveDisabled}
-                        onClick={saveConfiguration}
-                      >
-                        {proof ? (proof.status === 'verified' ? 'Verified' : 'Saved') : 'Save key'}
-                      </button>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
+          {!demoMode && prov && (agent.method === 'key' || agent.method === 'url') && (
+            <ConnectionFields
+              method={agent.method}
+              providerName={prov.name}
+              hint={agent.method === 'key' ? prov.keyHint : prov.hint}
+              value={agent.value}
+              model={agent.model}
+              apiKey={agent.apiKey ?? ''}
+              detected={showDetectedKey}
+              hasSavedKey={savedReady}
+              busy={agent.status === 'verifying'}
+              focusKey={keyOverrides.has(agent.provider)}
+              canSave={Boolean(onSave)}
+              outcome={proof?.status ?? null}
+              onChange={changeConnection}
+              onSave={saveConfiguration}
+              onOverride={() => setKeyOverrides((current) => new Set(current).add(agent.provider))}
+            />
           )}
 
           {!demoMode &&
@@ -444,83 +408,8 @@ export function StepAgent({
               </div>
             )}
 
-          {!demoMode && agent.method === 'url' && (
-            <div>
-              <label className={c.fieldLabel} htmlFor="welcome-agent-api-key">
-                API key (optional)
-              </label>
-              <div className={c.field}>
-                <input
-                  id="welcome-agent-api-key"
-                  name="agentApiKey"
-                  className={c.fieldInput}
-                  type="password"
-                  autoComplete="off"
-                  spellCheck={false}
-                  placeholder={
-                    savedReady
-                      ? 'Saved key; enter a replacement'
-                      : 'Leave blank for a keyless server'
-                  }
-                  value={agent.apiKey ?? ''}
-                  onChange={(event) => {
-                    onCredentialEdit?.();
-                    setAgent((current) => ({
-                      ...current,
-                      apiKey: event.target.value,
-                      status: 'idle',
-                    }));
-                  }}
-                  aria-label={`${prov.name} API key`}
-                />
-              </div>
-            </div>
-          )}
-
-          {!demoMode && agent.method === 'url' && (
-            <div>
-              <label className={c.fieldLabel} htmlFor="welcome-agent-model">
-                Model
-              </label>
-              <div className={c.field}>
-                <input
-                  id="welcome-agent-model"
-                  name="agentModel"
-                  className={c.fieldInput}
-                  type="text"
-                  autoComplete="off"
-                  spellCheck={false}
-                  placeholder="qwen3, llama3.3, gemma3…"
-                  value={agent.model}
-                  onChange={(event) => {
-                    onCredentialEdit?.();
-                    setAgent((current) => ({
-                      ...current,
-                      model: event.target.value,
-                      status: 'idle',
-                    }));
-                  }}
-                  aria-label={`${prov.name} model name`}
-                />
-              </div>
-              <div className={c.locknote}>
-                <Glyph name="spark" size={15} />
-                The model ID served by this endpoint.
-              </div>
-            </div>
-          )}
-
           {saveError && (
             <p role="alert">Could not save the configuration. Review the settings and try again.</p>
-          )}
-          {!demoMode && agent.method === 'url' && (
-            <button
-              className={`${t.btn} ${t.btnGhost}`}
-              disabled={saveDisabled}
-              onClick={saveConfiguration}
-            >
-              {proof ? 'Saved' : 'Save configuration'}
-            </button>
           )}
           {!demoMode && agent.status === 'verifying' && (
             <div className={`${c.statusPill} ${c.statusPillVerifying}`}>

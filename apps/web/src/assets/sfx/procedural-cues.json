@@ -1,0 +1,122 @@
+{
+  "method": "Original oscillators and seeded noise. No input recordings.",
+  "generatorSha256": "0bbfa959ddf08c3c3dcc08fd076540b50de45f70b5de863551889edd443af5cb",
+  "ffmpeg": "ffmpeg version 8.0.1 Copyright (c) 2000-2025 the FFmpeg developers",
+  "files": [
+    {
+      "file": "laugh-track.mp3",
+      "sha256": "2e7eaff3003c6537e9a5f2d91bdc4593ad861d9091f84011f8c0b6a88d2f51aa",
+      "frames": 110250,
+      "durationSeconds": 2.5,
+      "pcmSha256": "6d6102e2c233c766c6e63997de2a4c8e6c7c9b260a54391502055e8764ed5f07",
+      "meanSquare": 0.01294630362709601,
+      "probe": {
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "mp3",
+            "sample_rate": "44100",
+            "channels": 1,
+            "bit_rate": "128000"
+          }
+        ],
+        "format": {
+          "duration": "2.500000"
+        }
+      }
+    },
+    {
+      "file": "music-sting.mp3",
+      "sha256": "da7ede1284bf2b000d041950e2f1719f7f079a6b775da99922ccd3cfd6a0ca91",
+      "frames": 66150,
+      "durationSeconds": 1.5,
+      "pcmSha256": "3aa229731ebf8b43b46ea9aec4709e6642bf018ebd0a8d237dea7c01007328a9",
+      "meanSquare": 0.011234480822843885,
+      "probe": {
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "mp3",
+            "sample_rate": "44100",
+            "channels": 1,
+            "bit_rate": "128000"
+          }
+        ],
+        "format": {
+          "duration": "1.500000"
+        }
+      }
+    },
+    {
+      "file": "applause.mp3",
+      "sha256": "12bc6e05a69cbbad975b02faaeec42a7f2742c9babb591abe46675eb66470018",
+      "frames": 110250,
+      "durationSeconds": 2.5,
+      "pcmSha256": "f3c2b4fb044eb22a3ea871fee8d99f5ae3f5102f866ec7239b9b5328b3de8843",
+      "meanSquare": 0.0070678858752845535,
+      "probe": {
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "mp3",
+            "sample_rate": "44100",
+            "channels": 1,
+            "bit_rate": "128000"
+          }
+        ],
+        "format": {
+          "duration": "2.500000"
+        }
+      }
+    },
+    {
+      "file": "comedic-hit.mp3",
+      "sha256": "f87aedd25f26660db0dfa07a83670212041420d5156e167fa44c0234d8908b53",
+      "frames": 22050,
+      "durationSeconds": 0.5,
+      "pcmSha256": "dd40bc0641e6b4f21133493506e55226d0c50eeb91f43428c368d643c469c966",
+      "meanSquare": 0.023327957919201787,
+      "probe": {
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "mp3",
+            "sample_rate": "44100",
+            "channels": 1,
+            "bit_rate": "128000"
+          }
+        ],
+        "format": {
+          "duration": "0.500000"
+        }
+      }
+    },
+    {
+      "file": "rim-shot.mp3",
+      "sha256": "47a9629579e0e62cb71a19e6df774d1002ca3c3d6df291ddeab1ac7012705746",
+      "frames": 44100,
+      "durationSeconds": 1.0,
+      "pcmSha256": "1b3bb2414c3b05b3c206fcc2f19b864365db55c52a2169f91f52dd32046677c7",
+      "meanSquare": 0.007386585261336412,
+      "probe": {
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "mp3",
+            "sample_rate": "44100",
+            "channels": 1,
+            "bit_rate": "128000"
+          }
+        ],
+        "format": {
+          "duration": "1.000000"
+        }
+      }
+    }
+  ]
+}

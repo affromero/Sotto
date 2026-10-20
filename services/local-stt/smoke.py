@@ -1,4 +1,4 @@
-"""Whole-utterance synthetic speech check through the real local STT API."""
+"""Whole-utterance recording check through the real local STT API."""
 
 import argparse
 import hashlib
@@ -14,6 +14,110 @@ import unicodedata
 import urllib.request
 import wave
 from pathlib import Path
+from typing import TypedDict
+
+
+class SpeechSample(TypedDict):
+    id: str
+    speaker: str
+    sha256: str
+    sampleRate: int
+    audioSeconds: float
+    referenceText: str
+
+
+def load_samples(directory: Path) -> list[SpeechSample]:
+    manifest = json.loads((directory / "manifest.json").read_bytes())
+    if (
+        type(manifest.get("version")) is not int
+        or manifest["version"] != 1
+        or manifest.get("language") != "de"
+    ):
+        raise ValueError("Unsupported speech fixture manifest.")
+    samples = manifest.get("samples")
+    if not isinstance(samples, list) or not 2 <= len(samples) <= 32:
+        raise ValueError("Qualification requires 2 to 32 declared recordings.")
+    identifiers: set[str] = set()
+    speakers: set[str] = set()
+    hashes: set[str] = set()
+    recordings: set[str] = set()
+    for sample in samples:
+        if not isinstance(sample, dict):
+            raise TypeError("Invalid speech fixture entry.")
+        identifier = sample.get("id")
+        if (
+            not isinstance(identifier, str)
+            or not re.fullmatch(r"[a-z][a-z0-9-]{0,63}", identifier)
+            or identifier in identifiers
+        ):
+            raise ValueError("Recording IDs must be unique safe filenames.")
+        speaker = sample.get("speaker")
+        text = sample.get("referenceText")
+        if (
+            not isinstance(speaker, str)
+            or not speaker.strip()
+            or len(speaker) > 64
+            or not isinstance(text, str)
+            or not words(text)
+            or len(text) > 1000
+        ):
+            raise ValueError("Declare a speaker and bounded transcript.")
+        for field in ("sha256", "sourceSha256"):
+            value = sample.get(field)
+            if not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value):
+                raise ValueError("Declare complete recording hashes.")
+        source = sample.get("source")
+        if (
+            sample.get("license") != "CC0-1.0"
+            or not isinstance(source, str)
+            or not re.fullmatch(
+                r"https://raw\.githubusercontent\.com/[^/]+/[^/]+/[0-9a-f]{40}/.+",
+                source,
+            )
+            or not isinstance(sample.get("provenance"), str)
+            or not sample["provenance"].startswith("https://")
+        ):
+            raise ValueError("Record immutable source and public provenance.")
+        path = directory / f"{identifier}.wav"
+        if path.is_symlink() or not path.is_file() or path.stat().st_size > 10_000_000:
+            raise ValueError("Use bounded regular recording files.")
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        if digest != sample["sha256"] or digest in hashes:
+            raise ValueError("A recording changed or was duplicated.")
+        with wave.open(str(path), "rb") as audio:
+            if (
+                audio.getnchannels() != 1
+                or audio.getsampwidth() != 2
+                or audio.getcomptype() != "NONE"
+            ):
+                raise ValueError("Recordings must be mono 16-bit PCM WAV.")
+            rate = audio.getframerate()
+            frames = audio.getnframes()
+            pcm = audio.readframes(frames)
+            if not 8000 <= rate <= 96000 or frames == 0 or len(pcm) != frames * 2:
+                raise ValueError("Recording PCM is truncated or empty.")
+            recording = hashlib.sha256(str(rate).encode() + b":" + pcm).hexdigest()
+            if recording in recordings:
+                raise ValueError("A decoded recording was duplicated.")
+            duration = frames / rate
+        declared_duration = sample.get("audioSeconds")
+        if (
+            type(sample.get("sampleRate")) is not int
+            or rate != sample["sampleRate"]
+            or not 8000 <= rate <= 96000
+            or type(declared_duration) not in (int, float)
+            or not math.isfinite(declared_duration)
+            or not 0 < duration <= 60
+            or abs(duration - declared_duration) >= 0.001
+        ):
+            raise ValueError("Recording rate or duration differs from its manifest.")
+        identifiers.add(identifier)
+        speakers.add(speaker)
+        hashes.add(digest)
+        recordings.add(recording)
+    if len(speakers) < 2:
+        raise ValueError("Qualification requires at least two speakers.")
+    return samples
 
 
 def sha256(path: Path) -> str:
@@ -28,7 +132,7 @@ def response_errors(raw: dict, expected_text: str, duration: float) -> list[str]
     errors = []
     text = raw.get("text")
     if not isinstance(text, str) or words(text) != words(expected_text):
-        errors.append("Whole utterance differs from the declared synthesis text.")
+        errors.append("Whole utterance differs from the declared reference text.")
     for key, text_key in (("words", "word"), ("segments", "text")):
         parts = raw.get(key)
         if not isinstance(parts, list) or not parts:
@@ -69,29 +173,15 @@ def main() -> None:
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--audio-directory", type=Path, required=True)
-    parser.add_argument("--piper-receipt", type=Path, required=True)
-    parser.add_argument("--expected-text", required=True)
     parser.add_argument("--output-directory", type=Path, required=True)
     args = parser.parse_args()
     os.umask(0o077)
-    if not words(args.expected_text) or len(args.expected_text) > 1000:
-        raise ValueError("Declare a nonempty, bounded public synthesis utterance.")
     args.output_directory.mkdir(parents=True, exist_ok=True)
     if any(args.output_directory.iterdir()):
         raise ValueError("Use a fresh directory to preserve earlier evidence.")
     output = args.output_directory
-    piper = json.loads(args.piper_receipt.read_bytes())
-    assert piper["engine"] == "piper"
-    assert piper["referenceText"] == args.expected_text
-    samples = [sample for sample in piper["measurements"] if sample["warm"]]
-    assert 2 <= len(samples) <= 32
-    assert len({sample["voiceId"] for sample in samples}) == len(samples)
-    assert len({sample["sha256"] for sample in samples}) == len(samples)
-    audio_files = sorted(
-        args.audio_directory.glob("voice-*.wav"),
-        key=lambda path: int(path.stem.split("-")[1]),
-    )
-    assert len(audio_files) == len(samples)
+    samples = load_samples(args.audio_directory)
+    audio_files = [args.audio_directory / f"{sample['id']}.wav" for sample in samples]
     provenance = json.loads(
         Path("/home/ubuntu/speaches/sotto-model-provenance.json").read_bytes()
     )
@@ -171,11 +261,13 @@ def main() -> None:
                 raw_path.write_text(
                     json.dumps(raw, ensure_ascii=False, indent=2) + "\n"
                 )
-                errors = response_errors(raw, args.expected_text, duration)
-                failures.extend(f"{sample['voiceId']}: {error}" for error in errors)
+                errors = response_errors(raw, sample["referenceText"], duration)
+                failures.extend(f"{sample['id']}: {error}" for error in errors)
                 rows.append(
                     {
-                        "voiceId": sample["voiceId"],
+                        "sampleId": sample["id"],
+                        "speaker": sample["speaker"],
+                        "referenceText": sample["referenceText"],
                         "audioName": path.name,
                         "audioSha256": sample["sha256"],
                         "audioSeconds": duration,
@@ -229,12 +321,11 @@ def main() -> None:
     if not 0 < peak < 2147483648 or not 0 < rss < 2147483648:
         failures.append("STT memory exceeded the 2GiB qualification gate.")
     receipt = {
-        "version": 1,
-        "qualification": "Task-specific synthetic oral pipeline, not human pronunciation or general German ASR accuracy.",
+        "version": 2,
+        "qualification": f"{len(samples)} public German recordings from {len({sample['speaker'] for sample in samples})} speakers. This does not establish general ASR accuracy or assess pronunciation.",
         "qualificationPassed": not failures,
-        "referenceText": args.expected_text,
         "modelProvenance": provenance,
-        "piperReceiptSha256": sha256(args.piper_receipt),
+        "fixtureManifestSha256": sha256(args.audio_directory / "manifest.json"),
         "rows": rows,
         "failures": failures,
         "memoryPeakBytes": peak,

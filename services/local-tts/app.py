@@ -1,5 +1,5 @@
 """
-Local speech sidecar with explicitly selected Kokoro or German Piper engines.
+Private-network Kokoro speech sidecar.
 
 The existing Kokoro provider and generic Local provider use this private-network
 HTTP service. No cloud credential is needed. Engine selection never changes
@@ -15,7 +15,7 @@ GET /voices
     Response JSON: { "voices": [ { "id": str, "language": str, "label": str }, ... ] }
 
 GET /health
-    Response JSON: { "status": "ok", "engine": "kokoro" | "piper" }
+    Response JSON: { "status": "ok", "engine": "kokoro" }
 
 Kokoro voices follow the `{lang}{gender}_{name}` convention. The first letter of
 the voice id selects the Kokoro pipeline language code (`a` = American English,
@@ -28,9 +28,7 @@ from __future__ import annotations
 import io
 import logging
 import os
-from contextlib import asynccontextmanager
 from functools import cache
-from pathlib import Path
 
 import numpy as np
 import soundfile as sf
@@ -156,23 +154,10 @@ def _synthesize(text: str, voice: str) -> np.ndarray:
 
 def create_app() -> FastAPI:
     engine = os.environ.get("LOCAL_TTS_ENGINE", "kokoro")
-    if engine not in ("kokoro", "piper"):
-        raise ValueError("Unknown local TTS engine.")
+    if engine != "kokoro":
+        raise ValueError("This bundled sidecar supports only Kokoro.")
 
-    @asynccontextmanager
-    async def lifespan(application: FastAPI):
-        if engine == "piper":
-            from piper_backend import PiperBackend
-
-            path = Path(
-                os.environ.get(
-                    "PIPER_VOICE_MANIFEST", "/opt/piper/models/manifest.json"
-                )
-            )
-            application.state.piper = PiperBackend(path)
-        yield
-
-    application = FastAPI(title="Sotto Local TTS", version="1.0.0", lifespan=lifespan)
+    application = FastAPI(title="Sotto Local TTS", version="1.0.0")
 
     @application.get("/health")
     def health() -> JSONResponse:
@@ -180,26 +165,10 @@ def create_app() -> FastAPI:
 
     @application.get("/voices")
     def voices() -> JSONResponse:
-        catalogue = application.state.piper.catalogue() if engine == "piper" else VOICES
-        return JSONResponse({"voices": catalogue})
+        return JSONResponse({"voices": VOICES})
 
     @application.post("/tts")
     def tts(req: TtsRequest) -> Response:
-        if engine == "piper":
-            from piper_backend import PiperRequestError
-
-            try:
-                data = application.state.piper.synthesize(
-                    req.text, req.voice, req.language, req.model
-                )
-            except PiperRequestError as error:
-                raise HTTPException(status_code=400, detail=str(error)) from error
-            except Exception as error:
-                logger.error("Piper synthesis failed: %s", type(error).__name__)
-                raise HTTPException(
-                    status_code=500, detail="Local speech synthesis failed."
-                ) from error
-            return Response(content=data, media_type="audio/wav")
         voice = req.voice or DEFAULT_VOICE
         if not any(item["id"] == voice for item in VOICES):
             raise HTTPException(status_code=400, detail="Unknown Kokoro voice.")

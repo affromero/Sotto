@@ -5,7 +5,8 @@ import { OwnedCredentialConflictError } from 'thesidedoor-core/configuration/own
 import type { Prisma, PrismaClient } from '@/generated/prisma/client';
 import type { AuthenticatedRequest } from '@/lib/api-keys';
 import {
-  captureConfiguredSottoCredentialProbe,
+  bindSottoCredentialProbe,
+  captureConfiguredSottoCredentialDestination,
   validateSottoCredentialProbe,
 } from '@/lib/providers/shared/credential-validation';
 import {
@@ -123,17 +124,17 @@ export async function saveSottoCredential(
           throw new AccessError('invalid', 'Provider credentials are required');
         values = edit.values;
       }
-      const probe = await captureConfiguredSottoCredentialProbe(
+      const destination = await captureConfiguredSottoCredentialDestination(
         tx,
         input.scope,
-        input.provider,
-        values
+        input.provider
       );
+      const probe = bindSottoCredentialProbe(destination, values);
       if (probe.kind === 'unsupported')
         throw new AccessError('invalid', 'This provider does not use saved API credentials');
       if (
-        input.provider === 'local' &&
-        input.scope === 'ai' &&
+        destination.kind === 'api' &&
+        destination.requiresEndpointReview &&
         input.expectedEndpoint !== probe.binding.endpoint
       )
         throw new OwnedCredentialConflictError();
@@ -155,7 +156,6 @@ export async function saveSottoCredential(
       return {
         probe,
         prepared,
-        values,
         instanceId: storage.instance.instanceId,
         owner: storage.owner,
       };
@@ -180,11 +180,10 @@ export async function saveSottoCredential(
           storage.owner.generation !== captured.owner.generation
         )
           throw new OwnedCredentialConflictError();
-        const current = await captureConfiguredSottoCredentialProbe(
+        const current = await captureConfiguredSottoCredentialDestination(
           tx,
           input.scope,
-          input.provider,
-          captured.values
+          input.provider
         );
         if (
           current.kind === 'unsupported' ||

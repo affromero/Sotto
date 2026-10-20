@@ -137,26 +137,41 @@ suite('canonical credential validation with PostgreSQL', () => {
     expect(await jobs('notifications')).toEqual([]);
   });
 
-  it('does not send a local key to a changed endpoint during queued verification', async () => {
-    await setSiteConfig({ aiBaseUrl: 'http://localhost:11434/v1' }, ownerId, instance.database);
-    await instance.seedAiCredential(ownerId, 'local', 'local-secret');
-    await scheduleCredentialValidationPage(instance.database, null);
-    const work = (await jobs('key-validation')).find(
-      (record) => credentialValidationPayloadSchema.parse(record.job.payload).provider === 'local'
-    )!;
-    await setSiteConfig({ aiBaseUrl: 'http://localhost:9999/v1' }, ownerId, instance.database);
-    const fetch = vi.fn();
-    vi.stubGlobal('fetch', fetch);
-    await processCredentialValidation(instance.database, queued(work));
-    expect(fetch).not.toHaveBeenCalled();
-    const selected = await sottoTransaction(instance.database, (tx) =>
-      resolveSottoProfileCredential(tx, ownerId, 'ai', 'local', false)
-    );
-    expect(selected?.credential).toMatchObject({
-      availability: 'enabled',
-      verification: { lastAttempt: { status: 'inconclusive' } },
-    });
-  });
+  it.each(['before execution', 'during response'] as const)(
+    'discards compatible validation when configuration changes %s',
+    async (movement) => {
+      const destination = 'http://localhost:18221/v1';
+      const moved = 'http://localhost:18222/v1';
+      await setSiteConfig({ aiBaseUrl: destination }, ownerId, instance.database);
+      await instance.seedAiCredential(ownerId, 'local', 'queued-destination-key');
+      await scheduleCredentialValidationPage(instance.database, null);
+      const scheduled = (await jobs('key-validation')).find(
+        (job) => credentialValidationPayloadSchema.parse(job.job.payload).provider === 'local'
+      );
+      if (!scheduled) throw new Error('Local validation was not queued');
+      const contacted: string[] = [];
+      vi.stubGlobal('fetch', async (input: RequestInfo | URL, options?: RequestInit) => {
+        const outgoing = new Request(input, options);
+        contacted.push(outgoing.url);
+        expect(outgoing.headers.get('authorization')).toBe('Bearer queued-destination-key');
+        await setSiteConfig({ aiBaseUrl: moved }, ownerId, instance.database);
+        return Response.json({}, { status: 401 });
+      });
+      if (movement === 'before execution')
+        await setSiteConfig({ aiBaseUrl: moved }, ownerId, instance.database);
+      await processCredentialValidation(instance.database, queued(scheduled));
+      expect(contacted).toEqual(movement === 'before execution' ? [] : [destination + '/models']);
+      const unchanged = await sottoTransaction(instance.database, (tx) =>
+        resolveSottoProfileCredential(tx, ownerId, 'ai', 'local', false)
+      );
+      expect(unchanged?.credential).toMatchObject({
+        availability: 'enabled',
+        binding: { endpoint: destination },
+        verification: { lastAttempt: { status: 'inconclusive' } },
+      });
+      expect(await jobs('notifications')).toEqual([]);
+    }
+  );
 
   it('attributes a rejected shared credential to its owner without disabling recipient credentials', async () => {
     const recipient = await identity.household('Shared recipient');
