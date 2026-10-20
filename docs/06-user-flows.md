@@ -1,6 +1,6 @@
 # User Flows - Sotto
 
-**Date:** 2026-10-15
+**Date:** 2026-10-20
 
 **Summary:** End-to-end learner and operator flows for starting a self-hosted Sotto instance, creating a course, taking classes, using iPad workbooks, connecting devices, and maintaining the private learning stack.
 
@@ -8,21 +8,23 @@
 
 ## Flow Map
 
-| Goal                           | Start Here                                                 | Main Surface                                                  | Output                                                       |
-| ------------------------------ | ---------------------------------------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------ |
-| Run Sotto without cloning      | One-command installer                                      | Desktop browser at `http://localhost:3000` or your server URL | Running web app, workers, Postgres, Redis, and local storage |
-| Run Sotto from source          | `npm run setup` then `npm run dev`                         | Local development server                                      | Local OSS stack with `.env.local`                            |
-| Deploy to a VPS                | [03-self-host-deployment.md](./03-self-host-deployment.md) | Your domain through Caddy                                     | Production self-hosted instance                              |
-| Create the first course        | `/welcome` or `/learn/placement`                           | Placement wizard                                              | `Course` plus `PlacementResult`                              |
-| Start normal class progression | `/learn` -> `Take a class`                                 | `/learn/class/[classId]`                                      | Mastery-gated `CourseClass`                                  |
-| Build a class from a source    | `/learn` -> `Class about...`                               | Link/topic entry on the course card                           | CEFR-leveled sourced class                                   |
-| Study on iPad                  | Class hub/history -> `iPad workbook`                       | `/classes/[classId]/worksheet`                                | Printable/annotatable workbook with web deep links           |
-| Sharpen one skill              | `/learn/practice`                                          | Practice panel                                                | Ungated practice session and SRS updates                     |
-| Rehearse before live speaking  | `/learn/practice` or `/learn/live`                         | Practice runner or live conversation                          | Private attempts and follow-up vocabulary                    |
-| Review memory                  | `/memory`                                                  | Cytoscape graph                                               | Course-scoped vocab/grammar SRS view                         |
-| Take a mock exam               | `/learn/exams?course=...`                                  | Exam runner                                                   | Self-assessment score and feedback                           |
-| Pair clients and devices       | `/settings/devices`                                        | QR pairing/API keys                                           | `sk_sotto_` key for TUI, agents, scripts, or app clients     |
-| Plan teacher-run practice      | `/profiles`                                                | Student profile picker                                        | Isolated student profiles today; homework mode planned       |
+| Goal                           | Start Here                                                 | Main Surface                                                  | Output                                                                                   |
+| ------------------------------ | ---------------------------------------------------------- | ------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Run Sotto without cloning      | One-command installer                                      | Desktop browser at `http://localhost:3000` or your server URL | Running web app, workers, Postgres, Redis, and local storage                             |
+| Run Sotto from source          | `npm run setup` then `npm run dev`                         | Local development server                                      | Local OSS stack with `.env.local`                                                        |
+| Deploy to a VPS                | [03-self-host-deployment.md](./03-self-host-deployment.md) | Your domain through Caddy                                     | Production self-hosted instance                                                          |
+| Create the first course        | `/welcome` or `/learn/placement`                           | Placement wizard                                              | `Course` plus `PlacementResult`                                                          |
+| Start normal class progression | `/learn` -> `Take a class`                                 | `/learn/class/[classId]`                                      | Mastery-gated `CourseClass`                                                              |
+| Build a class from a source    | `/learn` -> `Class about...`                               | Link/topic entry on the course card                           | CEFR-leveled sourced class                                                               |
+| Study on iPad                  | Class hub/history -> `iPad workbook`                       | `/classes/[classId]/worksheet`                                | Printable/annotatable workbook with web deep links                                       |
+| Sharpen one skill              | `/learn/practice`                                          | Practice panel                                                | Ungated practice session and SRS updates                                                 |
+| Track level requirements       | Course card -> `Learning map`                              | `/learn/map?course=...`                                       | Separate Situations and Grammar trees, exact missing objectives and explicit advancement |
+| Revisit an uploaded class      | Course notes -> analyze materials -> learning map          | Classes from your materials                                   | Saved source focuses and repeated focused practice                                       |
+| Rehearse before live speaking  | `/learn/practice` or `/learn/live`                         | Practice runner or live conversation                          | Private attempts and follow-up vocabulary                                                |
+| Review memory                  | `/memory`                                                  | Cytoscape graph                                               | Course-scoped vocab/grammar SRS view                                                     |
+| Take a mock exam               | `/learn/exams?course=...`                                  | Exam runner                                                   | Self-assessment score and feedback                                                       |
+| Pair clients and devices       | `/settings/devices`                                        | QR pairing/API keys                                           | `sk_sotto_` key for TUI, agents, scripts, or app clients                                 |
+| Plan teacher-run practice      | `/profiles`                                                | Student profile picker                                        | Isolated student profiles today; homework mode planned                                   |
 
 ### End-to-end learner journey
 
@@ -181,13 +183,13 @@ If the welcome wizard is already complete, use `/learn` -> `+ Start a new course
 
 ### Placement options
 
-| Option           | UI Label                         | Best For                                           | Result                                                                   |
-| ---------------- | -------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------ |
-| Adaptive quiz    | `Take the placement test`        | New learner with no material to import             | Generates questions, submits answers, creates or raises the course level |
-| Materials import | `I have materials from my level` | Learner with notes, lessons, writing, or files     | Deduces level, offers `Start here` or `Verify with a few questions`      |
-| Manual level     | `I already know my level`        | Fast start when the learner knows their CEFR level | Creates the course at the chosen level                                   |
+| Option           | UI Label                         | Best For                                           | Result                                                                           |
+| ---------------- | -------------------------------- | -------------------------------------------------- | -------------------------------------------------------------------------------- |
+| Adaptive quiz    | `Take the placement test`        | New learner with no material to import             | Generates questions, submits answers, chooses the initial level for a new course |
+| Materials import | `I have materials from my level` | Learner with notes, lessons, writing, or files     | Deduces level, offers `Start here` or `Verify with a few questions`              |
+| Manual level     | `I already know my level`        | Fast start when the learner knows their CEFR level | Creates the course at the chosen level                                           |
 
-Placement can raise a learner's current course level. It should not lower a level the learner has already reached.
+Placement chooses a new course's starting level. An existing course keeps its level and placement provenance. Further advancement uses the learning map's requirements.
 
 ### Course context
 
@@ -206,14 +208,19 @@ sequenceDiagram
     L->>W: Open /welcome or /learn/placement
     W->>L: Choose quiz, materials, or manual level
     alt Adaptive quiz
-        W->>P: GET /api/v1/placement
-        P-->>W: CEFR questions
+        W->>P: POST /api/v1/placement/generate
+        P-->>W: Retained placement session
+        W->>P: GET /api/v1/placement?placementSessionId={sessionId}
+        P-->>W: Exact questions and question digest
         L->>W: Submit answers
         W->>P: POST /api/v1/placement
     else Materials path
         L->>W: Paste or upload materials
-        W->>P: POST /api/v1/placement/from-notes/upload
-        P-->>W: Deduced level
+        W->>P: Reserve and send checksum-verified material parts
+        W->>P: POST /api/v1/placement/from-notes with retained material IDs
+        P-->>W: Retained source-analysis ID
+        W->>P: GET /api/v1/material-analyses/{analysisId}
+        P-->>W: Coverage and supported level estimate
         L->>W: Start here or verify
         W->>P: POST /api/v1/placement/from-notes/confirm
     else Manual path
@@ -237,7 +244,8 @@ Start from `/learn`.
 5. Begin or resume the class.
 6. Complete each generated section.
 7. Submit the class.
-8. If passed, the course can advance.
+8. If passed, continue classes within the current band. Open the learning map
+   to complete the band when all pinned requirements are met.
 9. If failed, regenerate the failed sections and try again.
 
 The class runner handles grammar, reading, listening, speaking, and writing sections when the generated class includes them. The web class is the source of truth for audio playback, microphone recording, writing submission, grading, regeneration, and progress.
@@ -267,6 +275,70 @@ stateDiagram-v2
     NoActiveClass --> SourcedGenerating: Class about link or topic
     SourcedGenerating --> Available: extraction + leveling finish
 ```
+
+### Learning map and level review
+
+An A2 placement opens A2 requirements. Every precise objective begins as
+unassessed until eligible practice or class results provide evidence. The map
+has independent Situations and Grammar branches. You can practise ordering food
+without choosing a grammar topic, practise a grammatical structure by itself,
+or combine both in one class.
+
+Expand a group to see its objectives, examples and skill criteria. The current
+level lists everything still required before the next band. An objective can
+be confident and due for review at the same time. Open assessment history to
+see the observations behind its status.
+
+Search titles, examples or grammar aliases, then filter by branch, requirement,
+evidence, skill or review due date. These filters keep each objective's ancestor
+path visible and distinguish shown objectives from whole-level progress.
+Objective links and these filters survive reloads.
+
+Select a lower level to refresh it at that difficulty. Your current level and
+unfinished class stay saved. Higher levels can be previewed. Choose objectives
+or a broader group to generate a focused class; generating another class later
+creates another practice opportunity. A class score alone does not bypass
+missing level requirements. When the map shows readiness, explicitly advance
+one band. C2 completion retains C2 and remains available for review.
+
+### Uploaded materials and saved source classes
+
+In Course notes, choose original files and upload them. Originals are separate
+from editable notes. A lost connection retains verified progress. To resume in
+the browser, select the same files in the same order; saved checksums verify
+the remaining transfer. Before course creation, Open saved analysis retrieves
+an admitted analysis without asking for the original files again.
+
+Processing shows every page's extraction and recognition state. Scans and
+handwriting require explicit visual recognition using the configured model.
+Review the coverage before accepting a partial level estimate. Material
+content indicates teaching exposure and never grants mastery automatically.
+
+Analyze selected course materials, then open Classes from your materials in
+the learning map. Each saved focus has source citations and coverage. Preview
+it alone or add precise canonical objectives, then choose an available practice
+format. Source-only practice gives private feedback. Explicitly selected
+objectives require their own eligible assessments for progress.
+
+Selecting a source class marks its exact mapped objectives in the tree and
+offers a filter for them. These marks describe the selected class only and
+clear when the source, level or course changes or the page reloads. PDF citations
+open the retained original at the cited page in a supporting browser. Other
+source files remain available to download. Languages awaiting a published tree
+can still open and practise their saved source classes.
+
+Stop waiting leaves background work admitted. Cancel source analysis stops
+future chunks; an already admitted provider request may finish. If the outcome
+or cleanup is unknown, the screen keeps that state visible. Optional verified
+compression offers a smaller download only when every page passes comparison.
+The full original remains available.
+
+Older imports may have retained text without a verified original checksum or a
+page ledger. Read their text explicitly from Course notes. For new page processing,
+download the retained original if available, then upload it through Upload
+originals as a new material. Keep the older material and its existing source
+links. If no original is available, obtain the source file before re-uploading;
+the retained text cannot recreate missing pages or prove original file integrity.
 
 ## 5. Sourced Class Flow
 
