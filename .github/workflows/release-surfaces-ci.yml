@@ -283,6 +283,7 @@ jobs:
           -scheme Sotto
           -destination "platform=iOS Simulator,id=$SOTTO_IPHONE_SIMULATOR"
           -destination "platform=iOS Simulator,id=$SOTTO_IPAD_SIMULATOR"
+          -maximum-concurrent-test-simulator-destinations 1
           -resultBundlePath "$RUNNER_TEMP/sotto-ios-results.xcresult"
           CODE_SIGN_IDENTITY=-
       - name: Preserve failed iOS test results
