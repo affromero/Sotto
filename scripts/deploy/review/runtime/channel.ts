@@ -7,11 +7,15 @@ import { z } from 'zod';
 import {
   captureReviewFirstWorkerEvidence,
   inspectReviewFirstWorker,
+  inspectReviewContinuation,
+  inspectReviewPausedFirstWorker,
+  inspectReviewPausedConsumers,
   inspectReviewRedisEmpty,
   prepareReviewQueues,
   type ReviewQueueRuntime,
 } from '../first-worker';
 import { runReviewReadiness } from '../readiness';
+import { REVIEW_WORKLOAD_TIMEOUT_MS, runReviewWorkloads } from './workload';
 import { ALL_QUEUE_NAMES } from '../../../../apps/web/src/lib/queue';
 import { prismaUnfiltered } from '../../../../apps/web/src/lib/prisma';
 import { SIDEDOOR_STATE_ID } from '../../../../apps/web/src/lib/sidedoor/access/state/store';
@@ -24,7 +28,17 @@ import {
 
 const initialSchema = z
   .object({
-    mode: z.enum(['capture', 'inspect', 'prepare', 'providers', 'queues']),
+    mode: z.enum([
+      'capture',
+      'inspect',
+      'prepare',
+      'providers',
+      'queues',
+      'continuation',
+      'consumers',
+      'workloads',
+      'paused-admission',
+    ]),
     input: z.unknown(),
     checkpoint: z.unknown().optional(),
   })
@@ -97,7 +111,11 @@ export async function main(): Promise<void> {
       lines.close();
       process.stdin.destroy();
     },
-    initial.mode === 'providers' ? 310_000 : 90_000
+    initial.mode === 'workloads'
+      ? REVIEW_WORKLOAD_TIMEOUT_MS + 10_000
+      : initial.mode === 'providers'
+        ? 310_000
+        : 90_000
   );
   let redis: Redis | null = null;
   try {
@@ -109,6 +127,12 @@ export async function main(): Promise<void> {
         signal: controller.signal,
         assertFence: () => request('fence'),
         persistCheckpoint: (checkpoint) => request('checkpoint', checkpoint),
+      });
+    } else if (initial.mode === 'workloads') {
+      result = await runReviewWorkloads(initial.input, initial.checkpoint, {
+        signal: controller.signal,
+        assertFence: () => request('fence'),
+        persistCheckpoint: (checkpoint) => request('workloadCheckpoint', checkpoint),
       });
     } else {
       assert(
@@ -153,6 +177,20 @@ export async function main(): Promise<void> {
           queues: [...ALL_QUEUE_NAMES].sort().map((name) => ({ name, paused: false })),
         });
         result = await prepareReviewQueues(runtime, initial.input, redis);
+      } else if (initial.mode === 'continuation') {
+        const queue = runtime.createQueue('worksheet-pdf');
+        try {
+          result = await inspectReviewContinuation(prismaUnfiltered, initial.input, queue);
+        } finally {
+          await queue.close();
+        }
+      } else if (initial.mode === 'consumers') {
+        result = await inspectReviewPausedConsumers(runtime, initial.input);
+      } else if (initial.mode === 'paused-admission') {
+        const consumers = { address: '172.30.99.11', paused: true, count: 1 };
+        await inspectReviewPausedConsumers(runtime, consumers);
+        result = await inspectReviewPausedFirstWorker(prismaUnfiltered, initial.input);
+        await inspectReviewPausedConsumers(runtime, consumers);
       } else {
         result = await lifecycle.run(initial.input, runtime);
       }

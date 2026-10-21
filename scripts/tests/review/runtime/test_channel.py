@@ -83,6 +83,35 @@ sys.exit(9)
             self.root / 'provider-checkpoint.json',
         )['credentials'], [{'operationId': 'retained-operation'}])
 
+    def test_workload_intent_is_durable_before_ack_and_survives_lost_result(
+        self,
+    ) -> None:
+        script = '''emit({'type':'workloadCheckpoint','id':1,'value':{
+ 'version':1,'inputHash':'a'*64,'startedAt':123,
+ 'profiles':[{'courseIntent':True},{'courseIntent':False}]}});ack(1)
+with open(CHECKPOINT) as source:
+ assert json.load(source)['profiles'][0]['courseIntent'] is True
+sys.exit(9)
+'''.replace('CHECKPOINT', repr(str(
+            self.root / 'workload-checkpoint.json',
+        )))
+        with self.assertRaisesRegex(ValueError, 'result-unresolved'):
+            self.run_child(script, mode='workloads')
+        retained = self.root / 'workload-checkpoint.json'
+        self.assertEqual(private_json(retained)['startedAt'], 123)
+        self.assertEqual(retained.stat().st_mode & 0o777, 0o600)
+        self.assertNotIn('private-fixture-value', retained.read_text())
+        self.assertEqual(self.fences, 1)
+
+    def test_other_modes_cannot_acknowledge_workload_mutation_intents(
+        self,
+    ) -> None:
+        with self.assertRaisesRegex(ValueError, 'unexpected-workload'):
+            self.run_child('''emit({'type':'workloadCheckpoint','id':1,
+ 'value':{}});ack(1)
+''', mode='paused-admission')
+        self.assertFalse((self.root / 'workload-checkpoint.json').exists())
+
     def test_foreign_event_and_sequence_gap_never_receive_ack(self) -> None:
         for event in [
             {'type': 'checkpoint', 'id': 2, 'value': {}},

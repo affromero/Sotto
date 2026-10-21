@@ -15,7 +15,7 @@ import uuid
 from pathlib import Path
 from typing import ClassVar
 from unittest.mock import patch
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from scripts.deploy.images.metadata import record
 from scripts.deploy.review.build_observer import (
@@ -30,7 +30,9 @@ from scripts.deploy.review.build_observer import (
 )
 from scripts.deploy.review.preflight import validate_bundle
 from scripts.deploy.review.runtime.channel import exchange
+from scripts.deploy.review.runtime.services import PRESERVATION_OBSERVER
 from scripts.deploy.review.state import DeploymentLock
+from scripts.deploy.review.topology import rows
 
 ROOT = Path(__file__).resolve().parents[3]
 SDK_ENV = 'SOTTO_REVIEW_SDK_ARCHIVE'
@@ -354,6 +356,36 @@ m.exports[input.operation](input.options).then(r=>console.log(JSON.stringify(r))
         stages: list[dict[str, object]] = []
         capture_output = ''
         channel_capture: object = None
+        protected_inventory: dict[str, object] | None = None
+
+        def preserve_original_data() -> dict[str, object]:
+            values = dict(line.split('=', 1) for line in
+                          self.env_file.read_text().splitlines())
+            url = urlsplit(values['DATABASE_URL'])
+            query = dict(parse_qsl(url.query))
+            query['options'] = '-c search_path=' + schema
+            values['DATABASE_URL'] = urlunsplit(url._replace(
+                query=urlencode(query),
+            ))
+            env_file = root / 'preservation.env'
+            env_file.write_text(''.join(name+'='+value+'\n'
+                                       for name, value in values.items()))
+            env_file.chmod(0o600)
+            selected = None if protected_inventory is None else [
+                {'table': row['table'], 'columns': row['columns']}
+                for row in rows(protected_inventory['tables'], 'old table')
+            ]
+            result = subprocess.run([
+                'docker', 'run', '--rm', '-i', '--platform', 'linux/amd64',
+                '--read-only', '--cap-drop', 'ALL', '--security-opt',
+                'no-new-privileges', '--user', '1000', '--workdir',
+                '/app/apps/web', '--env-file', str(env_file),
+                '--entrypoint', 'node', IMAGE, '-e', PRESERVATION_OBSERVER,
+            ], input=json.dumps(selected), text=True, capture_output=True,
+                timeout=65)
+            self.assertEqual(result.returncode, 0,
+                             result.stdout + result.stderr)
+            return record(json.loads(result.stdout), 'preserved old data')
 
         def run_runtime(mode: str) -> subprocess.CompletedProcess[str]:
             fixture = root / 'fixture.json'
@@ -412,6 +444,11 @@ m.exports[input.operation](input.options).then(r=>console.log(JSON.stringify(r))
                     ),
                     'options': options,
                 }))
+                actual_inventory = preserve_original_data()
+                if protected_inventory is None:
+                    protected_inventory = actual_inventory
+                else:
+                    self.assertEqual(actual_inventory, protected_inventory)
                 if index == 0:
                     seed = value
                     capture_result = run_runtime('capture')
@@ -534,12 +571,17 @@ m.exports[input.operation](input.options).then(r=>console.log(JSON.stringify(r))
                     ).read_bytes()),
                     'captureBeforeSql': True,
                     'actualPythonNodeCapture': channel_capture is not None,
+                    'allOriginalTablesPreserved': True,
+                    'originalTableInventorySha256': sha(json.dumps(
+                        protected_inventory, sort_keys=True,
+                    ).encode()),
                     'toolSourceSha256': {
                         name: sha((ROOT / name).read_bytes()) for name in (
                             'scripts/deploy/review/first-worker.ts',
                             'scripts/deploy/review/readiness.ts',
                             'scripts/deploy/review/runtime/channel.ts',
                             'scripts/deploy/review/runtime/channel.py',
+                            'scripts/deploy/review/runtime/services.py',
                             'apps/web/tests/lib/deployment/'
                             'review-worksheet-admission.test.ts',
                             'scripts/tests/review/test_observer.py',

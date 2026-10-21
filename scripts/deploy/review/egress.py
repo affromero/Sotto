@@ -5,13 +5,14 @@ from __future__ import annotations
 import ipaddress
 import json
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 
 from scripts.deploy.images.metadata import digest, record
 from scripts.deploy.review.state import checksum
 from scripts.deploy.review.topology import rows
 
 TABLE = 'sotto_review_guard'
+FAMILIES = ('inet', 'bridge')
 RULES_PATH = '/etc/sotto-review/egress.nft'
 UNIT_NAME = 'sotto-review-egress.service'
 BLOCKED = (
@@ -65,41 +66,57 @@ def render_rules(
     ]))
     interface_set = ', '.join(json.dumps(name) for name in sorted(bridges))
     destinations = ', '.join(str(value) for value in blocked)
+    # add permits an existing table. Delete/recreate is one nft transaction.
+    loader = '\n'.join(f'{operation} table {family} {TABLE}'
+                       for operation in ('add', 'delete')
+                       for family in FAMILIES)
+    return loader + '\n' + ''.join(
+        render_table(family, interface_set, destinations)
+        for family in FAMILIES)
+
+
+def render_table(family: str, interfaces: str, destinations: str) -> str:
+    """Share service policy across routed and native bridge packet paths."""
+    bridge = family == 'bridge'
+    ingress = 'meta ibrname' if bridge else 'iifname'
+    egress = 'meta obrname' if bridge else 'oifname'
+    ipv6 = 'ether type ip6' if bridge else 'meta nfproto ipv6'
+    arp = '        ether type arp return\n' if bridge else ''
+    reply = ('        ct direction reply ct state established,related return\n'
+             if bridge else '')
     apps = '{ 172.30.99.10, 172.30.99.11 }'
     responders = '{ 172.30.99.2, 172.30.99.3, 172.30.99.10, 172.30.99.11 }'
-    # add permits an existing table. Delete/recreate is one nft transaction.
-    return f'''add table inet {TABLE}
-delete table inet {TABLE}
-table inet {TABLE} {{
-    set bridges {{ type ifname; elements = {{ {interface_set} }}; }}
+    host_input = '' if bridge else '''    chain review_input {
+        ct direction reply ct state established,related return
+        drop
+    }
+    chain input {
+        type filter hook input priority -10; policy accept;
+        iifname @bridges jump review_input
+    }
+'''
+    return f'''table {family} {TABLE} {{
+    set bridges {{ type ifname; elements = {{ {interfaces} }}; }}
     set blocked {{
         type ipv4_addr; flags interval;
         elements = {{ {destinations} }};
     }}
-    chain review_input {{
-        ct direction reply ct state established,related return
-        drop
-    }}
-    chain review_forward {{
-        ct state invalid drop
-        oifname @bridges ip daddr 172.30.99.3 tcp dport 5432 return
-        oifname @bridges ip daddr 172.30.99.2 tcp dport 6379 return
-        oifname @bridges ip daddr {apps} tcp dport 3000 return
-        oifname @bridges ip saddr {responders} \\
+{host_input}    chain review_forward {{
+{arp}        ct state invalid drop
+{reply}        {egress} @bridges ip daddr 172.30.99.3 tcp dport 5432 return
+        {egress} @bridges ip daddr 172.30.99.2 tcp dport 6379 return
+        {egress} @bridges ip daddr {apps} tcp dport 3000 return
+        {egress} @bridges ip saddr {responders} \\
             ct direction reply ct state established,related return
         ip daddr @blocked drop
-        meta nfproto ipv6 drop
+        {ipv6} drop
         udp dport 53 return
         tcp dport {{ 53, 80, 443 }} return
         drop
     }}
-    chain input {{
-        type filter hook input priority -10; policy accept;
-        iifname @bridges jump review_input
-    }}
     chain forward {{
         type filter hook forward priority -10; policy accept;
-        iifname @bridges jump review_forward
+        {ingress} @bridges jump review_forward
     }}
 }}
 '''
@@ -126,8 +143,9 @@ RequiredBy=docker.service
 def semantic_policy(value: object) -> dict[str, object]:
     envelope = record(value, 'nftables result')
     objects = rows(envelope.get('nftables'), 'nftables object')
-    result: list[dict[str, object]] = []
-    tables = 0
+    result: dict[str, list[dict[str, object]]] = {
+        family: [] for family in FAMILIES}
+    tables: set[str] = set()
     for entry in objects:
         if set(entry) == {'metainfo'}:
             continue
@@ -135,19 +153,45 @@ def semantic_policy(value: object) -> dict[str, object]:
             raise ValueError('Unexpected nftables object')
         kind, raw = next(iter(entry.items()))
         details = record(raw, 'nftables details')
+        family = details.get('family')
         if (
             kind not in {'table', 'chain', 'set', 'rule'}
-            or details.get('family') != 'inet'
+            or not isinstance(family, str) or family not in FAMILIES
             or details.get('name' if kind == 'table' else 'table') != TABLE
         ):
             raise ValueError('Unexpected table in review policy result')
         if kind == 'table':
-            tables += 1
-        result.append({kind: {key: item for key, item in details.items()
-                             if key != 'handle'}})
-    if tables != 1:
-        raise ValueError('Exactly one review guard table is required')
-    return {'nftables': result}
+            if family in tables:
+                raise ValueError('Duplicate review guard table')
+            tables.add(family)
+        result[family].append({kind: {
+            key: item for key, item in details.items() if key != 'handle'}})
+    if tables != set(FAMILIES):
+        raise ValueError('Exactly inet and bridge guard tables are required')
+    return {'nftables': [item for family in FAMILIES
+                         for item in result[family]]}
+
+
+def collect_policy(
+    command: Callable[[Sequence[str]], bytes],
+) -> dict[str, object]:
+    """Collect both guard tables through the controller's admitted boundary."""
+    objects: list[dict[str, object]] = []
+    for family in FAMILIES:
+        envelope = record(json.loads(command([
+            'sudo', '-n', '/usr/sbin/nft', '-j', 'list', 'table',
+            family, TABLE])), 'nftables result')
+        entries = rows(envelope.get('nftables'), 'nftables object')
+        # Validate each response's family before combining the two snapshots.
+        for entry in entries:
+            if set(entry) == {'metainfo'}:
+                continue
+            if len(entry) != 1 or record(
+                    next(iter(entry.values())), 'nftables details',
+            ).get('family') != family:
+                raise ValueError('Collected guard family differs')
+        objects.extend(entries)
+    return semantic_policy({'nftables': objects})
 
 
 def verify_policy(value: object, admitted_hash: str) -> None:

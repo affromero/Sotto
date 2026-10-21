@@ -11,7 +11,7 @@ import time
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 
-from scripts.deploy.images.metadata import record
+from scripts.deploy.images.metadata import digest, record
 from scripts.deploy.review.state import atomic_json
 
 PREFIX = b'SOTTO_REVIEW_IPC='
@@ -27,7 +27,9 @@ def exchange(
     """Keep secrets on stdin and retain uncertain credential operations."""
     if initial.get('mode') not in {
         'inspect', 'prepare', 'providers', 'queues', 'capture',
-    } or not 0 < timeout <= 330:
+        'continuation', 'consumers', 'workloads', 'paused-admission',
+    } or not 0 < timeout <= (3330 if initial.get('mode') == 'workloads'
+                            else 330):
         raise ValueError('bounded-runtime-exchange-required')
     encoded = json.dumps(initial, separators=(',', ':')).encode() + b'\n'
     if len(encoded) > MAX_LINE:
@@ -123,6 +125,25 @@ def exchange(
                         }:
                             raise ValueError('invalid-runtime-checkpoint')
                         atomic_json(directory / 'provider-checkpoint.json',
+                                    checkpoint)
+                    elif kind == 'workloadCheckpoint':
+                        if (initial['mode'] != 'workloads'
+                                or set(message) != {'type', 'id', 'value'}):
+                            raise ValueError('unexpected-workload-checkpoint')
+                        assert_fence()
+                        checkpoint = record(message['value'],
+                                            'workload checkpoint')
+                        if (set(checkpoint) != {
+                            'version', 'inputHash', 'startedAt', 'profiles',
+                        } or type(checkpoint['version']) is not int
+                                or checkpoint['version'] != 1
+                                or type(checkpoint['startedAt']) is not int
+                                or checkpoint['startedAt'] < 0
+                                or not isinstance(checkpoint['profiles'], list)
+                                or len(checkpoint['profiles']) != 2):
+                            raise ValueError('invalid-workload-checkpoint')
+                        digest(checkpoint['inputHash'], 'workload input')
+                        atomic_json(directory / 'workload-checkpoint.json',
                                     checkpoint)
                     else:
                         raise ValueError('unknown-runtime-event')

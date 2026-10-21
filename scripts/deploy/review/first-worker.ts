@@ -15,6 +15,7 @@ import {
   sottoStorageInstance,
 } from '../../../apps/web/src/lib/sidedoor/access/state/store';
 import {
+  readFailedSottoDelivery,
   readSottoWorkerJob,
   sottoJobOutbox,
 } from '../../../apps/web/src/lib/sidedoor/jobs/core/job-delivery';
@@ -155,28 +156,120 @@ async function readOnly<Result>(
   );
 }
 
-/** Both capture and revalidation use one canonical READ ONLY Serializable snapshot. */
+async function readWorksheetSnapshot(transaction: Prisma.TransactionClient) {
+  const identity = await transaction.$queryRawUnsafe<Record<string, unknown>[]>(
+    'SELECT current_database() AS "databaseName", current_schema() AS "schemaName", inet_server_addr()::text AS "serverAddress", inet_server_port() AS "serverPort", (SELECT oid::text FROM pg_database WHERE datname = current_database()) AS "databaseOid"'
+  );
+  assert(identity.length === 1, 'Unique database identity required');
+  const instance = await sottoStorageInstance(transaction).read();
+  const state = await sidedoorStateStore(transaction).read();
+  const access = await (await sottoAccessStore(transaction)).read();
+  const site = state.configuration.site;
+  assert(site !== null, 'Established storage configuration required');
+  const storage = Object.fromEntries(
+    [
+      'storageProvider',
+      'localStorageRoot',
+      'objectStorageEndpoint',
+      'objectStorageBucket',
+      'objectStorageRegion',
+      'objectStoragePublicUrl',
+    ].map((key) => [key, site[key] ?? null])
+  );
+  return {
+    databaseIdentityHash: hashReviewFirstWorkerValue(identity[0]),
+    storageIdentityHash: hashReviewFirstWorkerValue({ instance, storage }),
+    access,
+  };
+}
+
+async function readWorksheetEvidence(
+  transaction: Prisma.TransactionClient,
+  reference: { id: string; fingerprint: string },
+  access: Awaited<ReturnType<typeof readWorksheetSnapshot>>['access']
+) {
+  const outbox = sottoJobOutbox(transaction);
+  const receipt = await outbox.receipt(reference.id);
+  const record = await outbox.read(reference.id);
+  assert(
+    receipt?.status === 'pending' &&
+      record &&
+      !record.complete &&
+      receipt.id === reference.id &&
+      receipt.fingerprint === reference.fingerprint &&
+      record.fingerprint === reference.fingerprint &&
+      receipt.handler === 'worksheet-pdf' &&
+      receipt.version === 1,
+    'Unexpected durable receipt'
+  );
+  const durable = await readSottoWorkerJob(
+    transaction,
+    {
+      id: reference.id,
+      name: 'worksheet-pdf.v1',
+      data: { operationId: reference.id, fingerprint: reference.fingerprint },
+    },
+    { handler: 'worksheet-pdf', version: 1, payload: worksheetPdfPayloadSchema }
+  );
+  assert(!durable.complete, 'Worksheet work is no longer pending');
+  assert.equal(record.job.namespace, SIDEDOOR_STATE_ID);
+  assert.equal(record.job.id, reference.id);
+  assert.deepEqual(record.job.delivery, { attempts: 2, priority: 0, availableAt: 0 });
+  assert.equal(durable.payload.appBaseUrl, 'https://demo.sotto.fm');
+  const cls = await transaction.courseClass.findUnique({
+    where: { id: durable.payload.classId },
+    select: { id: true, courseId: true, updatedAt: true, worksheetPdfUrl: true },
+  });
+  assert(cls && cls.worksheetPdfUrl, 'Preserved worksheet class/reference missing');
+  assert.notEqual(
+    cls.updatedAt.getTime(),
+    durable.payload.classUpdatedAt,
+    'Only stale worksheet snapshots can be observed'
+  );
+  const ownership = await captureCourseStorage(transaction, cls.courseId);
+  assert(isDeepStrictEqual(ownership.scopes, durable.scopes), 'Captured ownership changed');
+  const profile = access.householdProfiles?.find((item) => item.id === ownership.userId);
+  const principal = access.principals.find((item) => item.id === ownership.userId);
+  assert(profile || principal, 'Canonical learner authority missing');
+  const course = await transaction.course.findUniqueOrThrow({
+    where: { id: cls.courseId },
+    select: { id: true, userId: true, createdAt: true },
+  });
+  const actual = {
+    id: reference.id,
+    fingerprint: record.fingerprint,
+    delivered: record.delivered,
+    jobHash: hashReviewFirstWorkerValue(record.job),
+    payloadHash: hashReviewFirstWorkerValue(durable.payload),
+    scopesHash: hashReviewFirstWorkerValue(durable.scopes),
+    classHash: hashReviewFirstWorkerValue({ id: cls.id, courseId: cls.courseId }),
+    courseHash: hashReviewFirstWorkerValue({
+      ...course,
+      createdAt: course.createdAt.getTime(),
+    }),
+    profileHash: hashReviewFirstWorkerValue({
+      id: ownership.userId,
+      profile: profile ?? null,
+      principal: principal
+        ? {
+            id: principal.id,
+            epoch: principal.epoch,
+            role: principal.role,
+            createdAt: principal.createdAt,
+          }
+        : null,
+    }),
+    classUpdatedAt: durable.payload.classUpdatedAt,
+    currentClassUpdatedAt: cls.updatedAt.getTime(),
+    worksheetReferenceHash: hashReviewFirstWorkerValue(cls.worksheetPdfUrl),
+  };
+  return actual;
+}
+
+/** Initial capture and admission inspect the complete preactivation inventory. */
 async function readReviewFirstWorker(database: PrismaClient, known: KnownReferences) {
   return readOnly(database, async (transaction, deadline) => {
-    const identity = await transaction.$queryRawUnsafe<Record<string, unknown>[]>(
-      'SELECT current_database() AS "databaseName", current_schema() AS "schemaName", inet_server_addr()::text AS "serverAddress", inet_server_port() AS "serverPort", (SELECT oid::text FROM pg_database WHERE datname = current_database()) AS "databaseOid"'
-    );
-    assert(identity.length === 1, 'Unique database identity required');
-    const instance = await sottoStorageInstance(transaction).read();
-    const state = await sidedoorStateStore(transaction).read();
-    const access = await (await sottoAccessStore(transaction)).read();
-    const site = state.configuration.site;
-    assert(site !== null, 'Established storage configuration required');
-    const storage = Object.fromEntries(
-      [
-        'storageProvider',
-        'localStorageRoot',
-        'objectStorageEndpoint',
-        'objectStorageBucket',
-        'objectStorageRegion',
-        'objectStoragePublicUrl',
-      ].map((key) => [key, site[key] ?? null])
-    );
+    const snapshot = await readWorksheetSnapshot(transaction);
     const outbox = sottoJobOutbox(transaction);
     const jobs: ReviewFirstWorkerEvidence['jobs'] = [];
     const seen = new Set<string>();
@@ -188,83 +281,11 @@ async function readReviewFirstWorker(database: PrismaClient, known: KnownReferen
       for (const reference of page.jobs) {
         assert(!seen.has(reference.id) && seen.size < 3, 'Unexpected incomplete work');
         seen.add(reference.id);
-        const expected = known.jobs.find((item) => item.id === reference.id);
-        assert(expected, 'Unknown work identity');
-        const receipt = await outbox.receipt(reference.id);
-        const record = await outbox.read(reference.id);
         assert(
-          receipt?.status === 'pending' &&
-            record &&
-            !record.complete &&
-            receipt.id === reference.id &&
-            receipt.fingerprint === reference.fingerprint &&
-            record.fingerprint === reference.fingerprint &&
-            receipt.handler === 'worksheet-pdf' &&
-            receipt.version === 1,
-          'Unexpected durable receipt'
+          known.jobs.some((item) => item.id === reference.id),
+          'Unknown work identity'
         );
-        const durable = await readSottoWorkerJob(
-          transaction,
-          {
-            id: reference.id,
-            name: 'worksheet-pdf.v1',
-            data: { operationId: reference.id, fingerprint: reference.fingerprint },
-          },
-          { handler: 'worksheet-pdf', version: 1, payload: worksheetPdfPayloadSchema }
-        );
-        assert(!durable.complete, 'Worksheet work is no longer pending');
-        assert.equal(record.job.namespace, known.namespace);
-        assert.equal(record.job.id, reference.id);
-        assert.deepEqual(record.job.delivery, { attempts: 2, priority: 0, availableAt: 0 });
-        assert.equal(durable.payload.appBaseUrl, 'https://demo.sotto.fm');
-        const cls = await transaction.courseClass.findUnique({
-          where: { id: durable.payload.classId },
-          select: { id: true, courseId: true, updatedAt: true, worksheetPdfUrl: true },
-        });
-        assert(cls && cls.worksheetPdfUrl, 'Preserved worksheet class/reference missing');
-        assert.notEqual(
-          cls.updatedAt.getTime(),
-          durable.payload.classUpdatedAt,
-          'Only stale worksheet snapshots can be observed'
-        );
-        const ownership = await captureCourseStorage(transaction, cls.courseId);
-        assert(isDeepStrictEqual(ownership.scopes, durable.scopes), 'Captured ownership changed');
-        const profile = access.householdProfiles?.find((item) => item.id === ownership.userId);
-        const principal = access.principals.find((item) => item.id === ownership.userId);
-        assert(profile || principal, 'Canonical learner authority missing');
-        const course = await transaction.course.findUniqueOrThrow({
-          where: { id: cls.courseId },
-          select: { id: true, userId: true, createdAt: true },
-        });
-        const actual = {
-          id: reference.id,
-          fingerprint: record.fingerprint,
-          delivered: record.delivered,
-          jobHash: hashReviewFirstWorkerValue(record.job),
-          payloadHash: hashReviewFirstWorkerValue(durable.payload),
-          scopesHash: hashReviewFirstWorkerValue(durable.scopes),
-          classHash: hashReviewFirstWorkerValue({ id: cls.id, courseId: cls.courseId }),
-          courseHash: hashReviewFirstWorkerValue({
-            ...course,
-            createdAt: course.createdAt.getTime(),
-          }),
-          profileHash: hashReviewFirstWorkerValue({
-            id: ownership.userId,
-            profile: profile ?? null,
-            principal: principal
-              ? {
-                  id: principal.id,
-                  epoch: principal.epoch,
-                  role: principal.role,
-                  createdAt: principal.createdAt,
-                }
-              : null,
-          }),
-          classUpdatedAt: durable.payload.classUpdatedAt,
-          currentClassUpdatedAt: cls.updatedAt.getTime(),
-          worksheetReferenceHash: hashReviewFirstWorkerValue(cls.worksheetPdfUrl),
-        };
-        jobs.push(actual);
+        jobs.push(await readWorksheetEvidence(transaction, reference, snapshot.access));
       }
       if (page.cursor !== null) {
         assert(page.jobs.length > 0 && !cursors.has(page.cursor) && cursors.size < 100);
@@ -296,8 +317,8 @@ async function readReviewFirstWorker(database: PrismaClient, known: KnownReferen
     return reviewFirstWorkerEvidenceSchema.parse({
       schemaVersion: 1,
       namespace: known.namespace,
-      databaseIdentityHash: hashReviewFirstWorkerValue(identity[0]),
-      storageIdentityHash: hashReviewFirstWorkerValue({ instance, storage }),
+      databaseIdentityHash: snapshot.databaseIdentityHash,
+      storageIdentityHash: snapshot.storageIdentityHash,
       jobs: jobs.sort((left, right) => left.id.localeCompare(right.id)),
     });
   });
@@ -318,6 +339,110 @@ export async function inspectReviewFirstWorker(database: PrismaClient, input: un
   const actual = await readReviewFirstWorker(database, known);
   assert.deepEqual(actual, evidence, 'Admitted worksheet evidence changed');
   return { admitted: true as const, zeroWork: false as const, pending: 3 as const };
+}
+
+async function readAdmittedWorksheets(database: PrismaClient, evidence: ReviewFirstWorkerEvidence) {
+  return readOnly(database, async (transaction, inspectionDeadline) => {
+    const snapshot = await readWorksheetSnapshot(transaction);
+    assert.equal(snapshot.databaseIdentityHash, evidence.databaseIdentityHash);
+    assert.equal(snapshot.storageIdentityHash, evidence.storageIdentityHash);
+    const jobs: ReviewFirstWorkerEvidence['jobs'] = [];
+    for (const reference of evidence.jobs) {
+      budget(inspectionDeadline);
+      jobs.push(await readWorksheetEvidence(transaction, reference, snapshot.access));
+    }
+    return jobs;
+  });
+}
+
+/** Historical count only. Canonical startup may admit other new work while paused. */
+export async function inspectReviewPausedFirstWorker(database: PrismaClient, input: unknown) {
+  const evidence = reviewFirstWorkerEvidenceSchema.parse(input);
+  const actual = await readAdmittedWorksheets(database, evidence);
+  for (const [index, job] of actual.entries()) {
+    const admitted = evidence.jobs[index];
+    assert(!admitted.delivered || job.delivered, 'Historical delivery acknowledgment regressed');
+    assert.deepEqual(
+      { ...job, delivered: admitted.delivered },
+      admitted,
+      'Historical evidence changed'
+    );
+  }
+  return { admitted: true as const, zeroWork: false as const, pending: 3 as const };
+}
+
+/** Read actual consumers and active jobs while every admitted queue remains paused. */
+export async function inspectReviewPausedConsumers(
+  runtime: Pick<ReviewQueueRuntime, 'names' | 'createQueue'>,
+  input: unknown
+) {
+  const expected = z
+    .object({
+      address: z.literal('172.30.99.11'),
+      paused: z.literal(true),
+      count: z.union([z.literal(0), z.literal(1)]),
+    })
+    .strict()
+    .parse(input);
+  assert.deepEqual([...runtime.names].sort(), [...ALL_QUEUE_NAMES].sort());
+  const deadline = Date.now() + timeoutMs;
+  for (const name of ALL_QUEUE_NAMES) {
+    budget(deadline);
+    const queue = runtime.createQueue(name);
+    try {
+      assert(await queue.isPaused(), 'Review queues must remain paused before activation');
+      assert.equal(await queue.getActiveCount(), 0, 'Paused queues have active work');
+      const workers = await queue.getWorkers();
+      assert.equal(workers.length, expected.count, 'Unexpected actual queue consumer count');
+      assert(
+        workers.every((worker) => /^172\.30\.99\.11:\d+$/.test(worker.addr)),
+        'Only the admitted full worker may consume review work'
+      );
+    } finally {
+      await queue.close();
+    }
+  }
+  return { consumers: ALL_QUEUE_NAMES.length, queuesPaused: true, workerAddress: expected.address };
+}
+
+/** Observe retained refusals after startup. New ordinary work has its own admission. */
+export async function inspectReviewContinuation(
+  database: PrismaClient,
+  input: unknown,
+  worksheetQueue: Queue
+) {
+  const evidence = reviewFirstWorkerEvidenceSchema.parse(input);
+  assert.equal(worksheetQueue.name, 'worksheet-pdf', 'Actual worksheet queue required');
+  const deadline = Date.now() + timeoutMs;
+  const actual = await readAdmittedWorksheets(database, evidence);
+  assert.deepEqual(
+    actual,
+    evidence.jobs.map((job) => ({ ...job, delivered: true })),
+    'Historical evidence changed'
+  );
+  for (const reference of evidence.jobs) {
+    budget(deadline);
+    const record = await readFailedSottoDelivery({
+      database,
+      queue: worksheetQueue,
+      operationId: reference.id,
+      version: 1,
+    });
+    assert.equal(record.fingerprint, reference.fingerprint, 'Historical delivery changed');
+    const queued = await worksheetQueue.getJob(reference.id);
+    assert(queued, 'Historical failed delivery missing');
+    assert.equal(queued.opts.jobId, reference.id, 'Historical job identity changed');
+    assert.equal(queued.attemptsMade, 2, 'Historical attempts are not exhausted');
+    assert.equal(queued.failedReason, 'Worksheet class changed before generation');
+  }
+  budget(deadline);
+  return {
+    retained: true as const,
+    zeroWork: false as const,
+    pending: 3 as const,
+    failed: 3 as const,
+    attempts: 2 as const,
+  };
 }
 
 /** Raw dedicated DB0 inspection precedes every Queue constructor and metadata write. */

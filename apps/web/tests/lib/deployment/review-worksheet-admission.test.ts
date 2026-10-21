@@ -23,6 +23,7 @@ import { SIDEDOOR_STATE_ID } from '@/lib/sidedoor/access/state/store';
 import { SottoAccessStore } from '@/lib/sidedoor/access/core/access-store';
 import {
   captureReviewFirstWorkerEvidence,
+  inspectReviewContinuation,
   inspectReviewFirstWorker,
   type ReviewFirstWorkerEvidence,
 } from '../../../../../scripts/deploy/review/first-worker';
@@ -202,6 +203,7 @@ suite('historical worksheet first-worker admission', () => {
     'retains stale failures through restart and restores delivery after Redis retention loss',
     async () => {
       expect(fixture.evidence).toBeDefined();
+      if (!fixture.evidence) throw new Error('Admitted historical evidence required');
       expect(await inspectReviewFirstWorker(database, fixture.evidence)).toEqual({
         admitted: true,
         zeroWork: false,
@@ -213,6 +215,27 @@ suite('historical worksheet first-worker admission', () => {
       expect(initial.results.every((result) => result.status === 'delivered')).toBe(true);
       await startWorker();
       await expectHistoricalFailures();
+      const originalState = await database.$queryRawUnsafe(
+        'SELECT * FROM "SidedoorState" ORDER BY id'
+      );
+      expect(await inspectReviewContinuation(database, fixture.evidence, queue)).toEqual({
+        retained: true,
+        zeroWork: false,
+        pending: 3,
+        failed: 3,
+        attempts: 2,
+      });
+      const changedEvidence = structuredClone(fixture.evidence);
+      changedEvidence.jobs[0].worksheetReferenceHash = '0'.repeat(64);
+      await expect(inspectReviewContinuation(database, changedEvidence, queue)).rejects.toThrow(
+        'Historical evidence changed'
+      );
+      expect(await database.$queryRawUnsafe('SELECT * FROM "SidedoorState" ORDER BY id')).toEqual(
+        originalState
+      );
+      await expect(inspectReviewFirstWorker(database, fixture.evidence)).rejects.toThrow(
+        'Admitted worksheet evidence changed'
+      );
       await worker!.close();
       worker = undefined;
       const exhausted = await reconcile();
@@ -289,6 +312,17 @@ suite('historical worksheet first-worker admission', () => {
         expect.objectContaining({ message: 'Eligible worksheet reached fixture renderer' }),
         expect.objectContaining({ message: 'Eligible worksheet reached fixture renderer' }),
       ]);
+      const afterNewWork = await database.$queryRawUnsafe(
+        'SELECT * FROM "SidedoorState" ORDER BY id'
+      );
+      expect(await inspectReviewContinuation(database, fixture.evidence, queue)).toMatchObject({
+        retained: true,
+        pending: 3,
+        failed: 3,
+      });
+      expect(await database.$queryRawUnsafe('SELECT * FROM "SidedoorState" ORDER BY id')).toEqual(
+        afterNewWork
+      );
       expect(await retainedState()).toEqual(beforeEligibleRun);
       for (const original of fixture.jobs)
         expect((await queue.getJob(original.id))?.attemptsMade).toBe(2);

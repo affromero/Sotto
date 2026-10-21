@@ -76,10 +76,13 @@ function fixture() {
     expect(headers.get('X-Sidedoor-Origin')).toBe('https://demo.sotto.fm');
     expect(headers.has('Host')).toBe(false);
     const path = url.pathname;
+    if (selected && !path.startsWith('/api/v1/access/'))
+      expect(headers.get('X-Sotto-Expected-Profile-Id')).toBe(selected);
     requests.push({ path, headers, options });
     const body: unknown = options.body ? JSON.parse(String(options.body)) : null;
     if (path === '/api/v1/access/household') {
       expect(body).toEqual({ password });
+      selected = '';
       return response(
         { principal: null, expiresAt: Date.now() + 60_000, sessionId: 'private-session' },
         200,

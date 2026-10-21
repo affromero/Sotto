@@ -9,7 +9,10 @@ import { StorageCleanupJournal, prepareStorageCleanup } from 'thesidedoor-core/s
 import {
   captureReviewFirstWorkerEvidence,
   hashReviewFirstWorkerValue as digest,
+  inspectReviewContinuation,
   inspectReviewFirstWorker,
+  inspectReviewPausedFirstWorker,
+  inspectReviewPausedConsumers,
   inspectReviewRedisEmpty,
   prepareReviewQueues,
   reviewFirstWorkerEvidenceSchema,
@@ -23,7 +26,7 @@ import {
   sottoStorageInstance,
 } from '@/lib/sidedoor/access/state/store';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
-import { sottoJobOutbox } from '@/lib/sidedoor/jobs/core/job-delivery';
+import { deliverSottoJob, sottoJobOutbox } from '@/lib/sidedoor/jobs/core/job-delivery';
 import { sottoJobExecutions } from '@/lib/sidedoor/jobs/core/job-execution-lifetime';
 import { captureCourseStorage } from '@/lib/sidedoor/storage/core/course-storage';
 import type { PrismaClient } from '@/generated/prisma/client';
@@ -279,6 +282,121 @@ suite('bounded canonical review first-worker admission', () => {
       jobs: source.jobs.map(({ id }) => ({ id })),
     };
   }
+
+  async function enqueueHistoricalDeliveries() {
+    const queue = runtime.createQueue('worksheet-pdf');
+    for (const reference of evidence.jobs)
+      await deliverSottoJob({
+        database: instance.database,
+        queue,
+        operationId: reference.id,
+        fingerprint: reference.fingerprint,
+        version: 1,
+      });
+    return queue;
+  }
+
+  it('retains exact historical evidence after paused acknowledgments and new canonical startup work', async () => {
+    const queue = await enqueueHistoricalDeliveries();
+    try {
+      await sottoTransaction(instance.database, async (transaction) => {
+        const ownership = await captureCourseStorage(transaction, courseId);
+        await sottoJobOutbox(transaction).enqueue(
+          prepareJob({
+            namespace: SIDEDOOR_STATE_ID,
+            handler: 'pricing-fetch',
+            version: 1,
+            payload: {},
+            scopes: ownership.scopes,
+            delivery: { attempts: 2, priority: 0, availableAt: 0 },
+          })
+        );
+      });
+      const before = await preservedState();
+      expect(await inspectReviewPausedFirstWorker(instance.database, evidence)).toEqual({
+        admitted: true,
+        zeroWork: false,
+        pending: 3,
+      });
+      await expect(inspectReviewFirstWorker(instance.database, evidence)).rejects.toThrow();
+      expect(await preservedState()).toEqual(before);
+    } finally {
+      await queue.close();
+    }
+  });
+
+  it('refuses changed historical content and regressed acknowledgments while paused', async () => {
+    const before = await preservedState();
+    for (const changed of [
+      {
+        ...evidence,
+        jobs: evidence.jobs.map((job) => ({ ...job, worksheetReferenceHash: '0'.repeat(64) })),
+      },
+      { ...evidence, jobs: evidence.jobs.map((job) => ({ ...job, delivered: true })) },
+    ])
+      await expect(inspectReviewPausedFirstWorker(instance.database, changed)).rejects.toThrow();
+    expect(await preservedState()).toEqual(before);
+  });
+
+  it('refuses unfinished historical deliveries without changing their state or receipts', async () => {
+    const queue = await enqueueHistoricalDeliveries();
+    try {
+      const before = await preservedState();
+      await expect(inspectReviewContinuation(instance.database, evidence, queue)).rejects.toThrow(
+        'Only a failed delivery'
+      );
+      expect(await preservedState()).toEqual(before);
+      for (const reference of evidence.jobs) {
+        const job = await queue.getJob(reference.id);
+        expect(await job?.getState()).toBe('waiting');
+        expect(job?.attemptsMade).toBe(0);
+      }
+      await expect(inspectReviewFirstWorker(instance.database, evidence)).rejects.toThrow(
+        'Admitted worksheet evidence changed'
+      );
+    } finally {
+      await queue.close();
+    }
+  });
+
+  it('refuses unrelated worker failures while preserving exhausted deliveries and pending receipts', async () => {
+    const queue = await enqueueHistoricalDeliveries();
+    const url = new URL(redisUrl);
+    const worker = new Worker(
+      queue.name,
+      async () => {
+        throw new Error('Different fixture failure');
+      },
+      {
+        connection: {
+          host: url.hostname,
+          port: Number(url.port),
+          db: 0,
+          maxRetriesPerRequest: null,
+        },
+        concurrency: 1,
+      }
+    );
+    const errors: Error[] = [];
+    worker.on('error', (error) => errors.push(error));
+    try {
+      await expect.poll(() => queue.getFailedCount(), { timeout: 5000 }).toBe(3);
+      await worker.close();
+      const before = await preservedState();
+      await expect(inspectReviewContinuation(instance.database, evidence, queue)).rejects.toThrow();
+      expect(errors).toEqual([]);
+      expect(await preservedState()).toEqual(before);
+      for (const reference of evidence.jobs) {
+        const job = await queue.getJob(reference.id);
+        expect(await job?.getState()).toBe('failed');
+        expect(job?.attemptsMade).toBe(2);
+        expect(job?.failedReason).toBe('Different fixture failure');
+      }
+    } finally {
+      await worker.close();
+      await queue.close();
+    }
+  });
 
   it('captures only private hashes from known canonical identities without admitting or changing work', async () => {
     const before = await preservedState();
@@ -630,6 +748,61 @@ suite('bounded canonical review first-worker admission', () => {
     }
     expect(await preservedState()).toEqual(before);
     await expect(prepareReviewQueues(runtime, evidence, redis)).rejects.toThrow(/Redis/);
+  });
+
+  it('proves zero consumers across all actual paused queues and refuses a live foreign consumer', async () => {
+    await prepareReviewQueues(runtime, evidence, redis);
+    const expected = { address: '172.30.99.11', paused: true, count: 0 };
+    expect(await inspectReviewPausedConsumers(runtime, expected)).toEqual({
+      consumers: ALL_QUEUE_NAMES.length,
+      queuesPaused: true,
+      workerAddress: expected.address,
+    });
+    await expect(
+      inspectReviewPausedConsumers(runtime, { ...expected, count: 1 })
+    ).rejects.toThrow();
+    const url = new URL(redisUrl);
+    const workers = ALL_QUEUE_NAMES.map(
+      (name) =>
+        new Worker(name, async () => undefined, {
+          connection: {
+            host: url.hostname,
+            port: Number(url.port),
+            db: 0,
+            maxRetriesPerRequest: null,
+          },
+        })
+    );
+    try {
+      await Promise.all(workers.map((worker) => worker.waitUntilReady()));
+      for (const name of ALL_QUEUE_NAMES) {
+        const queue = runtime.createQueue(name);
+        try {
+          await expect.poll(async () => (await queue.getWorkers()).length).toBe(1);
+        } finally {
+          await queue.close();
+        }
+      }
+      await expect(inspectReviewPausedConsumers(runtime, expected)).rejects.toThrow();
+      await expect(
+        inspectReviewPausedConsumers(runtime, { ...expected, count: 1 })
+      ).rejects.toThrow('Only the admitted full worker');
+    } finally {
+      await Promise.all(workers.map((worker) => worker.close()));
+    }
+  });
+
+  it('refuses an unpaused queue before accepting the consumer inventory', async () => {
+    await prepareReviewQueues(runtime, evidence, redis);
+    const queue = runtime.createQueue(ALL_QUEUE_NAMES[0]);
+    try {
+      await queue.resume();
+    } finally {
+      await queue.close();
+    }
+    await expect(
+      inspectReviewPausedConsumers(runtime, { address: '172.30.99.11', paused: true, count: 0 })
+    ).rejects.toThrow('remain paused');
   });
 
   it('rejects an incomplete runtime inventory before creating metadata', async () => {

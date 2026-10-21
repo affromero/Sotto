@@ -10,10 +10,9 @@ import {
   reconcileCredentialMutation,
   sameCredentialEditContext,
 } from 'thesidedoor-core/configuration/credential-client';
-import { readResponseBytes } from 'thesidedoor-core/runtime/stream';
 import { parseAgentModelId } from '@/lib/agent-models/id';
+import { createReviewTransport } from './runtime/transport';
 
-const origin = 'https://demo.sotto.fm';
 const text = z.string().min(1).max(1024);
 const selection = z.object({ aiProvider: text, aiModel: text }).strict();
 const automaticModels = z
@@ -108,18 +107,6 @@ export async function runReviewReadiness(
   try {
     const input = inputSchema.parse(value);
     const checkpoint = checkpointSchema.parse(retained);
-    const endpoint = new URL(input.endpoint);
-    if (
-      endpoint.protocol !== 'http:' ||
-      !['127.0.0.1', '[::1]'].includes(endpoint.hostname) ||
-      endpoint.username ||
-      endpoint.password ||
-      endpoint.pathname !== '/' ||
-      endpoint.search ||
-      endpoint.hash ||
-      !endpoint.port
-    )
-      fail();
     const ids = input.profiles.map((item) => item.id);
     if (new Set(ids).size !== 2 || !ids.includes(input.expectedOwnerId)) fail();
     if (
@@ -142,68 +129,18 @@ export async function runReviewReadiness(
       fail();
 
     const combinedSignal = AbortSignal.any([boundary.signal, AbortSignal.timeout(300_000)]);
-    const jar = new Map<string, string>();
-    let selectedProfileId: string | null = null;
-    const transport: typeof fetch = async (resource, options) => {
-      combinedSignal.throwIfAborted();
-      if (
-        typeof resource !== 'string' ||
-        !resource.startsWith('/api/v1/') ||
-        resource.includes('?') ||
-        resource.includes('#') ||
-        resource.includes('\\')
-      )
-        fail();
-      const destination = new URL(resource, endpoint);
-      if (destination.origin !== endpoint.origin) fail();
-      const headers = new Headers(options?.headers);
-      headers.set('Origin', origin);
-      headers.set('X-Sidedoor-Origin', origin);
-      if (selectedProfileId && !resource.startsWith('/api/v1/access/'))
-        headers.set('X-Sotto-Expected-Profile-Id', selectedProfileId);
-      if (jar.size)
-        headers.set('Cookie', [...jar].map(([name, token]) => `${name}=${token}`).join('; '));
-      const signal = AbortSignal.any([combinedSignal, AbortSignal.timeout(60_000)]);
-      const response = await (boundary.fetch ?? globalThis.fetch)(destination, {
-        ...options,
-        headers,
-        redirect: 'error',
-        cache: 'no-store',
-        signal,
-      });
-      if (response.redirected || (response.url && response.url !== destination.href)) fail();
-      for (const cookie of response.headers.getSetCookie()) {
-        const pair = cookie.split(';', 1)[0];
-        const offset = pair.indexOf('=');
-        if (offset < 1 || pair.length > 8192 || jar.size > 16) fail();
-        const name = pair.slice(0, offset);
-        if (!/^[a-zA-Z0-9_-]+$/.test(name) || /[\r\n]/.test(pair)) fail();
-        jar.set(name, pair.slice(offset + 1));
-        if (jar.size > 16) fail();
-      }
-      const bytes = await readResponseBytes(response, { signal, maxBytes: 1024 * 1024 });
-      return new Response(Uint8Array.from(bytes).buffer, {
-        status: response.status,
-        headers: response.headers,
-      });
-    };
-    const request = async (
-      path: string,
-      body?: unknown,
-      method = body === undefined ? 'GET' : 'POST'
-    ) => {
-      const response = await transport(path, {
-        method,
-        headers: { 'content-type': 'application/json' },
-        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-      });
-      if (!response.ok) fail();
-      return response.json() as Promise<unknown>;
-    };
-    const access = new AccessClient({ endpoint: '/api/v1/access', fetch: transport });
+    const transport = createReviewTransport({
+      endpoint: input.endpoint,
+      signal: combinedSignal,
+      fetch: boundary.fetch,
+      fail,
+      admitResource: (path) => !path.includes('?'),
+    });
+    const request = transport.request;
+    const access = new AccessClient({ endpoint: '/api/v1/access', fetch: transport.fetch });
     const select = async (id: string) => {
       await request('/api/v1/access/select-profile', { id });
-      selectedProfileId = id;
+      transport.selectProfile(id);
       const current = z
         .object({ id: text })
         .passthrough()
