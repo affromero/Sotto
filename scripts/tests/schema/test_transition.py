@@ -133,6 +133,73 @@ class SchemaReviewTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'queue module failed to load'):
                 REVIEW.unchanged_queue_contract(self.bound)
 
+    def test_explicit_additions_bind_exact_images_inventories_and_review_bytes(self) -> None:
+        self.review.update(schemaVersion=2,
+                           queueTransition={
+                               'previousQueues': ['audio-generation'],
+                               'candidateQueues': ['audio-generation', 'vocabulary-audio'],
+                               'addedQueues': ['vocabulary-audio'],
+                           })
+        self.validate()
+
+        def docker(arguments: list[str], **options: object) -> subprocess.CompletedProcess:
+            names = self.review['queueTransition']['previousQueues' if self.case.image in arguments else 'candidateQueues']
+            return subprocess.CompletedProcess(arguments, 0, json.dumps(names).encode())
+
+        raw = json.dumps(self.review).encode()
+        with patch.dict(os.environ, self.case.environment), patch.object(
+            REVIEW.subprocess, 'run', side_effect=docker
+        ):
+            transition = REVIEW.queue_transition(self.bound, raw)
+            proof = json.loads(transition['proof'])
+            self.assertEqual(proof['stack'], self.case.environment['SOTTO_STACK'])
+            self.assertEqual(proof['previousRuntimes'], self.provider['previousRuntimes'])
+            self.assertEqual(proof['candidateNames'], self.review['queueTransition']['candidateQueues'])
+            self.assertEqual(proof['schemaReviewSha256'], hashlib.sha256(raw).hexdigest())
+            self.assertEqual(transition['sha256'], hashlib.sha256(transition['proof'].encode()).hexdigest())
+            with self.assertRaises(ValueError):
+                REVIEW.queue_transition(self.bound)
+            for previous, candidate in [
+                (['audio-generation'], ['vocabulary-audio']),
+                (['audio-generation'], ['audio-generation']),
+                (['audio-generation'], ['audio-generation', 'vocabulary-audio', 'vocabulary-audio']),
+                (['audio-generation'], ['audio-generation', '../unreviewed']),
+            ]:
+                self.review['queueTransition'].update(previousQueues=previous, candidateQueues=candidate)
+                with self.subTest(candidate=candidate), self.assertRaises(ValueError):
+                    REVIEW.queue_transition(self.bound, json.dumps(self.review).encode())
+
+    def test_inconsistent_previous_images_and_unreviewed_inventories_are_rejected(self) -> None:
+        bound_review = json.loads(self.bound['review'])
+        bound_review['previousWorkerContracts']['sha256:' + '8' * 64] = 'a' * 64
+        self.bound['review'] = json.dumps(bound_review)
+        self.review.update(schemaVersion=2,
+                           queueTransition={
+                               'previousQueues': ['audio-generation'],
+                               'candidateQueues': ['audio-generation', 'vocabulary-audio'],
+                               'addedQueues': ['vocabulary-audio'],
+                           })
+
+        def docker(arguments: list[str], **options: object) -> subprocess.CompletedProcess:
+            if self.case.image in arguments:
+                names = ['audio-generation']
+            elif 'sha256:' + '8' * 64 in arguments:
+                names = ['foreign']
+            else:
+                names = ['audio-generation', 'vocabulary-audio']
+            return subprocess.CompletedProcess(arguments, 0, json.dumps(names).encode())
+
+        with patch.dict(os.environ, self.case.environment), patch.object(
+            REVIEW.subprocess, 'run', side_effect=docker
+        ):
+            with self.assertRaises(ValueError):
+                REVIEW.queue_transition(self.bound, json.dumps(self.review).encode())
+            del bound_review['previousWorkerContracts']['sha256:' + '8' * 64]
+            self.bound['review'] = json.dumps(bound_review)
+            self.review['queueTransition']['candidateQueues'].append('unreviewed')
+            with self.assertRaises(ValueError):
+                REVIEW.queue_transition(self.bound, json.dumps(self.review).encode())
+
     def test_additive_review_binds_exact_previous_candidate_and_added_queue_inventories(self) -> None:
         transition = {'previousQueues': ['audio-generation'],
                       'candidateQueues': ['audio-generation', 'material-analysis'],
@@ -145,14 +212,16 @@ class SchemaReviewTests(unittest.TestCase):
             return subprocess.CompletedProcess(arguments, 0, json.dumps(names).encode())
 
         with patch.dict(os.environ, self.case.environment), patch.object(REVIEW.subprocess, 'run', side_effect=probe):
-            REVIEW.unchanged_queue_contract(self.bound, transition)
+            REVIEW.queue_transition(self.bound, json.dumps(reviewed).encode())
             with self.assertRaises(ValueError):
                 REVIEW.unchanged_queue_contract(self.bound)
             for field, value in [('previousQueues', ['audio-generation', 'foreign']),
                                  ('candidateQueues', ['audio-generation', 'foreign']),
                                  ('addedQueues', ['foreign'])]:
                 with self.subTest(field=field), self.assertRaises(ValueError):
-                    REVIEW.unchanged_queue_contract(self.bound, {**transition, field: value})
+                    REVIEW.queue_transition(self.bound, json.dumps({
+                        **reviewed, 'queueTransition': {**transition, field: value},
+                    }).encode())
         for changed in [
             {**transition, 'candidateQueues': ['material-analysis']},
             {**transition, 'addedQueues': []},
@@ -201,6 +270,37 @@ class SchemaReviewTests(unittest.TestCase):
 
 
 class SchemaControllerTests(unittest.TestCase):
+    def test_added_queue_proof_runs_after_all_exact_old_writers_stop(self) -> None:
+        state = self.run_transition('migration-additions', success=True)
+        self.assertTrue(state['added_queue_checked_after_stop'])
+        self.assertTrue(state['migration_admitted_safely'])
+        self.assertTrue(state['queue_flags']['vocabulary-audio'])
+        self.assertNotEqual(state['added_queue_database_url'], 'postgresql://verified-direct')
+
+    def test_work_added_during_drain_retains_fence_before_backup_and_migration(self) -> None:
+        state = self.run_transition('migration-additions-late', success=False)
+        self.assertTrue(state['added_queue_checked_after_stop'])
+        self.assertTrue(state['retained_added_work'])
+        self.assertFalse(state.get('migration_started', False))
+        self.assertTrue(all(state['queue_flags'].values()))
+        self.assertEqual(state['active_route'], 'maintenance')
+        self.assertIsNotNone(state['unresolved_marker'])
+
+    def test_missing_or_malformed_admitted_proof_cannot_skip_final_inspection(self) -> None:
+        for mode in ('missing-proof', 'malformed-proof'):
+            with self.subTest(mode=mode):
+                state = self.run_transition('migration-additions-' + mode, success=False)
+                self.assertFalse(state.get('migration_started', False))
+                self.assertEqual(state['active_route'], 'maintenance')
+                self.assertIsNotNone(state['unresolved_marker'])
+
+    def test_partial_added_queue_restoration_retains_candidate_and_pauses_union(self) -> None:
+        state = self.run_transition('migration-additions-restore', success=False)
+        self.assertTrue(state['migration_complete'])
+        self.assertTrue(all(state['queue_flags'].values()))
+        self.assertEqual(state['active_route'], 'maintenance')
+        self.assertIsNotNone(state['unresolved_marker'])
+
     def test_additive_transition_restores_old_and_new_flags_after_fenced_cutover(self) -> None:
         case = controller_tests.DeploymentFailureTests()
         state, output = case.run_deployment('migration-success', schema_transition=True,
