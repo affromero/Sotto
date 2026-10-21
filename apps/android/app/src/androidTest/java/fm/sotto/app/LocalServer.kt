@@ -6,6 +6,9 @@ import java.net.InetAddress
 import java.net.ServerSocket
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.Executors
+import java.util.concurrent.Phaser
+import java.util.concurrent.RejectedExecutionException
+import java.util.concurrent.TimeUnit
 
 data class NativeRequest(val method: String, val path: String, val headers: Map<String, String>, val body: String)
 data class NativeReply(val status: Int = 200, val body: String, val headers: Map<String, String> = emptyMap())
@@ -13,6 +16,7 @@ data class NativeReply(val status: Int = 200, val body: String, val headers: Map
 class LocalServer : AutoCloseable {
     private val listener = ServerSocket(0, 20, InetAddress.getByName("127.0.0.1"))
     private val executor = Executors.newCachedThreadPool()
+    private val connections = Phaser(1)
     val origin = "http://127.0.0.1:${listener.localPort}"
     val received = CopyOnWriteArrayList<NativeRequest>()
     val protocolFailures = CopyOnWriteArrayList<Exception>()
@@ -23,8 +27,9 @@ class LocalServer : AutoCloseable {
         executor.execute {
             while (!closed) try {
                 val socket = listener.accept()
-                executor.execute {
-                    socket.use {
+                connections.register()
+                try { executor.execute {
+                    try { socket.use {
                         it.soTimeout = 10_000
                         val input = BufferedInputStream(it.getInputStream())
                         val first = input.line().split(' ')
@@ -60,10 +65,22 @@ class LocalServer : AutoCloseable {
                             output.write("HTTP/1.1 ${response.status} Test\r\nContent-Type: application/json\r\nCache-Control: no-store\r\nConnection: close\r\n${extra}Content-Length: ${body.size}\r\n\r\n".toByteArray())
                             output.write(body)
                         }
+                    } } catch (_: IOException) {
+                        // Foreground cancellation may close a connection before its request or response completes.
+                    } catch (error: Exception) {
+                        protocolFailures.add(error)
+                    } finally {
+                        connections.arriveAndDeregister()
                     }
+                } } catch (error: RejectedExecutionException) {
+                    try { socket.close() } finally { connections.arriveAndDeregister() }
+                    if (!closed) throw error
                 }
             } catch (_: IOException) { if (!closed) throw IllegalStateException("Test listener failed") }
         }
+    }
+    fun awaitConnectionsSettled() {
+        connections.awaitAdvanceInterruptibly(connections.arrive(), 5, TimeUnit.SECONDS)
     }
     override fun close() { closed = true; listener.close(); executor.shutdownNow() }
 }

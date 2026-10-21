@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, writeFile, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -123,6 +123,39 @@ test('the operator command validates actual files and rejects oversized or malfo
     const result = command();
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /128 KiB/);
+  } finally {
+    await rm(root, { recursive: true });
+  }
+});
+
+test('the operator refuses symlinks, directories and pipes without waiting for data', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'sotto-association-files-'));
+  const document = join(root, 'assetlinks.json');
+  const link = join(root, 'link.json');
+  const pipe = join(root, 'pipe.json');
+  try {
+    await writeFile(document, JSON.stringify(assetlinks));
+    await symlink(document, link);
+    const created = spawnSync('mkfifo', [pipe], { encoding: 'utf8' });
+    assert.equal(created.status, 0, created.stderr);
+    for (const path of [link, root, pipe]) {
+      const result = spawnSync(
+        process.execPath,
+        [
+          new URL('./validate-associations.mjs', import.meta.url).pathname,
+          '--assetlinks',
+          path,
+          '--android-package',
+          'fm.sotto.app',
+          '--android-sha256',
+          certificate,
+        ],
+        { encoding: 'utf8', timeout: 5000 }
+      );
+      assert.equal(result.error, undefined);
+      assert.notEqual(result.status, 0);
+      assert.match(result.stderr, /Association validation/);
+    }
   } finally {
     await rm(root, { recursive: true });
   }

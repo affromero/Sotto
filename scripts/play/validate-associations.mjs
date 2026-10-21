@@ -1,7 +1,7 @@
-import { readFile, stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
+import { readBoundedRegularFile } from '../../apps/web/src/lib/providers/documents/files.ts';
 
 function requireValue(condition, message) {
   if (!condition) throw new Error(message);
@@ -104,8 +104,7 @@ export function validateAndroidAssociation(document, packageName, fingerprints) 
 }
 
 async function readDocument(path) {
-  requireValue((await stat(path)).size <= 131_072, 'Association files must be at most 128 KiB.');
-  return JSON.parse(await readFile(path, 'utf8'));
+  return JSON.parse((await readBoundedRegularFile(path, { maximum: 131_072 })).toString('utf8'));
 }
 
 async function main() {
@@ -134,7 +133,10 @@ async function main() {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   main().catch((error) => {
-    console.error(error.message);
+    console.error(
+      'Association validation requires regular JSON files up to 128 KiB:',
+      error.message
+    );
     process.exitCode = 1;
   });
 }
