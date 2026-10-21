@@ -47,6 +47,7 @@ class HostBoundary:
         self.lose_restore = False
         self.fail_learning = False
         self.fail_paused_start = False
+        self.workload_result: dict[str, object] = {}
         self.original = {'owner': 'preserved', 'member': 'preserved'}
 
     def verify_tools(self) -> None:
@@ -172,14 +173,16 @@ class HostBoundary:
             self.learning_verified = True
             profiles = cast(list[dict[str, object]],
                             cast(dict[str, object], value)['profiles'])
+            active = sum(row['fixture'] is not None for row in profiles)
             return {
-                'profileCount': 2, 'generatedClasses': 2,
-                'syntheticAssessments': 2,
+                'profileCount': 2, 'generatedClasses': active,
+                'syntheticAssessments': active,
                 'humanPronunciationVerified': False,
                 'codexWorkload': 'verified',
                 'selectedSpeechWorkload': 'verified',
                 'speechSelections': [row['selection'] for row in profiles],
-                'referenceAudioSha256': ['b' * 64, 'c' * 64],
+                'referenceAudioSha256': ['b' * 64] * active,
+                **self.workload_result,
             }
         raise ValueError('unexpected runtime operation')
 
@@ -265,10 +268,16 @@ class ReviewControllerTests(unittest.TestCase):
             {'id': name, 'preferences': {}, 'selection': {}}
             for name in ('owner', 'member')
         ]
-        inputs = {
+        self.workload_profiles: list[dict[str, object]] = [
+            {**row, 'fixture': {'native': 'en', 'target': 'de',
+                               'curriculumId': 'seeded-curriculum'}}
+            for row in profile
+        ]
+        self.inputs: dict[str, object] = {
             'readiness': {'expectedOwnerId': 'owner', 'profiles': profile,
                           'selectedModelId': 'codex'},
-            'workloads': {'expectedOwnerId': 'owner', 'profiles': profile},
+            'workloads': {'expectedOwnerId': 'owner',
+                          'profiles': self.workload_profiles},
         }
         self.addCleanup(patch.stopall)
         patch.object(self.controller, 'HOST_STATE', self.root).start()
@@ -276,7 +285,8 @@ class ReviewControllerTests(unittest.TestCase):
                      return_value=self.host).start()
         for name in ('preserve_data', 'runtime_identity', 'handover_auth'):
             patch.object(services, name).start()
-        patch.object(services, 'private_inputs', return_value=inputs).start()
+        patch.object(services, 'private_inputs',
+                     return_value=self.inputs).start()
         patch.object(services, 'before_fence').start()
         patch.object(services, 'candidate', side_effect=self.candidate).start()
         patch.object(services, 'verify_candidate',
@@ -363,6 +373,86 @@ class ReviewControllerTests(unittest.TestCase):
         self.assertFalse((self.root / 'unresolved.json').exists())
         self.assertEqual(self.attempt.state()['status'], 'complete')
         self.lock.validate()
+
+    def assert_one_active_profile(self, active: str) -> None:
+        for profile in self.workload_profiles:
+            if profile['id'] != active:
+                profile['fixture'] = None
+        self.assertTrue(self.run_upgrade()['complete'])
+        proof = private_json(self.attempt.directory
+                             / 'workloads-verified.json')
+        self.assertEqual(proof['profileCount'], 2)
+        self.assertEqual(proof['generatedClasses'], 1)
+        self.assertEqual(proof['syntheticAssessments'], 1)
+        self.assertEqual(proof['referenceAudioSha256'], ['b' * 64])
+        self.assertEqual(self.host.original,
+                         {'owner': 'preserved', 'member': 'preserved'})
+        self.assertTrue(self.host.public)
+
+    def test_active_owner_and_observed_member_preserve_both_profiles(
+        self,
+    ) -> None:
+        self.assert_one_active_profile('owner')
+
+    def test_observed_owner_and_active_member_preserve_both_profiles(
+        self,
+    ) -> None:
+        self.assert_one_active_profile('member')
+
+    def assert_workload_refused_before_sql(self, reason: str) -> None:
+        with self.assertRaisesRegex(ValueError, reason):
+            self.run_upgrade()
+        self.assertEqual(self.attempt.state()['phase'], 'PRECHECK')
+        self.assertFalse(self.host.schema_written)
+        self.assertFalse(self.host.fenced)
+        self.assertFalse(self.host.worker)
+
+    def test_no_active_workload_refuses_before_fencing_or_sql(self) -> None:
+        for profile in self.workload_profiles:
+            profile['fixture'] = None
+        self.assert_workload_refused_before_sql('one-or-two-active')
+
+    def test_malformed_active_fixture_refuses_before_fencing_or_sql(
+        self,
+    ) -> None:
+        self.workload_profiles[0]['fixture'] = {'native': 'en'}
+        self.assert_workload_refused_before_sql('malformed-admitted')
+
+    def test_changed_review_profile_binding_refuses_before_sql(self) -> None:
+        self.workload_profiles[0]['preferences'] = {'changed': True}
+        self.assert_workload_refused_before_sql('same-two-review-profiles')
+
+    def test_two_claimed_generations_for_one_active_profile_refuse_cutover(
+        self,
+    ) -> None:
+        self.workload_profiles[1]['fixture'] = None
+        self.host.workload_result = {'generatedClasses': 2,
+                                     'syntheticAssessments': 2}
+        with self.assertRaisesRegex(ValueError, 'actual-learning-and-speech'):
+            self.run_upgrade()
+        self.assertFalse(self.host.public)
+        self.assertFalse(self.host.finalized)
+        self.assertFalse((self.attempt.directory
+                          / 'workloads-verified.json').exists())
+
+    def test_two_audio_proofs_for_one_active_profile_refuse_cutover(
+        self,
+    ) -> None:
+        self.workload_profiles[1]['fixture'] = None
+        self.host.workload_result = {'referenceAudioSha256': ['b' * 64] * 2}
+        with self.assertRaisesRegex(ValueError, 'active-generated-reference'):
+            self.run_upgrade()
+        self.assertFalse(self.host.public)
+        self.assertFalse(self.host.finalized)
+
+    def test_boolean_generation_count_cannot_claim_one_actual_workload(
+        self,
+    ) -> None:
+        self.workload_profiles[1]['fixture'] = None
+        self.host.workload_result = {'generatedClasses': True}
+        with self.assertRaisesRegex(ValueError, 'actual-learning-and-speech'):
+            self.run_upgrade()
+        self.assertFalse(self.host.public)
 
     def test_lost_sql_keeps_the_irreversible_marker_backups_and_lock(
         self,
@@ -600,6 +690,9 @@ class ReviewControllerTests(unittest.TestCase):
                 self.assert_contender_blocked()
                 self.assertEqual(self.attempt.state()['phase'], 'SQL_STARTED')
             resume.touch(mode=0o600)
+            time.sleep(0.15)
+            self.assert_contender_blocked()
+            self.assertEqual(self.attempt.state()['phase'], 'SQL_STARTED')
             os.kill(pid, signal.SIGUSR1)
             self.wait_for_supervisor(pid, 'completed')
             exited, status = os.waitpid(pid, 0)

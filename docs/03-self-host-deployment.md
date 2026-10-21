@@ -340,6 +340,11 @@ upgrade keeps the two existing profiles, storage and selected speech providers.
 Learning generation uses its separately admitted Codex CLI home, shared by the
 review web and worker. Keep that home separate from production credentials.
 
+Both profiles are authenticated and their preferences and existing course IDs
+are checked. Learning and speech workloads run on one or two profiles with an
+admitted absent course pair and an existing seeded curriculum. A profile that
+already has that course can be checked without generating new learning work.
+
 Before starting, independently admit the exact source, successful CI runs,
 immutable image receipts, staged migration inventories, host topology and
 private inputs. Preserve the original data and queue evidence. Require an

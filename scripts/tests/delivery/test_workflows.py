@@ -145,6 +145,40 @@ class WorkflowScopeTests(unittest.TestCase):
                 (self.root / 'scope-output').unlink()
                 self.before = self.git('rev-parse', 'HEAD').strip()
 
+    def test_tooling_checkout_retains_historical_source_provenance(
+        self,
+    ) -> None:
+        self.add_paths(['package-lock.json'])
+        workflow = (WORKFLOWS / 'source-ci.yml').read_text()
+        tooling = workflow.split('  tooling:\n', 1)[1]
+        checkout = tooling.split(
+            '      - uses: actions/checkout@', 1,
+        )[1].split('      - ', 1)[0]
+        depth = next((int(line.split(':', 1)[1])
+                      for line in checkout.splitlines()
+                      if line.strip().startswith('fetch-depth:')), 1)
+        with tempfile.TemporaryDirectory() as temporary:
+            for name, selected in (('configured', depth), ('shallow', 1)):
+                destination = Path(temporary) / name
+                command = ['git', 'clone', '--quiet']
+                if selected:
+                    command.extend(['--depth', str(selected)])
+                subprocess.run([
+                    *command, self.root.as_uri(), str(destination),
+                ], env=self.git_environment, check=True,
+                    capture_output=True, timeout=15)
+                historical = subprocess.run([
+                    'git', '-C', str(destination), 'show',
+                    self.before + ':README.md',
+                ], env=self.git_environment, capture_output=True,
+                    text=True, check=False, timeout=15)
+                if name == 'configured':
+                    self.assertEqual(historical.returncode, 0,
+                                     historical.stderr)
+                    self.assertEqual(historical.stdout, 'Initial fixture\n')
+                else:
+                    self.assertNotEqual(historical.returncode, 0)
+
     def test_push_range_includes_earlier_runtime_changes(self) -> None:
         self.add_paths(['apps/web/src/lib/runtime.ts'])
         self.add_paths(['apps/ios/Sources/App.swift'])

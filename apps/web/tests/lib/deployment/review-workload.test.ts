@@ -6,6 +6,7 @@ import {
   runReviewWorkloads,
   ReviewWorkloadError,
   REVIEW_WORKLOAD_TIMEOUT_MS,
+  reviewWorkloadCheckpointSchema,
   type ReviewWorkloadInput,
   type ReviewWorkloadCheckpoint,
 } from '../../../../../scripts/deploy/review/runtime/workload';
@@ -30,7 +31,7 @@ function audio(seconds = 1) {
 }
 
 function fixture() {
-  const preferences = {
+  const preferences: ReviewWorkloadInput['profiles'][number]['preferences'] = {
     preferredAiModel: null,
     preferredTtsProvider: null,
     preferredTtsModel: null,
@@ -68,6 +69,8 @@ function fixture() {
     })),
   };
   type Remote = {
+    preferences: typeof preferences;
+    originalCourses: { id: string; nativeLang: string; targetLang: string }[];
     course: string | null;
     operation: string | null;
     recording: string | null;
@@ -77,6 +80,8 @@ function fixture() {
     input.profiles.map((profile) => [
       profile.id,
       {
+        preferences: { ...preferences },
+        originalCourses: [{ id: `original-${profile.id}`, nativeLang: 'en', targetLang: 'es' }],
         course: null,
         operation: null,
         recording: null,
@@ -109,6 +114,7 @@ function fixture() {
     wrongTtsModel: false,
     missingOwnedEpisode: false,
     exemptSpeech: false,
+    missingSkill: false,
     missingAudio: false,
     foreignAudio: false,
     redirectedAudio: false,
@@ -167,7 +173,7 @@ function fixture() {
     if (path === '/api/v1/users/me')
       return reply({
         id: control.wrongActor ? 'another' : selected,
-        ...preferences,
+        ...remote.get(selected)!.preferences,
         ...(control.changedPreferences ? { preferredAiModel: 'changed' } : {}),
       });
     if (path === '/api/v1/access/authorize-owner')
@@ -187,30 +193,26 @@ function fixture() {
     const profile = input.profiles.find((item) => item.id === selected)!;
     const state = remote.get(selected)!;
     const progress = durable?.profiles.find((item) => item.profileId === selected);
-    if (path === '/api/v1/courses' && method === 'GET')
-      return reply({
-        courses: [
-          { id: `original-${selected}`, nativeLang: 'en', targetLang: 'es' },
-          ...(state.course
-            ? [
-                {
-                  id: state.course,
-                  nativeLang: profile.fixture.native,
-                  targetLang: profile.fixture.target,
-                },
-              ]
-            : []),
-          ...(control.occupiedPair
-            ? [
-                {
-                  id: 'unexpected-existing-course',
-                  nativeLang: profile.fixture.native,
-                  targetLang: profile.fixture.target,
-                },
-              ]
-            : []),
-        ],
-      });
+    if (path === '/api/v1/courses' && method === 'GET') {
+      const courses = [...state.originalCourses];
+      if (state.course || control.occupiedPair) {
+        if (!profile.fixture) throw new Error('Passive profile received fixture work');
+        if (state.course)
+          courses.push({
+            id: state.course,
+            nativeLang: profile.fixture.native,
+            targetLang: profile.fixture.target,
+          });
+        if (control.occupiedPair)
+          courses.push({
+            id: 'unexpected-existing-course',
+            nativeLang: profile.fixture.native,
+            targetLang: profile.fixture.target,
+          });
+      }
+      return reply({ courses });
+    }
+    if (!profile.fixture) throw new Error('Passive profile received fixture work');
     if (path === '/api/v1/courses' && method === 'POST') {
       expect(progress?.courseIntent).toBe(true);
       expect(state.course).toBeNull();
@@ -286,44 +288,46 @@ function fixture() {
         status: 'AVAILABLE',
         lesson: { title: 'A newly generated lesson', level: 'A1' },
         skillRequirements: requirements,
-        sections: ['GRAMMAR', 'READING', 'LISTENING', 'SPEAKING', 'WRITING'].map((skill) => ({
-          id: `section-${selected}-${skill}`,
-          skill,
-          status: 'READY',
-          questions: ['GRAMMAR', 'READING', 'LISTENING'].includes(skill)
-            ? Array.from({ length: skill === 'LISTENING' ? 4 : 5 }, (_, i) => ({
-                id: `q-${i}`,
-                question: 'Generated question',
-              }))
-            : [],
-          prompts:
-            skill === 'SPEAKING'
-              ? Array.from({ length: 4 }, (_, i) => ({
-                  id: `prompt-${selected}-${i}`,
-                  targetPhrase: 'A generated utterance',
-                  referenceTtsUrl: control.missingAudio
-                    ? null
-                    : control.foreignAudio
-                      ? 'https://outside.example/clip.wav'
-                      : `/api/v1/storage/speaking-ref/prompt-${selected}-${i}/fixture.wav`,
+        sections: ['GRAMMAR', 'READING', 'LISTENING', 'SPEAKING', 'WRITING']
+          .filter((skill) => !control.missingSkill || skill !== 'WRITING')
+          .map((skill) => ({
+            id: `section-${selected}-${skill}`,
+            skill,
+            status: 'READY',
+            questions: ['GRAMMAR', 'READING', 'LISTENING'].includes(skill)
+              ? Array.from({ length: skill === 'LISTENING' ? 4 : 5 }, (_, i) => ({
+                  id: `q-${i}`,
+                  question: 'Generated question',
                 }))
               : [],
-          writingPrompts:
-            skill === 'WRITING'
-              ? Array.from({ length: 3 }, (_, i) => ({
-                  id: `writing-${i}`,
-                  task: 'Write a greeting.',
-                }))
-              : [],
-          episode:
-            skill === 'LISTENING'
-              ? {
-                  id: `episode-${selected}`,
-                  status: 'READY',
-                  audioUrl: '/api/v1/storage/listening/fixture.mp3',
-                }
-              : null,
-        })),
+            prompts:
+              skill === 'SPEAKING'
+                ? Array.from({ length: 4 }, (_, i) => ({
+                    id: `prompt-${selected}-${i}`,
+                    targetPhrase: 'A generated utterance',
+                    referenceTtsUrl: control.missingAudio
+                      ? null
+                      : control.foreignAudio
+                        ? 'https://outside.example/clip.wav'
+                        : `/api/v1/storage/speaking-ref/prompt-${selected}-${i}/fixture.wav`,
+                  }))
+                : [],
+            writingPrompts:
+              skill === 'WRITING'
+                ? Array.from({ length: 3 }, (_, i) => ({
+                    id: `writing-${i}`,
+                    task: 'Write a greeting.',
+                  }))
+                : [],
+            episode:
+              skill === 'LISTENING'
+                ? {
+                    id: `episode-${selected}`,
+                    status: 'READY',
+                    audioUrl: '/api/v1/storage/listening/fixture.mp3',
+                  }
+                : null,
+          })),
       });
     }
     if (path === `/api/v1/episodes/episode-${selected}`)
@@ -394,6 +398,17 @@ function fixture() {
       durable = structuredClone(value);
     },
   };
+}
+
+function passiveFixture(passiveId: 'owner' | 'member' = 'member') {
+  const f = fixture();
+  const passive = f.input.profiles.find((profile) => profile.id === passiveId)!;
+  const active = f.input.profiles.find((profile) => profile.id !== passiveId)!;
+  passive.fixture = null;
+  active.existingCourseIds = [];
+  f.remote.get(active.id)!.originalCourses = [];
+  f.remote.get(passive.id)!.originalCourses[0].targetLang = 'de';
+  return { ...f, passiveId, activeId: active.id };
 }
 
 describe('fenced review workloads', () => {
@@ -528,7 +543,7 @@ describe('fenced review workloads', () => {
     f.control.loseCourseReply = true;
     await expect(f.run()).rejects.toBeInstanceOf(ReviewWorkloadError);
     const original = structuredClone(f.requests);
-    f.input.profiles[0].fixture.curriculumId = 'another-admitted-curriculum';
+    f.input.profiles[0].fixture!.curriculumId = 'another-admitted-curriculum';
     await expect(f.run()).rejects.toMatchObject({ phase: 'input' });
     expect(f.requests).toEqual(original);
   });
@@ -631,4 +646,171 @@ describe('fenced review workloads', () => {
     expect(await f.run()).toEqual(result);
     expect(f.mutations).toEqual(original);
   });
+
+  it.each(['member', 'owner'] as const)(
+    'preserves the passive %s course and performs the complete workload for the other profile',
+    async (passiveId) => {
+      const f = passiveFixture(passiveId);
+      const originalCourse = structuredClone(f.remote.get(passiveId)!.originalCourses);
+      const result = await f.run();
+      expect(result).toMatchObject({
+        profileCount: 2,
+        generatedClasses: 1,
+        syntheticAssessments: 1,
+        humanPronunciationVerified: false,
+        codexWorkload: 'verified',
+        selectedSpeechWorkload: 'verified',
+        speechSelections: f.input.profiles.map((profile) => profile.selection),
+      });
+      expect(result.referenceAudioSha256).toEqual([
+        f.checkpoint()!.profiles.find((row) => row.profileId === f.activeId)!.reference!.sha256,
+      ]);
+      expect(f.mutations.map(({ path, profile }) => ({ path, profile }))).toEqual([
+        { path: '/api/v1/courses', profile: f.activeId },
+        {
+          path: `/api/v1/courses/fixture-course-${f.activeId}/next-class?background=1`,
+          profile: f.activeId,
+        },
+        {
+          path: `/api/v1/classes/class-${f.activeId}/speaking/prompt-${f.activeId}-0`,
+          profile: f.activeId,
+        },
+      ]);
+      expect(f.remote.get(passiveId)).toMatchObject({
+        originalCourses: originalCourse,
+        course: null,
+        operation: null,
+        recording: null,
+      });
+      expect(f.checkpoint()!.profiles.find((row) => row.profileId === passiveId)).toMatchObject({
+        courseIntent: false,
+        courseId: null,
+        preparationIntent: false,
+        operationId: null,
+        reference: null,
+        uploadIntent: false,
+        recordingId: null,
+        verified: false,
+      });
+      const mutations = structuredClone(f.mutations);
+      expect(await f.run()).toEqual(result);
+      expect(f.mutations).toEqual(mutations);
+    }
+  );
+
+  it('refuses two passive profiles before login or durable work', async () => {
+    const f = passiveFixture();
+    f.input.profiles.forEach((profile) => {
+      profile.fixture = null;
+    });
+    await expect(f.run()).rejects.toMatchObject({ phase: 'input' });
+    expect(f.requests).toEqual([]);
+    expect(f.checkpoint()).toBeNull();
+    expect(f.mutations).toEqual([]);
+  });
+
+  it.each(['preferences', 'course'] as const)(
+    'refuses changed passive %s before starting the active owner workload',
+    async (change) => {
+      const f = passiveFixture();
+      const passive = f.remote.get(f.passiveId)!;
+      if (change === 'preferences') passive.preferences.preferredTtsModel = 'changed-model';
+      else passive.originalCourses[0].id = 'replacement-owned-course';
+      await expect(f.run()).rejects.toBeInstanceOf(ReviewWorkloadError);
+      expect(f.mutations).toEqual([]);
+      expect(f.remote.get(f.activeId)!.course).toBeNull();
+    }
+  );
+
+  it.each(['preferences', 'course'] as const)(
+    'refuses changed passive %s during the final readback after real workload completion',
+    async (change) => {
+      const f = passiveFixture();
+      const fetch = f.boundary.fetch;
+      f.boundary.fetch = async (resource, options) => {
+        const response = await fetch(resource, options);
+        if (
+          new URL(String(resource)).pathname === '/api/v1/admin/auto-models' &&
+          f.checkpoint()!.profiles.find((row) => row.profileId === f.activeId)!.verified
+        ) {
+          const passive = f.remote.get(f.passiveId)!;
+          if (change === 'preferences') passive.preferences.preferredSttModel = 'changed-model';
+          else passive.originalCourses[0].id = 'replacement-owned-course';
+        }
+        return response;
+      };
+      await expect(f.run()).rejects.toMatchObject({
+        phase: 'final_verification',
+      });
+      expect(f.checkpoint()!.profiles.find((row) => row.profileId === f.activeId)!.verified).toBe(
+        true
+      );
+      expect(f.mutations.every((mutation) => mutation.profile === f.activeId)).toBe(true);
+    }
+  );
+
+  const course = { courseIntent: true, courseId: 'forged-course' };
+  const preparation = {
+    ...course,
+    preparationIntent: true,
+    preparationStartedAt: 1,
+    operationId: randomUUID(),
+  };
+  const generated = { ...preparation, classId: 'forged-class' };
+  const reference = {
+    ...generated,
+    reference: {
+      promptId: 'forged-prompt',
+      sha256: 'a'.repeat(64),
+      durationSeconds: 1,
+    },
+  };
+  const upload = { ...reference, uploadIntent: true, uploadStartedAt: 1 };
+  const recording = { ...upload, recordingId: 'forged-recording' };
+  it.each([
+    ['courseIntent', { courseIntent: true }],
+    ['courseId', course],
+    ['preparationIntent', { ...course, preparationIntent: true, preparationStartedAt: 1 }],
+    ['preparationStartedAt', { preparationStartedAt: 1 }],
+    ['operationId', preparation],
+    ['classId', generated],
+    ['reference', reference],
+    ['uploadIntent', upload],
+    ['uploadStartedAt', { uploadStartedAt: 1 }],
+    ['recordingId', recording],
+    ['cancelIntent', { ...preparation, cancelIntent: true }],
+    ['cancelled', { ...preparation, cancelIntent: true, cancelled: true }],
+    ['verified', { ...recording, verified: true }],
+  ] as const)(
+    'refuses a schema-valid passive %s before any active work or HTTP request',
+    async (field, patch) => {
+      const f = passiveFixture();
+      f.control.failAfterInitialCheckpoint = true;
+      await expect(f.run()).rejects.toMatchObject({ phase: 'authentication' });
+      const checkpoint = f.checkpoint()!;
+      Object.assign(
+        checkpoint.profiles.find((row) => row.profileId === f.passiveId)!,
+        patch
+      );
+      f.replaceCheckpoint(reviewWorkloadCheckpointSchema.parse(checkpoint));
+      f.control.failAfterInitialCheckpoint = false;
+      await expect(f.run()).rejects.toMatchObject({ phase: 'input' });
+      expect(f.requests).toEqual([]);
+      expect(f.mutations).toEqual([]);
+      expect(f.checkpoint()!.profiles.find((row) => row.profileId === f.passiveId)![field]).toEqual(
+        checkpoint.profiles.find((row) => row.profileId === f.passiveId)![field]
+      );
+    }
+  );
+
+  it.each(['missingSkill', 'exemptSpeech', 'wrongAiModel', 'wrongTtsModel'] as const)(
+    'still refuses %s for the single active owner before uploading speech',
+    async (failure) => {
+      const f = passiveFixture();
+      f.control[failure] = true;
+      await expect(f.run()).rejects.toBeInstanceOf(ReviewWorkloadError);
+      expect(f.mutations.every((mutation) => !mutation.path.includes('/speaking/'))).toBe(true);
+      expect(f.remote.get(f.passiveId)!.course).toBeNull();
+    }
+  );
 });

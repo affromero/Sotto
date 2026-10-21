@@ -53,7 +53,8 @@ const profileSchema = z.strictObject({
       target: z.enum(['en', 'es', 'de']),
       curriculumId: id,
     })
-    .refine((pair) => ['en:es', 'es:en', 'en:de'].includes(`${pair.native}:${pair.target}`)),
+    .refine((pair) => ['en:es', 'es:en', 'en:de'].includes(`${pair.native}:${pair.target}`))
+    .nullable(),
 });
 
 export const reviewWorkloadInputSchema = z
@@ -68,6 +69,7 @@ export const reviewWorkloadInputSchema = z
     (input) =>
       new Set(input.profiles.map((profile) => profile.id)).size === 2 &&
       input.profiles.some((profile) => profile.id === input.expectedOwnerId) &&
+      input.profiles.some((profile) => profile.fixture !== null) &&
       parseAgentModelId(input.expectedAutomaticModels.model.aiModel)?.provider === 'codex' &&
       parseAgentModelId(input.expectedAutomaticModels.platform.aiModel)?.provider === 'codex' &&
       input.profiles.every(
@@ -120,6 +122,26 @@ export const reviewWorkloadCheckpointSchema = z.strictObject({
 export type ReviewWorkloadCheckpoint = z.infer<typeof reviewWorkloadCheckpointSchema>;
 type Profile = ReviewWorkloadInput['profiles'][number];
 type Progress = ReviewWorkloadCheckpoint['profiles'][number];
+
+function initialProgress(profileId: string): Progress {
+  return {
+    profileId,
+    courseIntent: false,
+    courseId: null,
+    preparationIntent: false,
+    preparationStartedAt: null,
+    operationId: null,
+    classId: null,
+    reference: null,
+    uploadIntent: false,
+    uploadStartedAt: null,
+    recordingId: null,
+    cancelIntent: false,
+    cancelled: false,
+    verified: false,
+  };
+}
+
 export interface ReviewWorkloadBoundary {
   assertFence: () => Promise<void>;
   persistCheckpoint: (checkpoint: ReviewWorkloadCheckpoint) => Promise<void>;
@@ -223,22 +245,7 @@ export async function runReviewWorkloads(
         version: 1,
         inputHash,
         startedAt: Date.now(),
-        profiles: input.profiles.map((profile) => ({
-          profileId: profile.id,
-          courseIntent: false,
-          courseId: null,
-          preparationIntent: false,
-          preparationStartedAt: null,
-          operationId: null,
-          classId: null,
-          reference: null,
-          uploadIntent: false,
-          uploadStartedAt: null,
-          recordingId: null,
-          cancelIntent: false,
-          cancelled: false,
-          verified: false,
-        })),
+        profiles: input.profiles.map((profile) => initialProgress(profile.id)),
       }
     );
     if (
@@ -250,6 +257,13 @@ export async function runReviewWorkloads(
       )
     )
       fail();
+    for (const [index, profile] of input.profiles.entries()) {
+      if (
+        profile.fixture === null &&
+        !isDeepStrictEqual(checkpoint.profiles[index], initialProgress(profile.id))
+      )
+        fail();
+    }
     for (const name of ['courseId', 'classId', 'recordingId'] as const) {
       const ids = checkpoint.profiles.map((row) => row[name]).filter((item) => item !== null);
       if (new Set(ids).size !== ids.length) fail();
@@ -340,10 +354,10 @@ export async function runReviewWorkloads(
         ...(row.courseId ? [row.courseId] : []),
       ].sort();
       if (!isDeepStrictEqual(list.map((course) => course.id).sort(), expected)) fail();
+      const fixture = profile.fixture;
+      if (fixture === null) return;
       const matching = list.filter(
-        (course) =>
-          course.nativeLang === profile.fixture.native &&
-          course.targetLang === profile.fixture.target
+        (course) => course.nativeLang === fixture.native && course.targetLang === fixture.target
       );
       if (
         row.courseId
@@ -377,11 +391,8 @@ export async function runReviewWorkloads(
     )
       fail();
     await configuration();
-
-    for (let index = 0; index < input.profiles.length; index++) {
-      const profile = input.profiles[index];
-      const row = checkpoint.profiles[index];
-      phase = 'retained_intent';
+    phase = 'retained_intent';
+    for (const row of checkpoint.profiles) {
       if (
         (row.courseIntent && !row.courseId) ||
         (row.preparationIntent && !row.operationId) ||
@@ -389,8 +400,20 @@ export async function runReviewWorkloads(
         row.cancelIntent
       )
         fail();
+    }
+    for (const [index, profile] of input.profiles.entries()) {
+      await select(profile);
+      await checkCourses(profile, checkpoint.profiles[index]);
+    }
+
+    for (let index = 0; index < input.profiles.length; index++) {
+      const profile = input.profiles[index];
+      const row = checkpoint.profiles[index];
+      phase = 'retained_intent';
       await select(profile);
       await checkCourses(profile, row);
+      const fixture = profile.fixture;
+      if (fixture === null) continue;
       if (!row.courseId) {
         phase = 'course_admission';
         await newMutation(profile, row);
@@ -402,16 +425,16 @@ export async function runReviewWorkloads(
             .parse(
               await mutate(
                 '/api/v1/courses',
-                { native: profile.fixture.native, target: profile.fixture.target },
+                { native: fixture.native, target: fixture.target },
                 201
               )
             ).course
         );
         if (
           course.userId !== profile.id ||
-          course.nativeLang !== profile.fixture.native ||
-          course.targetLang !== profile.fixture.target ||
-          course.curriculumId !== profile.fixture.curriculumId ||
+          course.nativeLang !== fixture.native ||
+          course.targetLang !== fixture.target ||
+          course.curriculumId !== fixture.curriculumId ||
           course.currentLevel !== 'A1' ||
           input.profiles.some((item) => item.existingCourseIds.includes(course.id)) ||
           checkpoint.profiles.some((item) => item.courseId === course.id)
@@ -526,8 +549,8 @@ export async function runReviewWorkloads(
           candidate.courseId !== courseId ||
           requirements.scope !== 'CLASS' ||
           requirements.level !== 'A1' ||
-          requirements.nativeLang !== profile.fixture.native ||
-          requirements.targetLang !== profile.fixture.target ||
+          requirements.nativeLang !== fixture.native ||
+          requirements.targetLang !== fixture.target ||
           requirements.ttsProvider !== profile.selection.ttsProvider ||
           requirements.sttProvider !== profile.selection.sttProvider ||
           !requirements.referenceAudioRequired ||
@@ -569,7 +592,7 @@ export async function runReviewWorkloads(
         if (
           episode.id !== listening.episode.id ||
           episode.userId !== profile.id ||
-          episode.language !== profile.fixture.target ||
+          episode.language !== fixture.target ||
           !episode.audioUrl.startsWith('/api/v1/storage/')
         )
           fail();
@@ -670,18 +693,25 @@ export async function runReviewWorkloads(
     }
     phase = 'final_verification';
     await configuration();
-    for (const profile of input.profiles) await select(profile);
+    for (const [index, profile] of input.profiles.entries()) {
+      await select(profile);
+      await checkCourses(profile, checkpoint.profiles[index]);
+    }
+    const activeProgress = input.profiles.flatMap((profile, index) =>
+      profile.fixture === null ? [] : [checkpoint.profiles[index]]
+    );
+    if (activeProgress.some((row) => !row.verified || row.reference === null)) fail();
     await boundary.assertFence();
     signal.throwIfAborted();
     return {
       profileCount: checkpoint.profiles.length,
-      generatedClasses: checkpoint.profiles.filter((row) => row.verified).length,
-      syntheticAssessments: checkpoint.profiles.filter((row) => row.verified).length,
+      generatedClasses: activeProgress.length,
+      syntheticAssessments: activeProgress.length,
       humanPronunciationVerified: false as const,
       codexWorkload: 'verified' as const,
       selectedSpeechWorkload: 'verified' as const,
       speechSelections: input.profiles.map((profile) => profile.selection),
-      referenceAudioSha256: checkpoint.profiles.map((row) => row.reference!.sha256),
+      referenceAudioSha256: activeProgress.map((row) => row.reference!.sha256),
     };
   } catch {
     boundary.signal.throwIfAborted();

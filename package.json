@@ -69,6 +69,8 @@
   },
   "dependencies": {
     "@prisma/client": "7.10.0",
+    "bullmq": "6.3.13",
+    "ioredis": "6.0.0",
     "pg": "^8.23.1",
     "thesidedoor-core": "0.5.7",
     "zod": "^4.6.6"

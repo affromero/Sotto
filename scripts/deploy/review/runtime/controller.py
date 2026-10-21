@@ -179,21 +179,50 @@ def inspect_continuation(
         return
 
 
+def admitted_workload_inputs(
+    inputs: dict[str, object],
+) -> tuple[dict[str, object], dict[str, object], int]:
+    """Bind both reviewers and count only explicitly admitted new work."""
+    readiness = record(inputs['readiness'], 'provider readiness input')
+    workloads = record(inputs['workloads'], 'workload input')
+    providers = rows(readiness['profiles'], 'readiness profile')
+    profiles = rows(workloads['profiles'], 'workload profile')
+    identities = [row.get('id') for row in profiles]
+    if (len(providers) != 2 or len(profiles) != 2
+            or any(not isinstance(value, str) for value in identities)
+            or len(set(identities)) != 2
+            or readiness.get('expectedOwnerId') not in identities
+            or readiness.get('expectedOwnerId') != workloads.get(
+                'expectedOwnerId')
+            or [(row['id'], row['preferences']) for row in providers]
+            != [(row['id'], row['preferences']) for row in profiles]):
+        raise ValueError('same-two-review-profiles-required')
+    active = 0
+    for profile in profiles:
+        if 'fixture' not in profile:
+            raise ValueError('explicit-admitted-workload-fixture-required')
+        if profile['fixture'] is None:
+            continue
+        fixture = record(profile['fixture'], 'admitted workload fixture')
+        if (set(fixture) != {'native', 'target', 'curriculumId'}
+                or any(not isinstance(value, str) or not value
+                       for value in fixture.values())):
+            raise ValueError('malformed-admitted-workload-fixture')
+        active += 1
+    if not 1 <= active <= 2:
+        raise ValueError('one-or-two-active-review-workloads-required')
+    return readiness, workloads, active
+
+
 def activate(
     operations: HostOperations, evidence: dict[str, object],
     continue_check: Callable[[], None] | None = None,
 ) -> None:
     operations.verify_fence()
     operations.verify_egress()
-    inputs = services.private_inputs(operations)
-    readiness = record(inputs['readiness'], 'provider readiness input')
-    workloads = record(inputs['workloads'], 'workload input')
-    if (readiness.get('expectedOwnerId') != workloads.get('expectedOwnerId')
-            or [(row['id'], row['preferences']) for row in
-                rows(readiness['profiles'], 'readiness profile')]
-            != [(row['id'], row['preferences']) for row in
-                rows(workloads['profiles'], 'workload profile')]):
-        raise ValueError('same-two-review-profiles-required')
+    readiness, workloads, active = admitted_workload_inputs(
+        services.private_inputs(operations),
+    )
     journal = read_activation(operations)
     path = operations.attempt.directory / 'activation.json'
     original_queues = record(operations.manifest['originalQueues'],
@@ -312,8 +341,11 @@ def activate(
         'workloads', workloads, checkpoint=workload_checkpoint,
         candidate_id=web,
     ), 'actual learning and speech workload')
-    if (result.get('profileCount') != 2 or result.get('generatedClasses') != 2
-            or result.get('syntheticAssessments') != 2
+    if (any(type(result.get(name)) is not int for name in (
+                'profileCount', 'generatedClasses', 'syntheticAssessments'))
+            or result.get('profileCount') != 2
+            or result.get('generatedClasses') != active
+            or result.get('syntheticAssessments') != active
             or result.get('humanPronunciationVerified') is not False
             or result.get('codexWorkload') != 'verified'
             or result.get('selectedSpeechWorkload') != 'verified'
@@ -321,8 +353,8 @@ def activate(
                 in rows(workloads['profiles'], 'workload profile')]):
         raise ValueError('actual-learning-and-speech-proof-required')
     hashes = result.get('referenceAudioSha256')
-    if not isinstance(hashes, list) or len(hashes) != 2:
-        raise ValueError('two-generated-reference-audio-proofs-required')
+    if not isinstance(hashes, list) or len(hashes) != active:
+        raise ValueError('active-generated-reference-audio-proofs-required')
     for value in hashes:
         digest(value, 'generated reference audio')
     atomic_json(operations.attempt.directory / 'workloads-verified.json',
@@ -372,7 +404,7 @@ def execute(
         if phase == 'PRECHECK':
             operations.preflight()
             services.runtime_identity(operations)
-            services.private_inputs(operations)
+            admitted_workload_inputs(services.private_inputs(operations))
             inspect_original(operations, evidence)
             attempt.advance('ADMITTED')
         elif phase == 'ADMITTED':
@@ -557,9 +589,11 @@ def supervise(
     flags = {'hold': False, 'resume': False, 'holding': False}
 
     def request_hold(number: int, frame: FrameType | None) -> None:
+        del number, frame
         flags['hold'] = True
 
     def request_resume(number: int, frame: FrameType | None) -> None:
+        del number, frame
         if flags['holding']:
             flags['resume'] = True
 

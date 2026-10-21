@@ -6,6 +6,7 @@ import copy
 import hashlib
 import json
 import os
+import shlex
 import sys
 import tempfile
 import unittest
@@ -50,7 +51,7 @@ class HostCommandTests(unittest.TestCase):
         # The system boundary emulates sudo's descriptor closure. The actual
         # bootstrap handoff and final process execute without substitution.
         sudo = self.root / 'sudo'
-        sudo.write_text('#!' + sys.executable + '\n' + '''
+        handoff = '''
 import os,sys
 from pathlib import Path
 from scripts.deploy.review.runtime.privileged import handoff
@@ -64,7 +65,9 @@ handoff(Path(options['--lock']),Path(options['--payload'])
         if '--payload' in options else None,
         int(options['--owner-uid']),options.get('--payload-sha256'),
         args[split+1:])
-''')
+'''
+        sudo.write_text('#!/bin/sh\nexec ' + shlex.quote(sys.executable)
+                        + ' -c ' + shlex.quote(handoff) + ' "$@"\n')
         sudo.chmod(0o700)
         target = '''import hashlib,json,os,sys
 metadata=os.fstat(9)
@@ -75,7 +78,8 @@ print(json.dumps({'device':metadata.st_dev,'inode':metadata.st_ino,
         for content in (None, b'private fixture input'):
             with self.subTest(contentPresent=content is not None), patch.dict(
                 os.environ,
-                {'PATH': str(self.root) + ':' + os.environ['PATH']},
+                {'PATH': str(self.root) + ':' + os.environ['PATH'],
+                 'PYTHONPATH': ''},
             ):
                 result = json.loads(self.operations.command(
                     ['sudo', '-n', sys.executable, '-c', target],
