@@ -220,6 +220,9 @@ final class LayoutAppearanceTests: XCTestCase {
                 await settle()
                 let text = descendants(of: host.content.view).compactMap { ($0 as? UITextView)?.text }
                 XCTAssertTrue(text.contains(teaching.explanation))
+                let navigation = try XCTUnwrap(descendants(of: host.content.view)
+                    .compactMap { $0 as? UINavigationBar }.first)
+                XCTAssertEqual(navigation.topItem?.title, "Class \(detail.order)")
                 XCTAssertFalse(text.contains(teaching.guidedPractice.answer))
                 XCTAssertFalse(text.contains(detail.sections[0].questions[0].question))
                 let explanation = try XCTUnwrap(descendants(of: host.content.view)

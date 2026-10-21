@@ -47,15 +47,24 @@ struct ClassSessionView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollViewReader { scroll in
-                ScrollView {
-                    classContent
-                        .padding(layout == .compact ? 16 : 28)
-                        .frame(maxWidth: 980, alignment: .leading)
-                        .id("class-content")
-                }
-                .onChange(of: selectedStage) { _, _ in scroll.scrollTo("class-content", anchor: .top) }
+            sessionLifecycle
+        }
+    }
+
+    private var sessionScroll: some View {
+        ScrollViewReader { scroll in
+            ScrollView {
+                classContent
+                    .padding(layout == .compact ? 16 : 28)
+                    .frame(maxWidth: 980, alignment: .leading)
+                    .id("class-content")
             }
+            .onChange(of: selectedStage) { _, _ in scroll.scrollTo("class-content", anchor: .top) }
+        }
+    }
+
+    private var sessionSheets: some View {
+        sessionScroll
             .background(SottoTheme.paper)
             .navigationTitle(model.pencilWorkbook && layout.supportsHandwriting ? "Class \(currentClass.order) workbook" : "Class \(currentClass.order)")
             .navigationBarTitleDisplayMode(.inline)
@@ -98,6 +107,10 @@ struct ClassSessionView: View {
                     await loadSelectionHelp(for: request)
                 }
             }
+    }
+
+    private var sessionLifecycle: some View {
+        sessionSheets
             .confirmationDialog("Remove class?", isPresented: $showingRemoveConfirmation, titleVisibility: .visible) {
                 Button("Remove class", role: .destructive) {
                     let classId = currentClass.id
@@ -126,7 +139,6 @@ struct ClassSessionView: View {
                 answers = currentClass.learnerAnswers ?? [:]
                 refreshPencilReviews()
             }
-        }
     }
 
     private var classContent: some View {
