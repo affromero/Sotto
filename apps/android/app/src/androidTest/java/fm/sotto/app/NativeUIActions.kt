@@ -77,8 +77,14 @@ class NativeUIActions(private val compose: ComposeTestRule) {
     }
     fun click(text: String, timeoutMillis: Long = 15_000) {
         val matcher = hasText(text) and hasClickAction() and isEnabled()
-        compose.waitUntil(timeoutMillis) { compose.onAllNodes(matcher)
-            .fetchSemanticsNodes(atLeastOneRootRequired = false).isNotEmpty() }
+        try {
+            compose.waitUntil(timeoutMillis) { compose.onAllNodes(matcher)
+                .fetchSemanticsNodes(atLeastOneRootRequired = false).isNotEmpty() }
+        } catch (error: ComposeTimeoutException) {
+            val hierarchy = runCatching { compose.onRoot().printToString() }
+                .getOrElse { "Compose hierarchy unavailable: ${it.message}" }
+            throw AssertionError("Expected enabled button: $text\n$hierarchy", error)
+        }
         compose.onAllNodes(matcher).onFirst().performScrollTo().assertIsDisplayed().performClick()
     }
     fun fill(label: String, text: String) {

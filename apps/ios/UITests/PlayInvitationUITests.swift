@@ -5,6 +5,12 @@ final class PlayInvitationUITests: XCTestCase {
     func testSystemInvitationCreatesAnApprovedProfileAndPlaysAllThreeNativeGames() async throws {
         continueAfterFailure = false
         let fixture = try PlayUIFixture()
+        defer {
+            let diagnostics = XCTAttachment(string: fixture.diagnostics)
+            diagnostics.name = "game-fixture-actions"
+            diagnostics.lifetime = .keepAlways
+            add(diagnostics)
+        }
         let server = try LocalHTTPServer { fixture.respond($0) }
         try await server.start()
         defer { server.stop() }
@@ -14,8 +20,6 @@ final class PlayInvitationUITests: XCTestCase {
         url.queryItems = [URLQueryItem(name: "v", value: "1"), URLQueryItem(name: "server", value: server.url.absoluteString),
             URLQueryItem(name: "code", value: "ABCDEFGHJK23")]
         app.open(try XCTUnwrap(url.url))
-        let name = app.textFields["play.newName"]
-        XCTAssertTrue(name.waitForExistence(timeout: 15), app.debugDescription)
         let cameraAlert = XCUIApplication(bundleIdentifier: "com.apple.springboard").alerts.matching(
             NSPredicate(format: "label CONTAINS[c] %@ AND label CONTAINS[c] %@", "Sotto", "camera")
         ).firstMatch
@@ -25,6 +29,8 @@ final class PlayInvitationUITests: XCTestCase {
             allow.tap()
             XCTAssertTrue(cameraAlert.waitForNonExistence(timeout: 5))
         }
+        let name = app.textFields["play.newName"]
+        XCTAssertTrue(name.waitForExistence(timeout: 15), app.debugDescription)
         name.tap()
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5), app.debugDescription)
         name.typeText("Native Sam")
@@ -32,7 +38,8 @@ final class PlayInvitationUITests: XCTestCase {
         app.swipeUp()
         let consent = app.switches["Create my learner profile on this server"]
         XCTAssertTrue(consent.waitForExistence(timeout: 5))
-        consent.tap()
+        try tap("Create my learner profile on this server", type: .switch, app: app)
+        XCTAssertEqual(consent.value as? String, "1", app.debugDescription)
         try tap("Ask to join as a new learner", app: app)
         try tap("Finish joining", app: app, timeout: 15)
         let firstCard = app.buttons["play.choice.A"]
@@ -81,14 +88,22 @@ final class PlayInvitationUITests: XCTestCase {
         case missingButton(String), invisibleButton(String), disabledButton(String)
     }
 
-    private func tap(_ title: String, app: XCUIApplication, timeout: TimeInterval = 10) throws {
-        let button = app.buttons[title].firstMatch
-        guard button.waitForExistence(timeout: timeout) else { throw InteractionFailure.missingButton(title) }
+    private func tap(_ title: String, type: XCUIElement.ElementType = .button,
+                     app: XCUIApplication, timeout: TimeInterval = 10) throws {
+        let named = app.descendants(matching: type)[title].firstMatch
+        let control = type == .switch ? named.switches.firstMatch : named
+        guard control.waitForExistence(timeout: timeout) else {
+            let hierarchy = XCTAttachment(string: app.debugDescription)
+            hierarchy.name = "missing-control-\(title)"
+            hierarchy.lifetime = .keepAlways
+            add(hierarchy)
+            throw InteractionFailure.missingButton(title)
+        }
         var scrolls = 0
         var geometryChecks = 0
         while geometryChecks < 8 {
             geometryChecks += 1
-            let frame = button.frame
+            let frame = control.frame
             guard !frame.isEmpty,
                   [frame.minX, frame.minY, frame.maxX, frame.maxY].allSatisfy({ $0.isFinite }) else {
                 throw InteractionFailure.invisibleButton(title)
@@ -103,19 +118,19 @@ final class PlayInvitationUITests: XCTestCase {
             let viewport = CGRect(x: bounds.minX + 8, y: top, width: bounds.width - 16, height: bottom - top)
             let origin = app.coordinate(withNormalizedOffset: .zero)
             if viewport.contains(frame) {
-                if button.isEnabled {
-                    origin.withOffset(CGVector(dx: frame.midX - bounds.minX, dy: frame.midY - bounds.minY)).tap()
+                if control.isEnabled {
+                    control.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
                     return
                 }
                 let deadline = ContinuousClock.now.advanced(by: .seconds(timeout))
-                while !button.isEnabled {
+                while !control.isEnabled {
                     guard ContinuousClock.now < deadline else { throw InteractionFailure.disabledButton(title) }
                     Thread.sleep(forTimeInterval: 0.05)
                 }
                 continue
             }
             guard scrolls < 6 else { throw InteractionFailure.invisibleButton(title) }
-            let scroll = app.scrollViews.containing(.button, identifier: title).firstMatch
+            let scroll = app.scrollViews.containing(type, identifier: title).firstMatch
             guard scroll.exists else { throw InteractionFailure.invisibleButton(title) }
             let visible = scroll.frame.intersection(viewport)
             guard !visible.isNull, visible.width > 0, visible.height > 44 else {
