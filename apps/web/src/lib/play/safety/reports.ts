@@ -33,7 +33,7 @@ export function playSafetyReportView(row: PlaySafetyReport) {
 }
 
 /** Only one selected, other-authored field from the reporter's actual view is evidence. */
-export function selectPlayReportEvidence(
+function selectPlayReportEvidence(
   room: StoredPlayRoom,
   userId: string,
   selector: PlayReportSelector
