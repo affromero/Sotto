@@ -13,10 +13,14 @@ import kotlinx.serialization.json.JsonObject
     val id: String, val connection: Connection, val path: String, val body: String,
     val response: OperationResponse, val baseline: PlayRoom? = null, val reconciled: Boolean = false,
 )
+@Serializable data class PendingSafety(
+    val id: String, val connection: Connection, val path: String, val body: String,
+)
 @Serializable data class Vault(
     val version: Int = 1, val serial: Long = 0, val connection: Connection? = null, val invitation: PlayInvitation? = null,
     val admission: Admission? = null, val retainedAdmissions: List<Admission> = emptyList(),
     val archivedConnections: List<Connection> = emptyList(), val pending: PendingOperation? = null,
+    val pendingSafety: PendingSafety? = null,
     val drafts: Map<String, String> = emptyMap(),
 ) {
     fun archive(value: Connection): Vault {
@@ -39,6 +43,11 @@ import kotlinx.serialization.json.JsonObject
         pending?.let {
             require(it.path.startsWith("/api/v1/play/") && it.body.toByteArray().size <= 16_384)
             SottoJson.decodeFromString<JsonObject>(it.body)
+        }
+        pendingSafety?.let {
+            require(it.path.startsWith("/api/v1/play/") && it.body.toByteArray().size <= 16_384)
+            val body = SottoJson.decodeFromString<JsonObject>(it.body)
+            require(body["actionId"]?.toString() == "\"${it.id}\"")
         }
     }
 }

@@ -8,7 +8,8 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
-suspend fun PlayCoordinator.join(settings: Settings, name: String, existing: Boolean) {
+suspend fun PlayCoordinator.join(settings: Settings, name: String, existing: Boolean, acceptedConduct: Boolean) {
+    require(acceptedConduct && state.value.policy?.version == CONDUCT_VERSION) { "Read and accept the conduct policy first." }
     require(settings.valid) { "Choose two different languages." }
     val vault = requireNotNull(state.value.vault)
     val invite = requireNotNull(vault.invitation) { "Open an invitation first." }
@@ -25,7 +26,7 @@ suspend fun PlayCoordinator.join(settings: Settings, name: String, existing: Boo
         require(name.trim().length in 1..80) { "Enter your name, up to 80 characters." }
         JoinCandidate(CandidateKind.NEW, settings, name = name.trim(), consentToProfile = true)
     }
-    val admission = Admission(invite, JoinCommand(newID(), invite.code, deviceName.take(80), candidate),
+    val admission = Admission(invite, JoinCommand(newID(), invite.code, deviceName.take(80), candidate, CONDUCT_VERSION),
         PlayInvitation.proof(), if (existing) original else null)
     persist {
         require(it.admission == null && it.invitation == invite && it.connection == original)
@@ -45,6 +46,9 @@ suspend fun PlayCoordinator.retryIntake() {
     val generation = epoch
     val original = state.value.vault?.connection
     assertExisting(pending)
+    require(pending.command.acceptedConductVersion == CONDUCT_VERSION) {
+        "This saved request predates conduct acceptance. Check it and explicitly accept the policy, or discard it and start a new request."
+    }
     val api = pending.existingConnection?.let(::api) ?: SottoClient(pending.invitation.server)
     val value = api.post<JoinStatusView>("/api/v1/play/invitations", pending.command.payload(), pending.proof)
     checkEpoch(generation, original)
@@ -58,6 +62,9 @@ suspend fun PlayCoordinator.finishAdmission() {
     val original = state.value.vault?.connection
     assertExisting(pending)
     if (pending.delivery == null) {
+        require(pending.command.acceptedConductVersion == CONDUCT_VERSION || state.value.pendingConductAccepted) {
+            "Accept the conduct policy for this saved request before claiming it."
+        }
         val api = pending.existingConnection?.let(::api) ?: SottoClient(pending.invitation.server)
         val value = api.post<Delivery>("/api/v1/play/join-requests/${SottoClient.id(pending.command.requestId)}/claim", "{}", pending.proof)
         checkEpoch(generation, original)
@@ -105,6 +112,35 @@ suspend fun PlayCoordinator.finishAdmission() {
             retainedAdmissions = it.retainedAdmissions.filterNot { value -> value.command.requestId == pending.command.requestId })
     }
     moveToRoom(verified)
+}
+
+suspend fun PlayCoordinator.acceptPendingConduct() {
+    val pending = requireNotNull(state.value.vault?.admission)
+    require(state.value.policy?.version == CONDUCT_VERSION && !state.value.legacyRequestMissing)
+    val generation = epoch
+    val original = state.value.vault?.connection
+    assertExisting(pending)
+    val api = pending.existingConnection?.let(::api) ?: SottoClient(pending.invitation.server)
+    val value = api.post<PendingConductAck>("/api/v1/play/join-requests/${SottoClient.id(pending.command.requestId)}/conduct",
+        buildJsonObject { put("version", CONDUCT_VERSION) }.toString(), pending.proof)
+    checkEpoch(generation, original)
+    require(value.requestId == pending.command.requestId && value.version == CONDUCT_VERSION)
+    require(state.value.vault?.admission == pending)
+    mutable.update { it.copy(pendingConductAccepted = true, notice = "Conduct accepted for this saved invitation.") }
+}
+
+suspend fun PlayCoordinator.retainLegacyAdmission(acceptedConduct: Boolean) {
+    val pending = requireNotNull(state.value.vault?.admission)
+    require(acceptedConduct && state.value.policy?.version == CONDUCT_VERSION && state.value.legacyRequestMissing)
+    require(pending.command.acceptedConductVersion == null && pending.delivery == null)
+    persist {
+        require(it.admission == pending)
+        val retained = it.retainedAdmissions.filterNot { old -> old.command.requestId == pending.command.requestId }
+        require(retained.size < 16) { "Remove an old recovery before keeping another." }
+        it.copy(admission = null, retainedAdmissions = retained + pending)
+    }
+    mutable.update { it.copy(joinStatus = null, pendingConductAccepted = false, legacyRequestMissing = false,
+        notice = "The old request and proof are kept unchanged. Submit a new request below when ready.") }
 }
 
 suspend fun PlayCoordinator.discardInvitation() {

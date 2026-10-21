@@ -14,6 +14,24 @@ import java.net.InetSocketAddress
 import java.util.concurrent.LinkedBlockingQueue
 
 class PlayTransportTest {
+    @Test fun structuredSafetyErrorsKeepTheirReasonAndActualHttpStatus() = runBlocking {
+        PlayScenario().use { server ->
+            val connection = server.connection()
+            for (fixture in server.safetyFixture.getValue("errors").let { it as kotlinx.serialization.json.JsonArray }) {
+                val value = fixture as kotlinx.serialization.json.JsonObject
+                val status = value.getValue("status").toString().toInt()
+                val body = value.getValue("body") as kotlinx.serialization.json.JsonObject
+                server.respond = { HttpReply(status, body.toString()) }
+                try { SottoClient(connection.server, connection).raw("/api/v1/play/safety"); fail("Expected safety rejection") }
+                catch (error: ApiError) {
+                    assertEquals(status, error.status)
+                    assertEquals(body.getValue("reason").toString().removeSurrounding("\""), error.reason)
+                    assertTrue(error.status != 401 && error.status != 403)
+                }
+            }
+        }
+    }
+
     @Test fun profileDeletionUsesConfirmedAuthenticatedDeleteAndAcceptsQueuedCleanup() = runBlocking {
         PlayScenario().use { server ->
             val connection = server.connection()

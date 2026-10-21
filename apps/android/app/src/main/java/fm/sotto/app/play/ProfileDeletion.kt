@@ -17,6 +17,7 @@ suspend fun PlayCoordinator.deleteProfile(expected: Connection) {
                 connection = saved.connection?.takeUnless(::matches),
                 archivedConnections = saved.archivedConnections.filterNot(::matches),
                 pending = saved.pending?.takeUnless { matches(it.connection) },
+                pendingSafety = saved.pendingSafety?.takeUnless { matches(it.connection) },
                 admission = saved.admission?.takeUnless { matches(it.existingConnection) ||
                     (it.invitation.server == current.server && it.delivery?.profile?.id == current.profile.id) },
                 retainedAdmissions = saved.retainedAdmissions.filterNot { matches(it.existingConnection) ||

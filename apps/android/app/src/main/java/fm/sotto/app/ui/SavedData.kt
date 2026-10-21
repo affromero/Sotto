@@ -53,6 +53,7 @@ import fm.sotto.app.network.NetworkAccess
                 if (all) eraseSavedData()
                 else persist {
                     require(connection == null || it.pending?.connection != connection) { "Recover the pending action before removing its credential." }
+                    require(connection == null || it.pendingSafety?.connection != connection) { "Recover the pending safety action before removing its credential." }
                     it.copy(archivedConnections = it.archivedConnections.filterNot { saved -> saved == connection },
                         retainedAdmissions = it.retainedAdmissions.filterNot { saved -> saved.command.requestId == recovery },
                         drafts = if (draft == null) it.drafts else it.drafts - draft)

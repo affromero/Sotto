@@ -22,7 +22,7 @@ import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
-class ApiError(val status: Int, message: String) : IOException(message)
+class ApiError(val status: Int, message: String, val reason: String? = null) : IOException(message)
 class ConnectionFailure(cause: IOException) : IOException("Could not reach the server. ${cause.message.orEmpty().take(200)}", cause)
 
 class SottoClient(
@@ -114,7 +114,10 @@ class SottoClient(
                             val message = runCatching {
                                 SottoJson.decodeFromString<JsonObject>(text)["error"]?.jsonPrimitive?.content
                             }.getOrNull()?.take(300)?.filterNot { it.isISOControl() }
-                            throw ApiError(response.code, message ?: "Server refused the request (${response.code}).")
+                            val reason = runCatching {
+                                SottoJson.decodeFromString<JsonObject>(text)["reason"]?.jsonPrimitive?.content
+                            }.getOrNull()?.takeIf { it.matches(Regex("[A-Z_]{1,50}")) }
+                            throw ApiError(response.code, message ?: "Server refused the request (${response.code}).", reason)
                         }
                         if (continuation.isActive) continuation.resume(text)
                     } catch (error: Exception) {

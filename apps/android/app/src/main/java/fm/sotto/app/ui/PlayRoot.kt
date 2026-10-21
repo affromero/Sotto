@@ -20,6 +20,7 @@ import fm.sotto.app.ui.legal.PrivacyLegal
 @Composable fun PlayRoot(coordinator: PlayCoordinator) {
     val state by coordinator.state.collectAsStateWithLifecycle()
     var discardID by remember { mutableStateOf<String?>(null) }
+    var discardSafetyID by remember { mutableStateOf<String?>(null) }
     var privacy by remember { mutableStateOf(false) }
     BackHandler(state.screen != Screen.Lobby) { coordinator.navigate(Screen.Lobby) }
     Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
@@ -45,9 +46,20 @@ import fm.sotto.app.ui.legal.PrivacyLegal
                 state.vault?.pending?.let { pending ->
                     Text("An action needs recovery. Its original request is saved.", style = MaterialTheme.typography.titleMedium)
                     if (pending.connection == state.vault?.connection)
-                        Action("Retry saved action", state.active && !state.busy && !state.checking && !state.accessRevoked && NetworkAccess.allowedFor(pending.connection.server)) { coordinator.run { retryAction() } }
+                        Action("Retry saved action", state.active && !state.busy && !state.checking && !state.accessRevoked && state.vault?.pendingSafety == null && NetworkAccess.allowedFor(pending.connection.server)) { coordinator.run { retryAction() } }
                     else Action("Restore original profile", state.active && !state.busy && !state.checking && NetworkAccess.allowedFor(pending.connection.server)) { coordinator.run { switchConnection(pending.connection) } }
                     Action("Discard pending action", !state.busy, secondary = true) { discardID = pending.id }
+                }
+                state.vault?.pendingSafety?.let { pending ->
+                    Text("A safety action needs recovery. Its exact request is protected.")
+                    if (pending.connection == state.vault?.connection)
+                        Action("Retry saved safety action", state.active && !state.busy && !state.accessRevoked && NetworkAccess.allowedFor(pending.connection.server)) {
+                            coordinator.runSafety { retrySafety() }
+                        }
+                    else Action("Restore safety action profile", state.active && !state.busy && NetworkAccess.allowedFor(pending.connection.server)) {
+                        coordinator.run { switchConnection(pending.connection) }
+                    }
+                    Action("Discard saved safety action", !state.busy, true) { discardSafetyID = pending.id }
                 }
                 key(state.identityGeneration) {
                     when (state.screen) {
@@ -56,6 +68,7 @@ import fm.sotto.app.ui.legal.PrivacyLegal
                         Screen.Pair -> PairServer(coordinator, state)
                         Screen.Notebook -> Notebook(coordinator, state)
                         Screen.Saved -> SavedData(coordinator, state)
+                        Screen.Safety -> PlaySafety(coordinator, state)
                         is Screen.Room -> GameRoom(coordinator, state)
                     }
                 }
@@ -63,6 +76,11 @@ import fm.sotto.app.ui.legal.PrivacyLegal
         }
     }
     if (privacy) PrivacyLegal { privacy = false }
+    discardSafetyID?.let { id -> AlertDialog(onDismissRequest = { discardSafetyID = null },
+        title = { Text("Discard this saved safety action?") },
+        text = { Text("It may already have saved. Check your reports and blocks before submitting again. The original connection and drafts are kept.") },
+        confirmButton = { TextButton({ discardSafetyID = null; coordinator.discardPendingSafety(id) }, enabled = !state.busy) { Text("Discard safety action") } },
+        dismissButton = { TextButton({ discardSafetyID = null }) { Text("Keep recovery") } }) }
     discardID?.let { id -> AlertDialog(onDismissRequest = { discardID = null },
         title = { Text("Discard this pending action?") },
         text = { Text("It may already have saved. Your draft and original connection are kept. Check the game before submitting again.") },
