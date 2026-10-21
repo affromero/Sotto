@@ -49,8 +49,10 @@ class ProfileDeletionTest {
             val other = server.connection(Seat.GUEST)
             val key = "${connection.server}/${connection.profile.id}/draft"
             val otherKey = "${other.server}/${other.profile.id}/draft"
+            val safetyId = newID()
             val store = MemoryVault(Vault(connection = connection, archivedConnections = listOf(connection, other),
                 pending = PendingOperation(newID(), connection, "/api/v1/play/rooms", "{}", OperationResponse.ROOM),
+                pendingSafety = PendingSafety(safetyId, connection, "/api/v1/play/safety/conduct", "{\"actionId\":\"$safetyId\",\"version\":1}"),
                 drafts = mapOf(key to "Deleted draft", otherKey to "Kept draft")))
             server.respond = { if (it.method == "DELETE") HttpReply(202, "{\"success\":true}") else server.normal(it) }
             val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -62,6 +64,7 @@ class ProfileDeletionTest {
                 val saved = store.load()
                 assertNull(saved.connection)
                 assertNull(saved.pending)
+                assertNull(saved.pendingSafety)
                 assertEquals(listOf(other), saved.archivedConnections)
                 assertEquals(mapOf(otherKey to "Kept draft"), saved.drafts)
                 assertTrue(coordinator.state.value.notice.orEmpty().contains("deletion accepted"))

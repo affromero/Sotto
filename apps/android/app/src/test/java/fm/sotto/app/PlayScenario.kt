@@ -24,6 +24,8 @@ class PlayScenario : AutoCloseable {
     private var executor: java.util.concurrent.ExecutorService? = null
     val fixture: JsonObject = SottoJson.parseToJsonElement(requireNotNull(javaClass.classLoader?.getResourceAsStream("contract.json"))
         .use { it.readBytes().toString(Charsets.UTF_8) }).jsonObject
+    val safetyFixture: JsonObject = SottoJson.parseToJsonElement(requireNotNull(javaClass.classLoader?.getResourceAsStream("safety.json"))
+        .use { it.readBytes().toString(Charsets.UTF_8) }).jsonObject
     fun round(name: String): PlayRound = SottoJson.decodeFromJsonElement(fixture.getValue("rounds").jsonArray
         .first { it.jsonObject["name"]?.jsonPrimitive?.content == name }.jsonObject.getValue("round"))
     fun room(seat: Seat = Seat.HOST): PlayRoom = SottoJson.decodeFromJsonElement(fixture.getValue("rooms").jsonArray
@@ -33,6 +35,11 @@ class PlayScenario : AutoCloseable {
         return Connection(origin, "a-real-device-token-for-$seat", Profile(member.id, member.name, false, "USER"))
     }
     fun normal(request: RecordedRequest): HttpReply = when {
+        request.path == "/api/v1/play/policy" -> HttpReply(200, safetyFixture.getValue("policy").toString())
+        request.path == "/api/v1/play/safety" -> HttpReply(200, JsonObject(safetyFixture.getValue("accepted").jsonObject +
+            ("profileId" to JsonPrimitive(request.headers["x-sotto-play-profile"]?.single() ?: connection().profile.id))).toString())
+        request.path == "/api/v1/play/safety/blocks" -> HttpReply(200, "{\"blocks\":[],\"nextCursor\":null}")
+        request.path == "/api/v1/play/safety/reports" -> HttpReply(200, "{\"reports\":[],\"nextCursor\":null}")
         request.path == "/api/v1/play/rooms" && request.method == "GET" -> HttpReply(200, "{\"rooms\":[],\"nextCursor\":null}")
         request.path == "/api/v1/play/enrollments" -> HttpReply(403, "{\"error\":\"Owner required\"}")
         request.path.startsWith("/api/v1/play/join-requests/") && request.method == "GET" -> HttpReply(200,

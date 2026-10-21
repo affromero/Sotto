@@ -10,7 +10,7 @@ import fm.sotto.app.model.*
 import fm.sotto.app.play.*
 import fm.sotto.app.ui.Action
 import fm.sotto.app.ui.Field
-import kotlinx.coroutines.launch
+import fm.sotto.app.ui.protectedDraft
 
 @Composable fun ChoiceCards(choices: List<Choice>, selected: String?, enabled: Boolean, onPick: (Option) -> Unit) {
     var meanings by remember(choices) { mutableStateOf(false) }
@@ -26,37 +26,9 @@ import kotlinx.coroutines.launch
     if (choices.any { it.supportText != null }) Action(if (meanings) "Hide meanings" else "Show meanings", secondary = true) { meanings = !meanings }
 }
 
-@Composable private fun draft(coordinator: PlayCoordinator, state: PlayState, room: PlayRoom, round: PlayRound,
-                              action: ActionType): Pair<String, (String) -> Unit> {
-    val key = coordinator.draftKey(room, round, action)
-    val saved = state.vault?.drafts?.get(key).orEmpty()
-    var text by remember(key) { mutableStateOf(saved) }
-    var previous by remember(key) { mutableStateOf(saved) }
-    LaunchedEffect(saved) {
-        if (text == previous) text = saved
-        previous = saved
-    }
-    val connection = state.vault?.connection
-    return text to { next ->
-        text = next.take(500)
-        val value = text
-        val generation = coordinator.epoch
-        coordinator.scope.launch {
-            try {
-                coordinator.checkEpoch(generation, connection)
-                coordinator.persist {
-                    require(it.connection == connection)
-                    it.copy(drafts = if (value.isEmpty()) it.drafts - key else it.drafts + (key to value))
-                }
-            } catch (_: kotlinx.coroutines.CancellationException) { }
-            catch (error: Exception) { if (coordinator.epoch == generation) coordinator.report(error) }
-        }
-    }
-}
-
 @Composable fun TextCommand(coordinator: PlayCoordinator, state: PlayState, room: PlayRoom, round: PlayRound,
                             action: ActionType, label: String, button: String, ready: Boolean) {
-    val (text, change) = draft(coordinator, state, room, round, action)
+    val (text, change) = protectedDraft(coordinator, state, coordinator.draftKey(room, round, action))
     Field(label, text, ready, false, onChange = change)
     Action(button, ready && text.isNotBlank()) {
         val captured = text.trim()
@@ -65,7 +37,7 @@ import kotlinx.coroutines.launch
 }
 
 @Composable fun Feedback(coordinator: PlayCoordinator, state: PlayState, room: PlayRoom, round: PlayRound, ready: Boolean) {
-    val (text, change) = draft(coordinator, state, room, round, ActionType.FEEDBACK)
+    val (text, change) = protectedDraft(coordinator, state, coordinator.draftKey(room, round, ActionType.FEEDBACK))
     Text("Did you understand?", style = MaterialTheme.typography.titleLarge)
     Field("A correction or natural alternative (optional)", text, ready, false, onChange = change)
     Action("I understood", ready) {

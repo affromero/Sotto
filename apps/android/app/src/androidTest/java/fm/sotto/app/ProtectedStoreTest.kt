@@ -22,13 +22,19 @@ class ProtectedStoreTest {
         try {
             val connection = connection()
             val pending = PendingOperation(newID(), connection, "/api/v1/play/rooms", "{\"actionId\":\"original\"}", OperationResponse.ROOM)
-            store.update { it.copy(connection = connection, pending = pending, drafts = mapOf("draft" to "a private language draft")) }
+            val safetyId = newID()
+            val safety = PendingSafety(safetyId, connection, "/api/v1/play/rooms/room/reports",
+                "{\"actionId\":\"$safetyId\",\"detail\":\"private report explanation\"}")
+            store.update { it.copy(connection = connection, pending = pending, pendingSafety = safety,
+                drafts = mapOf("draft" to "a private language draft")) }
             val bytes = File(context.noBackupFilesDir, "$name.enc").readBytes()
             assertFalse(bytes.toString(Charsets.UTF_8).contains(connection.token))
             assertFalse(bytes.toString(Charsets.UTF_8).contains("a private language draft"))
+            assertFalse(bytes.toString(Charsets.UTF_8).contains("private report explanation"))
             val restored = ProtectedStore(context, name).load()
             assertEquals(connection, restored.connection)
             assertEquals(pending, restored.pending)
+            assertEquals(safety, restored.pendingSafety)
             assertEquals("a private language draft", restored.drafts["draft"])
         } finally { store.erase() }
     }

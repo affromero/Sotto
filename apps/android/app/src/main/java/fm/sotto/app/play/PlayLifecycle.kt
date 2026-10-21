@@ -12,6 +12,7 @@ internal data class Lease(val roomID: String, val nonce: String, val client: Sot
 internal data class DeferredConfirmation(
     val id: String, val epoch: Long, val screen: Screen, val connection: Connection?, val expires: Long,
     val action: suspend PlayCoordinator.() -> Unit,
+    val safety: Boolean = false,
 )
 
 fun PlayCoordinator.setForeground(value: Boolean) {
@@ -26,7 +27,10 @@ fun PlayCoordinator.setForeground(value: Boolean) {
     mutable.update { it.copy(active = value) }
     if (value) {
         startLifetime()
-        if (valid) run(requireNotNull(pending).action)
+        if (valid) {
+            val confirmed = requireNotNull(pending)
+            if (confirmed.safety) runSafety(confirmed.action) else run(confirmed.action)
+        }
         else if (pending != null) mutable.update { it.copy(notice = "The confirmation changed. Please confirm again.") }
     }
 }
@@ -34,8 +38,10 @@ fun PlayCoordinator.setForeground(value: Boolean) {
 internal fun PlayCoordinator.stopLifetime(cancelWork: Boolean = true) {
     clearConfirmation()
     epoch++
+    retiredJobs = (retiredJobs + listOfNotNull(polling) + if (cancelWork) listOfNotNull(work, safetyWork) else emptyList())
+        .filterNot { it.isCompleted }.distinct()
     polling?.cancel(); polling = null
-    if (cancelWork) { work?.cancel(); work = null }
+    if (cancelWork) { work?.cancel(); work = null; safetyWork?.cancel(); safetyWork = null }
     mutable.update { it.copy(busy = false, checking = false) }
     releasePresence()
 }
@@ -67,7 +73,9 @@ internal fun PlayCoordinator.releasePresence() {
     val before = lease
     lease = null
     mutable.update { it.copy(leaseReady = false) }
-    if (before != null) scope.launch {
+    val previous = presenceRelease
+    if (before != null) presenceRelease = scope.launch {
+        previous?.join()
         try { withTimeout(5000) {
             before.client.raw("/api/v1/play/rooms/${SottoClient.id(before.roomID)}/presence",
                 buildJsonObject { put("type", "RELEASE"); put("viewNonce", before.nonce) }.toString())
@@ -76,6 +84,7 @@ internal fun PlayCoordinator.releasePresence() {
 }
 
 internal suspend fun PlayCoordinator.renewPresence(room: PlayRoom, generation: Long, connection: Connection) {
+    if (state.value.vault?.pendingSafety != null) { releasePresence(); return }
     if (room.ownSeat != Seat.HOST || room.status != RoomStatus.WAITING) { releasePresence(); return }
     if (lease?.roomID != room.id) {
         releasePresence()
@@ -106,9 +115,19 @@ internal suspend fun PlayCoordinator.refresh(generation: Long) {
         val admission = state.value.vault?.admission
         val invite = admission?.invitation ?: state.value.vault?.invitation ?: return
         val public = SottoClient(invite.server)
+        if (state.value.policy == null) {
+            val policy = public.get<ConductPolicy>("/api/v1/play/policy")
+            current(); require(policy.version == CONDUCT_VERSION) { "Update Sotto to read this server's current conduct policy." }
+            mutable.update { it.copy(policy = policy) }
+        }
         if (admission != null) {
-            val value = public.get<JoinStatusView>("/api/v1/play/join-requests/${SottoClient.id(admission.command.requestId)}", admission.proof)
-            current(); mutable.update { it.copy(joinStatus = value.status) }
+            try {
+                val value = public.get<JoinStatusView>("/api/v1/play/join-requests/${SottoClient.id(admission.command.requestId)}", admission.proof)
+                current(); mutable.update { it.copy(joinStatus = value.status, legacyRequestMissing = false) }
+            } catch (error: ApiError) {
+                if (error.status !in listOf(401, 404) || admission.command.acceptedConductVersion != null) throw error
+                current(); mutable.update { it.copy(legacyRequestMissing = true, joinStatus = null) }
+            }
         } else if (state.value.preview == null) {
             val value = public.get<Preview>("/api/v1/play/invitations?code=${invite.code}")
             current(); mutable.update { it.copy(preview = value) }
@@ -117,7 +136,17 @@ internal suspend fun PlayCoordinator.refresh(generation: Long) {
     }
     if (connection == null) return
     try {
+        if (state.value.safety == null || screen == Screen.Safety) {
+            if (state.value.policy == null) {
+                val policy = api(connection).get<ConductPolicy>("/api/v1/play/policy")
+                current(); require(policy.version == CONDUCT_VERSION) { "Update Sotto to read this server's current conduct policy." }
+                mutable.update { it.copy(policy = policy) }
+            }
+            val status = api(connection).get<SafetyStatus>("/api/v1/play/safety")
+            current(); applySafetyStatus(status, connection)
+        }
         when (screen) {
+            Screen.Safety -> refreshSafety()
             Screen.Lobby -> {
                 val value = api(connection).get<RoomList>("/api/v1/play/rooms")
                 current()

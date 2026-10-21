@@ -4,6 +4,7 @@ import fm.sotto.app.model.*
 import fm.sotto.app.network.HouseholdPairing
 import fm.sotto.app.network.SottoClient
 import fm.sotto.app.network.ConnectionFailure
+import fm.sotto.app.network.ApiError
 import fm.sotto.app.storage.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,17 +18,20 @@ class PlayCoordinator(val store: VaultPersistence, val scope: CoroutineScope, va
     internal var foreground = false
     internal var polling: Job? = null
     internal var work: Job? = null
+    internal var presenceRelease: Job? = null
+    internal var safetyWork: Job? = null
+    internal var retiredJobs: List<Job> = emptyList()
     internal var lease: Lease? = null
     internal var pairing: HouseholdPairing? = null
     internal var olderRooms = emptyList<PlayRoom>()
     internal var olderRoomsOpened = false
     internal var confirmation: DeferredConfirmation? = null
 
-    fun confirm(block: suspend PlayCoordinator.() -> Unit) {
+    fun confirm(safety: Boolean = false, block: suspend PlayCoordinator.() -> Unit) {
         if (state.value.busy) return
-        if (foreground) { run(block); return }
+        if (foreground) { if (safety) runSafety(block) else run(block); return }
         val pending = DeferredConfirmation(newID(), epoch, state.value.screen,
-            state.value.vault?.connection, System.nanoTime() + 3_000_000_000L, block)
+            state.value.vault?.connection, System.nanoTime() + 3_000_000_000L, block, safety)
         confirmation = pending
         scope.launch {
             delay(3000)
@@ -60,7 +64,18 @@ class PlayCoordinator(val store: VaultPersistence, val scope: CoroutineScope, va
     }
 
     internal fun report(error: Exception) {
-        mutable.update { it.copy(error = error.message ?: "The request failed. Please retry.", networkHelp = error is ConnectionFailure) }
+        val reason = (error as? ApiError)?.reason
+        if (reason == "PLAY_UNAVAILABLE") releasePresence()
+        mutable.update { it.copy(error = error.message ?: "The request failed. Please retry.", networkHelp = error is ConnectionFailure,
+            room = if (reason == "PLAY_UNAVAILABLE") null else it.room,
+            roomUnavailable = if (reason == "PLAY_UNAVAILABLE") true else it.roomUnavailable,
+            invitation = if (reason == "PLAY_UNAVAILABLE") null else it.invitation,
+            requests = if (reason == "PLAY_UNAVAILABLE") emptyList() else it.requests,
+            safety = when (reason) {
+                "CONDUCT_REQUIRED" -> it.safety?.copy(acceptedVersion = null, acceptedAt = null)
+                "SHARING_RESTRICTED" -> it.safety?.copy(sharingRestricted = true)
+                else -> it.safety
+            }) }
     }
 
     internal fun checkEpoch(generation: Long, connection: Connection? = state.value.vault?.connection) {
@@ -92,18 +107,24 @@ class PlayCoordinator(val store: VaultPersistence, val scope: CoroutineScope, va
     fun navigate(screen: Screen) {
         stopLifetime()
         if (screen != Screen.Pair) { pairing?.close(); pairing = null }
-        mutable.update { it.copy(screen = screen, room = null, invitation = null, preview = null,
-            requests = emptyList(), error = null, pairingProfiles = emptyList(), pairingServer = null) }
+        mutable.update { it.copy(screen = screen, room = null, roomUnavailable = false, invitation = null, preview = null,
+            requests = emptyList(), error = null, pairingProfiles = emptyList(), pairingServer = null,
+            policy = if (screen == Screen.Join) null else it.policy, legacyRequestMissing = false) }
         if (foreground) startLifetime()
     }
 
     internal fun moveToRoom(value: PlayRoom) {
         if (!acceptsRoom(value)) return
-        if (state.value.screen != Screen.Room(value.id)) {
+        val changedScreen = state.value.screen != Screen.Room(value.id)
+        if (changedScreen) {
             releasePresence()
             mutable.update { it.copy(room = null, invitation = null, requests = emptyList()) }
         }
-        mutable.update { it.copy(screen = Screen.Room(value.id), room = value) }
+        mutable.update { it.copy(screen = Screen.Room(value.id), room = value, roomUnavailable = false) }
+        if (changedScreen && foreground) {
+            polling?.cancel()
+            startLifetime()
+        }
     }
 
     internal fun acceptsRoom(value: PlayRoom): Boolean {
@@ -118,7 +139,7 @@ class PlayCoordinator(val store: VaultPersistence, val scope: CoroutineScope, va
 
     internal fun applyRoom(value: PlayRoom): Boolean {
         if (!acceptsRoom(value)) return false
-        mutable.update { it.copy(room = value) }
+        mutable.update { it.copy(room = value, roomUnavailable = false) }
         return true
     }
 
@@ -167,6 +188,7 @@ class PlayCoordinator(val store: VaultPersistence, val scope: CoroutineScope, va
     internal suspend fun activate(next: Connection) {
         persist {
             require(it.pending == null || it.pending.connection == next) { "Recover the original pending action first." }
+            require(it.pendingSafety == null || it.pendingSafety.connection == next) { "Recover the original pending safety action first." }
             val archived = it.connection?.takeIf { before -> before != next }?.let(it::archive) ?: it
             archived.copy(connection = next)
         }
@@ -182,7 +204,8 @@ class PlayCoordinator(val store: VaultPersistence, val scope: CoroutineScope, va
         val profile = requireNotNull(profiles.profiles.firstOrNull { it.id == next.profile.id }) {
             "This saved device no longer has access to its profile."
         }
-        val originalPending = state.value.vault?.pending?.connection?.takeIf { it.sameIdentity(next) }
+        val originalPending = (state.value.vault?.pendingSafety?.connection ?: state.value.vault?.pending?.connection)
+            ?.takeIf { it.sameIdentity(next) }
         activate(originalPending ?: next.copy(profile = profile))
         mutable.update { it.copy(screen = Screen.Lobby) }
     }

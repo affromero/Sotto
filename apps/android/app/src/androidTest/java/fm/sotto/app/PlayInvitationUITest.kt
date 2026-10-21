@@ -69,6 +69,7 @@ class PlayInvitationUITest {
             visible("Join a game")
             visible(fixture.invite.server)
             allowLocalNetwork()
+            click("I agree to this conduct policy before sharing my name or game content.")
             fill("Your name", "Sam")
             click("Create my own persistent learner profile on this server.")
             click("Request a profile and join")
