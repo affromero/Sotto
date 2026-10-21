@@ -345,6 +345,7 @@ private struct CourseDetailPane: View {
     @State private var showingMemory = false
     @State private var showingLive = false
     @State private var showingLearningMap = false
+    @State private var pendingFailedClassRemoval: SottoFailedClassRemoval?
 
     private var generation: SottoLoadingOperation? {
         model.classGenerationOperations[course.id]
@@ -384,7 +385,10 @@ private struct CourseDetailPane: View {
                     ClassGenerationErrorPanel(message: generationError,
                         retryTitle: model.classGenerationRetryTitle(for: course.id),
                         onRetry: { model.retryClassGeneration(for: course) },
-                        onCheckStatus: { model.checkClassGenerationStatus(for: course) })
+                        onCheckStatus: { model.checkClassGenerationStatus(for: course) },
+                        onRemove: model.failedClassRemoval(for: course).map { target in
+                            { pendingFailedClassRemoval = target }
+                        })
                 }
 
                 CourseActionGrid(
@@ -439,6 +443,18 @@ private struct CourseDetailPane: View {
             .frame(maxWidth: layout.readableWidth, alignment: .leading)
         }
         .background(SottoTheme.paper)
+        .confirmationDialog("Remove failed class?", isPresented: Binding(
+            get: { pendingFailedClassRemoval != nil },
+            set: { if !$0 { pendingFailedClassRemoval = nil } }
+        ), titleVisibility: .visible, presenting: pendingFailedClassRemoval) { target in
+            Button("Remove failed class", role: .destructive) {
+                pendingFailedClassRemoval = nil
+                model.run { await model.removeFailedClass(target) }
+            }
+            Button("Cancel", role: .cancel) { pendingFailedClassRemoval = nil }
+        } message: { _ in
+            Text("This removes the failed class so you can create a new one. Your course and vocabulary stay saved.")
+        }
         .task(id: course.id) {
             await refreshPracticeOverview()
         }
@@ -604,34 +620,33 @@ private struct ClassGenerationStatusPanel: View {
     }
 }
 
-private struct ClassGenerationErrorPanel: View {
+struct ClassGenerationErrorPanel: View {
     let message: String
     let retryTitle: String?
     let onRetry: () -> Void
     let onCheckStatus: () -> Void
+    var onRemove: (() -> Void)? = nil
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: "exclamationmark.triangle")
-                .foregroundStyle(.red)
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Class preparation needs attention")
-                    .font(.headline)
-                    .foregroundStyle(SottoTheme.ink)
-                Text(message)
-                    .font(.callout)
-                    .foregroundStyle(SottoTheme.muted)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Spacer()
-            VStack {
-                Button("Check status", action: onCheckStatus)
-                    .buttonStyle(.bordered)
-                if let retryTitle {
-                    Button(retryTitle, action: onRetry)
-                        .buttonStyle(.bordered)
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "exclamationmark.triangle")
+                    .foregroundStyle(.red)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Class preparation needs attention")
+                        .font(.headline)
+                        .foregroundStyle(SottoTheme.ink)
+                    Text(message)
+                        .font(.callout)
+                        .foregroundStyle(SottoTheme.muted)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
+            ViewThatFits(in: .horizontal) {
+                HStack { actions }
+                VStack(alignment: .leading, spacing: 12) { actions }
+            }
+            .buttonStyle(.bordered).controlSize(.large)
         }
         .padding(18)
         .background(SottoTheme.surface)
@@ -640,6 +655,13 @@ private struct ClassGenerationErrorPanel: View {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .stroke(SottoTheme.line)
         )
+    }
+
+    @ViewBuilder
+    private var actions: some View {
+        Button("Check status", action: onCheckStatus)
+        if let retryTitle { Button(retryTitle, action: onRetry) }
+        if let onRemove { Button("Remove failed class", role: .destructive, action: onRemove) }
     }
 }
 

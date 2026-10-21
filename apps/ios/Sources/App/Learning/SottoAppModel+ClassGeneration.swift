@@ -29,6 +29,7 @@ struct SottoClassGenerationObservation {
     let startedAt = Date()
     var operationId: String?
     var operationStatus: String?
+    var observedClassId: String?
     var isAdmitting = false
     var admissionUnconfirmed = false
     var explicitlyRechecking = false
@@ -319,6 +320,11 @@ extension SottoAppModel {
                     stopClassObservation(courseId: course.id, message: "Preparation changed. Your previous work is retained. Check the current class.")
                     return
                 }
+                if let pinned = observation.observedClassId, let current = progress.classId, pinned != current {
+                    stopClassObservation(courseId: course.id, message: "Preparation changed classes. Check status before continuing.")
+                    return
+                }
+                if observation.observedClassId == nil { observation.observedClassId = progress.classId }
                 observation.operationStatus = progress.operationStatus
                 classGenerationObservations[course.id] = observation
                 classGenerationOperations[course.id] = classGenerationOperation(progress: progress, course: course,

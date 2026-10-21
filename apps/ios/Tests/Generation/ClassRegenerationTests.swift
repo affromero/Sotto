@@ -127,6 +127,104 @@ final class ClassRegenerationTests: XCTestCase {
     }
 
     @MainActor
+    func testEmptyFailedOrCancelledClassCanBeRemovedWithoutOpeningAndReplaced() async throws {
+        for phase in ["FAILED", "CANCELLED"] {
+            let model = model()
+            let serverHost = host(model)
+            await model.loadCourses(showLoading: false)
+            model.startClassGeneration(for: try XCTUnwrap(model.courses.first))
+            await waitForState(model) { operations, _ in operations["course"]?.progress == 0.2 }
+            await ClassRegenerationServer.shared.setEmptyClass("FAILED", host: serverHost)
+            await ClassRegenerationServer.shared.set(phase, host: serverHost)
+            await waitForState(model) { $1["course"]?.contains(phase) == true }
+            if phase == "CANCELLED" {
+                var staleCourse = try XCTUnwrap(model.courses.first)
+                staleCourse.activeClassId = nil
+                staleCourse.classes = []
+                model.applyCourseRefresh([staleCourse])
+            }
+            let course = try XCTUnwrap(model.courses.first)
+            let target = try XCTUnwrap(model.failedClassRemoval(for: course))
+            XCTAssertNil(model.selectedClass)
+            let removed = await model.removeFailedClass(target)
+            XCTAssertTrue(removed, phase)
+            XCTAssertNil(model.courses.first?.activeClassId)
+            XCTAssertTrue(model.courses.first?.classes.isEmpty == true)
+            XCTAssertNil(model.classGenerationRetryTitle(for: course.id))
+            model.startClassGeneration(for: try XCTUnwrap(model.courses.first))
+            await waitForState(model) { $0["course"]?.progress == 0.2 && $1["course"] == nil }
+            let payloads = await ClassRegenerationServer.shared.postPayloads(host: serverHost)
+            XCTAssertEqual(payloads.last?.path, "/api/v1/courses/course/next-class")
+            model.signOut()
+        }
+    }
+
+    @MainActor
+    func testFailedClassRemovalPreservesTheGateWhenDeletionFails() async throws {
+        let model = model()
+        await model.loadCourses(showLoading: false)
+        model.startClassGeneration(for: try XCTUnwrap(model.courses.first))
+        await waitForState(model) { operations, _ in operations["course"]?.progress == 0.2 }
+        await ClassRegenerationServer.shared.setEmptyClass("FAILED", host: host(model))
+        await ClassRegenerationServer.shared.set("FAILED", host: host(model))
+        await waitForState(model) { $1["course"]?.contains("FAILED") == true }
+        let target = try XCTUnwrap(model.failedClassRemoval(for: try XCTUnwrap(model.courses.first)))
+        await ClassRegenerationServer.shared.setRemovalStatus(503, host: host(model))
+        let removed = await model.removeFailedClass(target)
+        XCTAssertFalse(removed)
+        XCTAssertEqual(model.courses.first?.activeClassId, "class")
+        XCTAssertNotNil(model.classGenerationRetryTitle(for: "course"))
+        XCTAssertTrue(model.classGenerationErrors["course"]?.contains("FAILED") == true)
+        XCTAssertNotNil(model.errorMessage)
+        XCTAssertNil(model.selectedClass)
+        model.signOut()
+    }
+
+    @MainActor
+    func testFailedClassRemovalRejectsChangedAndUncertainTargetsWithoutDeleting() async throws {
+        for change in ["RUNNING", "UNRESOLVED", "REPLACED", "RETARGETED", "GENERATING_DETAIL",
+                       "PASSED_DETAIL", "SUBMITTED_DETAIL", "profile", "active-class"] {
+            let model = model()
+            let serverHost = host(model)
+            await model.loadCourses(showLoading: false)
+            model.startClassGeneration(for: try XCTUnwrap(model.courses.first))
+            await waitForState(model) { operations, _ in operations["course"]?.progress == 0.2 }
+            await ClassRegenerationServer.shared.setEmptyClass("FAILED", host: serverHost)
+            await ClassRegenerationServer.shared.set("FAILED", host: serverHost)
+            await waitForState(model) { $1["course"]?.contains("FAILED") == true }
+            let target = try XCTUnwrap(model.failedClassRemoval(for: try XCTUnwrap(model.courses.first)))
+            if change == "profile" { model.clearSelectedProfile() }
+            else if change == "active-class" {
+                var changed = try XCTUnwrap(model.courses.first)
+                changed.activeClassId = "other-class"
+                model.applyCourseRefresh([changed])
+            } else if change == "GENERATING_DETAIL" {
+                await ClassRegenerationServer.shared.setEmptyClass("GENERATING", host: serverHost)
+            } else if change == "PASSED_DETAIL" {
+                await ClassRegenerationServer.shared.setEmptyClass("PASSED", host: serverHost)
+            } else if change == "SUBMITTED_DETAIL" {
+                await ClassRegenerationServer.shared.setEmptyClass("FAILED", host: serverHost, submitted: true)
+            } else { await ClassRegenerationServer.shared.set(change, host: serverHost) }
+            let removed = await model.removeFailedClass(target)
+            XCTAssertFalse(removed, change)
+            let requests = await ClassRegenerationServer.shared.requests(host: serverHost)
+            XCTAssertFalse(requests.contains("DELETE"), change)
+            model.signOut()
+        }
+    }
+
+    @MainActor
+    func testUnconfirmedPreparationDoesNotOfferFailedClassRemoval() async throws {
+        let model = model()
+        await model.loadCourses(showLoading: false)
+        await model.openClass("class")
+        await ClassRegenerationServer.shared.setAdmissionStatus(503, host: host(model))
+        await model.regenerateSelectedClass()
+        XCTAssertNil(model.failedClassRemoval(for: try XCTUnwrap(model.courses.first)))
+        model.signOut()
+    }
+
+    @MainActor
     func testAcceptedRegenerationReturnsToCourseProgressWhileTheClassIsStillPreparing() async throws {
         let model = model()
         await model.loadCourses(showLoading: false)
@@ -477,6 +575,8 @@ private actor ClassRegenerationServer {
     private var nextResponses = Set<String>()
     private var removed = Set<String>()
     private var removalStatuses: [String: Int] = [:]
+    private var emptyClassStatuses: [String: String] = [:]
+    private var submittedEmptyClasses = Set<String>()
     private var methods: [String: [String]] = [:]
     private var payloads: [String: [PostPayload]] = [:]
     private var admissionArrivals: [String: XCTestExpectation] = [:]
@@ -486,6 +586,11 @@ private actor ClassRegenerationServer {
 
     func set(_ phase: String, host: String) { phases[host] = phase }
     func setRemovalStatus(_ status: Int, host: String) { removalStatuses[host] = status }
+    func setEmptyClass(_ status: String, host: String, submitted: Bool = false) {
+        emptyClassStatuses[host] = status
+        if submitted { submittedEmptyClasses.insert(host) }
+        else { submittedEmptyClasses.remove(host) }
+    }
     func setAdmissionStatus(_ status: Int, host: String, next: Bool = false) {
         admissionStatuses[host] = status
         if next { nextResponses.insert(host) }
@@ -561,12 +666,17 @@ private actor ClassRegenerationServer {
             if phase == "UNAVAILABLE" { return (503, #"{"error":"Progress unavailable."}"#) }
             let operationId = phase == "REPLACED" ? "another-operation" : (admitted.contains(host) ? "new-operation" : "old-operation")
             return (200, """
-                {"operationId":"\(operationId)","operationStatus":"\(phase == "REPLACED" ? "RUNNING" : phase == "STALE_COMPLETED" ? "COMPLETED" : phase)","status":"\(isPreparing ? "GENERATING" : phase)","classId":"class","stage":"Preparing","detail":"Preparing class material","progress":0.2,"currentStep":1,"totalSteps":6,"sections":[]}
+                {"operationId":"\(operationId)","operationStatus":"\(phase == "REPLACED" ? "RUNNING" : phase == "STALE_COMPLETED" ? "COMPLETED" : phase == "RETARGETED" ? "FAILED" : phase)","status":"\(isPreparing ? "GENERATING" : phase)","classId":"\(phase == "RETARGETED" ? "other-class" : "class")","stage":"Preparing","detail":"Preparing class material","progress":0.2,"currentStep":1,"totalSteps":6,"sections":[]}
                 """)
         }
         if request.url?.path == "/api/v1/classes/other-class" {
             return (200, Self.classBody(attempt: 7, status: "AVAILABLE")
                 .replacingOccurrences(of: "\"id\":\"class\",\"courseId\"", with: "\"id\":\"other-class\",\"courseId\""))
+        }
+        if let status = emptyClassStatuses[host] {
+            return (200, """
+                {"id":"class","courseId":"course","status":"\(status)","order":1,"passThreshold":0.8,"attempt":\(attempt),"progressRevision":\(attempt),"submitted":\(submittedEmptyClasses.contains(host)),"sections":[]}
+                """)
         }
         return (200, Self.classBody(attempt: phase == "STALE_COMPLETED" ? 4 : attempt, status: isPreparing ? "GENERATING" : "AVAILABLE"))
     }

@@ -422,6 +422,21 @@ final class LayoutAppearanceTests: XCTestCase {
         }
     }
 
+    func testFailedClassRecoveryActionsFitPhoneAndTabletAtLargeTextSizes() async throws {
+        for viewport in [viewports[0], viewports[3]] {
+            let content = ClassGenerationErrorPanel(
+                message: "FAILED: The lesson could not be prepared. Your previous work is retained.",
+                retryTitle: "Try class again", onRetry: {}, onCheckStatus: {}, onRemove: {}
+            ).padding(16)
+            let size = measuredSize(content, viewport: viewport)
+            XCTAssertLessThanOrEqual(size.width, viewport.size.width + 1)
+            let host = try mount(ScrollView { content }, viewport: viewport, style: .light)
+            await settle()
+            attach(host.content.view, name: "failed-class-removal-\(viewport.name)")
+            host.close()
+        }
+    }
+
     private struct Viewport {
         let name: String
         let size: CGSize
