@@ -1,6 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { AccessError, AccessService, isAccessError } from 'thesidedoor-core/access';
-import { playDeliverySchema, playMemberSchema, type PlayDelivery } from '@sotto/shared';
+import {
+  playDeliverySchema,
+  playMemberSchema,
+  PLAY_CONDUCT_VERSION,
+  type PlayDelivery,
+} from '@sotto/shared';
 import { Prisma, type PlayJoinRequest, type PrismaClient } from '@/generated/prisma/client';
 import { sottoAccessStore } from '@/lib/sidedoor/access/core/access-store';
 import { requireOriginalSottoAdmission } from '@/lib/sidedoor/access/core/request-identity';
@@ -24,6 +29,17 @@ import {
   type PlayDeliveryEnvelope,
 } from './delivery-receipt';
 import { playProofHash, requirePlayClaimant } from './requests';
+import {
+  lockPlaySafetyParticipants,
+  playAdmissionParticipants,
+  requirePlayInteractionAllowed,
+} from '../safety/fences';
+import {
+  assertPlayDisplayNameAllowed,
+  assertPlaySharedTextAllowed,
+  PlaySafetyError,
+  redactPlayPublishedName,
+} from '../safety/policy';
 
 const DELIVERY_TTL_MS = 10 * 60 * 1000;
 type PlayClaimResult = { delivery: PlayDelivery; browserSessionToken: string | null };
@@ -155,6 +171,13 @@ export async function claimPlayEntry(
         await requirePlayBrowserContext(transaction, browserContext);
       const room = await loadPlayRoom(transaction, candidate.roomId);
       const now = clock();
+      await lockPlaySafetyParticipants(transaction, playAdmissionParticipants(room, candidate));
+      await requirePlayInteractionAllowed(transaction, playAdmissionParticipants(room, candidate));
+      if (candidate.acceptedConductVersion !== PLAY_CONDUCT_VERSION || !candidate.acceptedConductAt)
+        throw new PlaySafetyError(
+          'CONDUCT_REQUIRED',
+          'Accept the game conduct terms before joining.'
+        );
       if (candidate.status === 'CLAIMED' && candidate.candidateKind === 'NEW')
         return recoverNewDelivery(transaction, candidate, room, clock);
       requireLiveAdmission(candidate, room, now);
@@ -171,7 +194,7 @@ export async function claimPlayEntry(
       });
       const profile = playMemberSchema.parse({
         id: memberId,
-        name: user.name ?? 'Player',
+        name: redactPlayPublishedName(user.name),
         settings: candidate.settings,
       });
       const existingFingerprint = playFingerprint({
@@ -218,6 +241,8 @@ export async function claimPlayEntry(
         throw new PlayRuleError('conflict', 'Wait for the host to accept this request.');
       if (!(await playHostWaiting(transaction, room.id, clock())))
         throw new PlayRuleError('conflict', 'The host must return to the waiting game.');
+      if (candidate.candidateKind === 'NEW') assertPlayDisplayNameAllowed(candidate.proposedName!);
+      assertPlaySharedTextAllowed(candidate.deviceName);
       const admitted = await transaction.playRoom.updateMany({
         where: { id: room.id, revision: room.revision, status: 'WAITING', guestUserId: null },
         data: {

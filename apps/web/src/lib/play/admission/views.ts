@@ -1,12 +1,19 @@
 import { AccessError } from 'thesidedoor-core/access';
 import {
   playJoinStatusViewSchema,
+  PLAY_CONDUCT_VERSION,
   playPendingRequestViewSchema,
   type PlayPendingRequestView,
 } from '@sotto/shared';
 import type { PlayJoinRequest, Prisma } from '@/generated/prisma/client';
 import type { AuthenticatedRequest } from '@/lib/api-keys';
 import { loadPlayRoom, playHostWaiting, type StoredPlayRoom } from '../storage/room-view';
+import {
+  lockPlaySafetyParticipants,
+  playAdmissionParticipants,
+  playInteractionUnavailable,
+} from '../safety/fences';
+import { redactPlayPublishedName } from '../safety/policy';
 
 export async function loadPlayJoinRequest(database: Prisma.TransactionClient, requestId: string) {
   const candidate = await database.playJoinRequest.findUnique({ where: { id: requestId } });
@@ -20,6 +27,8 @@ async function playJoinStatus(
   room: StoredPlayRoom,
   now: Date
 ) {
+  if (await playInteractionUnavailable(database, playAdmissionParticipants(room, candidate)))
+    return 'REVOKED' as const;
   if (candidate.generation !== room.invitationGeneration || room.status === 'CANCELLED')
     return 'REVOKED' as const;
   if (['DECLINED', 'REVOKED', 'EXPIRED'].includes(candidate.status)) return candidate.status;
@@ -38,6 +47,7 @@ export async function projectPlayJoinStatus(
   now: Date
 ) {
   const room = await loadPlayRoom(database, candidate.roomId);
+  await lockPlaySafetyParticipants(database, playAdmissionParticipants(room, candidate));
   return playJoinStatusViewSchema.parse({
     requestId: candidate.id,
     status: await playJoinStatus(database, candidate, room, now),
@@ -57,6 +67,7 @@ export async function projectPendingPlayRequest(
   const isHost = room.hostUserId === identity.userId;
   if (!isHost && !(identity.isOwner && candidate.candidateKind === 'NEW'))
     throw new AccessError('forbidden');
+  await lockPlaySafetyParticipants(database, playAdmissionParticipants(room, candidate));
   const status = await playJoinStatus(database, candidate, room, now);
   const active =
     room.status === 'WAITING' &&
@@ -64,7 +75,8 @@ export async function projectPendingPlayRequest(
     candidate.expiresAt > now &&
     candidate.generation === room.invitationGeneration &&
     !room.guestUserId &&
-    ['WAITING_FOR_OWNER', 'WAITING_FOR_HOST', 'ACCEPTED'].includes(candidate.status);
+    ['WAITING_FOR_OWNER', 'WAITING_FOR_HOST', 'ACCEPTED'].includes(candidate.status) &&
+    status !== 'REVOKED';
   const allowedActions: PlayPendingRequestView['allowedActions'] = [];
   if (active) {
     allowedActions.push('DECLINE');
@@ -72,11 +84,17 @@ export async function projectPendingPlayRequest(
     if (
       identity.isOwner &&
       candidate.candidateKind === 'NEW' &&
+      candidate.acceptedConductVersion === PLAY_CONDUCT_VERSION &&
       !candidate.provisionedUserId &&
       (!isHost || hostWaiting)
     )
       allowedActions.push('APPROVE_PROFILE');
-    if (isHost && candidate.status === 'WAITING_FOR_HOST' && hostWaiting)
+    if (
+      isHost &&
+      candidate.status === 'WAITING_FOR_HOST' &&
+      hostWaiting &&
+      candidate.acceptedConductVersion === PLAY_CONDUCT_VERSION
+    )
       allowedActions.push('ACCEPT');
   }
   const profileId = candidate.candidateUserId ?? candidate.provisionedUserId;
@@ -87,7 +105,7 @@ export async function projectPendingPlayRequest(
     requestId: candidate.id,
     roomId: room.id,
     roomRevision: room.revision,
-    name: profile?.name ?? candidate.proposedName ?? 'Player',
+    name: redactPlayPublishedName(profile?.name ?? candidate.proposedName),
     candidateKind: candidate.candidateKind,
     settings: candidate.settings,
     status,

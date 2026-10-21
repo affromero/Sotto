@@ -5,6 +5,7 @@ import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 import type { PlayActor, PlayClock } from '../storage/rooms';
 import { loadPlayRoom } from '../storage/room-view';
 import { projectPendingPlayRequest } from './views';
+import { lockPlaySafetyParticipants, playAdmissionParticipants } from '../safety/fences';
 
 /** A host sees only their room; server owners separately see pending enrollments. */
 export function listPendingPlayRequests(
@@ -30,6 +31,16 @@ export function listPendingPlayRequests(
       take: 50,
     });
     const views: PlayPendingRequestView[] = [];
+    const rooms = await database.playRoom.findMany({
+      where: { id: { in: candidates.map((candidate) => candidate.roomId) } },
+    });
+    await lockPlaySafetyParticipants(
+      database,
+      candidates.flatMap((candidate) => {
+        const room = rooms.find((item) => item.id === candidate.roomId)!;
+        return playAdmissionParticipants(room, candidate);
+      })
+    );
     for (const candidate of candidates)
       views.push(await projectPendingPlayRequest(database, candidate, actor.identity, now));
     return { requests: views.filter((view) => !['REVOKED', 'EXPIRED'].includes(view.status)) };

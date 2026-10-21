@@ -9,6 +9,8 @@ import { sottoAccessStore } from '@/lib/sidedoor/access/core/access-store';
 import { PlayRuleError } from '../errors';
 import { projectPlayRound } from '../projection';
 import { playFingerprint } from './fingerprint';
+import { lockPlaySafetyParticipants, requirePlayInteractionAllowed } from '../safety/fences';
+import { redactPlayPublishedName } from '../safety/policy';
 
 const storedRoomInclude = {
   host: { select: { id: true, name: true } },
@@ -54,6 +56,8 @@ export async function projectStoredPlayRoom(
   now: Date
 ): Promise<PlayRoomView> {
   const ownSeat = requirePlaySeat(room, userId);
+  await lockPlaySafetyParticipants(database, [room.hostUserId, room.guestUserId]);
+  await requirePlayInteractionAllowed(database, [room.hostUserId, room.guestUserId], false);
   const status =
     room.expiresAt <= now && !['COMPLETED', 'CANCELLED'].includes(room.status)
       ? 'EXPIRED'
@@ -92,13 +96,13 @@ export async function projectStoredPlayRoom(
     ownSeat,
     host: {
       id: room.host.id,
-      name: room.host.name ?? 'Host',
+      name: redactPlayPublishedName(room.host.name, 'Host'),
       settings: playSettingsSchema.parse(room.hostSettings),
     },
     guest: room.guest
       ? {
           id: room.guest.id,
-          name: room.guest.name ?? 'Partner',
+          name: redactPlayPublishedName(room.guest.name, 'Partner'),
           settings: playSettingsSchema.parse(room.guestSettings),
         }
       : null,

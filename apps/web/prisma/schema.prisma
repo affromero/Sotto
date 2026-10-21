@@ -109,6 +109,13 @@ model User {
   playApprovals      PlayJoinRequest[]   @relation("PlayApprover")
   playActionReceipts PlayActionReceipt[]
   playPhrases        PlayPhrase[]
+  playSafety          PlaySafetyState?
+  playBlocks          PlayUserBlock[] @relation("PlayBlocker")
+  playBlockedBy       PlayUserBlock[] @relation("PlayBlocked")
+  playSafetyReports   PlaySafetyReport[] @relation("PlayReporter")
+  playReported        PlaySafetyReport[] @relation("PlayReported")
+  playSafetyResponses PlaySafetyReport[] @relation("PlayResponder")
+  playSafetyReceipts  PlaySafetyReceipt[]
 
   @@index([role])
 }
@@ -141,6 +148,7 @@ model PlayRoom {
   rounds         PlayRound[]
   receipts       PlayActionReceipt[]
   phrases        PlayPhrase[]
+  safetyReports  PlaySafetyReport[]
   rematch        PlayRoom?           @relation("PlayRematch", fields: [rematchRoomId], references: [id], onDelete: SetNull)
   previousRoom   PlayRoom?           @relation("PlayRematch")
 
@@ -186,6 +194,8 @@ model PlayJoinRequest {
   approvedByUserId     String?
   approvedAt           DateTime?
   acceptedAt           DateTime?
+  acceptedConductVersion Int?
+  acceptedConductAt      DateTime?
   enrollmentGeneration Int       @default(1)
   deliveryId           String?   @unique
   deliveryState        Json?
@@ -217,6 +227,7 @@ model PlayRound {
 
   room    PlayRoom     @relation(fields: [roomId], references: [id], onDelete: Cascade)
   phrases PlayPhrase[]
+  safetyReports PlaySafetyReport[]
 
   @@unique([roomId, order])
   @@unique([id, roomId])
@@ -259,6 +270,72 @@ model PlayPhrase {
   @@unique([userId, roundId, fingerprint])
   @@index([userId, createdAt])
   @@index([roomId])
+}
+
+model PlaySafetyState {
+  userId              String    @id
+  revision            Int       @default(0)
+  conductVersion      Int?
+  acceptedAt          DateTime?
+  sharingRestrictedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PlayUserBlock {
+  blockerUserId String
+  blockedUserId String
+  createdAt     DateTime @default(now())
+
+  blocker User @relation("PlayBlocker", fields: [blockerUserId], references: [id], onDelete: Cascade)
+  blocked User @relation("PlayBlocked", fields: [blockedUserId], references: [id], onDelete: Cascade)
+
+  @@id([blockerUserId, blockedUserId])
+  @@index([blockerUserId, createdAt, blockedUserId])
+  @@index([blockedUserId])
+}
+
+model PlaySafetyReport {
+  id             String    @id
+  reporterUserId String
+  subjectUserId  String
+  roomId         String?
+  roundId        String?
+  category       String
+  detail         String
+  evidence       Json
+  status         String    @default("OPEN")
+  revision       Int       @default(0)
+  createdAt      DateTime  @default(now())
+  response       String?
+  reviewAction   String?
+  respondedAt    DateTime?
+  responderUserId String?
+
+  reporter  User       @relation("PlayReporter", fields: [reporterUserId], references: [id], onDelete: Cascade)
+  subject   User       @relation("PlayReported", fields: [subjectUserId], references: [id], onDelete: Cascade)
+  responder User?      @relation("PlayResponder", fields: [responderUserId], references: [id], onDelete: SetNull)
+  room      PlayRoom?  @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  round     PlayRound? @relation(fields: [roundId], references: [id], onDelete: SetNull)
+
+  @@index([reporterUserId, createdAt, id])
+  @@index([status, createdAt, id])
+  @@index([subjectUserId])
+  @@index([roomId])
+  @@index([roundId])
+}
+
+model PlaySafetyReceipt {
+  actorUserId String
+  actionId    String
+  operation   String
+  fingerprint String
+  result      Json
+  createdAt   DateTime @default(now())
+
+  actor User @relation(fields: [actorUserId], references: [id], onDelete: Cascade)
+
+  @@id([actorUserId, actionId])
 }
 
 // ============ EPISODES ============

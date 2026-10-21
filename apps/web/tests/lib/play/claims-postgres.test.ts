@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { randomUUID } from 'node:crypto';
+import { acceptedPlayTestIdentity } from '../../helpers/play-fixture';
 import { AccessService, newToken, tokenHash } from 'thesidedoor-core/access';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PLAY_HOST_LEASE_MS } from '@sotto/shared';
@@ -43,7 +44,7 @@ suite('atomic guest credentials and exact delivery recovery', () => {
   });
   beforeEach(async () => {
     vi.stubEnv('BYOK_ENCRYPTION_KEY', encryptionKey);
-    authority = await instance.reset();
+    authority = await acceptedPlayTestIdentity(instance, await instance.reset());
   });
   afterEach(() => vi.unstubAllEnvs());
   afterAll(async () => instance?.close());
@@ -85,6 +86,7 @@ suite('atomic guest credentials and exact delivery recovery', () => {
         code: fixture.invite.code,
         client,
         deviceName: 'Guest device',
+        acceptedConductVersion: 1,
         candidate: { kind: 'NEW', name: 'Partner', settings, consentToProfile: true },
       },
       proof,
@@ -742,6 +744,7 @@ suite('atomic guest credentials and exact delivery recovery', () => {
         code: fixture.invite.code,
         client: 'BROWSER',
         deviceName: 'Existing browser',
+        acceptedConductVersion: 1,
         candidate: { kind: 'EXISTING', expectedProfileId: member.id, settings },
       },
       proof,

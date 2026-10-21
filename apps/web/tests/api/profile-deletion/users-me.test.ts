@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { randomUUID } from 'node:crypto';
+import { acceptedPlayTestIdentity } from '../../helpers/play-fixture';
 import { NextRequest } from 'next/server';
 import { HouseholdProfileService, newToken, tokenHash } from 'thesidedoor-core/access';
 import { StorageCleanupJournal, StorageWriteJournal } from 'thesidedoor-core/storage';
@@ -85,7 +86,7 @@ suite('self profile deletion with canonical PostgreSQL authority', () => {
     vi.stubEnv('NEXT_PUBLIC_APP_URL', origin);
     vi.stubEnv('SIDEDOOR_PASSWORD_ORIGINS', '[]');
     vi.stubEnv('BYOK_ENCRYPTION_KEY', 'isolated-self-profile-deletion-test-key');
-    identity = await instance.reset();
+    identity = await acceptedPlayTestIdentity(instance, await instance.reset());
     boundary.afterAuthentication = null;
     boundary.afterCapture = null;
     boundary.loseCommit = false;
@@ -174,6 +175,7 @@ suite('self profile deletion with canonical PostgreSQL authority', () => {
         code: invitation.code,
         client,
         deviceName: 'Invited learner',
+        acceptedConductVersion: 1,
         candidate: { kind: 'NEW', name: 'Invited learner', settings, consentToProfile: true },
       },
       proof,
