@@ -152,6 +152,13 @@ class SourceValidationTests(unittest.TestCase):
                 actual = [record['command'] for record in records]
                 for command in commands:
                     self.assertIn(command, actual)
+                if name == 'web':
+                    install = next(command for command in actual
+                                   if command[:3] == ['sudo', 'apt-get',
+                                                      'install'])
+                    self.assertIn('redis-server', install)
+                    self.assertLess(actual.index(install),
+                                    actual.index(['npm', 'run', 'ci:web']))
                 checkouts = [
                     step for step in self.jobs[name]['steps']
                     if step.get('uses', '').startswith('actions/checkout@')

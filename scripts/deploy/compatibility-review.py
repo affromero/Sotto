@@ -630,7 +630,14 @@ def schema_transition(
     if not evidence.strip() or continuity.get('mode') != 'preserve-existing':
         raise ValueError('Existing provider continuity and schema evidence required')
     files = cast(dict[str, dict[str, object]], continuity['reviewedRuntimeFiles'])
-    added = 0
+    published_migration_additions(files)
+
+
+def published_migration_additions(
+    files: Mapping[str, Mapping[str, object]],
+) -> list[str]:
+    """Keep the published SQL guard identical for each fenced schema stage."""
+    added: list[str] = []
     for name, pair in files.items():
         if not name.startswith('apps/web/prisma/migrations/'):
             continue
@@ -638,9 +645,10 @@ def schema_transition(
             r'apps/web/prisma/migrations/[A-Za-z0-9_]+/migration.sql', name
         ) or pair['candidateSha256'] is None:
             raise ValueError('Previously published migration files must remain unchanged')
-        added += 1
-    if not 1 <= added <= 16:
+        added.append(name)
+    if not 1 <= len(added) <= 16:
         raise ValueError('Bounded added migration inventory required')
+    return sorted(added)
 
 
 def validate_queue_transition(value: object) -> dict[str, list[str]]:

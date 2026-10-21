@@ -4,6 +4,14 @@
     {
       "tool": "knip",
       "mode": "all",
+      "file": "apps/web/tests/lib/deployment/review-first-worker.test.ts",
+      "kind": "binaries",
+      "name": "redis-server",
+      "reason": "System executable starts a private disposable Redis instance for real queue admission tests without changing the shared fixture."
+    },
+    {
+      "tool": "knip",
+      "mode": "all",
       "file": "apps/web/tests/lib/course-materials/pdf-optimization.test.ts",
       "kind": "binaries",
       "name": "qpdf",
