@@ -29,6 +29,8 @@ from scripts.deploy.review.build_observer import (
     unpack,
 )
 from scripts.deploy.review.preflight import validate_bundle
+from scripts.deploy.review.runtime.channel import exchange
+from scripts.deploy.review.state import DeploymentLock
 
 ROOT = Path(__file__).resolve().parents[3]
 SDK_ENV = 'SOTTO_REVIEW_SDK_ARCHIVE'
@@ -350,6 +352,33 @@ m.exports[input.operation](input.options).then(r=>console.log(JSON.stringify(r))
         previous: dict[str, str] = {}
         seed: dict[str, object] = {}
         stages: list[dict[str, object]] = []
+        capture_output = ''
+        channel_capture: object = None
+
+        def run_runtime(mode: str) -> subprocess.CompletedProcess[str]:
+            fixture = root / 'fixture.json'
+            fixture.write_text(json.dumps(seed))
+            fixture.chmod(0o600)
+            result = subprocess.run(
+                [
+                    'npx', '--no-install', 'vitest', 'run',
+                    'tests/lib/deployment/review-worksheet-admission.test.ts',
+                    '--reporter=verbose',
+                ],
+                cwd=ROOT / 'apps/web',
+                env={
+                    **os.environ,
+                    'SOTTO_REVIEW_WORKSHEET_FIXTURE': str(fixture),
+                    'SOTTO_REVIEW_WORKSHEET_MODE': mode,
+                },
+                text=True,
+                capture_output=True,
+                timeout=90,
+            )
+            self.assertEqual(result.returncode, 0,
+                             result.stdout + result.stderr)
+            return result
+
         try:
             for index, source in enumerate(sources):
                 paths = git(
@@ -385,30 +414,83 @@ m.exports[input.operation](input.options).then(r=>console.log(JSON.stringify(r))
                 }))
                 if index == 0:
                     seed = value
+                    capture_result = run_runtime('capture')
+                    capture_output = (capture_result.stdout
+                                      + capture_result.stderr)
+                    prefix = 'SOTTO_REVIEW_FIRST_WORKER_CAPTURE='
+                    captures = [line[len(prefix):]
+                                for line in capture_result.stdout.splitlines()
+                                if line.startswith(prefix)]
+                    self.assertEqual(len(captures), 1, capture_output)
+                    seed['evidence'] = record(json.loads(captures[0]),
+                                              'captured evidence')
+                    raw_jobs = seed['jobs']
+                    if not isinstance(raw_jobs, list):
+                        self.fail('Historical fixture job identities missing')
+                    references = [
+                        {'id': record(job, 'historical job')['id']}
+                        for job in raw_jobs
+                    ]
+                    references.sort(key=lambda item: str(item['id']))
+                    node = (
+                        'const load=require("node:module").createRequire('
+                        + json.dumps(str(ROOT / 'apps/web/package.json'))
+                        + ');const {PrismaPg}=load("@prisma/adapter-pg");'
+                        'const {PrismaClient}=load('
+                        '"./src/generated/prisma/client.ts");'
+                        'global.prisma=new PrismaClient({adapter:new PrismaPg('
+                        '{connectionString:process.env.'
+                        'SIDEDOOR_TEST_DATABASE_URL,options:'
+                        + json.dumps('-c search_path=' + schema + ',public')
+                        + '},{schema:' + json.dumps(schema) + '})});'
+                        'require('
+                        + json.dumps(str(ROOT / (
+                            'scripts/deploy/review/runtime/channel.ts'
+                        )))
+                        + ').main().catch(e=>{console.error(e);'
+                        'process.exitCode=1});'
+                    )
+                    lock_path = root / 'channel.lock'
+                    lock_path.touch(mode=0o600)
+                    lock = DeploymentLock(lock_path)
+                    try:
+                        with patch.dict(os.environ, {
+                            'TSX_TSCONFIG_PATH': str(
+                                ROOT / 'apps/web/tsconfig.json'
+                            ),
+                        }):
+                            channel_capture = exchange(
+                                ['node', '--require', 'tsx/cjs', '-e', node],
+                                {'mode': 'capture', 'input': {
+                                    'namespace': 'sotto-platform-v2',
+                                    'jobs': references,
+                                }}, directory=root, timeout=30,
+                                assert_fence=lambda: self.fail(
+                                    'Read-only capture requested a fence'
+                                ),
+                                queue_manifest=lambda value: self.fail(
+                                    'Read-only capture requested queue writes'
+                                ),
+                            )
+                    except Exception as error:
+                        diagnostics = ''.join(
+                            path.read_text(errors='replace')
+                            for path in root.glob('runtime-diagnostics-*.bin')
+                        )
+                        self.fail(str(error) + '\n' + diagnostics)
+                    finally:
+                        lock.close()
+                    self.assertEqual(channel_capture, seed['evidence'])
+                    unchanged = self.run_fixture(script, json.dumps({
+                        'operation': 'migrateWorksheetScenario',
+                        'options': {'schema': schema, 'migrations': []},
+                    }))
+                    self.assertEqual(unchanged['preserved'], seed['before'])
                 else:
                     self.assertEqual(value['preserved'], seed['before'])
                 stages.append({'source': source, 'migrations': inventory})
                 previous = inventory
-            fixture = root / 'fixture.json'
-            fixture.write_text(json.dumps(seed))
-            fixture.chmod(0o600)
-            result = subprocess.run(
-                [
-                    'npx', '--no-install', 'vitest', 'run',
-                    'tests/lib/deployment/review-worksheet-admission.test.ts',
-                    '--reporter=verbose',
-                ],
-                cwd=ROOT / 'apps/web',
-                env={
-                    **os.environ,
-                    'SOTTO_REVIEW_WORKSHEET_FIXTURE': str(fixture),
-                },
-                text=True,
-                capture_output=True,
-                timeout=90,
-            )
-            self.assertEqual(result.returncode, 0,
-                             result.stdout + result.stderr)
+            result = run_runtime('execute')
             self.assertEqual(retained.read_bytes(),
                              b'%PDF-1.4 retained worksheet fixture')
             self.assertEqual(sorted(
@@ -450,6 +532,23 @@ m.exports[input.operation](input.options).then(r=>console.log(JSON.stringify(r))
                     'fixtureBundleSha256': sha((
                         self.root / 'fixture.cjs'
                     ).read_bytes()),
+                    'captureBeforeSql': True,
+                    'actualPythonNodeCapture': channel_capture is not None,
+                    'toolSourceSha256': {
+                        name: sha((ROOT / name).read_bytes()) for name in (
+                            'scripts/deploy/review/first-worker.ts',
+                            'scripts/deploy/review/readiness.ts',
+                            'scripts/deploy/review/runtime/channel.ts',
+                            'scripts/deploy/review/runtime/channel.py',
+                            'apps/web/tests/lib/deployment/'
+                            'review-worksheet-admission.test.ts',
+                            'scripts/tests/review/test_observer.py',
+                        )
+                    },
+                    'capturedEvidenceSha256': sha(json.dumps(
+                        seed['evidence'], sort_keys=True,
+                    ).encode()),
+                    'captureOutput': capture_output,
                     'runtimeOutput': result.stdout + result.stderr,
                 },
             }))

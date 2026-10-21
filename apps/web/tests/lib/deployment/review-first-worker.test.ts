@@ -7,6 +7,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import { prepareJob } from 'thesidedoor-core/runtime/outbox';
 import { StorageCleanupJournal, prepareStorageCleanup } from 'thesidedoor-core/storage';
 import {
+  captureReviewFirstWorkerEvidence,
   hashReviewFirstWorkerValue as digest,
   inspectReviewFirstWorker,
   inspectReviewRedisEmpty,
@@ -272,6 +273,112 @@ suite('bounded canonical review first-worker admission', () => {
     };
   }
 
+  function knownReferences(source = evidence) {
+    return {
+      namespace: source.namespace,
+      jobs: source.jobs.map(({ id }) => ({ id })),
+    };
+  }
+
+  it('captures only private hashes from known canonical identities without admitting or changing work', async () => {
+    const before = await preservedState();
+    const captured = await captureReviewFirstWorkerEvidence(instance.database, knownReferences());
+    expect(captured).toEqual(evidence);
+    expect(captured).not.toHaveProperty('admitted');
+    expect(captured).not.toHaveProperty('prepared');
+    await expect(inspectReviewFirstWorker(instance.database, knownReferences())).rejects.toThrow();
+    await expect(prepareReviewQueues(runtime, knownReferences(), redis)).rejects.toThrow();
+    const serialized = JSON.stringify(captured);
+    for (const hidden of [
+      classId,
+      courseId,
+      ownerId,
+      '/api/storage/worksheets/preserved.pdf',
+      'passwordHash',
+      'token',
+    ])
+      expect(serialized).not.toContain(hidden);
+    expect(await preservedState()).toEqual(before);
+    expect(await redis.dbsize()).toBe(0);
+  });
+
+  it('requires exactly three unique ordered identities for observation only', async () => {
+    const known = knownReferences();
+    for (const input of [
+      { ...known, jobs: known.jobs.slice(1) },
+      { ...known, jobs: [known.jobs[0], known.jobs[0], known.jobs[2]] },
+      { ...known, jobs: [...known.jobs].reverse() },
+      { ...known, admitted: true },
+      { ...known, jobs: known.jobs.map((job) => ({ ...job, fingerprint: '0'.repeat(64) })) },
+    ])
+      await expect(captureReviewFirstWorkerEvidence(instance.database, input)).rejects.toThrow();
+    expect(await redis.dbsize()).toBe(0);
+  });
+
+  it('refuses a capture with a changed known identity', async () => {
+    const known = knownReferences();
+    known.jobs[0].id = '00000000-0000-4000-8000-000000000000';
+    known.jobs.sort((left, right) => left.id.localeCompare(right.id));
+    const before = await preservedState();
+    await expect(captureReviewFirstWorkerEvidence(instance.database, known)).rejects.toThrow();
+    expect(await preservedState()).toEqual(before);
+  });
+
+  it('refuses to capture an eligible current timestamp even when every immutable reference is known', async () => {
+    const original = evidence.jobs[0];
+    const current = await sottoTransaction(instance.database, async (transaction) => {
+      const outbox = sottoJobOutbox(transaction);
+      await outbox.complete(original.id, original.fingerprint);
+      const cls = await transaction.courseClass.findUniqueOrThrow({ where: { id: classId } });
+      return outbox.enqueue(
+        prepareJob({
+          namespace: SIDEDOOR_STATE_ID,
+          handler: 'worksheet-pdf',
+          version: 1,
+          payload: {
+            classId,
+            classUpdatedAt: cls.updatedAt.getTime(),
+            appBaseUrl: 'https://demo.sotto.fm',
+          },
+          scopes: (await captureCourseStorage(transaction, courseId)).scopes,
+          delivery: { attempts: 2, priority: 0, availableAt: 0 },
+        })
+      );
+    });
+    const known = knownReferences();
+    known.jobs = [
+      ...known.jobs.filter((job) => job.id !== original.id),
+      { id: current.job.id },
+    ].sort((left, right) => left.id.localeCompare(right.id));
+    const before = await preservedState();
+    await expect(captureReviewFirstWorkerEvidence(instance.database, known)).rejects.toThrow(
+      /Only stale/
+    );
+    expect(await preservedState()).toEqual(before);
+  });
+
+  it('refuses to capture missing classes and changed captured ownership', async () => {
+    const known = knownReferences();
+    const course = await instance.database.course.findUniqueOrThrow({ where: { id: courseId } });
+    await instance.database.course.update({
+      where: { id: courseId },
+      data: { createdAt: new Date(1) },
+    });
+    await expect(captureReviewFirstWorkerEvidence(instance.database, known)).rejects.toThrow(
+      /ownership/
+    );
+    await instance.database.course.update({
+      where: { id: courseId },
+      data: { createdAt: course.createdAt },
+    });
+    await instance.database.courseClass.delete({ where: { id: classId } });
+    const before = await preservedState();
+    await expect(captureReviewFirstWorkerEvidence(instance.database, known)).rejects.toThrow(
+      /class\/reference/
+    );
+    expect(await preservedState()).toEqual(before);
+  });
+
   it('admits only the exact retained three without changing state or creating Redis metadata', async () => {
     const before = await preservedState();
     expect(await inspectReviewRedisEmpty(redis)).toEqual({ empty: true });
@@ -339,6 +446,9 @@ suite('bounded canonical review first-worker admission', () => {
     await expect(inspectReviewFirstWorker(instance.database, evidence)).rejects.toThrow(
       /Unexpected|Unknown/
     );
+    await expect(
+      captureReviewFirstWorkerEvidence(instance.database, knownReferences())
+    ).rejects.toThrow(/Unexpected|Unknown/);
     expect(await preservedState()).toEqual(before);
   });
 
@@ -404,6 +514,9 @@ suite('bounded canonical review first-worker admission', () => {
       const changed = await captureEvidence();
       const before = await preservedState();
       await expect(inspectReviewFirstWorker(instance.database, changed)).rejects.toThrow();
+      await expect(
+        captureReviewFirstWorkerEvidence(instance.database, knownReferences(changed))
+      ).rejects.toThrow();
       expect(await preservedState()).toEqual(before);
     }
   );
@@ -475,6 +588,9 @@ suite('bounded canonical review first-worker admission', () => {
     await expect(inspectReviewFirstWorker(instance.database, evidence)).rejects.toThrow(
       /storage ownership/
     );
+    await expect(
+      captureReviewFirstWorkerEvidence(instance.database, knownReferences())
+    ).rejects.toThrow(/storage ownership/);
     expect(await preservedState()).toEqual(before);
     expect(await redis.dbsize()).toBe(0);
   });

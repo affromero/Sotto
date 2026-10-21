@@ -21,6 +21,11 @@ import { captureCourseStorage } from '@/lib/sidedoor/storage/core/course-storage
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 import { SIDEDOOR_STATE_ID } from '@/lib/sidedoor/access/state/store';
 import { SottoAccessStore } from '@/lib/sidedoor/access/core/access-store';
+import {
+  captureReviewFirstWorkerEvidence,
+  inspectReviewFirstWorker,
+  type ReviewFirstWorkerEvidence,
+} from '../../../../../scripts/deploy/review/first-worker';
 
 const boundary = vi.hoisted(() => ({ database: null as PrismaClient | null }));
 vi.mock('@/lib/prisma', async () => {
@@ -44,8 +49,10 @@ interface Fixture {
   scopes: { subjectId: string; generation: number }[];
   jobs: { id: string; fingerprint: string; job: unknown }[];
   profiles: { id: string; token: string }[];
+  evidence?: ReviewFirstWorkerEvidence;
 }
 const fixturePath = process.env.SOTTO_REVIEW_WORKSHEET_FIXTURE;
+const captureOnly = process.env.SOTTO_REVIEW_WORKSHEET_MODE === 'capture';
 const suite = fixturePath ? describe : describe.skip;
 
 suite('historical worksheet first-worker admission', () => {
@@ -80,6 +87,7 @@ suite('historical worksheet first-worker admission', () => {
       ),
     });
     boundary.database = database;
+    if (captureOnly) return;
     connection = {
       host: redis.hostname,
       port: Number(redis.port),
@@ -172,156 +180,188 @@ suite('historical worksheet first-worker admission', () => {
       );
   }
 
-  it('retains stale failures through restart and restores delivery after Redis retention loss', async () => {
-    const before = await retainedState();
-    const initial = await reconcile();
-    expect(initial.results).toHaveLength(3);
-    expect(initial.results.every((result) => result.status === 'delivered')).toBe(true);
-    await startWorker();
-    await expectHistoricalFailures();
-    await worker!.close();
-    worker = undefined;
-    const exhausted = await reconcile();
-    for (const result of exhausted.results) {
-      expect(result.status).toBe('failed');
-      if (result.status !== 'failed') throw new Error('Expected a retained failure');
-      expect(sottoJobFailureCode(result.error)).toBe('terminal_failed');
+  it.runIf(captureOnly)(
+    'captures final-runtime evidence from the unchanged eleven-migration schema',
+    async () => {
+      const captured = await captureReviewFirstWorkerEvidence(database, {
+        namespace: SIDEDOOR_STATE_ID,
+        jobs: fixture.jobs.map(({ id }) => ({ id })).sort((a, b) => a.id.localeCompare(b.id)),
+      });
+      expect(captured.jobs.map(({ id, fingerprint }) => ({ id, fingerprint }))).toEqual(
+        fixture.jobs
+          .map(({ id, fingerprint }) => ({ id, fingerprint }))
+          .sort((a, b) => a.id.localeCompare(b.id))
+      );
+      expect(captured).not.toHaveProperty('admitted');
+      expect(captured).not.toHaveProperty('prepared');
+      process.stdout.write('SOTTO_REVIEW_FIRST_WORKER_CAPTURE=' + JSON.stringify(captured) + '\n');
     }
-    await startWorker();
-    await reconcile();
-    await worker!.pause();
-    await expectHistoricalFailures();
-    await worker!.close();
-    worker = undefined;
-    expect(await retainedState()).toEqual(before);
+  );
 
-    // Simulate ordinary removal/loss of retained failed Redis deliveries only in this private fixture.
-    await queue.clean(0, 10, 'failed');
-    expect(await queue.getFailedCount()).toBe(0);
-    expect((await reconcile()).results.every((result) => result.status === 'delivered')).toBe(true);
-    await startWorker();
-    await expectHistoricalFailures();
-    await worker!.close();
-    worker = undefined;
-    expect(await retainedState()).toEqual(before);
+  it.skipIf(captureOnly)(
+    'retains stale failures through restart and restores delivery after Redis retention loss',
+    async () => {
+      expect(fixture.evidence).toBeDefined();
+      expect(await inspectReviewFirstWorker(database, fixture.evidence)).toEqual({
+        admitted: true,
+        zeroWork: false,
+        pending: 3,
+      });
+      const before = await retainedState();
+      const initial = await reconcile();
+      expect(initial.results).toHaveLength(3);
+      expect(initial.results.every((result) => result.status === 'delivered')).toBe(true);
+      await startWorker();
+      await expectHistoricalFailures();
+      await worker!.close();
+      worker = undefined;
+      const exhausted = await reconcile();
+      for (const result of exhausted.results) {
+        expect(result.status).toBe('failed');
+        if (result.status !== 'failed') throw new Error('Expected a retained failure');
+        expect(sottoJobFailureCode(result.error)).toBe('terminal_failed');
+      }
+      await startWorker();
+      await reconcile();
+      await worker!.pause();
+      await expectHistoricalFailures();
+      await worker!.close();
+      worker = undefined;
+      expect(await retainedState()).toEqual(before);
 
-    const laterClass = await database.courseClass.create({
-      data: { courseId: fixture.courseId, lessonId: before.classes[0].lessonId, order: 1 },
-    });
-    const later = await sottoTransaction(database, async (tx) => {
-      const ownership = await captureCourseStorage(tx, laterClass.courseId);
-      return sottoJobOutbox(tx).enqueue(
-        prepareJob({
-          id: 'ffffffff-ffff-4fff-bfff-ffffffffffff',
-          namespace: SIDEDOOR_STATE_ID,
-          handler: 'worksheet-pdf',
+      // Simulate ordinary removal/loss of retained failed Redis deliveries only in this private fixture.
+      await queue.clean(0, 10, 'failed');
+      expect(await queue.getFailedCount()).toBe(0);
+      expect((await reconcile()).results.every((result) => result.status === 'delivered')).toBe(
+        true
+      );
+      await startWorker();
+      await expectHistoricalFailures();
+      await worker!.close();
+      worker = undefined;
+      expect(await retainedState()).toEqual(before);
+
+      const laterClass = await database.courseClass.create({
+        data: { courseId: fixture.courseId, lessonId: before.classes[0].lessonId, order: 1 },
+      });
+      const later = await sottoTransaction(database, async (tx) => {
+        const ownership = await captureCourseStorage(tx, laterClass.courseId);
+        return sottoJobOutbox(tx).enqueue(
+          prepareJob({
+            id: 'ffffffff-ffff-4fff-bfff-ffffffffffff',
+            namespace: SIDEDOOR_STATE_ID,
+            handler: 'worksheet-pdf',
+            version: 1,
+            payload: {
+              classId: laterClass.id,
+              classUpdatedAt: laterClass.updatedAt.getTime(),
+              appBaseUrl: 'https://demo.sotto.fm',
+            },
+            scopes: ownership.scopes,
+            delivery: { attempts: 2, priority: 0, availableAt: 0 },
+          })
+        );
+      });
+      const advanced = await reconcile();
+      expect(advanced.results.at(-1)).toMatchObject({ id: later.job.id, status: 'delivered' });
+      const queued = await queue.getJob(later.job.id);
+      expect(await queued?.getState()).toBe('waiting');
+      const work = await sottoTransaction(database, (tx) =>
+        readSottoWorkerJob(tx, queued!, {
+          handler: queue.name,
           version: 1,
-          payload: {
-            classId: laterClass.id,
-            classUpdatedAt: laterClass.updatedAt.getTime(),
-            appBaseUrl: 'https://demo.sotto.fm',
-          },
-          scopes: ownership.scopes,
-          delivery: { attempts: 2, priority: 0, availableAt: 0 },
+          payload: worksheetPdfPayloadSchema,
         })
       );
-    });
-    const advanced = await reconcile();
-    expect(advanced.results.at(-1)).toMatchObject({ id: later.job.id, status: 'delivered' });
-    const queued = await queue.getJob(later.job.id);
-    expect(await queued?.getState()).toBe('waiting');
-    const work = await sottoTransaction(database, (tx) =>
-      readSottoWorkerJob(tx, queued!, {
-        handler: queue.name,
-        version: 1,
-        payload: worksheetPdfPayloadSchema,
-      })
-    );
-    expect(work.complete).toBe(false);
-    expect(chromium.launch).not.toHaveBeenCalled();
-    const beforeEligibleRun = await retainedState();
-    const rendererErrors: unknown[] = [];
-    await startWorker((job, error) => {
-      if (job?.id === later.job.id) rendererErrors.push(error.cause);
-    });
-    await expect
-      .poll(async () => (await queue.getJob(later.job.id))?.getState(), { timeout: 10_000 })
-      .toBe('failed');
-    await worker!.close();
-    worker = undefined;
-    expect(rendererErrors).toEqual([
-      expect.objectContaining({ message: 'Eligible worksheet reached fixture renderer' }),
-      expect.objectContaining({ message: 'Eligible worksheet reached fixture renderer' }),
-    ]);
-    expect(await retainedState()).toEqual(beforeEligibleRun);
-    for (const original of fixture.jobs)
-      expect((await queue.getJob(original.id))?.attemptsMade).toBe(2);
-  });
-
-  it('refuses changed identities, unsupported versions, invalid payloads and changed ownership', async () => {
-    vi.mocked(chromium.launch).mockClear();
-    const current = await database.courseClass.findUniqueOrThrow({
-      where: { id: fixture.classId },
-    });
-    const payload = {
-      classId: current.id,
-      classUpdatedAt: current.updatedAt.getTime(),
-      appBaseUrl: 'https://demo.sotto.fm',
-    };
-    const cases = [
-      {
-        payload,
-        scopes: fixture.scopes,
-        version: 1,
-        fingerprint: '0'.repeat(64),
-        error: /reference/,
-      },
-      { payload, scopes: fixture.scopes, version: 2, error: /Unsupported/ },
-      { payload: {}, scopes: fixture.scopes, version: 1, error: /classId|Invalid/ },
-      {
-        payload: { ...payload, classId: randomUUID() },
-        scopes: fixture.scopes,
-        version: 1,
-        error: /not found/,
-      },
-      {
-        payload,
-        scopes: fixture.scopes.map((scope) => ({ ...scope, generation: scope.generation + 1 })),
-        version: 1,
-        error: /ownership changed/,
-      },
-    ];
-    const before = await retainedState();
-    for (const scenario of cases) {
-      const record = await sottoTransaction(database, (tx) =>
-        sottoJobOutbox(tx).enqueue(
-          prepareJob({
-            namespace: SIDEDOOR_STATE_ID,
-            handler: queue.name,
-            version: scenario.version,
-            payload: scenario.payload,
-            scopes: scenario.scopes,
-            delivery: { attempts: 1, priority: 0, availableAt: 0 },
-          })
-        )
-      );
-      const queued: Job = await queue.add(
-        `${queue.name}.v${scenario.version}`,
-        {
-          operationId: record.job.id,
-          fingerprint: scenario.fingerprint ?? record.fingerprint,
-        },
-        { jobId: record.job.id, attempts: 1 }
-      );
-      await expect(async () => {
-        validateSottoQueueContract(queue.name, queued);
-        await executeSottoJob(queued, processWorksheetPdf);
-      }).rejects.toThrow(scenario.error);
-      expect(
-        await sottoTransaction(database, (tx) => sottoJobOutbox(tx).receipt(record.job.id))
-      ).toMatchObject({ status: 'pending', fingerprint: record.fingerprint });
+      expect(work.complete).toBe(false);
+      expect(chromium.launch).not.toHaveBeenCalled();
+      const beforeEligibleRun = await retainedState();
+      const rendererErrors: unknown[] = [];
+      await startWorker((job, error) => {
+        if (job?.id === later.job.id) rendererErrors.push(error.cause);
+      });
+      await expect
+        .poll(async () => (await queue.getJob(later.job.id))?.getState(), { timeout: 10_000 })
+        .toBe('failed');
+      await worker!.close();
+      worker = undefined;
+      expect(rendererErrors).toEqual([
+        expect.objectContaining({ message: 'Eligible worksheet reached fixture renderer' }),
+        expect.objectContaining({ message: 'Eligible worksheet reached fixture renderer' }),
+      ]);
+      expect(await retainedState()).toEqual(beforeEligibleRun);
+      for (const original of fixture.jobs)
+        expect((await queue.getJob(original.id))?.attemptsMade).toBe(2);
     }
-    expect(await retainedState()).toEqual(before);
-    expect(chromium.launch).not.toHaveBeenCalled();
-  });
+  );
+
+  it.skipIf(captureOnly)(
+    'refuses changed identities, unsupported versions, invalid payloads and changed ownership',
+    async () => {
+      vi.mocked(chromium.launch).mockClear();
+      const current = await database.courseClass.findUniqueOrThrow({
+        where: { id: fixture.classId },
+      });
+      const payload = {
+        classId: current.id,
+        classUpdatedAt: current.updatedAt.getTime(),
+        appBaseUrl: 'https://demo.sotto.fm',
+      };
+      const cases = [
+        {
+          payload,
+          scopes: fixture.scopes,
+          version: 1,
+          fingerprint: '0'.repeat(64),
+          error: /reference/,
+        },
+        { payload, scopes: fixture.scopes, version: 2, error: /Unsupported/ },
+        { payload: {}, scopes: fixture.scopes, version: 1, error: /classId|Invalid/ },
+        {
+          payload: { ...payload, classId: randomUUID() },
+          scopes: fixture.scopes,
+          version: 1,
+          error: /not found/,
+        },
+        {
+          payload,
+          scopes: fixture.scopes.map((scope) => ({ ...scope, generation: scope.generation + 1 })),
+          version: 1,
+          error: /ownership changed/,
+        },
+      ];
+      const before = await retainedState();
+      for (const scenario of cases) {
+        const record = await sottoTransaction(database, (tx) =>
+          sottoJobOutbox(tx).enqueue(
+            prepareJob({
+              namespace: SIDEDOOR_STATE_ID,
+              handler: queue.name,
+              version: scenario.version,
+              payload: scenario.payload,
+              scopes: scenario.scopes,
+              delivery: { attempts: 1, priority: 0, availableAt: 0 },
+            })
+          )
+        );
+        const queued: Job = await queue.add(
+          `${queue.name}.v${scenario.version}`,
+          {
+            operationId: record.job.id,
+            fingerprint: scenario.fingerprint ?? record.fingerprint,
+          },
+          { jobId: record.job.id, attempts: 1 }
+        );
+        await expect(async () => {
+          validateSottoQueueContract(queue.name, queued);
+          await executeSottoJob(queued, processWorksheetPdf);
+        }).rejects.toThrow(scenario.error);
+        expect(
+          await sottoTransaction(database, (tx) => sottoJobOutbox(tx).receipt(record.job.id))
+        ).toMatchObject({ status: 'pending', fingerprint: record.fingerprint });
+      }
+      expect(await retainedState()).toEqual(before);
+      expect(chromium.launch).not.toHaveBeenCalled();
+    }
+  );
 });

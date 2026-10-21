@@ -69,6 +69,19 @@ export const reviewFirstWorkerEvidenceSchema = z
   });
 export type ReviewFirstWorkerEvidence = z.infer<typeof reviewFirstWorkerEvidenceSchema>;
 
+const knownReferencesSchema = z
+  .object({
+    namespace: z.literal(SIDEDOOR_STATE_ID),
+    jobs: z.array(z.object({ id: z.uuid() }).strict()).length(3),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    const ids = value.jobs.map((job) => job.id);
+    if (new Set(ids).size !== 3 || !isDeepStrictEqual(ids, [...ids].sort()))
+      context.addIssue({ code: 'custom', message: 'Exactly three ordered identities required' });
+  });
+type KnownReferences = z.infer<typeof knownReferencesSchema>;
+
 const maxBytes = 262_144;
 const maxRows = 10_000;
 const timeoutMs = 15_000;
@@ -142,15 +155,13 @@ async function readOnly<Result>(
   );
 }
 
-/** Actual canonical final-runtime inspection. This function never delivers or settles work. */
-export async function inspectReviewFirstWorker(database: PrismaClient, input: unknown) {
-  const evidence = reviewFirstWorkerEvidenceSchema.parse(input);
+/** Both capture and revalidation use one canonical READ ONLY Serializable snapshot. */
+async function readReviewFirstWorker(database: PrismaClient, known: KnownReferences) {
   return readOnly(database, async (transaction, deadline) => {
     const identity = await transaction.$queryRawUnsafe<Record<string, unknown>[]>(
       'SELECT current_database() AS "databaseName", current_schema() AS "schemaName", inet_server_addr()::text AS "serverAddress", inet_server_port() AS "serverPort", (SELECT oid::text FROM pg_database WHERE datname = current_database()) AS "databaseOid"'
     );
     assert(identity.length === 1, 'Unique database identity required');
-    assert.equal(hashReviewFirstWorkerValue(identity[0]), evidence.databaseIdentityHash);
     const instance = await sottoStorageInstance(transaction).read();
     const state = await sidedoorStateStore(transaction).read();
     const access = await (await sottoAccessStore(transaction)).read();
@@ -166,12 +177,8 @@ export async function inspectReviewFirstWorker(database: PrismaClient, input: un
         'objectStoragePublicUrl',
       ].map((key) => [key, site[key] ?? null])
     );
-    assert.equal(
-      hashReviewFirstWorkerValue({ instance, storage }),
-      evidence.storageIdentityHash,
-      'Storage identity changed'
-    );
     const outbox = sottoJobOutbox(transaction);
+    const jobs: ReviewFirstWorkerEvidence['jobs'] = [];
     const seen = new Set<string>();
     const cursors = new Set<string>();
     let cursor: string | null = null;
@@ -181,8 +188,8 @@ export async function inspectReviewFirstWorker(database: PrismaClient, input: un
       for (const reference of page.jobs) {
         assert(!seen.has(reference.id) && seen.size < 3, 'Unexpected incomplete work');
         seen.add(reference.id);
-        const expected = evidence.jobs.find((item) => item.id === reference.id);
-        assert(expected && reference.fingerprint === expected.fingerprint, 'Unknown work identity');
+        const expected = known.jobs.find((item) => item.id === reference.id);
+        assert(expected, 'Unknown work identity');
         const receipt = await outbox.receipt(reference.id);
         const record = await outbox.read(reference.id);
         assert(
@@ -190,8 +197,8 @@ export async function inspectReviewFirstWorker(database: PrismaClient, input: un
             record &&
             !record.complete &&
             receipt.id === reference.id &&
-            receipt.fingerprint === expected.fingerprint &&
-            record.fingerprint === expected.fingerprint &&
+            receipt.fingerprint === reference.fingerprint &&
+            record.fingerprint === reference.fingerprint &&
             receipt.handler === 'worksheet-pdf' &&
             receipt.version === 1,
           'Unexpected durable receipt'
@@ -206,7 +213,7 @@ export async function inspectReviewFirstWorker(database: PrismaClient, input: un
           { handler: 'worksheet-pdf', version: 1, payload: worksheetPdfPayloadSchema }
         );
         assert(!durable.complete, 'Worksheet work is no longer pending');
-        assert.equal(record.job.namespace, evidence.namespace);
+        assert.equal(record.job.namespace, known.namespace);
         assert.equal(record.job.id, reference.id);
         assert.deepEqual(record.job.delivery, { attempts: 2, priority: 0, availableAt: 0 });
         assert.equal(durable.payload.appBaseUrl, 'https://demo.sotto.fm');
@@ -215,6 +222,11 @@ export async function inspectReviewFirstWorker(database: PrismaClient, input: un
           select: { id: true, courseId: true, updatedAt: true, worksheetPdfUrl: true },
         });
         assert(cls && cls.worksheetPdfUrl, 'Preserved worksheet class/reference missing');
+        assert.notEqual(
+          cls.updatedAt.getTime(),
+          durable.payload.classUpdatedAt,
+          'Only stale worksheet snapshots can be observed'
+        );
         const ownership = await captureCourseStorage(transaction, cls.courseId);
         assert(isDeepStrictEqual(ownership.scopes, durable.scopes), 'Captured ownership changed');
         const profile = access.householdProfiles?.find((item) => item.id === ownership.userId);
@@ -252,7 +264,7 @@ export async function inspectReviewFirstWorker(database: PrismaClient, input: un
           currentClassUpdatedAt: cls.updatedAt.getTime(),
           worksheetReferenceHash: hashReviewFirstWorkerValue(cls.worksheetPdfUrl),
         };
-        assert.deepEqual(actual, expected, 'Admitted worksheet evidence changed');
+        jobs.push(actual);
       }
       if (page.cursor !== null) {
         assert(page.jobs.length > 0 && !cursors.has(page.cursor) && cursors.size < 100);
@@ -269,7 +281,7 @@ export async function inspectReviewFirstWorker(database: PrismaClient, input: un
     const retainedIds = new Set<string>();
     for (const row of retained) {
       budget(deadline);
-      assert.equal(row.namespace, evidence.namespace, 'Unknown retained namespace');
+      assert.equal(row.namespace, known.namespace, 'Unknown retained namespace');
       const id = z.uuid().parse(row.id);
       assert(!retainedIds.has(id), 'Duplicate retained job identity');
       retainedIds.add(id);
@@ -281,8 +293,31 @@ export async function inspectReviewFirstWorker(database: PrismaClient, input: un
       assert.equal(record.complete, receipt.status === 'complete');
       if (receipt.status === 'pending') assert(seen.has(id), 'Unindexed incomplete work');
     }
-    return { admitted: true as const, zeroWork: false as const, pending: 3 as const };
+    return reviewFirstWorkerEvidenceSchema.parse({
+      schemaVersion: 1,
+      namespace: known.namespace,
+      databaseIdentityHash: hashReviewFirstWorkerValue(identity[0]),
+      storageIdentityHash: hashReviewFirstWorkerValue({ instance, storage }),
+      jobs: jobs.sort((left, right) => left.id.localeCompare(right.id)),
+    });
   });
+}
+
+/** Observation only. Its private output requires separate independent admission before use. */
+export async function captureReviewFirstWorkerEvidence(database: PrismaClient, input: unknown) {
+  return readReviewFirstWorker(database, knownReferencesSchema.parse(input));
+}
+
+/** Revalidate separately admitted evidence. Capture output is never accepted implicitly. */
+export async function inspectReviewFirstWorker(database: PrismaClient, input: unknown) {
+  const evidence = reviewFirstWorkerEvidenceSchema.parse(input);
+  const known = knownReferencesSchema.parse({
+    namespace: evidence.namespace,
+    jobs: evidence.jobs.map(({ id }) => ({ id })),
+  });
+  const actual = await readReviewFirstWorker(database, known);
+  assert.deepEqual(actual, evidence, 'Admitted worksheet evidence changed');
+  return { admitted: true as const, zeroWork: false as const, pending: 3 as const };
 }
 
 /** Raw dedicated DB0 inspection precedes every Queue constructor and metadata write. */
