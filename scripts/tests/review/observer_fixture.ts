@@ -1,10 +1,19 @@
 import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { createServer } from 'node:net';
 import { Client } from 'pg';
 import Redis from 'ioredis';
-import { initialAccessState } from 'thesidedoor-core/access';
+import {
+  AccessService,
+  HouseholdProfileService,
+  accessStateSchema,
+  hashPassword,
+  initialAccessState,
+  initializeAccess,
+} from 'thesidedoor-core/access';
+import { OptimisticStateStore } from 'thesidedoor-core/storage/optimistic';
+import { sqlStateBackend } from 'thesidedoor-core/storage/sql';
 import { JobExecutionJournal, JobOutbox, prepareJob } from 'thesidedoor-core/runtime/outbox';
 import { StorageInstanceControl } from 'thesidedoor-core/storage/instance';
 import {
@@ -15,6 +24,175 @@ import {
   storageBackendBinding,
 } from 'thesidedoor-core/storage';
 import { observe } from '../../deploy/review/observer';
+
+/** Produce real historical records before the final application's migration/runtime test. */
+export async function seedWorksheetScenario(options: {
+  schema: string;
+  migrations: string[];
+  storageRoot: string;
+}) {
+  assert.match(options.schema, /^review_worksheet_[a-f0-9]{32}$/);
+  assert.ok(process.env.DATABASE_URL);
+  const database = new Client({ connectionString: process.env.DATABASE_URL });
+  await database.connect();
+  try {
+    await database.query(`CREATE SCHEMA "${options.schema}"`);
+    await database.query(`SET search_path TO "${options.schema}",public`);
+    for (const migration of options.migrations) await database.query(migration);
+    const executor = {
+      query: async (sql: string, values: readonly unknown[]) =>
+        (await database.query(sql, [...values])).rows,
+    };
+    const namespace = 'sotto-platform-v2';
+    const authority = new OptimisticStateStore({
+      backend: sqlStateBackend(executor, 'postgres', 'worksheet-fixture-access'),
+      parse: accessStateSchema.parse,
+      initial: initialAccessState,
+    });
+    const createdAt = 1_700_000_000_000;
+    const password = 'historical worksheet fixture password';
+    const passwordHash = await hashPassword(password);
+    const ownerId = randomUUID();
+    const memberId = randomUUID();
+    const principals = [
+      { id: ownerId, name: 'Owner', role: 'owner' as const, passwordHash, epoch: 0, createdAt },
+      {
+        id: memberId,
+        name: 'Member',
+        role: 'member' as const,
+        passwordHash: null,
+        epoch: 0,
+        createdAt,
+      },
+    ];
+    await initializeAccess(authority, 'worksheet-fixture', {
+      principals,
+      mode: 'household',
+      householdPasswordHash: passwordHash,
+    });
+    const access = new AccessService({ store: authority });
+    const token = await access.enterHousehold(password);
+    await new HouseholdProfileService(access).select(token, ownerId);
+    assert.equal((await new HouseholdProfileService(access).selected(token))?.id, ownerId);
+    const memberToken = await access.enterHousehold(password);
+    await new HouseholdProfileService(access).select(memberToken, memberId);
+    for (const principal of principals) {
+      await database.query(
+        'INSERT INTO "User" (id,email,name,role,"createdAt","updatedAt") VALUES ($1,$2,$3,$4,$5,$5)',
+        [
+          principal.id,
+          `sidedoor+${principal.id}@localhost.invalid`,
+          principal.name,
+          principal.role === 'owner' ? 'ADMIN' : 'USER',
+          new Date(createdAt),
+        ]
+      );
+    }
+    await database.query('INSERT INTO "SidedoorState" VALUES ($1,$2,$3)', [
+      namespace,
+      randomUUID(),
+      {
+        version: 2,
+        revision: 0,
+        access: await authority.read(),
+        configuration: {
+          site: { storageProvider: 'local', localStorageRoot: options.storageRoot },
+          automaticModels: null,
+        },
+      },
+    ]);
+    const instanceControl = new StorageInstanceControl(executor, 'postgres', namespace);
+    await instanceControl.initialize(randomUUID());
+    const instance = await instanceControl.read();
+    const curriculumId = randomUUID();
+    const lessonId = randomUUID();
+    const courseId = randomUUID();
+    const classId = randomUUID();
+    const reference = '/api/storage/worksheets/retained-fixture.pdf';
+    await database.query(
+      'INSERT INTO "Curriculum" (id,"nativeLang","targetLang",title,"updatedAt") VALUES ($1,\'en\',\'es\',\'Fixture\',$2)',
+      [curriculumId, new Date(createdAt)]
+    );
+    await database.query(
+      'INSERT INTO "Lesson" (id,"curriculumId",level,"order",slug,title,objective,"grammarPoints","vocabThemes","targetVocab","updatedAt") VALUES ($1,$2,\'A1\',0,\'fixture\',\'Fixture\',\'Practice\',\'[]\',\'[]\',\'[]\',$3)',
+      [lessonId, curriculumId, new Date(createdAt)]
+    );
+    await database.query(
+      'INSERT INTO "Course" (id,"userId","nativeLang","targetLang","curriculumId","createdAt","updatedAt") VALUES ($1,$2,\'en\',\'es\',$3,$4,$4)',
+      [courseId, ownerId, curriculumId, new Date(createdAt)]
+    );
+    await database.query(
+      'INSERT INTO "CourseClass" (id,"courseId","lessonId","order","worksheetPdfUrl","createdAt","updatedAt") VALUES ($1,$2,$3,0,$4,$5,$6)',
+      [classId, courseId, lessonId, reference, new Date(createdAt), new Date(createdAt + 1000)]
+    );
+    const scopes = [
+      { subjectId: instance.subjectId, generation: instance.generation },
+      { subjectId: `course:${courseId}`, generation: createdAt },
+      { subjectId: `profile:${ownerId}`, generation: createdAt },
+    ].sort((left, right) => left.subjectId.localeCompare(right.subjectId));
+    const outbox = new JobOutbox(executor, 'postgres', namespace);
+    const jobs = [];
+    for (let index = 0; index < 3; index++) {
+      const record = await outbox.enqueue(
+        prepareJob({
+          namespace,
+          handler: 'worksheet-pdf',
+          version: 1,
+          payload: {
+            classId,
+            classUpdatedAt: createdAt + index,
+            appBaseUrl: 'https://demo.sotto.fm',
+          },
+          scopes,
+          delivery: { attempts: 2, priority: 0, availableAt: 0 },
+        })
+      );
+      if (index > 0) await outbox.acknowledgeDelivery(record.job.id, record.fingerprint);
+      jobs.push({ id: record.job.id, fingerprint: record.fingerprint, job: record.job });
+    }
+    return {
+      schema: options.schema,
+      jobs,
+      classId,
+      courseId,
+      reference,
+      scopes,
+      profiles: [
+        { id: ownerId, token },
+        { id: memberId, token: memberToken },
+      ],
+      before: await worksheetSnapshot(database),
+    };
+  } finally {
+    await database.end();
+  }
+}
+
+async function worksheetSnapshot(database: Client) {
+  const result = await database.query(`SELECT json_build_object(
+    'state',(SELECT json_agg(s ORDER BY id) FROM "SidedoorState" s),
+    'users',(SELECT json_agg(p ORDER BY id) FROM
+      (SELECT id,email,name,role,"createdAt","updatedAt" FROM "User") p),
+    'classes',(SELECT json_agg(c ORDER BY id) FROM
+      (SELECT id,"courseId","lessonId","updatedAt","worksheetPdfUrl" FROM "CourseClass") c),
+    'courses',(SELECT json_agg(c ORDER BY id) FROM
+      (SELECT id,"userId","createdAt","updatedAt" FROM "Course") c)) AS proof`);
+  return createHash('sha256').update(JSON.stringify(result.rows[0].proof)).digest('hex');
+}
+
+export async function migrateWorksheetScenario(options: { schema: string; migrations: string[] }) {
+  assert.match(options.schema, /^review_worksheet_[a-f0-9]{32}$/);
+  assert.ok(options.migrations.length <= 16);
+  const database = new Client({ connectionString: process.env.DATABASE_URL });
+  await database.connect();
+  try {
+    await database.query(`SET search_path TO "${options.schema}",public`);
+    for (const migration of options.migrations) await database.query(migration);
+    return { preserved: await worksheetSnapshot(database) };
+  } finally {
+    await database.end();
+  }
+}
 
 export async function runScenario(scenario: string, bundle: string) {
   assert.ok(process.env.DATABASE_URL);

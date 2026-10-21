@@ -11,6 +11,7 @@ import subprocess
 import tarfile
 import tempfile
 import unittest
+import uuid
 from pathlib import Path
 from typing import ClassVar
 from unittest.mock import patch
@@ -22,6 +23,7 @@ from scripts.deploy.review.build_observer import (
     SOURCE,
     TARGET,
     build,
+    git,
     historical_lock,
     sha,
     unpack,
@@ -195,6 +197,8 @@ class HistoricalObserverTests(unittest.TestCase):
             'runtime/outbox',
             'storage/instance',
             'storage',
+            'storage/optimistic',
+            'storage/sql',
             'configuration/owned-credentials',
             'configuration/credential-sharing',
         ]:
@@ -281,6 +285,12 @@ const Module=require('module'),m=new Module('/app/apps/web/observer.cjs');
 m.filename=m.id;m.paths=Module._nodeModulePaths('/app/apps/web');m._compile(s,m.id);
 m.exports.runScenario(process.argv[1],s).then(r=>console.log(JSON.stringify(r)))
 .catch(e=>{console.error(e);process.exitCode=1});});"""
+        value = self.run_fixture(script, name)
+        self.assertTrue(value['readOnly'])
+        self.assertTrue(value['unchanged'])
+        return value
+
+    def run_fixture(self, script: str, argument: str) -> dict[str, object]:
         result = subprocess.run(
             [
                 'docker',
@@ -305,7 +315,7 @@ m.exports.runScenario(process.argv[1],s).then(r=>console.log(JSON.stringify(r)))
                 IMAGE,
                 '-e',
                 script,
-                name,
+                argument,
             ],
             input=(self.root / 'fixture.cjs').read_text(),
             text=True,
@@ -313,10 +323,152 @@ m.exports.runScenario(process.argv[1],s).then(r=>console.log(JSON.stringify(r)))
             timeout=60,
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        value = record(json.loads(result.stdout), 'test result')
-        self.assertTrue(value['readOnly'])
-        self.assertTrue(value['unchanged'])
-        return value
+        return record(json.loads(result.stdout), 'test result')
+
+    def test_old_worksheet_records_fail_safely_in_final_runtime(self) -> None:
+        schema = 'review_worksheet_' + uuid.uuid4().hex
+        root = self.root / schema
+        root.mkdir(mode=0o700)
+        storage = root / 'storage'
+        storage.mkdir()
+        (storage / 'worksheets').mkdir()
+        retained = storage / 'worksheets/retained-fixture.pdf'
+        retained.write_bytes(b'%PDF-1.4 retained worksheet fixture')
+        sources = [
+            TARGET,
+            '67086a302f409824bb22606a049888ff86a77348',
+            'e43d88acf5457b0d0061275be91e4176b28ed7a6',
+            git(ROOT, 'rev-parse', 'HEAD').decode().strip(),
+        ]
+        script = """let s='';process.stdin.on('data',d=>s+=d);
+process.stdin.on('end',()=>{
+const Module=require('module'),m=new Module('/app/apps/web/observer.cjs');
+m.filename=m.id;m.paths=Module._nodeModulePaths('/app/apps/web');
+m._compile(s,m.id);const input=JSON.parse(process.argv[1]);
+m.exports[input.operation](input.options).then(r=>console.log(JSON.stringify(r)))
+.catch(e=>{console.error(e);process.exitCode=1});});"""
+        previous: dict[str, str] = {}
+        seed: dict[str, object] = {}
+        stages: list[dict[str, object]] = []
+        try:
+            for index, source in enumerate(sources):
+                paths = git(
+                    ROOT, 'ls-tree', '-r', '--name-only', source, '--',
+                    'apps/web/prisma/migrations',
+                ).decode().splitlines()
+                migrations = {
+                    path: git(ROOT, 'show', source + ':' + path)
+                    for path in paths if path.endswith('/migration.sql')
+                }
+                inventory = {
+                    path: sha(content) for path, content in migrations.items()
+                }
+                self.assertTrue(all(
+                    inventory.get(path) == digest
+                    for path, digest in previous.items()
+                ), 'Published migration bytes changed')
+                added = sorted(set(migrations) - set(previous))
+                self.assertTrue(1 <= len(added) <= 16)
+                options: dict[str, object] = {
+                    'schema': schema,
+                    'migrations': [
+                        migrations[path].decode() for path in added
+                    ],
+                    'storageRoot': str(storage),
+                }
+                value = self.run_fixture(script, json.dumps({
+                    'operation': (
+                        'seedWorksheetScenario' if index == 0
+                        else 'migrateWorksheetScenario'
+                    ),
+                    'options': options,
+                }))
+                if index == 0:
+                    seed = value
+                else:
+                    self.assertEqual(value['preserved'], seed['before'])
+                stages.append({'source': source, 'migrations': inventory})
+                previous = inventory
+            fixture = root / 'fixture.json'
+            fixture.write_text(json.dumps(seed))
+            fixture.chmod(0o600)
+            result = subprocess.run(
+                [
+                    'npx', '--no-install', 'vitest', 'run',
+                    'tests/lib/deployment/review-worksheet-admission.test.ts',
+                    '--reporter=verbose',
+                ],
+                cwd=ROOT / 'apps/web',
+                env={
+                    **os.environ,
+                    'SOTTO_REVIEW_WORKSHEET_FIXTURE': str(fixture),
+                },
+                text=True,
+                capture_output=True,
+                timeout=90,
+            )
+            self.assertEqual(result.returncode, 0,
+                             result.stdout + result.stderr)
+            self.assertEqual(retained.read_bytes(),
+                             b'%PDF-1.4 retained worksheet fixture')
+            self.assertEqual(sorted(
+                str(path.relative_to(storage))
+                for path in storage.rglob('*')
+            ), ['worksheets', 'worksheets/retained-fixture.pdf'])
+            (root / 'stages.json').write_text(json.dumps(stages))
+            sdk_path = Path(subprocess.check_output(
+                ['node', '-p',
+                 "require.resolve('thesidedoor-core/runtime/outbox')"],
+                cwd=ROOT / 'apps/web', text=True,
+            ).strip()).parents[2] / 'package.json'
+            print(json.dumps({
+                'worksheetProof': {
+                    'stages': [{
+                        'source': stage['source'],
+                        'migrationInventorySha256': sha(json.dumps(
+                            stage['migrations'], sort_keys=True,
+                        ).encode()),
+                        'migrationCount': len(record(
+                            stage['migrations'], 'stage inventory'
+                        )),
+                    } for stage in stages],
+                    'targetSdkVersion': json.loads(
+                        sdk_path.read_text()
+                    )['version'],
+                    'targetSdkPackageSha256': sha(sdk_path.read_bytes()),
+                    'targetLockSha256': sha(
+                        (ROOT / 'package-lock.json').read_bytes()
+                    ),
+                    'historicalSdkIntegrity': self.receipt['sdkIntegrity'],
+                    'historicalSdkArchiveSha256':
+                        self.receipt['sdkArchiveSha256'],
+                    'historicalLockSha256':
+                        self.receipt['targetLockSha256'],
+                    'fixtureSourceSha256': sha((
+                        ROOT / 'scripts/tests/review/observer_fixture.ts'
+                    ).read_bytes()),
+                    'fixtureBundleSha256': sha((
+                        self.root / 'fixture.cjs'
+                    ).read_bytes()),
+                    'runtimeOutput': result.stdout + result.stderr,
+                },
+            }))
+        finally:
+            cleanup = """const {Client}=require('pg');
+const c=new Client({connectionString:process.env.DATABASE_URL});
+(async()=>{await c.connect();try{await c.query(
+  'DROP SCHEMA IF EXISTS "'+process.argv[1]+'" CASCADE');
+}finally{await c.end()}})().catch(e=>{console.error(e);process.exitCode=1});"""
+            removed = subprocess.run(
+                ['node', '-e', cleanup, schema],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+                timeout=20,
+            )
+            self.assertEqual(removed.returncode, 0,
+                             removed.stdout + removed.stderr)
 
     def test_pending_and_delivered_jobs_still_block_first_worker(self) -> None:
         self.assertFalse(self.scenario('pending')['zeroWork'])
