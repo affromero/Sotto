@@ -9,7 +9,13 @@ final class PlayUIFixture: @unchecked Sendable {
     private var revision = 4
     private var ack = false
     private var requestID = ""
+    private var actions: [String] = []
     var acknowledged: Bool { lock.withLock { ack } }
+    var diagnostics: String {
+        lock.withLock {
+            "Stage: \(stage), revision: \(revision)\nActions:\n" + actions.joined(separator: "\n")
+        }
+    }
 
     init() throws {
         let url = try XCTUnwrap(Bundle(for: PlayInvitationUITests.self).url(forResource: "contract", withExtension: "json"))
@@ -44,9 +50,11 @@ final class PlayUIFixture: @unchecked Sendable {
                 return json(["profiles": [["id": "guest-profile", "name": "Sam", "avatarUrl": "", "isOwner": false, "role": "USER"]]])
             }
             if path.hasSuffix("/actions"), post {
-                revision += 1
                 let type = payload["type"] as? String
                 let command = payload["command"] as? [String: Any]
+                let expected = payload["expectedRevision"] as? Int
+                actions.append("\(command?["type"] as? String ?? type ?? "unknown"): expected=\(expected.map(String.init) ?? "missing"), current=\(revision), stage=\(stage)")
+                revision += 1
                 switch command?["type"] as? String {
                 case "CHOOSE": stage = "finished-0-GUEST"
                 case "GUESS": stage = "guessed-2-GUEST"

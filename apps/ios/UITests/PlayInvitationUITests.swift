@@ -5,6 +5,12 @@ final class PlayInvitationUITests: XCTestCase {
     func testSystemInvitationCreatesAnApprovedProfileAndPlaysAllThreeNativeGames() async throws {
         continueAfterFailure = false
         let fixture = try PlayUIFixture()
+        defer {
+            let diagnostics = XCTAttachment(string: fixture.diagnostics)
+            diagnostics.name = "game-fixture-actions"
+            diagnostics.lifetime = .keepAlways
+            add(diagnostics)
+        }
         let server = try LocalHTTPServer { fixture.respond($0) }
         try await server.start()
         defer { server.stop() }
@@ -86,7 +92,13 @@ final class PlayInvitationUITests: XCTestCase {
                      app: XCUIApplication, timeout: TimeInterval = 10) throws {
         let named = app.descendants(matching: type)[title].firstMatch
         let control = type == .switch ? named.switches.firstMatch : named
-        guard control.waitForExistence(timeout: timeout) else { throw InteractionFailure.missingButton(title) }
+        guard control.waitForExistence(timeout: timeout) else {
+            let hierarchy = XCTAttachment(string: app.debugDescription)
+            hierarchy.name = "missing-control-\(title)"
+            hierarchy.lifetime = .keepAlways
+            add(hierarchy)
+            throw InteractionFailure.missingButton(title)
+        }
         var scrolls = 0
         var geometryChecks = 0
         while geometryChecks < 8 {

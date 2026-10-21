@@ -1,16 +1,21 @@
 import {
   AccessError,
   HouseholdProfileManagement,
+  isAccessError,
   type ProfileManagerCredential,
 } from 'thesidedoor-core/access';
 import { cookieValue } from 'thesidedoor-core/access/http';
 import { StorageCleanupJournal } from 'thesidedoor-core/storage';
 import type { Prisma, PrismaClient } from '@/generated/prisma/client';
+import type { AuthenticatedRequest } from '@/lib/api-keys';
 import { logger } from '@/lib/logger';
 import { captureStorageBackend } from '@/lib/r2';
 import { sottoAccessStore } from '@/lib/sidedoor/access/core/access-store';
 import { sottoDeviceService } from '@/lib/sidedoor/access/state/device-identity';
-import { resolveSottoRequest } from '@/lib/sidedoor/access/core/request-identity';
+import {
+  requireOriginalSottoAdmission,
+  resolveSottoRequest,
+} from '@/lib/sidedoor/access/core/request-identity';
 import { sharedAccess } from '@/lib/sidedoor/access/core/service';
 import { SHARED_SESSION_COOKIE } from '@/lib/sidedoor/access/core/session-identity';
 import { SIDEDOOR_STATE_ID, sidedoorStateStore } from '@/lib/sidedoor/access/state/store';
@@ -67,32 +72,62 @@ async function admission(database: Prisma.TransactionClient, request: Request) {
 }
 
 /** Revoke authority and persist the complete cleanup snapshot before cascading learner data. */
-export async function deleteSottoProfile(database: PrismaClient, request: Request, id: string) {
+export function deleteSottoProfile(database: PrismaClient, request: Request, id: string) {
+  return deleteProfile(database, request, id);
+}
+
+/** Self deletion is bound to the authenticated learner captured before confirmation. */
+export function deleteOwnSottoProfile(
+  database: PrismaClient,
+  request: Request,
+  expected: AuthenticatedRequest
+) {
+  return deleteProfile(database, request, expected.userId, expected);
+}
+
+function prepareRemoval(id: string, epoch: number, selfPrincipal: boolean) {
+  const manager = management();
+  return selfPrincipal
+    ? manager.prepareRemoveSelf(id, epoch, true)
+    : manager.prepareRemove(id, epoch, true);
+}
+
+async function deleteProfile(
+  database: PrismaClient,
+  request: Request,
+  id: string,
+  expected?: AuthenticatedRequest
+) {
   const captured = await sottoTransaction(
     database,
     async (tx) => {
+      if (expected) await requireOriginalSottoAdmission(tx, request, expected);
       const { identity, credential, envelope } = await admission(tx, request);
       const user = await tx.user.findUnique({ where: { id }, select: { createdAt: true } });
       if (!user) return null;
       const profile = envelope.access.householdProfiles?.find((item) => item.id === id);
       if (!profile) throw new AccessError('forbidden');
-      management().prepareRemove(id, profile.epoch, true).apply(envelope.access, credential);
+      const selfPrincipal =
+        expected !== undefined && identity.principalId !== null && !identity.isOwner;
+      prepareRemoval(id, profile.epoch, selfPrincipal).apply(envelope.access, credential);
       return {
         epoch: profile.epoch,
         generation: user.createdAt.getTime(),
         selected: identity.kind === 'content' && identity.userId === id,
+        selfPrincipal,
       };
     },
     { signal: request.signal }
   );
   if (!captured) return null;
   const backend = await captureStorageBackend();
-  const removal = management().prepareRemove(id, captured.epoch, true);
+  const removal = prepareRemoval(id, captured.epoch, captured.selfPrincipal);
   let job: { id: string };
   try {
     job = await sottoTransaction(
       database,
       async (tx) => {
+        if (expected) await requireOriginalSottoAdmission(tx, request, expected);
         const { credential, envelope } = await admission(tx, request);
         const user = await tx.user.findUnique({ where: { id }, select: { createdAt: true } });
         if (!user || user.createdAt.getTime() !== captured.generation)
@@ -122,6 +157,14 @@ export async function deleteSottoProfile(database: PrismaClient, request: Reques
     );
   } catch (error) {
     const recovered = await sottoTransaction(database, async (tx) => {
+      if (expected) {
+        try {
+          await requireOriginalSottoAdmission(tx, request, expected);
+        } catch (admissionError) {
+          if (isAccessError(admissionError)) return null;
+          throw admissionError;
+        }
+      }
       const identity = await resolveSottoRequest(tx, request);
       if (!identity) return null;
       return recoverCleanup(tx, `profile:${id}`, captured.generation);
