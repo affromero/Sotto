@@ -14,8 +14,6 @@ final class PlayInvitationUITests: XCTestCase {
         url.queryItems = [URLQueryItem(name: "v", value: "1"), URLQueryItem(name: "server", value: server.url.absoluteString),
             URLQueryItem(name: "code", value: "ABCDEFGHJK23")]
         app.open(try XCTUnwrap(url.url))
-        let name = app.textFields["play.newName"]
-        XCTAssertTrue(name.waitForExistence(timeout: 15), app.debugDescription)
         let cameraAlert = XCUIApplication(bundleIdentifier: "com.apple.springboard").alerts.matching(
             NSPredicate(format: "label CONTAINS[c] %@ AND label CONTAINS[c] %@", "Sotto", "camera")
         ).firstMatch
@@ -25,6 +23,8 @@ final class PlayInvitationUITests: XCTestCase {
             allow.tap()
             XCTAssertTrue(cameraAlert.waitForNonExistence(timeout: 5))
         }
+        let name = app.textFields["play.newName"]
+        XCTAssertTrue(name.waitForExistence(timeout: 15), app.debugDescription)
         name.tap()
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5), app.debugDescription)
         name.typeText("Native Sam")
