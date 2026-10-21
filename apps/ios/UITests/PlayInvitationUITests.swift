@@ -84,9 +84,10 @@ final class PlayInvitationUITests: XCTestCase {
     private func tap(_ title: String, app: XCUIApplication, timeout: TimeInterval = 10) throws {
         let button = app.buttons[title].firstMatch
         guard button.waitForExistence(timeout: timeout) else { throw InteractionFailure.missingButton(title) }
-        let deadline = ContinuousClock.now.advanced(by: .seconds(timeout))
         var scrolls = 0
-        while ContinuousClock.now < deadline {
+        var geometryChecks = 0
+        while geometryChecks < 8 {
+            geometryChecks += 1
             let frame = button.frame
             guard !frame.isEmpty,
                   [frame.minX, frame.minY, frame.maxX, frame.maxY].allSatisfy({ $0.isFinite }) else {
@@ -106,7 +107,11 @@ final class PlayInvitationUITests: XCTestCase {
                     origin.withOffset(CGVector(dx: frame.midX - bounds.minX, dy: frame.midY - bounds.minY)).tap()
                     return
                 }
-                Thread.sleep(forTimeInterval: 0.05)
+                let deadline = ContinuousClock.now.advanced(by: .seconds(timeout))
+                while !button.isEnabled {
+                    guard ContinuousClock.now < deadline else { throw InteractionFailure.disabledButton(title) }
+                    Thread.sleep(forTimeInterval: 0.05)
+                }
                 continue
             }
             guard scrolls < 6 else { throw InteractionFailure.invisibleButton(title) }
@@ -124,6 +129,6 @@ final class PlayInvitationUITests: XCTestCase {
             start.press(forDuration: 0.05, thenDragTo: end)
             scrolls += 1
         }
-        throw InteractionFailure.disabledButton(title)
+        throw InteractionFailure.invisibleButton(title)
     }
 }
