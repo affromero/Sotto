@@ -324,7 +324,9 @@ class AndroidToolSelectionTests(unittest.TestCase):
 
 
 class NativeResultBundleTests(unittest.TestCase):
-    def test_failed_ios_tests_preserve_their_diagnostic_bundle(self) -> None:
+    def test_ios_runs_both_destinations_serially_and_preserves_failures(
+        self,
+    ) -> None:
         parsed = subprocess.run([
             'node', '-e',
             ("process.stdout.write(JSON.stringify(require('yaml').parse("
@@ -388,6 +390,12 @@ class NativeResultBundleTests(unittest.TestCase):
                 'platform=iOS Simulator,id=synthetic-tablet',
             ])
             self.assertIn('CODE_SIGN_IDENTITY=-', actual)
+            concurrency = '-maximum-concurrent-test-simulator-destinations'
+            self.assertEqual(actual.count(concurrency), 1)
+            self.assertEqual(actual[actual.index(concurrency) + 1], '1')
+            self.assertFalse(any(value.startswith((
+                '-only-testing', '-skip-testing', '-retry-tests-on-failure',
+            )) for value in actual))
 
 
 class DesktopArtifactTests(unittest.TestCase):
