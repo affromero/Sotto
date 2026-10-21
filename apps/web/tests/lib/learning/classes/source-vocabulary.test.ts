@@ -121,12 +121,14 @@ describe('source vocabulary evidence', () => {
         }),
       };
     });
+    const originalWords = structuredClone(retainedWords);
     expect(
       await extractSourceVocabulary({ ...options, text, sourceFragments: [text], retainedWords })
     ).toEqual([
       { ...retainedWords[0], lemma: 'Mechaniker' },
       { ...retainedWords[1], lemma: 'sehen', gloss: 'see', pos: 'verb' },
     ]);
+    expect(retainedWords).toEqual(originalWords);
     expect(boundary.upsert).not.toHaveBeenCalled();
   });
 

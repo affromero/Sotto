@@ -309,7 +309,7 @@ export async function extractSourceVocabulary(options: {
 }
 
 /** Reused source candidates retain the same independent lexical evidence gate. */
-export async function reviewSourceVocabulary(
+async function reviewSourceVocabulary(
   options: {
     userId: string;
     execution: SottoProviderExecution;
