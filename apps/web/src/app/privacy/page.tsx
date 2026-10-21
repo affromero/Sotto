@@ -82,6 +82,25 @@ export default function PrivacyPage() {
               Security also depends on how the operator protects the host, database, backups, and
               encryption keys.
             </p>
+            <p>
+              Native apps require HTTPS for public servers. Private and local servers may use HTTP,
+              which does not encrypt the connection.
+            </p>
+
+            <h2 id="game-safety">Game safety and reports</h2>
+            <p>
+              Accept the conduct rules before sharing game content. You can report a partner&apos;s
+              visible content to this server&apos;s operator or block further games with that
+              profile. Reports include the selected text, category and detail you submit. The
+              operator can respond, end a room or restrict sharing. Open Game safety to read your
+              own report responses and manage your block list.
+            </p>
+            <p>
+              Block lists are private to the player who creates them. Blocking ends active games
+              between the profiles and prevents further invitations and messages. Unblocking keeps
+              those games closed; the players need a new invitation to play again. Reports are
+              available to the reporting player and server operator.
+            </p>
 
             <h2 id="delete-profile">5. Retention, deletion, and export</h2>
             <p>
@@ -91,6 +110,10 @@ export default function PrivacyPage() {
               profile and server. Operators remain responsible for retention in backups, external
               storage, logs, and connected providers. Ask the operator of this instance about
               access, correction, export, deletion, or retention requests.
+            </p>
+            <p>
+              Associated game safety reports and blocks are removed when a linked profile is
+              deleted. The operator controls retention in backups, logs and connected services.
             </p>
             <p>
               You can request deletion without installing Sotto. Contact the operator of the server

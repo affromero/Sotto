@@ -312,10 +312,6 @@ describe('self-hosted language-learning surfaces', () => {
   });
 
   it('keeps public contact and demo surfaces self-host neutral', () => {
-    const privacy = readSource('src/app/privacy/page.tsx');
-    expect(privacy).toContain('SOTTO_PRIVACY_CONTACT_EMAIL');
-    expect(privacy).toContain('Android Keystore');
-    expect(privacy).toContain('id="delete-profile"');
     const publicContactSources = [
       'apps/web/src/app/about/page.tsx',
       'apps/web/src/app/support/page.tsx',

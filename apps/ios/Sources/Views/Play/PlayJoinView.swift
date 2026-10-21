@@ -10,6 +10,7 @@ struct PlayJoinView: View {
     @State private var settings = PlaySettings()
     @State private var consent = false
     @State private var scanner = false
+    @State private var conduct = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -23,6 +24,19 @@ struct PlayJoinView: View {
                         .foregroundStyle(SottoTheme.muted)
                 }
                 if let pending = coordinator.state?.admission {
+                    if pending.command.acceptedConductVersion == nil, pending.conductVersion == nil {
+                        PlayConductPanel(coordinator: coordinator, accepted: $conduct)
+                        Button("Accept conduct for saved invitation") {
+                            coordinator.run { try await coordinator.acceptSavedAdmissionConduct() }
+                        }.buttonStyle(SottoPrimaryButtonStyle()).disabled(coordinator.busy || !conduct)
+                        if pending.delivery == nil {
+                            Button("Keep unavailable old request and start again") {
+                                coordinator.run { try await coordinator.retainUnknownLegacyAdmission() }
+                            }.buttonStyle(SottoSecondaryButtonStyle()).disabled(coordinator.busy || !conduct)
+                            Text("Use this only if the server cannot find the saved request. Its original proof is kept in recoveries.")
+                                .font(.caption).foregroundStyle(SottoTheme.muted)
+                        }
+                    }
                     Text("Joining as \(pending.command.candidate.name ?? pending.existingConnection?.selectedProfile?.name ?? "your profile")")
                         .font(.headline)
                     Text(statusText).foregroundStyle(SottoTheme.muted)
@@ -35,7 +49,8 @@ struct PlayJoinView: View {
                         Text("Join as \(pending.delivery?.profile.name ?? pending.command.candidate.name ?? pending.existingConnection?.selectedProfile?.name ?? "your profile") at \(invite.serverURL.host() ?? "this server").\(pending.command.candidate.kind == .new ? " Your current connection, \(model.activeProfile?.name ?? "unpaired") at \(model.credentials?.serverURL.host() ?? "this device"), stays saved." : "")")
                             .font(.callout)
                         Button("Finish joining") { coordinator.run { try await coordinator.finishAdmission() } }
-                            .buttonStyle(SottoPrimaryButtonStyle()).disabled(coordinator.busy)
+                            .buttonStyle(SottoPrimaryButtonStyle()).disabled(coordinator.busy
+                                || (pending.command.acceptedConductVersion == nil && pending.conductVersion == nil))
                     } else {
                         Button("Retry saved request") { coordinator.run { try await coordinator.retryIntake() } }
                             .buttonStyle(SottoSecondaryButtonStyle()).disabled(coordinator.busy)
@@ -50,22 +65,26 @@ struct PlayJoinView: View {
                         }.frame(minHeight: 44).disabled(coordinator.busy)
                     }
                 } else {
+                    PlayConductPanel(coordinator: coordinator, accepted: $conduct)
                     PlaySettingsFields(settings: $settings)
                     if let profile = model.activeProfile, model.credentials?.serverURL == invite.serverURL {
                         Button("Ask to join as \(profile.name)") {
-                            coordinator.run { try await coordinator.join(settings: settings, name: "", existing: true) }
-                        }.buttonStyle(SottoPrimaryButtonStyle()).disabled(coordinator.busy || !settings.isValid)
+                            coordinator.run { try await coordinator.join(settings: settings, name: "", existing: true, acceptedConduct: conduct) }
+                        }.buttonStyle(SottoPrimaryButtonStyle()).disabled(coordinator.busy || !settings.isValid || !conduct
+                            || coordinator.policyServer != invite.serverURL)
                         Divider()
                     }
                     TextField("Your name", text: $name).textContentType(.name).textFieldStyle(.roundedBorder)
                         .accessibilityIdentifier("play.newName")
+                        .disabled(!conduct || coordinator.policyServer != invite.serverURL)
                     Toggle("Create my learner profile on this server", isOn: $consent)
                     Text("The server owner must approve your new profile. Your host then lets you into the game. This device will use the approved profile; your current connection stays saved.")
                         .font(.callout).foregroundStyle(SottoTheme.muted)
                     Button("Ask to join as a new learner") {
-                        coordinator.run { try await coordinator.join(settings: settings, name: name, existing: false) }
+                        coordinator.run { try await coordinator.join(settings: settings, name: name, existing: false, acceptedConduct: conduct) }
                     }.buttonStyle(SottoSecondaryButtonStyle())
-                        .disabled(coordinator.busy || !consent || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !settings.isValid)
+                        .disabled(coordinator.busy || !conduct || coordinator.policyServer != invite.serverURL
+                            || !consent || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !settings.isValid)
                     Button("Use another invitation") {
                         do { try coordinator.discardInvitation() } catch { coordinator.report(error) }
                     }.frame(minHeight: 44)
@@ -91,6 +110,7 @@ struct PlayJoinView: View {
             }
         }
         .onAppear { if server.isEmpty { server = model.credentials?.serverURL.absoluteString ?? "" } }
+        .onChange(of: coordinator.policyServer) { _, _ in conduct = false }
         .sheet(isPresented: $scanner) {
             NavigationStack {
                 QRScannerView { value in scanner = false; coordinator.receive(value) }

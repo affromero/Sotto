@@ -15,6 +15,7 @@ struct PrivacyPolicyLink: View {
 }
 
 struct PrivacyPolicyView: View {
+    @EnvironmentObject private var model: SottoAppModel
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -27,9 +28,15 @@ struct PrivacyPolicyView: View {
                     Text("Pairing codes are scanned locally. Server credentials are stored in the iOS Keychain. Workbook and answer handwriting are saved on this device. Convert to text runs on this device. Read my marks sends the exercise and ink as an image to your server and its selected AI provider for interpretation. You review the answer before submitting it for feedback. Photos you choose are uploaded to your server as your profile image. Sotto does not include advertising or tracking SDKs.")
                     Text("AI and speech processing").font(.headline)
                     Text("Your server sends lesson context, written answers, recordings, and transcripts to the AI and speech providers selected by its operator. Ask your operator which providers are configured and review their terms before sharing sensitive information. Live translation sends microphone audio and translation context directly to Google Gemini after your permission, then stores the transcript on your server.")
+                    Text("Playing together").font(.headline)
+                    Text("Games run without AI requests. Your server stores game answers, partner messages and results. Your partner sees content revealed by the game. Your phrase notebook stays private. Add to study explicitly saves a phrase to your learning tools.")
+                    Text("Game safety").font(.headline)
+                    Text("Accept the conduct rules before sharing game content. You can report a partner's visible content to your server operator and block further games with that profile. Reports include the selected text, category and detail you submit. The operator can respond, end a room or restrict sharing. Your own report responses and block list are available in Game safety. Unblocking requires a new invitation to play again.")
+                    Text("Connections").font(.headline)
+                    Text("Public servers require HTTPS. Private and local servers may use HTTP, which does not encrypt the connection.")
                     Text("Deletion and questions").font(.headline)
-                    Text("Use Delete learner profile in Settings to request removal of your profile and learning data. Your server operator controls retention in backups, logs, and connected providers. Contact that operator for access, export, retention, or other privacy requests. Unpairing removes this device's saved access credentials; it does not delete server data.")
-                    Link("Privacy policy on the web", destination: SottoPrivacy.policyURL)
+                    Text("Use Delete learner profile in Settings to request removal of your profile and learning data. Associated game reports and blocks are removed when a linked profile is deleted. Your server operator controls retention in backups, logs, and connected providers. Contact that operator for access, export, retention, or other privacy requests. Unpairing removes this device's saved access credentials; it does not delete server data.")
+                    Link("Privacy policy on the web", destination: model.credentials?.serverURL.appendingPathComponent("privacy") ?? SottoPrivacy.policyURL)
                         .frame(minHeight: 44)
                     Link("Google privacy policy", destination: URL(string: "https://policies.google.com/privacy")!)
                         .frame(minHeight: 44)

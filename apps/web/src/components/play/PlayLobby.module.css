@@ -3,6 +3,12 @@
   padding: 24px 16px 120px;
   margin: 0 auto;
 }
+.safetyLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--color-primary);
+}
 .header {
   padding: 16px 0 36px;
 }

@@ -67,7 +67,8 @@ struct PlayJoinRequest: Codable, Equatable {
     let client = "NATIVE"
     let deviceName: String
     let candidate: PlayJoinCandidate
-    private enum CodingKeys: String, CodingKey { case requestId, code, client, deviceName, candidate }
+    var acceptedConductVersion: Int? = nil
+    private enum CodingKeys: String, CodingKey { case requestId, code, client, deviceName, candidate, acceptedConductVersion }
 }
 enum PlayJoinStatus: String, Codable {
     case waitingForOwner = "WAITING_FOR_OWNER", waitingForHost = "WAITING_FOR_HOST"

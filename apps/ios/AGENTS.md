@@ -59,6 +59,15 @@ their UDIDs to `xcodebuild`. Test **both** families: the layout differs by size 
 
 ## Partner games
 
+- Game safety has a separate protected pending slot. Preserve an uncertain
+  game action and its drafts while cancelling/draining work before blocking
+  or reporting. Only an acknowledgment with the original action ID clears
+  the safety slot. Typed safety refusals do not revoke pairing.
+- Fresh invitations require explicit current conduct before sharing a name.
+  Old commands and proofs stay immutable; accept conduct through their
+  proof-bound endpoint, including previously issued deliveries. Keep unknown
+  requests in explicit recovery before starting with new IDs.
+
 - Play is available before course setup and AI consent. Opening it cancels the
   solo-course refresh loop without accepting AI processing. Connection changes
   reuse the canonical learner-state reset and verified profiles.

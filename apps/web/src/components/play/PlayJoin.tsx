@@ -13,6 +13,9 @@ import {
   playInvitationPreviewSchema,
   playJoinStatusViewSchema,
   playRoomViewSchema,
+  playSafetyPolicySchema,
+  playPendingConductAcceptedSchema,
+  type PlaySafetyPolicy,
   type PlayInviteEnvelope,
   type PlayJoinStatusView,
   type PlaySettings,
@@ -21,13 +24,23 @@ import type { z } from 'zod';
 import type { PlayDistribution } from '@/lib/play/install/distribution';
 import { PlayInstallOptions } from '@/components/pwa/PlayInstallOptions';
 import { PlayLanguageFields, validPlaySettings } from './PlayLanguageFields';
-import { newPlayActionId, newPlayProof, playErrorMessage, playFetch } from './client/api';
+import {
+  newPlayActionId,
+  newPlayProof,
+  playErrorMessage,
+  playFetch,
+  PlayHttpError,
+} from './client/api';
+import { PlayConduct } from './safety/PlayConduct';
 import {
   clearPendingPlayAdmission,
   clearPlayInvitationIntent,
   readPendingPlayAdmission,
   rememberPlayInvitation,
   savePendingPlayAdmission,
+  readRetainedPlayAdmissions,
+  retainPendingPlayAdmission,
+  removeRetainedPlayAdmission,
   type PendingPlayAdmission,
 } from './client/intent';
 import { usePlayPoll } from './client/usePlayPoll';
@@ -67,12 +80,18 @@ export function PlayJoin({
   });
   const [name, setName] = useState('');
   const [consent, setConsent] = useState(false);
+  const [conduct, setConduct] = useState(false);
+  const [policy, setPolicy] = useState<PlaySafetyPolicy | null>(null);
+  const [retained, setRetained] = useState<PendingPlayAdmission[]>([]);
+  const [removingRecovery, setRemovingRecovery] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const claiming = useRef(false);
   const intake = useRef(false);
   const active = useRef(false);
   const flow = useRef<AbortController | null>(null);
+  const completedAdmission = useRef<string | null>(null);
+  const manualRecoveryRequired = useRef<string | null>(null);
   const foreign =
     invitation !== null &&
     typeof location !== 'undefined' &&
@@ -130,6 +149,7 @@ export function PlayJoin({
         rememberPlayInvitation(envelope);
         if (envelope.serverUrl !== location.origin) return;
         const restored = readPendingPlayAdmission();
+        setRetained(readRetainedPlayAdmissions());
         if (restored?.command.code === envelope.code) setPending(restored);
         else if (restored) setOtherPending(restored);
       } catch (caught) {
@@ -149,6 +169,11 @@ export function PlayJoin({
   const load = useCallback(
     async (signal: AbortSignal) => {
       if (!invitation || invitation.serverUrl !== location.origin || intake.current) return;
+      if (!policy) {
+        const rules = await playFetch('/api/v1/play/policy', playSafetyPolicySchema, { signal });
+        signal.throwIfAborted();
+        setPolicy(rules);
+      }
       if (pending) {
         const result = await playFetch(
           `/api/v1/play/join-requests/${encodeURIComponent(pending.command.requestId)}`,
@@ -165,7 +190,7 @@ export function PlayJoin({
       );
       if (!signal.aborted) setPreview(result);
     },
-    [invitation, pending]
+    [invitation, pending, policy]
   );
   const polling = usePlayPoll(load);
 
@@ -178,8 +203,11 @@ export function PlayJoin({
     pending?.command.candidate.kind === 'EXISTING' && member?.id !== pending.originalProfileId;
 
   const enter = useCallback(
-    async (approvedSwitchProfileId?: string) => {
+    async (approvedSwitchProfileId?: string, manual = false) => {
       if (!pending || claiming.current || intake.current || !active.current) return;
+      if (completedAdmission.current === pending.command.requestId) return;
+      if (!manual && manualRecoveryRequired.current === pending.command.requestId) return;
+      if (pending.command.acceptedConductVersion !== 1 && pending.conductVersion !== 1) return;
       claiming.current = true;
       const controller = new AbortController();
       flow.current = controller;
@@ -227,6 +255,8 @@ export function PlayJoin({
               throw new Error('Your active profile changed. Choose the invited profile again.');
             clearPendingPlayAdmission();
             clearPlayInvitationIntent();
+            completedAdmission.current = pending.command.requestId;
+            manualRecoveryRequired.current = null;
             setPending(null);
             router.replace(`/play/rooms/${encodeURIComponent(room.id)}`);
             return;
@@ -260,10 +290,15 @@ export function PlayJoin({
         signal.throwIfAborted();
         clearPendingPlayAdmission();
         clearPlayInvitationIntent();
+        completedAdmission.current = pending.command.requestId;
+        manualRecoveryRequired.current = null;
         setPending(null);
         router.replace(`/play/rooms/${encodeURIComponent(room.id)}`);
       } catch (caught) {
+        manualRecoveryRequired.current = pending.command.requestId;
         if (!signal.aborted) setError(playErrorMessage(caught));
+        else if (active.current)
+          setError('Joining was interrupted. Recover your saved game connection to continue.');
       } finally {
         claiming.current = false;
         if (flow.current === controller) flow.current = null;
@@ -288,7 +323,16 @@ export function PlayJoin({
   }, [status, enter, error]);
 
   const requestEntry = async () => {
-    if (!invitation || !preview || member === undefined || intake.current || otherPending) return;
+    if (
+      !invitation ||
+      !preview ||
+      !policy ||
+      !conduct ||
+      member === undefined ||
+      intake.current ||
+      otherPending
+    )
+      return;
     intake.current = true;
     const controller = new AbortController();
     flow.current = controller;
@@ -312,6 +356,7 @@ export function PlayJoin({
           code: invitation.code,
           client: 'BROWSER',
           deviceName: 'Sotto web app',
+          acceptedConductVersion: policy.version,
           candidate: current
             ? { kind: 'EXISTING', expectedProfileId: current.id, settings }
             : { kind: 'NEW', name: name.trim(), settings, consentToProfile: true },
@@ -348,6 +393,16 @@ export function PlayJoin({
       signal.throwIfAborted();
       if ((current?.id ?? null) !== pending.originalProfileId)
         throw new Error('Your active profile changed. Restore the profile that requested entry.');
+      if (pending.command.acceptedConductVersion !== 1) {
+        const result = await playFetch(
+          `/api/v1/play/join-requests/${encodeURIComponent(pending.command.requestId)}`,
+          playJoinStatusViewSchema,
+          { proof: pending.proof, signal }
+        );
+        signal.throwIfAborted();
+        setStatus(result);
+        return;
+      }
       const result = await playFetch('/api/v1/play/invitations', playJoinStatusViewSchema, {
         body: pending.command,
         proof: pending.proof,
@@ -355,6 +410,64 @@ export function PlayJoin({
       });
       signal.throwIfAborted();
       setStatus(result);
+    } catch (caught) {
+      if (!signal.aborted) setError(playErrorMessage(caught));
+    } finally {
+      intake.current = false;
+      if (flow.current === controller) flow.current = null;
+      if (active.current) setBusy(false);
+    }
+  };
+  const savedConduct = async (replaceMissing: boolean) => {
+    if (!pending || !policy || !conduct || busy || intake.current || claiming.current) return;
+    const original = pending;
+    const controller = new AbortController();
+    flow.current = controller;
+    const signal = controller.signal;
+    intake.current = true;
+    setBusy(true);
+    setError(null);
+    try {
+      const current = await loadMember(signal);
+      signal.throwIfAborted();
+      if (
+        original.command.candidate.kind === 'EXISTING' &&
+        current?.id !== original.originalProfileId
+      )
+        throw new Error('Restore the original profile before accepting conduct for this request.');
+      const path = `/api/v1/play/join-requests/${encodeURIComponent(original.command.requestId)}`;
+      try {
+        await playFetch(path, playJoinStatusViewSchema, { proof: original.proof, signal });
+        if (replaceMissing)
+          throw new Error('This request exists. Accept conduct for the saved invitation instead.');
+      } catch (caught) {
+        if (
+          !replaceMissing ||
+          original.received ||
+          !(caught instanceof PlayHttpError) ||
+          ![401, 404].includes(caught.status)
+        )
+          throw caught;
+        signal.throwIfAborted();
+        retainPendingPlayAdmission(original);
+        setRetained(readRetainedPlayAdmissions());
+        clearPendingPlayAdmission();
+        setPending(null);
+        setStatus(null);
+        return;
+      }
+      const accepted = await playFetch(`${path}/conduct`, playPendingConductAcceptedSchema, {
+        body: { version: policy.version, expectedProfileId: current?.id ?? null },
+        proof: original.proof,
+        signal,
+      });
+      signal.throwIfAborted();
+      if (accepted.requestId !== original.command.requestId || accepted.version !== policy.version)
+        throw new Error('The server did not confirm conduct for this saved request.');
+      const next = { ...original, conductVersion: accepted.version };
+      savePendingPlayAdmission(next);
+      setPending(next);
+      setConduct(false);
     } catch (caught) {
       if (!signal.aborted) setError(playErrorMessage(caught));
     } finally {
@@ -436,6 +549,38 @@ export function PlayJoin({
               </>
             ) : pending ? (
               <>
+                {pending.command.acceptedConductVersion !== 1 && pending.conductVersion !== 1 && (
+                  <>
+                    <PlayConduct
+                      policy={policy}
+                      accepted={conduct}
+                      onChange={setConduct}
+                      disabled={busy}
+                    />
+                    <button
+                      type="button"
+                      className={styles.primary}
+                      disabled={busy || !conduct || !policy}
+                      onClick={() => {
+                        void savedConduct(false);
+                      }}
+                    >
+                      Accept conduct for saved invitation
+                    </button>
+                    {!pending.received && (
+                      <button
+                        type="button"
+                        className={styles.secondary}
+                        disabled={busy || !conduct || !policy}
+                        onClick={() => {
+                          void savedConduct(true);
+                        }}
+                      >
+                        Keep unavailable old request and start again
+                      </button>
+                    )}
+                  </>
+                )}
                 <p role="status" className={styles.status}>
                   {status ? statusText[status.status] : 'Recovering your request…'}
                 </p>
@@ -453,9 +598,15 @@ export function PlayJoin({
                     <button
                       type="button"
                       className={styles.primary}
-                      disabled={busy || !status || !['ACCEPTED', 'CLAIMED'].includes(status.status)}
+                      disabled={
+                        busy ||
+                        !status ||
+                        !['ACCEPTED', 'CLAIMED'].includes(status.status) ||
+                        (pending.command.acceptedConductVersion !== 1 &&
+                          pending.conductVersion !== 1)
+                      }
                       onClick={() => {
-                        if (member) void enter(member.id);
+                        if (member) void enter(member.id, true);
                       }}
                     >
                       Switch this browser to{' '}
@@ -474,7 +625,7 @@ export function PlayJoin({
                     onClick={() => {
                       if (status && ['ACCEPTED', 'CLAIMED'].includes(status.status)) {
                         setError(null);
-                        void enter();
+                        void enter(undefined, true);
                       } else void retryRequest();
                     }}
                   >
@@ -491,10 +642,21 @@ export function PlayJoin({
               <form
                 onSubmit={(event) => {
                   event.preventDefault();
-                  if (validPlaySettings(settings, cards) && (member || (consent && name.trim())))
+                  if (
+                    conduct &&
+                    policy &&
+                    validPlaySettings(settings, cards) &&
+                    (member || (consent && name.trim()))
+                  )
                     void requestEntry();
                 }}
               >
+                <PlayConduct
+                  policy={policy}
+                  accepted={conduct}
+                  onChange={setConduct}
+                  disabled={busy}
+                />
                 <p className={styles.status}>
                   {preview.hostWaiting
                     ? 'Your host is here and waiting.'
@@ -516,7 +678,7 @@ export function PlayJoin({
                         maxLength={80}
                         autoComplete="given-name"
                         required
-                        disabled={busy}
+                        disabled={busy || !conduct || !policy}
                       />
                     </label>
                     <label className={styles.consent}>
@@ -548,6 +710,8 @@ export function PlayJoin({
                   className={styles.primary}
                   disabled={
                     busy ||
+                    !conduct ||
+                    !policy ||
                     !validPlaySettings(settings, cards) ||
                     (!member && (!consent || !name.trim()))
                   }
@@ -578,6 +742,65 @@ export function PlayJoin({
             )}
           </section>
         )
+      )}
+      {retained.length > 0 && (
+        <details className={styles.panel}>
+          <summary>Saved invitation recoveries</summary>
+          {retained.map((saved) => (
+            <div key={saved.command.requestId}>
+              <button
+                type="button"
+                className={styles.secondary}
+                disabled={busy || pending !== null}
+                onClick={() => {
+                  try {
+                    savePendingPlayAdmission(saved);
+                    location.assign(createPlayInviteLink(saved.serverUrl, saved.command.code));
+                  } catch (caught) {
+                    setError(playErrorMessage(caught));
+                  }
+                }}
+              >
+                Resume invitation {saved.command.code}
+              </button>
+              <button
+                type="button"
+                className={styles.quiet}
+                disabled={busy}
+                onClick={() => setRemovingRecovery(saved.command.requestId)}
+              >
+                Remove saved recovery
+              </button>
+            </div>
+          ))}
+          {removingRecovery && (
+            <div role="group" aria-label="Confirm removal of saved recovery">
+              <p>Remove this original request and proof from this browser?</p>
+              <button
+                type="button"
+                className={styles.secondary}
+                onClick={() => {
+                  try {
+                    removeRetainedPlayAdmission(removingRecovery);
+                    setRetained(readRetainedPlayAdmissions());
+                    setRemovingRecovery(null);
+                  } catch (caught) {
+                    setError(playErrorMessage(caught));
+                  }
+                }}
+              >
+                Confirm remove recovery
+              </button>
+              <button
+                type="button"
+                className={styles.quiet}
+                onClick={() => setRemovingRecovery(null)}
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+        </details>
       )}
       <PlayInstallOptions
         distribution={distribution}

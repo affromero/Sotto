@@ -8,6 +8,24 @@ afterEach(() => {
 });
 
 describe('uncertain game actions', () => {
+  it('returns a definite safety refusal with its reason so a revision retry cannot reinterpret it', async () => {
+    vi.stubGlobal('fetch', async () =>
+      Response.json(
+        { error: 'Sharing is restricted.', reason: 'SHARING_RESTRICTED' },
+        { status: 409 }
+      )
+    );
+    const hook = renderHook(() => usePlayMutation(playAcknowledgedSchema));
+    let result: unknown;
+    await act(async () => {
+      result = await hook.result.current.runOutcome('/api/v1/play/rooms/game/actions', {
+        actionId: 'original-action',
+      });
+    });
+    expect(result).toEqual({ kind: 'REFUSED', status: 409, reason: 'SHARING_RESTRICTED' });
+    expect(hook.result.current).toMatchObject({ pending: false, uncertain: false, busy: false });
+    hook.unmount();
+  });
   it('retries the original idempotent body and resolves the original draft submission once confirmed', async () => {
     const sent: unknown[] = [];
     vi.stubGlobal('fetch', async (_path: string, options: RequestInit) => {

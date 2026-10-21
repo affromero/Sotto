@@ -10,7 +10,7 @@ final class PlayProtectedStoreTests: XCTestCase {
         let invitation = try PlayInvitation(serverURL: URL(string: "https://school.example")!, code: "ABCDEFGHJK23")
         let candidate = PlayJoinCandidate(kind: .new, expectedProfileId: nil, name: "Ana",
             settings: PlaySettings(), consentToProfile: true)
-        let request = PlayJoinRequest(requestId: UUID(), code: invitation.code, deviceName: "Ana's iPhone", candidate: candidate)
+        let request = PlayJoinRequest(requestId: UUID(), code: invitation.code, deviceName: "Ana's iPhone", candidate: candidate, acceptedConductVersion: 1)
         let recovery = PlayAdmissionRecovery(invitation: invitation, command: request, proof: try PlayInvitation.newProof(), existingConnection: nil)
         var state = PlayProtectedState()
         state.admission = recovery
