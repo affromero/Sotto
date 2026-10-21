@@ -725,6 +725,19 @@ describe('composeListeningContent', () => {
     mustIncludeVocab: [{ word: 'hola', translation: 'hello' }],
   };
 
+  it('requests a shorter conversation for class practice with the accepted lesson context', async () => {
+    setupHappyPath();
+    await composeListeningContent({
+      ...CONTENT_PARAMS,
+      firstSeenClassId: 'class-1',
+      teaching: sampleTeaching,
+    });
+    expect(mockGenerateScript.mock.calls[0][0]).toMatchObject({
+      durationTarget: 2,
+      teaching: sampleTeaching,
+    });
+  });
+
   it('returns the episode id + comprehension questions without persisting a class section', async () => {
     setupHappyPath();
 

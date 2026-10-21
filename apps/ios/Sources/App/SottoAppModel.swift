@@ -35,6 +35,7 @@ final class SottoAppModel: ObservableObject {
     private var work: Task<Void, Never>?
     private var workId: UUID?
     var classGenerationAdmissionId: UUID?
+    var classRemovalId: UUID?
     var classGenerationTasks: [String: Task<Void, Never>] = [:]
     var classGenerationObservations: [String: SottoClassGenerationObservation] = [:]
 
@@ -117,6 +118,7 @@ final class SottoAppModel: ObservableObject {
     /// replaces whatever was still running.
     func run(_ operation: @escaping @MainActor () async -> Void) {
         work?.cancel()
+        classRemovalId = nil
         classGenerationAdmissionId = nil
         let id = UUID()
         workId = id
@@ -133,6 +135,7 @@ final class SottoAppModel: ObservableObject {
     /// explicit cancellation action on the course progress panel.
     func cancelWork() async {
         work?.cancel()
+        classRemovalId = nil
         work = nil
         workId = nil
         classGenerationAdmissionId = nil
@@ -225,6 +228,7 @@ final class SottoAppModel: ObservableObject {
 
     private func resetLearnerState() {
         classGenerationAdmissionId = nil
+        classRemovalId = nil
         isLoading = false
         loadingOperation = nil
         courseRefreshTasks.values.forEach { $0.task.cancel() }
@@ -485,33 +489,6 @@ final class SottoAppModel: ObservableObject {
         )
     }
 
-    func deleteSelectedClass() async {
-        guard let client = makeClient(), let selectedClass else { return }
-        isLoading = true
-        loadingOperation = SottoLoadingOperation(
-            title: "Removing class",
-            detail: "Clearing the active class so a new one can be generated.",
-            progress: nil,
-            currentStep: nil,
-            totalSteps: nil,
-            elapsedSeconds: nil,
-            remainingSeconds: nil
-        )
-        errorMessage = nil
-
-        do {
-            try await client.deleteClass(classId: selectedClass.id)
-            self.selectedClass = nil
-            classResult = nil
-            workbook = nil
-            courses = try await client.listCourses()
-        } catch {
-            report(error)
-        }
-
-        loadingOperation = nil
-        isLoading = false
-    }
 
     func startFullCatchUp(for course: SottoCourse) async {
         await startPractice(courseId: course.id, kind: "FULL")

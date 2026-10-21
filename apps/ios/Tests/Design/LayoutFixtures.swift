@@ -69,11 +69,23 @@ enum LayoutFixtures {
           "callouts":[{"label":"Remember the meaning","text":"The helping verb and the final verb belong together.","tone":"teal"}],
           "links":[]}
       },
+      "teaching":{
+        "version":1,"title":"Describe a completed journey",
+        "explanation":"Use sein with a completed journey to a destination. Put the helping verb second and the participle at the end.\n\nFor activities such as writing, use haben instead.",
+        "workedExamples":[
+          {"prompt":"Describe yesterday's journey to Berlin.","answer":"Gestern bin ich nach Berlin gefahren.","explanation":"Bin agrees with ich. Gefahren finishes the sentence."},
+          {"prompt":"Describe yesterday's letter.","answer":"Gestern habe ich einen Brief geschrieben.","explanation":"Writing uses haben in this example."}
+        ],
+        "commonMistake":{"incorrect":"Gestern ich bin gefahren.","correction":"Gestern bin ich gefahren.","explanation":"The helping verb follows Gestern."},
+        "guidedPractice":{"prompt":"Describe your completed trip to Hamburg.","hint":"Choose the helping verb for movement to a destination.","answer":"Ich bin nach Hamburg gefahren.","explanation":"Sein marks this completed journey."}
+      },
       "sections":[
         {"id":"layout-grammar","skill":"GRAMMAR","status":"AVAILABLE","attempt":1,
          "questions":[{"id":"layout-choice","order":0,
            "question":"Gestern ___ ich mit meiner Freundin nach Berlin gefahren.",
-           "options":["bin","habe","werde","hatte"]}],"prompts":[],"writingPrompts":[]},
+           "options":["bin","habe","werde","hatte"],"explanation":"This journey uses sein."},
+          {"id":"layout-choice-second","order":1,"question":"Which helping verb fits a letter?",
+           "options":["habe","bin","bist","seid"]}],"prompts":[],"writingPrompts":[]},
         {"id":"layout-reading","skill":"READING","status":"AVAILABLE","attempt":1,
          "questions":[{"id":"layout-reading-choice","order":0,
            "question":"How did Lea travel to Berlin?",

@@ -29,6 +29,7 @@ struct SottoClassGenerationObservation {
     let startedAt = Date()
     var operationId: String?
     var operationStatus: String?
+    var observedClassId: String?
     var isAdmitting = false
     var admissionUnconfirmed = false
     var explicitlyRechecking = false
@@ -56,6 +57,13 @@ extension SottoAppModel {
         guard let client = makeClient(), let selectedClass,
               let course = courses.first(where: { $0.id == selectedClass.courseId }) else { return }
         guard classGenerationObservations[course.id] == nil else {
+            if classGenerationRetryTitle(for: course.id) != nil,
+               let observation = classGenerationObservations[course.id],
+               observation.request.classId == selectedClass.id ||
+               (observation.request.classId == nil && course.activeClassId == selectedClass.id) {
+                retryClassGeneration(for: course)
+                return
+            }
             closeClass()
             checkClassGenerationStatus(for: course)
             return
@@ -159,6 +167,7 @@ extension SottoAppModel {
                 }
                 let observation = beginClassObservation(course: course, request: request, admitting: true)
                 if await admitClassGeneration(client: client, course: course, observation: observation) {
+                    if selectedClass?.id == request.classId { closeClass() }
                     await monitorClassGeneration(client: client, course: course, observationId: observation.id)
                 } else if isCurrentLearningClient(client),
                           classGenerationObservations[course.id] == nil || classGenerationObservations[course.id]?.id == observation.id {
@@ -311,6 +320,11 @@ extension SottoAppModel {
                     stopClassObservation(courseId: course.id, message: "Preparation changed. Your previous work is retained. Check the current class.")
                     return
                 }
+                if let pinned = observation.observedClassId, let current = progress.classId, pinned != current {
+                    stopClassObservation(courseId: course.id, message: "Preparation changed classes. Check status before continuing.")
+                    return
+                }
+                if observation.observedClassId == nil { observation.observedClassId = progress.classId }
                 observation.operationStatus = progress.operationStatus
                 classGenerationObservations[course.id] = observation
                 classGenerationOperations[course.id] = classGenerationOperation(progress: progress, course: course,

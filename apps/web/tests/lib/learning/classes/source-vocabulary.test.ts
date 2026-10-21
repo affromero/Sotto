@@ -56,6 +56,227 @@ beforeEach(() => {
   }));
 });
 describe('source vocabulary evidence', () => {
+  it('repairs retained inflections and noun articles without changing their source or mastery', async () => {
+    const text = 'Der Mechaniker hat das Auto gesehen.';
+    const retainedWords = [
+      {
+        lemma: 'der Mechaniker',
+        gloss: 'mechanic',
+        pos: 'noun',
+        sourceForm: 'Der Mechaniker',
+        questionIndices: [],
+      },
+      {
+        lemma: 'gesehen',
+        gloss: 'seen',
+        pos: 'participle',
+        sourceForm: 'gesehen',
+        questionIndices: [],
+      },
+    ];
+    boundary.generate.mockImplementation(async (_prompt, messages, request) => {
+      const payload = JSON.parse(messages[0].content);
+      if (request.jsonSchema.name === 'source_vocabulary_extraction') {
+        expect(payload.correction.words).toEqual(retainedWords);
+        expect(payload.correction.feedback.map((item: { index: number }) => item.index)).toEqual([
+          0, 1,
+        ]);
+        return {
+          model: 'captured',
+          content: JSON.stringify({
+            words: [
+              {
+                lemma: 'Mechaniker',
+                gloss: 'mechanic',
+                pos: 'noun',
+                sourceSpan: { startWordIndex: 0, endWordIndex: 1 },
+                questionIndices: [],
+              },
+              {
+                lemma: 'sehen',
+                gloss: 'see',
+                pos: 'verb',
+                sourceSpan: { startWordIndex: 5, endWordIndex: 5 },
+                questionIndices: [],
+              },
+            ],
+          }),
+        };
+      }
+      return {
+        model: 'captured',
+        content: JSON.stringify({
+          items: payload.items.map((item: { content: { lemma: string } }, index: number) => {
+            const valid = ['Mechaniker', 'sehen'].includes(item.content.lemma);
+            return {
+              index,
+              metadata: {
+                acceptable: valid,
+                issues: valid ? [] : ['incorrect'],
+                feedback: valid ? [] : ['Use the canonical lemma and lexical part of speech.'],
+              },
+              associations: [],
+            };
+          }),
+        }),
+      };
+    });
+    const originalWords = structuredClone(retainedWords);
+    expect(
+      await extractSourceVocabulary({ ...options, text, sourceFragments: [text], retainedWords })
+    ).toEqual([
+      { ...retainedWords[0], lemma: 'Mechaniker' },
+      { ...retainedWords[1], lemma: 'sehen', gloss: 'see', pos: 'verb' },
+    ]);
+    expect(retainedWords).toEqual(originalWords);
+    expect(boundary.upsert).not.toHaveBeenCalled();
+  });
+
+  it('addresses a rejected word in the second batch against the complete retained candidate', async () => {
+    const text = 'reisen buchen lernen lesen schreiben gesehen';
+    const retainedWords = text.split(' ').map((lemma) => ({
+      lemma,
+      gloss: 'meaning',
+      pos: 'verb',
+      sourceForm: lemma,
+      questionIndices: [],
+    }));
+    boundary.generate.mockImplementation(async (_prompt, messages, request) => {
+      const payload = JSON.parse(messages[0].content);
+      if (request.jsonSchema.name === 'source_vocabulary_extraction') {
+        expect(payload.correction.feedback).toEqual([{ index: 5, feedback: ['Use sehen.'] }]);
+        return {
+          model: 'captured',
+          content: JSON.stringify({
+            words: retainedWords.map((word, index) => ({
+              lemma: index === 5 ? 'sehen' : word.lemma,
+              gloss: word.gloss,
+              pos: 'verb',
+              sourceSpan: { startWordIndex: index, endWordIndex: index },
+              questionIndices: [],
+            })),
+          }),
+        };
+      }
+      return {
+        model: 'captured',
+        content: JSON.stringify({
+          items: payload.items.map((item: { content: { lemma: string } }, index: number) => ({
+            index,
+            metadata: {
+              acceptable: item.content.lemma !== 'gesehen',
+              issues: item.content.lemma === 'gesehen' ? ['incorrect'] : [],
+              feedback: item.content.lemma === 'gesehen' ? ['Use sehen.'] : [],
+            },
+            associations: [],
+          })),
+        }),
+      };
+    });
+    const result = await extractSourceVocabulary({
+      ...options,
+      text,
+      sourceFragments: [text],
+      retainedWords,
+    });
+    expect(result.at(-1)).toMatchObject({ lemma: 'sehen', sourceForm: 'gesehen' });
+    expect(result.map((word) => word.sourceForm)).toEqual(
+      retainedWords.map((word) => word.sourceForm)
+    );
+  });
+
+  it('rejects a metadata repair that changes the original quotation', async () => {
+    const text = 'gesehen gehen';
+    boundary.generate.mockImplementation(async (_prompt, _messages, request) => ({
+      model: 'captured',
+      content: JSON.stringify(
+        request.jsonSchema.name === 'source_vocabulary_extraction'
+          ? {
+              words: [
+                {
+                  lemma: 'gehen',
+                  gloss: 'go',
+                  pos: 'verb',
+                  sourceSpan: { startWordIndex: 1, endWordIndex: 1 },
+                  questionIndices: [],
+                },
+              ],
+            }
+          : {
+              items: [
+                {
+                  index: 0,
+                  metadata: { acceptable: false, issues: ['incorrect'], feedback: ['Use sehen.'] },
+                  associations: [],
+                },
+              ],
+            }
+      ),
+    }));
+    await expect(
+      extractSourceVocabulary({
+        ...options,
+        text,
+        sourceFragments: [text],
+        retainedWords: [
+          {
+            lemma: 'gesehen',
+            gloss: 'seen',
+            pos: 'participle',
+            sourceForm: 'gesehen',
+            questionIndices: [],
+          },
+        ],
+      })
+    ).rejects.toMatchObject({ code: 'replacement_identity' });
+  });
+
+  it('propagates provider failure without attempting metadata repair', async () => {
+    const outage = new Error('Selected provider unavailable');
+    boundary.generate.mockRejectedValue(outage);
+    await expect(
+      extractSourceVocabulary({
+        ...options,
+        retainedWords: [
+          { lemma: 'gehen', gloss: 'go', pos: 'verb', sourceForm: 'gegangen', questionIndices: [] },
+        ],
+      })
+    ).rejects.toBe(outage);
+    expect(boundary.generate.mock.calls.map((call) => call[2].jsonSchema.name)).toEqual([
+      'reading_vocabulary_quality',
+    ]);
+  });
+
+  it('shares one replacement between malformed extraction and rejected metadata', async () => {
+    boundary.generate.mockResolvedValueOnce({ model: 'captured', content: '{' });
+    boundary.generate.mockResolvedValueOnce({
+      model: 'captured',
+      content: JSON.stringify(extracted('schlafen')),
+    });
+    boundary.generate.mockResolvedValue({
+      model: 'captured',
+      content: JSON.stringify({
+        items: [
+          {
+            index: 0,
+            metadata: {
+              acceptable: false,
+              issues: ['incorrect'],
+              feedback: ['The quotation represents gehen.'],
+            },
+            associations: [],
+          },
+        ],
+      }),
+    });
+    await expect(extractSourceVocabulary(options)).rejects.toThrow();
+    expect(
+      boundary.generate.mock.calls.filter(
+        (call) => call[2].jsonSchema.name === 'source_vocabulary_extraction'
+      )
+    ).toHaveLength(2);
+  });
+
   it('admits an independently reviewed inflection without inventing assessments or writing mastery', async () => {
     expect(await extractSourceVocabulary(options)).toEqual([
       { lemma: 'gehen', gloss: 'go', pos: 'verb', sourceForm: 'gegangen', questionIndices: [] },

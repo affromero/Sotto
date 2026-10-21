@@ -81,6 +81,42 @@ const PARAMS = {
 };
 
 describe('keyed reading extraction requests', () => {
+  it('sends bounded source metadata correction without inventing reading questions', async () => {
+    const correction = {
+      words: [{ lemma: 'gesehen', sourceForm: 'gesehen' }],
+      issues: ['incorrect'],
+      feedback: [{ index: 0, feedback: ['Use sehen as the lemma.'] }],
+    };
+    await requestVocabularyExtraction({
+      ...PARAMS,
+      text: 'Ich habe es gesehen.',
+      label: 'COURSE_NOTES',
+      usageCategory: 'course-source-vocabulary',
+      sourceVocabulary: true,
+      readingCorrection: correction,
+    });
+    const [, messages, options] = mockGenerateResponse.mock.calls[0];
+    const payload = JSON.parse(messages[0].content);
+    expect(payload.correction).toEqual(correction);
+    expect(payload.questions).toBeUndefined();
+    expect(options.jsonSchema.name).toBe('source_vocabulary_extraction');
+  });
+
+  it('keeps complete source inventories outside the sample metadata repair protocol', async () => {
+    await expect(
+      requestVocabularyExtraction({
+        ...PARAMS,
+        text: 'gesehen',
+        label: 'COURSE_NOTES',
+        usageCategory: 'inventory',
+        sourceVocabulary: true,
+        sourceInventory: true,
+        readingCorrection: { words: [{ sourceForm: 'gesehen' }], issues: [], feedback: [] },
+      })
+    ).rejects.toThrow();
+    expect(mockGenerateResponse).not.toHaveBeenCalled();
+  });
+
   it('requests complete source coverage with its exact owned range instead of a 12-word sample', async () => {
     await requestVocabularyExtraction({
       ...PARAMS,

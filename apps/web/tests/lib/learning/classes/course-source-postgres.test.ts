@@ -457,6 +457,94 @@ suite('owned imported course source against PostgreSQL', () => {
     ).toEqual(before);
   });
 
+  it('repairs legacy source metadata for generation while preserving every learner memory row', async () => {
+    const lemmas = [
+      'gesehen',
+      'der Mechaniker',
+      'reisen',
+      'buchen',
+      'lernen',
+      'lesen',
+      'schreiben',
+      'gehen',
+    ];
+    await material('Retained words.txt', lemmas.join(' '));
+    for (const lemma of lemmas)
+      await instance.database.learnerVocab.create({
+        data: {
+          courseId,
+          lemma,
+          translation: `Meaning of ${lemma}`,
+          partOfSpeech:
+            lemma === 'gesehen' ? 'participle' : lemma === 'der Mechaniker' ? 'noun' : 'verb',
+          reps: 0,
+          mastery: 0,
+          dueAt: new Date('2026-01-01T00:00:00Z'),
+        },
+      });
+    const before = await instance.database.learnerVocab.findMany({
+      where: { courseId },
+      orderBy: { id: 'asc' },
+    });
+    boundary.generate.mockImplementation(async (_prompt, messages, request) => {
+      const payload = JSON.parse(messages[0].content);
+      if (request.jsonSchema.name === 'source_vocabulary_extraction') {
+        expect(payload.correction).toBeDefined();
+        return {
+          model: 'captured',
+          content: JSON.stringify({
+            words: payload.correction.words.map(
+              (word: { lemma: string; gloss: string; pos: string; sourceForm: string }) => {
+                const start = payload.passageWords.findIndex(
+                  (token: { surface: string }) => token.surface === word.sourceForm.split(' ')[0]
+                );
+                return {
+                  lemma:
+                    word.lemma === 'gesehen'
+                      ? 'sehen'
+                      : word.lemma === 'der Mechaniker'
+                        ? 'Mechaniker'
+                        : word.lemma,
+                  gloss: word.gloss,
+                  pos: word.pos === 'participle' ? 'verb' : word.pos,
+                  sourceSpan: {
+                    startWordIndex: start,
+                    endWordIndex: start + word.sourceForm.split(' ').length - 1,
+                  },
+                  questionIndices: [],
+                };
+              }
+            ),
+          }),
+        };
+      }
+      return {
+        model: 'captured',
+        content: JSON.stringify({
+          items: payload.items.map((item: { content: { lemma: string } }, index: number) => {
+            const invalid = ['gesehen', 'der Mechaniker'].includes(item.content.lemma);
+            return {
+              index,
+              metadata: {
+                acceptable: !invalid,
+                issues: invalid ? ['incorrect'] : [],
+                feedback: invalid ? ['Use the canonical lemma and lexical part of speech.'] : [],
+              },
+              associations: [],
+            };
+          }),
+        }),
+      };
+    });
+    const result = await getCourseVocabularyTargets(params());
+    expect(result.vocab.map((word) => word.lemma).sort()).toEqual(
+      ['sehen', 'Mechaniker', ...lemmas.slice(2)].sort()
+    );
+    expect(
+      await instance.database.learnerVocab.findMany({ where: { courseId }, orderBy: { id: 'asc' } })
+    ).toEqual(before);
+  });
+
   it('rejects a foreign actor before extracting or publishing source words', async () => {
     await material('Owned.txt', 'Mia ist gegangen.');
     await expect(

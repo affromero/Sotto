@@ -12,6 +12,8 @@ struct ClassSessionView: View {
     @State private var answers: [String: Int] = [:]
     @State private var submittedAnswers: [String: Int] = [:]
     @ObservedObject var drafts: WritingDraftStore
+    var initialSectionId: String? = nil
+    @State private var selectedStage = "lesson"
     @State private var showingRemoveConfirmation = false
     @State private var selectionHelpRequest: LearnerSelectionHelpRequest?
     @State private var selectionHelp: SottoSelectionHelpResponse?
@@ -26,10 +28,6 @@ struct ClassSessionView: View {
 
     private var currentClass: SottoClassDetail {
         model.selectedClass ?? classDetail
-    }
-
-    private var questions: [SottoQuestion] {
-        currentClass.sections.flatMap(\.questions)
     }
 
     /// Only the choices that moved since the last submit.
@@ -47,23 +45,26 @@ struct ClassSessionView: View {
         !changedAnswers.isEmpty || drafts.hasChanges
     }
 
-    private var completionProgress: Double {
-        if currentClass.submitted { return 1 }
-        guard !questions.isEmpty else { return 0 }
-        return min(1, Double(answers.count) / Double(questions.count))
-    }
-
-    private var completionPercent: Int {
-        Int((completionProgress * 100).rounded())
-    }
-
     var body: some View {
         NavigationStack {
+            sessionLifecycle
+        }
+    }
+
+    private var sessionScroll: some View {
+        ScrollViewReader { scroll in
             ScrollView {
                 classContent
-                .padding(layout == .compact ? 16 : 28)
-                .frame(maxWidth: 980, alignment: .leading)
+                    .padding(layout == .compact ? 16 : 28)
+                    .frame(maxWidth: 980, alignment: .leading)
+                    .id("class-content")
             }
+            .onChange(of: selectedStage) { _, _ in scroll.scrollTo("class-content", anchor: .top) }
+        }
+    }
+
+    private var sessionSheets: some View {
+        sessionScroll
             .background(SottoTheme.paper)
             .navigationTitle(model.pencilWorkbook && layout.supportsHandwriting ? "Class \(currentClass.order) workbook" : "Class \(currentClass.order)")
             .navigationBarTitleDisplayMode(.inline)
@@ -106,10 +107,15 @@ struct ClassSessionView: View {
                     await loadSelectionHelp(for: request)
                 }
             }
+    }
+
+    private var sessionLifecycle: some View {
+        sessionSheets
             .confirmationDialog("Remove class?", isPresented: $showingRemoveConfirmation, titleVisibility: .visible) {
                 Button("Remove class", role: .destructive) {
+                    let classId = currentClass.id
                     model.run {
-                        await model.deleteSelectedClass()
+                        await model.deleteSelectedClass(classId: classId, progress: progress)
                     }
                 }
                 Button("Cancel", role: .cancel) {}
@@ -123,6 +129,7 @@ struct ClassSessionView: View {
                 answers = progress.answers ?? currentClass.learnerAnswers ?? [:]
                 drafts.register(currentClass.sections.flatMap(\.writingPrompts), savedDrafts: currentClass.writingDrafts ?? [:])
                 hydrated = true
+                selectedStage = initialSectionId ?? "lesson"
                 refreshPencilReviews()
             }
             .onChange(of: answers) { _, _ in saveProgress(); refreshPencilReviews() }
@@ -132,36 +139,94 @@ struct ClassSessionView: View {
                 answers = currentClass.learnerAnswers ?? [:]
                 refreshPencilReviews()
             }
-        }
     }
 
     private var classContent: some View {
         VStack(alignment: .leading, spacing: 26) {
-            ClassHeroHeader(
-                classDetail: currentClass,
-                answeredCount: answers.count,
-                questionCount: questions.count,
-                completionProgress: completionProgress,
-                completionPercent: completionPercent
-            )
+            stageNavigation
             LearningSaveFailureView(progress: progress)
             if model.pencilWorkbook && layout.supportsHandwriting {
                 Text("Write or mark your answers on each white exercise page with Apple Pencil. Use a finger to scroll. Tap Read my marks, check the interpretation, then Use reviewed answer. Record speaking below and tap Submit at the end for class feedback.")
                     .font(.callout).foregroundStyle(SottoTheme.muted)
             }
             pencilReviewStatus
-            if let intro = currentClass.intro {
-                ClassIntroBlock(intro: intro, onSelectionHelp: openSelectionHelp)
+            if selectedStage == "lesson" {
+                if let teaching = currentClass.teaching {
+                    ClassTeachingView(teaching: teaching, onSelectionHelp: openSelectionHelp)
+                    if let intro = currentClass.intro {
+                        DisclosureGroup("Class summary") {
+                            ClassIntroBlock(intro: intro, onSelectionHelp: openSelectionHelp)
+                        }
+                    }
+                } else if let intro = currentClass.intro {
+                    ClassIntroBlock(intro: intro, onSelectionHelp: openSelectionHelp)
+                }
+            } else if selectedStage == "review" {
+                if let result = model.classResult { ClassResultBanner(result: result) }
+                ClassFeedbackClinicBlock(classDetail: currentClass, result: model.classResult)
+                workbookSubmissionFooter
+            } else if let section = orderedSections.first(where: { $0.id == selectedStage }) {
+                DisclosureGroup("Lesson notes") {
+                    if let teaching = currentClass.teaching {
+                        ClassTeachingView(teaching: teaching, onSelectionHelp: openSelectionHelp)
+                    } else if let intro = currentClass.intro {
+                        ClassIntroBlock(intro: intro, onSelectionHelp: openSelectionHelp)
+                    }
+                }
+                classSection(section).id(section.id)
             }
-            if let result = model.classResult {
-                ClassResultBanner(result: result)
-            }
-            ForEach(currentClass.sections) { section in
-                classSection(section)
-            }
-            ClassFeedbackClinicBlock(classDetail: currentClass, result: model.classResult)
-            workbookSubmissionFooter
+            stageActions
         }
+    }
+
+    private var orderedSections: [SottoClassSection] {
+        let order = ["GRAMMAR", "READING", "LISTENING", "SPEAKING", "WRITING"]
+        return currentClass.sections.sorted {
+            (order.firstIndex(of: $0.skill.uppercased()) ?? 99) <
+                (order.firstIndex(of: $1.skill.uppercased()) ?? 99)
+        }
+    }
+
+    private var stages: [String] { ["lesson"] + orderedSections.map(\.id) + ["review"] }
+
+    private var stageNavigation: some View {
+        Picker("Class section", selection: $selectedStage) {
+            Text("Lesson").tag("lesson")
+            ForEach(orderedSections) { section in
+                Text(classSkillLabel(section.skill)).tag(section.id)
+            }
+            Text("Review and submit").tag("review")
+        }
+        .pickerStyle(.menu)
+        .controlSize(.large)
+        .accessibilityIdentifier("class-section-picker")
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var stageActions: some View {
+        let index = stages.firstIndex(of: selectedStage) ?? 0
+        return ViewThatFits(in: .horizontal) {
+            HStack {
+                Button("Previous section") { selectedStage = stages[index - 1] }
+                    .disabled(index == 0)
+                Spacer()
+                nextStageButton(index: index)
+            }
+            VStack(alignment: .leading, spacing: 12) {
+                Button("Previous section") { selectedStage = stages[index - 1] }
+                    .disabled(index == 0)
+                nextStageButton(index: index)
+            }
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.large)
+    }
+
+    private func nextStageButton(index: Int) -> some View {
+        Button(index == 0 ? "Start practice" : "Next section") {
+            selectedStage = stages[index + 1]
+        }
+        .disabled(index + 1 >= stages.count)
     }
 
     private func classSection(_ section: SottoClassSection) -> some View {

@@ -315,7 +315,7 @@ export async function composeListeningContent(
                 ]
               : [],
             tone: 'casual',
-            durationTarget: 4,
+            durationTarget: p.firstSeenClassId ? 2 : 4,
             provider: ai.provider,
             model: ai.model,
             apiKeyOverride: ai.apiKey,

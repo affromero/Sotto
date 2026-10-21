@@ -12,6 +12,7 @@ struct ClassSectionView: View {
     let pencilToolPicker: PKToolPicker
     let onPencilReviewRequired: (String, Bool) -> Void
     let onSelectionHelp: (String, String) -> Void
+    @State private var questionIndex = 0
 
     private var skill: String {
         section.skill.uppercased()
@@ -62,7 +63,7 @@ struct ClassSectionView: View {
                 ClassReadingPassageBlock(passage: sharedReadingPassage, onSelectionHelp: onSelectionHelp)
             }
 
-            ForEach(sortedQuestions) { question in
+            ForEach(pencilWorkbook ? sortedQuestions : Array(sortedQuestions.dropFirst(questionIndex).prefix(1))) { question in
                 if pencilWorkbook {
                     PencilHomeworkCard(classId: classId, attempt: classAttempt, exercise: .question(question),
                         toolPicker: pencilToolPicker,
@@ -78,6 +79,16 @@ struct ClassSectionView: View {
                 ) { selected in
                     answers[question.id] = selected
                 }
+            }
+
+            if !pencilWorkbook, !sortedQuestions.isEmpty {
+                Text("Question \(questionIndex + 1) of \(sortedQuestions.count)")
+                    .font(.caption).foregroundStyle(SottoTheme.muted)
+                ViewThatFits(in: .horizontal) {
+                    HStack { questionActions }
+                    VStack(alignment: .leading, spacing: 12) { questionActions }
+                }
+                .buttonStyle(.bordered).controlSize(.large)
             }
 
             if !section.prompts.isEmpty {
@@ -119,6 +130,14 @@ struct ClassSectionView: View {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .stroke(SottoTheme.line)
         )
+    }
+
+    @ViewBuilder
+    private var questionActions: some View {
+        Button("Previous question") { questionIndex -= 1 }
+            .disabled(questionIndex == 0)
+        Button("Next question") { questionIndex += 1 }
+            .disabled(questionIndex + 1 >= sortedQuestions.count)
     }
 }
 
@@ -483,7 +502,7 @@ struct QuestionView: View {
                 }
             }
 
-            if let explanation = question.explanation, !explanation.isEmpty {
+            if selectedIndex != nil, let explanation = question.explanation, !explanation.isEmpty {
                 SelectableLearnerText(
                     explanation,
                     font: LearnerTextFonts.callout,
