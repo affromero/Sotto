@@ -417,6 +417,7 @@ def archive_imports(
 def verify_completed(operations: HostOperations) -> None:
     """Verify the completed release without requiring archived import heads."""
     from scripts.deploy.review.runtime import services
+    from scripts.deploy.review.runtime.policy import verify_queue_policy
 
     operations.lock.validate()
     operations.verify_tools()
@@ -425,6 +426,7 @@ def verify_completed(operations: HostOperations) -> None:
     operations.verify_egress()
     services.verify_candidate(operations, 'web')
     services.verify_candidate(operations, 'workers')
+    verify_queue_policy(operations)
     services.wait_health(operations, public=True)
     verify_completed_records(operations)
     verify_startup_unit(operations)
@@ -606,6 +608,7 @@ def recover_completed(
 ) -> None:
     """Recover public routing only after complete evidence passes under503."""
     from scripts.deploy.review.runtime import services
+    from scripts.deploy.review.runtime.policy import verify_queue_policy
 
     operations.verify_fence()
     operations.verify_tools()
@@ -617,6 +620,7 @@ def recover_completed(
     identities = [services.verify_candidate(
         operations, role, require_running=False,
     ) for role in ('web', 'workers')]
+    verify_queue_policy(operations)
     for identity in identities:
         state = record(operations.inspect(identity)[0]['State'], 'recovery')
         if not state.get('Running'):
@@ -642,6 +646,7 @@ def start_completed(
     """Start only the two fully bound containers from a completed attempt."""
     from scripts.deploy.review.runtime import services
     from scripts.deploy.review.runtime.operations import HOST_STATE
+    from scripts.deploy.review.runtime.policy import verify_queue_policy
 
     operations.lock.validate()
     if operations.attempt.state()['status'] != 'complete':
@@ -661,6 +666,7 @@ def start_completed(
     identities = [services.verify_candidate(
         operations, role, require_running=False,
     ) for role in ('web', 'workers')]
+    verify_queue_policy(operations)
     for identity in identities:
         state = record(operations.inspect(identity)[0]['State'], 'startup')
         if not state.get('Running'):

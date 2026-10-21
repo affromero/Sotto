@@ -29,6 +29,7 @@ from scripts.deploy.review.egress import (
     render_rules,
     semantic_policy,
 )
+from scripts.deploy.review.runtime.policy import helper_memory, runtime_policy
 from scripts.deploy.review.runtime.release import (
     before_fence as before_fence,
 )
@@ -299,6 +300,7 @@ def candidate_document(operations: HostOperations) -> dict[str, object]:
         web_memory=cast(int, resources['webMemoryBytes']),
         worker_memory=cast(int, resources['workerMemoryBytes']),
         egress_network=PROJECT + '_egress',
+        runtime_policy=runtime_policy(operations.manifest),
     )
     for service in record(result['services'], 'candidate services').values():
         record(service, 'candidate service')['labels'] = {
@@ -341,7 +343,9 @@ def validate_created_candidate(
             or record(actual['State'], 'candidate state').get('Running')
             or environment(actual) != {**environment(image), **supplied}):
         raise ValueError('created-review-candidate-not-admitted')
-    for name in ('Cmd', 'Entrypoint', 'WorkingDir', 'Healthcheck',
+    if config.get('Cmd') != desired['command']:
+        raise ValueError('candidate-admitted-command-changed')
+    for name in ('Entrypoint', 'WorkingDir', 'Healthcheck',
                  'StopSignal', 'ExposedPorts'):
         if config.get(name) != base.get(name):
             raise ValueError('candidate-image-command-changed')
@@ -356,6 +360,7 @@ def validate_created_candidate(
             or host.get('UTSMode') not in ('', None)
             or host.get('UsernsMode') not in ('', None)
             or host.get('Memory') != desired['mem_limit']
+            or host.get('MemorySwap') != desired['memswap_limit']
             or host.get('RestartPolicy')
             != {'Name': 'no', 'MaximumRetryCount': 0}
             or host.get('LogConfig') != {
@@ -788,11 +793,16 @@ def backup_archive(
     """Name, bind and settle only the admitted read-only archive process."""
     operations.settle_pending_helpers()
     arguments = ['-C', path, '-cf', '-', '.']
+    base = rows(json.loads(operations.docker(
+        'image', 'inspect', image,
+    )), 'backup image')[0]
     binding = {
         'kind': 'backup', 'imageId': image, 'network': 'none',
         'entrypoint': 'tar', 'argumentsHash': checksum(arguments),
         'inputSha256': hashlib.sha256(b'').hexdigest(),
         'sourceContainerId': source, 'invocation': time.time_ns(),
+        'memoryBytes': helper_memory(operations.manifest),
+        'environmentHash': checksum(environment(base)),
     }
     identity = checksum(binding)
     container_name = PROJECT + '-tool-' + identity[:24]
@@ -803,6 +813,8 @@ def backup_archive(
         'create', '--name', container_name, '--label',
         'io.sotto.review-attempt='+operations.attempt.manifest_hash,
         '--pull', 'never', '--network', 'none', '--read-only',
+        '--memory', str(helper_memory(operations.manifest)),
+        '--memory-swap', str(helper_memory(operations.manifest)),
         '--volumes-from', source+':ro', '--user', '0:0',
         '--entrypoint', 'tar', image, *arguments,
     ).decode().strip()

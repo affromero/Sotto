@@ -25,6 +25,7 @@ from scripts.deploy.review.state import (
     atomic_json,
     private_json,
 )
+from scripts.tests.review.runtime import admitted_runtime_fixture
 
 
 class HostBoundary:
@@ -116,17 +117,25 @@ class HostBoundary:
         self, mode: str, value: object, *,
         checkpoint: object = None, candidate_id: str | None = None,
     ) -> object:
-        queues = self.manifest['originalQueues']
+        queues = cast(dict[str, object], self.manifest['originalQueues'])
         if mode == 'capture':
             return private_json(self.attempt.directory / 'evidence.json')
         self.verify_fence()
         if mode == 'prepare':
             atomic_json(self.attempt.directory / 'original-queues.json',
-                        cast(dict[str, object], queues))
+                        queues)
             if self.lose_prepare:
                 raise RuntimeError('queue preparation response lost')
+            atomic_json(self.attempt.directory / 'queue-policy-intent.json',
+                        {'schemaVersion': 1,
+                         'connectionIdentity': queues['connectionIdentity'],
+                         'queues': [{'name': row['name'],
+                                     'originalConcurrency': None,
+                                     'concurrency': 1}
+                                    for row in cast(list[dict[str, object]],
+                                                    queues['queues'])]})
             return {'prepared': True, 'manifest': queues,
-                    'zeroWork': False, 'pending': 3}
+                    'zeroWork': False, 'pending': 3, 'queueConcurrency': 1}
         if mode == 'providers':
             if not self.web or candidate_id != 'web-id':
                 raise ValueError('provider request escaped candidate')
@@ -245,6 +254,7 @@ class ReviewControllerTests(unittest.TestCase):
             for size in (13, 28, 31)
         ]
         manifest: dict[str, object] = {
+            **admitted_runtime_fixture(),
             'tools': {'scripts/deploy/review/egress.py': 'd' * 64},
             'kernelProofSha256': hashed['kernel-proof.json'],
             'offserverCodexProofSha256': hashed['codex-proof.json'],
@@ -252,7 +262,7 @@ class ReviewControllerTests(unittest.TestCase):
             'initialStage': initial, 'stages': stages,
             'finalWorker': worker, 'finalWeb': {'sha': '1' * 40},
             'originalQueues': {'schemaVersion': 1,
-                               'connectionIdentity': 'private-identity',
+                               'connectionIdentity': 'a' * 64,
                                'queues': [{'name': f'queue-{i}',
                                            'paused': False}
                                           for i in range(27)]},

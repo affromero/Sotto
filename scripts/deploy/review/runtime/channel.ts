@@ -16,6 +16,7 @@ import {
 } from '../first-worker';
 import { runReviewReadiness } from '../readiness';
 import { REVIEW_WORKLOAD_TIMEOUT_MS, runReviewWorkloads } from './workload';
+import { inspectReviewQueuePolicy, reviewRuntimePolicySchema } from './policy/queues';
 import { ALL_QUEUE_NAMES } from '../../../../apps/web/src/lib/queue';
 import { prismaUnfiltered } from '../../../../apps/web/src/lib/prisma';
 import { SIDEDOOR_STATE_ID } from '../../../../apps/web/src/lib/sidedoor/access/state/store';
@@ -38,9 +39,11 @@ const initialSchema = z
       'consumers',
       'workloads',
       'paused-admission',
+      'queue-policy',
     ]),
     input: z.unknown(),
     checkpoint: z.unknown().optional(),
+    policy: z.unknown().optional(),
   })
   .strict();
 const ackSchema = z.object({ type: z.literal('ack'), id: z.number().int().positive() }).strict();
@@ -68,6 +71,7 @@ export async function main(): Promise<void> {
     'Bounded private input required'
   );
   const initial = initialSchema.parse(JSON.parse(first.value));
+  if (initial.policy !== undefined) reviewRuntimePolicySchema.parse(initial.policy);
   const pending = new Map<number, { resolve: () => void; reject: (error: Error) => void }>();
   let sequence = 0;
   let completed = false;
@@ -158,6 +162,9 @@ export async function main(): Promise<void> {
           REDIS_URL: process.env.REDIS_URL,
         },
         createQueue: (name: string) => new Queue(name, { connection, skipMetasUpdate: true }),
+        policy: reviewRuntimePolicySchema.parse(initial.policy),
+        policyIntent: null,
+        admitQueuePolicy: (intent) => request('queuePolicyIntent', intent),
       };
       const runtime = {
         ...queueRuntime,
@@ -166,17 +173,25 @@ export async function main(): Promise<void> {
         isSottoSynchronousJob,
         requireSottoJobVersion,
       };
-      await request('fence');
-      if (initial.mode === 'inspect') {
+      await request(initial.mode === 'queue-policy' ? 'policyCheck' : 'fence');
+      if (initial.mode === 'queue-policy') {
+        result = await inspectReviewQueuePolicy(queueRuntime, initial.input, false);
+      } else if (initial.mode === 'inspect') {
         result = await inspectReviewFirstWorker(prismaUnfiltered, initial.input);
       } else if (initial.mode === 'prepare') {
-        await inspectReviewRedisEmpty(redis);
-        await request('queueManifest', {
-          schemaVersion: 1,
-          connectionIdentity: lifecycle.connectionIdentity(process.env, SIDEDOOR_STATE_ID),
-          queues: [...ALL_QUEUE_NAMES].sort().map((name) => ({ name, paused: false })),
-        });
-        result = await prepareReviewQueues(runtime, initial.input, redis);
+        const input = z
+          .strictObject({ evidence: z.unknown(), policyIntent: z.unknown() })
+          .parse(initial.input);
+        runtime.policyIntent = input.policyIntent;
+        if (input.policyIntent === null) {
+          await inspectReviewRedisEmpty(redis);
+          await request('queueManifest', {
+            schemaVersion: 1,
+            connectionIdentity: lifecycle.connectionIdentity(process.env, SIDEDOOR_STATE_ID),
+            queues: [...ALL_QUEUE_NAMES].sort().map((name) => ({ name, paused: false })),
+          });
+        }
+        result = await prepareReviewQueues(runtime, input.evidence, redis);
       } else if (initial.mode === 'continuation') {
         const queue = runtime.createQueue('worksheet-pdf');
         try {
@@ -195,7 +210,8 @@ export async function main(): Promise<void> {
         result = await lifecycle.run(initial.input, runtime);
       }
     }
-    if (initial.mode !== 'capture') await request('fence');
+    if (initial.mode !== 'capture')
+      await request(initial.mode === 'queue-policy' ? 'policyCheck' : 'fence');
     emit({ type: 'result', value: result });
     completed = true;
   } finally {

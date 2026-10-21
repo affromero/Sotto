@@ -345,6 +345,14 @@ are checked. Learning and speech workloads run on one or two profiles with an
 admitted absent course pair and an existing seeded curriculum. A profile that
 already has that course can be checked without generating new learning work.
 
+The private review policy binds separate service and helper memory limits,
+their Node heap settings, and the public operator contact through the existing
+`SOTTO_PRIVACY_CONTACT_EMAIL` setting. Helpers count toward capacity alongside
+the web and worker, with the existing reserve retained. The review queues keep
+all functionality with one concurrent job per queue. Measure cold startup and
+real workloads, including helper memory and swap, before admitting the limits.
+This does not change production or self-hosting defaults.
+
 Before starting, independently admit the exact source, successful CI runs,
 immutable image receipts, staged migration inventories, host topology and
 private inputs. Preserve the original data and queue evidence. Require an

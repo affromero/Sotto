@@ -9,7 +9,11 @@ import unittest
 from pathlib import Path
 
 from scripts.deploy.review.runtime.channel import exchange
-from scripts.deploy.review.state import DeploymentLock, private_json
+from scripts.deploy.review.state import (
+    DeploymentLock,
+    atomic_json,
+    private_json,
+)
 
 
 class ReviewChannelTests(unittest.TestCase):
@@ -47,6 +51,9 @@ def ack(identity):
             {'mode': mode, 'input': {'secret': 'private-fixture-value'}},
             directory=self.root, assert_fence=self.fence,
             queue_manifest=lambda value: self.manifests.append(dict(value)),
+            queue_policy=lambda value: atomic_json(
+                self.root / 'queue-policy-intent.json', value,
+            ),
             timeout=timeout,
         )
 
@@ -143,6 +150,44 @@ emit({'type':'result','value':{'paused':True}})
  'credentials':[],'modelChangePrepared':False}});ack(1)
 ''')
         self.assertFalse((self.root / 'provider-checkpoint.json').exists())
+
+    def test_getter_only_guard_acknowledges_without_a_mutation_checkpoint(
+        self,
+    ) -> None:
+        result = self.run_child('''emit({'type':'policyCheck','id':1});ack(1)
+emit({'type':'result','value':{'concurrency':1}})
+''', mode='queue-policy')
+        self.assertEqual(result, {'concurrency': 1})
+        self.assertEqual(self.fences, 1)
+        self.assertFalse((self.root / 'provider-checkpoint.json').exists())
+        self.assertFalse((self.root / 'queue-policy-intent.json').exists())
+
+    def test_getter_only_mode_cannot_acknowledge_fence_or_mutation_events(
+        self,
+    ) -> None:
+        for kind in ('fence', 'checkpoint', 'workloadCheckpoint',
+                     'queueManifest', 'queuePolicyIntent'):
+            with self.subTest(kind=kind), self.assertRaises(ValueError):
+                self.run_child("emit({'type':" + repr(kind)
+                               + ",'id':1,'value':{}});ack(1)",
+                               mode='queue-policy')
+        self.assertEqual(self.fences, 0)
+        self.assertFalse((self.root / 'provider-checkpoint.json').exists())
+        self.assertFalse((self.root / 'queue-policy-intent.json').exists())
+
+    def test_original_concurrency_intent_is_durable_before_setter_ack(
+        self,
+    ) -> None:
+        path = self.root / 'queue-policy-intent.json'
+        result = self.run_child('''emit({'type':'queuePolicyIntent','id':1,
+'value':{'originalConcurrency':None,'concurrency':1}});ack(1)
+with open(INTENT) as source:
+ assert json.load(source)['originalConcurrency'] is None
+emit({'type':'result','value':{'prepared':True}})
+'''.replace('INTENT', repr(str(path))), mode='prepare')
+        self.assertEqual(result, {'prepared': True})
+        self.assertEqual(private_json(path)['concurrency'], 1)
+        self.assertEqual(path.stat().st_mode & 0o777, 0o600)
 
     def test_partial_line_deadline_and_duplicate_result_fail_closed(
         self,

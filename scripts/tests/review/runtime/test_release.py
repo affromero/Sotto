@@ -28,6 +28,7 @@ from scripts.deploy.review.state import (
     private_json,
 )
 from scripts.deploy.review.topology import NETWORK, PROJECT
+from scripts.tests.review.runtime import admitted_runtime_fixture
 
 
 class ReleaseRecoveryTests(unittest.TestCase):
@@ -72,6 +73,7 @@ class ReleaseRecoveryTests(unittest.TestCase):
                 'release_sha': 'a'*40, 'state': 'verified',
             })
         manifest: dict[str, object] = {
+            **admitted_runtime_fixture(),
             'images': receipts, 'finalWeb': receipts[0],
             'finalWorker': receipts[1],
             'runtimeUid': os.geteuid(), 'runtimeGid': os.getegid(),
@@ -116,6 +118,12 @@ class ReleaseRecoveryTests(unittest.TestCase):
         self.serving = False
         self.fail_reload = False
         self.started: list[str] = []
+        self.queue_concurrency = 1
+        runtime_boundary = patch.object(
+            HostOperations, 'runtime_exchange', side_effect=self.runtime,
+        )
+        runtime_boundary.start()
+        self.addCleanup(runtime_boundary.stop)
         self.unit = self.root / 'systemd/sotto-review-start.service'
         self.unit.parent.mkdir(mode=0o700)
         self.drop_ins = ''
@@ -152,6 +160,13 @@ class ReleaseRecoveryTests(unittest.TestCase):
                               side_effect=self.docker)
         docker.start()
         self.addCleanup(docker.stop)
+
+    def runtime(self, mode: str, value: object) -> dict[str, object]:
+        if mode != 'queue-policy':
+            raise AssertionError('Unadmitted runtime boundary request')
+        return {'queueCount': 27, 'concurrency': self.queue_concurrency,
+                'privacyContactEmail': record(value, 'policy')
+                ['privacyContactEmail']}
 
     def command(self, arguments: list[str]) -> bytes:
         self.command_history.append(arguments)
@@ -601,6 +616,20 @@ class ReleaseRecoveryTests(unittest.TestCase):
                   patch.object(HostOperations, 'verify_storage'),
                   patch.object(HostOperations, 'verify_egress'),
                   self.assertRaisesRegex(ValueError, 'candidate-changed')):
+                release.start_completed(self.operations)
+        self.assertEqual(self.started, [])
+
+    def test_changed_queue_policy_refuses_before_either_stopped_service_starts(
+        self,
+    ) -> None:
+        with patch('scripts.deploy.review.runtime.release.DIRECTORY',
+                   str(self.root / 'review')):
+            self.stopped_release()
+            self.queue_concurrency = 2
+            with (patch.object(HostOperations, 'verify_tools'),
+                  patch.object(HostOperations, 'verify_storage'),
+                  patch.object(HostOperations, 'verify_egress'),
+                  self.assertRaisesRegex(ValueError, 'queue-policy-changed')):
                 release.start_completed(self.operations)
         self.assertEqual(self.started, [])
 
