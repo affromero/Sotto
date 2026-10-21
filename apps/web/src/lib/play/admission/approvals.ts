@@ -1,4 +1,8 @@
-import { approvePlayJoinSchema, playPendingRequestViewSchema } from '@sotto/shared';
+import {
+  approvePlayJoinSchema,
+  playPendingRequestViewSchema,
+  PLAY_CONDUCT_VERSION,
+} from '@sotto/shared';
 import { AccessError } from 'thesidedoor-core/access';
 import { Prisma } from '@/generated/prisma/client';
 import { createSottoProfile, prepareSottoProfile } from '@/lib/sidedoor/access/core/profiles';
@@ -11,6 +15,17 @@ import { loadPlayRoom } from '../storage/room-view';
 import type { PlayActor, PlayClock } from '../storage/rooms';
 import { playSponsoringOwner, requireOrdinaryPlayEnrollment } from './authority';
 import { loadPlayJoinRequest, projectPendingPlayRequest } from './views';
+import {
+  lockPlaySafetyParticipants,
+  playAdmissionParticipants,
+  requirePlayInteractionAllowed,
+} from '../safety/fences';
+import {
+  assertPlayDisplayNameAllowed,
+  assertPlaySharedTextAllowed,
+  PlaySafetyError,
+  redactPlayPublishedName,
+} from '../safety/policy';
 
 /** Prepare only after a real owner chooses enrollment, outside transaction retries. */
 export async function approvePlayEntry(
@@ -40,6 +55,8 @@ export async function approvePlayEntry(
       generation: candidate.generation,
       proofHash: candidate.proofHash,
       deviceName: candidate.deviceName,
+      acceptedConductVersion: candidate.acceptedConductVersion,
+      acceptedConductAt: candidate.acceptedConductAt?.toISOString() ?? null,
     });
   const capturedInput = identityInput(captured);
 
@@ -55,6 +72,22 @@ export async function approvePlayEntry(
         sponsorId = await playSponsoringOwner(database, actor);
       if (!isHost && !(actor.identity.isOwner && candidate.candidateKind === 'NEW'))
         throw new AccessError('forbidden');
+      const participants = playAdmissionParticipants(room, candidate);
+      await lockPlaySafetyParticipants(database, participants);
+      if (command.type !== 'DECLINE') {
+        await requirePlayInteractionAllowed(database, participants);
+        if (
+          candidate.acceptedConductVersion !== PLAY_CONDUCT_VERSION ||
+          !candidate.acceptedConductAt
+        )
+          throw new PlaySafetyError(
+            'CONDUCT_REQUIRED',
+            'The joining player must accept the game conduct terms.'
+          );
+        if (candidate.candidateKind === 'NEW')
+          assertPlayDisplayNameAllowed(candidate.proposedName!);
+        assertPlaySharedTextAllowed(candidate.deviceName);
+      }
       const previous = await database.playActionReceipt.findUnique({
         where: {
           actorUserId_actionId: { actorUserId: actor.identity.userId, actionId: command.actionId },
@@ -67,7 +100,8 @@ export async function approvePlayEntry(
           previous.roomId !== room.id
         )
           throw new PlayRuleError('conflict', 'That action ID has already been used.');
-        return playPendingRequestViewSchema.parse(previous.result);
+        const result = playPendingRequestViewSchema.parse(previous.result);
+        return { ...result, name: redactPlayPublishedName(result.name) };
       }
       if (identityInput(candidate) !== capturedInput)
         throw new PlayRuleError('conflict', 'The enrollment request changed. Refresh it.');
@@ -109,6 +143,13 @@ export async function approvePlayEntry(
         if (!prepared || !sponsorId || candidate.candidateKind !== 'NEW')
           throw new AccessError('forbidden');
         const profile = await createSottoProfile(database, actor.request, prepared, null);
+        await database.playSafetyState.create({
+          data: {
+            userId: profile.id,
+            conductVersion: PLAY_CONDUCT_VERSION,
+            acceptedAt: candidate.acceptedConductAt,
+          },
+        });
         await database.playJoinRequest.update({
           where: { id: requestId },
           data: {
@@ -165,6 +206,10 @@ export async function approvePlayEntry(
       const candidate = await loadPlayJoinRequest(database, requestId);
       await projectPendingPlayRequest(database, candidate, actor.identity, clock());
       if (command.type === 'APPROVE_PROFILE') await playSponsoringOwner(database, actor);
+      const room = await loadPlayRoom(database, candidate.roomId);
+      await lockPlaySafetyParticipants(database, playAdmissionParticipants(room, candidate));
+      if (command.type !== 'DECLINE')
+        await requirePlayInteractionAllowed(database, playAdmissionParticipants(room, candidate));
       const receipt = await database.playActionReceipt.findUnique({
         where: {
           actorUserId_actionId: { actorUserId: actor.identity.userId, actionId: command.actionId },
@@ -172,7 +217,8 @@ export async function approvePlayEntry(
       });
       if (!receipt || receipt.operation !== 'APPROVE' || receipt.fingerprint !== fingerprint)
         throw error;
-      return playPendingRequestViewSchema.parse(receipt.result);
+      const result = playPendingRequestViewSchema.parse(receipt.result);
+      return { ...result, name: redactPlayPublishedName(result.name) };
     });
   });
 }

@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { randomUUID } from 'node:crypto';
+import { acceptedPlayTestIdentity } from '../../helpers/play-fixture';
 import { newToken } from 'thesidedoor-core/access';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { approvePlayEntry } from '@/lib/play/admission/approvals';
@@ -30,7 +31,7 @@ suite('invitation requests and canonical owner approval', () => {
   });
   beforeEach(async () => {
     vi.stubEnv('BYOK_ENCRYPTION_KEY', 'isolated-play-admission-test-key');
-    authority = await instance.reset();
+    authority = await acceptedPlayTestIdentity(instance, await instance.reset());
   });
   afterEach(() => vi.unstubAllEnvs());
   afterAll(async () => instance?.close());
@@ -72,6 +73,7 @@ suite('invitation requests and canonical owner approval', () => {
       code,
       client: 'NATIVE',
       deviceName: 'Partner phone',
+      acceptedConductVersion: 1,
       candidate: { kind: 'NEW', name: 'New partner', settings, consentToProfile: true },
     };
   }

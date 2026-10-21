@@ -3,7 +3,7 @@ import {
   playInvitationPreviewSchema,
   playInvitationQuerySchema,
   playJoinStatusViewSchema,
-  requestPlayJoinSchema,
+  playConsentedJoinRequestSchema,
 } from '@sotto/shared';
 import { prismaUnfiltered } from '@/lib/prisma';
 import { previewPlayInvitation } from '@/lib/play/admission/invitations';
@@ -34,7 +34,7 @@ export function GET(request: Request) {
 export function POST(request: Request) {
   return playOperation(request, playBrowserMutation(request), async () => {
     await limitPlayOperation('intake:instance', 30);
-    const command = await playBody(request, requestPlayJoinSchema);
+    const command = await playBody(request, playConsentedJoinRequestSchema);
     return playOperation(request, command.client === 'BROWSER', async () => {
       const browserNew = command.client === 'BROWSER' && command.candidate.kind === 'NEW';
       // Explicit anonymous enrollment uses no authority from an unselected cookie.

@@ -17,6 +17,13 @@ import { PlayRuleError } from '../errors';
 import { playFingerprint } from './fingerprint';
 import { replayPlayAction } from './receipts';
 import {
+  lockPlaySafetyParticipants,
+  playInteractionUnavailable,
+  requirePlayInteractionAllowed,
+} from '../safety/fences';
+import { assertPlaySharedTextAllowed } from '../safety/policy';
+import { cancelPlayRoomForSafety } from '../safety/cancellation';
+import {
   loadPlayRoom,
   projectStoredPlayRoom,
   requirePlaySeat,
@@ -105,6 +112,8 @@ export function createStoredPlayRoom(
     },
     async (database) => {
       const now = clock();
+      await lockPlaySafetyParticipants(database, [actor.identity.userId]);
+      await requirePlayInteractionAllowed(database, [actor.identity.userId]);
       await database.playRoom.create({
         data: {
           id: roomId,
@@ -161,15 +170,20 @@ export function listStoredPlayRooms(
       throw new PlayRuleError('forbidden', 'Game page unavailable.');
     const rooms = await database.playRoom.findMany({
       where: member,
-      select: { id: true },
+      select: { id: true, hostUserId: true, guestUserId: true },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: query.limit + 1,
       ...(query.beforeId ? { cursor: { id: query.beforeId }, skip: 1 } : {}),
     });
     const page = rooms.slice(0, query.limit);
+    await lockPlaySafetyParticipants(
+      database,
+      page.flatMap((room) => [room.hostUserId, room.guestUserId])
+    );
     const now = clock();
     const views: PlayRoomView[] = [];
-    for (const room of page)
+    for (const room of page) {
+      if (await playInteractionUnavailable(database, [room.hostUserId, room.guestUserId])) continue;
       views.push(
         await projectStoredPlayRoom(
           database,
@@ -178,6 +192,7 @@ export function listStoredPlayRooms(
           now
         )
       );
+    }
     return { rooms: views, nextCursor: rooms.length > query.limit ? page.at(-1)!.id : null };
   });
 }
@@ -195,18 +210,6 @@ async function bumpRevision(database: Prisma.TransactionClient, room: StoredPlay
     data: { revision: { increment: 1 } },
   });
   if (changed.count !== 1) throw new PlayRuleError('conflict', 'The game changed. Refresh it.');
-}
-
-async function cancelRoom(database: Prisma.TransactionClient, roomId: string) {
-  await database.playRoom.update({
-    where: { id: roomId },
-    data: { status: 'CANCELLED', invitationHash: null },
-  });
-  await database.playPresenceLease.deleteMany({ where: { roomId } });
-  await database.playJoinRequest.updateMany({
-    where: { roomId },
-    data: { status: 'REVOKED', deliveryState: Prisma.DbNull },
-  });
 }
 
 export function actOnStoredPlayRoom(
@@ -231,6 +234,8 @@ export function actOnStoredPlayRoom(
       const room = await loadPlayRoom(database, roomId);
       const now = clock();
       const seat = requirePlaySeat(room, actor.identity.userId);
+      await lockPlaySafetyParticipants(database, [room.hostUserId, room.guestUserId]);
+      await requirePlayInteractionAllowed(database, [room.hostUserId, room.guestUserId]);
       requireCurrent(room, command.expectedRevision, now);
       const view = await projectStoredPlayRoom(database, room, actor.identity.userId, now);
       if ('command' in command) {
@@ -238,6 +243,11 @@ export function actOnStoredPlayRoom(
           throw new PlayRuleError('conflict', 'This game is not playing.');
         const active = room.rounds.find((round) => round.order === room.currentRound);
         if (!active) throw new PlayRuleError('invalid', 'The active round is missing.');
+        if (!view.round?.allowedActions.includes(command.command.type))
+          throw new PlayRuleError('forbidden', 'That action is not available.');
+        if ('text' in command.command) assertPlaySharedTextAllowed(command.command.text);
+        if (command.command.type === 'FEEDBACK' && command.command.correction)
+          assertPlaySharedTextAllowed(command.command.correction);
         const next = advancePlayRound(
           readPrivatePlayRound(active.privateState),
           seat,
@@ -251,10 +261,17 @@ export function actOnStoredPlayRoom(
       } else {
         if (!view.allowedActions.includes(command.type))
           throw new PlayRuleError('forbidden', 'That action is not available.');
+        if (command.type === 'CANCEL' || command.type === 'LEAVE') {
+          await cancelPlayRoomForSafety(database, roomId);
+          return projectStoredPlayRoom(
+            database,
+            await loadPlayRoom(database, roomId),
+            actor.identity.userId,
+            now
+          );
+        }
         await bumpRevision(database, room);
-        if (command.type === 'CANCEL' || command.type === 'LEAVE')
-          await cancelRoom(database, roomId);
-        else if (command.type === 'START') {
+        if (command.type === 'START') {
           const rounds = createPlayRounds(
             playGameConfigSchema.parse({
               kind: room.kind,

@@ -182,7 +182,7 @@ test('two learners play all six rounds, keep private phrases and discover the sa
     await expect(guest.getByRole('heading', { name: 'Your blocked players' })).toBeVisible();
     await guest.screenshot({ path: '/tmp/sotto-game-safety-dark-375.png', fullPage: true });
     await host.goto('/play/safety/review');
-    await host.getByLabel('Action', { exact: true }).selectOption('DISMISS');
+    await host.getByRole('combobox', { name: 'Action', exact: true }).selectOption('DISMISS');
     const response = 'I have reviewed this report. Your block stays in place.';
     await host.getByRole('textbox', { name: 'Response to the reporting player' }).fill(response);
     await host.getByRole('button', { name: 'Review decision' }).click();

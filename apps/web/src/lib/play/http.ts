@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { playEmptyQuerySchema } from '@sotto/shared';
+import { playEmptyQuerySchema, PLAY_SAFETY_HTTP_STATUS } from '@sotto/shared';
 import { AccessError } from 'thesidedoor-core/access';
 import { cookieValue, readAccessJson } from 'thesidedoor-core/access/http';
 import { authenticateRequest } from '@/lib/api-keys';
@@ -10,6 +10,7 @@ import { checkRateLimit } from '@/lib/redis';
 import { accessOperation } from '@/lib/sidedoor/access/core/http';
 import { SHARED_SESSION_COOKIE } from '@/lib/sidedoor/access/core/session-identity';
 import { PlayRuleError } from './errors';
+import { PlaySafetyError } from './safety/policy';
 import type { PlayActor } from './storage/rooms';
 
 export const PLAY_PROOF_HEADER = 'X-Sotto-Play-Proof';
@@ -67,6 +68,11 @@ export async function playOperation(
       return await operation();
     } catch (error) {
       if (error instanceof z.ZodError) return errorResponse('Invalid play request.', 400);
+      if (error instanceof PlaySafetyError)
+        return NextResponse.json(
+          { error: error.message, reason: error.reason },
+          { status: PLAY_SAFETY_HTTP_STATUS[error.reason] }
+        );
       if (error instanceof PlayRuleError)
         return errorResponse(
           error.message,
