@@ -85,7 +85,7 @@ jobs:
       - name: Type-check deployment Python
         run: |
           curl --proto '=https' --tlsv1.2 -LsSf https://astral.sh/uv/0.11.17/install.sh | sh
-          "$HOME/.local/bin/uvx" --from mypy==2.4.0 mypy --strict --explicit-package-bases --python-version 3.12 scripts/deploy/images scripts/deploy/compatibility-review.py
+          "$HOME/.local/bin/uvx" --from mypy==2.4.0 mypy --strict --explicit-package-bases --python-version 3.12 scripts/deploy/images scripts/deploy/review scripts/deploy/compatibility-review.py
       - name: Audit dependencies
         run: node scripts/ci/audit-gate.mjs
       - name: Validate repository tooling

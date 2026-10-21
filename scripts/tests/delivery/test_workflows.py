@@ -692,7 +692,40 @@ class ReleaseAdmissionTests(unittest.TestCase):
                       (self.root / 'output').read_text().splitlines())
         self.assertEqual(output, {
             'sha': SHA, 'runtime': 'false', 'publish': 'true',
+            'review': 'false',
         })
+
+    def test_review_dispatch_skips_production_without_requiring_its_origins(self) -> None:
+        self.environment.update({
+            'GITHUB_EVENT_NAME': 'workflow_dispatch', 'REVIEW_ONLY': 'true',
+            'SOTTO_PUBLIC_APP_URL': '', 'SOTTO_PERSONAL_APP_URL': '',
+        })
+        (self.root / 'delivery/verified/source-validation.json').write_text(
+            json.dumps({
+                'sha': SHA, 'runtime_changed': False, 'source_validated': True,
+            }))
+        result = self.run_step(
+            'deploy.yml', 'Validate release revision and runtime scope')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        output = dict(line.split('=', 1) for line in
+                      (self.root / 'output').read_text().splitlines())
+        self.assertEqual(output, {
+            'sha': SHA, 'runtime': 'true', 'publish': 'false',
+            'review': 'true',
+        })
+
+    def test_review_flag_cannot_activate_from_an_automatic_event(self) -> None:
+        self.environment['REVIEW_ONLY'] = 'true'
+        (self.root / 'delivery/verified/source-validation.json').write_text(
+            json.dumps({
+                'sha': SHA, 'runtime_changed': True, 'source_validated': True,
+            }))
+        result = self.run_step(
+            'deploy.yml', 'Validate release revision and runtime scope')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        output = (self.root / 'output').read_text()
+        self.assertIn('publish=true\n', output)
+        self.assertIn('review=false\n', output)
 
     def test_native_commit_without_backend_gate_skips_images(self) -> None:
         for workflow in ('deploy.yml', 'oss-image.yml'):

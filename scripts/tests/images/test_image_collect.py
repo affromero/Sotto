@@ -21,7 +21,7 @@ from images.fixtures import (
 )
 
 
-class ImageCollectorTests(ReceiptFixture):
+class ImageCollectorFixture(ReceiptFixture):
     reference: str
     image: dict[str, object]
     env: dict[str, str]
@@ -107,6 +107,7 @@ class ImageCollectorTests(ReceiptFixture):
             '--output', str(self.root / 'receipt.json'),
         ], cwd=ROOT, env=self.env, text=True, capture_output=True)
 
+class ImageCollectorTests(ImageCollectorFixture):
     def test_receipt_preserves_actual_id_config_measurements_and_probes(
         self,
     ) -> None:
@@ -121,6 +122,11 @@ class ImageCollectorTests(ReceiptFixture):
                          ['audio-generation', 'class-preparation'])
         self.assertEqual(receipt['runtime']['rollingContract'], 'e' * 64)
         self.assertEqual(receipt['provenance'], PROVENANCE)
+        self.assertEqual(set(receipt), {
+            'schemaVersion', 'sha', 'role', 'reference', 'imageId',
+            'configDigest', 'platform', 'source', 'revision',
+            'measurement', 'provenance', 'runtime',
+        })
 
     def test_classic_store_config_id_is_rejected_without_rewriting(
         self,

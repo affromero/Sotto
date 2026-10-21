@@ -7,6 +7,7 @@ import hashlib
 import json
 import os
 import subprocess
+from collections.abc import Mapping
 from pathlib import Path
 
 from scripts.deploy.images.measure_image import measure
@@ -23,9 +24,12 @@ from scripts.deploy.images.probe import probe
 DEPLOY = Path(__file__).resolve().parents[1]
 
 
-def collect(role: str, sha: str, reference: str) -> dict[str, object]:
+def collect_identity(
+    sha: str, reference: str,
+    expected_labels: Mapping[str, str] | None = None,
+    expected_user: str | None = None,
+) -> dict[str, object]:
     source_sha(sha)
-    image_reference(role, reference)
     inspected = json.loads(subprocess.check_output([
         'docker', 'image', 'inspect', reference,
     ], text=True))
@@ -42,6 +46,12 @@ def collect(role: str, sha: str, reference: str) -> dict[str, object]:
             or labels.get('org.opencontainers.image.source') != SOURCE
             or reference not in repo_digests):
         raise ValueError('Actual image identity does not match this release')
+    if expected_labels is not None and any(
+            labels.get(key) != value
+            for key, value in expected_labels.items()):
+        raise ValueError('Actual image labels differ from the trusted build')
+    if expected_user is not None and config.get('User') != expected_user:
+        raise ValueError('Actual image runtime user differs from the build')
     actual_id = digest(image.get('Id'), 'actual image ID', 'sha256:')
     if actual_id != reference.split('@', 1)[1]:
         raise ValueError('Use a containerd image store for actual image IDs')
@@ -55,7 +65,7 @@ def collect(role: str, sha: str, reference: str) -> dict[str, object]:
         raise ValueError('Expected a single-platform image manifest')
     manifest_config = record(manifest.get('config'), 'manifest configuration')
     result: dict[str, object] = {
-        'schemaVersion': 1, 'sha': sha, 'role': role, 'reference': reference,
+        'schemaVersion': 1, 'sha': sha, 'reference': reference,
         'imageId': actual_id, 'configDigest': digest(
             manifest_config.get('digest'), 'config digest', 'sha256:'),
         'platform': 'linux/amd64', 'source': SOURCE, 'revision': sha,
@@ -68,6 +78,13 @@ def collect(role: str, sha: str, reference: str) -> dict[str, object]:
             'sourceRunId': int(os.environ['SOURCE_RUN_ID']),
         },
     }
+    return result
+
+
+def collect(role: str, sha: str, reference: str) -> dict[str, object]:
+    image_reference(role, reference)
+    result = collect_identity(sha, reference)
+    result['role'] = role
     if role == 'workers':
         result['runtime'] = {
             'schemaHash': probe(reference, DEPLOY / 'images/schema.cjs'),

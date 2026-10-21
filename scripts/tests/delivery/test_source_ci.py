@@ -125,7 +125,7 @@ class SourceValidationTests(unittest.TestCase):
                  'https://astral.sh/uv/0.11.17/install.sh'],
                 ['uvx', '--from', 'mypy==2.4.0', 'mypy', '--strict',
                  '--explicit-package-bases', '--python-version', '3.12',
-                 'scripts/deploy/images',
+                 'scripts/deploy/images', 'scripts/deploy/review',
                  'scripts/deploy/compatibility-review.py'],
                 ['node', 'scripts/ci/audit-gate.mjs'],
                 ['python3', '-m', 'unittest', 'discover', '-s',
@@ -173,6 +173,7 @@ class SourceValidationTests(unittest.TestCase):
             ('tooling', ['uvx', '--from', 'mypy==2.4.0', 'mypy', '--strict',
                          '--explicit-package-bases', '--python-version',
                          '3.12', 'scripts/deploy/images',
+                         'scripts/deploy/review',
                          'scripts/deploy/compatibility-review.py']),
             ('speech', ['uv', 'run', 'pytest']),
         ]
