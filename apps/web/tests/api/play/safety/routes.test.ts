@@ -421,4 +421,60 @@ suite('safety HTTP boundaries with canonical PostgreSQL and Redis', () => {
     ])
       expect(isPublicPlayRequest(path, 'POST')).toBe(false);
   });
+
+  it('keeps valid credentials usable when new report or block targets a missing or private room', async () => {
+    const { game } = await pair();
+    const stranger = await identity.household('Unrelated learner');
+    for (const roomId of [game.id, randomUUID()]) {
+      const blocked = await block(
+        request(
+          'POST',
+          `/rooms/${roomId}/block`,
+          { actionId: randomUUID() },
+          browser(stranger.token)
+        ),
+        ctx(roomId)
+      );
+      expect(blocked.status).toBe(404);
+      expect(await blocked.json()).toEqual({
+        error: 'Game unavailable.',
+        reason: 'PLAY_UNAVAILABLE',
+      });
+      const reported = await report(
+        request('POST', `/rooms/${roomId}/reports`, reportBody(), browser(stranger.token)),
+        ctx(roomId)
+      );
+      expect(reported.status).toBe(404);
+      expect(await reported.json()).toEqual({
+        error: 'Game unavailable.',
+        reason: 'PLAY_UNAVAILABLE',
+      });
+    }
+    expect(
+      (await safety(request('GET', '/safety', undefined, browser(stranger.token)))).status
+    ).toBe(200);
+    expect(await instance.database.playSafetyReport.count()).toBe(0);
+    expect(await instance.database.playUserBlock.count()).toBe(0);
+    const invalid = { ...browser(stranger.token), authorization: 'Bearer invalid' };
+    expect(
+      (
+        await block(
+          request('POST', `/rooms/${game.id}/block`, { actionId: randomUUID() }, invalid),
+          ctx(game.id)
+        )
+      ).status
+    ).toBe(401);
+    expect(
+      (
+        await report(
+          request('POST', `/rooms/${game.id}/reports`, reportBody(), invalid),
+          ctx(game.id)
+        )
+      ).status
+    ).toBe(401);
+    expect(
+      (await reviewList(request('GET', '/safety/review', undefined, browser(stranger.token))))
+        .status
+    ).toBe(403);
+  });
 });

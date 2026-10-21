@@ -10,11 +10,12 @@ import type { PlaySafetyReport, Prisma } from '@/generated/prisma/client';
 import { requireOriginalSottoAdmission } from '@/lib/sidedoor/access/core/request-identity';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 import { projectPlayRound } from '../projection';
-import { loadPlayRoom, requirePlaySeat, type StoredPlayRoom } from '../storage/room-view';
+import { requirePlaySeat, type StoredPlayRoom } from '../storage/room-view';
 import type { PlayActor, PlayClock } from '../storage/rooms';
 import { lockPlaySafetyParticipants } from './fences';
 import { PlaySafetyError, redactPlayPublishedName } from './policy';
 import { mutatePlaySafety } from './receipts';
+import { loadPlaySafetyParticipantRoom } from './participant-room';
 
 export function playSafetyReportView(row: PlaySafetyReport) {
   return playReportViewSchema.parse({
@@ -87,8 +88,7 @@ export function reportPlayContent(
     'REPORT',
     { roomId, command },
     async (database) => {
-      const room = await loadPlayRoom(database, roomId);
-      requirePlaySeat(room, actor.identity.userId);
+      const { room } = await loadPlaySafetyParticipantRoom(database, roomId, actor.identity.userId);
       await lockPlaySafetyParticipants(database, [room.hostUserId, room.guestUserId]);
       const selected = selectPlayReportEvidence(room, actor.identity.userId, command.selector);
       if (selected.evidence.text !== command.expectedVisibleText)

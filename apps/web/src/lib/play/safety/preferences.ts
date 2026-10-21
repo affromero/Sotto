@@ -10,12 +10,12 @@ import { isAccessError } from 'thesidedoor-core/access';
 import { requireOriginalSottoAdmission } from '@/lib/sidedoor/access/core/request-identity';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 import { playSponsoringOwner } from '../admission/authority';
-import { loadPlayRoom, requirePlaySeat } from '../storage/room-view';
 import type { PlayActor, PlayClock } from '../storage/rooms';
 import { cancelBlockedPlayPair } from './cancellation';
 import { fencePlaySafetyChange, lockPlaySafetyParticipants } from './fences';
 import { PlaySafetyError, redactPlayPublishedName } from './policy';
 import { mutatePlaySafety } from './receipts';
+import { loadPlaySafetyParticipantRoom } from './participant-room';
 
 export function readPlaySafety(actor: PlayActor, clock: PlayClock = () => new Date()) {
   return sottoTransaction(actor.database, async (database) => {
@@ -73,8 +73,11 @@ export function blockPlayPartner(
     'BLOCK',
     { roomId, command },
     async (database) => {
-      const room = await loadPlayRoom(database, roomId);
-      const seat = requirePlaySeat(room, actor.identity.userId);
+      const { room, seat } = await loadPlaySafetyParticipantRoom(
+        database,
+        roomId,
+        actor.identity.userId
+      );
       const other = seat === 'HOST' ? room.guestUserId : room.hostUserId;
       if (!other) throw new PlaySafetyError('PLAY_UNAVAILABLE', 'There is no partner to block.');
       await lockPlaySafetyParticipants(database, [actor.identity.userId, other]);
