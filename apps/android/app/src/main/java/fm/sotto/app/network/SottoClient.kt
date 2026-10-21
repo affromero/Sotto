@@ -7,6 +7,7 @@ import fm.sotto.app.io.readBounded
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.CookieJar
@@ -21,7 +22,7 @@ import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
-class ApiError(val status: Int, message: String) : IOException(message)
+class ApiError(val status: Int, message: String, val reason: String? = null) : IOException(message)
 class ConnectionFailure(cause: IOException) : IOException("Could not reach the server. ${cause.message.orEmpty().take(200)}", cause)
 
 class SottoClient(
@@ -42,8 +43,20 @@ class SottoClient(
     suspend inline fun <reified T> post(path: String, body: String, proof: String? = null): T =
         SottoJson.decodeFromString(raw(path, body, proof))
 
-    suspend fun raw(path: String, body: String? = null, proof: String? = null): String {
+    suspend fun deleteAccount() {
+        require(connection != null && !pairing)
+        val result = SottoJson.decodeFromString<JsonObject>(
+            raw("/api/v1/users/me", "{\"confirm\":\"DELETE\"}", method = "DELETE"))
+        require(result["success"]?.jsonPrimitive?.booleanOrNull == true) {
+            "The server did not confirm profile deletion. Your saved access is kept."
+        }
+    }
+
+    suspend fun raw(path: String, body: String? = null, proof: String? = null,
+                    method: String = if (body == null) "GET" else "POST"): String {
         NetworkAccess.requirePermission(server)
+        require(method in setOf("GET", "POST", "DELETE") && ((method == "GET") == (body == null)))
+        require(!pairing || method != "DELETE")
         require(path.length <= 2048 && path.startsWith("/api/v1/") && !path.startsWith("//"))
         val relative = URI(path)
         require(relative.scheme == null && relative.rawAuthority == null && relative.rawFragment == null)
@@ -56,7 +69,7 @@ class SottoClient(
             .header("Accept", "application/json").header("Cache-Control", "no-store")
         if (body != null) {
             require(body.toByteArray().size <= 16_384)
-            request.post(body.toRequestBody("application/json; charset=utf-8".toMediaType()))
+            request.method(method, body.toRequestBody("application/json; charset=utf-8".toMediaType()))
             if (pairing) request.header("Origin", server)
         }
         connection?.let {
@@ -66,7 +79,9 @@ class SottoClient(
                 request.header("X-Sotto-Play-Profile", it.profile.id)
         }
         proof?.let { request.header("X-Sotto-Play-Proof", it) }
-        return execute(transport.newCall(request.build()))
+        val client = if (method == "DELETE") transport.newBuilder()
+            .readTimeout(90, TimeUnit.SECONDS).callTimeout(90, TimeUnit.SECONDS).build() else transport
+        return execute(client.newCall(request.build()), if (method == "DELETE") setOf(200, 202) else setOf(200, 201))
     }
 
     companion object {
@@ -81,7 +96,7 @@ class SottoClient(
         )
         fun id(value: String): String = value.also { require(it.matches(Regex("[A-Za-z0-9_-]{1,100}"))) }
 
-        private suspend fun execute(call: Call): String = suspendCancellableCoroutine { continuation ->
+        private suspend fun execute(call: Call, accepted: Set<Int>): String = suspendCancellableCoroutine { continuation ->
             continuation.invokeOnCancellation { call.cancel() }
             call.enqueue(object : Callback {
                 override fun onFailure(call: Call, e: IOException) {
@@ -95,11 +110,14 @@ class SottoClient(
                             val bytes = body.byteStream().use { input -> input.readBounded(1_048_576) }
                             bytes.toString(Charsets.UTF_8)
                         }
-                        if (response.code !in listOf(200, 201)) {
+                        if (response.code !in accepted) {
                             val message = runCatching {
                                 SottoJson.decodeFromString<JsonObject>(text)["error"]?.jsonPrimitive?.content
                             }.getOrNull()?.take(300)?.filterNot { it.isISOControl() }
-                            throw ApiError(response.code, message ?: "Server refused the request (${response.code}).")
+                            val reason = runCatching {
+                                SottoJson.decodeFromString<JsonObject>(text)["reason"]?.jsonPrimitive?.content
+                            }.getOrNull()?.takeIf { it.matches(Regex("[A-Z_]{1,50}")) }
+                            throw ApiError(response.code, message ?: "Server refused the request (${response.code}).", reason)
                         }
                         if (continuation.isActive) continuation.resume(text)
                     } catch (error: Exception) {

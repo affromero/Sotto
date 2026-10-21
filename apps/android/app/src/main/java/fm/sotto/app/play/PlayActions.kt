@@ -62,14 +62,15 @@ internal suspend fun PlayCoordinator.operation(path: String, body: String, respo
     val connection = requireNotNull(state.value.vault?.connection) { "Pair with a learner profile first." }
     checkEpoch(epoch, connection)
     val pending = PendingOperation(newID(), connection, path, body, response, baseline)
-    persist {
-        require(it.pending == null && it.connection == connection) { "Recover the pending action first." }
-        it.copy(pending = pending)
+    stageProtectedRequest(connection, pending, { it.pending }) { saved, request ->
+        require(saved.pendingSafety == null) { "Recover the saved safety action first." }
+        saved.copy(pending = request)
     }
     retryAction()
 }
 
 suspend fun PlayCoordinator.retryAction() {
+    require(state.value.vault?.pendingSafety == null) { "Recover the saved safety action before retrying a game action." }
     val pending = requireNotNull(state.value.vault?.pending)
     val generation = epoch
     require(pending.connection == state.value.vault?.connection) { "Restore the original saved profile to recover this action." }
@@ -105,7 +106,7 @@ suspend fun PlayCoordinator.retryAction() {
     } catch (error: Exception) {
         checkEpoch(generation, pending.connection)
         if (error !is ApiError || error.status !in 400..499 || error.status == 429) throw error
-        if (error.status == 409 && reconcile(pending, generation)) return
+        if (error.status == 409 && error.reason == null && reconcile(pending, generation)) return
         persist { if (it.pending?.id == pending.id) it.copy(pending = null) else it }
         if (error.status == 401) memberFailure(error, generation, pending.connection)
         if (error.status == 403) {
@@ -127,8 +128,7 @@ suspend fun PlayCoordinator.retryAction() {
 private suspend fun PlayCoordinator.finishOperation(pending: PendingOperation) {
     val request = SottoJson.parseToJsonElement(pending.body).jsonObject
     val command = request["command"]?.let { SottoJson.decodeFromJsonElement<Command>(it) }
-    persist {
-        require(it.pending?.id == pending.id)
+    completeProtectedRequest(pending, { it.pending }) {
         val before = pending.baseline
         val round = before?.round
         if (command == null || before == null || round == null) it.copy(pending = null)

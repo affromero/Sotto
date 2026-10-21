@@ -70,6 +70,7 @@
   "dependencies": {
     "@prisma/client": "7.10.0",
     "pg": "^8.23.1",
+    "thesidedoor-core": "0.5.7",
     "zod": "^4.6.6"
   },
   "devDependencies": {

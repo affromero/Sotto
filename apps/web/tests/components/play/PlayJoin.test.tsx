@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlayRoomView } from '@sotto/shared';
 import { PlayJoin } from '@/components/play/PlayJoin';
+import { safetyResponse } from './safety/fixtures';
 import {
   readPendingPlayAdmission,
   savePendingPlayAdmission,
@@ -35,6 +36,7 @@ function saved(existing = false): PendingPlayAdmission {
       code,
       client: 'BROWSER',
       deviceName: 'Browser',
+      acceptedConductVersion: 1,
       candidate: existing
         ? { kind: 'EXISTING', expectedProfileId: 'first-profile', settings }
         : { kind: 'NEW', name: 'Partner', consentToProfile: true, settings },
@@ -97,6 +99,8 @@ describe('browser invitation admission and recovery', () => {
     let admission = 'WAITING_FOR_OWNER';
     const claims: unknown[] = [];
     vi.stubGlobal('fetch', async (path: string, options?: RequestInit) => {
+      const safety = safetyResponse(path);
+      if (safety) return safety;
       if (path === '/api/v1/users/me')
         return current
           ? Response.json({ id: current, name: current })
@@ -142,6 +146,8 @@ describe('browser invitation admission and recovery', () => {
     let admission = 'WAITING_FOR_HOST';
     const writes: string[] = [];
     vi.stubGlobal('fetch', async (path: string, options?: RequestInit) => {
+      const safety = safetyResponse(path);
+      if (safety) return safety;
       if (options?.method === 'POST') writes.push(path);
       if (path === '/api/v1/users/me') return Response.json({ id: current, name: current });
       return Response.json(status(admission));
@@ -161,6 +167,8 @@ describe('browser invitation admission and recovery', () => {
   it('rejects an existing delivery for a different profile before clearing recovery information', async () => {
     savePendingPlayAdmission(saved(true));
     vi.stubGlobal('fetch', async (path: string) => {
+      const safety = safetyResponse(path);
+      if (safety) return safety;
       if (path === '/api/v1/users/me') return Response.json({ id: 'first-profile' });
       if (path.endsWith('/claim'))
         return Response.json({
@@ -182,6 +190,8 @@ describe('browser invitation admission and recovery', () => {
     let claimSignal: AbortSignal | null | undefined;
     const writes: string[] = [];
     vi.stubGlobal('fetch', async (path: string, options?: RequestInit) => {
+      const safety = safetyResponse(path);
+      if (safety) return safety;
       if (path === '/api/v1/users/me') return Response.json({}, { status: 401 });
       if (options?.method === 'POST') writes.push(path);
       if (path.endsWith('/claim')) {
@@ -216,6 +226,8 @@ describe('browser invitation admission and recovery', () => {
     let current = 'First';
     const writes: string[] = [];
     vi.stubGlobal('fetch', async (path: string, options?: RequestInit) => {
+      const safety = safetyResponse(path);
+      if (safety) return safety;
       if (options?.method === 'POST') writes.push(path);
       if (path === '/api/v1/users/me') return Response.json({ id: current, name: current });
       return Response.json({
@@ -231,6 +243,8 @@ describe('browser invitation admission and recovery', () => {
     });
     show();
     const submit = await screen.findByRole('button', { name: 'Ask to join as First' });
+    fireEvent.click(await screen.findByRole('checkbox', { name: /I accept this server/ }));
+    await waitFor(() => expect(submit).toBeEnabled());
     current = 'Second';
     fireEvent.click(submit);
     expect(await screen.findByRole('alert')).toHaveTextContent(/profile changed/);
@@ -243,6 +257,8 @@ describe('browser invitation admission and recovery', () => {
     let unavailable = true;
     const sent: { body: unknown; proof: string | null }[] = [];
     vi.stubGlobal('fetch', async (path: string, options?: RequestInit) => {
+      const safety = safetyResponse(path);
+      if (safety) return safety;
       if (path === '/api/v1/users/me') return Response.json({ id: 'First', name: 'First' });
       if (options?.method === 'POST') {
         sent.push({
@@ -268,7 +284,11 @@ describe('browser invitation admission and recovery', () => {
       });
     });
     show();
-    fireEvent.click(await screen.findByRole('button', { name: 'Ask to join as First' }));
+    const submit = await screen.findByRole('button', { name: 'Ask to join as First' });
+    expect(submit).toBeDisabled();
+    fireEvent.click(await screen.findByRole('checkbox', { name: /I accept this server/ }));
+    await waitFor(() => expect(submit).toBeEnabled());
+    fireEvent.click(submit);
     const retry = await screen.findByRole('button', { name: 'Retry the same join request' });
     await waitFor(() => expect(retry).toBeEnabled());
     fireEvent.click(retry);
@@ -278,6 +298,7 @@ describe('browser invitation admission and recovery', () => {
       kind: 'EXISTING',
       expectedProfileId: 'First',
     });
+    expect(readPendingPlayAdmission()?.command.acceptedConductVersion).toBe(1);
     expect(Object.values(localStorage).join('')).not.toContain(sent[0].proof);
   });
 });

@@ -10,6 +10,7 @@ import { PlayRuleError } from '../errors';
 import { playFingerprint } from '../storage/fingerprint';
 import { loadPlayRoom, playHostWaiting } from '../storage/room-view';
 import type { PlayActor, PlayClock } from '../storage/rooms';
+import { lockPlaySafetyParticipants, requirePlayInteractionAllowed } from '../safety/fences';
 
 const MAX_ROOM_VIEWS = 8;
 
@@ -27,6 +28,10 @@ export function updatePlayPresence(
     const now = clock();
     if (room.hostUserId !== actor.identity.userId)
       throw new PlayRuleError('forbidden', 'Only the host can wait for players.');
+    if (command.type === 'RENEW') {
+      await lockPlaySafetyParticipants(database, [room.hostUserId, room.guestUserId]);
+      await requirePlayInteractionAllowed(database, [room.hostUserId, room.guestUserId]);
+    }
     const binding = {
       roomId,
       credentialKind: actor.identity.authentication,

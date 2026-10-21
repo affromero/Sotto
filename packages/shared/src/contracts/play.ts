@@ -24,9 +24,24 @@ import {
   playJoinStatusViewSchema,
   playPhraseViewSchema,
   playRoomViewSchema,
-  requestPlayJoinSchema,
 } from '../play/rooms';
 import type { EndpointDef } from './endpoints';
+import {
+  acceptPlayConductSchema,
+  acceptPendingPlayConductSchema,
+  playBlockListSchema,
+  playConsentedJoinRequestSchema,
+  playPendingConductAcceptedSchema,
+  playReportListSchema,
+  playReportReviewListSchema,
+  playSafetyCompletedSchema,
+  playSafetyMutationSchema,
+  playSafetyPolicySchema,
+  playSafetyStatusSchema,
+  playSafetyErrorSchema,
+  reportPlayContentSchema,
+  reviewPlayReportSchema,
+} from '../play/safety';
 
 const nullableInvitation = playInvitationViewSchema.nullable();
 export const playContractSchemas = {
@@ -40,7 +55,7 @@ export const playContractSchemas = {
   PlayInvitation: playInvitationViewSchema,
   PlayCurrentInvitation: nullableInvitation,
   PlayInvitationPreview: playInvitationPreviewSchema,
-  PlayJoinRequest: requestPlayJoinSchema,
+  PlayJoinRequest: playConsentedJoinRequestSchema,
   PlayJoinStatus: playJoinStatusViewSchema,
   PlayApproval: approvePlayJoinSchema,
   PlayPendingRequest: playPendingRequestViewSchema,
@@ -53,6 +68,19 @@ export const playContractSchemas = {
   PlaySavePhrase: savePlayPhraseSchema,
   PlayPhrase: playPhraseViewSchema,
   PlayPhraseList: playPhraseListSchema,
+  PlaySafetyPolicy: playSafetyPolicySchema,
+  PlaySafetyError: playSafetyErrorSchema,
+  PlaySafetyStatus: playSafetyStatusSchema,
+  PlayConductAcceptance: acceptPlayConductSchema,
+  PlayPendingConductAcceptance: acceptPendingPlayConductSchema,
+  PlayPendingConductAccepted: playPendingConductAcceptedSchema,
+  PlaySafetyMutation: playSafetyMutationSchema,
+  PlaySafetyCompleted: playSafetyCompletedSchema,
+  PlayBlockList: playBlockListSchema,
+  PlayReport: reportPlayContentSchema,
+  PlayReportList: playReportListSchema,
+  PlayReportReview: reviewPlayReportSchema,
+  PlayReportReviewList: playReportReviewListSchema,
 };
 
 const page = [
@@ -158,7 +186,7 @@ export const playEndpoints: EndpointDef[] = (
       summary:
         'Request admission with a fresh claimant proof. EXISTING additionally requires current app admission. BROWSER requires canonical browser origin.',
       auth: 'claimant',
-      request: requestPlayJoinSchema,
+      request: playConsentedJoinRequestSchema,
       response: playJoinStatusViewSchema,
       successStatuses: [201],
     },
@@ -216,6 +244,109 @@ export const playEndpoints: EndpointDef[] = (
       request: savePlayPhraseSchema,
       response: playPhraseViewSchema,
       successStatuses: [201],
+    },
+    {
+      id: 'playSafetyPolicy',
+      method: 'GET',
+      path: `${root}/policy`,
+      summary: 'Read the current conduct policy and the selected server operator contact.',
+      auth: 'none',
+      response: playSafetyPolicySchema,
+    },
+    {
+      id: 'playSafetyStatus',
+      method: 'GET',
+      path: `${root}/safety`,
+      summary: 'Read only my conduct acceptance, Play restriction and owner review capability.',
+      auth: 'bearer',
+      response: playSafetyStatusSchema,
+    },
+    {
+      id: 'playAcceptConduct',
+      method: 'POST',
+      path: `${root}/safety/conduct`,
+      summary: 'Explicitly accept the current conduct policy as my canonical profile.',
+      auth: 'bearer',
+      request: acceptPlayConductSchema,
+      response: playSafetyCompletedSchema,
+    },
+    {
+      id: 'playAcceptPendingConduct',
+      method: 'POST',
+      path: `${root}/join-requests/{requestId}/conduct`,
+      summary:
+        'Accept conduct for the exact proof-bound pending request. BROWSER requires expectedProfileId, including null. EXISTING also requires its current app credential.',
+      auth: 'claimant',
+      request: acceptPendingPlayConductSchema,
+      response: playPendingConductAcceptedSchema,
+    },
+    {
+      id: 'playBlocks',
+      method: 'GET',
+      path: `${root}/safety/blocks`,
+      summary: 'List only my own persistent partner blocks.',
+      auth: 'bearer',
+      response: playBlockListSchema,
+      query: page,
+    },
+    {
+      id: 'playBlockPartner',
+      method: 'POST',
+      path: `${root}/rooms/{roomId}/block`,
+      summary:
+        'Block the other actual participant, ending active games together without revoking either learner profile.',
+      auth: 'bearer',
+      request: playSafetyMutationSchema,
+      response: playSafetyCompletedSchema,
+    },
+    {
+      id: 'playUnblockPartner',
+      method: 'POST',
+      path: `${root}/safety/blocks/{blockedUserId}/unblock`,
+      summary: 'Remove a block belonging to my own list. Old games and invitations remain closed.',
+      auth: 'bearer',
+      request: playSafetyMutationSchema,
+      response: playSafetyCompletedSchema,
+    },
+    {
+      id: 'playReportContent',
+      method: 'POST',
+      path: `${root}/rooms/{roomId}/reports`,
+      summary:
+        'Report a partner using one server-verified visible content selection. No arbitrary offender ID or hidden state is accepted.',
+      auth: 'bearer',
+      request: reportPlayContentSchema,
+      response: playSafetyCompletedSchema,
+      successStatuses: [201],
+    },
+    {
+      id: 'playReports',
+      method: 'GET',
+      path: `${root}/safety/reports`,
+      summary: 'Read only my submitted reports and the owner responses.',
+      auth: 'bearer',
+      response: playReportListSchema,
+      query: page,
+    },
+    {
+      id: 'playReviewReports',
+      method: 'GET',
+      path: `${root}/safety/review`,
+      summary:
+        'Real-server-owner-only inbox of bounded submitted report evidence, without private room access.',
+      auth: 'bearer',
+      response: playReportReviewListSchema,
+      query: [...page, { name: 'status', required: false }],
+    },
+    {
+      id: 'playReviewReport',
+      method: 'POST',
+      path: `${root}/safety/review/{reportId}`,
+      summary:
+        'Real-server-owner-only revision-checked response and action on the reported subject.',
+      auth: 'bearer',
+      request: reviewPlayReportSchema,
+      response: playSafetyCompletedSchema,
     },
   ] satisfies EndpointDef[]
 ).map((endpoint) => ({ ...endpoint, codegenExclude: true }));

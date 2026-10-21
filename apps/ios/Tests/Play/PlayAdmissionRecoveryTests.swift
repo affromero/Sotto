@@ -161,7 +161,7 @@ final class PlayAdmissionRecoveryTests: XCTestCase {
             settings: PlaySettings(), consentToProfile: nil)
         var saved = PlayProtectedState()
         saved.admission = PlayAdmissionRecovery(invitation: invite,
-            command: PlayJoinRequest(requestId: requestID, code: invite.code, deviceName: "Fixture device", candidate: candidate),
+            command: PlayJoinRequest(requestId: requestID, code: invite.code, deviceName: "Fixture device", candidate: candidate, acceptedConductVersion: 1),
             proof: try PlayInvitation.newProof(), existingConnection: original)
         let vault = PlayMemoryStore()
         try vault.save(saved)
@@ -196,7 +196,7 @@ final class PlayAdmissionRecoveryTests: XCTestCase {
         let invite = try PlayInvitation(serverURL: server, code: "ABCDEFGHJK23")
         return PlayAdmissionRecovery(invitation: invite,
             command: PlayJoinRequest(requestId: requestID, code: invite.code, deviceName: "Fixture device",
-                candidate: PlayJoinCandidate(kind: .new, expectedProfileId: nil, name: "Sam", settings: PlaySettings(), consentToProfile: true)),
+                candidate: PlayJoinCandidate(kind: .new, expectedProfileId: nil, name: "Sam", settings: PlaySettings(), consentToProfile: true), acceptedConductVersion: 1),
             proof: try PlayInvitation.newProof(), existingConnection: nil, delivery: received)
     }
 }

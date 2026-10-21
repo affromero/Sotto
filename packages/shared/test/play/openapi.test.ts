@@ -36,4 +36,28 @@ describe('Play OpenAPI capability boundaries', () => {
       },
     });
   });
+
+  it('keeps public policy, proof-bound pending consent and private safety operations separate', () => {
+    const full = buildOpenApiDocument();
+    const paths = full.paths as Record<string, Record<string, { security?: unknown }>>;
+    expect(paths['/api/v1/play/policy'].get.security).toBeUndefined();
+    expect(paths['/api/v1/play/join-requests/{requestId}/conduct'].post.security).toEqual([
+      { playClaimantProof: [] },
+    ]);
+    for (const path of [
+      '/api/v1/play/safety',
+      '/api/v1/play/safety/reports',
+      '/api/v1/play/safety/review',
+    ])
+      expect(paths[path].get.security).toEqual([{ bearerAuth: [] }]);
+    const components = full.components as { schemas: Record<string, { required?: string[] }> };
+    expect(components.schemas.PlayJoinRequest.required).toContain('acceptedConductVersion');
+    expect(components.schemas.PlaySafetyError.required).toEqual(
+      expect.arrayContaining(['reason', 'error'])
+    );
+    const codegen = buildOpenApiDocument({ codegen: true });
+    expect(codegen.paths).not.toHaveProperty('/api/v1/play/safety');
+    expect(codegen.components).not.toHaveProperty('schemas.PlaySafetyStatus');
+    expect(codegen.components).not.toHaveProperty('schemas.PlaySafetyError');
+  });
 });

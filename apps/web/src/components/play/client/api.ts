@@ -1,9 +1,11 @@
 import type { z } from 'zod';
+import { PLAY_SAFETY_HTTP_STATUS, playSafetyErrorSchema } from '@sotto/shared';
 
 export class PlayHttpError extends Error {
   constructor(
     readonly status: number,
-    message: string
+    message: string,
+    readonly reason?: keyof typeof PLAY_SAFETY_HTTP_STATUS
   ) {
     super(message);
     this.name = 'PlayHttpError';
@@ -48,7 +50,14 @@ export async function playFetch<Schema extends z.ZodType>(
       body && typeof body === 'object' && 'error' in body && typeof body.error === 'string'
         ? body.error.slice(0, 500)
         : 'The game is unavailable. Try again.';
-    throw new PlayHttpError(response.status, message);
+    const safety = playSafetyErrorSchema.safeParse(body);
+    throw new PlayHttpError(
+      response.status,
+      message,
+      safety.success && PLAY_SAFETY_HTTP_STATUS[safety.data.reason] === response.status
+        ? safety.data.reason
+        : undefined
+    );
   }
   const parsed = schema.safeParse(body);
   if (!parsed.success)

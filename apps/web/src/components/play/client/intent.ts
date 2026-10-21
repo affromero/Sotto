@@ -7,6 +7,7 @@ import {
 
 const INTENT_KEY = 'sotto:play-invitation:v1';
 const PENDING_KEY = 'sotto:play-admission:v1';
+const RETAINED_KEY = 'sotto:play-admission-recoveries:v1';
 const AGE_MS = 24 * 60 * 60 * 1000;
 const savedIntentSchema = z.strictObject({
   invitation: playInviteEnvelopeSchema,
@@ -15,7 +16,8 @@ const savedIntentSchema = z.strictObject({
 const pendingSchema = z.strictObject({
   version: z.literal(1),
   serverUrl: playInviteEnvelopeSchema.shape.serverUrl,
-  command: requestPlayJoinSchema,
+  command: requestPlayJoinSchema.extend({ acceptedConductVersion: z.literal(1).optional() }),
+  conductVersion: z.literal(1).optional(),
   proof: playClaimantProofSchema,
   originalProfileId: z.string().min(1).max(100).nullable(),
   savedAt: z.number().int().nonnegative(),
@@ -94,4 +96,31 @@ export function readPendingPlayAdmission() {
 
 export function clearPendingPlayAdmission() {
   sessionStorage.removeItem(PENDING_KEY);
+}
+
+export function readRetainedPlayAdmissions(): PendingPlayAdmission[] {
+  const value = sessionStorage.getItem(RETAINED_KEY);
+  if (!value) return [];
+  if (value.length > 131_072)
+    throw new Error('Saved invitation recoveries exceed the supported size. They have been kept.');
+  return z.array(pendingSchema).max(16).parse(JSON.parse(value));
+}
+
+export function retainPendingPlayAdmission(pending: PendingPlayAdmission) {
+  const saved = readRetainedPlayAdmissions();
+  if (saved.some((item) => item.command.requestId === pending.command.requestId)) return;
+  if (saved.length >= 16) throw new Error('Remove a saved recovery before keeping another.');
+  const parsed = pendingSchema.parse(pending);
+  if (parsed.serverUrl !== location.origin || parsed.command.client !== 'BROWSER')
+    throw new Error('Keep the invitation on its original server.');
+  sessionStorage.setItem(RETAINED_KEY, JSON.stringify([...saved, parsed]));
+}
+
+export function removeRetainedPlayAdmission(requestId: string) {
+  sessionStorage.setItem(
+    RETAINED_KEY,
+    JSON.stringify(
+      readRetainedPlayAdmissions().filter((item) => item.command.requestId !== requestId)
+    )
+  );
 }

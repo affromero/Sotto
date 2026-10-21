@@ -733,16 +733,21 @@ struct SottoAPIClient {
         policy: SottoAPIRequestPolicy = .standard
     ) async throws -> Response {
         let (data, response) = try await session.data(for: request, delegate: SottoAPIRedirectPolicy(serverURL: serverURL, policy: policy))
-        return try decodeResponse(data, response: response, acceptedStatuses: acceptedStatuses)
+        return try decodeResponse(data, response: response, acceptedStatuses: acceptedStatuses, policy: policy)
     }
 
     func decodeResponse<Response: Decodable>(_ data: Data, response: URLResponse,
-        acceptedStatuses: Set<Int>) throws -> Response {
+        acceptedStatuses: Set<Int>, policy: SottoAPIRequestPolicy = .standard) throws -> Response {
         guard let http = response as? HTTPURLResponse else {
             throw SottoAPIError.message("Sotto returned a non-HTTP response.")
         }
 
         guard acceptedStatuses.contains(http.statusCode) else {
+            if policy == .play,
+               let failure = try? JSONDecoder().decode(PlaySafetyFailure.self, from: data),
+               failure.reason.status == http.statusCode {
+                throw failure
+            }
             if let error = try? JSONDecoder().decode(SottoErrorResponse.self, from: data) {
                 throw SottoAPIError.http(http.statusCode, error.error.description)
             }

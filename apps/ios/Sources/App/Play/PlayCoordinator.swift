@@ -1,6 +1,6 @@
 import Foundation
 
-enum PlayScreen: Equatable { case lobby, join, room(String), notebook }
+enum PlayScreen: Equatable { case lobby, join, room(String), notebook, safety, report }
 
 @MainActor
 final class PlayCoordinator: ObservableObject {
@@ -23,6 +23,18 @@ final class PlayCoordinator: ObservableObject {
     @Published var error: String?
     @Published var notice: String?
     @Published var busy = false
+    @Published var safetyBusy = false
+    @Published var safetyPolicy: PlaySafetyPolicy?
+    @Published var safetyStatus: PlaySafetyStatus?
+    @Published var blocks: [PlayBlock] = []
+    @Published var blocksCursor: String?
+    @Published var safetyReports: [PlaySafetyReport] = []
+    @Published var safetyReportsCursor: String?
+    var olderBlocks: [PlayBlock] = []
+    var olderSafetyReports: [PlaySafetyReport] = []
+    var openedOlderBlocks = false
+    var openedOlderSafetyReports = false
+    @Published var reportRoom: PlayRoom?
     @Published var leaseReady = false
     @Published var accessRevoked = false
     @Published var boundConnection: SottoCredentials?
@@ -32,6 +44,13 @@ final class PlayCoordinator: ObservableObject {
     var lease: (roomID: String, nonce: String, renewed: Date, client: SottoAPIClient)?
     var ownerCapability: Bool?
     var work: Task<Void, Never>?
+    var actionGeneration = UUID()
+    var drainingWork: Task<Void, Never>?
+    var drainGeneration = UUID()
+    var pollingWork: Task<Void, Error>?
+    var presenceRelease: Task<Void, Never>?
+    var policyServer: URL?
+    @Published var gameUnavailable = false
 
     init(model: SottoAppModel, session: URLSession, store: any PlayProtectedPersistence) {
         self.model = model
@@ -70,14 +89,21 @@ final class PlayCoordinator: ObservableObject {
         error = failure.localizedDescription
     }
     func run(_ action: @escaping @MainActor () async throws -> Void) {
-        guard !busy, active, !accessRevoked, boundConnection == model?.credentials, state != nil else { return }
+        guard !busy, !safetyBusy, state?.pendingSafety == nil, active, !accessRevoked,
+              boundConnection == model?.credentials, state != nil else { return }
         busy = true
         error = nil
         let generation = epoch
+        let invocation = UUID()
+        actionGeneration = invocation
         work = Task { [weak self] in
             guard let self else { return }
             guard self.active, self.epoch == generation, !Task.isCancelled else { return }
-            defer { if self.epoch == generation { self.busy = false; self.work = nil } }
+            defer {
+                if self.epoch == generation, self.actionGeneration == invocation {
+                    self.busy = false; self.work = nil
+                }
+            }
             do { try await action() }
             catch { if self.epoch == generation { self.report(error) } }
         }
@@ -108,6 +134,16 @@ final class PlayCoordinator: ObservableObject {
         requests = []
         invitation = nil
         ownerCapability = nil
+        safetyPolicy = nil
+        safetyStatus = nil
+        blocks = []
+        blocksCursor = nil
+        safetyReports = []
+        safetyReportsCursor = nil
+        resetSafetyPages()
+        reportRoom = nil
+        policyServer = nil
+        gameUnavailable = false
     }
     func observeConnection() {
         guard boundConnection != model?.credentials else { return }
@@ -122,6 +158,7 @@ final class PlayCoordinator: ObservableObject {
         requests = []
         invitation = nil
         preview = nil
+        gameUnavailable = false
         error = nil
         notice = nil
         screen = destination

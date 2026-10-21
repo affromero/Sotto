@@ -1,0 +1,57 @@
+import groovy.json.JsonOutput
+import groovy.xml.XmlSlurper
+
+// Run this maintenance task with --no-configuration-cache. Normal builds verify
+// the committed inventory without resolving POMs or running this exporter.
+gradle.projectsEvaluated {
+    def app = gradle.rootProject.project(':app')
+    app.tasks.register('exportSottoLegalArtifacts') {
+        doLast {
+            def metadata = [:]
+            def readPom
+            readPom = { String coordinate, Set<String> parents ->
+                if (metadata.containsKey(coordinate)) return metadata[coordinate]
+                if (parents.contains(coordinate) || parents.size() >= 10) {
+                    throw new GradleException("Cyclic or excessive POM ancestry: ${coordinate}")
+                }
+                def request = app.dependencies.create("${coordinate}@pom")
+                def files = app.configurations.detachedConfiguration(request)
+                files.transitive = false
+                def parser = new XmlSlurper(false, false)
+                parser.setFeature('http://apache.org/xml/features/disallow-doctype-decl', true)
+                def pom = parser.parse(files.singleFile)
+                def licenses = pom.licenses.license.collect {
+                    [name: it.name.text().trim(), url: it.url.text().trim()]
+                }
+                if (licenses.empty && !pom.parent.groupId.text().empty) {
+                    def parent = [pom.parent.groupId.text(), pom.parent.artifactId.text(),
+                                  pom.parent.version.text()].join(':')
+                    licenses = readPom(parent, parents + coordinate).licenses
+                }
+                if (coordinate == 'javax.inject:javax.inject:1' && licenses.empty) {
+                    licenses = [[name: 'Apache License, Version 2.0',
+                        url: 'https://www.apache.org/licenses/LICENSE-2.0',
+                        evidence: 'https://github.com/javax-inject/javax-inject#license']]
+                }
+                if (licenses.empty || licenses.any { !it.name || !it.url }) {
+                    throw new GradleException("Missing license metadata: ${coordinate}")
+                }
+                def result = [licenses: licenses, projectUrl: pom.url.text().trim()]
+                metadata[coordinate] = result
+                result
+            }
+            def artifacts = app.configurations.releaseRuntimeClasspath
+                .resolvedConfiguration.resolvedArtifacts.collect { item ->
+                    def id = item.moduleVersion.id.toString()
+                    def pom = readPom(id, [] as Set)
+                    [id: id, file: item.file.absolutePath, licenses: pom.licenses,
+                     projectUrl: pom.projectUrl]
+                }.unique { "${it.id}|${it.file}" }.sort { "${it.id}|${it.file}" }
+            def output = new File(app.layout.buildDirectory.get().asFile,
+                'legal/artifacts.json')
+            output.parentFile.mkdirs()
+            output.text = JsonOutput.prettyPrint(JsonOutput.toJson(artifacts)) + '\n'
+            println "Exported ${artifacts.size()} legal artifacts to ${output}"
+        }
+    }
+}

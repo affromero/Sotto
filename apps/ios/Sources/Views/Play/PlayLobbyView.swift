@@ -15,6 +15,14 @@ struct PlayLobbyView: View {
                 .foregroundStyle(SottoTheme.muted)
             if let profile = model.activeProfile {
                 Label("Playing as \(profile.name)", systemImage: "person.crop.circle")
+                if !coordinator.sharingAllowed {
+                    Text(coordinator.safetyStatus?.sharingRestricted == true
+                        ? "This profile is restricted from partner games. You can still manage blocks and reports."
+                        : "Read and accept this server's game conduct before playing.")
+                        .foregroundStyle(SottoTheme.muted)
+                    Button("Open game safety") { coordinator.navigate(.safety) }
+                        .buttonStyle(SottoPrimaryButtonStyle())
+                }
                 Picker("Game", selection: $kind) {
                     ForEach(PlayKind.allCases, id: \.self) { Text($0.title).tag($0) }
                 }.frame(minHeight: 44)
@@ -28,7 +36,7 @@ struct PlayLobbyView: View {
                 Button("Create a game") {
                     coordinator.run { try await coordinator.create(kind: kind, theme: theme, settings: settings, openQuestions: openQuestions) }
                 }.buttonStyle(SottoPrimaryButtonStyle())
-                    .disabled(coordinator.busy || coordinator.state?.pending != nil || !settings.isValid)
+                    .disabled(coordinator.gameControlsDisabled || !settings.isValid)
                 if !coordinator.requests.isEmpty {
                     Text("Profile approval").font(.title2.bold())
                     PlayAdmissionList(coordinator: coordinator)

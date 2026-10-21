@@ -31,6 +31,7 @@ class PlayHostUITest {
             click("Open server")
             click("Alex")
             visible("A game for two")
+            acceptHostConduct()
             click("Create game")
             visible("Stay here while your partner enters.")
             click("Create invitation")
@@ -49,6 +50,7 @@ class PlayHostUITest {
         HostUIFixture().use { fixture ->
             activity = ActivityScenario.launch(MainActivity::class.java)
             click("Pair with your server"); fill("Server address", fixture.server.origin); allowLocalNetwork(); click("Open server"); click("Alex")
+            acceptHostConduct()
             click("Create game")
             visible("Stay here while your partner enters.")
             UiDevice.getInstance(instrumentation).pressHome()
@@ -62,5 +64,14 @@ class PlayHostUITest {
             assertNotEquals(renewals.first(), renewals.last())
             assertTrue(fixture.server.protocolFailures.isEmpty())
         }
+    }
+
+    private fun NativeUIActions.acceptHostConduct() {
+        click("Game safety, reports and blocks")
+        click("I agree to this conduct policy.")
+        click("Accept conduct policy")
+        visible("You accepted the current conduct policy.")
+        visible("Open owner report review")
+        click("Back to Play")
     }
 }

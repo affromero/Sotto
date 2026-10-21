@@ -1,5 +1,6 @@
 import { PublicNav } from '@/components/layout/PublicNav';
 import { Footer } from '@/components/layout/Footer';
+import { PLAY_CONDUCT_TITLE, PLAY_CONDUCT_PARAGRAPHS, PLAY_CONDUCT_VERSION } from '@sotto/shared';
 import styles from './page.module.css';
 
 export const metadata = {
@@ -68,7 +69,22 @@ export default function TermsPage() {
               arising from operating or using an independently deployed instance.
             </p>
 
-            <h2>7. Questions</h2>
+            <h2>7. {PLAY_CONDUCT_TITLE}</h2>
+            <p>
+              Game conduct version {PLAY_CONDUCT_VERSION} applies before sharing in partner games.
+            </p>
+            {PLAY_CONDUCT_PARAGRAPHS.map((paragraph) => (
+              <p key={paragraph}>{paragraph}</p>
+            ))}
+            <p>
+              Use Report or block in a game to send selected visible content to this server&apos;s
+              owner. Game safety shows your blocks, reports, and the owner&apos;s responses. Owners
+              review reports on this server and are responsible for acting on them. See this
+              server&apos;s <a href="/privacy">privacy information and operator contact</a> for
+              handling and deletion requests.
+            </p>
+
+            <h2>8. Questions</h2>
             <p>
               Contact the operator for questions about a particular deployment. Use the
               repository&apos;s public support channels for questions about the software.

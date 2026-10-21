@@ -14,6 +14,10 @@ struct PlayRoomView: View {
                 }
                 Text("\(room.host.name) & \(room.guest?.name ?? "your partner")")
                     .foregroundStyle(SottoTheme.muted)
+                if !room.reportOptions.isEmpty {
+                    Button("Report or block partner") { coordinator.showReport(for: room) }
+                        .buttonStyle(SottoSecondaryButtonStyle()).accessibilityIdentifier("play.reportOrBlock")
+                }
                 if room.status == .waiting {
                     waiting(room)
                 } else if room.status == .playing, let round = room.round {
@@ -37,11 +41,14 @@ struct PlayRoomView: View {
                 ForEach(room.allowedActions, id: \.self) { action in
                     Button(actionLabel(action)) { coordinator.run { try await coordinator.roomAction(action, in: room) } }
                         .buttonStyle(SottoSecondaryButtonStyle())
-                        .disabled(coordinator.busy || coordinator.state?.pending != nil)
+                        .disabled(coordinator.gameControlsDisabled)
                 }
             }.accessibilityElement(children: .contain).accessibilityIdentifier("play.room.\(room.id)")
         } else {
-            ProgressView("Opening your game")
+            if coordinator.gameUnavailable {
+                Text("This game is unavailable. Your saved profile and private learning are kept.")
+                Button("Open game safety") { coordinator.navigate(.safety) }.buttonStyle(SottoPrimaryButtonStyle())
+            } else { ProgressView("Opening your game") }
         }
     }
 

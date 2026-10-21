@@ -1,6 +1,9 @@
 import { PublicNav } from '@/components/layout/PublicNav';
 import { Footer } from '@/components/layout/Footer';
+import { privacyContactUrl } from '@/lib/privacy/contact';
 import styles from './page.module.css';
+
+export const dynamic = 'force-dynamic';
 
 export const metadata = {
   title: 'Privacy. Sotto',
@@ -8,6 +11,7 @@ export const metadata = {
 };
 
 export default function PrivacyPage() {
+  const contact = privacyContactUrl(process.env.SOTTO_PRIVACY_CONTACT_EMAIL);
   return (
     <>
       <PublicNav />
@@ -16,7 +20,7 @@ export default function PrivacyPage() {
           <header className={styles.header}>
             <h1 className={styles.title}>Privacy</h1>
             <p className={styles.subtitle}>How data flows through a self-hosted Sotto instance.</p>
-            <p className={styles.lastUpdated}>Last updated: September 26, 2026</p>
+            <p className={styles.lastUpdated}>Last updated: October 21, 2026</p>
           </header>
 
           <div className={styles.content}>
@@ -31,9 +35,9 @@ export default function PrivacyPage() {
             <h2>2. Data stored by an instance</h2>
             <p>
               An instance may store profiles, courses, generated lessons, source material, scripts,
-              recordings, transcripts, answers, feedback, progress, provider usage records, and
-              encrypted provider credentials. The exact data depends on the features the operator
-              enables.
+              recordings, transcripts, answers, feedback, progress, provider usage records, and game
+              answers, partner messages, private phrase notebooks and encrypted provider
+              credentials. The exact data depends on the features the operator enables.
             </p>
 
             <h2>3. Configured service providers</h2>
@@ -55,6 +59,14 @@ export default function PrivacyPage() {
               tracking SDKs.
             </p>
             <p>
+              The Android app encrypts saved credentials, invitation recovery, drafts and pending
+              actions with Android Keystore protection and excludes them from device backups.
+              Pairing and invitation QR codes are scanned locally after camera permission. Partner
+              games run without AI requests. Your partner sees content revealed by the game; your
+              phrase notebook stays private. Add to study explicitly saves phrases to your
+              profile&apos;s learning tools.
+            </p>
+            <p>
               Live translation asks for permission before streaming microphone audio and translation
               context directly to Google Gemini. The conversation transcript is saved on your
               server. Review{' '}
@@ -70,15 +82,54 @@ export default function PrivacyPage() {
               Security also depends on how the operator protects the host, database, backups, and
               encryption keys.
             </p>
+            <p>
+              Native apps require HTTPS for public servers. Private and local servers may use HTTP,
+              which does not encrypt the connection.
+            </p>
 
-            <h2>5. Retention, deletion, and export</h2>
+            <h2 id="game-safety">Game safety and reports</h2>
+            <p>
+              Accept the conduct rules before sharing game content. You can report a partner&apos;s
+              visible content to this server&apos;s operator or block further games with that
+              profile. Reports include the selected text, category and detail you submit. The
+              operator can respond, end a room or restrict sharing. Open Game safety to read your
+              own report responses and manage your block list.
+            </p>
+            <p>
+              Block lists are private to the player who creates them. Blocking ends active games
+              between the profiles and prevents further invitations and messages. Unblocking keeps
+              those games closed; the players need a new invitation to play again. Reports are
+              available to the reporting player and server operator.
+            </p>
+
+            <h2 id="delete-profile">5. Retention, deletion, and export</h2>
             <p>
               Sotto includes controls for deleting profiles and associated application data. In the
-              iPhone and iPad app, use Delete learner profile in Settings. Operators remain
-              responsible for retention in backups, external storage, logs, and connected providers.
-              Ask the operator of this instance about access, correction, export, deletion, or
-              retention requests.
+              iPhone and iPad app, use Delete learner profile in Settings. In the Android app, open
+              Saved connections and recoveries, then Delete learner profile. Confirm the named
+              profile and server. Operators remain responsible for retention in backups, external
+              storage, logs, and connected providers. Ask the operator of this instance about
+              access, correction, export, deletion, or retention requests.
             </p>
+            <p>
+              Associated game safety reports and blocks are removed when a linked profile is
+              deleted. The operator controls retention in backups, logs and connected services.
+            </p>
+            <p>
+              You can request deletion without installing Sotto. Contact the operator of the server
+              where your profile lives and identify that server and your profile name. Send no
+              passwords, device tokens or invitation proofs. The operator may need to verify profile
+              ownership before arranging deletion. Independently operated servers control their own
+              deletion and retention.
+            </p>
+            {contact && (
+              <p>
+                <a href={contact}>
+                  Request Sotto profile deletion from this server&apos;s operator
+                </a>
+                .
+              </p>
+            )}
 
             <h2>6. Cookies</h2>
             <p>
