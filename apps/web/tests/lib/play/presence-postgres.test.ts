@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { randomUUID } from 'node:crypto';
+import { acceptedPlayTestIdentity } from '../../helpers/play-fixture';
 import { newToken, tokenHash, HouseholdProfileService } from 'thesidedoor-core/access';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { PLAY_HOST_LEASE_MS } from '@sotto/shared';
@@ -25,7 +26,7 @@ suite('canonical foreground host leases', () => {
     instance = await createSharedTestInstance('play_presence');
   });
   beforeEach(async () => {
-    authority = await instance.reset();
+    authority = await acceptedPlayTestIdentity(instance, await instance.reset());
   });
   afterAll(async () => instance?.close());
 

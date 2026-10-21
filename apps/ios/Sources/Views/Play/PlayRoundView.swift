@@ -5,7 +5,7 @@ struct PlayRoundView: View {
     let room: PlayRoom
     let round: PlayRound
     @State private var showMeanings = false
-    private var locked: Bool { coordinator.busy || coordinator.state?.pending != nil }
+    private var locked: Bool { coordinator.gameControlsDisabled }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -150,14 +150,14 @@ struct PlayDraftField: View {
                     try await coordinator.command(command, in: room)
                 }
             }.buttonStyle(SottoSecondaryButtonStyle())
-                .disabled(coordinator.busy || coordinator.state?.pending != nil || (action != .feedback && text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty))
+                .disabled(coordinator.gameControlsDisabled || (action != .feedback && text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty))
             if action == .feedback {
                 Button("Needs another try") {
                     let submitted = text.trimmingCharacters(in: .whitespacesAndNewlines)
                     coordinator.run {
                         try await coordinator.command(.feedback(understood: false, correction: submitted.isEmpty ? nil : submitted), in: room)
                     }
-                }.buttonStyle(SottoSecondaryButtonStyle()).disabled(coordinator.busy || coordinator.state?.pending != nil)
+                }.buttonStyle(SottoSecondaryButtonStyle()).disabled(coordinator.gameControlsDisabled)
             }
         }
         .id(key)

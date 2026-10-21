@@ -40,10 +40,12 @@ import java.util.UUID
 }
 @Serializable data class JoinCommand(
     val requestId: String, val code: String, val deviceName: String, val candidate: JoinCandidate,
+    val acceptedConductVersion: Int? = null,
 ) {
     fun payload(): String = buildJsonObject {
         put("requestId", requestId); put("code", code); put("client", "NATIVE")
         put("deviceName", deviceName); put("candidate", candidate.payload())
+        acceptedConductVersion?.let { put("acceptedConductVersion", it) }
     }.toString()
 }
 @Serializable enum class JoinStatus {

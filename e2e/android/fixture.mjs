@@ -8,6 +8,9 @@ export async function startAndroidFixture(root) {
     await readFile(`${root}/packages/shared/fixtures/play/contract.json`, 'utf8')
   );
   const room = fixtures.rooms.find((entry) => entry.name === 'playing-GUEST').room;
+  const safety = JSON.parse(
+    await readFile(`${root}/packages/shared/fixtures/play/safety.json`, 'utf8')
+  );
   const token = `fixture-${randomBytes(24).toString('hex')}`;
   const profile = { id: room.guest.id, name: 'Sam', isOwner: false, role: 'USER' };
   const received = [];
@@ -32,7 +35,11 @@ export async function startAndroidFixture(root) {
       let body;
       assert.equal(request.headers.cookie, undefined);
       assert.equal(request.headers.origin, undefined);
-      if (path === '/api/v1/play/invitations' && request.method === 'GET') {
+      if (path === '/api/v1/play/policy') {
+        body = safety.policy;
+      } else if (path === '/api/v1/play/safety') {
+        body = { ...safety.accepted, profileId: profile.id };
+      } else if (path === '/api/v1/play/invitations' && request.method === 'GET') {
         body = {
           roomId: room.id,
           hostName: 'Alex',
@@ -47,6 +54,7 @@ export async function startAndroidFixture(root) {
         const input = JSON.parse(raw);
         assert.equal(input.candidate.kind, 'NEW');
         assert.equal(input.candidate.consentToProfile, true);
+        assert.equal(input.acceptedConductVersion, safety.version);
         assert.match(request.headers['x-sotto-play-proof'], /^[A-Za-z0-9_-]{43}$/);
         requestID = input.requestId;
         status = 201;

@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { randomUUID } from 'node:crypto';
+import { acceptedPlayTestIdentity } from '../../helpers/play-fixture';
 import { newToken } from 'thesidedoor-core/access';
 import { NextRequest } from 'next/server';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -47,7 +48,7 @@ suite('partner play API with canonical admission and real PostgreSQL/Redis', () 
     vi.stubEnv('BYOK_ENCRYPTION_KEY', 'isolated-play-routes-test-key');
     vi.stubEnv('NEXT_PUBLIC_APP_URL', origin);
     vi.stubEnv('SIDEDOOR_PASSWORD_ORIGINS', '[]');
-    identity = await instance.reset();
+    identity = await acceptedPlayTestIdentity(instance, await instance.reset());
     const redis = getRedisClient();
     const keys = await redis.keys('ratelimit:play:*');
     if (keys.length) await redis.del(...keys);
@@ -126,6 +127,7 @@ suite('partner play API with canonical admission and real PostgreSQL/Redis', () 
           code: fixture.code,
           client,
           deviceName: 'Partner phone',
+          acceptedConductVersion: 1,
           candidate: { kind: 'NEW', name: 'Partner', settings, consentToProfile: true },
         },
         claimant(proof, client === 'BROWSER')
@@ -378,6 +380,7 @@ suite('partner play API with canonical admission and real PostgreSQL/Redis', () 
           code: fixture.code,
           client: 'NATIVE',
           deviceName: 'New device',
+          acceptedConductVersion: 1,
           candidate: { kind: 'NEW', name: 'Pending partner', settings, consentToProfile: true },
         },
         claimant(newToken())
@@ -438,6 +441,7 @@ suite('partner play API with canonical admission and real PostgreSQL/Redis', () 
           code: fixture.code,
           client: 'NATIVE',
           deviceName: 'Phone',
+          acceptedConductVersion: 1,
           candidate: { kind: 'NEW', name: 'Partner', settings, consentToProfile: true },
         },
         claimant(newToken())

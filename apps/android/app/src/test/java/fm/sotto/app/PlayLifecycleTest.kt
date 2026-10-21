@@ -9,6 +9,52 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class PlayLifecycleTest {
+    @Test fun admissionFinishingDuringAJoinPollLeavesTheRoomInteractive() = runBlocking {
+        PlayScenario().use { server ->
+            val guest = server.connection(Seat.GUEST)
+            val invite = PlayInvitation(server.origin, "ABCDEFGH2345")
+            val admission = Admission(invite, JoinCommand(newID(), invite.code, "Android test",
+                JoinCandidate(CandidateKind.NEW, Settings(), name = "Sam", consentToProfile = true), CONDUCT_VERSION),
+                PlayInvitation.proof(), delivery = Delivery(DeliveryKind.NATIVE, "delivery-1", "fixture-room",
+                    requireNotNull(server.room(Seat.GUEST).guest), guest.token))
+            val disk = MemoryVault(Vault(invitation = invite, admission = admission))
+            val activated = java.util.concurrent.atomic.AtomicBoolean(false)
+            val joinPollStarted = java.util.concurrent.CountDownLatch(1)
+            val finishJoinPoll = java.util.concurrent.CountDownLatch(1)
+            disk.afterCommit = { if (it.connection == guest) activated.set(true) }
+            server.respond = { request -> when {
+                request.path == "/api/v1/profiles" -> HttpReply(200, SottoJson.encodeToString(ProfileList(listOf(guest.profile))))
+                request.path == "/api/v1/play/rooms/fixture-room" -> HttpReply(200, SottoJson.encodeToString(server.room(Seat.GUEST)))
+                request.path.endsWith("/ack") -> {
+                    check(joinPollStarted.await(5, java.util.concurrent.TimeUnit.SECONDS))
+                    HttpReply(200, "{\"acknowledged\":true}")
+                }
+                request.path.startsWith("/api/v1/play/join-requests/") -> {
+                    if (activated.get()) {
+                        joinPollStarted.countDown()
+                        finishJoinPoll.await(5, java.util.concurrent.TimeUnit.SECONDS)
+                    }
+                    server.normal(request)
+                }
+                else -> server.normal(request)
+            } }
+            val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+            try {
+                val coordinator = PlayCoordinator(disk, scope, "Android test")
+                coordinator.setForeground(true)
+                coordinator.awaitState { it.screen == Screen.Join && !it.checking }
+                coordinator.run { finishAdmission() }
+                coordinator.awaitState { it.screen == Screen.Room("fixture-room") && !it.busy }
+                finishJoinPoll.countDown()
+                val interactive = coordinator.awaitState { !it.checking && it.room != null }
+                assertTrue(interactive.active)
+                assertNull(interactive.vault?.admission)
+                assertEquals(guest, interactive.vault?.connection)
+                assertTrue(ActionType.CHOOSE in requireNotNull(interactive.room?.round).header.allowedActions)
+            } finally { finishJoinPoll.countDown(); scope.cancel() }
+        }
+    }
+
     @Test fun returningToGamesKeepsInvitationRecoveryWithoutReopeningJoinOnNavigationOrResume() = runBlocking {
         PlayScenario().use { server ->
             val invite = PlayInvitation(server.origin, "ABCDEFGH2345")

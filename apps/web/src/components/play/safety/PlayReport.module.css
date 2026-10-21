@@ -1,0 +1,30 @@
+.root {
+  composes: panel from './PlaySafety.module.css';
+}
+.root fieldset {
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.field {
+  composes: field from './PlaySafety.module.css';
+}
+.actions {
+  composes: actions from './PlaySafety.module.css';
+}
+.button {
+  composes: button from './PlaySafety.module.css';
+}
+.primary {
+  composes: primary from './PlaySafety.module.css';
+}
+.evidence {
+  composes: evidence from './PlaySafety.module.css';
+}
+.confirm {
+  composes: confirm from './PlaySafety.module.css';
+}
+.error {
+  composes: error from './PlaySafety.module.css';
+}

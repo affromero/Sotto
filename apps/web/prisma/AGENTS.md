@@ -105,6 +105,14 @@ cannot renew after release, including a delayed first heartbeat. New enrollment
 requests keep every profile/approval field null until canonical owner approval
 commits the prepared profile and all approval metadata together.
 
+Partner safety uses `PlaySafetyState` for conduct, sharing restrictions and
+per-user transaction fences, `PlayUserBlock` for persistent canonical-user
+blocks, `PlaySafetyReport` for one reporter-visible excerpt and owner response,
+and `PlaySafetyReceipt` for bounded acknowledgments independent of room
+deletion. User deletion cascades these records. Room/round removal preserves
+reports while clearing their provenance foreign keys. Pending admissions carry
+explicit nullable conduct version/time; old records never imply consent.
+
 MaterialUploadBatch reserves an owned declaration set by request identity.
 MaterialUpload binds each transfer to its stable CourseMaterial. Immutable
 MaterialUploadPart receipts record exact ranges and SHA-256 checksums. Complete

@@ -8,6 +8,7 @@ struct PlayRootView: View {
     @State private var recovery = UUID()
     @State private var erasingGames = false
     @State private var discardingAction: UUID?
+    @State private var discardingSafety: UUID?
 
     var body: some View {
         NavigationStack {
@@ -30,25 +31,42 @@ struct PlayRootView: View {
                     } else if coordinator.boundConnection != model.credentials {
                         ProgressView("Checking your connection")
                     } else {
+                        if let pending = coordinator.state?.pendingSafety {
+                            Text("A saved safety action needs confirmation. Retry sends its exact original request. Your game action and drafts are kept.")
+                                .font(.callout).foregroundStyle(SottoTheme.muted)
+                            if pending.connection != model.credentials {
+                                Button("Restore safety action's original connection") {
+                                    coordinator.runSafety { try await coordinator.switchConnection(pending.connection) }
+                                }.buttonStyle(SottoSecondaryButtonStyle()).disabled(coordinator.safetyBusy)
+                            } else {
+                                Button("Recover saved safety action") {
+                                    coordinator.runSafety { try await coordinator.retryAction(slot: .safety) }
+                                }.buttonStyle(SottoPrimaryButtonStyle()).disabled(coordinator.safetyBusy)
+                            }
+                            Button("Discard saved safety action", role: .destructive) { discardingSafety = pending.id }
+                                .frame(minHeight: 44).disabled(coordinator.safetyBusy)
+                        }
                         if let pending = coordinator.state?.pending {
                             Text("A saved action needs confirmation. Retry keeps its original identity.")
                                 .font(.callout).foregroundStyle(SottoTheme.muted)
                             if pending.connection != model.credentials {
                                 Button("Restore original connection") {
                                     coordinator.run { try await coordinator.switchConnection(pending.connection) }
-                                }.buttonStyle(SottoSecondaryButtonStyle()).disabled(coordinator.busy)
+                                }.buttonStyle(SottoSecondaryButtonStyle()).disabled(normalLocked || coordinator.busy)
                             } else {
                                 Button("Recover pending action") { coordinator.run { try await coordinator.retryAction() } }
-                                    .buttonStyle(SottoSecondaryButtonStyle()).disabled(coordinator.busy)
+                                    .buttonStyle(SottoSecondaryButtonStyle()).disabled(normalLocked || coordinator.busy)
                             }
                             Button("Discard pending action", role: .destructive) { discardingAction = pending.id }
-                                .frame(minHeight: 44).disabled(coordinator.busy)
+                                .frame(minHeight: 44).disabled(normalLocked || coordinator.busy)
                         }
                         switch coordinator.screen {
-                        case .lobby: PlayLobbyView(coordinator: coordinator)
-                        case .join: PlayJoinView(coordinator: coordinator)
-                        case .room: PlayRoomView(coordinator: coordinator)
-                        case .notebook: PlayNotebookView(coordinator: coordinator)
+                        case .lobby: PlayLobbyView(coordinator: coordinator).disabled(normalLocked)
+                        case .join: PlayJoinView(coordinator: coordinator).disabled(normalLocked)
+                        case .room: PlayRoomView(coordinator: coordinator).disabled(normalLocked)
+                        case .notebook: PlayNotebookView(coordinator: coordinator).disabled(normalLocked)
+                        case .safety: PlaySafetyView(coordinator: coordinator)
+                        case .report: PlayReportView(coordinator: coordinator)
                         }
                     }
                 }
@@ -74,6 +92,7 @@ struct PlayRootView: View {
                         if model.hasSelectedProfile {
                             Button("Private notebook") { coordinator.navigate(.notebook) }
                         }
+                        Button("Game safety") { coordinator.navigate(.safety) }
                     } label: {
                         Image(systemName: "ellipsis.circle").frame(width: 44, height: 44)
                     }.accessibilityLabel("Play menu")
@@ -102,6 +121,16 @@ struct PlayRootView: View {
             }
             Button("Cancel", role: .cancel) { discardingAction = nil }
         }
+        .confirmationDialog("This safety action may already have saved. Check your blocks and reports before submitting again.", isPresented: Binding(
+            get: { discardingSafety != nil }, set: { if !$0 { discardingSafety = nil } }), titleVisibility: .visible) {
+            if let id = discardingSafety {
+                Button("Discard saved safety action", role: .destructive) {
+                    do { try coordinator.discardSafetyAction(id: id) } catch { coordinator.report(error) }
+                    discardingSafety = nil
+                }
+            }
+            Button("Cancel", role: .cancel) { discardingSafety = nil }
+        }
     }
 
     private struct Lifecycle: Equatable {
@@ -113,6 +142,7 @@ struct PlayRootView: View {
     private var discardBinding: Binding<Bool> {
         Binding(get: { discardingAction != nil }, set: { if !$0 { discardingAction = nil } })
     }
+    private var normalLocked: Bool { coordinator.safetyBusy || coordinator.state?.pendingSafety != nil }
 }
 
 struct PlaySettingsFields: View {

@@ -1,0 +1,27 @@
+.root {
+  composes: root from './PlaySafety.module.css';
+}
+.panel {
+  composes: panel from './PlaySafety.module.css';
+}
+.actions {
+  composes: actions from './PlaySafety.module.css';
+}
+.button {
+  composes: button from './PlaySafety.module.css';
+}
+.primary {
+  composes: primary from './PlaySafety.module.css';
+}
+.field {
+  composes: field from './PlaySafety.module.css';
+}
+.confirm {
+  composes: confirm from './PlaySafety.module.css';
+}
+.evidence {
+  composes: evidence from './PlaySafety.module.css';
+}
+.error {
+  composes: error from './PlaySafety.module.css';
+}

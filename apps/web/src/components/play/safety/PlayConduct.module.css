@@ -1,0 +1,9 @@
+.root {
+  composes: panel from './PlaySafety.module.css';
+}
+.links {
+  composes: actions from './PlaySafety.module.css';
+}
+.check {
+  composes: check from './PlaySafety.module.css';
+}

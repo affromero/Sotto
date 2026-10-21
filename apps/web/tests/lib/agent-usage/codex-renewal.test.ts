@@ -2,6 +2,7 @@
 import { mkdtemp, readFile, writeFile, rm, access } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createServer, type Socket } from 'node:net';
 import { beforeAll, afterAll, beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import type { PrismaClient } from '@/generated/prisma/client';
 import {
@@ -71,7 +72,11 @@ suite('managed Codex usage renewal', () => {
       return false;
     }
   }
-  async function fixture(mode: 'renew' | 'block' | 'switch' | 'reject' = 'renew') {
+  async function fixture(
+    mode: 'renew' | 'block' | 'switch' | 'reject' = 'renew',
+    readyPort?: number
+  ) {
+    if (mode === 'block' && readyPort === undefined) throw new Error('Missing readiness port');
     await writeFile(
       join(directory, 'codex'),
       '#!' +
@@ -90,7 +95,11 @@ readline.createInterface({input:process.stdin}).on('line', line => {
   if (msg.method === 'initialize') { console.log(JSON.stringify({id:0,result:{}})); return; }
   if (msg.method === 'initialized') return;
   if (msg.method !== 'account/read' || msg.params.refreshToken !== false) process.exit(6);
-  if (${JSON.stringify(mode)} === 'block') return;
+  if (${JSON.stringify(mode)} === 'block') {
+    const socket = require('node:net').connect(${JSON.stringify(readyPort)}, '127.0.0.1', () => socket.end());
+    socket.on('error', () => process.exit(7));
+    return;
+  }
   if (${JSON.stringify(mode)} === 'reject') {
     console.log(JSON.stringify({id:1,error:{code:-1,message:'refresh_token_expired'}})); return;
   }
@@ -199,15 +208,58 @@ readline.createInterface({input:process.stdin}).on('line', line => {
 
   it('cancels and drains a stalled renewal before returning', async () => {
     await auth(1);
-    await fixture('block');
     const controller = new AbortController();
     const failure = new Error('Status reader canceled');
-    const pending = getCodexUsageProvider(await execution(controller.signal));
-    const rejected = expect(pending).rejects.toBe(failure);
-    await expect.poll(() => exists('started')).toBe(true);
-    const started = JSON.parse(await readFile(join(directory, 'started'), 'utf8'));
-    controller.abort(failure);
-    await rejected;
-    expect(() => process.kill(started.pid, 0)).toThrow(expect.objectContaining({ code: 'ESRCH' }));
+    let connected!: () => void;
+    let connectionFailed!: (error: Error) => void;
+    const ready = new Promise<{ kind: 'ready' } | { kind: 'readiness-failed'; error: Error }>(
+      (resolve) => {
+        connected = () => resolve({ kind: 'ready' });
+        connectionFailed = (error) => resolve({ kind: 'readiness-failed', error });
+      }
+    );
+    const sockets = new Set<Socket>();
+    const server = createServer((socket) => {
+      sockets.add(socket);
+      socket.on('error', connectionFailed);
+      connected();
+    });
+    let outcome: Promise<{ kind: 'resolved' } | { kind: 'rejected'; error: unknown }> | undefined;
+    try {
+      await new Promise<void>((resolve, reject) => {
+        server.once('error', reject);
+        server.listen(0, '127.0.0.1', () => {
+          server.off('error', reject);
+          resolve();
+        });
+      });
+      server.on('error', connectionFailed);
+      const address = server.address();
+      if (!address || typeof address === 'string') throw new Error('Missing readiness address');
+      await fixture('block', address.port);
+      outcome = getCodexUsageProvider(await execution(controller.signal)).then(
+        () => ({ kind: 'resolved' as const }),
+        (error: unknown) => ({ kind: 'rejected' as const, error })
+      );
+      const first = await Promise.race([ready, outcome]);
+      if (first.kind === 'readiness-failed') throw first.error;
+      expect(first.kind).toBe('ready');
+      const started = JSON.parse(await readFile(join(directory, 'started'), 'utf8'));
+      controller.abort(failure);
+      const cancelled = await outcome;
+      if (cancelled.kind !== 'rejected') throw new Error('The canceled renewal completed');
+      expect(cancelled.error).toBe(failure);
+      expect(() => process.kill(started.pid, 0)).toThrow(
+        expect.objectContaining({ code: 'ESRCH' })
+      );
+    } finally {
+      controller.abort(failure);
+      await outcome;
+      for (const socket of sockets) socket.destroy();
+      if (server.listening)
+        await new Promise<void>((resolve, reject) =>
+          server.close((error) => (error ? reject(error) : resolve()))
+        );
+    }
   });
 });

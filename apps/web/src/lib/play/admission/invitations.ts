@@ -21,6 +21,8 @@ import { PlayRuleError } from '../errors';
 import { playFingerprint } from '../storage/fingerprint';
 import { loadPlayRoom, playHostWaiting } from '../storage/room-view';
 import type { PlayActor, PlayClock } from '../storage/rooms';
+import { lockPlaySafetyParticipants, requirePlayInteractionAllowed } from '../safety/fences';
+import { redactPlayPublishedName } from '../safety/policy';
 
 const codeAlphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const inviteReceiptSchema = z.strictObject({
@@ -95,6 +97,8 @@ async function requireInviteHost(
   const room = await loadPlayRoom(database, roomId);
   if (room.hostUserId !== actor.identity.userId)
     throw new PlayRuleError('forbidden', 'Only the host can share this game.');
+  await lockPlaySafetyParticipants(database, [room.hostUserId, room.guestUserId]);
+  await requirePlayInteractionAllowed(database, [room.hostUserId, room.guestUserId]);
   return room;
 }
 
@@ -231,13 +235,15 @@ export function previewPlayInvitation(
     });
     if (!room || room.status !== 'WAITING' || room.expiresAt <= now || room.guestUserId)
       return null;
+    await lockPlaySafetyParticipants(transaction, [room.hostUserId]);
+    await requirePlayInteractionAllowed(transaction, [room.hostUserId], false);
     const reserved = await transaction.playJoinRequest.count({
       where: { roomId: room.id, status: { in: ['ACCEPTED', 'CLAIMED'] } },
     });
     if (reserved > 0) return null;
     return playInvitationPreviewSchema.parse({
       roomId: room.id,
-      hostName: room.host.name ?? 'Host',
+      hostName: redactPlayPublishedName(room.host.name, 'Host'),
       kind: room.kind,
       theme: room.theme,
       questionStyle: room.questionStyle,

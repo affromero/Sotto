@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { randomUUID } from 'node:crypto';
+import { acceptedPlayTestIdentity } from '../../helpers/play-fixture';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { PlayRoomView, PlayRoundCommand } from '@sotto/shared';
 import { playFingerprint } from '@/lib/play/storage/fingerprint';
@@ -30,7 +31,7 @@ suite('persistent private games on PostgreSQL', () => {
     instance = await createSharedTestInstance('play_rooms');
   });
   beforeEach(async () => {
-    authority = await instance.reset();
+    authority = await acceptedPlayTestIdentity(instance, await instance.reset());
   });
   afterAll(async () => instance?.close());
 
@@ -496,6 +497,8 @@ suite('persistent private games on PostgreSQL', () => {
         settings: guestSettings,
         client: 'BROWSER',
         deviceName: 'Test browser',
+        acceptedConductVersion: 1,
+        acceptedConductAt: now,
         proofHash: playFingerprint(requestId),
         fingerprint: playFingerprint({ roomId, candidateUserId }),
         status: 'ACCEPTED',
@@ -635,6 +638,8 @@ suite('persistent private games on PostgreSQL', () => {
       settings: guestSettings,
       client: 'NATIVE',
       deviceName: 'Test phone',
+      acceptedConductVersion: 1,
+      acceptedConductAt: new Date(),
       proofHash: playFingerprint(id),
       fingerprint: playFingerprint({ id }),
       status: 'WAITING_FOR_OWNER',

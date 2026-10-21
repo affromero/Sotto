@@ -30,11 +30,10 @@ export default function SupportPage() {
                   &#9993;
                 </span>
                 <div>
-                  <strong>Email Support</strong>
+                  <strong>Server Support</strong>
                   <p>
-                    Reach the maintainers of your deployment at{' '}
-                    <a href="mailto:support@example.com">support@example.com</a>. Response times
-                    depend on whoever runs your instance.
+                    Contact the operator of your server for access, profile deletion, backups, and
+                    configuration.
                   </p>
                 </div>
               </div>
@@ -66,7 +65,8 @@ export default function SupportPage() {
                   <strong>Product Feedback</strong>
                   <p>
                     Have ideas or found a bug? Visit the <a href="/feedback">feedback page</a> to
-                    share your thoughts, or open an issue on the project.
+                    share your thoughts, or open a{' '}
+                    <a href="https://github.com/affromero/Sotto/issues">project issue</a>.
                   </p>
                 </div>
               </div>

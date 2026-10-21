@@ -327,7 +327,7 @@ describe('self-hosted language-learning surfaces', () => {
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
 
-    expect(publicContactSources).toContain('support@example.com');
+    expect(publicContactSources).not.toContain('support@example.com');
     expect(publicContactSources).not.toContain('sotto.fm');
     expect(publicContactSources).not.toContain('@sottofm');
     expect(publicContactSources).not.toContain('r2.sotto.fm');

@@ -1,0 +1,145 @@
+.root {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 28px 16px 130px;
+  color: var(--color-text-primary);
+}
+.root h1 {
+  font: 400 clamp(36px, 6vw, 56px)/1.1 var(--font-heading);
+  margin: 18px 0;
+}
+.root h2 {
+  font: 400 28px var(--font-heading);
+  margin: 8px 0 16px;
+}
+.root h3 {
+  font: 500 18px var(--font-body);
+}
+.panel {
+  border-top: 1px solid var(--color-border);
+  padding: 24px 0;
+  line-height: 1.6;
+}
+.muted {
+  color: var(--color-text-secondary);
+}
+.eyebrow {
+  font: 500 11px var(--font-mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+}
+.actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.actions a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+.root fieldset {
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.button {
+  min-height: 44px;
+  padding: 10px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-primary);
+  font: inherit;
+  cursor: pointer;
+}
+.primary {
+  composes: button;
+  background: var(--color-primary);
+  color: white;
+  border-color: var(--color-primary);
+}
+.button:disabled,
+.primary:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.button:focus-visible,
+.primary:focus-visible,
+.root a:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+}
+.root a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+.error {
+  color: var(--color-error);
+}
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--color-border);
+  overflow-wrap: anywhere;
+}
+.evidence {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding-left: 16px;
+  border-left: 3px solid var(--color-primary);
+  margin: 16px 0;
+}
+.field {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0;
+}
+.field input,
+.field select,
+.field textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font: inherit;
+}
+.field textarea {
+  resize: vertical;
+  min-height: 100px;
+}
+.check {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  margin: 16px 0;
+}
+.check input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--color-primary);
+  flex-shrink: 0;
+}
+.confirm {
+  padding: 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  margin: 16px 0;
+}
+@media (min-width: 768px) {
+  .root {
+    padding: 36px 28px 130px;
+  }
+}

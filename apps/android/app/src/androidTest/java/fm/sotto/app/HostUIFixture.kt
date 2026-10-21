@@ -10,6 +10,9 @@ class HostUIFixture : AutoCloseable {
     val profile = Profile("host-profile", "Alex", true, "USER")
     private val fixture = SottoJson.parseToJsonElement(InstrumentationRegistry.getInstrumentation().context.assets
         .open("contract.json").use { it.readBytes().toString(Charsets.UTF_8) }).jsonObject
+    private val safety = SottoJson.parseToJsonElement(InstrumentationRegistry.getInstrumentation().context.assets
+        .open("safety.json").use { it.readBytes().toString(Charsets.UTF_8) }).jsonObject
+    private var accepted = false
     private val original: PlayRoom = SottoJson.decodeFromJsonElement(fixture.getValue("rooms").jsonArray[0].jsonObject.getValue("room"))
     private var current: PlayRoom? = null
     private var invitation: InvitationView? = null
@@ -23,6 +26,18 @@ class HostUIFixture : AutoCloseable {
         if (request.path.startsWith("/api/v1/play/")) require(request.headers["authorization"] == "Bearer $token" &&
             request.headers["cookie"] == null && request.headers["origin"] == null)
         return when {
+            request.path == "/api/v1/play/policy" -> NativeReply(body = safety.getValue("policy").toString())
+            request.path == "/api/v1/play/safety" -> NativeReply(body = JsonObject(
+                safety.getValue(if (accepted) "accepted" else "unaccepted").jsonObject + mapOf(
+                    "profileId" to JsonPrimitive(profile.id), "canReviewReports" to JsonPrimitive(true))).toString())
+            request.path == "/api/v1/play/safety/blocks" -> encoded(BlockList.serializer(), BlockList(emptyList()))
+            request.path == "/api/v1/play/safety/reports" -> encoded(ReportList.serializer(), ReportList(emptyList()))
+            request.path == "/api/v1/play/safety/conduct" -> {
+                val body = SottoJson.parseToJsonElement(request.body).jsonObject
+                require(body["version"] == JsonPrimitive(CONDUCT_VERSION))
+                accepted = true
+                encoded(SafetyAck.serializer(), SafetyAck(body.getValue("actionId").jsonPrimitive.content, true))
+            }
             request.path == "/api/v1/access/open-household" -> {
                 require(request.headers["origin"] == server.origin)
                 NativeReply(body = "{}", headers = mapOf("Set-Cookie" to "access=ephemeral-fixture; Path=/"))
@@ -35,6 +50,7 @@ class HostUIFixture : AutoCloseable {
             request.path == "/api/v1/auth/pair" -> NativeReply(201, "{\"token\":\"one-time-fixture\",\"serverUrl\":\"${server.origin}\"}")
             request.path == "/api/v1/auth/pair/redeem" -> NativeReply(body = "{\"token\":\"$token\"}")
             request.path == "/api/v1/play/rooms" && request.method == "POST" -> {
+                require(accepted)
                 val body = SottoJson.parseToJsonElement(request.body).jsonObject
                 val settings = SottoJson.decodeFromJsonElement<Settings>(body.getValue("settings"))
                 current = original.copy(status = RoomStatus.WAITING, revision = 0, guest = null, round = null,

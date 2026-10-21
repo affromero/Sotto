@@ -22,6 +22,7 @@ import { usePlayRequest } from './client/profile';
 import { rememberPlayInvitation } from './client/intent';
 import { usePlayMutation } from './client/usePlayMutation';
 import { usePlayPoll } from './client/usePlayPoll';
+import { usePlaySafetyStatus } from './safety/safety-client';
 import styles from './PlayLobby.module.css';
 
 const modes = [
@@ -54,6 +55,7 @@ const themes: { id: PlayTheme; title: string }[] = [
 export function PlayLobby({ isOwner }: { isOwner: boolean }) {
   const playFetch = usePlayRequest();
   const router = useRouter();
+  const safety = usePlaySafetyStatus();
   const [kind, setKind] = useState<PlayRoomView['kind']>('MIXED');
   const [theme, setTheme] = useState<PlayTheme>('EVERYDAY');
   const [open, setOpen] = useState(false);
@@ -75,7 +77,7 @@ export function PlayLobby({ isOwner }: { isOwner: boolean }) {
   const create = usePlayMutation(playRoomViewSchema);
   const approval = usePlayMutation(playPendingRequestViewSchema);
   const cards = (kind === 'MIXED' || kind === 'KNOW_ME') && !open;
-  const busy = create.pending || approval.pending;
+  const busy = create.pending || approval.pending || !safety.sharingAllowed;
 
   const load = useCallback(
     async (signal: AbortSignal) => {
@@ -156,6 +158,23 @@ export function PlayLobby({ isOwner }: { isOwner: boolean }) {
           in your own language.
         </p>
       </header>
+      <Link href="/play/safety" className={styles.safetyLink}>
+        Game safety, blocks and reports
+      </Link>
+      {safety.error && (
+        <p className={styles.error} role="alert">
+          {safety.error}
+        </p>
+      )}
+      {!safety.accepted && (
+        <p>Read and accept this server&apos;s game conduct in Game safety before playing.</p>
+      )}
+      {safety.status?.sharingRestricted && (
+        <p role="status">
+          The server owner has restricted this profile from partner games. Your safety settings and
+          private learning remain available.
+        </p>
+      )}
       <div className={styles.columns}>
         <section className={styles.make} aria-labelledby="new-game-heading">
           <h2 id="new-game-heading">Make a game</h2>

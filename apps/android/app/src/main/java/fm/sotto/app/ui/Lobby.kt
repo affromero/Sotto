@@ -11,13 +11,16 @@ import fm.sotto.app.ui.platform.localNetworkAccess
     var kind by remember { mutableStateOf(GameKind.MIXED) }
     var theme by remember { mutableStateOf(Theme.EVERYDAY) }
     var open by remember { mutableStateOf(false) }
-    val ready = state.active && !state.busy && !state.checking && !state.accessRevoked && state.vault?.pending == null
+    val ready = state.active && !state.busy && !state.checking && !state.accessRevoked && state.vault?.pending == null &&
+        state.vault?.pendingSafety == null && state.safety?.acceptedVersion == CONDUCT_VERSION && state.safety.sharingRestricted == false
     Text("A game for two", style = MaterialTheme.typography.headlineMedium)
     val network = localNetworkAccess(state.vault?.connection?.server)
     Text("Pick for each other, give a clue, or try a secret mission. Swap languages as you go.")
     Action("Join with a code or link", !state.busy) { coordinator.navigate(Screen.Join) }
     Action(if (state.vault?.connection == null) "Pair with your server" else "Pair another server", !state.busy, true) { coordinator.navigate(Screen.Pair) }
     if (state.vault?.connection != null) {
+        Action("Game safety, reports and blocks", state.active && !state.accessRevoked, true) { coordinator.openSafety() }
+        if (state.safety?.acceptedVersion != CONDUCT_VERSION) Text("Read and accept the conduct policy in Game safety before sharing.")
         Text("Start a game", style = MaterialTheme.typography.titleLarge)
         Menu("Game", kind, GameKind.entries.map { it to it.title }, ready) { kind = it }
         Menu("Theme", theme, Theme.entries.map { it to it.name.humanize() }, ready) { theme = it }

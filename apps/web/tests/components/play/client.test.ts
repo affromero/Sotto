@@ -1,12 +1,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { playInvitationActionSchema, playJoinStatusViewSchema } from '@sotto/shared';
 import { newPlayActionId, playFetch } from '@/components/play/client/api';
+import { safety } from './safety/fixtures';
 import {
   clearPendingPlayAdmission,
   readPendingPlayAdmission,
   savePendingPlayAdmission,
   rememberPlayInvitation,
   readPlayInvitationIntent,
+  readRetainedPlayAdmissions,
+  retainPendingPlayAdmission,
   type PendingPlayAdmission,
 } from '@/components/play/client/intent';
 
@@ -19,6 +22,19 @@ afterEach(() => {
 const instant = '2026-10-20T17:00:00.000Z';
 
 describe('private game browser transport', () => {
+  it.each(safety.errors)(
+    'keeps $body.reason distinct from an authentication refusal',
+    async (failure) => {
+      vi.stubGlobal('fetch', async () => Response.json(failure.body, { status: failure.status }));
+      await expect(
+        playFetch('/api/v1/play/rooms/game/actions', playJoinStatusViewSchema, { body: {} })
+      ).rejects.toMatchObject({
+        status: failure.status,
+        reason: failure.body.reason,
+        message: failure.body.error,
+      });
+    }
+  );
   it('creates valid action identifiers on local HTTP without randomUUID', () => {
     vi.stubGlobal('crypto', { getRandomValues: crypto.getRandomValues.bind(crypto) });
     const first = newPlayActionId();
@@ -111,6 +127,21 @@ describe('versioned invitation return and credential-free admission recovery', (
       },
     };
   }
+
+  it('preserves original commands and proofs when retained recovery capacity is full or unreadable', () => {
+    const originals = Array.from({ length: 16 }, () => {
+      const value = pending();
+      return { ...value, command: { ...value.command, requestId: newPlayActionId() } };
+    });
+    for (const value of originals) retainPendingPlayAdmission(value);
+    expect(() => retainPendingPlayAdmission(pending())).toThrow(/Remove a saved recovery/);
+    expect(readRetainedPlayAdmissions()).toEqual(originals);
+    expect(Object.values(localStorage).join('')).not.toContain(originals[0].proof);
+    const malformed = '{kept original unreadable recovery';
+    sessionStorage.setItem('sotto:play-admission-recoveries:v1', malformed);
+    expect(() => readRetainedPlayAdmissions()).toThrow();
+    expect(sessionStorage.getItem('sotto:play-admission-recoveries:v1')).toBe(malformed);
+  });
 
   it('retains the exact invitation, proof and idempotency ID through a page reload', () => {
     rememberPlayInvitation(invitation);

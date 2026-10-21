@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PlayLobby } from '@/components/play/PlayLobby';
+import { safetyResponse } from './safety/fixtures';
 
 const navigation = vi.hoisted(() => ({ destinations: [] as string[] }));
 vi.mock('next/navigation', () => {
@@ -37,6 +38,8 @@ describe('independent partner-play lobby', () => {
     };
     const sent: unknown[] = [];
     vi.stubGlobal('fetch', async (path: string, options?: RequestInit) => {
+      const safety = safetyResponse(path);
+      if (safety) return safety;
       if (options?.method === 'POST') {
         sent.push(JSON.parse(String(options.body)));
         if (!approved) {
@@ -77,6 +80,8 @@ describe('independent partner-play lobby', () => {
   it('defaults to mixed card rounds and sends the selected language direction and level without a course', async () => {
     const created: Record<string, unknown>[] = [];
     vi.stubGlobal('fetch', async (path: string, options?: RequestInit) => {
+      const safety = safetyResponse(path);
+      if (safety) return safety;
       if (options?.method === 'POST') {
         const body = JSON.parse(String(options.body));
         created.push(body);
@@ -126,12 +131,15 @@ describe('independent partner-play lobby', () => {
   });
 
   it('normalizes a human code and retains only the nonsecret invitation before navigation', async () => {
-    vi.stubGlobal('fetch', async (path: string) =>
-      Response.json(
-        path.endsWith('/phrases')
-          ? { phrases: [], nextCursor: null }
-          : { rooms: [], nextCursor: null }
-      )
+    vi.stubGlobal(
+      'fetch',
+      async (path: string) =>
+        safetyResponse(path) ??
+        Response.json(
+          path.endsWith('/phrases')
+            ? { phrases: [], nextCursor: null }
+            : { rooms: [], nextCursor: null }
+        )
     );
     render(<PlayLobby isOwner={false} />);
     await screen.findByText('Your next game starts here.');
@@ -153,6 +161,8 @@ describe('independent partner-play lobby', () => {
   it('shows server-owner profile enrollment separately from host entry approval', async () => {
     const requested: string[] = [];
     vi.stubGlobal('fetch', async (path: string) => {
+      const safety = safetyResponse(path);
+      if (safety) return safety;
       requested.push(path);
       if (path.endsWith('/enrollments'))
         return Response.json({

@@ -13,9 +13,16 @@ struct PlayAdmissionRecovery: Codable, Equatable {
     /// Existing admissions always retain the original device and selection.
     let existingConnection: SottoCredentials?
     var delivery: PlayDelivery?
+    var conductVersion: Int?
 }
 
-enum PlayOperationResponse: String, Codable { case room, invitation, approval, phrase }
+enum PlayOperationResponse: String, Codable { case room, invitation, approval, phrase, safety }
+enum PlayPendingSlot {
+    case game, safety
+    var path: WritableKeyPath<PlayProtectedState, PlayPendingOperation?> {
+        self == .game ? \.pending : \.pendingSafety
+    }
+}
 struct PlayPendingOperation: Codable, Equatable {
     let id: UUID
     let connection: SottoCredentials
@@ -32,6 +39,7 @@ struct PlayProtectedState: Codable, Equatable {
     var retainedAdmissions: [PlayAdmissionRecovery] = []
     var archivedConnections: [SottoCredentials] = []
     var pending: PlayPendingOperation?
+    var pendingSafety: PlayPendingOperation?
     var drafts: [String: String] = [:]
 
     mutating func archive(_ credentials: SottoCredentials) throws {
@@ -65,12 +73,16 @@ struct PlayProtectedState: Codable, Equatable {
                 throw SottoAPIError.message("Saved invitation recovery is invalid. It has been preserved.")
             }
         }
-        if let pending {
+        for pending in [pending, pendingSafety].compactMap({ $0 }) {
             guard pending.path.hasPrefix("/api/v1/play/"), pending.body.count <= 16_384,
                   PlayInvitation.origin(pending.connection.serverURL) != nil,
                   pending.connection.selectedProfile != nil else {
                 throw SottoAPIError.message("Saved game action is invalid. It has been preserved.")
             }
+        }
+        guard pending?.response != .safety,
+              pendingSafety.map({ $0.response == .safety }) ?? true else {
+            throw SottoAPIError.message("Saved game recovery has an invalid action type. It has been preserved.")
         }
     }
 }

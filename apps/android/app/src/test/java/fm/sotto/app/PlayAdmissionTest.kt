@@ -41,7 +41,7 @@ class PlayAdmissionTest {
             val first = PlayCoordinator(disk, firstScope, "Android test")
             first.setForeground(true)
             first.awaitState { it.preview != null && !it.checking }
-            first.join(Settings(), "Sam", existing = false)
+            first.join(Settings(), "Sam", existing = false, acceptedConduct = true)
             val intake = requireNotNull(disk.load().admission)
             try { first.finishAdmission(); fail("Expected uncertain acknowledgment") }
             catch (error: ApiError) { assertEquals(503, error.status) }
@@ -83,7 +83,7 @@ class PlayAdmissionTest {
                 val coordinator = PlayCoordinator(disk, scope, "Android test")
                 coordinator.setForeground(true)
                 coordinator.awaitState { it.preview != null && !it.checking }
-                coordinator.join(Settings(), "Sam", false)
+                coordinator.join(Settings(), "Sam", false, acceptedConduct = true)
                 try { coordinator.finishAdmission(); fail("Expected protected write failure") }
                 catch (_: java.io.IOException) { }
                 assertEquals(original, disk.load().connection)
@@ -104,7 +104,7 @@ class PlayAdmissionTest {
                 val coordinator = PlayCoordinator(disk, scope, "Android test")
                 coordinator.setForeground(true)
                 coordinator.awaitState { it.preview != null && !it.checking }
-                coordinator.join(Settings(), "", true)
+                coordinator.join(Settings(), "", true, acceptedConduct = true)
                 coordinator.finishAdmission()
                 assertEquals(original, disk.load().connection)
                 assertNull(disk.load().admission)
@@ -129,7 +129,7 @@ class PlayAdmissionTest {
                 val coordinator = PlayCoordinator(disk, scope, "Android test")
                 coordinator.setForeground(true)
                 coordinator.awaitState { it.preview != null && !it.checking }
-                coordinator.join(Settings(), "Sam", false)
+                coordinator.join(Settings(), "Sam", false, acceptedConduct = true)
                 try { coordinator.finishAdmission(); fail("A broad credential must not be activated") }
                 catch (_: IllegalArgumentException) { }
                 assertNull(disk.load().connection)

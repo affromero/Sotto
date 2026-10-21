@@ -20,6 +20,7 @@ import type { z } from 'zod';
 import { AdmissionRequests } from './AdmissionRequests';
 import { PhraseCapture } from './PhraseCapture';
 import { RoundPlay } from './RoundPlay';
+import { PlayReport } from './safety/PlayReport';
 import { PlayHttpError, playErrorMessage, newPlayActionId } from './client/api';
 import { usePlayRequest } from './client/profile';
 import { useHostPresence } from './client/useHostPresence';
@@ -49,6 +50,10 @@ export function PlayRoom({ roomId }: { roomId: string }) {
   const playFetch = usePlayRequest();
   const router = useRouter();
   const [room, setRoom] = useState<PlayRoomView | null>(null);
+  const [reportRoom, setReportRoom] = useState<PlayRoomView | null>(null);
+  const [safetyPending, setSafetyPending] = useState(false);
+  const [unavailable, setUnavailable] = useState(false);
+  const sharingStopped = useRef(false);
   const [invitation, setInvitation] = useState<Invitation | null>(null);
   const [inviteLoaded, setInviteLoaded] = useState(false);
   const [requests, setRequests] = useState<PlayPendingRequestView[]>([]);
@@ -67,9 +72,20 @@ export function PlayRoom({ roomId }: { roomId: string }) {
   const runInvite = invite.run;
   const approval = usePlayMutation(playPendingRequestViewSchema);
   const path = `/api/v1/play/rooms/${encodeURIComponent(roomId)}`;
-  const hostWaiting = room?.ownSeat === 'HOST' && room.status === 'WAITING' && !room.guest;
+  const hostWaiting =
+    !reportRoom &&
+    !unavailable &&
+    room?.ownSeat === 'HOST' &&
+    room.status === 'WAITING' &&
+    !room.guest;
   const presence = useHostPresence(roomId, hostWaiting);
-  const busy = reconciling || action.pending || invite.pending || approval.pending;
+  const busy =
+    !!reportRoom ||
+    safetyPending ||
+    reconciling ||
+    action.pending ||
+    invite.pending ||
+    approval.pending;
   const link = invitation ? createPlayInviteLink(location.origin, invitation.code) : '';
 
   useEffect(() => {
@@ -79,7 +95,7 @@ export function PlayRoom({ roomId }: { roomId: string }) {
   }, []);
 
   const applyView = useCallback((view: PlayRoomView) => {
-    if (lifetime.current.signal.aborted) return false;
+    if (lifetime.current.signal.aborted || sharingStopped.current) return false;
     const previous = currentView.current;
     if (
       previous &&
@@ -97,6 +113,7 @@ export function PlayRoom({ roomId }: { roomId: string }) {
 
   const load = useCallback(
     async (signal: AbortSignal) => {
+      if (reportRoom || sharingStopped.current) return null;
       const sequence = ++readSequence.current;
       try {
         const view = await playFetch(path, playRoomViewSchema, { signal });
@@ -124,6 +141,19 @@ export function PlayRoom({ roomId }: { roomId: string }) {
       } catch (caught) {
         if (
           !signal.aborted &&
+          caught instanceof PlayHttpError &&
+          caught.reason === 'PLAY_UNAVAILABLE'
+        ) {
+          sharingStopped.current = true;
+          admissionEpoch.current++;
+          currentView.current = null;
+          setRoom(null);
+          setInvitation(null);
+          setRequests([]);
+          setUnavailable(true);
+        }
+        if (
+          !signal.aborted &&
           sequence === readSequence.current &&
           caught instanceof PlayHttpError &&
           [401, 403].includes(caught.status)
@@ -137,7 +167,7 @@ export function PlayRoom({ roomId }: { roomId: string }) {
         throw caught;
       }
     },
-    [path, applyView, playFetch]
+    [path, applyView, playFetch, reportRoom]
   );
   const polling = usePlayPoll(load);
 
@@ -226,6 +256,7 @@ export function PlayRoom({ roomId }: { roomId: string }) {
           attempt !== 0 ||
           outcome.kind !== 'REFUSED' ||
           outcome.status !== 409 ||
+          outcome.reason !== undefined ||
           !fresh ||
           epoch !== admissionEpoch.current ||
           fresh.ownSeat !== room.ownSeat ||
@@ -285,293 +316,331 @@ export function PlayRoom({ roomId }: { roomId: string }) {
     }
   };
 
-  if (!room)
-    return (
-      <main className={styles.root}>
-        <Link href="/play" className={styles.back}>
-          Back to play
-        </Link>
-        <h1>Your game</h1>
-        <p role={polling.error ? 'alert' : 'status'}>{polling.error ?? 'Opening your game…'}</p>
-        {polling.error && <Link href="/profiles">Check your active profile</Link>}
-      </main>
-    );
   return (
     <main className={styles.root}>
-      <header className={styles.header}>
-        <Link href="/play" className={styles.back}>
-          All games
-        </Link>
-        <span role="status" className={styles.connection}>
-          {polling.connection === 'CONNECTED'
-            ? 'Connected'
-            : polling.connection === 'PAUSED'
-              ? 'Updates paused'
-              : 'Reconnecting…'}
-        </span>
-      </header>
-      <div className={styles.players}>
-        <span>{room.host.name}</span>
-        <span aria-hidden="true">×</span>
-        <span>{room.guest?.name ?? 'Your partner'}</span>
-      </div>
-      <div className={styles.progress}>
-        <span>
-          {room.round
-            ? `Round ${room.round.order + 1} of ${room.kind === 'MIXED' ? 6 : 2}`
-            : room.status === 'WAITING'
-              ? 'A game for two'
-              : room.status.toLowerCase()}
-        </span>
-        <span>{room.points} points together</span>
-      </div>
-      {(polling.error || notice || presence.error) && (
-        <p className={styles.notice} role={polling.error || presence.error ? 'alert' : 'status'}>
-          {polling.error ?? presence.error ?? notice}
-        </p>
+      <Link href="/play/safety" className={styles.back}>
+        Game safety
+      </Link>
+      {reportRoom && (
+        <PlayReport
+          room={reportRoom}
+          onPendingChange={setSafetyPending}
+          onClose={() => setReportRoom(null)}
+          onBlocked={() => {
+            sharingStopped.current = true;
+            admissionEpoch.current++;
+            readSequence.current++;
+            currentView.current = null;
+            setRoom(null);
+            setInvitation(null);
+            setRequests([]);
+            setUnavailable(true);
+          }}
+        />
       )}
-      {[action, invite, approval].map(
-        (mutation, index) =>
-          mutation.error && (
-            <div key={index} className={styles.notice} role="alert">
-              <p>{mutation.error}</p>
-              {mutation.uncertain && (
-                <button
-                  type="button"
-                  className={styles.secondary}
-                  disabled={mutation.busy}
-                  onClick={() => {
-                    void mutation.retry();
-                  }}
-                >
-                  Recover the same action
-                </button>
-              )}
-            </div>
-          )
-      )}
+      {!room ? (
+        <>
+          <Link href="/play" className={styles.back}>
+            Back to play
+          </Link>
+          <h1>Your game</h1>
+          <p role={polling.error ? 'alert' : 'status'}>
+            {unavailable
+              ? 'This game is unavailable. Your saved profile and private learning remain available.'
+              : (polling.error ?? 'Opening your game…')}
+          </p>
+          {polling.error && !unavailable && <Link href="/profiles">Check your active profile</Link>}
+        </>
+      ) : (
+        <>
+          <header className={styles.header}>
+            <Link href="/play" className={styles.back}>
+              All games
+            </Link>
+            <span role="status" className={styles.connection}>
+              {polling.connection === 'CONNECTED'
+                ? 'Connected'
+                : polling.connection === 'PAUSED'
+                  ? 'Updates paused'
+                  : 'Reconnecting…'}
+            </span>
+          </header>
+          <div className={styles.players}>
+            <span>{room.host.name}</span>
+            <span aria-hidden="true">×</span>
+            <span>{room.guest?.name ?? 'Your partner'}</span>
+          </div>
+          {room.guest && !reportRoom && (
+            <button className={styles.secondary} onClick={() => setReportRoom(room)}>
+              Report or block partner
+            </button>
+          )}
+          <div className={styles.progress}>
+            <span>
+              {room.round
+                ? `Round ${room.round.order + 1} of ${room.kind === 'MIXED' ? 6 : 2}`
+                : room.status === 'WAITING'
+                  ? 'A game for two'
+                  : room.status.toLowerCase()}
+            </span>
+            <span>{room.points} points together</span>
+          </div>
+          {(polling.error || notice || presence.error) && (
+            <p
+              className={styles.notice}
+              role={polling.error || presence.error ? 'alert' : 'status'}
+            >
+              {polling.error ?? presence.error ?? notice}
+            </p>
+          )}
+          {[action, invite, approval].map(
+            (mutation, index) =>
+              mutation.error && (
+                <div key={index} className={styles.notice} role="alert">
+                  <p>{mutation.error}</p>
+                  {mutation.uncertain && (
+                    <button
+                      type="button"
+                      className={styles.secondary}
+                      disabled={mutation.busy || !!reportRoom}
+                      onClick={() => {
+                        void mutation.retry();
+                      }}
+                    >
+                      Recover the same action
+                    </button>
+                  )}
+                </div>
+              )
+          )}
 
-      {room.status === 'WAITING' && (
-        <section className={styles.waiting} aria-labelledby="waiting-heading">
-          <h1 id="waiting-heading">
-            {room.guest
-              ? 'You’re both here.'
-              : room.ownSeat === 'HOST'
-                ? 'Save a seat for your partner.'
-                : 'Your host is getting ready.'}
-          </h1>
-          {room.guest ? (
+          {room.status === 'WAITING' && (
+            <section className={styles.waiting} aria-labelledby="waiting-heading">
+              <h1 id="waiting-heading">
+                {room.guest
+                  ? 'You’re both here.'
+                  : room.ownSeat === 'HOST'
+                    ? 'Save a seat for your partner.'
+                    : 'Your host is getting ready.'}
+              </h1>
+              {room.guest ? (
+                <>
+                  <p>
+                    {room.ownSeat === 'HOST'
+                      ? 'Start when you are both ready. You each get a language turn.'
+                      : 'You are in. Your host can start the game.'}
+                  </p>
+                  {room.allowedActions.includes('START') && (
+                    <button
+                      type="button"
+                      className={styles.primary}
+                      disabled={busy}
+                      onClick={() => {
+                        void roomAction('START');
+                      }}
+                    >
+                      Start playing
+                    </button>
+                  )}
+                </>
+              ) : room.ownSeat === 'HOST' ? (
+                <>
+                  <p>Share the code, link, or QR. Stay in this game to let your partner enter.</p>
+                  <p className={styles.presence} role="status">
+                    {presence.ready
+                      ? 'You’re here and waiting.'
+                      : 'Keep this game in the foreground to accept entry.'}
+                  </p>
+                  {invitation ? (
+                    <div className={styles.invitation}>
+                      <div>
+                        <label htmlFor="room-code">Invitation code</label>
+                        <input
+                          id="room-code"
+                          className={styles.code}
+                          value={formatPlayInviteCode(invitation.code)}
+                          readOnly
+                          onFocus={(event) => event.target.select()}
+                        />
+                        <button
+                          type="button"
+                          className={styles.secondary}
+                          onClick={() => {
+                            void copy(formatPlayInviteCode(invitation.code));
+                          }}
+                        >
+                          Copy code
+                        </button>
+                        <label htmlFor="room-link">Invitation link</label>
+                        <input
+                          id="room-link"
+                          value={link}
+                          readOnly
+                          onFocus={(event) => event.target.select()}
+                        />
+                        <button
+                          type="button"
+                          className={styles.secondary}
+                          onClick={() => {
+                            void copy(link);
+                          }}
+                        >
+                          Copy link
+                        </button>
+                      </div>
+                      <div>
+                        {qr?.link === link && (
+                          <Image
+                            src={qr.data}
+                            alt="Scan to open this game invitation"
+                            width={280}
+                            height={280}
+                            unoptimized
+                            className={styles.qr}
+                          />
+                        )}
+                        {qrError?.link === link && <p role="alert">{qrError.message}</p>}
+                      </div>
+                    </div>
+                  ) : (
+                    <p role="status">
+                      {invite.pending
+                        ? 'Making your invitation…'
+                        : 'Your invitation is not ready yet.'}
+                    </p>
+                  )}
+                  {inviteLoaded && !busy && (
+                    <button
+                      type="button"
+                      className={styles.quiet}
+                      onClick={() => {
+                        void rotate(room.revision);
+                      }}
+                    >
+                      {invitation ? 'Replace invitation code' : 'Create invitation'}
+                    </button>
+                  )}
+                  <section className={styles.requests} aria-labelledby="room-requests-heading">
+                    <h2 id="room-requests-heading">At the door</h2>
+                    {requests.length === 0 ? (
+                      <p>No requests yet. Your partner will appear here.</p>
+                    ) : (
+                      <AdmissionRequests
+                        requests={requests}
+                        approveAndEnter
+                        busy={busy || !presence.ready}
+                        onAction={approve}
+                      />
+                    )}
+                  </section>
+                </>
+              ) : (
+                <p>Waiting for your host.</p>
+              )}
+            </section>
+          )}
+
+          {room.status === 'PLAYING' && room.round && (
             <>
-              <p>
-                {room.ownSeat === 'HOST'
-                  ? 'Start when you are both ready. You each get a language turn.'
-                  : 'You are in. Your host can start the game.'}
-              </p>
-              {room.allowedActions.includes('START') && (
+              <RoundPlay
+                key={`${room.round.id}:${room.ownSeat}`}
+                round={room.round}
+                busy={busy}
+                onCommand={command}
+              />
+              <PhraseCapture
+                key={`save:${room.round.id}:${room.ownSeat}`}
+                roomId={room.id}
+                round={room.round}
+              />
+              {room.allowedActions.includes('NEXT_ROUND') && (
                 <button
                   type="button"
                   className={styles.primary}
                   disabled={busy}
                   onClick={() => {
-                    void roomAction('START');
+                    void roomAction('NEXT_ROUND');
                   }}
                 >
-                  Start playing
+                  {room.round.order + 1 === (room.kind === 'MIXED' ? 6 : 2)
+                    ? 'See your recap'
+                    : 'Next round. Swap turns.'}
                 </button>
               )}
             </>
-          ) : room.ownSeat === 'HOST' ? (
-            <>
-              <p>Share the code, link, or QR. Stay in this game to let your partner enter.</p>
-              <p className={styles.presence} role="status">
-                {presence.ready
-                  ? 'You’re here and waiting.'
-                  : 'Keep this game in the foreground to accept entry.'}
-              </p>
-              {invitation ? (
-                <div className={styles.invitation}>
-                  <div>
-                    <label htmlFor="room-code">Invitation code</label>
-                    <input
-                      id="room-code"
-                      className={styles.code}
-                      value={formatPlayInviteCode(invitation.code)}
-                      readOnly
-                      onFocus={(event) => event.target.select()}
-                    />
-                    <button
-                      type="button"
-                      className={styles.secondary}
-                      onClick={() => {
-                        void copy(formatPlayInviteCode(invitation.code));
-                      }}
-                    >
-                      Copy code
-                    </button>
-                    <label htmlFor="room-link">Invitation link</label>
-                    <input
-                      id="room-link"
-                      value={link}
-                      readOnly
-                      onFocus={(event) => event.target.select()}
-                    />
-                    <button
-                      type="button"
-                      className={styles.secondary}
-                      onClick={() => {
-                        void copy(link);
-                      }}
-                    >
-                      Copy link
-                    </button>
-                  </div>
-                  <div>
-                    {qr?.link === link && (
-                      <Image
-                        src={qr.data}
-                        alt="Scan to open this game invitation"
-                        width={280}
-                        height={280}
-                        unoptimized
-                        className={styles.qr}
-                      />
-                    )}
-                    {qrError?.link === link && <p role="alert">{qrError.message}</p>}
-                  </div>
-                </div>
-              ) : (
-                <p role="status">
-                  {invite.pending ? 'Making your invitation…' : 'Your invitation is not ready yet.'}
-                </p>
-              )}
-              {inviteLoaded && !busy && (
+          )}
+
+          {room.status === 'COMPLETED' && (
+            <section className={styles.recap} aria-labelledby="recap-heading">
+              <span className={styles.eyebrow}>A few new things to say</span>
+              <h1 id="recap-heading">That was your game.</h1>
+              <p>{room.points} points together. Keep the words you want to use again.</p>
+              {room.allowedActions.includes('REMATCH') && (
                 <button
                   type="button"
-                  className={styles.quiet}
+                  className={styles.primary}
+                  disabled={busy}
                   onClick={() => {
-                    void rotate(room.revision);
+                    void roomAction('REMATCH');
                   }}
                 >
-                  {invitation ? 'Replace invitation code' : 'Create invitation'}
+                  Play another together
                 </button>
               )}
-              <section className={styles.requests} aria-labelledby="room-requests-heading">
-                <h2 id="room-requests-heading">At the door</h2>
-                {requests.length === 0 ? (
-                  <p>No requests yet. Your partner will appear here.</p>
-                ) : (
-                  <AdmissionRequests
-                    requests={requests}
-                    approveAndEnter
-                    busy={busy || !presence.ready}
-                    onAction={approve}
-                  />
-                )}
-              </section>
-            </>
-          ) : (
-            <p>Waiting for your host.</p>
+              {room.rematchRoomId && (
+                <Link
+                  className={styles.nextGame}
+                  href={`/play/rooms/${encodeURIComponent(room.rematchRoomId)}`}
+                >
+                  Your next game is ready
+                </Link>
+              )}
+              {room.completedRounds.map((round) => (
+                <details key={round.id} className={styles.roundRecap}>
+                  <summary>
+                    Round {round.order + 1} ·{' '}
+                    {round.mode === 'KNOW_ME'
+                      ? 'Pick & predict'
+                      : round.mode === 'DESCRIBE'
+                        ? 'Describe & guess'
+                        : 'Secret mission'}{' '}
+                    · {round.result?.skipped ? 'skipped' : `${round.result?.points ?? 0} points`}
+                  </summary>
+                  <RoundPlay round={round} busy onCommand={command} />
+                  <PhraseCapture roomId={room.id} round={round} />
+                </details>
+              ))}
+              <Link href="/play" className={styles.back}>
+                Open your phrase notebook
+              </Link>
+            </section>
           )}
-        </section>
-      )}
-
-      {room.status === 'PLAYING' && room.round && (
-        <>
-          <RoundPlay
-            key={`${room.round.id}:${room.ownSeat}`}
-            round={room.round}
-            busy={busy}
-            onCommand={command}
-          />
-          <PhraseCapture
-            key={`save:${room.round.id}:${room.ownSeat}`}
-            roomId={room.id}
-            round={room.round}
-          />
-          {room.allowedActions.includes('NEXT_ROUND') && (
-            <button
-              type="button"
-              className={styles.primary}
-              disabled={busy}
-              onClick={() => {
-                void roomAction('NEXT_ROUND');
-              }}
-            >
-              {room.round.order + 1 === (room.kind === 'MIXED' ? 6 : 2)
-                ? 'See your recap'
-                : 'Next round. Swap turns.'}
-            </button>
+          {(room.status === 'CANCELLED' || room.status === 'EXPIRED') && (
+            <section className={styles.waiting}>
+              <h1>
+                {room.status === 'EXPIRED' ? 'This game has expired.' : 'This game has ended.'}
+              </h1>
+              <p>You can make another game. Saved phrases stay in your private notebook.</p>
+              <Link href="/play" className={styles.nextGame}>
+                Back to play
+              </Link>
+            </section>
+          )}
+          {(room.allowedActions.includes('LEAVE') || room.allowedActions.includes('CANCEL')) && (
+            <footer className={styles.footer}>
+              <button
+                type="button"
+                className={styles.quiet}
+                disabled={busy}
+                onClick={() => {
+                  void roomAction(room.allowedActions.includes('CANCEL') ? 'CANCEL' : 'LEAVE');
+                }}
+              >
+                End this game
+              </button>
+            </footer>
           )}
         </>
-      )}
-
-      {room.status === 'COMPLETED' && (
-        <section className={styles.recap} aria-labelledby="recap-heading">
-          <span className={styles.eyebrow}>A few new things to say</span>
-          <h1 id="recap-heading">That was your game.</h1>
-          <p>{room.points} points together. Keep the words you want to use again.</p>
-          {room.allowedActions.includes('REMATCH') && (
-            <button
-              type="button"
-              className={styles.primary}
-              disabled={busy}
-              onClick={() => {
-                void roomAction('REMATCH');
-              }}
-            >
-              Play another together
-            </button>
-          )}
-          {room.rematchRoomId && (
-            <Link
-              className={styles.nextGame}
-              href={`/play/rooms/${encodeURIComponent(room.rematchRoomId)}`}
-            >
-              Your next game is ready
-            </Link>
-          )}
-          {room.completedRounds.map((round) => (
-            <details key={round.id} className={styles.roundRecap}>
-              <summary>
-                Round {round.order + 1} ·{' '}
-                {round.mode === 'KNOW_ME'
-                  ? 'Pick & predict'
-                  : round.mode === 'DESCRIBE'
-                    ? 'Describe & guess'
-                    : 'Secret mission'}{' '}
-                · {round.result?.skipped ? 'skipped' : `${round.result?.points ?? 0} points`}
-              </summary>
-              <RoundPlay round={round} busy onCommand={command} />
-              <PhraseCapture roomId={room.id} round={round} />
-            </details>
-          ))}
-          <Link href="/play" className={styles.back}>
-            Open your phrase notebook
-          </Link>
-        </section>
-      )}
-      {(room.status === 'CANCELLED' || room.status === 'EXPIRED') && (
-        <section className={styles.waiting}>
-          <h1>{room.status === 'EXPIRED' ? 'This game has expired.' : 'This game has ended.'}</h1>
-          <p>You can make another game. Saved phrases stay in your private notebook.</p>
-          <Link href="/play" className={styles.nextGame}>
-            Back to play
-          </Link>
-        </section>
-      )}
-      {(room.allowedActions.includes('LEAVE') || room.allowedActions.includes('CANCEL')) && (
-        <footer className={styles.footer}>
-          <button
-            type="button"
-            className={styles.quiet}
-            disabled={busy}
-            onClick={() => {
-              void roomAction(room.allowedActions.includes('CANCEL') ? 'CANCEL' : 'LEAVE');
-            }}
-          >
-            End this game
-          </button>
-        </footer>
       )}
     </main>
   );

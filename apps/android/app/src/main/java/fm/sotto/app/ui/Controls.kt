@@ -11,6 +11,35 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import fm.sotto.app.model.Level
 import fm.sotto.app.model.Settings
+import fm.sotto.app.play.PlayCoordinator
+import fm.sotto.app.play.PlayState
+import kotlinx.coroutines.launch
+
+@Composable fun protectedDraft(coordinator: PlayCoordinator, state: PlayState, key: String): Pair<String, (String) -> Unit> {
+    val saved = state.vault?.drafts?.get(key).orEmpty()
+    var text by remember(key) { mutableStateOf(saved) }
+    var previous by remember(key) { mutableStateOf(saved) }
+    LaunchedEffect(saved) {
+        if (text == previous) text = saved
+        previous = saved
+    }
+    val connection = state.vault?.connection
+    return text to { next ->
+        text = next.take(500)
+        val value = text
+        val generation = coordinator.epoch
+        coordinator.scope.launch {
+            try {
+                coordinator.checkEpoch(generation, connection)
+                coordinator.persist {
+                    require(it.connection == connection)
+                    it.copy(drafts = if (value.isEmpty()) it.drafts - key else it.drafts + (key to value))
+                }
+            } catch (_: kotlinx.coroutines.CancellationException) { }
+            catch (error: Exception) { if (coordinator.epoch == generation) coordinator.report(error) }
+        }
+    }
+}
 
 @Composable fun Action(label: String, enabled: Boolean = true, secondary: Boolean = false, onClick: () -> Unit) {
     if (secondary) OutlinedButton(onClick, Modifier.fillMaxWidth().heightIn(min = 48.dp), enabled = enabled) { Text(label) }

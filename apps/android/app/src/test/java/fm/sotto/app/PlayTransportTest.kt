@@ -14,6 +14,48 @@ import java.net.InetSocketAddress
 import java.util.concurrent.LinkedBlockingQueue
 
 class PlayTransportTest {
+    @Test fun structuredSafetyErrorsKeepTheirReasonAndActualHttpStatus() = runBlocking {
+        PlayScenario().use { server ->
+            val connection = server.connection()
+            for (fixture in server.safetyFixture.getValue("errors").let { it as kotlinx.serialization.json.JsonArray }) {
+                val value = fixture as kotlinx.serialization.json.JsonObject
+                val status = value.getValue("status").toString().toInt()
+                val body = value.getValue("body") as kotlinx.serialization.json.JsonObject
+                server.respond = { HttpReply(status, body.toString()) }
+                try { SottoClient(connection.server, connection).raw("/api/v1/play/safety"); fail("Expected safety rejection") }
+                catch (error: ApiError) {
+                    assertEquals(status, error.status)
+                    assertEquals(body.getValue("reason").toString().removeSurrounding("\""), error.reason)
+                    assertTrue(error.status != 401 && error.status != 403)
+                }
+            }
+        }
+    }
+
+    @Test fun profileDeletionUsesConfirmedAuthenticatedDeleteAndAcceptsQueuedCleanup() = runBlocking {
+        PlayScenario().use { server ->
+            val connection = server.connection()
+            for (status in listOf(200, 202)) {
+                server.respond = { HttpReply(status, "{\"success\":true,\"cleanup\":{\"phase\":\"pending\"}}") }
+                SottoClient(connection.server, connection).deleteAccount()
+                val request = server.received.last()
+                assertEquals("/api/v1/users/me", request.path)
+                assertEquals("DELETE", request.method)
+                assertEquals("{\"confirm\":\"DELETE\"}", request.body)
+                assertEquals(listOf("Bearer ${connection.token}"), request.headers["authorization"])
+                assertEquals(listOf(connection.profile.id), request.headers["x-sotto-profile-id"])
+                assertNull(request.headers["cookie"])
+                assertNull(request.headers["origin"])
+            }
+            server.respond = { HttpReply(202, "{\"success\":false}") }
+            try { SottoClient(connection.server, connection).deleteAccount(); fail("Deletion must be confirmed") }
+            catch (_: IllegalArgumentException) { }
+            server.respond = { HttpReply(403, "{\"error\":\"Protected profile\"}") }
+            try { SottoClient(connection.server, connection).deleteAccount(); fail("Forbidden deletion must fail") }
+            catch (error: ApiError) { assertEquals(403, error.status) }
+        }
+    }
+
     @Test fun privateRequestsKeepSecretsInBoundHeadersWithoutCookiesOriginOrRedirects() = runBlocking {
         val received = LinkedBlockingQueue<Map<String, List<String>>>()
         val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)

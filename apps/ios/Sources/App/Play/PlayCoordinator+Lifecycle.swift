@@ -16,7 +16,10 @@ extension PlayCoordinator {
         var failures = 0
         while current(generation, connection: boundConnection), !accessRevoked {
             do {
-                try await refresh(generation)
+                let poll = Task { try await self.refresh(generation) }
+                pollingWork = poll
+                try await poll.value
+                pollingWork = nil
                 failures = 0
             } catch {
                 guard epoch == generation else { return }
@@ -31,9 +34,26 @@ extension PlayCoordinator {
     func endForeground() {
         active = false
         epoch = UUID()
-        work?.cancel()
+        let previous = work
+        let polling = pollingWork
+        polling?.cancel()
+        pollingWork = nil
+        previous?.cancel()
+        if previous != nil || polling != nil {
+            let earlier = drainingWork
+            let drain = UUID()
+            drainGeneration = drain
+            drainingWork = Task { [weak self] in
+                await earlier?.value
+                await previous?.value
+                _ = try? await polling?.value
+                if self?.drainGeneration == drain { self?.drainingWork = nil }
+            }
+        }
         work = nil
+        actionGeneration = UUID()
         busy = false
+        safetyBusy = false
         releasePresence()
     }
 
@@ -42,7 +62,9 @@ extension PlayCoordinator {
         lease = nil
         leaseReady = false
         if let previous {
-            Task {
+            let earlier = presenceRelease
+            presenceRelease = Task {
+                await earlier?.value
                 do { _ = try await previous.client.playPresence(previous.roomID, nonce: previous.nonce, release: true) }
                 catch { /* The server's bounded lease also expires after disconnection. */ }
             }
@@ -70,6 +92,12 @@ extension PlayCoordinator {
 
     func refresh(_ generation: UUID) async throws {
         let connection = model?.credentials
+        guard !safetyBusy, state?.pendingSafety == nil else { releasePresence(); return }
+        try await loadSafetyPolicy(generation: generation)
+        if let connection, connection.selectedProfile != nil {
+            do { try await loadSafetyStatus(generation: generation, connection: connection) }
+            catch { try handleMemberFailure(error, generation: generation, connection: connection) }
+        }
         switch screen {
         case .join:
             guard let invite = state?.admission?.invitation ?? state?.invitation else { return }
@@ -135,11 +163,19 @@ extension PlayCoordinator {
                     try requireCurrent(generation, connection: connection)
                 }
             } catch { try handleMemberFailure(error, generation: generation, connection: connection) }
+        case .safety:
+            guard let connection, connection.selectedProfile != nil else { return }
+            try await refreshSafetyLists(generation: generation, connection: connection)
+        case .report: break
         }
     }
 
     func handleMemberFailure(_ error: Error, generation: UUID, connection: SottoCredentials) throws {
         try requireCurrent(generation, connection: connection)
+        if let failure = error as? PlaySafetyFailure, failure.reason == .unavailable {
+            clearGameCache()
+            gameUnavailable = true
+        }
         if case let SottoAPIError.http(status, _) = error, status == 401 || status == 403 {
             self.error = error.localizedDescription
             endForeground()

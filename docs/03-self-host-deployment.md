@@ -76,7 +76,7 @@ local emulator installs do not establish App Store or Play publication. Sign
 Android APKs/AABs and iOS archives through your distribution account before
 offering them. The Android application ID and iOS bundle ID are `fm.sotto.app`.
 
-Invitations currently use the browser bridge and registered `sotto://play/join`
+Invitations support the browser bridge and registered `sotto://play/join`
 scheme, plus paste, game code and camera QR. They contain a server address and
 expiring invitation code, never credentials. After installing, reopen the original
 link or enter its server and code. The server must be reachable from the guest's
@@ -84,6 +84,14 @@ device. New profiles still require owner approval and a present accepting host.
 
 Verified HTTPS app links require a controlled domain and actual signed app
 identities. They are not enabled by default for arbitrary self-hosted domains.
+The official iOS target declares `sotto.fm` and `sotto.afromero.co`, and this
+server serves their exact Apple application identifier at
+`/.well-known/apple-app-site-association`. Only GET and HEAD on that exact
+endpoint bypass household access. The association covers only `/play/join`.
+Deploy it on both domains before installing the newly signed app, then inspect
+the archive's entitlements and verify HTTPS invitation opening. Other server
+domains retain the browser, paste/code and QR flows.
+
 To activate them for a distribution you control:
 
 1. Read the Apple application identifier from the signed app's entitlements and

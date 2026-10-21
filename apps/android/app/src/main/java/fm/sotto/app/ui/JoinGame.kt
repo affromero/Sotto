@@ -16,6 +16,7 @@ import fm.sotto.app.ui.platform.localNetworkAccess
     var name by remember(invite) { mutableStateOf("") }
     var existing by remember(invite) { mutableStateOf(false) }
     var consent by remember(invite) { mutableStateOf(false) }
+    var conduct by remember(invite) { mutableStateOf(false) }
     val ready = state.active && !state.busy && !state.checking
     Text("Join a game", style = MaterialTheme.typography.headlineMedium)
     val network = localNetworkAccess(invite?.server ?: PlayInvitation.parse(code)?.server ?: PlayInvitation.typedServer(server))
@@ -46,19 +47,41 @@ import fm.sotto.app.ui.platform.localNetworkAccess
     }
     val pending = state.vault?.admission
     if (pending != null) {
+        val hasConduct = pending.command.acceptedConductVersion == CONDUCT_VERSION || pending.conductVersion == CONDUCT_VERSION
         Text(state.joinStatus?.name?.humanize() ?: "Checking your request…", style = MaterialTheme.typography.titleLarge)
         Text("New profiles need the server owner's approval. The game host must also be present and accept you.")
         if (pending.existingConnection != null && pending.existingConnection != state.vault.connection)
             Action("Restore original profile", ready && fm.sotto.app.network.NetworkAccess.allowedFor(pending.existingConnection.server)) { coordinator.run { switchConnection(pending.existingConnection) } }
-        Action("Retry join request", ready && network && pending.delivery == null) { coordinator.run { retryIntake() } }
+        if (pending.command.acceptedConductVersion == null && !hasConduct) {
+            ConductText(state.policy, invite.server)
+            if (state.legacyRequestMissing && pending.delivery != null) {
+                Text("The server cannot verify this issued profile recovery. Its credential and proof are kept. Keep the recovery and contact the server operator.")
+            }
+            else if (state.legacyRequestMissing) {
+                Text("This old request cannot be verified. Its original request and proof can be kept while you start fresh.")
+                LabeledToggle("I agree to this conduct policy for a new request.", conduct, ready && state.policy != null) { conduct = it }
+                Action("Keep old recovery and start a fresh request", ready && network && conduct) {
+                    coordinator.run { retainLegacyAdmission(acceptedConduct = conduct) }
+                }
+            }
+            else {
+                LabeledToggle("I agree to this conduct policy for my saved request.", conduct, ready && state.policy != null) { conduct = it }
+                Action("Accept conduct for saved request", ready && network && conduct) { coordinator.run { acceptPendingConduct() } }
+            }
+        }
+        Action("Retry join request", ready && network && pending.delivery == null && pending.command.acceptedConductVersion == CONDUCT_VERSION) { coordinator.run { retryIntake() } }
         Action(if (pending.delivery != null) "Finish saving profile" else "Enter accepted game",
-            ready && network && (pending.delivery != null || state.joinStatus in listOf(JoinStatus.ACCEPTED, JoinStatus.CLAIMED))) {
+            ready && network && hasConduct && (pending.delivery != null ||
+                state.joinStatus in listOf(JoinStatus.ACCEPTED, JoinStatus.CLAIMED))) {
             coordinator.run { finishAdmission() }
         }
         if (pending.delivery != null) Action("Keep recovery and open another invitation", ready, true) { coordinator.run { retainAdmission() } }
         else Action("Discard invitation", ready, true) { coordinator.run { discardInvitation() } }
         return
     }
+    ConductText(state.policy, invite.server)
+    LabeledToggle("I agree to this conduct policy before sharing my name or game content.", conduct, ready && state.policy != null) { conduct = it }
+    if (!conduct) return
     val canUseExisting = state.vault?.connection?.server == invite.server
     if (canUseExisting) LabeledToggle("Join as ${state.vault.connection.profile.name}", existing, ready) { existing = it }
     else Action("Pair an existing profile on this server", ready, true) { coordinator.navigate(Screen.Pair) }
@@ -67,7 +90,7 @@ import fm.sotto.app.ui.platform.localNetworkAccess
     if (!existing) LabeledToggle("Create my own persistent learner profile on this server.", consent, ready) { consent = it }
     Action(if (existing) "Request to join as ${state.vault?.connection?.profile?.name}" else "Request a profile and join",
         ready && network && settings.valid && (existing && canUseExisting || !existing && consent && name.isNotBlank())) {
-        coordinator.run { join(settings, name, existing) }
+        coordinator.run { join(settings, name, existing, acceptedConduct = conduct) }
     }
     Action("Choose another invitation", ready, true) { coordinator.run { discardInvitation() } }
 }

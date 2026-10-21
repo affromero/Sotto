@@ -19,13 +19,14 @@ import { supportsSttLanguage } from '@/lib/providers/stt-registry';
 import { errorResponse } from '@/lib/api-response';
 import { THEME_PREFS_COOKIE, serializeThemePrefs, themePrefsFromUser } from '@/lib/theme-prefs';
 import { z } from 'zod';
-import { deleteSottoProfile } from '@/lib/sidedoor/access/deletion/profile-deletion';
+import { deleteOwnSottoProfile } from '@/lib/sidedoor/access/deletion/profile-deletion';
+import { accessOperation } from '@/lib/sidedoor/access/core/http';
 import { ACTIVE_PROFILE_COOKIE } from '@/lib/profiles/profile-cookie';
 import { SHARED_SESSION_COOKIE } from '@/lib/sidedoor/access/core/session-identity';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 import { requireOriginalSottoAdmission } from '@/lib/sidedoor/access/core/request-identity';
 import { isAccessError } from 'thesidedoor-core/access';
-import { accessErrorStatus } from 'thesidedoor-core/access/http';
+import { accessErrorStatus, readAccessJson } from 'thesidedoor-core/access/http';
 
 const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365;
 
@@ -373,19 +374,19 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  try {
+  return accessOperation(request, !request.headers.has('authorization'), async () => {
     const authResult = await authenticateRequest(request);
     if (!authResult) {
       return errorResponse('Unauthorized', 401);
     }
 
-    const body = await request.json();
+    const body = await readAccessJson(request);
     const validation = deleteAccountSchema.safeParse(body);
     if (!validation.success) {
       return errorResponse('You must send { "confirm": "DELETE" } to delete your account', 400);
     }
 
-    const cleanup = await deleteSottoProfile(prismaUnfiltered, request, authResult.userId);
+    const cleanup = await deleteOwnSottoProfile(prismaUnfiltered, request, authResult);
     if (!cleanup) return errorResponse('User not found', 404);
     const response = NextResponse.json(
       { success: true, cleanup: { id: cleanup.id, phase: cleanup.phase } },
@@ -395,10 +396,5 @@ export async function DELETE(request: NextRequest) {
     response.cookies.delete(THEME_PREFS_COOKIE);
     response.cookies.delete(SHARED_SESSION_COOKIE);
     return response;
-  } catch (error: unknown) {
-    logger.error('Failed to delete account', {
-      error: error instanceof Error ? error.message : String(error),
-    });
-    return errorResponse('Failed to delete account', 500);
-  }
+  });
 }

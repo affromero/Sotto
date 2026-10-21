@@ -1,0 +1,4 @@
+{
+  "androidx.camera:camera-core:1.6.2": ["libyuv-LICENSE.txt", "libyuv-PATENTS.txt"],
+  "javax.inject:javax.inject:1": ["javax-inject-NOTICE.txt"]
+}

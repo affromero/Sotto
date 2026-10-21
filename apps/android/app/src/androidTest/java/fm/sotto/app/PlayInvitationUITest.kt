@@ -24,6 +24,25 @@ class PlayInvitationUITest {
     @Before fun freshDevice() { runBlocking { application.protectedStore.erase() } }
     @After fun cleanup() { activity?.close(); runBlocking { application.protectedStore.erase() } }
 
+    @Test fun privacyAndBundledLicensesAreAvailableBeforePairing() = with(NativeUIActions(compose)) {
+        activity = ActivityScenario.launch(MainActivity::class.java)
+        click("Privacy and licenses")
+        visible("Your server and your data")
+        visible("Delete your profile")
+        click("Read license notices")
+        compose.waitUntil(15_000) {
+            compose.onAllNodes(hasText("Sotto Android license notices", substring = true))
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNode(hasText("Sotto Android license notices", substring = true))
+            .assertTextContains("PolyForm Noncommercial", substring = true)
+            .assertTextContains("The LibYuv Project Authors", substring = true)
+            .assertTextContains("The JSR-330 Expert Group", substring = true)
+        click("Close")
+        visible("Join with a code or link")
+        assertNull(runBlocking { application.protectedStore.load() }.connection)
+    }
+
     @Test fun decliningCameraPermissionKeepsPastedInvitationsAvailableWithoutSubmittingAJoin() = with(NativeUIActions(compose)) {
         PlayUIFixture().use { fixture ->
             activity = ActivityScenario.launch(MainActivity::class.java)
@@ -50,6 +69,7 @@ class PlayInvitationUITest {
             visible("Join a game")
             visible(fixture.invite.server)
             allowLocalNetwork()
+            click("I agree to this conduct policy before sharing my name or game content.")
             fill("Your name", "Sam")
             click("Create my own persistent learner profile on this server.")
             click("Request a profile and join")

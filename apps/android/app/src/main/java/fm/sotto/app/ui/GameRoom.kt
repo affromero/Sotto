@@ -13,10 +13,20 @@ import fm.sotto.app.ui.platform.localNetworkAccess
 @Composable fun GameRoom(coordinator: PlayCoordinator, state: PlayState) {
     val network = localNetworkAccess(state.vault?.connection?.server)
     val room = state.room
-    if (room == null) { Text(if (state.accessRevoked) "This profile can no longer open the game." else "Opening game…"); return }
-    val ready = state.active && network && !state.busy && !state.checking && !state.accessRevoked && state.vault?.pending == null
+    if (room == null) {
+        Text(when {
+            state.accessRevoked -> "This profile can no longer open the game."
+            state.roomUnavailable -> "This game is unavailable. Your profile and safety settings are still accessible."
+            else -> "Opening game…"
+        })
+        if (state.roomUnavailable) Action("Open game safety", state.active, true) { coordinator.openSafety() }
+        return
+    }
+    val ready = state.active && network && !state.busy && !state.checking && !state.accessRevoked && state.vault?.pending == null &&
+        state.vault?.pendingSafety == null && state.safety?.acceptedVersion == CONDUCT_VERSION && state.safety.sharingRestricted == false
     Text(room.kind.title, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.testTag("play.room.${room.id}"))
     Text("${room.host.name} + ${room.guest?.name ?: "your partner"} · ${room.points} shared points")
+    Action("Game safety, report or block", state.active && !state.accessRevoked, true) { coordinator.openSafety(room) }
     if (room.status == RoomStatus.WAITING) {
         Text("A seat for your partner", style = MaterialTheme.typography.titleLarge)
         Text(if (state.leaseReady) "Stay here while your partner enters." else if (room.ownSeat == Seat.HOST)

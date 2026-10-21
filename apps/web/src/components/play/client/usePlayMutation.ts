@@ -6,11 +6,16 @@ import { PlayHttpError, playErrorMessage } from './api';
 import { usePlayRequest } from './profile';
 
 /** Keep the exact action and its caller pending until an uncertain result is reconciled. */
-export function usePlayMutation<Schema extends z.ZodType>(schema: Schema) {
+export function usePlayMutation<Schema extends z.ZodType>(
+  schema: Schema,
+  validateResult?: (value: z.infer<Schema>, body: unknown) => boolean
+) {
   const playFetch = usePlayRequest();
   type Result = z.infer<Schema>;
   type Outcome =
-    { kind: 'OK'; value: Result } | { kind: 'REFUSED'; status: number } | { kind: 'CANCELLED' };
+    | { kind: 'OK'; value: Result }
+    | { kind: 'REFUSED'; status: number; reason?: PlayHttpError['reason'] }
+    | { kind: 'CANCELLED' };
   type Action = {
     path: string;
     body: unknown;
@@ -38,6 +43,11 @@ export function usePlayMutation<Schema extends z.ZodType>(schema: Schema) {
           signal: current.controller.signal,
         });
         if (action.current !== current) return;
+        if (validateResult && !validateResult(result, current.body))
+          throw new PlayHttpError(
+            0,
+            'The server did not confirm this action. Retry keeps the exact request.'
+          );
         action.current = null;
         setBusy(false);
         setPending(false);
@@ -46,18 +56,23 @@ export function usePlayMutation<Schema extends z.ZodType>(schema: Schema) {
         if (action.current !== current) return;
         setBusy(false);
         setError(playErrorMessage(caught));
-        if (!(caught instanceof PlayHttpError) || caught.status === 0 || caught.status >= 500) {
+        if (
+          !(caught instanceof PlayHttpError) ||
+          caught.status === 0 ||
+          caught.status === 429 ||
+          caught.status >= 500
+        ) {
           setUncertain(true);
           return;
         }
         action.current = null;
         setPending(false);
-        current.resolve({ kind: 'REFUSED', status: caught.status });
+        current.resolve({ kind: 'REFUSED', status: caught.status, reason: caught.reason });
       } finally {
         current.inFlight = false;
       }
     },
-    [schema, playFetch]
+    [schema, playFetch, validateResult]
   );
 
   const runOutcome = useCallback(

@@ -2,7 +2,7 @@ import Foundation
 
 extension PlayCoordinator {
     func discardPendingAction(id: UUID) throws {
-        guard !busy, let pending = state?.pending, pending.id == id else {
+        guard !busy, !safetyBusy, state?.pendingSafety == nil, let pending = state?.pending, pending.id == id else {
             throw SottoAPIError.message("The pending action changed. Check its current state before discarding it.")
         }
         try save {
@@ -58,20 +58,26 @@ extension PlayCoordinator {
     }
 
     func operation<Body: Encodable>(path: String, body: Body, response: PlayOperationResponse,
-                                  baseline: PlayRoom? = nil) async throws {
+                                  baseline: PlayRoom? = nil, slot: PlayPendingSlot = .game) async throws {
         try requireCurrent(epoch, connection: boundConnection)
-        guard state?.pending == nil else { throw SottoAPIError.message("Recover the pending action first.") }
+        guard state?[keyPath: slot.path] == nil,
+              slot == .safety || state?.pendingSafety == nil else {
+            throw SottoAPIError.message("Recover the pending action first.")
+        }
         guard let connection = model?.credentials, connection.selectedProfile != nil else {
             throw SottoAPIError.message("Choose a paired learner profile first.")
         }
         let pending = PlayPendingOperation(id: UUID(), connection: connection, path: path,
             body: try JSONEncoder().encode(body), response: response, baseline: baseline, reconciliationUsed: false)
-        try save { $0.pending = pending }
-        try await retryAction()
+        try save { $0[keyPath: slot.path] = pending }
+        try await retryAction(slot: slot)
     }
 
-    func retryAction() async throws {
-        guard let pending = state?.pending else { return }
+    func retryAction(slot: PlayPendingSlot = .game) async throws {
+        guard slot == .safety || state?.pendingSafety == nil else {
+            throw SottoAPIError.message("Recover the saved safety action first.")
+        }
+        guard let pending = state?[keyPath: slot.path] else { return }
         let generation = epoch
         guard pending.connection == model?.credentials else {
             throw SottoAPIError.message("Return to the original saved profile to recover this action.")
@@ -101,14 +107,37 @@ extension PlayCoordinator {
                 try finishOperation(pending)
                 if !phrases.contains(where: { $0.id == value.id }) { phrases.insert(value, at: 0) }
                 notice = "Saved privately to your notebook."
+            case .safety:
+                let value: PlaySafetyCompleted = try await api.play(pending.path, body: pending.body)
+                try requireCurrent(generation, connection: pending.connection)
+                struct Identity: Decodable { let actionId: UUID }
+                let identity = try JSONDecoder().decode(Identity.self, from: pending.body)
+                guard slot == .safety, value.completed, value.actionId == identity.actionId else {
+                    throw SottoAPIError.message("The server did not confirm this safety action. Its exact request is saved.")
+                }
+                try finishOperation(pending, slot: slot)
+                resetSafetyPages()
+                if pending.path.hasSuffix("/block") {
+                    clearGameCache()
+                    notice = "Partner blocked. Your games together have ended. You can still report visible content."
+                    screen = .safety
+                    return
+                } else { notice = "Safety action saved." }
+                try await loadSafetyStatus(generation: generation, connection: pending.connection)
+                try await refreshSafetyLists(generation: generation, connection: pending.connection)
             }
         } catch {
             try requireCurrent(generation, connection: pending.connection)
+            if let failure = error as? PlaySafetyFailure {
+                if state?[keyPath: slot.path]?.id == pending.id { try save { $0[keyPath: slot.path] = nil } }
+                if failure.reason == .unavailable { clearGameCache(); gameUnavailable = true }
+                throw failure
+            }
             guard case let SottoAPIError.http(status, _) = error, (400..<500).contains(status), status != 429 else {
                 throw error
             }
-            if status == 409, try await reconcile(pending, generation: generation) { return }
-            if state?.pending?.id == pending.id { try save { $0.pending = nil } }
+            if slot == .game, status == 409, try await reconcile(pending, generation: generation) { return }
+            if state?[keyPath: slot.path]?.id == pending.id { try save { $0[keyPath: slot.path] = nil } }
             if status == 403 {
                 do {
                     if let baseline = pending.baseline {
@@ -129,10 +158,11 @@ extension PlayCoordinator {
         }
     }
 
-    func finishOperation(_ pending: PlayPendingOperation) throws {
-        guard state?.pending?.id == pending.id else { throw CancellationError() }
+    func finishOperation(_ pending: PlayPendingOperation, slot: PlayPendingSlot = .game) throws {
+        guard state?[keyPath: slot.path]?.id == pending.id else { throw CancellationError() }
         try save { next in
-            next.pending = nil
+            next[keyPath: slot.path] = nil
+            guard slot == .game else { return }
             guard let before = pending.baseline, let round = before.round,
                   let request = try? JSONDecoder().decode(PlayActionRequest.self, from: pending.body),
                   let command = request.command else { return }
