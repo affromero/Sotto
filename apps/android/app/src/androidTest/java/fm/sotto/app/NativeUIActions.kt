@@ -10,6 +10,28 @@ import fm.sotto.app.network.NetworkAccess
 import androidx.test.espresso.Espresso
 
 class NativeUIActions(private val compose: ComposeTestRule) {
+    fun denyCameraPermission() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val device = UiDevice.getInstance(instrumentation)
+        val selector = By.res("com.android.permissioncontroller", "permission_deny_button")
+        val dialog = requireNotNull(device.wait(Until.findObject(selector), 10_000)) {
+            "Android did not show its camera permission request."
+        }
+        val permissionPackage = dialog.applicationPackage
+        compose.waitUntil(10_000) {
+            instrumentation.uiAutomation.windows.any {
+                it.isFocused && it.root?.packageName == permissionPackage
+            }
+        }
+        device.waitForIdle(3000)
+        val deny = requireNotNull(device.findObject(By.copy(selector).enabled(true).clickable(true))) {
+            "The camera permission dialog closed before denial."
+        }
+        deny.click()
+        check(device.wait(Until.gone(selector), 10_000)) {
+            "Android did not dismiss the camera permission request after denial."
+        }
+    }
     fun allowLocalNetwork() {
         if (android.os.Build.VERSION.SDK_INT < 37 || NetworkAccess.permissionGranted()) return
         click("Allow local network access")
@@ -47,7 +69,9 @@ class NativeUIActions(private val compose: ComposeTestRule) {
                 else nodes.isNotEmpty()
             }
         } catch (error: ComposeTimeoutException) {
-            throw AssertionError("Expected ${if (absent) "absent" else "visible"} text: $text\n${compose.onRoot().printToString()}", error)
+            val hierarchy = runCatching { compose.onRoot().printToString() }
+                .getOrElse { "Compose hierarchy unavailable: ${it.message}" }
+            throw AssertionError("Expected ${if (absent) "absent" else "visible"} text: $text\n$hierarchy", error)
         }
         if (!absent) compose.onAllNodesWithText(text).onFirst().performScrollTo().assertIsDisplayed()
     }

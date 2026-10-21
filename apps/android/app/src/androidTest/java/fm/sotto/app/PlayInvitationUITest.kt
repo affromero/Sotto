@@ -33,9 +33,7 @@ class PlayInvitationUITest {
             click("Join with a code or link")
             click("Scan invitation QR")
             click("Allow camera for QR scanning")
-            val deny = UiDevice.getInstance(instrumentation).wait(Until.findObject(
-                By.res("com.android.permissioncontroller", "permission_deny_button")), 10_000)
-            requireNotNull(deny).click()
+            denyCameraPermission()
             visible("Camera access is off. You can paste a link or type the code.")
             fill("Invitation link or game code", fixture.invite.appLink)
             click("Open invitation")
