@@ -9,9 +9,6 @@ import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import androidx.test.uiautomator.By
-import androidx.test.uiautomator.UiDevice
-import androidx.test.uiautomator.Until
 import fm.sotto.app.MainActivity
 import fm.sotto.app.NativeUIActions
 import fm.sotto.app.SottoApplication
@@ -46,9 +43,7 @@ class PlayProcessDeathTest {
             val blocked = runCatching { Socket().use { it.connect(InetSocketAddress(destination.host, destination.port), 2000) } }.isFailure
             assertTrue("A local-network socket must be blocked before permission is granted", blocked)
             click("Allow local network access")
-            val deny = UiDevice.getInstance(instrumentation).wait(Until.findObject(
-                By.res("com.android.permissioncontroller", "permission_deny_button")), 10_000)
-            requireNotNull(deny).click()
+            denyPermission()
             visible("Access is still off. Your saved profiles and requests are kept. You can change the permission in Android Settings.")
             assertNull(runBlocking { application.protectedStore.load() }.admission)
             assertNull(runBlocking { application.protectedStore.load() }.connection)
