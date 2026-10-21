@@ -153,9 +153,9 @@ export default function AboutPage() {
           <section className={styles.contact}>
             <h2 className={styles.sectionTitle}>Get in Touch</h2>
             <p className={styles.sectionText}>
-              Questions about running your own instance, or feedback on the courses? Reach the
-              maintainers of your deployment at{' '}
-              <a href="mailto:support@example.com">support@example.com</a>.
+              Contact your server&apos;s operator for questions about your instance. For bugs or
+              feature ideas, open a{' '}
+              <a href="https://github.com/affromero/Sotto/issues">project issue</a>.
             </p>
           </section>
         </div>

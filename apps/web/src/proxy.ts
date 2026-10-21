@@ -54,7 +54,7 @@ function privateResponse(response: NextResponse): NextResponse {
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   if (
-    pathname === '/.well-known/apple-app-site-association' &&
+    ['/.well-known/apple-app-site-association', '/support', '/about'].includes(pathname) &&
     (request.method === 'GET' || request.method === 'HEAD')
   )
     return NextResponse.next();

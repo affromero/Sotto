@@ -2,6 +2,13 @@
 # Shared queue control for rolling and fenced deployments. Sourced by deploy.sh.
 queue_control() {
   local command="$1" mode="${2:-running}" container="" ids payload raw report service
+  if [ "$mode" = running ] && [ "${SCHEMA_TRANSITION:-false}" = true ]; then
+    if [ "${COMPATIBILITY_CUTOVER:-false}" = true ]; then mode=candidate; else mode=previous; fi
+  fi
+  if [ "$command" = snapshot ] && [ -e "$QUEUE_MANIFEST" ]; then
+    echo "ERROR: original queue snapshot already exists. Preserve it for recovery." >&2
+    return 1
+  fi
   if [ "$mode" != candidate ] && [ "$mode" != candidate-direct ]; then
     [ "$mode" = running ] || [ "$mode" = previous ] || return 1
     for service in workers-light workers-pipeline workers-heavy; do
@@ -22,15 +29,15 @@ queue_control() {
       [ "$container" = "$captured" ] || { echo "ERROR: previous database control worker changed." >&2; return 1; }
     fi
   fi
-  payload=$(python3 - "$command" "$QUEUE_MANIFEST" "${SCHEMA_TRANSITION:-false}" "${IMAGE_OVERRIDES:-}/schema-review.json" <<'QUEUE_INPUT'
+  payload=$(python3 - "$command" "$QUEUE_MANIFEST" "$DEPLOY_STATE_DIR/schema-review.json" "$mode" <<'QUEUE_INPUT'
 import json, pathlib, sys
-command, path, schema, review_path = sys.argv[1:]
+command, path, review, mode = sys.argv[1:]
 value = {'command': command}
-if command == 'snapshot' and schema == 'true':
-    bound = json.loads(pathlib.Path(review_path).read_text())
-    review = json.loads(bound['review'])
-    if review['schemaVersion'] == 2:
-        value['queueTransition'] = review['queueTransition']
+if pathlib.Path(review).exists():
+    transition = json.loads(pathlib.Path(review).read_text()).get('queueTransition')
+    if transition is not None:
+        value['transition'] = transition
+        value['role'] = 'candidate' if mode in ('candidate', 'candidate-direct') else 'previous'
 if command not in ('snapshot', 'established', 'activation-ready', 'database-identity'):
     value['manifest'] = json.loads(pathlib.Path(path).read_text())
 print(json.dumps(value))
@@ -44,12 +51,12 @@ QUEUE_INPUT
   else
     printf '%s\n' "$payload" | docker exec -i -w /app/apps/web "$container" node --import tsx -e "$QUEUE_HELPER" > "$raw" || return 1
   fi
-  report=$(python3 - "$raw" "$mode" "$container" <<'QUEUE_OUTPUT'
+  report=$(python3 - "$raw" "$mode" "$container" "$command" <<'QUEUE_OUTPUT'
 import json, pathlib, sys
 lines = [line.removeprefix('SOTTO_DEPLOY_QUEUE=') for line in pathlib.Path(sys.argv[1]).read_text().splitlines() if line.startswith('SOTTO_DEPLOY_QUEUE=')]
 assert len(lines) == 1, 'Missing queue lifecycle report'
 report = json.loads(lines[0])
-if sys.argv[2] == 'previous':
+if sys.argv[2] == 'previous' and sys.argv[4] == 'database-identity':
     report['controlContainerId'] = sys.argv[3]
 print(json.dumps(report))
 QUEUE_OUTPUT
@@ -58,6 +65,25 @@ QUEUE_OUTPUT
     printf '%s\n' "$report" | python3 -c 'import os,sys; path=sys.argv[1]; stream=open(path,"x"); stream.write(sys.stdin.read()); stream.flush(); os.fsync(stream.fileno()); stream.close(); directory=os.open(os.path.dirname(path),os.O_RDONLY); os.fsync(directory); os.close(directory)' "$QUEUE_MANIFEST" || return 1
   fi
   printf '%s\n' "$report"
+}
+
+verify_added_queues_empty() {
+  local added
+  added=$(python3 - "$DEPLOY_STATE_DIR/schema-review.json" "$QUEUE_MANIFEST" <<'QUEUE_TRANSITION'
+import json, sys
+record = json.load(open(sys.argv[1]))
+manifest = json.load(open(sys.argv[2]))
+if manifest['schemaVersion'] == 2:
+    assert record['queueTransition'] == manifest['transition'], 'Admitted queue transition changed'
+    print('true')
+else:
+    assert manifest['schemaVersion'] == 1 and 'queueTransition' not in record
+    print('false')
+QUEUE_TRANSITION
+  ) || return 1
+  if [ "$added" = true ]; then
+    queue_control added-empty candidate > "$DEPLOY_STATE_DIR/schema-added-queues-empty.json"
+  fi
 }
 
 wait_for_worker_drain() {

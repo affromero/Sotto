@@ -588,7 +588,7 @@ def schema_transition(
     if version == 2:
         fields.add('queueTransition')
     if set(review) != fields or type(version) is not int or (
-        version not in {1, 2}
+        version not in (1, 2)
         or review['procedure'] != 'fenced-schema-migration'
     ):
         raise ValueError('Exact fenced schema transition review required')
@@ -659,13 +659,14 @@ def validate_queue_transition(value: object) -> dict[str, list[str]]:
     return cast(dict[str, list[str]], value)
 
 
-def unchanged_queue_contract(
-    bound: Mapping[str, object], transition: object = None,
-) -> None:
+
+def queue_transition(
+    bound: Mapping[str, object], schema_review: bytes | None = None,
+) -> dict[str, object] | None:
     review = mapping(cast(str, bound['review']).encode())
     contracts = cast(dict[str, str], review['previousWorkerContracts'])
     directory = Path(__file__).parent / 'images'
-    inventories = []
+    inventories: dict[str, list[str]] = {}
     for image in [os.environ['SOTTO_WORKERS_IMAGE_REF'], *contracts]:
         try:
             raw = command_output([
@@ -679,17 +680,46 @@ def unchanged_queue_contract(
         names = json.loads(raw)
         if not isinstance(names, list) or not names or any(
             not isinstance(name, str) for name in names
-        ) or len(names) != len(set(names)):
+        ) or len(names) != len(set(names)) or len(names) > 100 or any(
+            not re.fullmatch(r'[a-z][a-z0-9-]{0,99}', name)
+            for name in names
+        ):
             raise ValueError('Complete unique queue inventory required')
-        inventories.append(sorted(names))
-    if transition is None:
-        if any(names != inventories[0] for names in inventories):
+        inventories[image] = sorted(names)
+    candidate = inventories[os.environ['SOTTO_WORKERS_IMAGE_REF']]
+    previous = inventories[next(iter(contracts))]
+    if any(inventories[image] != previous for image in contracts):
+        raise ValueError('Previous worker queue inventories differ')
+    schema = mapping(schema_review) if schema_review is not None else {}
+    if schema.get('schemaVersion') != 2:
+        if candidate != previous:
             raise ValueError('Schema transition requires unchanged queue names')
-        return
-    reviewed = validate_queue_transition(transition)
-    if (inventories[0] != reviewed['candidateQueues']
-            or any(names != reviewed['previousQueues'] for names in inventories[1:])):
-        raise ValueError('Image queue inventories differ from the reviewed transition')
+        return None
+    reviewed = validate_queue_transition(schema.get('queueTransition'))
+    if reviewed['previousQueues'] != previous or (
+        reviewed['candidateQueues'] != candidate
+    ):
+        raise ValueError('Queue transition differs from exact reviewed inventories')
+    continuity = provider_activation(review)
+    proof = json.dumps({
+        'schemaVersion': 1,
+        'stack': os.environ['SOTTO_STACK'],
+        'releaseSha': os.environ['SOTTO_RELEASE_SHA'],
+        'candidateWebImage': os.environ['SOTTO_WEB_IMAGE_REF'],
+        'candidateWorkersImage': os.environ['SOTTO_WORKERS_IMAGE_REF'],
+        'previousRuntimes': continuity['previousRuntimes'],
+        'previousNames': previous, 'candidateNames': candidate,
+        'compatibilityReviewSha256': hashlib.sha256(
+            cast(str, bound['review']).encode()).hexdigest(),
+        'schemaReviewSha256': hashlib.sha256(
+            schema_review if schema_review is not None else b'').hexdigest(),
+    }, sort_keys=True, separators=(',', ':'))
+    return {'proof': proof, 'sha256': hashlib.sha256(proof.encode()).hexdigest()}
+
+
+def unchanged_queue_contract(bound: Mapping[str, object]) -> None:
+    if queue_transition(bound) is not None:
+        raise ValueError('Schema transition requires unchanged queue names')
 
 
 def schema_drift(status: str, directory: Path) -> None:
@@ -889,8 +919,11 @@ def main() -> int:
                 review, evidence, bound, continuity, arguments[4],
                 read_bytes(Path(arguments[5])), os.environ,
             )
-            unchanged_queue_contract(bound, review.get('queueTransition'))
-            print(json.dumps({'review': raw.decode(), 'evidence': evidence.decode()}))
+            transition = queue_transition(bound, raw)
+            record: dict[str, object] = {'review': raw.decode(), 'evidence': evidence.decode()}
+            if transition is not None:
+                record['queueTransition'] = transition
+            print(json.dumps(record))
             return 0
         if arguments and arguments[0] == 'schema-preparation' and len(arguments) == 2:
             schema_preparation(Path(arguments[1]))

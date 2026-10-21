@@ -192,6 +192,27 @@ jobs:
         with:
           packages: platform-tools
           cmdline-tools-version: '16111833'
+      - name: Select pinned Android tools for emulator creation
+        run: |
+          python3 - <<'PY'
+          import os, subprocess, tempfile
+          from pathlib import Path
+          tools = Path(os.environ['ANDROID_HOME']) / 'cmdline-tools'
+          pinned = tools / '16111833'
+          latest = tools / 'latest'
+          manager = pinned / 'bin/avdmanager'
+          inventory = subprocess.check_output([str(manager), 'list', 'device', '-c'], text=True)
+          if os.environ['SOTTO_ANDROID_DEVICE_PROFILE'] not in inventory.splitlines():
+              raise SystemExit('Requested device is absent from pinned Android tools')
+          if latest.exists() or latest.is_symlink():
+              backup = Path(tempfile.mkdtemp(prefix='sotto-preinstalled-tools-', dir=os.environ['RUNNER_TEMP']))
+              latest.rename(backup / 'latest')
+          latest.symlink_to(pinned, target_is_directory=True)
+          print('Emulator tools:', latest.resolve(strict=True))
+          print(inventory)
+          PY
+        env:
+          SOTTO_ANDROID_DEVICE_PROFILE: ${{ matrix.profile }}
       - name: Enable emulator acceleration
         run: sudo chmod a+rw /dev/kvm
       - name: Run native Android behavior and process recovery

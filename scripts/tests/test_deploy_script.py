@@ -301,9 +301,16 @@ if args[0] == 'exec':
         command = request['command']
         snapshot = {'schemaVersion': 1, 'connectionIdentity': 'f' * 64,
                     'queues': [{'name': key, 'paused': value} for key, value in sorted(state['queue_flags'].items())]}
-        transition = request.get('queueTransition', request.get('manifest', {}).get('queueTransition'))
-        if transition:
-            snapshot.update(schemaVersion=2, queueTransition=transition)
+        if 'transition' in request:
+            snapshot.update(schemaVersion=2, transition=request['transition'])
+        if command == 'added-empty':
+            state['added_queue_database_url'] = os.environ.get('DATABASE_URL')
+            state['added_queue_checked_after_stop'] = not any(
+                state['running'].get(item, False) for item in (old_web, *old_workers.values()))
+            if not state['added_queue_checked_after_stop'] or mode == 'migration-additions-late':
+                state['retained_added_work'] = True
+                finish(code=1)
+            finish('SOTTO_DEPLOY_QUEUE=' + json.dumps({**snapshot, 'addedQueuesEmpty': True}))
         if command == 'established':
             finish('SOTTO_DEPLOY_QUEUE=' + json.dumps({'schemaVersion': 1, 'connectionIdentity': 'f' * 64,
                                                      'established': True, 'appliedMigrations': 3}))
@@ -332,7 +339,7 @@ if args[0] == 'exec':
             state['queue_flags'] = dict.fromkeys(state['queue_flags'], True)
             snapshot['queues'] = [{'name': key, 'paused': True} for key in sorted(state['queue_flags'])]
         if command == 'restore':
-            if mode in ('compat-restore', 'migration-restore'):
+            if mode in ('compat-restore', 'migration-restore', 'migration-additions-restore'):
                 state['queue_flags']['audio-generation'] = False
                 finish(code=1)
             state['queue_flags'] = {queue['name']: queue['paused'] for queue in request['manifest']['queues']}
@@ -368,6 +375,15 @@ if args[0] == 'stop':
         state['running'][identifier] = False
         state['stopped'].append(identifier)
         if identifier == old_web: state['old_web'] = None
+    if mode in ('migration-additions-missing-proof', 'migration-additions-malformed-proof') and not any(
+            state['running'].get(item, False) for item in (old_web, *old_workers.values())):
+        record_path = next((root / '.local/state/sotto-deploy').rglob('schema-review.json'))
+        if mode == 'migration-additions-missing-proof':
+            record = json.loads(record_path.read_text())
+            del record['queueTransition']
+            record_path.write_text(json.dumps(record))
+        else:
+            record_path.write_text('{')
     finish('\n'.join(identifiers))
 if args[0] in ('volume', 'tag'): finish()
 if args[0] != 'compose': finish(code=2)
@@ -468,12 +484,13 @@ class DeploymentFailureTests(unittest.TestCase):
                      'active': 1, 'journal_pending': failure == 'unknown-cleanup', 'unsafe_stops': [],
                      'unsafe_starts': [], 'stopped': [], 'worker_generation': 'old'}
             state['implicit_without_release'] = implicit_without_release
-            if additive_queues:
+            if additive_queues or failure.startswith('migration-additions'):
                 previous = sorted(state['queue_flags'])
-                state['queue_flags'].update({'material-analysis': True, 'vocabulary-audio': False})
+                added = {'material-analysis': True, 'vocabulary-audio': False} if additive_queues else {'vocabulary-audio': True}
+                state['queue_flags'].update(added)
                 state['queue_transition'] = {
                     'previousQueues': previous, 'candidateQueues': sorted(state['queue_flags']),
-                    'addedQueues': ['material-analysis', 'vocabulary-audio'],
+                    'addedQueues': sorted(added),
                 }
             if provider_continuity:
                 activation = root / 'previous-activation'
@@ -505,6 +522,8 @@ class DeploymentFailureTests(unittest.TestCase):
                 values['SOTTO_REVIEWED_CANDIDATE_SCHEMA_HASH'] = 'e' * 64
             if failure == 'migration-direct-target':
                 values['DIRECT_DATABASE_URL'] = 'postgresql://another-target'
+            if failure.startswith('migration-additions'):
+                values['DIRECT_DATABASE_URL'] = 'postgresql://verified-direct'
             if reviewed_runtime:
                 evidence = b'Independent review of exact fixture images.'
                 evidence_path = root / 'compatibility-evidence.txt'
@@ -551,7 +570,7 @@ class DeploymentFailureTests(unittest.TestCase):
                     schema_evidence.write_bytes(b'Independent exact fenced migration review.')
                     schema_evidence.chmod(0o600)
                     schema_review = root / 'schema-review.json'
-                    schema_review.write_text(json.dumps({
+                    schema_values = {
                         'schemaVersion': 1, 'procedure': 'fenced-schema-migration',
                         'stack': stack, 'releaseSha': SHA,
                         'candidateWebImage': values['SOTTO_WEB_IMAGE_REF'],
@@ -560,12 +579,12 @@ class DeploymentFailureTests(unittest.TestCase):
                         'compatibilityReviewSha256': hashlib.sha256(review_path.read_bytes()).hexdigest(),
                         'reviewer': 'Independent schema reviewer',
                         'evidenceSha256': hashlib.sha256(schema_evidence.read_bytes()).hexdigest(),
-                    }))
+                    }
+                    if state.get('queue_transition'):
+                        schema_values.update(schemaVersion=2,
+                            queueTransition=state['queue_transition'])
+                    schema_review.write_text(json.dumps(schema_values))
                     schema_review.chmod(0o600)
-                    if additive_queues:
-                        value = json.loads(schema_review.read_text())
-                        value.update(schemaVersion=2, queueTransition=state['queue_transition'])
-                        schema_review.write_text(json.dumps(value))
             (root / '.env.production').write_text(''.join(key + '=' + value + '\n' for key, value in values.items()))
             with serving_fixture(root) as (ports, observations, phase_observations):
                 environment.update(ports)
