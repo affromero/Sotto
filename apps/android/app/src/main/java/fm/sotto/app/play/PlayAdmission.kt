@@ -61,10 +61,10 @@ suspend fun PlayCoordinator.finishAdmission() {
     val generation = epoch
     val original = state.value.vault?.connection
     assertExisting(pending)
+    require(pending.command.acceptedConductVersion == CONDUCT_VERSION || pending.conductVersion == CONDUCT_VERSION) {
+        "Accept the conduct policy for this saved request before finishing its recovery."
+    }
     if (pending.delivery == null) {
-        require(pending.command.acceptedConductVersion == CONDUCT_VERSION || state.value.pendingConductAccepted) {
-            "Accept the conduct policy for this saved request before claiming it."
-        }
         val api = pending.existingConnection?.let(::api) ?: SottoClient(pending.invitation.server)
         val value = api.post<Delivery>("/api/v1/play/join-requests/${SottoClient.id(pending.command.requestId)}/claim", "{}", pending.proof)
         checkEpoch(generation, original)
@@ -120,13 +120,21 @@ suspend fun PlayCoordinator.acceptPendingConduct() {
     val generation = epoch
     val original = state.value.vault?.connection
     assertExisting(pending)
+    SottoClient(pending.invitation.server).get<JoinStatusView>(
+        "/api/v1/play/join-requests/${SottoClient.id(pending.command.requestId)}", pending.proof)
+    checkEpoch(generation, original)
+    require(state.value.vault?.admission == pending)
     val api = pending.existingConnection?.let(::api) ?: SottoClient(pending.invitation.server)
     val value = api.post<PendingConductAck>("/api/v1/play/join-requests/${SottoClient.id(pending.command.requestId)}/conduct",
         buildJsonObject { put("version", CONDUCT_VERSION) }.toString(), pending.proof)
     checkEpoch(generation, original)
     require(value.requestId == pending.command.requestId && value.version == CONDUCT_VERSION)
     require(state.value.vault?.admission == pending)
-    mutable.update { it.copy(pendingConductAccepted = true, notice = "Conduct accepted for this saved invitation.") }
+    persist {
+        require(it.admission == pending)
+        it.copy(admission = pending.copy(conductVersion = value.version))
+    }
+    mutable.update { it.copy(notice = "Conduct accepted for this saved invitation.") }
 }
 
 suspend fun PlayCoordinator.retainLegacyAdmission(acceptedConduct: Boolean) {
@@ -139,7 +147,7 @@ suspend fun PlayCoordinator.retainLegacyAdmission(acceptedConduct: Boolean) {
         require(retained.size < 16) { "Remove an old recovery before keeping another." }
         it.copy(admission = null, retainedAdmissions = retained + pending)
     }
-    mutable.update { it.copy(joinStatus = null, pendingConductAccepted = false, legacyRequestMissing = false,
+    mutable.update { it.copy(joinStatus = null, legacyRequestMissing = false,
         notice = "The old request and proof are kept unchanged. Submit a new request below when ready.") }
 }
 

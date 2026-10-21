@@ -47,13 +47,17 @@ import fm.sotto.app.ui.platform.localNetworkAccess
     }
     val pending = state.vault?.admission
     if (pending != null) {
+        val hasConduct = pending.command.acceptedConductVersion == CONDUCT_VERSION || pending.conductVersion == CONDUCT_VERSION
         Text(state.joinStatus?.name?.humanize() ?: "Checking your request…", style = MaterialTheme.typography.titleLarge)
         Text("New profiles need the server owner's approval. The game host must also be present and accept you.")
         if (pending.existingConnection != null && pending.existingConnection != state.vault.connection)
             Action("Restore original profile", ready && fm.sotto.app.network.NetworkAccess.allowedFor(pending.existingConnection.server)) { coordinator.run { switchConnection(pending.existingConnection) } }
-        if (pending.command.acceptedConductVersion == null && pending.delivery == null) {
+        if (pending.command.acceptedConductVersion == null && !hasConduct) {
             ConductText(state.policy, invite.server)
-            if (state.legacyRequestMissing) {
+            if (state.legacyRequestMissing && pending.delivery != null) {
+                Text("The server cannot verify this issued profile recovery. Its credential and proof are kept. Keep the recovery and contact the server operator.")
+            }
+            else if (state.legacyRequestMissing) {
                 Text("This old request cannot be verified. Its original request and proof can be kept while you start fresh.")
                 LabeledToggle("I agree to this conduct policy for a new request.", conduct, ready && state.policy != null) { conduct = it }
                 Action("Keep old recovery and start a fresh request", ready && network && conduct) {
@@ -62,12 +66,12 @@ import fm.sotto.app.ui.platform.localNetworkAccess
             }
             else {
                 LabeledToggle("I agree to this conduct policy for my saved request.", conduct, ready && state.policy != null) { conduct = it }
-                Action("Accept conduct for saved request", ready && network && conduct && !state.pendingConductAccepted) { coordinator.run { acceptPendingConduct() } }
+                Action("Accept conduct for saved request", ready && network && conduct) { coordinator.run { acceptPendingConduct() } }
             }
         }
         Action("Retry join request", ready && network && pending.delivery == null && pending.command.acceptedConductVersion == CONDUCT_VERSION) { coordinator.run { retryIntake() } }
         Action(if (pending.delivery != null) "Finish saving profile" else "Enter accepted game",
-            ready && network && (pending.delivery != null || (pending.command.acceptedConductVersion == CONDUCT_VERSION || state.pendingConductAccepted) &&
+            ready && network && hasConduct && (pending.delivery != null ||
                 state.joinStatus in listOf(JoinStatus.ACCEPTED, JoinStatus.CLAIMED))) {
             coordinator.run { finishAdmission() }
         }

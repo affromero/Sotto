@@ -192,8 +192,8 @@ class PlaySafetyTest {
             connected(server, disk) { coordinator ->
                 try { coordinator.retryIntake(); fail("Old intake may not be rewritten") } catch (_: IllegalArgumentException) { }
                 coordinator.acceptPendingConduct()
-                assertEquals(original, disk.load().admission)
-                assertTrue(coordinator.state.value.pendingConductAccepted)
+                assertEquals(original.copy(conductVersion = CONDUCT_VERSION), disk.load().admission)
+                assertEquals(CONDUCT_VERSION, coordinator.state.value.vault?.admission?.conductVersion)
                 val request = server.received.single { it.method == "POST" }
                 assertEquals("{\"version\":1}", request.body)
                 assertEquals(listOf(original.proof), request.headers["x-sotto-play-proof"])

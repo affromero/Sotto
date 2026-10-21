@@ -7,6 +7,7 @@ import kotlinx.serialization.json.JsonObject
 @Serializable data class Admission(
     val invitation: PlayInvitation, val command: JoinCommand, val proof: String,
     val existingConnection: Connection? = null, val delivery: Delivery? = null,
+    val conductVersion: Int? = null,
 )
 @Serializable enum class OperationResponse { ROOM, INVITATION, APPROVAL, PHRASE }
 @Serializable data class PendingOperation(

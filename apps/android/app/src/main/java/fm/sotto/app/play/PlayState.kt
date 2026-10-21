@@ -25,7 +25,7 @@ data class PlayState(
     val blocks: List<PlayerBlock> = emptyList(), val blocksCursor: String? = null,
     val reports: List<SafetyReport> = emptyList(), val reportsCursor: String? = null,
     val blocksExpanded: Boolean = false, val reportsExpanded: Boolean = false,
-    val pendingConductAccepted: Boolean = false, val legacyRequestMissing: Boolean = false,
+    val legacyRequestMissing: Boolean = false,
     val pairingServer: String? = null, val owner: Boolean? = null, val leaseReady: Boolean = false,
     val busy: Boolean = false, val checking: Boolean = false, val active: Boolean = false, val accessRevoked: Boolean = false,
     val error: String? = null, val notice: String? = null, val networkHelp: Boolean = false, val identityGeneration: Long = 0,

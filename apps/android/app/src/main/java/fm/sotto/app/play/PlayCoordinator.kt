@@ -109,7 +109,7 @@ class PlayCoordinator(val store: VaultPersistence, val scope: CoroutineScope, va
         if (screen != Screen.Pair) { pairing?.close(); pairing = null }
         mutable.update { it.copy(screen = screen, room = null, roomUnavailable = false, invitation = null, preview = null,
             requests = emptyList(), error = null, pairingProfiles = emptyList(), pairingServer = null,
-            policy = if (screen == Screen.Join) null else it.policy, pendingConductAccepted = false, legacyRequestMissing = false) }
+            policy = if (screen == Screen.Join) null else it.policy, legacyRequestMissing = false) }
         if (foreground) startLifetime()
     }
 
