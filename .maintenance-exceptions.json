@@ -20,6 +20,14 @@
     {
       "tool": "knip",
       "mode": "all",
+      "file": "scripts/play/validate-associations.test.mjs",
+      "kind": "binaries",
+      "name": "mkfifo",
+      "reason": "System utility creates a real FIFO to verify association validation rejects nonregular files without blocking."
+    },
+    {
+      "tool": "knip",
+      "mode": "all",
       "file": "apps/web/package.json",
       "kind": "dependencies",
       "name": "@prisma/client",

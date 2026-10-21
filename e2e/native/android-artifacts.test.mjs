@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, open, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -63,8 +63,13 @@ test('failed native runs retain unique private diagnostics under configured and 
       const path = join(value.parent, directory);
       assert.equal((await stat(path)).mode & 0o777, 0o700);
       const log = join(path, 'install-app.log');
-      assert.equal((await stat(log)).mode & 0o777, 0o600);
-      assert.match(await readFile(log, 'utf8'), /Fixture install denied/);
+      const handle = await open(log, 'r');
+      try {
+        assert.equal((await handle.stat()).mode & 0o777, 0o600);
+        assert.match(await handle.readFile('utf8'), /Fixture install denied/);
+      } finally {
+        await handle.close();
+      }
     }
   } finally {
     await rm(value.root, { recursive: true });
