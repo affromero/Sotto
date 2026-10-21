@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { GraduationCap, Network, Settings, Shield } from 'lucide-react';
+import { GraduationCap, Network, Settings, Shield, Gamepad2 } from 'lucide-react';
 import { AccountSwitcher } from './AccountSwitcher';
 import { NotificationDropdown } from '@/components/notifications/NotificationDropdown';
 import { AgentUsageStatus } from '@/components/layout/AgentUsageStatus';
@@ -33,6 +33,7 @@ function getNavItems(): NavItem[] {
   const items: NavItem[] = [
     { href: '/learn', label: 'Learn', icon: GraduationCap },
     { href: '/memory', label: 'Memory', icon: Network },
+    { href: '/play', label: 'Play', icon: Gamepad2 },
   ];
 
   items.push({ href: '/settings', label: 'Settings', icon: Settings });

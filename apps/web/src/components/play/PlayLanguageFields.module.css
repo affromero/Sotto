@@ -1,0 +1,54 @@
+.root {
+  padding: 20px 0;
+  margin: 0;
+  border: 0;
+  border-top: 1px solid var(--color-border);
+}
+.root legend {
+  padding: 0;
+  font: 400 23px var(--font-heading);
+}
+.fields {
+  display: grid;
+  gap: 16px;
+  margin-top: 12px;
+}
+.fields label {
+  display: grid;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+}
+.fields select {
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font: 400 15px var(--font-body);
+}
+.fields select:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 3px;
+}
+.note {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  margin: 14px 0 0;
+  line-height: 1.5;
+}
+.error {
+  color: var(--color-error, #a33225);
+  font-size: 14px;
+  margin: 14px 0 0;
+}
+@media (min-width: 640px) {
+  .fields {
+    grid-template-columns: 1fr 1fr;
+  }
+  .fields label:last-child {
+    max-width: 180px;
+  }
+}

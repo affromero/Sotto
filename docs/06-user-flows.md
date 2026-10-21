@@ -169,6 +169,38 @@ flowchart LR
     sttClient --> run
 ```
 
+## Partner games
+
+Open Play without creating a course or configuring AI. Each player chooses their
+own language direction and level. Mixed play has six short rounds: hidden card
+predictions, word clues and guesses, then secret missions with a surprise twist.
+Missions share six messages; open questions are an explicit alternative to cards.
+Use hints, skip a round or choose a two-round game when you want something shorter.
+
+The host stays inside the waiting game and shares its code, link or QR. An
+installed app opens the invitation through its Open in Sotto button. Otherwise,
+the invitation page offers configured native downloads and home-screen web
+installation. Keep the link or code and reopen it after installing. Installation
+alone never creates a profile or grants access to a game.
+
+Existing learners request entry with their own profile. A new learner explicitly
+consents to a persistent profile on the named server. Only the server owner can
+approve creating it. The game host separately accepts the player while present
+in that waiting game. When the host is also the owner, one visible action can
+create the profile and admit the player. An absent host cannot admit anyone.
+
+The players share their game messages, clues and revealed answers. Secret picks,
+targets and mission objectives remain hidden until the relevant reveal. Courses,
+progress and vocabulary memories stay private. Save visible words or sentences
+to your own phrase notebook; Add to study explicitly sends selected language to
+an existing matching course. Game points never claim vocabulary mastery or
+change review scheduling. Both players discover the same host-created rematch.
+
+Keep a failed join or uncertain action available for recovery. Retry uses its
+original request, profile and server. A retained profile delivery stays on the
+device until it is verified and acknowledged or explicitly discarded. Switching
+profiles clears the previous learner's game and notebook views.
+
 ## 3. First Course Happy Path
 
 ### New learner

@@ -17,9 +17,11 @@ function git(...args) {
 try {
   let desktop = false;
   let ios = false;
+  let android = false;
   if (values.all || !values.base || /^0+$/.test(values.base)) {
     desktop = true;
     ios = true;
+    android = true;
   } else {
     const base =
       values.event === 'pull_request'
@@ -35,6 +37,7 @@ try {
       ) {
         desktop = true;
         ios = true;
+        android = true;
       }
       desktop ||=
         path.startsWith('apps/desktop/') ||
@@ -42,9 +45,26 @@ try {
         path === 'scripts/ci/test-desktop-appimage.sh' ||
         path === 'apps/web/public/brand/sotto-mark.svg';
       ios ||= path.startsWith('apps/ios/');
+      android ||=
+        path.startsWith('apps/android/') ||
+        path.startsWith('e2e/android/') ||
+        path === 'scripts/ci/android-results.py';
+      if (
+        path.startsWith('packages/shared/fixtures/play/') ||
+        path.startsWith('packages/shared/src/play/') ||
+        path === 'packages/shared/src/contracts/play.ts' ||
+        path.startsWith('scripts/play/') ||
+        path.startsWith('e2e/native/') ||
+        path === 'e2e/run.mjs' ||
+        path === 'e2e/provider.mjs' ||
+        path.startsWith('apps/web/src/lib/play/')
+      ) {
+        ios = true;
+        android = true;
+      }
     }
   }
-  console.log(`desktop=${desktop}\nios=${ios}`);
+  console.log(`desktop=${desktop}\nios=${ios}\nandroid=${android}`);
 } catch (error) {
   console.error(`Native change selection failed: ${error.message}`);
   process.exitCode = 1;

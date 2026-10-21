@@ -36,6 +36,14 @@ src/
 
 ## Rules
 
+`src/play/` defines browser-safe game commands, personalized round views and
+versioned invitation links. Server-private round state and scoring live in the
+web library. Native clients consume the same API contracts and allowed actions.
+`contracts/play.ts` registers member and claimant-proof operations in the full
+OpenAPI contract. Play operations and their components stay outside the TUI
+codegen surface. Proofs travel only in `X-Sotto-Play-Proof`; existing-player
+admission additionally requires that player's canonical app credential.
+
 - **No Prisma imports** — use string union types from `enums.ts` instead
 - **No React imports** — types only, no components or hooks
 - **No Node.js APIs** — must stay browser-safe

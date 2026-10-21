@@ -7,6 +7,7 @@ import { ToastProvider } from '@/components/providers/ToastProvider';
 import { NotificationProvider } from '@/components/providers/NotificationProvider';
 import { CommandPaletteLoader } from '@/components/ui/CommandPaletteLoader';
 import { THEME_INIT_SCRIPT } from '@/lib/theme-script';
+import { PlayInvitationReturn } from '@/components/pwa/PlayInvitationReturn';
 import { getAppBaseUrl } from '@/lib/urls';
 import '@fontsource/newsreader/400.css';
 import '@fontsource/newsreader/400-italic.css';
@@ -93,6 +94,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <ToastProvider>
             <NotificationProvider>
               <AudioPlayerProvider>
+                <PlayInvitationReturn />
                 {children}
                 <GlobalMiniPlayer />
                 <CommandPaletteLoader />

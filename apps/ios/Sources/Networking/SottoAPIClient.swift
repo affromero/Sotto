@@ -729,9 +729,10 @@ struct SottoAPIClient {
 
     func send<Response: Decodable>(
         _ request: URLRequest,
-        acceptedStatuses: Set<Int>
+        acceptedStatuses: Set<Int>,
+        policy: SottoAPIRequestPolicy = .standard
     ) async throws -> Response {
-        let (data, response) = try await session.data(for: request, delegate: SottoAPIRedirectPolicy(serverURL: serverURL))
+        let (data, response) = try await session.data(for: request, delegate: SottoAPIRedirectPolicy(serverURL: serverURL, policy: policy))
         return try decodeResponse(data, response: response, acceptedStatuses: acceptedStatuses)
     }
 
@@ -955,16 +956,4 @@ private struct EmptyBody: Encodable {}
 
 private struct ClassGenerationCancelResponse: Decodable {
     let cancelled: Bool
-}
-
-enum SottoAPIError: LocalizedError {
-    case message(String)
-    case http(Int, String)
-
-    var errorDescription: String? {
-        switch self {
-        case let .message(value), let .http(_, value):
-            value
-        }
-    }
 }

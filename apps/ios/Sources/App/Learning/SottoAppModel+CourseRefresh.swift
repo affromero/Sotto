@@ -23,7 +23,7 @@ extension SottoAppModel {
     }
 
     func loadCourses(showLoading: Bool = true) async {
-        guard hasSelectedProfile, let client = makeClient() else { return }
+        guard !showingPlay, hasSelectedProfile, let client = makeClient() else { return }
         let identity = SottoLearnerIdentity(client)
         if showLoading {
             isLoading = true
@@ -44,7 +44,7 @@ extension SottoAppModel {
             let refreshed = try await request.task.value
             try Task.checkCancellation()
             if request.task.isCancelled { throw CancellationError() }
-            guard isCurrentLearningClient(client) else { return }
+            guard !showingPlay, isCurrentLearningClient(client) else { return }
             applyCourseRefresh(refreshed)
             resumeClassGenerationMonitoring()
             courseRefreshError = nil

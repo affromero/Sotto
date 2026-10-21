@@ -72,32 +72,21 @@ If the hook blocks your commit:
 ## Contribution licensing
 
 This policy applies prospectively to new first-party contributions submitted
-after its adoption. It grants no rights to existing contributions and does not
-change the contribution terms of separately licensed components.
-
-Before accepting a new contribution, maintainers require the contributor's
-affirmative acceptance of an additional MIT license for the identified work.
-The contributor keeps copyright. The grant permits incorporation in future
-PolyForm Noncommercial releases and separate commercial licensing. It is not
-a copyright assignment. Provide the copyright holder's name and retain the
-applicable MIT copyright and permission notice with the contribution.
+after its adoption. New first-party Sotto contributions use PolyForm
+Noncommercial 1.0.0 in the root LICENSE, subject to THIRD_PARTY_NOTICES.md.
+Contributors keep their copyright. No additional MIT grant is required.
 
 Confirm in the pull request that you own the work or are authorized by its
-copyright owner, and that you additionally license the identified contribution
-under the MIT License at https://opensource.org/license/mit. Identify third-party
-material separately. If an employer owns the work, obtain its authorization.
-Maintainers must resolve absent or conflicting permission before acceptance.
+copyright owner to contribute it under these terms. Identify third-party
+material and its license separately. If an employer owns the work, obtain its
+authorization. Maintainers must resolve absent or conflicting permission before
+acceptance. No grant is inferred from an unchecked checkbox, silence or a Git
+author identity.
 
-The repository's outbound license remains the root LICENSE with the exceptions
-in THIRD_PARTY_NOTICES.md. No grant is inferred from an earlier contribution, an
-unchecked checkbox, silence or a Git author identity.
-
-The additional MIT grant and its notices remain effective for the contribution
-they cover. The combined release's outbound terms do not erase those component
-rights. Preserve the applicable MIT notices when incorporating that work.
-
-Existing AGPL releases keep their original grants. Separately licensed components
-keep their own contribution terms.
+Third-party material and separately licensed components keep their own licenses
+and contribution terms. This policy does not withdraw any previously granted
+rights, including those for earlier AGPL releases or MIT-covered contributions.
+Preserve the applicable copyright and license notices.
 
 ## Code of Conduct
 

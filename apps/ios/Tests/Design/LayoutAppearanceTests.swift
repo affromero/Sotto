@@ -6,6 +6,34 @@ import XCTest
 
 @MainActor
 final class LayoutAppearanceTests: XCTestCase {
+    func testNativePartnerGamesWrapAt375PointsAndLargeTabletTextInBothAppearances() async throws {
+        let fixtures = try PlayTestFixtures.load()
+        let phone = Viewport(name: "play-phone-375", size: CGSize(width: 375, height: 812),
+            layout: .compact, textSize: .large)
+        let tablet = Viewport(name: "play-narrow-tablet", size: CGSize(width: 540, height: 700),
+            layout: .regular, textSize: .accessibility3)
+        for roundName in ["initial-0-HOST", "initial-2-HOST", "message-3-4-HOST"] {
+            let room = try fixtures.room(round: roundName)
+            let round = try XCTUnwrap(room.round)
+            let model = SottoAppModel(credentials: PlayTestIdentity.connection(server: LayoutFixtures.server),
+                credentialStore: PlayCredentialMemoryStore(), playStore: PlayMemoryStore())
+            for viewport in [phone, tablet] {
+                for style in [UIUserInterfaceStyle.light, .dark] {
+                    let content = PlayRoundView(coordinator: model.play, room: room, round: round)
+                        .environmentObject(model).padding(18).background(SottoTheme.paper)
+                    let host = try mount(ScrollView { content }, viewport: viewport, style: style)
+                    defer { host.close() }
+                    await settle()
+                    let scroll = try XCTUnwrap(descendants(of: host.content.view).compactMap { $0 as? UIScrollView }
+                        .first { $0.isScrollEnabled && $0.bounds.width > host.content.view.bounds.width * 0.7 })
+                    XCTAssertLessThanOrEqual(scroll.contentSize.width, scroll.bounds.width + 1,
+                        "The native game must fit \(viewport.name) with \(style).")
+                    attach(host.content.view, name: "play-\(roundName)-\(viewport.name)-\(style.rawValue)")
+                }
+            }
+        }
+    }
+
     func testClassTeachingFitsPhoneTabletAndNarrowReadingColumns() async throws {
         let detail = try LayoutFixtures.classDetail()
         let intro = try XCTUnwrap(detail.intro)

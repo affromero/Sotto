@@ -82,6 +82,15 @@ suite('Household profiles with shared authority', () => {
       expect.objectContaining({ id: created.id, name: 'Learner' })
     );
   });
+
+  it('requires server owner authority to create persistent profiles', async () => {
+    const learner = await identity.household('Existing learner');
+    const response = await POST(request('POST', learner.token, { name: 'Another learner' }));
+    expect(response.status).toBe(403);
+    expect(await instance.database.user.count()).toBe(2);
+    expect((await identity.access.store.read()).householdProfiles).toHaveLength(2);
+    expect((await GET(request('GET', learner.token))).status).toBe(200);
+  });
   it.each([
     { name: '   ' },
     { name: 'Learner', avatarSlug: 'unknown' },

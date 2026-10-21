@@ -90,6 +90,8 @@ jobs:
         run: node scripts/ci/audit-gate.mjs
       - name: Validate repository tooling
         run: python3 -m unittest discover -s scripts/tests -p 'test*.py'
+      - name: Validate native link and integration tooling
+        run: node --test scripts/play/validate-associations.test.mjs e2e/native/*.test.mjs
       - name: Verify PostgreSQL backup and restore
         env:
           SOTTO_TEST_POSTGRES: '1'

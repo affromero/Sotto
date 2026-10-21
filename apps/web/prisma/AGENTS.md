@@ -94,6 +94,17 @@ npx prisma studio      # Visual database browser
 
 ## Scope
 
+Partner play uses `PlayRoom`, `PlayPresenceLease`, `PlayJoinRequest`, `PlayRound`,
+`PlayActionReceipt`, and `PlayPhrase`. Its migration adds state checks and a
+partial unique index permitting one accepted entrant per room. These SQL rules
+must survive subsequent migrations. Both participant relations cascade shared
+rooms and admission secrets on profile deletion. Phrase provenance uses a
+composite round/room foreign key. Courses have no dependency on game records.
+Released host-view leases retain a tombstone until the room ends. An old nonce
+cannot renew after release, including a delayed first heartbeat. New enrollment
+requests keep every profile/approval field null until canonical owner approval
+commits the prepared profile and all approval metadata together.
+
 MaterialUploadBatch reserves an owned declaration set by request identity.
 MaterialUpload binds each transfer to its stable CourseMaterial. Immutable
 MaterialUploadPart receipts record exact ranges and SHA-256 checksums. Complete

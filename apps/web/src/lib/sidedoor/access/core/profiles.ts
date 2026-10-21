@@ -103,6 +103,8 @@ export async function createSottoProfile(
 ) {
   const identity = await resolveSottoRequest(database, request);
   if (!identity) throw new AccessError('unauthorized');
+  if (!identity.isOwner)
+    throw new AccessError('forbidden', 'Only the server owner can add profiles');
   const store = await sottoAccessStore(database);
   const credential =
     identity.authentication === 'device'

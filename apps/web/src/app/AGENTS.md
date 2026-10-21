@@ -1,5 +1,12 @@
 # src/app/ — Next.js App Router Pages & API Routes
 
+`/api/v1/play` serves independent two-player games. Member routes revalidate
+canonical content admission in their tool-layer transactions. Only exact
+invitation intake, proof-bound status/claim/ACK paths and `/play/join` bypass
+perimeter admission. An owner approves persistent profiles; a foreground host
+accepts entry. Browser claims require canonical origin policy and place the
+session only in an HttpOnly cookie. Every Play response is private and uncached.
+
 Vocabulary lives at `/learn/vocabulary?course=...`, with optional `session` for
 resumption. Course vocabulary APIs list dictionary/import state, edit meanings,
 and admit deterministic study. Practice vocabulary actions preserve first-response

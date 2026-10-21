@@ -97,6 +97,7 @@ prepare_schema_transition() {
     python3 scripts/deploy/stop-workers.py stop "$previous_container"
   done
   python3 scripts/deploy/compatibility-review.py continuity-stopped "$IMAGE_OVERRIDES/compatibility-review.json" "$OLD_SLOT" "$DEPLOY_STATE_DIR/schema-stopped.json"
+  verify_added_queues_empty
   # This backup includes the final writes accepted before the HTTP fence.
   backup_database
   record_unresolved compatibility-cutover

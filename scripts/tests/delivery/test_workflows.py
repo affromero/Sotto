@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import glob
+import fnmatch
 import json
 import os
 import subprocess
@@ -98,6 +99,15 @@ class WorkflowScopeTests(unittest.TestCase):
         ])
         self.assertEqual(self.scope(), {'runtime': 'false', 'source': 'true'})
 
+    def test_integration_harness_changes_validate_without_runtime_images(self) -> None:
+        for path in ('e2e/native/run.mjs', 'e2e/android/process.mjs',
+                     'e2e/run.mjs', 'e2e/provider.mjs'):
+            with self.subTest(path=path):
+                self.add_paths([path])
+                self.assertEqual(self.scope(), {'runtime': 'false', 'source': 'true'})
+                (self.root / 'scope-output').unlink()
+                self.before = self.git('rev-parse', 'HEAD').strip()
+
     def test_hook_changes_validate_without_images(self) -> None:
         self.add_paths(['.pre-commit-config.yaml'])
         self.assertEqual(self.scope(), {'runtime': 'false', 'source': 'true'})
@@ -167,6 +177,150 @@ class WorkflowScopeTests(unittest.TestCase):
         self.assertEqual(self.scope(event='pull_request'), {
             'runtime': 'false', 'source': 'false',
         })
+
+
+class AndroidWorkflowTests(unittest.TestCase):
+    def setUp(self) -> None:
+        parsed = subprocess.run([
+            'node', '-e',
+            ("process.stdout.write(JSON.stringify(require('yaml').parse("
+             "require('node:fs').readFileSync(process.argv[1], 'utf8'))))"),
+            str(WORKFLOWS / 'release-surfaces-ci.yml'),
+        ], cwd=ROOT, text=True, capture_output=True, check=True)
+        self.workflow = json.loads(parsed.stdout)
+
+    def test_shared_inputs_and_android_recovery_trigger_native_workflow(self) -> None:
+        for event in ('push', 'pull_request'):
+            patterns = self.workflow['on'][event]['paths']
+            for path in ('apps/android/app/MainActivity.kt',
+                         'e2e/android/process.mjs',
+                         'scripts/ci/android-results.py',
+                         'e2e/native/run.mjs', 'e2e/run.mjs', 'e2e/provider.mjs',
+                         'packages/shared/fixtures/play/contract.json',
+                         'packages/shared/src/play/types.ts',
+                         'packages/shared/src/contracts/play.ts',
+                         'scripts/play/export-fixtures.ts',
+                         'apps/web/src/lib/play/projection.ts'):
+                with self.subTest(event=event, path=path):
+                    self.assertTrue(any(fnmatch.fnmatch(path, pattern)
+                                        for pattern in patterns))
+
+    def test_android_jobs_prepare_sdk_before_using_command_line_tools(self) -> None:
+        for name in ('android', 'android-device'):
+            with self.subTest(job=name):
+                steps = self.workflow['jobs'][name]['steps']
+                setup = next(index for index, step in enumerate(steps)
+                             if step.get('uses', '').startswith(
+                                 'android-actions/setup-android@'))
+                consumer = next(index for index, step in enumerate(steps)
+                                if 'sdkmanager ' in step.get('run', '')
+                                or 'android-emulator-runner@'
+                                in step.get('uses', ''))
+                self.assertLess(setup, consumer)
+                packages = steps[setup]['with']['packages'].split()
+                self.assertIn('platform-tools', packages)
+                self.assertNotIn('tools', packages)
+                self.assertRegex(steps[setup]['with']['cmdline-tools-version'], r'^\d+$')
+
+    def test_android_build_produces_both_unsigned_distribution_formats(self) -> None:
+        steps = self.workflow['jobs']['android']['steps']
+        build = next(step['run'] for step in steps
+                     if step.get('name') ==
+                     'Validate Android and build unsigned distributions')
+        for task in ('lint', 'testDebugUnitTest', 'assembleDebugAndroidTest',
+                     'assembleRelease', 'bundleRelease'):
+            self.assertIn(task, build.split())
+        upload = next(step for step in steps if 'upload-artifact@'
+                      in step.get('uses', ''))
+        self.assertEqual(upload['if'], 'always()')
+        self.assertIn('outputs/bundle/', upload['with']['path'])
+        self.assertIn('test-results/', upload['with']['path'])
+
+    def test_both_emulators_run_external_recovery_in_addition_to_connected_tests(self) -> None:
+        job = self.workflow['jobs']['android-device']
+        matrix = job['strategy']['matrix']['include']
+        self.assertTrue({'36', '37.0'} <= {row['api'] for row in matrix})
+        self.assertIn('pixel_tablet', {row['profile'] for row in matrix})
+        runner = next(step for step in job['steps']
+                      if 'android-emulator-runner@' in step.get('uses', ''))
+        self.assertEqual(runner['with']['arch'], 'x86_64')
+        self.assertEqual(job['env']['ANDROID_SERIAL'], 'emulator-5554')
+        self.assertEqual(runner['with']['disk-size'], '6G')
+        self.assertIn('-wipe-data', runner['with']['emulator-options'].split())
+        script = runner['with']['script']
+        connected = script.index('connectedDebugAndroidTest')
+        verified = script.index('python3 scripts/ci/android-results.py ')
+        recovery = script.index('node e2e/android/process.mjs "$ANDROID_SERIAL"')
+        self.assertLess(connected, verified)
+        self.assertLess(verified, recovery)
+        upload = next(step for step in job['steps']
+                      if 'upload-artifact@' in step.get('uses', ''))
+        self.assertEqual(upload['if'], 'always()')
+        self.assertIn('android-process/', upload['with']['path'])
+
+
+class AndroidToolSelectionTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.root = Path(self.directory.name)
+        self.tools = self.root / 'sdk/cmdline-tools'
+        self.latest = self.tools / 'latest'
+        self.pinned = self.tools / '16111833'
+        self.latest.mkdir(parents=True)
+        (self.latest / 'source.properties').write_text('Pkg.Revision=12.0\n')
+        self.scratch = self.root / 'scratch'
+        self.scratch.mkdir()
+        self.environment = {
+            **os.environ,
+            'ANDROID_HOME': str(self.root / 'sdk'),
+            'RUNNER_TEMP': str(self.scratch),
+            'SOTTO_ANDROID_DEVICE_PROFILE': 'pixel_9',
+        }
+
+    def manager(self, inventory: str) -> None:
+        binary = self.pinned / 'bin/avdmanager'
+        binary.parent.mkdir(parents=True)
+        binary.write_text('#!/bin/sh\nprintf "%s\\n" ' + inventory + '\n')
+        binary.chmod(0o755)
+
+    def select(self) -> subprocess.CompletedProcess[str]:
+        return subprocess.run([
+            sys.executable, '-c', python_step(
+                'release-surfaces-ci.yml',
+                'Select pinned Android tools for emulator creation',
+            ),
+        ], env=self.environment, text=True, capture_output=True)
+
+    def test_runner_latest_path_selects_pinned_devices_and_preserves_old_tools(self) -> None:
+        self.manager('pixel_9 pixel_tablet')
+        for profile in ['pixel_9', 'pixel_tablet']:
+            with self.subTest(profile=profile):
+                self.environment['SOTTO_ANDROID_DEVICE_PROFILE'] = profile
+                selected = self.select()
+                self.assertEqual(selected.returncode, 0, selected.stdout + selected.stderr)
+                result = subprocess.run([
+                    str(self.latest / 'bin/avdmanager'), 'list', 'device', '-c',
+                ], text=True, capture_output=True, check=True)
+                self.assertIn(profile, result.stdout.splitlines())
+        retained = list(self.scratch.glob('*/latest/source.properties'))
+        self.assertTrue(any(path.read_text() == 'Pkg.Revision=12.0\n' for path in retained))
+
+    def test_missing_profile_keeps_preinstalled_tools_untouched(self) -> None:
+        self.manager('pixel_8')
+        result = self.select()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('Requested device is absent', result.stdout + result.stderr)
+        self.assertFalse(self.latest.is_symlink())
+        self.assertEqual((self.latest / 'source.properties').read_text(), 'Pkg.Revision=12.0\n')
+        self.assertEqual(list(self.scratch.iterdir()), [])
+
+    def test_missing_pinned_manager_keeps_preinstalled_tools_untouched(self) -> None:
+        result = self.select()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('FileNotFoundError', result.stderr)
+        self.assertFalse(self.latest.is_symlink())
+        self.assertEqual(list(self.scratch.iterdir()), [])
 
 
 class NativeResultBundleTests(unittest.TestCase):

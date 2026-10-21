@@ -8,8 +8,7 @@ const refresh = vi.fn();
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push, refresh }) }));
 
 vi.mock('next/image', () => ({
-  default: ({ src, alt }: { src: string; alt: string }) =>
-    React.createElement('img', { src, alt }),
+  default: ({ src, alt }: { src: string; alt: string }) => React.createElement('img', { src, alt }),
 }));
 
 import { ProfilePicker } from '@/components/profiles/ProfilePicker';
@@ -43,7 +42,7 @@ describe('ProfilePicker', () => {
   });
 
   it('renders every profile with its course summary plus an add tile', () => {
-    render(<ProfilePicker profiles={[owner, member]} activeId="local-user" />);
+    render(<ProfilePicker profiles={[owner, member]} activeId="local-user" canCreateProfiles />);
 
     expect(screen.getByText('Marco')).toBeInTheDocument();
     expect(screen.getByText('Italian · A2')).toBeInTheDocument();
@@ -59,7 +58,7 @@ describe('ProfilePicker', () => {
       .mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }));
     const user = userEvent.setup();
 
-    render(<ProfilePicker profiles={[owner, member]} activeId="local-user" />);
+    render(<ProfilePicker profiles={[owner, member]} activeId="local-user" canCreateProfiles />);
     await user.click(screen.getByRole('button', { name: /switch to lena/i }));
 
     await waitFor(() => expect(push).toHaveBeenCalledWith('/learn'));
@@ -71,7 +70,7 @@ describe('ProfilePicker', () => {
 
   it('opens the editor for a profile in manage mode instead of switching', async () => {
     const user = userEvent.setup();
-    render(<ProfilePicker profiles={[owner, member]} activeId="local-user" />);
+    render(<ProfilePicker profiles={[owner, member]} activeId="local-user" canCreateProfiles />);
 
     await user.click(screen.getByRole('button', { name: /manage profiles/i }));
     await user.click(screen.getByRole('button', { name: /edit lena/i }));
@@ -89,7 +88,7 @@ describe('ProfilePicker', () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), { status: 200 }));
     const user = userEvent.setup();
 
-    render(<ProfilePicker profiles={[owner]} activeId="local-user" />);
+    render(<ProfilePicker profiles={[owner]} activeId="local-user" canCreateProfiles />);
     await user.click(screen.getByRole('button', { name: /add learner/i }));
     await user.type(screen.getByLabelText('Name'), 'Sofía');
     await user.click(screen.getByRole('button', { name: /create/i }));
@@ -100,5 +99,12 @@ describe('ProfilePicker', () => {
       '/api/v1/profiles',
       expect.objectContaining({ method: 'POST' })
     );
+  });
+
+  it('shows existing learners and management while hiding creation without owner authority', () => {
+    render(<ProfilePicker profiles={[owner, member]} activeId="lena" canCreateProfiles={false} />);
+    expect(screen.getByRole('button', { name: /switch to lena/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /manage profiles/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /add learner/i })).not.toBeInTheDocument();
   });
 });

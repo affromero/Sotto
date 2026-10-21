@@ -79,6 +79,24 @@ final class PrivacyConsentTests: XCTestCase {
         XCTAssertFalse(relaunched.hasAIConsent)
     }
 
+    func testUnpairingErasesProtectedGameCredentialsAndReportsGameStorageFailure() throws {
+        let store = ConsentPersistence()
+        let games = PlayMemoryStore()
+        var saved = PlayProtectedState()
+        try saved.archive(credentials())
+        try games.save(saved)
+        let model = SottoAppModel(credentials: credentials(), credentialStore: store, playStore: games)
+        games.failDelete = true
+        XCTAssertFalse(model.signOut())
+        XCTAssertTrue(model.isPaired)
+        XCTAssertFalse(try games.load().archivedConnections.isEmpty)
+        XCTAssertTrue(model.errorMessage?.contains("deletion unavailable") == true)
+        games.failDelete = false
+        XCTAssertTrue(model.signOut())
+        XCTAssertFalse(model.isPaired)
+        XCTAssertTrue(try games.load().archivedConnections.isEmpty)
+    }
+
     func testFailedWithdrawalReportsErrorAndKeepsPairingUntilDeletionSucceeds() {
         let store = ConsentPersistence()
         let model = SottoAppModel(credentials: credentials(), credentialStore: store)

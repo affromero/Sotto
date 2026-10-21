@@ -67,6 +67,51 @@ rolls back its database transaction and stops the update.
 
 The VPS instructions below are for operators deploying behind their own domain.
 
+## Native invitation distribution
+
+Set the optional `SOTTO_IOS_APP_STORE_URL`, `SOTTO_ANDROID_PLAY_STORE_URL` and
+`SOTTO_ANDROID_APK_URL` only to actual published HTTPS downloads. The invitation
+and download pages leave unavailable stores explicit. Native source builds and
+local emulator installs do not establish App Store or Play publication. Sign
+Android APKs/AABs and iOS archives through your distribution account before
+offering them. The Android application ID and iOS bundle ID are `fm.sotto.app`.
+
+Invitations currently use the browser bridge and registered `sotto://play/join`
+scheme, plus paste, game code and camera QR. They contain a server address and
+expiring invitation code, never credentials. After installing, reopen the original
+link or enter its server and code. The server must be reachable from the guest's
+device. New profiles still require owner approval and a present accepting host.
+
+Verified HTTPS app links require a controlled domain and actual signed app
+identities. They are not enabled by default for arbitrary self-hosted domains.
+To activate them for a distribution you control:
+
+1. Read the Apple application identifier from the signed app's entitlements and
+   add its exact domain to the app's Associated Domains entitlement. Register
+   the matching HTTPS host and `/play/join` route in the Android manifest.
+2. Serve `/.well-known/apple-app-site-association` with that actual application
+   identifier and only `/play/join` in its `paths` or `components`. Serve
+   `/.well-known/assetlinks.json` with `delegate_permission/common.handle_all_urls`,
+   package `fm.sotto.app` and the SHA-256 fingerprints of the installed signing
+   certificates. Play App Signing can use a different certificate from your
+   upload key. Use the certificate that signs users' installed app.
+3. Serve both files as JSON over HTTPS with status 200 and no redirects. Configure
+   the front proxy to serve those exact files outside household authentication.
+   The application does not expose a general public `/.well-known` exception.
+4. Validate your actual files, supplying the signed identifier and certificate
+   values in the named shell variables:
+
+   ```bash
+   node scripts/play/validate-associations.mjs \
+     --aasa "$AASA_FILE" --apple-app-id "$APPLE_APP_ID" \
+     --assetlinks "$ASSETLINKS_FILE" --android-package fm.sotto.app \
+     --android-sha256 "$ANDROID_SIGNING_SHA256"
+   ```
+
+5. Install the signed apps and verify opening the real HTTPS invitation on both
+   device families. JSON validation alone does not prove domain association.
+   Keep the browser's Open in Sotto and paste/code paths available.
+
 ## Before You Start
 
 You need:
@@ -322,6 +367,29 @@ SQL application, failed drift checks and errors while restoring queue flags.
 The controller never resolves migration history or restarts old code after a
 migration has started. Before that point, a reviewed recovery may return to the
 captured old release after its execution ownership is proven settled.
+
+The controller probes every captured worker image and the candidate image,
+requires all previous inventories to agree, and matches them to the version 2
+`queueTransition` review. Only strict additions are permitted. Version 1
+continues to require unchanged queues.
+The runtime compatibility review remains version 2 and retains its complete
+container, provider and changed-file bindings.
+
+Before fencing, the controller saves a version 2 original queue manifest with
+the pause flags for the union of both inventories. Its transition proof binds
+the stack, release, exact images and accepted review hashes. Every queue command
+checks that proof and the actual runtime's inventory. The injected helper can
+pause added queues from a previous worker without changing its installed code.
+
+Added queues must have no jobs in any state, schedulers, connected workers,
+active execution owners or incomplete durable outbox work. The controller checks
+this before saving the original manifest and again after all four captured old
+services stop, before backup or migration. The final check uses the application
+database connection, whose identity was compared with the direct migration
+connection before fencing. Work found during drainage retains maintenance and
+the original manifest. Recovery never replaces that snapshot or deletes work.
+After candidate startup, restoring flags preserves legitimate candidate work
+and each queue's original paused state.
 
 For recovery, retain `schema-preparation.json`, `schema-stopped.json`, both
 accepted reviews, the original queue manifest, migration/drift logs and the
