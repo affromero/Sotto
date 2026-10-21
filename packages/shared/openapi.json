@@ -13236,9 +13236,20 @@
                 "additionalProperties": false
               }
             ]
+          },
+          "acceptedConductVersion": {
+            "type": "number",
+            "enum": [1]
           }
         },
-        "required": ["requestId", "code", "client", "deviceName", "candidate"],
+        "required": [
+          "requestId",
+          "code",
+          "client",
+          "deviceName",
+          "candidate",
+          "acceptedConductVersion"
+        ],
         "additionalProperties": false
       },
       "PlayJoinStatus": {
@@ -13748,6 +13759,708 @@
           }
         },
         "required": ["phrases", "nextCursor"],
+        "additionalProperties": false
+      },
+      "PlaySafetyPolicy": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number",
+            "enum": [1]
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "paragraphs": {
+            "minItems": 1,
+            "maxItems": 8,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1000
+            }
+          },
+          "operatorContactUrl": {
+            "type": "string",
+            "maxLength": 1000,
+            "format": "starts_with",
+            "pattern": "^mailto:.*",
+            "nullable": true
+          },
+          "termsPath": {
+            "type": "string",
+            "enum": ["/terms"]
+          },
+          "privacyPath": {
+            "type": "string",
+            "enum": ["/privacy"]
+          },
+          "reviewPath": {
+            "type": "string",
+            "enum": ["/play/safety/review"]
+          }
+        },
+        "required": [
+          "version",
+          "title",
+          "paragraphs",
+          "operatorContactUrl",
+          "termsPath",
+          "privacyPath",
+          "reviewPath"
+        ],
+        "additionalProperties": false
+      },
+      "PlaySafetyError": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "CONDUCT_REQUIRED",
+              "SHARING_RESTRICTED",
+              "PLAY_UNAVAILABLE",
+              "TEXT_FILTERED",
+              "CONTENT_CHANGED",
+              "SAFETY_CONFLICT"
+            ]
+          }
+        },
+        "required": ["error", "reason"],
+        "additionalProperties": false
+      },
+      "PlaySafetyStatus": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "acceptedVersion": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "maximum": 9007199254740991,
+            "nullable": true
+          },
+          "acceptedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+            "nullable": true
+          },
+          "sharingRestricted": {
+            "type": "boolean"
+          },
+          "canReviewReports": {
+            "type": "boolean"
+          },
+          "serverTime": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          }
+        },
+        "required": [
+          "profileId",
+          "acceptedVersion",
+          "acceptedAt",
+          "sharingRestricted",
+          "canReviewReports",
+          "serverTime"
+        ],
+        "additionalProperties": false
+      },
+      "PlayConductAcceptance": {
+        "type": "object",
+        "properties": {
+          "actionId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "version": {
+            "type": "number",
+            "enum": [1]
+          }
+        },
+        "required": ["actionId", "version"],
+        "additionalProperties": false
+      },
+      "PlayPendingConductAcceptance": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "version": {
+                "type": "number",
+                "enum": [1]
+              },
+              "expectedProfileId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100,
+                "nullable": true
+              }
+            },
+            "required": ["version", "expectedProfileId"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "version": {
+                "type": "number",
+                "enum": [1]
+              }
+            },
+            "required": ["version"],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "PlayPendingConductAccepted": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "version": {
+            "type": "number",
+            "enum": [1]
+          }
+        },
+        "required": ["requestId", "version"],
+        "additionalProperties": false
+      },
+      "PlaySafetyMutation": {
+        "type": "object",
+        "properties": {
+          "actionId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": ["actionId"],
+        "additionalProperties": false
+      },
+      "PlaySafetyCompleted": {
+        "type": "object",
+        "properties": {
+          "actionId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "completed": {
+            "type": "boolean",
+            "enum": [true]
+          }
+        },
+        "required": ["actionId", "completed"],
+        "additionalProperties": false
+      },
+      "PlayBlockList": {
+        "type": "object",
+        "properties": {
+          "blocks": {
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "blockedUserId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                }
+              },
+              "required": ["blockedUserId", "name", "createdAt"],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "nullable": true
+          }
+        },
+        "required": ["blocks", "nextCursor"],
+        "additionalProperties": false
+      },
+      "PlayReport": {
+        "type": "object",
+        "properties": {
+          "actionId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "HARASSMENT",
+              "THREATS",
+              "HATE",
+              "SEXUAL_CONTENT",
+              "VIOLENCE",
+              "IMPERSONATION",
+              "OTHER"
+            ]
+          },
+          "detail": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "selector": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": ["PARTNER_NAME"]
+                  }
+                },
+                "required": ["kind"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": ["ROUND_TEXT"]
+                  },
+                  "roundId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "field": {
+                    "type": "string",
+                    "enum": [
+                      "TARGET",
+                      "CLUE",
+                      "GUESS",
+                      "OTHER_ANSWER",
+                      "MESSAGE",
+                      "HINT",
+                      "CORRECTION"
+                    ]
+                  },
+                  "index": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 5
+                  }
+                },
+                "required": ["kind", "roundId", "field"],
+                "additionalProperties": false
+              }
+            ]
+          },
+          "expectedVisibleText": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        },
+        "required": ["actionId", "category", "detail", "selector", "expectedVisibleText"],
+        "additionalProperties": false
+      },
+      "PlayReportList": {
+        "type": "object",
+        "properties": {
+          "reports": {
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "roomId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100,
+                  "nullable": true
+                },
+                "category": {
+                  "type": "string",
+                  "enum": [
+                    "HARASSMENT",
+                    "THREATS",
+                    "HATE",
+                    "SEXUAL_CONTENT",
+                    "VIOLENCE",
+                    "IMPERSONATION",
+                    "OTHER"
+                  ]
+                },
+                "detail": {
+                  "type": "string",
+                  "maxLength": 1000
+                },
+                "evidence": {
+                  "type": "object",
+                  "properties": {
+                    "selector": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["PARTNER_NAME"]
+                            }
+                          },
+                          "required": ["kind"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["ROUND_TEXT"]
+                            },
+                            "roundId": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 100
+                            },
+                            "field": {
+                              "type": "string",
+                              "enum": [
+                                "TARGET",
+                                "CLUE",
+                                "GUESS",
+                                "OTHER_ANSWER",
+                                "MESSAGE",
+                                "HINT",
+                                "CORRECTION"
+                              ]
+                            },
+                            "index": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 5
+                            }
+                          },
+                          "required": ["kind", "roundId", "field"],
+                          "additionalProperties": false
+                        }
+                      ]
+                    },
+                    "text": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 500
+                    }
+                  },
+                  "required": ["selector", "text"],
+                  "additionalProperties": false
+                },
+                "status": {
+                  "type": "string",
+                  "enum": ["OPEN", "RESOLVED"]
+                },
+                "revision": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                },
+                "response": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1000,
+                  "nullable": true
+                },
+                "respondedAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                  "nullable": true
+                }
+              },
+              "required": [
+                "id",
+                "roomId",
+                "category",
+                "detail",
+                "evidence",
+                "status",
+                "revision",
+                "createdAt",
+                "response",
+                "respondedAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "nullable": true
+          }
+        },
+        "required": ["reports", "nextCursor"],
+        "additionalProperties": false
+      },
+      "PlayReportReview": {
+        "type": "object",
+        "properties": {
+          "actionId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "action": {
+            "type": "string",
+            "enum": ["RESPOND", "DISMISS", "CLOSE_ROOM", "RESTRICT_PLAY", "RESTORE_PLAY"]
+          },
+          "response": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          }
+        },
+        "required": ["actionId", "expectedRevision", "action", "response"],
+        "additionalProperties": false
+      },
+      "PlayReportReviewList": {
+        "type": "object",
+        "properties": {
+          "reports": {
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "roomId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100,
+                  "nullable": true
+                },
+                "category": {
+                  "type": "string",
+                  "enum": [
+                    "HARASSMENT",
+                    "THREATS",
+                    "HATE",
+                    "SEXUAL_CONTENT",
+                    "VIOLENCE",
+                    "IMPERSONATION",
+                    "OTHER"
+                  ]
+                },
+                "detail": {
+                  "type": "string",
+                  "maxLength": 1000
+                },
+                "evidence": {
+                  "type": "object",
+                  "properties": {
+                    "selector": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["PARTNER_NAME"]
+                            }
+                          },
+                          "required": ["kind"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["ROUND_TEXT"]
+                            },
+                            "roundId": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 100
+                            },
+                            "field": {
+                              "type": "string",
+                              "enum": [
+                                "TARGET",
+                                "CLUE",
+                                "GUESS",
+                                "OTHER_ANSWER",
+                                "MESSAGE",
+                                "HINT",
+                                "CORRECTION"
+                              ]
+                            },
+                            "index": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 5
+                            }
+                          },
+                          "required": ["kind", "roundId", "field"],
+                          "additionalProperties": false
+                        }
+                      ]
+                    },
+                    "text": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 500
+                    }
+                  },
+                  "required": ["selector", "text"],
+                  "additionalProperties": false
+                },
+                "status": {
+                  "type": "string",
+                  "enum": ["OPEN", "RESOLVED"]
+                },
+                "revision": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                },
+                "response": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1000,
+                  "nullable": true
+                },
+                "respondedAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                  "nullable": true
+                },
+                "reporter": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    }
+                  },
+                  "required": ["id", "name"],
+                  "additionalProperties": false
+                },
+                "subject": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    }
+                  },
+                  "required": ["id", "name"],
+                  "additionalProperties": false
+                },
+                "subjectRestricted": {
+                  "type": "boolean"
+                },
+                "allowedActions": {
+                  "maxItems": 5,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": ["RESPOND", "DISMISS", "CLOSE_ROOM", "RESTRICT_PLAY", "RESTORE_PLAY"]
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "roomId",
+                "category",
+                "detail",
+                "evidence",
+                "status",
+                "revision",
+                "createdAt",
+                "response",
+                "respondedAt",
+                "reporter",
+                "subject",
+                "subjectRestricted",
+                "allowedActions"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "nullable": true
+          }
+        },
+        "required": ["reports", "nextCursor"],
         "additionalProperties": false
       }
     }
@@ -14356,6 +15069,426 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/PlaySavePhrase"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/play/policy": {
+      "get": {
+        "operationId": "playSafetyPolicy",
+        "summary": "Read the current conduct policy and the selected server operator contact.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlaySafetyPolicy"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/play/safety": {
+      "get": {
+        "operationId": "playSafetyStatus",
+        "summary": "Read only my conduct acceptance, Play restriction and owner review capability.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlaySafetyStatus"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/play/safety/conduct": {
+      "post": {
+        "operationId": "playAcceptConduct",
+        "summary": "Explicitly accept the current conduct policy as my canonical profile.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlaySafetyCompleted"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlayConductAcceptance"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/play/join-requests/{requestId}/conduct": {
+      "post": {
+        "operationId": "playAcceptPendingConduct",
+        "summary": "Accept conduct for the exact proof-bound pending request. BROWSER requires expectedProfileId, including null. EXISTING also requires its current app credential.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayPendingConductAccepted"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlayPendingConductAcceptance"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "playClaimantProof": []
+          }
+        ]
+      }
+    },
+    "/api/v1/play/safety/blocks": {
+      "get": {
+        "operationId": "playBlocks",
+        "summary": "List only my own persistent partner blocks.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayBlockList"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "beforeId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/play/rooms/{roomId}/block": {
+      "post": {
+        "operationId": "playBlockPartner",
+        "summary": "Block the other actual participant, ending active games together without revoking either learner profile.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlaySafetyCompleted"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "roomId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlaySafetyMutation"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/play/safety/blocks/{blockedUserId}/unblock": {
+      "post": {
+        "operationId": "playUnblockPartner",
+        "summary": "Remove a block belonging to my own list. Old games and invitations remain closed.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlaySafetyCompleted"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "blockedUserId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlaySafetyMutation"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/play/rooms/{roomId}/reports": {
+      "post": {
+        "operationId": "playReportContent",
+        "summary": "Report a partner using one server-verified visible content selection. No arbitrary offender ID or hidden state is accepted.",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlaySafetyCompleted"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "roomId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlayReport"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/play/safety/reports": {
+      "get": {
+        "operationId": "playReports",
+        "summary": "Read only my submitted reports and the owner responses.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayReportList"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "beforeId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/play/safety/review": {
+      "get": {
+        "operationId": "playReviewReports",
+        "summary": "Real-server-owner-only inbox of bounded submitted report evidence, without private room access.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayReportReviewList"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "beforeId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/play/safety/review/{reportId}": {
+      "post": {
+        "operationId": "playReviewReport",
+        "summary": "Real-server-owner-only revision-checked response and action on the reported subject.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlaySafetyCompleted"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "reportId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlayReportReview"
               }
             }
           }

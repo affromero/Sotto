@@ -1,0 +1,131 @@
+{
+  "version": 1,
+  "policy": {
+    "version": 1,
+    "title": "Playing together safely",
+    "paragraphs": [
+      "Treat your partner with respect. Do not share harassment, threats, hate, impersonation, sexual exploitation, objectionable sexual or graphic violent material, or unlawful content.",
+      "Your partner sees the language you share in the game. Games use a local text filter and work without AI processing. You can report content or a player, block a partner, and manage your own blocks.",
+      "Reports send the selected visible content and your explanation to this server’s owner. The owner can respond, close a game, or restrict a profile from partner games. Your private learning remains separate.",
+      "Blocking ends your active games together and prevents new games between these profiles. Unblocking does not reopen old games. Ask this server’s operator about its handling of reports, retention, and contact details."
+    ],
+    "operatorContactUrl": "mailto:operator@example.test?subject=Sotto%20game%20safety",
+    "termsPath": "/terms",
+    "privacyPath": "/privacy",
+    "reviewPath": "/play/safety/review"
+  },
+  "unaccepted": {
+    "profileId": "fixture-player",
+    "acceptedVersion": null,
+    "acceptedAt": null,
+    "sharingRestricted": false,
+    "canReviewReports": false,
+    "serverTime": "2026-10-21T12:00:00.000Z"
+  },
+  "accepted": {
+    "profileId": "fixture-player",
+    "acceptedVersion": 1,
+    "acceptedAt": "2026-10-21T11:00:00.000Z",
+    "sharingRestricted": false,
+    "canReviewReports": false,
+    "serverTime": "2026-10-21T12:00:00.000Z"
+  },
+  "restricted": {
+    "profileId": "fixture-player",
+    "acceptedVersion": 1,
+    "acceptedAt": "2026-10-21T11:00:00.000Z",
+    "sharingRestricted": true,
+    "canReviewReports": false,
+    "serverTime": "2026-10-21T12:00:00.000Z"
+  },
+  "blocks": {
+    "blocks": [
+      {
+        "blockedUserId": "fixture-partner",
+        "name": "Partner",
+        "createdAt": "2026-10-21T11:30:00.000Z"
+      }
+    ],
+    "nextCursor": null
+  },
+  "reportRequest": {
+    "actionId": "2a217591-bf41-4885-a3b1-9df9f6523d63",
+    "category": "HARASSMENT",
+    "detail": "This was directed at me.",
+    "selector": {
+      "kind": "ROUND_TEXT",
+      "roundId": "fixture-round",
+      "field": "MESSAGE",
+      "index": 1
+    },
+    "expectedVisibleText": "The exact visible line."
+  },
+  "report": {
+    "id": "2a217591-bf41-4885-a3b1-9df9f6523d63",
+    "roomId": "fixture-room",
+    "category": "HARASSMENT",
+    "detail": "This was directed at me.",
+    "evidence": {
+      "selector": {
+        "kind": "ROUND_TEXT",
+        "roundId": "fixture-round",
+        "field": "MESSAGE",
+        "index": 1
+      },
+      "text": "The exact visible line."
+    },
+    "status": "RESOLVED",
+    "revision": 1,
+    "createdAt": "2026-10-21T11:31:00.000Z",
+    "response": "I have closed the game and restricted this profile from partner games.",
+    "respondedAt": "2026-10-21T11:40:00.000Z"
+  },
+  "review": {
+    "reporter": { "id": "fixture-player", "name": "Learner" },
+    "subject": { "id": "fixture-partner", "name": "Partner" },
+    "subjectRestricted": true,
+    "allowedActions": ["RESPOND", "RESTORE_PLAY"]
+  },
+  "completed": { "actionId": "2a217591-bf41-4885-a3b1-9df9f6523d63", "completed": true },
+  "browserPendingAcceptance": { "version": 1, "expectedProfileId": null },
+  "nativePendingAcceptance": { "version": 1 },
+  "pendingAccepted": { "requestId": "fixture-request", "version": 1 },
+  "errors": [
+    {
+      "status": 409,
+      "body": {
+        "error": "Accept the current conduct policy before sharing.",
+        "reason": "CONDUCT_REQUIRED"
+      }
+    },
+    {
+      "status": 409,
+      "body": {
+        "error": "This profile cannot currently share in partner games.",
+        "reason": "SHARING_RESTRICTED"
+      }
+    },
+    {
+      "status": 404,
+      "body": { "error": "This game is unavailable.", "reason": "PLAY_UNAVAILABLE" }
+    },
+    {
+      "status": 400,
+      "body": { "error": "This text cannot be shared in the game.", "reason": "TEXT_FILTERED" }
+    },
+    {
+      "status": 409,
+      "body": {
+        "error": "The selected content changed. Refresh before reporting.",
+        "reason": "CONTENT_CHANGED"
+      }
+    },
+    {
+      "status": 409,
+      "body": {
+        "error": "This safety action changed. Refresh before acting.",
+        "reason": "SAFETY_CONFLICT"
+      }
+    }
+  ]
+}
