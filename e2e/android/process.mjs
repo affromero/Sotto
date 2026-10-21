@@ -1,18 +1,17 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdir, writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { startAndroidFixture } from './fixture.mjs';
 
 const root = resolve(import.meta.dirname, '../..');
 const serial = process.argv[2];
 assert.match(serial || '', /^emulator-[0-9]+$/, 'Pass the dedicated emulator serial explicitly');
 const adb = process.env.ANDROID_HOME ? `${process.env.ANDROID_HOME}/platform-tools/adb` : 'adb';
-const output = resolve(
-  process.env.SOTTO_NATIVE_TEST_OUTPUT || '/tmp/sotto-android-process',
-  serial
-);
-await mkdir(output, { recursive: true });
+const outputParent = resolve(process.env.SOTTO_NATIVE_TEST_OUTPUT || tmpdir());
+await mkdir(outputParent, { recursive: true, mode: 0o700 });
+const output = await mkdtemp(join(outputParent, `sotto-android-process-${serial}-`));
 
 async function command(args, name) {
   const child = spawn(adb, ['-s', serial, ...args], { stdio: ['ignore', 'pipe', 'pipe'] });
@@ -27,7 +26,7 @@ async function command(args, name) {
     child.once('error', reject);
     child.once('exit', resolve);
   });
-  if (name) await writeFile(`${output}/${name}.log`, text);
+  if (name) await writeFile(`${output}/${name}.log`, text, { flag: 'wx', mode: 0o600 });
   if (code !== 0) throw new Error(`adb ${args.slice(0, 3).join(' ')} failed (${code})\n${text}`);
   return text;
 }
@@ -131,7 +130,10 @@ try {
     originalDeliveryRecovery: true,
     localPermissionRevoked: sdk >= 37,
   };
-  await writeFile(`${output}/result.json`, `${JSON.stringify(result, null, 2)}\n`);
+  await writeFile(`${output}/result.json`, `${JSON.stringify(result, null, 2)}\n`, {
+    flag: 'wx',
+    mode: 0o600,
+  });
   process.stdout.write(
     `Android process recovery passed on ${serial} (API ${sdk}). Results: ${output}\n`
   );
