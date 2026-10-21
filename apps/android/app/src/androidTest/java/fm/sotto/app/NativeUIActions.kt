@@ -10,12 +10,12 @@ import fm.sotto.app.network.NetworkAccess
 import androidx.test.espresso.Espresso
 
 class NativeUIActions(private val compose: ComposeTestRule) {
-    fun denyCameraPermission() {
+    fun denyPermission() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val device = UiDevice.getInstance(instrumentation)
         val selector = By.res("com.android.permissioncontroller", "permission_deny_button")
         val dialog = requireNotNull(device.wait(Until.findObject(selector), 10_000)) {
-            "Android did not show its camera permission request."
+            "Android did not show its permission request."
         }
         val permissionPackage = dialog.applicationPackage
         compose.waitUntil(10_000) {
@@ -25,11 +25,11 @@ class NativeUIActions(private val compose: ComposeTestRule) {
         }
         device.waitForIdle(3000)
         val deny = requireNotNull(device.findObject(By.copy(selector).enabled(true).clickable(true))) {
-            "The camera permission dialog closed before denial."
+            "The permission dialog closed before denial."
         }
         deny.click()
         check(device.wait(Until.gone(selector), 10_000)) {
-            "Android did not dismiss the camera permission request after denial."
+            "Android did not dismiss its permission request after denial."
         }
     }
     fun allowLocalNetwork() {
