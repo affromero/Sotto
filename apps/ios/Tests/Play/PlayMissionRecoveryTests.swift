@@ -19,6 +19,7 @@ final class PlayMissionRecoveryTests: XCTestCase {
             defer { server.stop() }
             let model = SottoAppModel(credentials: PlayTestIdentity.connection(server: server.url, id: "guest-profile"),
                 session: URLSession(configuration: .ephemeral), credentialStore: PlayCredentialMemoryStore(), playStore: PlayMemoryStore())
+            defer { withExtendedLifetime(model) {} }
             let coordinator = model.play
             coordinator.navigate(.room(before.id))
             let polling = Task { await coordinator.foreground() }
@@ -50,6 +51,7 @@ final class PlayMissionRecoveryTests: XCTestCase {
             defer { server.stop() }
             let model = SottoAppModel(credentials: PlayTestIdentity.connection(server: server.url, id: "guest-profile"),
                 session: URLSession(configuration: .ephemeral), credentialStore: PlayCredentialMemoryStore(), playStore: PlayMemoryStore())
+            defer { withExtendedLifetime(model) {} }
             let coordinator = model.play
             coordinator.navigate(.room(before.id))
             let polling = Task { await coordinator.foreground() }
