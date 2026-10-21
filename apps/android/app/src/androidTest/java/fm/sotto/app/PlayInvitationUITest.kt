@@ -8,9 +8,6 @@ import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import androidx.test.uiautomator.By
-import androidx.test.uiautomator.UiDevice
-import androidx.test.uiautomator.Until
 import fm.sotto.app.model.*
 import kotlinx.coroutines.runBlocking
 import org.junit.*
@@ -33,7 +30,7 @@ class PlayInvitationUITest {
             click("Join with a code or link")
             click("Scan invitation QR")
             click("Allow camera for QR scanning")
-            denyCameraPermission()
+            denyPermission()
             visible("Camera access is off. You can paste a link or type the code.")
             fill("Invitation link or game code", fixture.invite.appLink)
             click("Open invitation")
