@@ -7,6 +7,13 @@ import Redis from 'ioredis';
 import { initialAccessState } from 'thesidedoor-core/access';
 import { JobExecutionJournal, JobOutbox, prepareJob } from 'thesidedoor-core/runtime/outbox';
 import { StorageInstanceControl } from 'thesidedoor-core/storage/instance';
+import {
+  StorageBackendRegistry,
+  StorageCleanupJournal,
+  prepareStorageBackend,
+  prepareStorageCleanup,
+  storageBackendBinding,
+} from 'thesidedoor-core/storage';
 import { observe } from '../../deploy/review/observer';
 
 export async function runScenario(scenario: string, bundle: string) {
@@ -73,6 +80,7 @@ export async function runScenario(scenario: string, bundle: string) {
       },
     ]);
     const outbox = new JobOutbox(executor, 'postgres', namespace);
+    const capturedScope = { subjectId: 'PRIVATE_CAPTURED_SCOPE', generation: 0 };
     const jobs = [];
     for (let index = 0; index < 3; index++) {
       const job = await outbox.enqueue(
@@ -81,13 +89,77 @@ export async function runScenario(scenario: string, bundle: string) {
           handler: 'worksheet-pdf',
           version: 1,
           payload: { privateText: 'PRIVATE_WORKSHEET_BODY' },
-          scopes: [{ subjectId: 'member', generation: 0 }],
+          scopes: [capturedScope],
           delivery: { attempts: 1, priority: 0, availableAt: 0 },
         })
       );
       jobs.push(job);
       if (index > 0) await outbox.acknowledgeDelivery(job.job.id, job.fingerprint);
       if (scenario === 'complete') await outbox.complete(job.job.id, job.fingerprint);
+    }
+    if (scenario.startsWith('deletion-') || scenario === 'erased') {
+      const cleanup = new StorageCleanupJournal(executor, 'postgres', namespace);
+      const deletion = prepareStorageCleanup({
+        namespace,
+        ...capturedScope,
+        generation: scenario === 'deletion-generation' ? 1 : capturedScope.generation,
+      });
+      await cleanup.createJob(deletion);
+      if (scenario === 'deletion-matching') {
+        const location = {
+          kind: 'object' as const,
+          endpoint: 'https://storage.example',
+          bucket: 'fixture',
+        };
+        const backend = prepareStorageBackend(namespace, {
+          kind: 'object',
+          location,
+          binding: storageBackendBinding(location),
+        });
+        await new StorageBackendRegistry(executor, 'postgres', namespace).register(backend);
+        await cleanup.registerCollectors(deletion.id, 0, [
+          {
+            id: 'inventory',
+            kind: 'inventory',
+            scope: 'fixture/',
+            backendIds: [backend.id],
+          },
+        ]);
+        let progress = await cleanup.transition(deletion.id, 0);
+        progress = await cleanup.recordDrainedIntents(progress.id, progress.epoch, null);
+        const emptyInventory = () =>
+          cleanup.recordCollectorPage({
+            jobId: progress.id,
+            epoch: progress.epoch,
+            collectorId: 'inventory',
+            after: null,
+            next: null,
+            targets: [],
+          });
+        progress = await emptyInventory();
+        progress = await cleanup.transition(progress.id, progress.epoch);
+        progress = await cleanup.transition(progress.id, progress.epoch);
+        progress = await cleanup.beginVerification(progress.id, progress.epoch);
+        progress = await emptyInventory();
+        progress = await cleanup.transition(progress.id, progress.epoch);
+        assert.equal(progress.phase, 'complete');
+      }
+      if (scenario === 'erased') {
+        for (const job of jobs) {
+          await outbox.complete(job.job.id, job.fingerprint);
+          await outbox.erase(job.job.id, job.fingerprint, capturedScope);
+        }
+      }
+      if (scenario === 'deletion-missing') {
+        await database.query(
+          "DELETE FROM \"SidedoorState\" WHERE state->>'kind' = 'storage_cleanup'"
+        );
+      }
+      if (scenario === 'deletion-malformed') {
+        await database.query(
+          "UPDATE \"SidedoorState\" SET state = jsonb_set(state,'{phase}','\"invalid\"') WHERE state->>'kind' = 'storage_cleanup'"
+        );
+      }
     }
     if (scenario === 'active') {
       const job = jobs[0];
@@ -117,6 +189,15 @@ export async function runScenario(scenario: string, bundle: string) {
     const snapshot = async () =>
       JSON.stringify((await database.query('SELECT * FROM "SidedoorState" ORDER BY id')).rows);
     const before = await snapshot();
+    if (scenario === 'deletion-missing' || scenario === 'deletion-malformed') {
+      await assert.rejects(
+        () =>
+          observe({ query: async (sql, values = []) => database.query(sql, [...values]) }, redis),
+        scenario === 'deletion-missing' ? /Storage cleanup job is missing/ : { name: 'ZodError' }
+      );
+      assert.equal(await snapshot(), before);
+      return { scenario, readOnly: true, unchanged: true, zeroWork: false, jobs: 3 };
+    }
     if (scenario === 'oversized') {
       await assert.rejects(
         () =>
@@ -145,7 +226,9 @@ export async function runScenario(scenario: string, bundle: string) {
           return response;
         },
       },
-      redis
+      scenario === 'deletion-matching'
+        ? { dbsize: async () => 0, scan: async (): Promise<[string, string[]]> => ['0', []] }
+        : redis
     );
     assert.equal(await snapshot(), before);
     assert.equal(writeRejected, true);
@@ -156,6 +239,19 @@ export async function runScenario(scenario: string, bundle: string) {
       { id: 'member', role: 'member' },
     ]);
     assert.equal(JSON.stringify(result).includes('PRIVATE_'), false);
+    if (scenario === 'deletion-matching') {
+      assert.equal(result.redis.empty, true);
+      assert.equal(result.executions.length, 0);
+      assert.ok(
+        result.cleanup.every(
+          (item) =>
+            item.phase === 'complete' &&
+            item.pending === 0 &&
+            item.unresolvedManifests === 0 &&
+            item.remainingCollectors === 0
+        )
+      );
+    }
     if (scenario === 'cli') {
       const streamed = spawnSync(process.execPath, ['-'], {
         input: bundle,
@@ -199,12 +295,35 @@ export async function runScenario(scenario: string, bundle: string) {
       }
     }
     if (scenario === 'complete') assert.equal(result.zeroWork, result.redis.empty);
-    else {
+    else if (scenario === 'erased') {
+      assert.equal(result.zeroWork, false);
+      assert.ok(result.jobs.every((job) => job.status === 'erased' && !job.deletionProof));
+    } else {
       assert.equal(result.zeroWork, false);
       assert.equal(result.jobs.length, 3);
       if (scenario === 'invalid') assert.ok(result.jobs.every((job) => job.status === 'invalid'));
       else assert.equal(result.jobs.filter((job) => job.delivered).length, 2);
       if (scenario === 'active') assert.equal(result.executions[0].status, 'active');
+      if (scenario !== 'invalid') {
+        const status =
+          scenario === 'deletion-matching'
+            ? 'matching-deletion'
+            : scenario === 'deletion-generation'
+              ? 'inconsistent'
+              : 'absent';
+        for (const job of result.jobs) {
+          assert.equal(job.status, 'pending');
+          assert.equal(job.deletionProof?.status, status);
+          assert.equal(job.deletionProof?.capturedScopeCount, 1);
+          assert.equal(job.deletionProof?.matching, scenario === 'deletion-matching' ? 1 : 0);
+          assert.equal(job.deletionProof?.mismatched, scenario === 'deletion-generation' ? 1 : 0);
+          assert.equal(job.deletionProof?.absent, status === 'absent' ? 1 : 0);
+          assert.deepEqual(
+            job.deletionProof?.matchingCleanupPhases,
+            scenario === 'deletion-matching' ? { complete: 1 } : {}
+          );
+        }
+      }
     }
     return {
       scenario,

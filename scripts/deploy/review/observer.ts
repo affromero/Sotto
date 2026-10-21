@@ -3,7 +3,7 @@ import { Client } from 'pg';
 import Redis from 'ioredis';
 import { accessStateSchema } from 'thesidedoor-core/access';
 import { JobExecutionJournal, JobOutbox } from 'thesidedoor-core/runtime/outbox';
-import { StorageCleanupJournal } from 'thesidedoor-core/storage';
+import { StorageCleanupJournal, StorageWriteJournal } from 'thesidedoor-core/storage';
 import { StorageInstanceControl } from 'thesidedoor-core/storage/instance';
 import { OwnedCredentials } from 'thesidedoor-core/configuration/owned-credentials';
 import { CredentialSharing } from 'thesidedoor-core/configuration/credential-sharing';
@@ -117,6 +117,16 @@ export async function observe(database: Database, redis: RedisReader) {
       references.set(id, fingerprint);
       if (references.size > limit) throw new Error('Outbox inspection bound exceeded');
     }
+    const cleanupJournal = new StorageCleanupJournal(executor, 'postgres', namespace);
+    const writes = new StorageWriteJournal(executor, 'postgres', namespace);
+    type DeletionProof = {
+      status: 'absent' | 'matching-deletion' | 'inconsistent';
+      capturedScopeCount: number;
+      absent: number;
+      matching: number;
+      mismatched: number;
+      matchingCleanupPhases: Record<string, number>;
+    };
     const jobs: {
       id: string;
       status: string;
@@ -124,8 +134,13 @@ export async function observe(database: Database, redis: RedisReader) {
       version?: number;
       delivered?: boolean;
       matchesIndex?: boolean;
+      deletionProof?: DeletionProof;
     }[] = [];
     for (const [id, fingerprint] of references) {
+      let inspected: {
+        receipt: NonNullable<Awaited<ReturnType<JobOutbox['receipt']>>>;
+        record: Awaited<ReturnType<JobOutbox['read']>>;
+      };
       try {
         const receipt = await outbox.receipt(id);
         if (!receipt) {
@@ -133,17 +148,59 @@ export async function observe(database: Database, redis: RedisReader) {
           continue;
         }
         const record = receipt.status === 'erased' ? null : await outbox.read(id);
-        jobs.push({
-          id,
-          status: receipt.status,
-          handler: receipt.handler,
-          version: receipt.version,
-          matchesIndex: receipt.fingerprint === fingerprint,
-          ...(record ? { delivered: record.delivered } : {}),
-        });
+        if (receipt.status !== 'erased' && !record) throw new Error('Missing outbox record');
+        inspected = { receipt, record };
       } catch {
         jobs.push({ id, status: 'invalid' });
+        continue;
       }
+      const { receipt, record } = inspected;
+      let deletionProof: DeletionProof | undefined;
+      if (receipt.status === 'pending' && record) {
+        deletionProof = {
+          status: 'absent',
+          capturedScopeCount: record.job.scopes.length,
+          absent: 0,
+          matching: 0,
+          mismatched: 0,
+          matchingCleanupPhases: {},
+        };
+        for (const scope of record.job.scopes) {
+          const tombstone = await writes.tombstone(scope.subjectId);
+          if (!tombstone) {
+            deletionProof.absent++;
+            continue;
+          }
+          // Missing or malformed cleanup proof must fail the observation.
+          const deletion = await cleanupJournal.get(tombstone.jobId);
+          if (
+            tombstone.generation !== scope.generation ||
+            deletion.namespace !== namespace ||
+            deletion.subjectId !== scope.subjectId ||
+            deletion.generation !== scope.generation
+          ) {
+            deletionProof.mismatched++;
+            continue;
+          }
+          deletionProof.matching++;
+          deletionProof.matchingCleanupPhases[deletion.phase] =
+            (deletionProof.matchingCleanupPhases[deletion.phase] ?? 0) + 1;
+        }
+        deletionProof.status = deletionProof.mismatched
+          ? 'inconsistent'
+          : deletionProof.matching
+            ? 'matching-deletion'
+            : 'absent';
+      }
+      jobs.push({
+        id,
+        status: receipt.status,
+        handler: receipt.handler,
+        version: receipt.version,
+        matchesIndex: receipt.fingerprint === fingerprint,
+        ...(record ? { delivered: record.delivered } : {}),
+        ...(deletionProof ? { deletionProof } : {}),
+      });
     }
 
     const executionRows = (
@@ -164,7 +221,6 @@ export async function observe(database: Database, redis: RedisReader) {
       });
       executions.push({ id: record.id, status: record.status });
     }
-    const cleanupJournal = new StorageCleanupJournal(executor, 'postgres', namespace);
     const cleanup = [];
     let cleanupCursor: string | null = null;
     do {

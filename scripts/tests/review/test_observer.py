@@ -349,3 +349,20 @@ m.exports.runScenario(process.argv[1],s).then(r=>console.log(JSON.stringify(r)))
         self,
     ) -> None:
         self.assertFalse(self.scenario('oversized')['zeroWork'])
+
+    def test_matching_deletion_proof_does_not_admit_pending_jobs(self) -> None:
+        self.assertFalse(self.scenario('deletion-matching')['zeroWork'])
+
+    def test_wrong_generation_is_explicitly_inconsistent(self) -> None:
+        self.assertFalse(self.scenario('deletion-generation')['zeroWork'])
+
+    def test_tombstone_without_cleanup_fails_the_observation(self) -> None:
+        self.assertFalse(self.scenario('deletion-missing')['zeroWork'])
+
+    def test_tombstone_with_malformed_cleanup_fails_the_observation(
+        self,
+    ) -> None:
+        self.assertFalse(self.scenario('deletion-malformed')['zeroWork'])
+
+    def test_erased_receipt_does_not_read_removed_payload(self) -> None:
+        self.assertFalse(self.scenario('erased')['zeroWork'])
