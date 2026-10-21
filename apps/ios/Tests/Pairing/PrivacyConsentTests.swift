@@ -4,6 +4,30 @@ import XCTest
 
 @MainActor
 final class PrivacyConsentTests: XCTestCase {
+    func testBundledPrivacyDisclosesRetainedDeviceRegistrationsAndPartnerGraph() throws {
+        let url = try XCTUnwrap(Bundle.main.url(forResource: "PrivacyInfo", withExtension: "xcprivacy"))
+        let data = try Data(contentsOf: url)
+        let manifest = try XCTUnwrap(
+            PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any])
+        let declarations = try XCTUnwrap(manifest["NSPrivacyCollectedDataTypes"] as? [[String: Any]])
+        let identifiers = try declarations.map {
+            try XCTUnwrap($0["NSPrivacyCollectedDataType"] as? String)
+        }
+        XCTAssertEqual(Set(identifiers).count, identifiers.count, "Each collected type needs one declaration.")
+        XCTAssertEqual(manifest["NSPrivacyTracking"] as? Bool, false)
+        XCTAssertEqual(manifest["NSPrivacyTrackingDomains"] as? [String], [])
+
+        for type in ["NSPrivacyCollectedDataTypeContacts", "NSPrivacyCollectedDataTypeDeviceID"] {
+            let declaration = try XCTUnwrap(declarations.first {
+                $0["NSPrivacyCollectedDataType"] as? String == type
+            }, "The shipped app must disclose \(type).")
+            XCTAssertEqual(declaration["NSPrivacyCollectedDataTypeLinked"] as? Bool, true)
+            XCTAssertEqual(declaration["NSPrivacyCollectedDataTypeTracking"] as? Bool, false)
+            XCTAssertEqual(declaration["NSPrivacyCollectedDataTypePurposes"] as? [String],
+                ["NSPrivacyCollectedDataTypePurposeAppFunctionality"])
+        }
+    }
+
     func testAcceptedPermissionSurvivesRelaunchFromKeychain() throws {
         let store = CredentialStore(account: "consent-test-\(UUID().uuidString)")
         defer { try? store.delete() }

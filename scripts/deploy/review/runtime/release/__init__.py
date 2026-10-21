@@ -5,7 +5,9 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import stat
+import sys
 import time
 from collections.abc import Callable, Mapping
 from importlib import import_module
@@ -15,7 +17,6 @@ from typing import TYPE_CHECKING, cast
 
 from scripts.deploy.images.metadata import record
 from scripts.deploy.review.build_observer import bounded_bytes
-from scripts.deploy.review.runtime import services
 from scripts.deploy.review.state import (
     atomic_json,
     private_json,
@@ -26,11 +27,129 @@ from scripts.deploy.review.topology import DIRECTORY, PROJECT, rows
 if TYPE_CHECKING:
     from scripts.deploy.review.runtime.operations import HostOperations
 
+STARTUP_UNIT = Path('/etc/systemd/system/sotto-review-start.service')
+
+
+def startup_unit(operations: HostOperations) -> bytes:
+    """Start only the completed attempt from its admitted immutable source."""
+    from scripts.deploy.review.runtime.operations import HOST_STATE
+
+    root = operations.root
+    attempt = operations.attempt.directory
+    interpreter = Path(sys.executable).resolve()
+    for path in (root, attempt, interpreter):
+        if (not path.is_absolute() or path.resolve() != path
+                or not re.fullmatch(r'/[A-Za-z0-9_./-]+', str(path))):
+            raise ValueError('literal-absolute-startup-paths-required')
+    if attempt.parent != HOST_STATE:
+        raise ValueError('canonical-completed-attempt-required')
+    command = (f'{interpreter} -m scripts.deploy.review.runtime.controller '
+               f'--start-completed --attempt {attempt}')
+    return f'''[Unit]
+Description=Start the verified shared Sotto review release
+Requires=docker.service sotto-review-egress.service
+After=docker.service sotto-review-egress.service
+PartOf=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=sotto
+UMask=0077
+TimeoutStartSec=0
+WorkingDirectory={root}
+ExecStart={command}
+
+[Install]
+WantedBy=docker.service
+'''.encode()
+
+
+def startup_binding(operations: HostOperations) -> dict[str, object]:
+    return {'path': str(STARTUP_UNIT),
+            'sha256': hashlib.sha256(startup_unit(operations)).hexdigest(),
+            'sourceRoot': str(operations.root),
+            'attemptDirectory': str(operations.attempt.directory)}
+
+
+def verify_startup_installation(operations: HostOperations) -> None:
+    metadata = STARTUP_UNIT.lstat()
+    if (not stat.S_ISREG(metadata.st_mode) or metadata.st_uid != 0
+            or stat.S_IMODE(metadata.st_mode) != 0o644
+            or bounded_bytes(STARTUP_UNIT) != startup_unit(operations)):
+        raise ValueError('completed-startup-unit-changed')
+    properties = operations.command([
+        'systemctl', 'show', '--property=FragmentPath',
+        '--property=DropInPaths', STARTUP_UNIT.name,
+    ]).decode().splitlines()
+    if dict(line.split('=', 1) for line in properties) != {
+        'FragmentPath': str(STARTUP_UNIT), 'DropInPaths': '',
+    }:
+        raise ValueError('completed-startup-unit-overridden')
+
+
+def install_startup_unit(operations: HostOperations) -> None:
+    operations.lock.validate()
+    expected = startup_binding(operations)
+    intent = operations.attempt.directory / 'startup-unit-intent.json'
+    if intent.exists():
+        if private_json(intent) != expected:
+            raise ValueError('startup-unit-intent-changed')
+    else:
+        if STARTUP_UNIT.exists() or STARTUP_UNIT.is_symlink():
+            raise ValueError('foreign-existing-completed-startup-unit')
+        atomic_json(intent, expected)
+    content = startup_unit(operations)
+    if STARTUP_UNIT.exists() or STARTUP_UNIT.is_symlink():
+        metadata = STARTUP_UNIT.lstat()
+        if (not stat.S_ISREG(metadata.st_mode)
+                or bounded_bytes(STARTUP_UNIT) != content):
+            raise ValueError('pending-completed-startup-unit-changed')
+    candidate = operations.attempt.directory / STARTUP_UNIT.name
+    if candidate.exists():
+        if bounded_bytes(candidate, private=True) != content:
+            raise ValueError('private-completed-startup-unit-changed')
+    else:
+        operations.private_file(candidate, content)
+    operations.command([
+        'sudo', '-n', 'install', '-o', 'root', '-g', 'root', '-m', '0644',
+        str(candidate), str(STARTUP_UNIT),
+    ])
+    operations.command(['sudo', '-n', 'systemctl', 'daemon-reload'])
+    verify_startup_installation(operations)
+    operations.command(['sudo', '-n', 'systemctl', 'enable',
+                        STARTUP_UNIT.name])
+    verify_startup_enabled(operations)
+    atomic_json(operations.attempt.directory / 'startup-unit.json',
+                {**expected, 'enabled': True})
+
+
+def verify_startup_enabled(operations: HostOperations) -> None:
+    verify_startup_installation(operations)
+    relation = STARTUP_UNIT.parent / 'docker.service.wants' / STARTUP_UNIT.name
+    metadata = relation.lstat()
+    if (not stat.S_ISLNK(metadata.st_mode) or metadata.st_uid != 0
+            or relation.resolve() != STARTUP_UNIT
+            or operations.command(['systemctl', 'is-enabled',
+                                   STARTUP_UNIT.name]).strip() != b'enabled'):
+        raise ValueError('completed-startup-relation-changed')
+
+
+def verify_startup_unit(operations: HostOperations) -> None:
+    expected = startup_binding(operations)
+    if (private_json(operations.attempt.directory / 'startup-unit-intent.json')
+            != expected
+            or private_json(operations.attempt.directory / 'startup-unit.json')
+            != {**expected, 'enabled': True}):
+        raise ValueError('completed-startup-receipt-changed')
+    verify_startup_enabled(operations)
+
 
 def cutover(
     operations: HostOperations, *,
     continue_check: Callable[[], None] | None = None,
 ) -> None:
+    from scripts.deploy.review.runtime import services
     from scripts.deploy.review.runtime.operations import (
         CADDY,
         HOST_STATE,
@@ -82,6 +201,8 @@ def install_public_routing(
     *, continue_check: Callable[[], None] | None = None,
 ) -> None:
     """Reload even when a prior install completed before its reload result."""
+    from scripts.deploy.review.runtime import services
+
     try:
         if continue_check is not None:
             continue_check()
@@ -190,6 +311,7 @@ def finalize(
     operations: HostOperations, *,
     continue_check: Callable[[], None] | None = None,
 ) -> None:
+    from scripts.deploy.review.runtime import services
     from scripts.deploy.review.runtime.operations import RETENTION
 
     operations.lock.validate()
@@ -232,6 +354,9 @@ def finalize(
                                  / 'workloads-verified.json'),
         'browserVerification': 'required',
     })
+    if continue_check is not None:
+        continue_check()
+    install_startup_unit(operations)
 
 
 def archive_imports(
@@ -291,6 +416,8 @@ def archive_imports(
 
 def verify_completed(operations: HostOperations) -> None:
     """Verify the completed release without requiring archived import heads."""
+    from scripts.deploy.review.runtime import services
+
     operations.lock.validate()
     operations.verify_tools()
     operations.verify_images(require_imports=False, final_only=True)
@@ -300,6 +427,7 @@ def verify_completed(operations: HostOperations) -> None:
     services.verify_candidate(operations, 'workers')
     services.wait_health(operations, public=True)
     verify_completed_records(operations)
+    verify_startup_unit(operations)
 
 
 def verify_completed_records(
@@ -477,12 +605,15 @@ def recover_completed(
     continue_check: Callable[[], None] | None = None,
 ) -> None:
     """Recover public routing only after complete evidence passes under503."""
+    from scripts.deploy.review.runtime import services
+
     operations.verify_fence()
     operations.verify_tools()
     operations.verify_images(require_imports=False, final_only=True)
     operations.verify_storage()
     operations.verify_egress()
     verify_completed_records(operations, fenced=True)
+    verify_startup_unit(operations)
     identities = [services.verify_candidate(
         operations, role, require_running=False,
     ) for role in ('web', 'workers')]
@@ -509,6 +640,7 @@ def start_completed(
     continue_check: Callable[[], None] | None = None,
 ) -> None:
     """Start only the two fully bound containers from a completed attempt."""
+    from scripts.deploy.review.runtime import services
     from scripts.deploy.review.runtime.operations import HOST_STATE
 
     operations.lock.validate()
@@ -525,6 +657,7 @@ def start_completed(
     operations.verify_storage()
     operations.verify_egress()
     verify_completed_records(operations)
+    verify_startup_unit(operations)
     identities = [services.verify_candidate(
         operations, role, require_running=False,
     ) for role in ('web', 'workers')]

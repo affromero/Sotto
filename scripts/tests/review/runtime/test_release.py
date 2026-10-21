@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+import configparser
 import hashlib
 import json
 import os
+import shlex
 import shutil
+import stat
+import subprocess
+import sys
 import tempfile
 import unittest
 from importlib import import_module
@@ -27,6 +32,8 @@ from scripts.deploy.review.topology import NETWORK, PROJECT
 
 class ReleaseRecoveryTests(unittest.TestCase):
     def setUp(self) -> None:
+        previous_umask = os.umask(0o077)
+        self.addCleanup(os.umask, previous_umask)
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name).resolve()
@@ -84,7 +91,7 @@ class ReleaseRecoveryTests(unittest.TestCase):
                 'relativePath': 'review-stage-assets/finalizer.py',
                 'sha256': hashlib.sha256(asset.read_bytes()).hexdigest(),
             }
-        attempt = Attempt.create(self.root, 'release-fixture', manifest,
+        attempt = Attempt.create(self.host, 'release-fixture', manifest,
                                  'a' * 64)
         self.operations = HostOperations(attempt, self.lock)
         self.operations.root = self.root
@@ -109,6 +116,32 @@ class ReleaseRecoveryTests(unittest.TestCase):
         self.serving = False
         self.fail_reload = False
         self.started: list[str] = []
+        self.unit = self.root / 'systemd/sotto-review-start.service'
+        self.unit.parent.mkdir(mode=0o700)
+        self.drop_ins = ''
+        self.command_history: list[list[str]] = []
+        self.lost_startup_result = ''
+        unit_boundary = patch.object(release, 'STARTUP_UNIT', self.unit)
+        unit_boundary.start()
+        self.addCleanup(unit_boundary.stop)
+        real_lstat = Path.lstat
+
+        def installed_lstat(path: Path) -> os.stat_result:
+            metadata = real_lstat(path)
+            if path in {self.unit, self.unit.parent
+                        / 'docker.service.wants' / self.unit.name}:
+                values = list(metadata)
+                values[4] = 0
+                return os.stat_result(values)
+            return metadata
+
+        metadata_boundary = patch.object(Path, 'lstat', installed_lstat)
+        metadata_boundary.start()
+        self.addCleanup(metadata_boundary.stop)
+        command_boundary = patch.object(HostOperations, 'command',
+                                        side_effect=self.command)
+        command_boundary.start()
+        self.addCleanup(command_boundary.stop)
         for name, value in (('RETENTION', self.retention),
                             ('HOST_STATE', self.host), ('CADDY', self.caddy)):
             boundary = patch('scripts.deploy.review.runtime.operations.'
@@ -119,6 +152,41 @@ class ReleaseRecoveryTests(unittest.TestCase):
                               side_effect=self.docker)
         docker.start()
         self.addCleanup(docker.stop)
+
+    def command(self, arguments: list[str]) -> bytes:
+        self.command_history.append(arguments)
+        if arguments[2:4] == ['install', '-o']:
+            destination = Path(arguments[-1])
+            if destination not in {self.caddy, self.unit}:
+                raise AssertionError('Unadmitted fixture install target')
+            if destination == self.unit:
+                self.assertEqual(private_json(
+                    self.operations.attempt.directory
+                    / 'startup-unit-intent.json',
+                ), release.startup_binding(self.operations))
+            destination.write_bytes(Path(arguments[-2]).read_bytes())
+            destination.chmod(0o644)
+            if destination == self.unit and self.lost_startup_result \
+                    == 'install':
+                self.lost_startup_result = ''
+                raise OSError('fixture lost startup install result')
+        elif arguments[-3:] == ['systemctl', 'reload', 'caddy']:
+            self.serving = self.caddy.read_bytes() == self.original
+        elif arguments[:2] == ['systemctl', 'show']:
+            return (f'FragmentPath={self.unit}\n'
+                    f'DropInPaths={self.drop_ins}\n').encode()
+        elif arguments[:2] == ['systemctl', 'is-enabled']:
+            return b'enabled\n'
+        elif arguments[-3:] == ['systemctl', 'enable', self.unit.name]:
+            relation = (self.unit.parent / 'docker.service.wants'
+                        / self.unit.name)
+            relation.parent.mkdir(mode=0o700, exist_ok=True)
+            if not relation.is_symlink():
+                relation.symlink_to(self.unit)
+            if self.lost_startup_result == 'enable':
+                self.lost_startup_result = ''
+                raise OSError('fixture lost startup enable result')
+        return b''
 
     def docker(self, *arguments: str) -> bytes:
         if arguments[:2] == ('image', 'inspect'):
@@ -158,6 +226,111 @@ class ReleaseRecoveryTests(unittest.TestCase):
             name: record(value, 'captured')['sha256']
             for name, value in captured.items()
         }})
+
+    def test_completed_unit_uses_verified_entry_without_starting_services(
+        self,
+    ) -> None:
+        configuration = configparser.ConfigParser(interpolation=None)
+        configuration.read_string(release.startup_unit(
+            self.operations).decode())
+        self.assertEqual(configuration['Unit']['Requires'],
+                         'docker.service sotto-review-egress.service')
+        self.assertEqual(configuration['Unit']['After'],
+                         configuration['Unit']['Requires'])
+        self.assertEqual(configuration['Unit']['PartOf'], 'docker.service')
+        service = configuration['Service']
+        self.assertEqual(service['Type'], 'oneshot')
+        self.assertEqual(service['RemainAfterExit'], 'yes')
+        self.assertEqual(service['TimeoutStartSec'], '0')
+        self.assertEqual(service['User'], 'sotto')
+        self.assertEqual(service['UMask'], '0077')
+        self.assertNotIn('ExecStop', service)
+        self.assertEqual(shlex.split(service['ExecStart'])[1:], [
+            '-m', 'scripts.deploy.review.runtime.controller',
+            '--start-completed', '--attempt',
+            str(self.operations.attempt.directory),
+        ])
+        self.assertEqual(configuration['Install']['WantedBy'],
+                         'docker.service')
+        release.install_startup_unit(self.operations)
+        release.verify_startup_unit(self.operations)
+        self.assertEqual(self.unit.read_bytes(),
+                         release.startup_unit(self.operations))
+        self.assertTrue(all('--now' not in arguments
+                            for arguments in self.command_history))
+        self.assertFalse(any('start' in arguments or 'restart' in arguments
+                             for arguments in self.command_history))
+        self.assertEqual(self.started, [])
+
+    def test_release_and_services_can_load_in_either_fresh_process_order(
+        self,
+    ) -> None:
+        for names in (('release', 'services'), ('services', 'release')):
+            with self.subTest(first=names[0]):
+                result = subprocess.run([
+                    sys.executable, '-c',
+                    'from scripts.deploy.review.runtime import '
+                    + ', '.join(names)
+                    + '; assert services.finalize is release.finalize',
+                ], cwd=Path(__file__).resolve().parents[4],
+                    capture_output=True, text=True, timeout=10, check=False)
+                self.assertEqual(result.returncode, 0, result.stderr)
+
+    def check_lost_startup_result(self, stage: str) -> None:
+        self.lost_startup_result = stage
+        directory = self.operations.attempt.directory
+        with self.assertRaisesRegex(OSError, 'lost startup'):
+            release.install_startup_unit(self.operations)
+        self.assertTrue((directory / 'startup-unit-intent.json').exists())
+        self.assertFalse((directory / 'startup-unit.json').exists())
+        self.assertEqual(self.unit.read_bytes(),
+                         release.startup_unit(self.operations))
+        release.install_startup_unit(self.operations)
+        release.verify_startup_unit(self.operations)
+
+    def test_lost_install_result_replays_only_the_owned_identical_unit(
+        self,
+    ) -> None:
+        self.check_lost_startup_result('install')
+
+    def test_lost_enable_result_reconciles_the_same_completed_relation(
+        self,
+    ) -> None:
+        self.check_lost_startup_result('enable')
+
+    def test_foreign_existing_startup_unit_is_preserved_and_refused(
+        self,
+    ) -> None:
+        self.unit.write_bytes(b'foreign service')
+        with self.assertRaisesRegex(ValueError, 'foreign-existing'):
+            release.install_startup_unit(self.operations)
+        self.assertEqual(self.unit.read_bytes(), b'foreign service')
+        self.assertEqual(self.command_history, [])
+
+    def test_foreign_drop_in_refuses_completion_without_a_receipt(
+        self,
+    ) -> None:
+        self.drop_ins = '/etc/systemd/system/sotto-review-start.d/foreign.conf'
+        with self.assertRaisesRegex(ValueError, 'unit-overridden'):
+            release.install_startup_unit(self.operations)
+        self.assertFalse((self.operations.attempt.directory
+                          / 'startup-unit.json').exists())
+        self.assertEqual(self.started, [])
+
+    def test_changed_unit_or_enable_relation_refuses_verified_startup(
+        self,
+    ) -> None:
+        release.install_startup_unit(self.operations)
+        self.unit.chmod(0o600)
+        with self.assertRaisesRegex(ValueError, 'unit-changed'):
+            release.verify_startup_unit(self.operations)
+        self.unit.chmod(0o644)
+        relation = self.unit.parent / 'docker.service.wants' / self.unit.name
+        relation.unlink()
+        relation.symlink_to(self.caddy)
+        with self.assertRaisesRegex(ValueError, 'relation-changed'):
+            release.verify_startup_unit(self.operations)
+        self.assertTrue(stat.S_ISREG(self.unit.lstat().st_mode))
 
     def test_lost_begin_result_still_captures_exact_import_records(
         self,
@@ -282,6 +455,7 @@ class ReleaseRecoveryTests(unittest.TestCase):
         _, identities = release.retention_context(self.operations)
         atomic_json(self.retention / (PROJECT+'.json'),
                     {'protected_images': sorted(identities)})
+        release.install_startup_unit(self.operations)
 
     def test_completed_evidence_retains_rotated_auth_and_rejects_changed_copy(
         self,
@@ -351,11 +525,7 @@ class ReleaseRecoveryTests(unittest.TestCase):
             return real_open(name, flags, mode, dir_fd=dir_fd)
 
         def command(arguments: list[str]) -> bytes:
-            if arguments[2:4] == ['install', '-o']:
-                self.caddy.write_bytes(Path(arguments[-2]).read_bytes())
-            elif arguments[-3:] == ['systemctl', 'reload', 'caddy']:
-                self.serving = self.caddy.read_bytes() == self.original
-            return b''
+            return self.command(arguments)
 
         def public_get(_: str) -> tuple[int, bytes]:
             if not self.serving:

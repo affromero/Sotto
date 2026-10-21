@@ -333,6 +333,65 @@ image evidence; upgrading the established review database still requires a
 reviewed migration and recovery procedure. Do not run a first-install bootstrap
 against its existing data.
 
+### Upgrade the established store-review server
+
+The existing demo serves both App Store and Google Play reviewers. Its guarded
+upgrade keeps the two existing profiles, storage and selected speech providers.
+Learning generation uses its separately admitted Codex CLI home, shared by the
+review web and worker. Keep that home separate from production credentials.
+
+Before starting, independently admit the exact source, successful CI runs,
+immutable image receipts, staged migration inventories, host topology and
+private inputs. Preserve the original data and queue evidence. Require an
+admitted Linux kernel proof of the review-only network guard. Import missing
+images through capacity admission before creating the private, checksum-bound
+`Attempt` with `scripts.deploy.review.state.Attempt.create`. The controller
+requires those images to be present and performs no builds or image pulls.
+
+From the admitted source directory, launch the owned attempt:
+
+```bash
+python3 -m scripts.deploy.review.runtime.controller \
+  --launch --attempt "$REVIEW_ATTEMPT_DIR"
+```
+
+The detached supervisor acquires the shared deployment lock on FD9 itself.
+Do not wrap this command in another `flock`. It holds the public 503
+maintenance fence through backups, staged SQL, provider configuration, learning
+and speech workloads. Public routing returns after those checks pass. Complete
+browser and two-player checks separately after cutover.
+
+On failure or a requested stop, inspect the private attempt records and resolve
+the recorded cause. The live supervisor retains FD9. After fencing begins,
+recovery keeps the 503 response in place. Resume only that verified held
+process:
+
+```bash
+python3 -m scripts.deploy.review.runtime.controller \
+  --resume --attempt "$REVIEW_ATTEMPT_DIR"
+```
+
+SIGKILL or reboot releases the kernel lock. The unresolved marker and retained
+fence block automatic startup. After verifying that the old supervisor is gone,
+use `--launch --recover` with the same attempt directory. Once SQL may have
+started, recovery moves forward with compatible code. Keep the marker, backups
+and failed records; do not restart the old release or run a first-install
+bootstrap against this database.
+
+Completion installs and enables `sotto-review-start.service` for the captured
+release. It runs after Docker and the review network guard, using this entry
+point from the admitted source directory:
+
+```bash
+python3 -m scripts.deploy.review.runtime.controller \
+  --start-completed --attempt "$REVIEW_ATTEMPT_DIR"
+```
+
+It rejects unresolved deployments and verifies the retained release, guard and
+both exact container configurations before starting the captured containers.
+It does not create replacement containers or perform a new deployment. The
+installer leaves running services alone; it does not restart Docker or the host.
+
 ### Fenced schema transitions
 
 For an established stack, `bash scripts/deploy/schema/deploy.sh REVIEW EVIDENCE`
