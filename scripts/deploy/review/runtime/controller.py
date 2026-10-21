@@ -25,6 +25,10 @@ from scripts.deploy.review.runtime.operations import (
     HOST_STATE,
     HostOperations,
 )
+from scripts.deploy.review.runtime.policy import (
+    retain_queue_intent,
+    runtime_policy,
+)
 from scripts.deploy.review.state import (
     PHASES,
     Attempt,
@@ -51,6 +55,7 @@ def admitted_file(
 
 def admission(operations: HostOperations) -> dict[str, object]:
     attempt, manifest = operations.attempt, operations.manifest
+    runtime_policy(manifest)
     operations.verify_tools()
     evidence = admitted_file(attempt, 'evidence.json', attempt.evidence_hash)
     jobs = rows(evidence.get('jobs'), 'admitted worksheet job')
@@ -230,19 +235,30 @@ def activate(
     if not journal['queuesPrepared']:
         if continue_check is not None:
             continue_check()
-        if journal['prepareIntent']:
+        if (journal['prepareIntent'] and not (
+                operations.attempt.directory / 'queue-policy-intent.json'
+                ).exists()):
             raise ValueError(
                 'partial-queue-preparation-needs-canonical-inspection',
             )
-        operations.verify_empty_redis()
+        policy_path = operations.attempt.directory / 'queue-policy-intent.json'
+        if policy_path.exists():
+            retain_queue_intent(operations, private_json(policy_path))
+        if not journal['prepareIntent']:
+            operations.verify_empty_redis()
         journal['prepareIntent'] = True
         atomic_json(path, journal)
-        prepared = record(operations.runtime_exchange('prepare', evidence),
+        prepared = record(operations.runtime_exchange('prepare', {
+            'evidence': evidence, 'policyIntent': (
+                private_json(policy_path) if policy_path.exists() else None),
+        }),
                           'queue preparation')
         if (prepared.get('prepared') is not True
                 or prepared.get('manifest') != original_queues
                 or prepared.get('zeroWork') is not False
                 or prepared.get('pending') != 3
+                or prepared.get('queueConcurrency') != 1
+                or not policy_path.exists()
                 or private_json(operations.attempt.directory
                                 / 'original-queues.json') != original_queues):
             raise ValueError('original-queue-preparation-not-verified')

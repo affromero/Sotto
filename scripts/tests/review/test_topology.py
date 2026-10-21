@@ -20,6 +20,7 @@ from scripts.deploy.review.topology import (
     classified_environment,
     verify_capture,
 )
+from scripts.tests.review.runtime import admitted_runtime_fixture
 
 
 class ReviewTopologyTests(unittest.TestCase):
@@ -170,6 +171,7 @@ class ReviewTopologyTests(unittest.TestCase):
     def test_candidate_keeps_db_keys_storage_and_one_shared_auth_home(
         self,
     ) -> None:
+        original = copy.deepcopy(self.private)
         result = candidate_compose(
             attempt_id='release-a',
             web_reference=(
@@ -184,6 +186,8 @@ class ReviewTopologyTests(unittest.TestCase):
             runtime_uid=1000, runtime_gid=1000,
             web_memory=536_870_912, worker_memory=1_073_741_824,
             egress_network=PROJECT + '_egress',
+            runtime_policy=cast(dict[str, object],
+                                admitted_runtime_fixture()['runtimePolicy']),
         )
         services = cast(dict[str, dict[str, object]], result['services'])
         self.assertEqual(set(services), {'web', 'workers'})
@@ -194,7 +198,8 @@ class ReviewTopologyTests(unittest.TestCase):
             for key in ('DATABASE_URL', 'REDIS_URL', 'BYOK_ENCRYPTION_KEY'):
                 self.assertEqual(private[key], self.private[key])
             self.assertEqual(private['CODEX_HOME'], '/home/sotto/.codex')
-            self.assertNotIn('SOTTO_PRIVACY_CONTACT_EMAIL', private)
+            self.assertEqual(private['SOTTO_PRIVACY_CONTACT_EMAIL'],
+                             'me@afromero.co')
             self.assertEqual(service['restart'], 'no')
             self.assertNotIn('ports', service)
             self.assertEqual(service['pull_policy'], 'never')
@@ -204,6 +209,15 @@ class ReviewTopologyTests(unittest.TestCase):
         self.assertEqual(worker['WORKER_PROFILE'], 'all')
         self.assertEqual(worker['WORKER_PRESET'], 'full')
         self.assertEqual(worker['WORKER_QUEUES'], '')
+        self.assertEqual(self.private, original)
+        self.assertEqual(services['web']['command'],
+                         ['node', '--max-old-space-size=256', 'server.js'])
+        self.assertEqual(services['workers']['command'], [
+            'node', '--max-old-space-size=512', '--import', 'tsx',
+            'src/workers/index.ts',
+        ])
+        for service in services.values():
+            self.assertEqual(service['memswap_limit'], service['mem_limit'])
 
 
 if __name__ == '__main__':

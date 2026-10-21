@@ -1,6 +1,5 @@
 // @vitest-environment node
-import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
-import { createServer } from 'node:net';
+import { execFileSync } from 'node:child_process';
 import { Queue, Worker } from 'bullmq';
 import Redis from 'ioredis';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -34,6 +33,7 @@ import {
   createSharedTestInstance,
   type SharedTestInstance,
 } from '../../helpers/setup/shared-instance';
+import { createPrivateRedis } from '../../helpers/queue/private-redis';
 
 const boundary = vi.hoisted(() => ({ database: null as PrismaClient | null }));
 vi.mock('@/lib/prisma', async () => {
@@ -73,61 +73,20 @@ suite('bounded canonical review first-worker admission', () => {
   let classId: string;
   let ownerId: string;
   let redis: Redis;
-  let redisProcess: ChildProcess;
+  let privateRedis: Awaited<ReturnType<typeof createPrivateRedis>>;
   let redisUrl: string;
   let runtime: ReviewQueueRuntime;
 
   beforeAll(async () => {
     instance = await createSharedTestInstance('review_first_worker');
     boundary.database = instance.database;
-    const reservation = createServer();
-    await new Promise<void>((resolve, reject) => {
-      reservation.once('error', reject);
-      reservation.listen(0, '127.0.0.1', resolve);
-    });
-    const address = reservation.address();
-    if (!address || typeof address === 'string') throw new Error('Loopback port required');
-    const port = address.port;
-    await new Promise<void>((resolve, reject) =>
-      reservation.close((error) => (error ? reject(error) : resolve()))
-    );
-    redisProcess = spawn(
-      'redis-server',
-      ['--bind', '127.0.0.1', '--port', String(port), '--save', '', '--appendonly', 'no'],
-      { stdio: 'ignore' }
-    );
-    redisUrl = `redis://127.0.0.1:${port}/0`;
-    redis = new Redis(redisUrl, {
-      commandTimeout: 5000,
-      connectTimeout: 1000,
-      maxRetriesPerRequest: 1,
-      retryStrategy: (attempt) => (attempt < 100 ? 20 : null),
-    });
-    redis.on('error', () => undefined);
-    await new Promise<void>((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error('Private Redis startup timed out')), 5000);
-      redis.once('ready', () => {
-        clearTimeout(timer);
-        resolve();
-      });
-      redisProcess.once('error', (error) => {
-        clearTimeout(timer);
-        reject(error);
-      });
-      redisProcess.once('exit', () => {
-        clearTimeout(timer);
-        reject(new Error('Private Redis exited'));
-      });
-    });
+    privateRedis = await createPrivateRedis();
+    redisUrl = privateRedis.url;
+    redis = privateRedis.client;
   });
 
   afterAll(async () => {
-    await redis?.quit();
-    if (redisProcess && redisProcess.exitCode === null) {
-      const exited = new Promise<void>((resolve) => redisProcess.once('exit', () => resolve()));
-      redisProcess.kill('SIGTERM');
-      await exited;
-    }
+    await privateRedis?.close();
     boundary.database = null;
     await instance?.close();
   });
@@ -198,6 +157,18 @@ suite('bounded canonical review first-worker admission', () => {
       },
       names: ALL_QUEUE_NAMES,
       createQueue: (name) => new Queue(name, { connection: redis, skipMetasUpdate: true }),
+      policy: {
+        schemaVersion: 1,
+        webHeapMiB: 256,
+        workerHeapMiB: 512,
+        helperHeapMiB: 192,
+        queueConcurrency: 1,
+        privacyContactEmail: 'me@afromero.co',
+      },
+      policyIntent: null,
+      admitQueuePolicy: async (intent) => {
+        runtime.policyIntent = intent;
+      },
     };
   });
 
@@ -678,7 +649,9 @@ suite('bounded canonical review first-worker admission', () => {
 
   it('rejects any raw Redis key before creating queue metadata and retains it', async () => {
     await redis.set('unexpected-state', 'preserve');
-    await expect(prepareReviewQueues(runtime, evidence, redis)).rejects.toThrow(/Redis/);
+    await expect(
+      prepareReviewQueues({ ...runtime, policyIntent: null }, evidence, redis)
+    ).rejects.toThrow(/Redis/);
     expect(await redis.keys('*')).toEqual(['unexpected-state']);
     expect(await redis.get('unexpected-state')).toBe('preserve');
   });
@@ -747,7 +720,19 @@ suite('bounded canonical review first-worker admission', () => {
       }
     }
     expect(await preservedState()).toEqual(before);
-    await expect(prepareReviewQueues(runtime, evidence, redis)).rejects.toThrow(/Redis/);
+    const ownedKeys = (await redis.keys('*')).sort();
+    const ownedValues = await Promise.all(ownedKeys.map((key) => redis.dump(key)));
+    await expect(prepareReviewQueues(runtime, evidence, redis)).resolves.toEqual(result);
+    expect((await redis.keys('*')).sort()).toEqual(ownedKeys);
+    expect(await Promise.all(ownedKeys.map((key) => redis.dump(key)))).toEqual(ownedValues);
+    await redis.set('foreign-preparation-state', 'retained');
+    await expect(prepareReviewQueues(runtime, evidence, redis)).rejects.toThrow(/unowned/);
+    expect(await redis.get('foreign-preparation-state')).toBe('retained');
+    await redis.del('foreign-preparation-state');
+    await expect(
+      prepareReviewQueues({ ...runtime, policyIntent: null }, evidence, redis)
+    ).rejects.toThrow(/Redis/);
+    expect(await preservedState()).toEqual(before);
   });
 
   it('proves zero consumers across all actual paused queues and refuses a live foreign consumer', async () => {

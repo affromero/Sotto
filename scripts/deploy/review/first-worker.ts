@@ -4,6 +4,12 @@ import { createRequire } from 'node:module';
 import { isDeepStrictEqual } from 'node:util';
 import type { Queue } from 'bullmq';
 import type Redis from 'ioredis';
+import {
+  inspectReviewQueuePolicy,
+  prepareReviewQueuePolicy,
+  reviewRuntimePolicySchema,
+  type ReviewQueuePolicyIntent,
+} from './runtime/policy/queues';
 import { z } from 'zod';
 import { StorageCleanupJournal } from 'thesidedoor-core/storage';
 import type { Prisma, PrismaClient } from '../../../apps/web/src/generated/prisma/client';
@@ -373,7 +379,7 @@ export async function inspectReviewPausedFirstWorker(database: PrismaClient, inp
 
 /** Read actual consumers and active jobs while every admitted queue remains paused. */
 export async function inspectReviewPausedConsumers(
-  runtime: Pick<ReviewQueueRuntime, 'names' | 'createQueue'>,
+  runtime: Pick<ReviewQueueRuntime, 'names' | 'createQueue' | 'policy'>,
   input: unknown
 ) {
   const expected = z
@@ -384,6 +390,7 @@ export async function inspectReviewPausedConsumers(
     })
     .strict()
     .parse(input);
+  await inspectReviewQueuePolicy(runtime, runtime.policy);
   assert.deepEqual([...runtime.names].sort(), [...ALL_QUEUE_NAMES].sort());
   const deadline = Date.now() + timeoutMs;
   for (const name of ALL_QUEUE_NAMES) {
@@ -475,6 +482,9 @@ export interface ReviewQueueRuntime {
   environment: { DATABASE_URL: string; REDIS_URL: string };
   names: readonly string[];
   createQueue(name: string): Queue;
+  policy: unknown;
+  policyIntent: unknown;
+  admitQueuePolicy(intent: ReviewQueuePolicyIntent): Promise<void>;
 }
 
 /** Explicit first metadata write. Partial failures retain pause state for controller recovery. */
@@ -499,7 +509,8 @@ export async function prepareReviewQueues(
     'Final queue inventory changed'
   );
   await inspectReviewFirstWorker(runtime.database, evidence);
-  await inspectReviewRedisEmpty(redis);
+  reviewRuntimePolicySchema.parse(runtime.policy);
+  if (runtime.policyIntent === null) await inspectReviewRedisEmpty(redis);
   const deadline = Date.now() + timeoutMs;
   const queues: Queue[] = [];
   const manifest = {
@@ -513,11 +524,30 @@ export async function prepareReviewQueues(
       const queue = runtime.createQueue(name);
       queues.push(queue);
       assert.equal(queue.opts.connection, redis, 'Queue must use the inspected Redis client');
-      await queue.pause();
+      if (runtime.policyIntent === null) await queue.pause();
+      else assert(await queue.isPaused(), 'Retained review queue was unpaused');
       assert.equal((await queue.getWorkers()).length, 0, 'Unexpected review consumer');
       assert.equal((await queue.getJobs(undefined, 0, 0)).length, 0, 'Unexpected queued work');
       assert.equal(await queue.getJobSchedulersCount(), 0, 'Unexpected scheduled work');
     }
+    const ownedKeys = new Set(queues.flatMap((queue) => Object.values(queue.keys)));
+    let cursor = '0';
+    let pages = 0;
+    do {
+      budget(deadline);
+      const page = await redis.scan(cursor, 'COUNT', 100);
+      assert(
+        ++pages <= 100 && page[1].every((key) => ownedKeys.has(key)),
+        'Review Redis contains unowned preparation metadata'
+      );
+      cursor = page[0];
+    } while (cursor !== '0');
+    await prepareReviewQueuePolicy(
+      queues,
+      manifest.connectionIdentity,
+      runtime.policyIntent,
+      runtime.admitQueuePolicy
+    );
     const drained = await lifecycle.run(
       { command: 'drained-all', manifest },
       {
@@ -570,7 +600,13 @@ export async function prepareReviewQueues(
       assert.equal(await queue.getJobSchedulersCount(), 0, 'Unexpected scheduled work');
     }
     budget(deadline);
-    return { prepared: true as const, manifest, zeroWork: false as const, pending: 3 as const };
+    return {
+      prepared: true as const,
+      manifest,
+      queueConcurrency: 1 as const,
+      zeroWork: false as const,
+      pending: 3 as const,
+    };
   } finally {
     const closed = await Promise.allSettled(queues.map((queue) => queue.close()));
     assert(

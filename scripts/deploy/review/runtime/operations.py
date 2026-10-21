@@ -26,6 +26,15 @@ from scripts.deploy.review.egress import (
 )
 from scripts.deploy.review.runtime.channel import exchange
 from scripts.deploy.review.runtime.mounts import MOUNT_PROBE, resolve_mounts
+from scripts.deploy.review.runtime.policy import (
+    admit_queue_getter,
+    bind_helper_environment,
+    concurrent_memory,
+    helper_arguments,
+    helper_memory,
+    retain_queue_intent,
+    runtime_policy,
+)
 from scripts.deploy.review.runtime.services import (
     backup_review,
     install_egress,
@@ -343,8 +352,7 @@ class HostOperations:
         require_memory = import_module('scripts.deploy.stop-workers')
         require_memory.require_overlap_memory(
             Path('/proc/meminfo').read_text(),
-            cast(int, resources['webMemoryBytes'])
-            + cast(int, resources['workerMemoryBytes']),
+            concurrent_memory(self.manifest),
         )
 
     def install_caddy(self, content: bytes) -> None:
@@ -494,6 +502,7 @@ class HostOperations:
     ) -> bytes:
         """An admitted image runs the explicitly named maintenance tool."""
         self.settle_pending_helpers()
+        arguments = helper_arguments(self.manifest, entrypoint, arguments)
         image = rows(json.loads(self.docker(
             'image', 'inspect', cast(str, receipt['reference']),
         )), 'maintenance image')[0]
@@ -502,16 +511,20 @@ class HostOperations:
             'kind': 'maintenance', 'imageId': image_id, 'network': network,
             'entrypoint': entrypoint, 'argumentsHash': checksum(arguments),
             'inputSha256': hashlib.sha256(content or b'').hexdigest(),
+            'memoryBytes': helper_memory(self.manifest),
             'invocation': time.time_ns(),
         }
         identity = checksum(binding)
         name = PROJECT + '-tool-' + identity[:24]
         path = self.attempt.directory / ('helper-' + identity + '.json')
-        atomic_json(path, {**binding, 'name': name, 'status': 'prepared'})
         command = self.tool_command(
             receipt, entrypoint, arguments, network=network, mounts=mounts,
             container_name=name,
         )
+        binding['environmentHash'] = bind_helper_environment(
+            self, command, image,
+        )
+        atomic_json(path, {**binding, 'name': name, 'status': 'prepared'})
         container_id = self.command(command).decode().strip()
         digest(container_id, 'maintenance container')
         admitted_image = {'imageId': image_id}
@@ -551,6 +564,9 @@ class HostOperations:
         values.update({'COMMIT_SHA': cast(str, receipt['sha']),
                        'HOME': '/home/sotto',
                        'CODEX_HOME': '/home/sotto/.codex'})
+        heap = runtime_policy(self.manifest)['helperHeapMiB']
+        values['NODE_OPTIONS'] = (values.get('NODE_OPTIONS', '')
+                                 + f' --max-old-space-size={heap}').strip()
         encoded = ''.join(f'{name}={value}\n'
                           for name, value in sorted(values.items())).encode()
         private_env = self.attempt.directory / (
@@ -571,6 +587,8 @@ class HostOperations:
             '--pull', 'never', '--platform',
             'linux/amd64', '--read-only', '--tmpfs', '/tmp',
             '--network', network, '--user', '1000',
+            '--memory', str(helper_memory(self.manifest)),
+            '--memory-swap', str(helper_memory(self.manifest)),
             '--workdir', '/app/apps/web', '--env-file',
             str(private_env), '--env', 'TSX_DISABLE_CACHE=1',
             '--env', 'TSX_TSCONFIG_PATH=/app/apps/web/tsconfig.json',
@@ -743,11 +761,13 @@ class HostOperations:
         """Bind the helper before start and audit its exit."""
         if mode not in {'capture', 'inspect', 'prepare', 'providers',
                         'queues', 'continuation', 'consumers', 'workloads',
-                        'paused-admission'}:
+                        'paused-admission', 'queue-policy'}:
             raise ValueError('unsupported-review-runtime-operation')
         self.lock.validate()
         self.settle_pending_helpers()
-        if mode != 'capture':
+        if mode == 'queue-policy':
+            admit_queue_getter(self)
+        elif mode != 'capture':
             self.verify_fence()
             self.verify_egress()
         image = record(self.manifest['finalWorker'], 'final worker image')
@@ -770,24 +790,27 @@ class HostOperations:
                 raise ValueError('unexpected-runtime-network-reference')
             network = NETWORK
         initial = {'mode': mode, 'input': value,
-                   'checkpoint': checkpoint}
+                   'checkpoint': checkpoint,
+                   'policy': runtime_policy(self.manifest)}
         script = (
             'require("/app/scripts/deploy/review/runtime/channel.ts")'
             '.main().catch(()=>{console.error('
             '"Review runtime operation failed");process.exitCode=1})'
         )
-        arguments = ['--require', 'tsx/cjs', '-e', script]
+        arguments = helper_arguments(
+            self.manifest, 'node', ['--require', 'tsx/cjs', '-e', script],
+        )
         binding = {'mode': mode, 'inputSha256': checksum(initial),
                    'imageId': image['imageId'], 'network': network,
                    'entrypoint': 'node', 'toolsSha256': checksum(tools),
                    'argumentsHash': checksum(arguments),
+                   'memoryBytes': helper_memory(self.manifest),
                    'invocation': time.time_ns()}
         identity = checksum(binding)
         name = PROJECT + '-tool-' + identity[:24]
         intent = self.attempt.directory / ('helper-' + identity + '.json')
         if intent.exists():
             raise ValueError('retained-helper-requires-explicit-recovery')
-        atomic_json(intent, {**binding, 'name': name, 'status': 'prepared'})
         command = self.tool_command(
             image, 'node', arguments,
             network=network,
@@ -795,6 +818,13 @@ class HostOperations:
             mounts=[f'type=bind,src={self.root / "scripts/deploy"},'
                     'dst=/app/scripts/deploy,readonly'],
         )
+        actual_image = rows(json.loads(self.docker(
+            'image', 'inspect', cast(str, image['imageId']),
+        )), 'runtime helper image')[0]
+        binding['environmentHash'] = bind_helper_environment(
+            self, command, actual_image,
+        )
+        atomic_json(intent, {**binding, 'name': name, 'status': 'prepared'})
         # Create first so process loss cannot hide the container identity.
         container_id = self.command(command).decode().strip()
         digest(container_id, 'runtime helper container')
@@ -810,8 +840,11 @@ class HostOperations:
                              'status': 'created'})
 
         def verify() -> None:
-            self.verify_fence()
-            self.verify_egress()
+            if mode == 'queue-policy':
+                admit_queue_getter(self)
+            else:
+                self.verify_fence()
+                self.verify_egress()
             current = self.inspect(container_id)[0]
             if (current['Id'] != container_id
                     or current['Image'] != image['imageId']
@@ -834,6 +867,7 @@ class HostOperations:
                 ['docker', 'start', '-ai', container_id], initial,
                 directory=self.attempt.directory,
                 assert_fence=verify, queue_manifest=original_manifest,
+                queue_policy=lambda value: retain_queue_intent(self, value),
                 timeout=(3330 if mode == 'workloads' else
                          330 if mode == 'providers' else 100),
             )
@@ -850,7 +884,9 @@ class HostOperations:
                 'containerId': container_id})
             raise
         self.settle_helper(container_id, image, intent, binding, name)
-        if mode != 'capture':
+        if mode == 'queue-policy':
+            admit_queue_getter(self)
+        elif mode != 'capture':
             self.verify_fence()
             self.verify_egress()
         else:
@@ -912,6 +948,12 @@ class HostOperations:
                 or host.get('Privileged') is not False
                 or host.get('NetworkMode') != binding['network']):
             raise ValueError('retained-runtime-helper-identity-changed')
+        if (host.get('Memory') != binding['memoryBytes']
+                or binding['memoryBytes'] != helper_memory(self.manifest)
+                or host.get('MemorySwap') != binding['memoryBytes']
+                or checksum(environment(actual))
+                != binding['environmentHash']):
+            raise ValueError('retained-helper-resource-or-environment-changed')
         return actual
 
     def settle_helper(

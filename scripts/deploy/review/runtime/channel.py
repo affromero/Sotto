@@ -23,11 +23,13 @@ def exchange(
     directory: Path, assert_fence: Callable[[], None],
     queue_manifest: Callable[[Mapping[str, object]], None],
     timeout: float,
+    queue_policy: Callable[[Mapping[str, object]], None] | None = None,
 ) -> object:
     """Keep secrets on stdin and retain uncertain credential operations."""
     if initial.get('mode') not in {
         'inspect', 'prepare', 'providers', 'queues', 'capture',
         'continuation', 'consumers', 'workloads', 'paused-admission',
+        'queue-policy',
     } or not 0 < timeout <= (3330 if initial.get('mode') == 'workloads'
                             else 330):
         raise ValueError('bounded-runtime-exchange-required')
@@ -104,9 +106,22 @@ def exchange(
                             or type(message.get('id')) is not int):
                         raise ValueError('runtime-ack-sequence-changed')
                     if kind == 'fence':
-                        if set(message) != {'type', 'id'}:
+                        if (initial['mode'] == 'queue-policy'
+                                or set(message) != {'type', 'id'}):
                             raise ValueError('invalid-runtime-fence-event')
                         assert_fence()
+                    elif kind == 'policyCheck':
+                        if (initial['mode'] != 'queue-policy'
+                                or set(message) != {'type', 'id'}):
+                            raise ValueError('invalid-queue-policy-event')
+                        assert_fence()
+                    elif kind == 'queuePolicyIntent':
+                        if (initial['mode'] != 'prepare'
+                                or queue_policy is None
+                                or set(message) != {'type', 'id', 'value'}):
+                            raise ValueError('invalid-queue-policy-intent')
+                        assert_fence()
+                        queue_policy(record(message['value'], 'queue policy'))
                     elif kind == 'queueManifest':
                         if (initial['mode'] != 'prepare'
                                 or set(message) != {'type', 'id', 'value'}):

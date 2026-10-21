@@ -133,7 +133,8 @@ print(json.dumps({'device':metadata.st_dev,'inode':metadata.st_ino,
     ) -> None:
         tools = self.operations.manifest['tools']
         assert isinstance(tools, dict)
-        for name in ('services.py', 'release/__init__.py'):
+        for name in ('services.py', 'release/__init__.py',
+                     'policy/__init__.py', 'policy/queues.ts'):
             retained = tools.pop('scripts/deploy/review/runtime/' + name)
             with self.subTest(source=name), self.assertRaisesRegex(
                 ValueError, 'complete-runtime-source',

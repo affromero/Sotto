@@ -34,6 +34,7 @@ from scripts.deploy.review.runtime.services import (
 )
 from scripts.deploy.review.state import Attempt, DeploymentLock, atomic_json
 from scripts.deploy.review.topology import AUTH_HOME, DIRECTORY, NETWORK
+from scripts.tests.review.runtime import admitted_runtime_fixture
 
 
 class AuthHandoverTests(unittest.TestCase):
@@ -300,7 +301,8 @@ class CandidateAdmissionTests(unittest.TestCase):
         path.touch(mode=0o600)
         lock = DeploymentLock(path)
         self.addCleanup(lock.close)
-        attempt = Attempt.create(root, 'candidate', {'topology': {
+        attempt = Attempt.create(root, 'candidate', {
+            **admitted_runtime_fixture(), 'topology': {
             'network': {'id': 'review-network'},
             'services': {'web': {'mounts': []}},
         }}, 'a' * 64)
@@ -313,6 +315,8 @@ class CandidateAdmissionTests(unittest.TestCase):
         }}
         self.desired: dict[str, object] = {
             'container_name': 'admitted', 'user': '1000', 'mem_limit': 123,
+            'memswap_limit': 123,
+            'command': ['node', '--max-old-space-size=256', 'server.js'],
             'environment': {'NODE_ENV': 'production'},
             'logging': {'driver': 'json-file', 'options': {'max-size': '5m'}},
             'networks': {'review': {'ipv4_address': '172.30.99.10'}},
@@ -320,6 +324,7 @@ class CandidateAdmissionTests(unittest.TestCase):
         self.actual: dict[str, object] = {
             'Name': '/admitted', 'Image': 'admitted-image',
             'Config': {**record(self.image['Config'], 'image'),
+                       'Cmd': self.desired['command'],
                        'User': '1000',
                        'Labels': {'io.sotto.review-attempt':
                                   attempt.manifest_hash},
@@ -329,7 +334,7 @@ class CandidateAdmissionTests(unittest.TestCase):
             'HostConfig': {
                 'Privileged': False, 'PublishAllPorts': False,
                 'ReadonlyRootfs': False, 'NetworkMode': NETWORK,
-                'IpcMode': 'private', 'Memory': 123,
+                'IpcMode': 'private', 'Memory': 123, 'MemorySwap': 123,
                 'RestartPolicy': {'Name': 'no', 'MaximumRetryCount': 0},
                 'LogConfig': {'Type': 'json-file',
                               'Config': {'max-size': '5m'}},
@@ -348,6 +353,8 @@ class CandidateAdmissionTests(unittest.TestCase):
         self,
     ) -> None:
         cases = [('Config', 'Cmd', ['malicious']),
+                 ('HostConfig', 'MemorySwap', 0),
+                 ('HostConfig', 'Memory', 999),
                  ('HostConfig', 'CapAdd', ['SYS_ADMIN']),
                  ('Config', 'Env', ['NODE_ENV=production'])]
         with patch.object(HostOperations, 'docker',

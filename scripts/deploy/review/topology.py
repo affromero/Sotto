@@ -15,6 +15,7 @@ from scripts.deploy.images.metadata import (
 )
 from scripts.deploy.review.artifact import review_reference
 from scripts.deploy.review.build_observer import TARGET
+from scripts.deploy.review.runtime.policy import role_command
 from scripts.deploy.review.state import checksum
 
 PROJECT = 'sotto-review'
@@ -251,6 +252,7 @@ def candidate_compose(
     original_image_environment: Mapping[str, str],
     auth_source: str, runtime_uid: int, runtime_gid: int,
     web_memory: int, worker_memory: int, egress_network: str,
+    runtime_policy: Mapping[str, object],
 ) -> dict[str, object]:
     """Private JSON Compose document. Callers must never log its contents."""
     if not re.fullmatch(r'[a-z0-9][a-z0-9-]{0,39}', attempt_id):
@@ -275,6 +277,10 @@ def candidate_compose(
     values.update(PUBLIC_ENVIRONMENT)
     values.update({'COMMIT_SHA': final_source, 'HOME': '/home/sotto',
                    'CODEX_HOME': AUTH_HOME, 'PORT': '3000'})
+    contact = runtime_policy['privacyContactEmail']
+    if not isinstance(contact, str):
+        raise ValueError('admitted-review-contact-required')
+    values['SOTTO_PRIVACY_CONTACT_EMAIL'] = contact
     mounts = [DIRECTORY + '/storage:' + STORAGE,
               'executions:' + EXECUTIONS, auth_source + ':' + AUTH_HOME]
     services: dict[str, object] = {}
@@ -293,7 +299,8 @@ def candidate_compose(
             'container_name': f'{PROJECT}-{attempt_id}-{role}',
             'user': f'{runtime_uid}:{runtime_gid}',
             'environment': role_environment, 'volumes': mounts,
-            'restart': 'no', 'mem_limit': memory,
+            'restart': 'no', 'mem_limit': memory, 'memswap_limit': memory,
+            'command': role_command(runtime_policy, role),
             'logging': {'driver': 'json-file',
                         'options': {'max-size': '10m', 'max-file': '2'}},
             'networks': {'review': {'ipv4_address': address}, 'egress': {}},
