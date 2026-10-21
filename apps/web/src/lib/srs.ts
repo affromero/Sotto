@@ -22,10 +22,14 @@ const PASS_QUALITY = 0.6;
  * Apply one review outcome to a card.
  * @param quality fraction correct for this review, 0..1. >= 0.6 counts as a pass.
  */
-export function reviewCard(state: SrsState, quality: number, now: Date): SrsUpdate {
+export function reviewSchedule(
+  state: Omit<SrsState, 'mastery'>,
+  quality: number,
+  now: Date
+): Omit<SrsUpdate, 'mastery'> {
   const q = Math.max(0, Math.min(1, quality));
   const passed = q >= PASS_QUALITY;
-  let { ease, intervalDays, reps, lapses, mastery } = state;
+  let { ease, intervalDays, reps, lapses } = state;
 
   if (passed) {
     reps += 1;
@@ -35,15 +39,20 @@ export function reviewCard(state: SrsState, quality: number, now: Date): SrsUpda
     // SM-2 ease update, mapping quality 0..1 onto SM-2's q in 3..5.
     const sm2q = 3 + q * 2;
     ease = Math.max(MIN_EASE, ease + (0.1 - (5 - sm2q) * (0.08 + (5 - sm2q) * 0.02)));
-    mastery = updateMasteryPosterior(mastery, { quality: q });
   } else {
     reps = 0;
     lapses += 1;
     intervalDays = 0;
     ease = Math.max(MIN_EASE, ease - 0.2);
-    mastery = updateMasteryPosterior(mastery, { quality: q });
   }
 
   const dueAt = new Date(now.getTime() + Math.max(0, intervalDays) * DAY_MS);
-  return { ease, intervalDays, reps, lapses, mastery, dueAt };
+  return { ease, intervalDays, reps, lapses, dueAt };
+}
+
+export function reviewCard(state: SrsState, quality: number, now: Date): SrsUpdate {
+  return {
+    ...reviewSchedule(state, quality, now),
+    mastery: updateMasteryPosterior(state.mastery, { quality: Math.max(0, Math.min(1, quality)) }),
+  };
 }

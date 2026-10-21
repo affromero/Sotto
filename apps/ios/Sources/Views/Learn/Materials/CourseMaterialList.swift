@@ -20,7 +20,7 @@ struct CourseMaterialList: View {
                             .multilineTextAlignment(.leading)
                     }
                     .disabled(downloadingId != nil)
-                    Button("View imported text") { selectedExtract = material }
+                    Button("Inspect source pages") { selectedExtract = material }
                         .font(.caption)
                         .frame(minHeight: 44)
                 }
@@ -45,13 +45,7 @@ struct CourseMaterialList: View {
         }
         .sheet(item: $selectedExtract) { material in
             NavigationStack {
-                ScrollView {
-                    Text(material.extractedText)
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding()
-                }
-                .navigationTitle(material.name)
+                MaterialSourceView(material: material).environmentObject(model)
                 .toolbar {
                     ToolbarItem(placement: .confirmationAction) {
                         Button("Done") { selectedExtract = nil }

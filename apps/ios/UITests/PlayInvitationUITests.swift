@@ -3,6 +3,7 @@ import XCTest
 @MainActor
 final class PlayInvitationUITests: XCTestCase {
     func testSystemInvitationCreatesAnApprovedProfileAndPlaysAllThreeNativeGames() async throws {
+        continueAfterFailure = false
         let fixture = try PlayUIFixture()
         let server = try LocalHTTPServer { fixture.respond($0) }
         try await server.start()
@@ -15,8 +16,19 @@ final class PlayInvitationUITests: XCTestCase {
         app.open(try XCTUnwrap(url.url))
         let name = app.textFields["play.newName"]
         XCTAssertTrue(name.waitForExistence(timeout: 15), app.debugDescription)
+        let cameraAlert = XCUIApplication(bundleIdentifier: "com.apple.springboard").alerts.matching(
+            NSPredicate(format: "label CONTAINS[c] %@ AND label CONTAINS[c] %@", "Sotto", "camera")
+        ).firstMatch
+        if cameraAlert.waitForExistence(timeout: 3) {
+            let allow = cameraAlert.buttons["Allow"]
+            XCTAssertTrue(allow.waitForExistence(timeout: 5))
+            allow.tap()
+            XCTAssertTrue(cameraAlert.waitForNonExistence(timeout: 5))
+        }
         name.tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5), app.debugDescription)
         name.typeText("Native Sam")
+        XCTAssertEqual(name.value as? String, "Native Sam")
         app.swipeUp()
         let consent = app.switches["Create my learner profile on this server"]
         XCTAssertTrue(consent.waitForExistence(timeout: 5))

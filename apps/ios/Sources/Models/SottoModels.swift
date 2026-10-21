@@ -209,6 +209,7 @@ struct SottoCourseNotesResponse: Decodable, Equatable {
     let imported: Int?
     let failed: Int?
     let materials: [SottoCourseMaterial]?
+    let nextCursor: String?
 }
 
 struct SottoCoursePedagogyResponse: Decodable, Equatable {
@@ -435,6 +436,9 @@ struct SottoSpeakingPrompt: Decodable, Identifiable, Equatable {
     let ipa: String?
     let referenceTtsUrl: String?
     let latestRecording: SottoSpeakingRecording?
+    let taskMode: String?
+    let assessmentScope: String?
+    var communicative: Bool { taskMode == "COMMUNICATIVE" }
 }
 
 struct SottoSpeakingRecording: Decodable, Equatable {
@@ -749,20 +753,6 @@ struct SottoMemoryNode: Decodable, Identifiable, Equatable {
 
 // MARK: - Placement
 
-struct SottoPlacementBatch: Decodable, Equatable {
-    let native: String
-    let target: String
-    let questions: [SottoPlacementQuestion]
-}
-
-struct SottoPlacementQuestion: Decodable, Identifiable, Equatable {
-    let id: String
-    let cefr: String
-    let skill: String
-    let prompt: String
-    let options: [String]
-}
-
 struct SottoPlacementAnswer: Encodable, Equatable {
     let id: String
     /// 0-3 pick an option; 4 is the "I don't know" answer the scorer expects.
@@ -774,6 +764,8 @@ struct SottoPlacementAnswer: Encodable, Equatable {
 struct SottoPlacementResult: Decodable, Equatable {
     let courseId: String
     let level: String
+    let assessedLevel: String
+    let confirmationReceiptId: UUID
     let scoreBySkill: [String: Double]?
 }
 

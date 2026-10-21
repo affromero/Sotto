@@ -1,0 +1,122 @@
+.root {
+  color: var(--color-text-primary);
+  margin: 2rem 0;
+  padding-top: 1.5rem;
+  border-top: 2px solid var(--color-primary);
+  scroll-margin-top: 5rem;
+}
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: start;
+  gap: 1rem;
+}
+.header h2 {
+  font-family: var(--font-heading);
+  font-size: 2rem;
+}
+.kicker {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--color-text-secondary);
+}
+.root p {
+  margin: 0.7rem 0;
+  max-width: 75ch;
+  overflow-wrap: anywhere;
+}
+.note {
+  color: var(--color-text-secondary);
+  font-size: 0.9rem;
+}
+.reviews {
+  list-style: none;
+  padding: 0;
+  margin: 1.4rem 0;
+}
+.reviews li {
+  border-top: 1px solid var(--color-border);
+  padding: 1rem 0;
+}
+.reviews li a,
+.reviews li button {
+  margin-right: 0.75rem;
+}
+.root button,
+.root a {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-primary);
+}
+.root button {
+  font: inherit;
+  padding: 0.55rem 0.8rem;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  border-radius: 0.3rem;
+  cursor: pointer;
+}
+.root button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.root fieldset {
+  border: 0;
+  padding: 0;
+}
+.root legend {
+  font-family: var(--font-heading);
+  font-size: 1.4rem;
+  margin: 1rem 0;
+}
+.fields {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+.fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+}
+.fields input,
+.fields select {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
+  border-radius: 0.3rem;
+  padding: 0.6rem;
+  font: inherit;
+}
+.root :is(button, a, input, select):focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+}
+.consent {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  min-height: 44px;
+  margin: 1rem 0;
+}
+.consent input {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+}
+.recovery {
+  padding-left: 1rem;
+  border-left: 2px solid var(--color-primary);
+}
+@media (min-width: 768px) {
+  .fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

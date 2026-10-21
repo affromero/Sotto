@@ -1,9 +1,15 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
-import { extractUploadTexts, MAX_IMPORTED_FILE_CHARS } from '@/lib/note-upload';
 import { originalPdf } from '../../helpers/learning/pdf';
+import { extractUploadTexts, MAX_IMPORTED_FILE_CHARS, isTextMaterial } from '@/lib/note-upload';
 
 describe('learner note text imports', () => {
+  it('shares explicit text-format classification with asynchronous complete extraction', () => {
+    expect(isTextMaterial('Notes.TXT', 'application/octet-stream')).toBe(true);
+    expect(isTextMaterial('captions.srt', 'text/plain')).toBe(true);
+    expect(isTextMaterial('handwriting.pdf', 'application/pdf')).toBe(false);
+    expect(isTextMaterial('archive.zip', 'application/zip')).toBe(false);
+  });
   it('retains the original PDF and keeps embedded text only as a lexical index', async () => {
     const bytes = originalPdf();
     const result = await extractUploadTexts([

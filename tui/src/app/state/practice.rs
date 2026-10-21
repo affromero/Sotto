@@ -30,6 +30,8 @@ struct PracticeSnapshot {
     #[serde(default)] progress_revision: i64,
     submission_result: Option<types::SubmitPracticeResponse>,
     skill_requirements: Option<serde_json::Value>,
+    practice_level: Option<String>,
+    learning_selection: Option<serde_json::Value>,
 }
 
 fn practice_view(course: Course, response: &types::StartPracticeResponse) -> Result<View, Box<Course>> {
@@ -95,9 +97,14 @@ fn practice_view(course: Course, response: &types::StartPracticeResponse) -> Res
         sections.push(ClassSection { id: "writing".into(), skill: types::SkillType::Writing, progress: SectionProgress::Writing { prompts, index, input, phase }, label: None, work });
     }
     if sections.is_empty() { return Err(Box::new(course)); }
-    let requirements = saved.skill_requirements.and_then(|value| value.get("skills").cloned()).and_then(|skills| skills.as_object().cloned()).map(|skills| skills.iter().filter_map(|(skill, rule)| {
+    let mut requirements: Vec<String> = saved.skill_requirements.and_then(|value| value.get("skills").cloned()).and_then(|skills| skills.as_object().cloned()).map(|skills| skills.iter().filter_map(|(skill, rule)| {
         if rule["state"] == "EXEMPT_NO_PROVIDER" { Some(format!("{} unavailable: {}", skill.to_lowercase(), rule["reason"].as_str().unwrap_or("provider missing").to_lowercase().replace('_', " "))) } else { None }
     }).collect()).unwrap_or_default();
+    let practice_level = saved.practice_level.or_else(|| saved.learning_selection.as_ref()
+        .and_then(|selection| selection["level"].as_str()).map(str::to_owned));
+    if let Some(level) = practice_level {
+        requirements.insert(0, format!("Practice {level} · course {}", course.current_level));
+    }
     let cursor = sections.iter().position(|section| !section_complete(section)).unwrap_or(0);
     Ok(View::Practice { course, session_id: saved.session_id, sections: Some(sections), cursor, submitting: false, progress: ProgressSave { revision: saved.progress_revision, ..Default::default() }, requirements })
 }

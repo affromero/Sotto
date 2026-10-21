@@ -76,7 +76,7 @@ local emulator installs do not establish App Store or Play publication. Sign
 Android APKs/AABs and iOS archives through your distribution account before
 offering them. The Android application ID and iOS bundle ID are `fm.sotto.app`.
 
-Invitations currently use the browser bridge and registered `sotto://play/join`
+Invitations support the browser bridge and registered `sotto://play/join`
 scheme, plus paste, game code and camera QR. They contain a server address and
 expiring invitation code, never credentials. After installing, reopen the original
 link or enter its server and code. The server must be reachable from the guest's
@@ -84,6 +84,14 @@ device. New profiles still require owner approval and a present accepting host.
 
 Verified HTTPS app links require a controlled domain and actual signed app
 identities. They are not enabled by default for arbitrary self-hosted domains.
+The official iOS target declares `sotto.fm` and `sotto.afromero.co`, and this
+server serves their exact Apple application identifier at
+`/.well-known/apple-app-site-association`. Only GET and HEAD on that exact
+endpoint bypass household access. The association covers only `/play/join`.
+Deploy it on both domains before installing the newly signed app, then inspect
+the archive's entitlements and verify HTTPS invitation opening. Other server
+domains retain the browser, paste/code and QR flows.
+
 To activate them for a distribution you control:
 
 1. Read the Apple application identifier from the signed app's entitlements and
@@ -300,8 +308,9 @@ uses a separate, explicit procedure. The ordinary `scripts/deploy.sh` invocation
 continues to reject different Prisma assets. Both paths use the same committed
 release, immutable images, capacity admission, deployment lock and provider
 continuity checks. The fenced procedure supports added migration SQL while
-preserving every previously published migration file. Queue names must stay
-unchanged, and an existing provider activation must remain enabled.
+preserving every previously published migration file. An existing provider
+activation must remain enabled. Schema review version 1 requires unchanged
+queue names. Version 2 supports an explicitly reviewed addition of queues.
 
 Supply the ordinary schema version 2 runtime continuity review through
 `SOTTO_COMPATIBILITY_REVIEW_FILE` and `SOTTO_COMPATIBILITY_EVIDENCE_FILE`.
@@ -309,7 +318,7 @@ The additional private schema review has exactly these fields:
 
 | Field                                        | Required value                                                                   |
 | -------------------------------------------- | -------------------------------------------------------------------------------- |
-| `schemaVersion`                              | Integer `1`                                                                      |
+| `schemaVersion`                              | Integer `1`, or `2` for an additive queue transition                             |
 | `procedure`                                  | `fenced-schema-migration`                                                        |
 | `stack`, `releaseSha`                        | Exact stack and full candidate source SHA                                        |
 | `candidateWebImage`, `candidateWorkersImage` | Exact digest-pinned references                                                   |
@@ -317,6 +326,19 @@ The additional private schema review has exactly these fields:
 | `previousSchemaHashes`                       | Object mapping every captured worker image ID to its canonical Prisma asset hash |
 | `compatibilityReviewSha256`                  | SHA-256 of the exact schema version 2 review file bytes                          |
 | `reviewer`, `evidenceSha256`                 | Independent schema reviewer and SHA-256 of the exact schema evidence bytes       |
+
+Version 2 additionally requires `queueTransition`, containing exactly
+`previousQueues`, `candidateQueues`, and `addedQueues`. Each is a sorted,
+unique, nonempty list of at most 100 queue names. The candidate must retain
+every previous queue, and `addedQueues` must equal the exact difference.
+Canonical probes of the immutable candidate and every previous worker image
+must match these inventories. Removing or renaming queues is unsupported.
+
+The captured old runtime saves the actual original pause state of every queue
+in the candidate inventory, including newly added names. Snapshot reads avoid
+updating queue metadata. Both old and candidate runtimes use that complete
+version 2 manifest for pausing, drain checks, recovery and state restoration.
+An unrelated queue or a changed runtime inventory stops the transition.
 
 The runtime review binds all four previous containers, both complete provider
 inventories and every changed runtime file, including Prisma assets. Schema

@@ -16,13 +16,25 @@ const mockCurriculumFindUnique = vi.fn();
 const mockCurriculumCreate = vi.fn();
 const mockLessonCreateMany = vi.fn();
 const mockTransaction = vi.fn();
+const mockLessonCount = vi.fn();
+const mockLessonFindMany = vi.fn();
+const mockLessonAggregate = vi.fn();
+const mappedObjectives = new Map<
+  string,
+  { lessonId: string; objectiveId: string; criterionVersion: number; role: string }
+>();
 
 vi.mock('@/lib/prisma', () => ({
-  prisma: {
+  prismaUnfiltered: {
     curriculum: {
       findUnique: (...args: unknown[]) => mockCurriculumFindUnique(...args),
     },
     $transaction: (...args: unknown[]) => mockTransaction(...args),
+    lesson: {
+      count: (...args: unknown[]) => mockLessonCount(...args),
+      findMany: (...args: unknown[]) => mockLessonFindMany(...args),
+      aggregate: (...args: unknown[]) => mockLessonAggregate(...args),
+    },
   },
 }));
 
@@ -74,7 +86,10 @@ vi.mock('@/lib/logger', () => ({
 }));
 
 // ── Import under test (after mocks) ──────────────────────────────────────────
-import { getOrCreateCurriculum as getOrCreateCurriculumWithExecution } from '@/lib/curriculum-generator';
+import {
+  getOrCreateCurriculum as getOrCreateCurriculumWithExecution,
+  ensureCurriculumHasLevelLessons,
+} from '@/lib/curriculum-generator';
 import { blockedProviderExecution } from '../helpers/runtime/provider-execution';
 
 function getOrCreateCurriculum(userId: string, native: string, target: string) {
@@ -123,8 +138,41 @@ const VALID_CURRICULUM_JSON = JSON.stringify({
 function setupSuccessfulTransaction(createdId: string) {
   mockTransaction.mockImplementation(async (cb: (tx: unknown) => Promise<unknown>) => {
     const tx = {
-      curriculum: { create: mockCurriculumCreate },
-      lesson: { createMany: mockLessonCreateMany },
+      $executeRaw: async () => 1,
+      curriculum: { create: mockCurriculumCreate, findFirst: async () => ({ id: createdId }) },
+      lesson: {
+        createMany: mockLessonCreateMany,
+        findMany: async () => {
+          const input = mockLessonCreateMany.mock.lastCall?.[0] as {
+            data: Array<{ slug: string; level: string; grammarPoints: string[] }>;
+          };
+          return input.data.map((lesson) => ({ ...lesson, id: lesson.slug }));
+        },
+      },
+      learningMapRevision: {
+        findUnique: async () => null,
+        findMany: async () => [],
+        upsert: async ({ create }: { create: { catalogHash: string } }) => ({
+          id: 'catalog',
+          ...create,
+        }),
+      },
+      learningNodeIdentity: { createMany: async () => ({ count: 0 }) },
+      lessonLearningObjective: {
+        deleteMany: async ({ where }: { where: { lessonId: string } }) => {
+          for (const [key, mapping] of mappedObjectives)
+            if (mapping.lessonId === where.lessonId) mappedObjectives.delete(key);
+          return { count: 0 };
+        },
+        upsert: async ({
+          create,
+        }: {
+          create: { lessonId: string; objectiveId: string; criterionVersion: number; role: string };
+        }) => {
+          mappedObjectives.set(`${create.lessonId}:${create.objectiveId}`, create);
+          return create;
+        },
+      },
     };
     mockCurriculumCreate.mockResolvedValue({ id: createdId });
     mockLessonCreateMany.mockResolvedValue({ count: 2 });
@@ -137,6 +185,10 @@ function setupSuccessfulTransaction(createdId: string) {
 describe('getOrCreateCurriculum', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mappedObjectives.clear();
+    mockLessonCount.mockResolvedValue(0);
+    mockLessonFindMany.mockResolvedValue([]);
+    mockLessonAggregate.mockResolvedValue({ _max: { order: 20 } });
     mockGetAiKey.mockResolvedValue({ provider: 'anthropic', apiKey: 'sk-test' });
     mockGetAiProviderMeta.mockReturnValue({ defaultModel: 'claude-haiku-4-5-20251001' });
     mockLoadAndRender.mockReturnValue('You are a CEFR curriculum architect...');
@@ -211,6 +263,81 @@ describe('getOrCreateCurriculum', () => {
       TARGET: expect.any(String),
     });
   });
+  it('retains explicit situation scope from generated lessons without inventing broad grammar mappings', async () => {
+    mockCurriculumFindUnique.mockResolvedValue(null);
+    setupSuccessfulTransaction('mapped-course');
+    const authored = JSON.parse(VALID_CURRICULUM_JSON) as {
+      title: string;
+      lessons: Record<string, unknown>[];
+    };
+    authored.lessons[0]!.learningObjectiveIds = ['de.s.introductions'];
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify(authored),
+      model: 'test',
+      inputTokens: 1,
+      outputTokens: 1,
+    });
+    await getOrCreateCurriculum('user-1', 'en', 'de');
+    expect([...mappedObjectives.values()]).toEqual([
+      {
+        lessonId: 'a1-greetings',
+        objectiveId: 'de.s.introductions',
+        criterionVersion: 1,
+        role: 'EXPLICIT_GENERATION',
+      },
+    ]);
+  });
+  it('extends a higher band with objective links from that band', async () => {
+    setupSuccessfulTransaction('existing-curriculum');
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify({
+        lessons: [
+          {
+            slug: 'b1-passive',
+            level: 'B1',
+            order: 1,
+            title: 'Past passive',
+            objective: 'Explain an earlier process.',
+            grammarPoints: ['past-passive'],
+            vocabThemes: ['work'],
+            targetVocab: [{ lemma: 'bauen', gloss: 'build' }],
+            learningObjectiveIds: ['de.g.passive-past'],
+          },
+        ],
+      }),
+      model: 'test',
+      inputTokens: 1,
+      outputTokens: 1,
+    });
+    await ensureCurriculumHasLevelLessons({
+      userId: 'user-1',
+      execution: blockedProviderExecution('user-1'),
+      curriculumId: 'existing-curriculum',
+      nativeLang: 'en',
+      targetLang: 'de',
+      level: 'B1',
+    });
+    expect([...mappedObjectives.values()]).toEqual([
+      {
+        lessonId: 'b1-passive',
+        objectiveId: 'de.g.passive-past',
+        criterionVersion: 1,
+        role: 'EXPLICIT_GENERATION',
+      },
+    ]);
+    expect(mockLessonCreateMany.mock.lastCall?.[0].data).toEqual([
+      expect.objectContaining({ level: 'B1', order: 21 }),
+    ]);
+  });
+  it('continues agent-composed curricula for accepted languages whose map is unavailable', async () => {
+    mockCurriculumFindUnique.mockResolvedValue(null);
+    setupSuccessfulTransaction('arabic-curriculum');
+    expect(await getOrCreateCurriculum('user-1', 'en', 'ar')).toEqual({ id: 'arabic-curriculum' });
+    expect([...mappedObjectives.values()]).toEqual([]);
+    expect(mockGenerateResponse.mock.lastCall?.[0]).toContain(
+      'The ar learning map is unavailable.'
+    );
+  });
 
   it('logs AI usage after generation', async () => {
     mockCurriculumFindUnique.mockResolvedValue(null);
@@ -277,15 +404,7 @@ describe('getOrCreateCurriculum', () => {
       model: 'claude-haiku-4-5-20251001',
     });
 
-    mockTransaction.mockImplementation(async (cb: (tx: unknown) => Promise<unknown>) => {
-      const tx = {
-        curriculum: { create: mockCurriculumCreate },
-        lesson: { createMany: mockLessonCreateMany },
-      };
-      mockCurriculumCreate.mockResolvedValue({ id: 'dedup-id' });
-      mockLessonCreateMany.mockResolvedValue({ count: 2 });
-      return cb(tx);
-    });
+    setupSuccessfulTransaction('dedup-id');
 
     await getOrCreateCurriculum('user-1', 'en', 'de');
 

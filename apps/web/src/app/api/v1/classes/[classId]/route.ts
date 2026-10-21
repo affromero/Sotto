@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { speakingTaskMode } from '@/lib/learning-map/evidence/communicative-speaking';
 import { classRegenerationRequestSchema } from '@sotto/shared';
 import { sottoRequestExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import { authenticateRequest } from '@/lib/api-keys';
@@ -80,6 +81,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         explanation: q.explanation,
       })),
       prompts: s.prompts.map((p) => ({
+        taskMode: speakingTaskMode(p.learningObjectives),
         id: p.id,
         order: p.order,
         targetPhrase: p.targetPhrase,

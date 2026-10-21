@@ -1,0 +1,38 @@
+.root {
+  display: grid;
+  gap: 8px;
+  overflow-wrap: anywhere;
+}
+
+.root p {
+  margin: 0;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.actions button {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--line-strong, rgba(30, 33, 40, 0.24));
+  border-radius: var(--r, 4px);
+  background: var(--paper, #f5f4f0);
+  color: var(--ink, #1e2128);
+  cursor: pointer;
+}
+
+.actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.text {
+  max-height: 300px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+}

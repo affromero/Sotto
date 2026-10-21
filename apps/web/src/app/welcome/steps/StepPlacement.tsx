@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, type ChangeEvent } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import {
   LANGUAGES,
   PLACEMENT_BY_LANG,
@@ -11,6 +11,23 @@ import {
 import type { CefrLevel } from '../data';
 import type { ContextItem } from '../WelcomeFlow';
 import { Glyph } from '../Glyph';
+import { MaterialCoverage, MaterialPartialConsent } from '@/components/placement/MaterialCoverage';
+import { MaterialAnalysisRetry } from '@/components/placement/MaterialAnalysisRetry';
+import { MaterialAnalysisCancellation } from '@/components/placement/analysis-controls/MaterialAnalysisCancellation';
+import {
+  analyzePlacementMaterials,
+  openSavedMaterialAnalysis,
+  forgetSavedMaterialAnalysis,
+  materialPlacementReference,
+  type MaterialPlacementCheckpoint,
+  type MaterialPlacementReference,
+  type MaterialAnalysisProjection,
+} from '@/lib/course-materials/client/analysis';
+import {
+  readSavedMaterialPlacement,
+  saveMaterialPlacementRetry,
+  type SavedMaterialPlacementCheckpoint,
+} from '@/lib/course-materials/client/placement-checkpoint';
 import t from '../theme.module.css';
 import c from '@/app/welcome/components.styles';
 
@@ -21,6 +38,8 @@ interface Props {
   toggleUnderstood: (lvl: CefrLevel) => void;
   selectPlacementLevel?: (lvl: CefrLevel) => void;
   onAddContextItems?: (items: Array<Omit<ContextItem, 'id'>>) => void;
+  onAnalysis?: (value: { level: CefrLevel; reference: MaterialPlacementReference } | null) => void;
+  onAnalysisPending?: (pending: boolean) => void;
   level: CefrLevel | null;
   demoMode?: boolean;
   onNext: () => void;
@@ -36,6 +55,7 @@ interface NotesDeduction {
   confidence: number;
   imported?: number;
   failed?: number;
+  analysis?: MaterialAnalysisProjection;
 }
 
 const LEVEL_LABELS: Record<CefrLevel, string> = {
@@ -75,6 +95,8 @@ export function StepPlacement({
   toggleUnderstood,
   selectPlacementLevel,
   onAddContextItems,
+  onAnalysis,
+  onAnalysisPending,
   level,
   demoMode = false,
   onNext,
@@ -87,6 +109,19 @@ export function StepPlacement({
   const [notesDeduction, setNotesDeduction] = useState<NotesDeduction | null>(null);
   const [notesError, setNotesError] = useState('');
   const notesInputRef = useRef<HTMLInputElement>(null);
+  const checkpoint = useRef<MaterialPlacementCheckpoint | null>(null);
+  const savedCheckpoint = useRef<SavedMaterialPlacementCheckpoint | null>(null);
+  const notesController = useRef<AbortController | null>(null);
+  const [acceptPartial, setAcceptPartial] = useState(false);
+  const [notesProgress, setNotesProgress] = useState('Reading material...');
+  const [lastAnalysis, setLastAnalysis] = useState<MaterialAnalysisProjection | null>(null);
+  useEffect(
+    () => () => {
+      notesController.current?.abort();
+      onAnalysisPending?.(false);
+    },
+    [onAnalysisPending]
+  );
 
   const idx = level ? LEVELS.indexOf(level) : -1;
   const pct = level ? ((idx + 1) / LEVELS.length) * 100 : 0;
@@ -99,13 +134,33 @@ export function StepPlacement({
   const sourceRtl = baseLang === 'ar';
   const rtl = language === 'ar';
   const hasNotesMaterial = notesText.trim().length > 0 || notesFiles.length > 0;
+  const invalidateSourceSelection = () => {
+    notesController.current?.abort();
+    notesController.current = null;
+    checkpoint.current = null;
+    savedCheckpoint.current = null;
+    setNotesDeduction(null);
+    setAcceptPartial(false);
+    setNotesPhase('input');
+    setLastAnalysis(null);
+    onAnalysis?.(null);
+    onAnalysisPending?.(false);
+  };
 
-  const chooseLevel = (nextLevel: CefrLevel) => {
+  const assignLevel = (nextLevel: CefrLevel) => {
     if (selectPlacementLevel) {
       selectPlacementLevel(nextLevel);
       return;
     }
     toggleUnderstood(nextLevel);
+  };
+  const chooseLevel = (nextLevel: CefrLevel) => {
+    invalidateSourceSelection();
+    assignLevel(nextLevel);
+  };
+  const chooseMode = (nextMode: PlacementMode) => {
+    invalidateSourceSelection();
+    setMode(nextMode);
   };
 
   function addNotesAsContext(
@@ -131,9 +186,11 @@ export function StepPlacement({
     if (itemsToAdd.length) onAddContextItems?.(itemsToAdd);
   }
 
-  async function deduceFromNotes() {
-    if (!hasNotesMaterial) return;
+  async function deduceFromNotes(savedOnly = false) {
+    if (!savedOnly && !hasNotesMaterial) return;
     setNotesPhase('deducing');
+    onAnalysis?.(null);
+    onAnalysisPending?.(true);
     setNotesError('');
 
     if (demoMode) {
@@ -152,61 +209,115 @@ export function StepPlacement({
         failed: 0,
       };
       setNotesDeduction(demoDeduction);
-      chooseLevel(inferred);
+      assignLevel(inferred);
       addNotesAsContext();
       setNotesPhase('result');
+      onAnalysisPending?.(false);
       return;
     }
 
+    const controller = new AbortController();
+    notesController.current?.abort();
+    notesController.current = controller;
     try {
-      const form = new FormData();
-      form.set('native', baseLang);
-      form.set('target', language);
-      if (notesText.trim()) form.set('content', notesText.trim());
-      for (const file of notesFiles) form.append('files', file);
-
-      const res = await fetch('/api/v1/placement/from-notes/upload', {
-        method: 'POST',
-        body: form,
-      });
-      if (!res.ok) {
-        const body = (await res.json().catch(() => null)) as { error?: string } | null;
-        setNotesError(
-          body?.error ??
-            'Could not read those materials. Try pasted text, a smaller file, or choose a level manually.'
+      const analysis = savedOnly
+        ? await openSavedMaterialAnalysis({
+            native: baseLang,
+            target: language,
+            signal: controller.signal,
+            onProgress: setNotesProgress,
+            onProjection: setLastAnalysis,
+            onSaved: (value) => {
+              savedCheckpoint.current = value;
+              setNotesText('');
+              setNotesFiles([]);
+            },
+          })
+        : await analyzePlacementMaterials({
+            native: baseLang,
+            target: language,
+            content: notesText,
+            files: notesFiles,
+            checkpoint: checkpoint.current,
+            signal: controller.signal,
+            onCheckpoint: (value) => {
+              checkpoint.current = value;
+              savedCheckpoint.current = readSavedMaterialPlacement(
+                value.profileId,
+                baseLang,
+                language
+              );
+            },
+            onProgress: setNotesProgress,
+            onProjection: setLastAnalysis,
+          });
+      controller.signal.throwIfAborted();
+      const inference = analysis.summary?.inference;
+      if (!inference || !isCefrLevel(inference.level))
+        throw new Error(
+          'These materials do not support a level estimate. Take the test or choose a level manually.'
         );
-        setNotesPhase('error');
-        return;
-      }
-
-      const data = (await res.json()) as {
-        deducedLevel?: string;
-        rationale?: string;
-        confidence?: number;
-        imported?: number;
-        failed?: number;
-        materials?: Array<{ id: string; name: string; extractedText: string }>;
-      };
-      const deducedLevel = isCefrLevel(data.deducedLevel) ? data.deducedLevel : 'A1';
+      const deducedLevel = inference.level;
       const deduction: NotesDeduction = {
         deducedLevel,
-        rationale: data.rationale?.trim() || 'Estimated from the materials you shared.',
-        confidence: typeof data.confidence === 'number' ? data.confidence : 0,
-        imported: data.imported,
-        failed: data.failed,
+        rationale: inference.rationale,
+        confidence: inference.confidence,
+        imported: notesFiles.length,
+        analysis,
       };
       setNotesDeduction(deduction);
-      chooseLevel(deducedLevel);
-      addNotesAsContext(data.materials ?? []);
+      setAcceptPartial(false);
+      if (analysis.status === 'COMPLETE') {
+        assignLevel(deducedLevel);
+        onAnalysis?.({
+          level: deducedLevel,
+          reference: materialPlacementReference(analysis, false),
+        });
+      }
       setNotesPhase('result');
-    } catch {
-      setNotesError('Could not reach the server. Try again or choose a level manually.');
+    } catch (error) {
+      if (controller.signal.aborted) return;
+      setNotesError(
+        error instanceof Error
+          ? error.message
+          : 'Could not reach the server. Try again or choose a level manually.'
+      );
       setNotesPhase('error');
+    } finally {
+      if (notesController.current === controller) onAnalysisPending?.(false);
     }
   }
 
   function handleNotesFiles(event: ChangeEvent<HTMLInputElement>) {
     setNotesFiles(Array.from(event.currentTarget.files ?? []));
+    invalidateSourceSelection();
+  }
+  async function resumeRetry(analysisId: string, parentId: string) {
+    const previous = savedCheckpoint.current;
+    if (!previous || previous.analysisId !== parentId)
+      throw new Error('The source selection changed. Open its current analysis before retrying.');
+    saveMaterialPlacementRetry(previous.profileId, baseLang, language, parentId, analysisId);
+    if (checkpoint.current?.analysisId === parentId) checkpoint.current.analysisId = analysisId;
+    await deduceFromNotes(true);
+  }
+
+  async function forgetSaved() {
+    const controller = new AbortController();
+    notesController.current?.abort();
+    notesController.current = controller;
+    try {
+      await forgetSavedMaterialAnalysis(baseLang, language, controller.signal);
+      if (controller.signal.aborted) return;
+      invalidateSourceSelection();
+      setNotesError('');
+    } catch (cause) {
+      if (!controller.signal.aborted)
+        setNotesError(
+          cause instanceof Error ? cause.message : 'Could not clear this browser resume record.'
+        );
+    } finally {
+      if (notesController.current === controller) notesController.current = null;
+    }
   }
 
   const title =
@@ -239,7 +350,7 @@ export function StepPlacement({
 
       {mode === 'choose' && (
         <div className={c.placementChoiceGrid}>
-          <button type="button" className={c.placementChoice} onClick={() => setMode('ladder')}>
+          <button type="button" className={c.placementChoice} onClick={() => chooseMode('ladder')}>
             <span className={c.placementChoiceIcon} aria-hidden="true">
               <Glyph name="check" size={18} />
             </span>
@@ -250,7 +361,7 @@ export function StepPlacement({
               </span>
             </span>
           </button>
-          <button type="button" className={c.placementChoice} onClick={() => setMode('notes')}>
+          <button type="button" className={c.placementChoice} onClick={() => chooseMode('notes')}>
             <span className={c.placementChoiceIcon} aria-hidden="true">
               <Glyph name="upload" size={18} />
             </span>
@@ -261,7 +372,7 @@ export function StepPlacement({
               </span>
             </span>
           </button>
-          <button type="button" className={c.placementChoice} onClick={() => setMode('manual')}>
+          <button type="button" className={c.placementChoice} onClick={() => chooseMode('manual')}>
             <span className={c.placementChoiceIcon} aria-hidden="true">
               <Glyph name="map" size={18} />
             </span>
@@ -284,7 +395,10 @@ export function StepPlacement({
             id="placement-notes"
             className={c.placementNotesInput}
             value={notesText}
-            onChange={(event) => setNotesText(event.currentTarget.value)}
+            onChange={(event) => {
+              setNotesText(event.currentTarget.value);
+              invalidateSourceSelection();
+            }}
             rows={7}
             maxLength={20000}
             placeholder="Paste the exact material: class notes, a chapter excerpt, homework feedback, vocabulary you are studying, or a paragraph you wrote."
@@ -315,13 +429,42 @@ export function StepPlacement({
             disabled={!hasNotesMaterial || notesPhase === 'deducing'}
             onClick={() => void deduceFromNotes()}
           >
-            {notesPhase === 'deducing' ? 'Reading material...' : 'Estimate from material'}
+            {notesPhase === 'deducing' ? notesProgress : 'Estimate from material'}
           </button>
+          {!demoMode && (
+            <button
+              type="button"
+              className={c.placementPrimary}
+              disabled={notesPhase === 'deducing'}
+              onClick={() => void deduceFromNotes(true)}
+            >
+              Open saved analysis
+            </button>
+          )}
+          {!demoMode && <MaterialAnalysisCancellation analysis={lastAnalysis} />}
 
           {notesPhase === 'error' && (
             <div className={c.placementNotice} role="alert">
               {notesError}
             </div>
+          )}
+          {notesPhase === 'error' && (
+            <MaterialAnalysisRetry analysis={lastAnalysis} onRetry={resumeRetry} />
+          )}
+          {notesPhase === 'error' && (
+            <>
+              <button
+                type="button"
+                className={c.placementPrimary}
+                onClick={() => void forgetSaved()}
+              >
+                Clear this browser&apos;s saved progress
+              </button>
+              <p>
+                Clears the active learner&apos;s resume record. Saved sources and background work
+                stay on the server.
+              </p>
+            </>
           )}
 
           {notesPhase === 'result' && notesDeduction && (
@@ -331,6 +474,26 @@ export function StepPlacement({
                 <b>{LEVEL_LABELS[notesDeduction.deducedLevel]}</b>
               </div>
               <p>{notesDeduction.rationale}</p>
+              {notesDeduction.analysis && <MaterialCoverage analysis={notesDeduction.analysis} />}
+              {notesDeduction.analysis && (
+                <MaterialAnalysisRetry analysis={notesDeduction.analysis} onRetry={resumeRetry} />
+              )}
+              {notesDeduction.analysis?.status === 'PARTIAL' && (
+                <MaterialPartialConsent
+                  disabled={!notesDeduction.analysis.coverage}
+                  checked={acceptPartial}
+                  onChange={(accepted) => {
+                    setAcceptPartial(accepted);
+                    if (accepted && notesDeduction.analysis) {
+                      assignLevel(notesDeduction.deducedLevel);
+                      onAnalysis?.({
+                        level: notesDeduction.deducedLevel,
+                        reference: materialPlacementReference(notesDeduction.analysis, true),
+                      });
+                    } else onAnalysis?.(null);
+                  }}
+                />
+              )}
               <span className={c.placementNotesConfidence}>
                 Confidence {Math.round(notesDeduction.confidence * 100)}%
                 {typeof notesDeduction.imported === 'number'
@@ -384,7 +547,10 @@ export function StepPlacement({
                 <button
                   key={p.level}
                   className={`${c.plRow} ${on ? c.plRowOn : ''}`}
-                  onClick={() => toggleUnderstood(p.level)}
+                  onClick={() => {
+                    invalidateSourceSelection();
+                    toggleUnderstood(p.level);
+                  }}
                   aria-pressed={on}
                   aria-label={`${p.level}: ${p.text}`}
                 >
@@ -458,13 +624,23 @@ export function StepPlacement({
       <div className={t.actions}>
         <button
           className={`${t.btn} ${t.btnBare}`}
-          onClick={mode === 'choose' ? onBack : () => setMode('choose')}
+          onClick={mode === 'choose' ? onBack : () => chooseMode('choose')}
         >
           ← Back
         </button>
         <span className={t.spacer} />
         {mode !== 'choose' && (
-          <button className={`${t.btn} ${t.btnPrimary}`} disabled={!level} onClick={onNext}>
+          <button
+            className={`${t.btn} ${t.btnPrimary}`}
+            disabled={
+              !level ||
+              (mode === 'notes' &&
+                (notesPhase !== 'result' ||
+                  !notesDeduction ||
+                  (notesDeduction.analysis?.status === 'PARTIAL' && !acceptPartial)))
+            }
+            onClick={onNext}
+          >
             Compose my course{' '}
             <span className={t.btnArrow}>
               <Glyph name="arrow" size={17} />

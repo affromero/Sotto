@@ -67,6 +67,7 @@ impl SottoClient {
         let body = types::StartPracticeRequest {
             kind,
             focus_target_id: None,
+            learning_selection: None,
             request_id: Some(request_id),
         };
         let resp = self
@@ -78,30 +79,68 @@ impl SottoClient {
     }
 
     pub async fn resume_practice(&self, session_id: &str) -> Result<types::StartPracticeResponse> {
-        Ok(self.inner.resume_practice(session_id).await.map_err(|e| eyre!("failed to resume practice: {e}"))?.into_inner())
+        Ok(self
+            .inner
+            .resume_practice(session_id)
+            .await
+            .map_err(|e| eyre!("failed to resume practice: {e}"))?
+            .into_inner())
     }
 
-    pub async fn practice_generation_action(&self, session_id: &str, recover: bool) -> Result<types::StartPracticePreparing> {
+    pub async fn practice_generation_action(
+        &self,
+        session_id: &str,
+        recover: bool,
+    ) -> Result<types::StartPracticePreparing> {
         let body = types::PracticeGenerationAction {
-            action: if recover { types::PracticeGenerationActionAction::Recover } else { types::PracticeGenerationActionAction::Cancel },
+            action: if recover {
+                types::PracticeGenerationActionAction::Recover
+            } else {
+                types::PracticeGenerationActionAction::Cancel
+            },
             acknowledge_unknown_outcome: Some(recover),
         };
-        Ok(self.inner.practice_generation_action(session_id, &body).await.map_err(|e| eyre!("failed to change preparation: {e}"))?.into_inner())
+        Ok(self
+            .inner
+            .practice_generation_action(session_id, &body)
+            .await
+            .map_err(|e| eyre!("failed to change preparation: {e}"))?
+            .into_inner())
     }
 
-    pub async fn save_learning_progress(&self, class: bool, id: &str, progress: types::LearningProgressRequest) -> Result<types::LearningProgressResponse> {
+    pub async fn save_learning_progress(
+        &self,
+        class: bool,
+        id: &str,
+        progress: types::LearningProgressRequest,
+    ) -> Result<types::LearningProgressResponse> {
         let kind = if class { "classes" } else { "practice" };
-        let response = self.http.patch(format!("{}/api/v1/{kind}/{id}", self.base_url))
-            .json(&progress).send().await?;
+        let response = self
+            .http
+            .patch(format!("{}/api/v1/{kind}/{id}", self.base_url))
+            .json(&progress)
+            .send()
+            .await?;
         let status = response.status();
         if !status.is_success() {
-            return Err(eyre!("progress was not saved ({status}): {}", response.text().await?));
+            return Err(eyre!(
+                "progress was not saved ({status}): {}",
+                response.text().await?
+            ));
         }
         Ok(response.json().await?)
     }
 
-    pub async fn submit_practice_writing(&self, session_id: &str, prompt_id: &str, text: String) -> Result<WritingGradeResponse> {
-        let url = format!("{}/api/v1/practice/{session_id}/writing/{prompt_id}", self.base_url);
+    pub async fn submit_practice_writing(
+        &self,
+        session_id: &str,
+        prompt_id: &str,
+        text: String,
+    ) -> Result<WritingGradeResponse> {
+        let url = format!(
+            "{}/api/v1/practice/{session_id}/writing/{prompt_id}",
+            self.base_url
+        );
         self.submit_writing_at(&url, text).await
     }
 
@@ -251,7 +290,9 @@ impl SottoClient {
             409 => {
                 let body: serde_json::Value = resp.json().await?;
                 match body["activeClassId"].as_str() {
-                    Some(class_id) => Ok(NextClassOutcome::Created { class_id: class_id.to_string() }),
+                    Some(class_id) => Ok(NextClassOutcome::Created {
+                        class_id: class_id.to_string(),
+                    }),
                     None => Err(eyre!("The class gate could not be resolved: {body}")),
                 }
             }
@@ -262,15 +303,31 @@ impl SottoClient {
         }
     }
 
-    pub async fn repair_class(&self, class_id: &str, expected_attempt: i64) -> Result<NextClassOutcome> {
-        let response = self.http.post(format!("{}/api/v1/classes/{class_id}", self.base_url))
-            .json(&serde_json::json!({ "scope": "sections", "expectedAttempt": expected_attempt })).send().await?;
+    pub async fn repair_class(
+        &self,
+        class_id: &str,
+        expected_attempt: i64,
+    ) -> Result<NextClassOutcome> {
+        let response = self
+            .http
+            .post(format!("{}/api/v1/classes/{class_id}", self.base_url))
+            .json(&serde_json::json!({ "scope": "sections", "expectedAttempt": expected_attempt }))
+            .send()
+            .await?;
         if response.status().as_u16() != 202 {
-            return Err(eyre!("Class repair was not accepted ({}): {}", response.status(), response.text().await?));
+            return Err(eyre!(
+                "Class repair was not accepted ({}): {}",
+                response.status(),
+                response.text().await?
+            ));
         }
         let receipt: types::ClassRegenerationAccepted = response.json().await?;
-        if receipt.status.to_string() != "GENERATING" { return Err(eyre!("Invalid class repair acknowledgement")); }
-        Ok(NextClassOutcome::Created { class_id: class_id.to_string() })
+        if receipt.status.to_string() != "GENERATING" {
+            return Err(eyre!("Invalid class repair acknowledgement"));
+        }
+        Ok(NextClassOutcome::Created {
+            class_id: class_id.to_string(),
+        })
     }
 
     /// Fetch a class with its sections.
@@ -471,89 +528,6 @@ impl SottoClient {
     }
 
     // --- Placement / memory / onboarding ----------------------------------
-
-    /// Generate a placement batch for the `native`/`target` language pair.
-    pub async fn generate_placement(
-        &self,
-        native: &str,
-        target: &str,
-    ) -> Result<types::GeneratePlacementResponse> {
-        // Query params are generated alphabetically: (focusLevel, native, target).
-        // The TUI runs a cold placement, so it never biases toward a level.
-        let resp = self
-            .inner
-            .generate_placement(None, native, target)
-            .await
-            .map_err(|e| eyre!("failed to generate placement: {e}"))?;
-        Ok(resp.into_inner())
-    }
-
-    /// Submit placement answers; assigns a CEFR level and creates the course.
-    pub async fn submit_placement(
-        &self,
-        native: &str,
-        target: &str,
-        answers: Vec<types::SubmitPlacementRequestAnswersItem>,
-    ) -> Result<types::SubmitPlacementResponse> {
-        let native = types::SubmitPlacementRequestNative::try_from(native.to_string())
-            .map_err(|e| eyre!("invalid native language code: {e}"))?;
-        let target = types::SubmitPlacementRequestTarget::try_from(target.to_string())
-            .map_err(|e| eyre!("invalid target language code: {e}"))?;
-        let body = types::SubmitPlacementRequest {
-            native,
-            target,
-            answers,
-        };
-        let resp = self
-            .inner
-            .submit_placement(&body)
-            .await
-            .map_err(|e| eyre!("failed to submit placement: {e}"))?;
-        Ok(resp.into_inner())
-    }
-
-    /// Deduce a CEFR level from pasted materials; creates no course.
-    pub async fn deduce_from_notes(
-        &self,
-        native: &str,
-        target: &str,
-        content: &str,
-    ) -> Result<types::DeduceFromNotesResponse> {
-        let body = types::DeduceFromNotesRequest {
-            native: types::DeduceFromNotesRequestNative::try_from(native.to_string())
-                .map_err(|e| eyre!("invalid native language code: {e}"))?,
-            target: types::DeduceFromNotesRequestTarget::try_from(target.to_string())
-                .map_err(|e| eyre!("invalid target language code: {e}"))?,
-            content: types::DeduceFromNotesRequestContent::try_from(content.to_string())
-                .map_err(|e| eyre!("materials cannot be empty: {e}"))?,
-        };
-        let resp = self
-            .inner
-            .deduce_placement_from_notes(&body)
-            .await
-            .map_err(|e| eyre!("failed to deduce level from notes: {e}"))?;
-        Ok(resp.into_inner())
-    }
-
-    /// Confirm a deduced level: create the course and seed note + vocabulary.
-    pub async fn confirm_from_notes(
-        &self,
-        native: &str,
-        target: &str,
-    ) -> Result<types::ConfirmFromNotesResponse> {
-        let body = types::ConfirmFromNotesRequest {
-            native: types::ConfirmFromNotesRequestNative::try_from(native.to_string())
-                .map_err(|e| eyre!("invalid native language code: {e}"))?,
-            target: types::ConfirmFromNotesRequestTarget::try_from(target.to_string())
-                .map_err(|e| eyre!("invalid target language code: {e}"))?,
-        };
-        let resp = self
-            .inner
-            .confirm_placement_from_notes(&body)
-            .await
-            .map_err(|e| eyre!("failed to confirm placement from notes: {e}"))?;
-        Ok(resp.into_inner())
-    }
 
     /// Declare a CEFR level manually; creates the course or raises to it.
     pub async fn manual_placement(

@@ -46,6 +46,7 @@ export class CodexProvider implements AIProvider {
       model: opts?.model,
       useWebSearch: opts?.useWebSearch,
       jsonSchema: opts?.jsonSchema,
+      ...(opts?.maxOutputBytes === undefined ? {} : { maxOutputBytes: opts.maxOutputBytes }),
       ...(images.length ? { images } : {}),
       ...(opts?.isolated ? { isolated: opts.isolated } : {}),
     });
@@ -70,6 +71,7 @@ export class CodexProvider implements AIProvider {
           model: opts?.model,
           useWebSearch: opts?.useWebSearch,
           jsonSchema: opts?.jsonSchema,
+          ...(opts?.maxOutputBytes === undefined ? {} : { maxOutputBytes: opts.maxOutputBytes }),
           ...(images.length ? { images } : {}),
           ...(opts?.isolated ? { isolated: opts.isolated } : {}),
         });

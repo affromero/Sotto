@@ -22,10 +22,15 @@ queue_control() {
       [ "$container" = "$captured" ] || { echo "ERROR: previous database control worker changed." >&2; return 1; }
     fi
   fi
-  payload=$(python3 - "$command" "$QUEUE_MANIFEST" <<'QUEUE_INPUT'
+  payload=$(python3 - "$command" "$QUEUE_MANIFEST" "${SCHEMA_TRANSITION:-false}" "${IMAGE_OVERRIDES:-}/schema-review.json" <<'QUEUE_INPUT'
 import json, pathlib, sys
-command, path = sys.argv[1:]
+command, path, schema, review_path = sys.argv[1:]
 value = {'command': command}
+if command == 'snapshot' and schema == 'true':
+    bound = json.loads(pathlib.Path(review_path).read_text())
+    review = json.loads(bound['review'])
+    if review['schemaVersion'] == 2:
+        value['queueTransition'] = review['queueTransition']
 if command not in ('snapshot', 'established', 'activation-ready', 'database-identity'):
     value['manifest'] = json.loads(pathlib.Path(path).read_text())
 print(json.dumps(value))

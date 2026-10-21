@@ -8,6 +8,7 @@ import {
   appendFile,
   truncate,
   symlink,
+  rename,
   rm,
 } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -15,7 +16,7 @@ import { tmpdir } from 'node:os';
 import { ProcessRunner, ProcessExecutionError } from 'thesidedoor-core/runtime/process';
 import { ProviderCleanupError } from 'thesidedoor-core/ai';
 import { StorageReadCleanupError } from 'thesidedoor-core/storage';
-import { readPdfFile } from '@/lib/providers/documents/files';
+import { readBoundedRegularFile } from '@/lib/providers/documents/files';
 import { originalPdf } from '../../helpers/learning/pdf';
 
 const boundary = vi.hoisted(() => ({
@@ -68,20 +69,47 @@ afterEach(async () => {
 });
 describe('bounded original PDF file reads', () => {
   it('returns the complete exact-size original', async () => {
-    expect(await readPdfFile(path, { maximum: 17, expectedBytes: 17 })).toEqual(
+    expect(await readBoundedRegularFile(path, { maximum: 17, expectedBytes: 17 })).toEqual(
       Buffer.from('complete original')
     );
+  });
+  it('retains the opened original when its pathname is replaced after validation', async () => {
+    boundary.afterStat = async () => {
+      boundary.afterStat = null;
+      await rename(path, join(directory, 'retained.pdf'));
+      await writeFile(path, 'replacement content');
+    };
+    expect(await readBoundedRegularFile(path, { maximum: 17 })).toEqual(
+      Buffer.from('complete original')
+    );
+    expect(await readFile(path, 'utf8')).toBe('replacement content');
+  });
+  it('permits empty text only through explicit empty-file admission', async () => {
+    await writeFile(path, '');
+    await expect(readBoundedRegularFile(path, { maximum: 17 })).rejects.toThrow('type or size');
+    expect(await readBoundedRegularFile(path, { maximum: 17, allowEmpty: true })).toEqual(
+      Buffer.alloc(0)
+    );
+  });
+  it('honors cancellation after opening without returning the admitted bytes', async () => {
+    const controller = new AbortController();
+    const reason = new Error('Learner cancelled the file read');
+    boundary.afterStat = async () => controller.abort(reason);
+    await expect(
+      readBoundedRegularFile(path, { maximum: 17, signal: controller.signal })
+    ).rejects.toBe(reason);
+    expect(await readFile(path, 'utf8')).toBe('complete original');
   });
   it.each([{ maximum: 16 }, { maximum: 20, expectedBytes: 18 }])(
     'rejects invalid recorded bounds %j',
     async (limits) => {
-      await expect(readPdfFile(path, limits)).rejects.toThrow('type or size');
+      await expect(readBoundedRegularFile(path, limits)).rejects.toThrow('type or size');
     }
   );
   it('rejects a symlink in place of the original', async () => {
     const link = join(directory, 'link.pdf');
     await symlink(path, link);
-    await expect(readPdfFile(link, { maximum: 100 })).rejects.toThrow();
+    await expect(readBoundedRegularFile(link, { maximum: 100 })).rejects.toThrow();
   });
   it('rejects a FIFO without waiting for a writer', async () => {
     const fifo = join(directory, 'pipe.pdf');
@@ -91,7 +119,7 @@ describe('bounded original PDF file reads', () => {
       environment: {},
       timeoutMs: 5000,
     });
-    await expect(readPdfFile(fifo, { maximum: 100 })).rejects.toThrow('type or size');
+    await expect(readBoundedRegularFile(fifo, { maximum: 100 })).rejects.toThrow('type or size');
   });
   it.each(['growth', 'truncation'])(
     'rejects concurrent %s instead of returning partial or oversized content',
@@ -100,14 +128,14 @@ describe('bounded original PDF file reads', () => {
         if (change === 'growth') await appendFile(path, ' extra');
         else await truncate(path, 3);
       };
-      await expect(readPdfFile(path, { maximum: 17 })).rejects.toThrow(
+      await expect(readBoundedRegularFile(path, { maximum: 17 })).rejects.toThrow(
         change === 'growth' ? 'changed' : 'truncated'
       );
     }
   );
   it('surfaces unconfirmed descriptor closure as a typed storage cleanup failure', async () => {
     boundary.closeFailure = true;
-    await expect(readPdfFile(path, { maximum: 17 })).rejects.toBeInstanceOf(
+    await expect(readBoundedRegularFile(path, { maximum: 17 })).rejects.toBeInstanceOf(
       StorageReadCleanupError
     );
   });

@@ -73,6 +73,8 @@ describe('public proxy routes without a database', () => {
   });
   it.each([
     '/privacy/private',
+    '/.well-known/apple-app-site-association/private',
+    '/.well-known/other-file',
     '/terms/private',
     '/access/security',
     '/api/v1/storage/recordings/private.wav',
@@ -93,6 +95,22 @@ describe('public proxy routes without a database', () => {
     expect(response.status).toBe(503);
     expect(response.headers.get('cache-control')).toContain('no-store');
   });
+  it.each(['true', 'false'])(
+    'serves Apple invitation association reads without shared state in self-hosted mode %s',
+    async (mode) => {
+      vi.stubEnv('SELF_HOSTED', mode);
+      const url = 'http://localhost:3000/.well-known/apple-app-site-association';
+      for (const method of ['GET', 'HEAD']) {
+        const response = await proxy(new NextRequest(url, { method }));
+        expect(response.headers.get('x-middleware-next')).toBe('1');
+      }
+      for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) {
+        const response = await proxy(new NextRequest(url, { method }));
+        expect(response.status).toBe(503);
+        expect(response.headers.get('cache-control')).toContain('no-store');
+      }
+    }
+  );
   it('keeps the managed showcase available when shared state is unavailable', async () => {
     vi.stubEnv('SELF_HOSTED', 'false');
     expect((await proxy(request('/privacy'))).headers.get('x-middleware-next')).toBe('1');

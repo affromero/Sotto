@@ -12,6 +12,8 @@ import { readSkillRequirements } from '../skill-requirements';
 import { reviewReadingVocabulary } from '../reading-vocabulary';
 import { assertStoredClassMaterial } from './class-material';
 import { currentClassSections } from './current-sections';
+import { recordClassAssessmentObservations } from '../../learning-map/evidence/session';
+import { speakingTaskMode } from '../../learning-map/evidence/communicative-speaking';
 import {
   evaluateLearningWork,
   LearningIncompleteError,
@@ -183,6 +185,9 @@ export async function submitClass(
           passageText: section.questions.find((question) => question.passageText)?.passageText,
           audio: section.episode?.deletedAt ? null : section.episode,
           referenceAudioUrls: section.prompts.map((prompt) => prompt.referenceTtsUrl),
+          speakingTaskModes: section.prompts.map((prompt) =>
+            speakingTaskMode(prompt.learningObjectives)
+          ),
         };
       });
       let evaluation: ReturnType<typeof evaluateLearningWork>;
@@ -287,6 +292,13 @@ export async function submitClass(
       const vocab =
         targets?.vocab ?? (cls.lesson.targetVocab as unknown as Array<{ lemma: string }>);
       const grammar = targets?.grammarPoints ?? (cls.lesson.grammarPoints as unknown as string[]);
+      const canonicalGrammar = await recordClassAssessmentObservations(tx, {
+        courseId: cls.courseId,
+        userId,
+        classId,
+        sections: cls.sections,
+        answers,
+      });
       const previousEvidence = [
         cls.submission?.answers ?? [],
         ...history.flatMap((entry) => {
@@ -343,7 +355,9 @@ export async function submitClass(
         reviewReading && !cls.readingVocabulary && Array.isArray(vocab)
           ? vocab.map((item) => item.lemma).filter((lemma) => !assessedReading.has(lemma))
           : [],
-        reviewGrammar && Array.isArray(grammar) ? grammar : [],
+        reviewGrammar && Array.isArray(grammar)
+          ? grammar.filter((key) => !canonicalGrammar.has(key))
+          : [],
         sectionResults.find((section) => section.skill === 'READING')!.score,
         sectionResults.find((section) => section.skill === 'GRAMMAR')!.score,
         now,

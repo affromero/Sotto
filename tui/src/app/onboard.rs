@@ -31,6 +31,7 @@ impl App {
         // A fresh navigation target.
         self.bump_gen();
         self.view = View::placement_lang();
+        self.placement_transport = Default::default();
         self.render();
     }
 
@@ -100,9 +101,23 @@ impl App {
         }
         let client = Arc::clone(&self.client);
         let (native, target) = (native.to_string(), target.to_string());
-        self.dispatch(
+
+        let request_id = self.placement_transport.quiz_request(&native, &target);
+        let source = match self.placement_transport.source() {
+            Ok(source) => source,
+            Err(error) => {
+                self.status_bar.set_error(error.to_string());
+                return;
+            }
+        };
+        let accept_partial = self.placement_transport.accept_partial;
+        self.dispatch_placement(
             req_gen,
-            async move { client.generate_placement(&native, &target).await },
+            async move {
+                client
+                    .generate_placement(&native, &target, request_id, source, accept_partial)
+                    .await
+            },
             Action::PlacementLoaded,
         );
         self.render();
@@ -119,8 +134,12 @@ impl App {
         match result.as_ref() {
             Ok(resp) => match placement_questions(resp) {
                 Some(questions) => {
-                    self.view =
-                        View::placement_review(resp.native.clone(), resp.target.clone(), questions);
+                    self.placement_transport.batch = Some(resp.clone());
+                    self.view = View::placement_review(
+                        resp.native.to_string(),
+                        resp.target.to_string(),
+                        questions,
+                    );
                 }
                 None => {
                     self.status_bar
@@ -206,10 +225,8 @@ impl App {
     }
 
     fn submit_placement(&mut self) {
-        let (native, target, answers) = match &self.view {
+        let answers = match &self.view {
             View::PlacementReview {
-                native,
-                target,
                 questions,
                 selected,
                 submitting,
@@ -219,11 +236,16 @@ impl App {
                     return;
                 }
                 match build_placement_answers(questions, selected) {
-                    Ok(answers) if !answers.is_empty() => (native.clone(), target.clone(), answers),
+                    Ok(answers)
+                        if answers.len() == questions.len()
+                            && (6..=24).contains(&answers.len()) =>
+                    {
+                        answers
+                    }
                     Ok(_) => {
-                        // The route requires at least one answer (`.min(1)`).
+                        // Submit exactly the saved question set.
                         self.status_bar
-                            .set_error("Answer at least one question to submit.".to_string());
+                            .set_error("Answer every saved question to submit.".to_string());
                         self.render();
                         return;
                     }
@@ -241,9 +263,20 @@ impl App {
             *submitting = true;
         }
         let client = Arc::clone(&self.client);
-        self.dispatch(
+        let Some(batch) = self.placement_transport.batch.clone() else {
+            self.status_bar
+                .set_error("The saved placement receipt is missing. Reopen its request.".into());
+            return;
+        };
+        let request_id = self.placement_transport.submit_request(&answers);
+        let accept_partial = self.placement_transport.accept_partial;
+        self.dispatch_placement(
             req_gen,
-            async move { client.submit_placement(&native, &target, answers).await },
+            async move {
+                client
+                    .submit_placement(batch, request_id, answers, accept_partial)
+                    .await
+            },
             Action::PlacementSubmitted,
         );
         self.render();
@@ -388,7 +421,7 @@ impl App {
                     self.render();
                     return;
                 }
-                (native.clone(), target.clone(), input.trim().to_string())
+                (native.clone(), target.clone(), input.clone())
             }
             _ => return,
         };
@@ -397,9 +430,16 @@ impl App {
             *phase = NotesPhase::Deducing;
         }
         let client = Arc::clone(&self.client);
-        self.dispatch(
+        let request_id = self
+            .placement_transport
+            .notes_request(&native, &target, &content);
+        self.dispatch_placement(
             req_gen,
-            async move { client.deduce_from_notes(&native, &target, &content).await },
+            async move {
+                client
+                    .deduce_from_notes(&native, &target, &content, request_id)
+                    .await
+            },
             Action::NotesDeduced,
         );
         self.render();
@@ -408,19 +448,31 @@ impl App {
     pub(super) fn on_notes_deduced(
         &mut self,
         req_gen: u64,
-        result: ApiResult<types::DeduceFromNotesResponse>,
+        result: ApiResult<crate::api::PlacementAnalysisStatus>,
     ) {
         if !self.is_current(req_gen) {
             return;
         }
         match result.as_ref() {
             Ok(resp) => {
-                let confidence = (resp.confidence * 100.0).round().clamp(0.0, 100.0) as u8;
+                let Some(inference) = resp
+                    .summary
+                    .as_ref()
+                    .and_then(|summary| summary.inference.as_ref())
+                else {
+                    self.status_bar
+                        .set_error("The saved source has no placement inference.".into());
+                    return;
+                };
+                self.placement_transport.analysis = Some(resp.clone());
+                let confidence = (inference.confidence * 100.0).round().clamp(0.0, 100.0) as u8;
                 if let View::NotesPlacement { phase, .. } = &mut self.view {
                     *phase = NotesPhase::Result {
-                        level: resp.deduced_level.to_string(),
-                        rationale: resp.rationale.clone(),
+                        level: inference.level.clone(),
+                        rationale: inference.rationale.clone(),
                         confidence,
+                        partial: resp.status == "PARTIAL",
+                        accepted_partial: false,
                     };
                 }
             }
@@ -445,14 +497,34 @@ impl App {
             } => (native.clone(), target.clone()),
             _ => return,
         };
+        if !self.placement_transport.source_allowed() {
+            self.status_bar
+                .set_error("Press p to accept the displayed partial source coverage first.".into());
+            self.render();
+            return;
+        }
+        let source = match self.placement_transport.source() {
+            Ok(Some(source)) => source,
+            _ => {
+                self.status_bar
+                    .set_error("The exact source analysis receipt is missing.".into());
+                return;
+            }
+        };
+        let request_id = self.placement_transport.confirm_request();
+        let accept_partial = self.placement_transport.accept_partial;
         let req_gen = self.bump_gen();
         if let View::NotesPlacement { phase, .. } = &mut self.view {
             *phase = NotesPhase::Confirming;
         }
         let client = Arc::clone(&self.client);
-        self.dispatch(
+        self.dispatch_placement(
             req_gen,
-            async move { client.confirm_from_notes(&native, &target).await },
+            async move {
+                client
+                    .confirm_from_notes(&native, &target, source, request_id, accept_partial)
+                    .await
+            },
             Action::NotesConfirmed,
         );
         self.render();
@@ -497,6 +569,12 @@ impl App {
     /// From the deduced-level result, take the MC test instead. The backend
     /// seeds the cached materials onto the course when this test is submitted.
     pub(super) fn notes_take_test(&mut self) {
+        if !self.placement_transport.source_allowed() {
+            self.status_bar
+                .set_error("Press p to accept the displayed partial source coverage first.".into());
+            self.render();
+            return;
+        }
         let (native, target) = match &self.view {
             View::NotesPlacement {
                 native,
@@ -508,17 +586,49 @@ impl App {
         };
         let req_gen = self.bump_gen();
         let client = Arc::clone(&self.client);
-        self.dispatch(
+
+        let request_id = self.placement_transport.quiz_request(&native, &target);
+        let source = match self.placement_transport.source() {
+            Ok(source) => source,
+            Err(error) => {
+                self.status_bar.set_error(error.to_string());
+                return;
+            }
+        };
+        let accept_partial = self.placement_transport.accept_partial;
+        self.dispatch_placement(
             req_gen,
-            async move { client.generate_placement(&native, &target).await },
+            async move {
+                client
+                    .generate_placement(&native, &target, request_id, source, accept_partial)
+                    .await
+            },
             Action::PlacementLoaded,
         );
         self.render();
     }
 
+    pub(super) fn notes_accept_partial(&mut self) {
+        if let View::NotesPlacement {
+            phase:
+                NotesPhase::Result {
+                    partial: true,
+                    accepted_partial,
+                    ..
+                },
+            ..
+        } = &mut self.view
+        {
+            *accepted_partial = true;
+            self.placement_transport.accept_partial = true;
+            self.render();
+        }
+    }
+
     /// Esc in notes placement: from the result, return to editing; from editing,
     /// return to the language picker.
     pub(super) fn notes_cancel(&mut self) {
+        self.bump_gen();
         match &mut self.view {
             View::NotesPlacement {
                 phase: phase @ NotesPhase::Result { .. },

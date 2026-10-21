@@ -3,6 +3,30 @@
     use ratatui::Terminal;
     use ratatui::backend::TestBackend;
 
+    #[test]
+    fn canonical_only_review_is_visible_in_total_and_each_relevant_skill() {
+        let mut app = test_app();
+        let overview: types::PracticeOverviewResponse = serde_json::from_value(serde_json::json!({
+            "due":{"vocab":0,"grammar":0,"objectives":1,"bySkill":{"GRAMMAR":1,"WRITING":1}},
+            "totalVocab":0,"recent":[]
+        })).unwrap();
+        app.view = View::CourseHome {
+            course: course("A"), due: DueCounts::from(&overview), menu_cursor: 1,
+            notice: None, starting: false,
+        };
+        let mut terminal = Terminal::new(TestBackend::new(120, 30)).unwrap();
+        terminal.draw(|frame| { let _ = app.draw(frame); }).unwrap();
+        let text: String = terminal.backend().buffer().content().iter().map(|cell| cell.symbol()).collect();
+        let text = text.split_whitespace().collect::<Vec<_>>().join(" ");
+        assert!(text.contains("Due 1 total"));
+        assert!(text.contains("0 legacy grammar"));
+        assert!(text.contains("1 objective"));
+        assert!(!text.contains("1 objectives"));
+        assert!(text.contains("Grammar (1 due)"));
+        assert!(text.contains("Writing (1 due)"));
+        assert!(text.contains("Full practice (1 due)"));
+    }
+
     /// Render `app` into a `w`×`h` test backend; returns Ok if no panic.
     fn render_at(app: &mut App, w: u16, h: u16) {
         let backend = TestBackend::new(w, h);
@@ -318,6 +342,8 @@
                 recent: Vec::new(),
                     vocab: 3,
                     grammar: 1,
+                    objectives: 0,
+                    by_skill: Default::default(),
                     total_vocab: 20,
                 },
                 menu_cursor: 0,

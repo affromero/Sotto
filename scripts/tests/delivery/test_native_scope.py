@@ -108,7 +108,9 @@ class NativeScopeTests(unittest.TestCase):
         self.assertEqual(self.scope(), {'desktop': 'true', 'ios': 'true', 'android': 'true'})
 
     def test_android_source_and_external_recovery_driver_select_android(self) -> None:
-        for path in ('apps/android/app/MainActivity.kt', 'e2e/android/process.mjs'):
+        for path in ('apps/android/app/MainActivity.kt',
+                     'e2e/android/process.mjs',
+                     'scripts/ci/android-results.py'):
             with self.subTest(path=path):
                 self.write(path)
                 self.commit()

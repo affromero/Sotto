@@ -1,0 +1,55 @@
+.root {
+  display: grid;
+  gap: 0.75rem;
+  padding-block: 1rem;
+  border-top: 1px solid var(--color-border);
+}
+.root h3 {
+  margin: 0;
+  font: var(--text-h3);
+}
+.root p {
+  margin: 0;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+.sources {
+  margin: 0;
+  padding: 0.75rem;
+  border: 1px solid var(--color-border);
+}
+.sources label {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 44px;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.sources input {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+.action {
+  min-height: 44px;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  color: var(--color-primary);
+  font: inherit;
+  cursor: pointer;
+}
+.action:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.action:focus-visible,
+.sources input:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+}
+.error {
+  color: var(--color-error);
+}

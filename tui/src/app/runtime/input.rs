@@ -176,14 +176,24 @@ impl App {
                 NotesPhase::Result { .. } => match key.code {
                     KeyCode::Enter => Some(Action::NotesConfirm),
                     KeyCode::Char('t') => Some(Action::NotesTakeTest),
+                    KeyCode::Char('p') => Some(Action::NotesAcceptPartial),
                     KeyCode::Esc => Some(Action::NotesCancel),
                     _ => None,
                 },
                 // Deducing / Confirming: a request is in flight; swallow keys.
-                NotesPhase::Deducing | NotesPhase::Confirming => None,
+                NotesPhase::Deducing | NotesPhase::Confirming => {
+                    if key.code == KeyCode::Esc {
+                        Some(Action::NotesCancel)
+                    } else {
+                        None
+                    }
+                }
             };
         }
 
+        if matches!(&self.view, View::LearningMap { state, .. } if state.searching) {
+            return self.learning_map_key(key);
+        }
         // Global polish keys (reached only when no text-entry/ask overlay is
         // active — those modes return above, so these never disturb typing):
         // `t` theme picker, `?` key-help, `A` (shift+a) account switcher.
@@ -194,6 +204,9 @@ impl App {
             _ => {}
         }
 
+        if matches!(self.view, View::LearningMap { .. }) {
+            return self.learning_map_key(key);
+        }
         // Screen-specific keys take priority over the generic mapping below.
         match &self.view {
             View::PracticePreparing { .. } => match key.code {
@@ -257,6 +270,11 @@ impl App {
                 return Some(Action::StartExam);
             }
             // CourseHome: `m` opens the memory graph, `s` opens settings.
+            View::CourseHome {
+                starting: false, ..
+            } if key.code == KeyCode::Char('l') => {
+                return Some(Action::LearningMap(crate::action::LearningMapIntent::Open));
+            }
             View::CourseHome {
                 starting: false, ..
             } if matches!(key.code, KeyCode::Char('m')) => {
@@ -638,6 +656,8 @@ impl App {
         self.cache_practice();
         self.client = client;
         self.pending_admissions.clear();
+        self.pending_selections.clear();
+        self.placement_transport = Default::default();
         self.practice_cache.clear();
         let user = profile
             .name
@@ -655,6 +675,9 @@ impl App {
 
     pub(super) fn on_select(&mut self) {
         match &self.view {
+            View::LearningMap { .. } => {
+                self.learning_map_intent(crate::action::LearningMapIntent::Select)
+            }
             View::Courses { courses, cursor } => {
                 if let Some(course) = courses.get(*cursor).cloned() {
                     self.enter_course_home(course);
@@ -806,6 +829,7 @@ impl App {
     pub(super) fn on_back(&mut self) {
         self.cache_practice();
         match &self.view {
+            View::LearningMap { .. } => self.learning_map_intent(crate::action::LearningMapIntent::Back),
             View::CourseHome { .. } => {
                 // Back to the course list; refetch so counts are current.
                 self.fetch_courses();

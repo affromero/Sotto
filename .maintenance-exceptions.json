@@ -4,6 +4,14 @@
     {
       "tool": "knip",
       "mode": "all",
+      "file": "apps/web/tests/lib/course-materials/pdf-optimization.test.ts",
+      "kind": "binaries",
+      "name": "qpdf",
+      "reason": "Optional system executable used by real lossless PDF optimization tests and installed in the worker image."
+    },
+    {
+      "tool": "knip",
+      "mode": "all",
       "file": "apps/web/tests/lib/agent-clients/isolated-agent-journal.test.ts",
       "kind": "binaries",
       "name": "mkfifo",

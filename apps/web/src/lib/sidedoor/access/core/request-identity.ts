@@ -33,6 +33,9 @@ export async function requireOriginalSottoAdmission(
     current.isOwner !== expected.isOwner
   )
     throw new AccessError('conflict', 'The active identity changed during this operation');
+  const expectedProfileId = request.headers.get('x-sotto-expected-profile-id');
+  if (expectedProfileId !== null && expectedProfileId !== current.userId)
+    throw new AccessError('conflict', 'The active profile differs from the captured profile');
 }
 
 /** A supplied Authorization header is exclusive. It never falls back to browser cookies. */

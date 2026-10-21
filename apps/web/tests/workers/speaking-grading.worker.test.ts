@@ -1,6 +1,10 @@
+// @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Job } from 'bullmq';
 import type { SpeakingGradingPayload } from '@/lib/queue';
+import { createSkillRequirements } from '@sotto/shared';
+import { assessmentFixture } from '../lib/learning-map/evidence/evidence-fixtures';
+import { privateSpeakingFixture } from '../lib/learning-map/private-speaking/fixtures';
 
 const mocks = vi.hoisted(() => {
   const ownership = {
@@ -59,6 +63,7 @@ const mocks = vi.hoisted(() => {
     validateStorageInputs: vi.fn().mockResolvedValue([backend]),
     markCleanupUnconfirmed: vi.fn(),
     transcribe: vi.fn(),
+    generateResponse: vi.fn(),
     authenticatedFetch: vi.fn(async (_request, _init, observation) => {
       observation?.onDispatch();
       observation?.onConsumed?.({ status: 200 });
@@ -142,6 +147,7 @@ vi.mock('@/lib/sidedoor/credentials/runtime/provider-execution', () => ({
     .mockResolvedValue({ authenticatedFetch: mocks.authenticatedFetch }),
 }));
 vi.mock('@/lib/providers/ai', () => ({
+  createAIProvider: () => ({ generateResponse: mocks.generateResponse }),
   aiProviderRules: vi.fn(() => [
     { method: 'POST', url: 'https://api.anthropic.com/', descendants: true },
   ]),
@@ -163,6 +169,7 @@ vi.mock('@/lib/pronunciation/scorer', () => ({
   resolvePronunciationScorer: vi.fn(() => ({ score: mocks.score })),
 }));
 vi.mock('@/lib/logger', () => ({ logger: { info: vi.fn(), error: vi.fn() } }));
+vi.mock('@/lib/usage-logger', () => ({ logUsage: vi.fn() }));
 vi.mock('@/lib/server-config', () => ({
   infra: vi.fn(() => undefined),
   getServerInfra: vi.fn().mockResolvedValue({}),
@@ -237,6 +244,175 @@ describe('durable speaking grading', () => {
     );
     expect(mocks.markCleanupUnconfirmed).not.toHaveBeenCalled();
   });
+
+  it('grades an independent spoken request against its criterion and stores supported semantic evidence', async () => {
+    const assessed = assessmentFixture('SPEAKING');
+    if (assessed.task.kind !== 'COMMUNICATIVE_SPEAKING')
+      throw new Error('Expected communicative fixture.');
+    mocks.database.speakingRecording.findUnique.mockResolvedValue({
+      ...mocks.recording,
+      attempt: 1,
+      prompt: {
+        targetPhrase: assessed.task.task,
+        translation: assessed.task.guidance,
+        learningObjectives: assessed,
+      },
+    });
+    mocks.database.classSection.findUnique.mockResolvedValue({
+      attempt: 1,
+      class: {
+        courseId: 'course-1',
+        course: { targetLang: 'de' },
+        skillRequirements: createSkillRequirements({
+          scope: 'CLASS',
+          nativeLang: 'en',
+          targetLang: 'de',
+          level: 'A2',
+          ttsProvider: 'cartesia',
+          sttProvider: 'openai',
+        }),
+      },
+    });
+    const text = 'Bitte ein vegetarisches Gericht.';
+    mocks.transcribe.mockImplementation(async (_audio, options) => {
+      options.onDispatch();
+      options.onSettled();
+      return { text, segments: [], words: [] };
+    });
+    mocks.generateResponse.mockImplementation(async (_system, messages, options) => {
+      const input = JSON.parse(messages[0].content);
+      const response = await options.fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+      });
+      await response.text();
+      return {
+        model: 'configured-model',
+        content: JSON.stringify({
+          finding: {
+            schemaVersion: 1,
+            taskFingerprint: input.taskFingerprint,
+            responseSha256: input.responseSha256,
+            assessed: true,
+            quality: 0.6,
+            quotes: ['vegetarisches Gericht'],
+            rationale: 'The learner independently communicates the dietary constraint.',
+          },
+          feedback: 'Add the reason for the request.',
+        }),
+      };
+    });
+    await processSpeakingGrading(job());
+    expect(mocks.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: 'SCORED',
+          transcript: text,
+          overallScore: 0.6,
+          rubricScores: { communicative: 0.6 },
+          phonemeScores: [],
+          objectiveEvidence: expect.objectContaining({
+            taskFingerprint: assessed.taskFingerprint,
+            quality: 0.6,
+            quotes: ['vegetarisches Gericht'],
+          }),
+        }),
+      })
+    );
+    expect(mocks.markCleanupUnconfirmed).not.toHaveBeenCalled();
+  });
+
+  it.each(['valid', 'changed-source', 'retired-during-grading'] as const)(
+    'keeps private communicative feedback separate from canonical evidence (%s)',
+    async (mode) => {
+      const { selection, assessment } = privateSpeakingFixture();
+      if (assessment.task.kind !== 'COMMUNICATIVE_SPEAKING')
+        throw new Error('Expected private elicitation.');
+      mocks.database.speakingRecording.findUnique.mockResolvedValue({
+        ...mocks.recording,
+        sectionId: null,
+        practiceSessionId: 'practice-1',
+        attempt: 1,
+        prompt: {
+          targetPhrase: assessment.task.task,
+          translation: assessment.task.guidance,
+          learningObjectives: assessment,
+        },
+      });
+      const session = {
+        courseId: 'course-1',
+        course: { targetLang: 'de' },
+        learningSelection: selection,
+        skillRequirements: createSkillRequirements({
+          scope: 'SPEAKING',
+          nativeLang: 'en',
+          targetLang: 'de',
+          level: 'A2',
+          ttsProvider: 'local',
+          sttProvider: 'openai',
+        }),
+      };
+      if (mode === 'changed-source')
+        session.learningSelection = {
+          ...selection,
+          sourceFocus: { ...selection.sourceFocus!, analysisRevision: 4 },
+        };
+      mocks.database.practiceSession.findUnique.mockImplementation(async () => session);
+      const text = 'Ich werde im Mai umziehen, weil ich dort arbeite.';
+      mocks.transcribe.mockImplementation(async (_audio, options) => {
+        options.onDispatch();
+        options.onSettled();
+        return { text, segments: [], words: [] };
+      });
+      mocks.generateResponse.mockImplementation(async (_system, messages, options) => {
+        const input = JSON.parse(messages[0].content);
+        expect(input.criterion.assessment).toContain('future change with werden');
+        expect(input.criterion).not.toHaveProperty('objectiveId');
+        const response = await options.fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+        });
+        await response.text();
+        if (mode === 'retired-during-grading')
+          session.learningSelection = null as unknown as typeof selection;
+        return {
+          model: 'configured-model',
+          content: JSON.stringify({
+            finding: {
+              schemaVersion: 1,
+              taskFingerprint: input.taskFingerprint,
+              responseSha256: input.responseSha256,
+              assessed: true,
+              quality: 0.7,
+              quotes: ['werde im Mai umziehen'],
+              rationale:
+                'The learner independently describes the future change with the requested grammar.',
+            },
+            feedback: 'Add another detail about the new plan.',
+          }),
+        };
+      });
+      if (mode !== 'valid') {
+        await expect(processSpeakingGrading(job())).rejects.toThrow();
+        expect(mocks.update).not.toHaveBeenCalledWith(
+          expect.objectContaining({ data: expect.objectContaining({ status: 'SCORED' }) })
+        );
+        if (mode === 'changed-source') expect(mocks.transcribe).not.toHaveBeenCalled();
+        return;
+      }
+      await processSpeakingGrading(job());
+      expect(mocks.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: 'SCORED',
+            transcript: text,
+            overallScore: 0.7,
+            rubricScores: { communicative: 0.7 },
+            phonemeScores: [],
+            objectiveEvidence: undefined,
+          }),
+        })
+      );
+    }
+  );
 
   it('retains the execution after a dispatch with no terminal proof', async () => {
     mocks.transcribe.mockImplementation(async (_audio, options) => {

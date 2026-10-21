@@ -1,6 +1,7 @@
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { SottoClient, ApiError } from './client.js';
+import { registerLearningTools } from './learning-tools.js';
 import {
   formatEpisodeDetail,
   formatEpisodeList,
@@ -20,6 +21,7 @@ export function createServer(client: SottoClient): McpServer {
     name: 'sotto',
     version: '0.1.0',
   });
+  registerLearningTools(server, client);
 
   // --- Tools ---
 

@@ -54,6 +54,11 @@ function privateResponse(response: NextResponse): NextResponse {
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   if (
+    pathname === '/.well-known/apple-app-site-association' &&
+    (request.method === 'GET' || request.method === 'HEAD')
+  )
+    return NextResponse.next();
+  if (
     pathname === '/privacy' ||
     pathname === '/terms' ||
     PUBLIC_FILES.has(pathname) ||

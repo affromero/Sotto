@@ -17,6 +17,7 @@ import { getDefaultModelForLanguage } from '@/lib/tts-language-support';
 import { getAllSttProviderMeta } from '@/lib/providers/stt-registry';
 import { getTestableProviders } from '@/lib/admin/testable-providers';
 import { ProvidersTabs } from './ProvidersTabs';
+import { MaterialRecognitionCapabilities } from '@/components/course-materials/MaterialRecognitionCapabilities';
 import styles from '@/app/(admin)/adminTheme.styles';
 
 export const metadata = { title: 'Providers & models · Sotto admin' };
@@ -174,6 +175,7 @@ export default async function AdminProvidersPage() {
           sttProviders: testable.stt,
         }}
       />
+      {session?.isOwner === true && <MaterialRecognitionCapabilities providers={aiProviders} />}
     </>
   );
 }

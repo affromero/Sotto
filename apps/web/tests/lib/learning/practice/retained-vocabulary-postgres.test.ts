@@ -1,11 +1,11 @@
 // @vitest-environment node
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Job } from 'bullmq';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { PrismaClient } from '@/generated/prisma/client';
+import { Prisma, type PrismaClient } from '@/generated/prisma/client';
 import { setSiteConfig } from '@/lib/site-config';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 import {
@@ -17,6 +17,7 @@ import { sottoJobExecutions } from '@/lib/sidedoor/jobs/core/job-execution-lifet
 import { requestPracticePreparation, readPracticePreparation } from '@/lib/practice/preparation';
 import { resumePractice } from '@/lib/practice/resume';
 import { processPracticePreparation } from '@/workers/practice/practice-preparation.worker';
+import { durableEnvelopeSchema } from '@/lib/sidedoor/jobs/core/durable-queue';
 import { createSharedTestInstance } from '../../../helpers/setup/shared-instance';
 import { practiceProviderFixture, practiceVocabularyFixture } from './provider-fixture';
 
@@ -32,6 +33,50 @@ afterEach(() => {
 });
 const suite = process.env.SIDEDOOR_TEST_DATABASE_URL ? describe : describe.skip;
 suite('Vocabulary work admitted before captured dictionary selections', () => {
+  it('validates exact analysis and placement authority on the retained practice import path', () => {
+    const base = {
+      userId: 'owned-profile',
+      createdAt: 1,
+      instanceId: randomUUID(),
+      scopes: ['instance', 'profile', 'source'].map((subjectId) => ({
+        subjectId,
+        generation: 1,
+      })),
+    };
+    const authority = {
+      ...base,
+      kind: 'material-analysis',
+      analysisId: randomUUID(),
+      sourceSetDigest: 'a'.repeat(64),
+    };
+    expect(
+      durableEnvelopeSchema.parse({
+        type: 'material-analysis',
+        payload: {},
+        authority,
+      }).authority
+    ).toEqual(authority);
+    const placement = {
+      ...base,
+      kind: 'placement-session',
+      placementSessionId: randomUUID(),
+      inputDigest: 'b'.repeat(64),
+    };
+    expect(
+      durableEnvelopeSchema.parse({
+        type: 'placement-generation',
+        payload: {},
+        authority: placement,
+      }).authority
+    ).toEqual(placement);
+    expect(() =>
+      durableEnvelopeSchema.parse({
+        type: 'material-analysis',
+        payload: {},
+        authority: { ...authority, sourceSetDigest: 'changed' },
+      })
+    ).toThrow();
+  });
   it('publishes a retained null-seed request without changing its specification or fingerprint', async () => {
     const instance = await createSharedTestInstance('retained_vocab');
     const directory = await mkdtemp(join(tmpdir(), 'retained-vocab-'));
@@ -52,10 +97,17 @@ suite('Vocabulary work admitted before captured dictionary selections', () => {
       );
       await instance.database.user.update({
         where: { id: identity.ownerId },
-        data: { preferredAiProvider: 'local', preferredAiModel: 'local:retained-fixture' },
+        data: {
+          preferredAiProvider: 'local',
+          preferredAiModel: 'local:retained-fixture',
+        },
       });
       const curriculum = await instance.database.curriculum.create({
-        data: { nativeLang: 'en', targetLang: 'de', title: 'Retained practice fixture' },
+        data: {
+          nativeLang: 'en',
+          targetLang: 'de',
+          title: 'Retained practice fixture',
+        },
       });
       const course = await instance.database.course.create({
         data: {
@@ -96,13 +148,40 @@ suite('Vocabulary work admitted before captured dictionary selections', () => {
         readPracticePreparation(database, operation.sessionId)
       );
       // The previous capture persisted this exact nullable seed shape.
-      const generation = { ...admitted.generation, seed: null };
+      const {
+        schemaVersion,
+        practiceLevel,
+        learningRequest,
+        learningSelection,
+        levelCoverage,
+        ...legacyGeneration
+      } = admitted.generation;
+      expect(schemaVersion).toBe(2);
+      expect(practiceLevel).toBe('A1');
+      expect(learningRequest).toBeNull();
+      expect(learningSelection).toBeNull();
+      expect(levelCoverage).toBeDefined();
+      const generation = { ...legacyGeneration, seed: null };
+      const {
+        generationVersion,
+        practiceLevel: operationLevel,
+        learningRequest: operationRequest,
+        ...legacyOperation
+      } = operation;
+      expect(generationVersion).toBe(2);
+      expect(operationLevel).toBe('A1');
+      expect(operationRequest).toBeNull();
       const fingerprint = createHash('sha256').update(JSON.stringify(generation)).digest('hex');
       await instance.database.practiceSession.update({
         where: { id: operation.sessionId },
         data: {
+          practiceLevel: null,
+          learningSelection: Prisma.JsonNull,
           generationSpec: generation,
-          generationState: { ...operation, inputFingerprint: fingerprint },
+          generationState: {
+            ...legacyOperation,
+            inputFingerprint: fingerprint,
+          },
         },
       });
       const record = await sottoTransaction(instance.database, (database) =>
@@ -117,7 +196,10 @@ suite('Vocabulary work admitted before captured dictionary selections', () => {
         };
         const name = payload.response_format?.json_schema?.name;
         const inputText = payload.messages.at(-1)?.content ?? '';
-        let reviewed: { items?: { index: number }[]; questions?: { index: number }[] } = {};
+        let reviewed: {
+          items?: { index: number }[];
+          questions?: { index: number }[];
+        } = {};
         try {
           reviewed = JSON.parse(inputText);
         } catch {
@@ -125,7 +207,12 @@ suite('Vocabulary work admitted before captured dictionary selections', () => {
         }
         const content =
           name === 'class_teaching_critic'
-            ? { items: reviewed.items!.map(({ index }) => ({ index, findings: [] })) }
+            ? {
+                items: reviewed.items!.map(({ index }) => ({
+                  index,
+                  findings: [],
+                })),
+              }
             : name === 'class_teaching_adjudicator'
               ? {
                   items: reviewed.items!.map(({ index }) => ({

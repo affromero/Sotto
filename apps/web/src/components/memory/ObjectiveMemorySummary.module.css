@@ -1,0 +1,73 @@
+.root {
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+}
+
+.root h2 {
+  margin: 0 0 12px;
+  font-family: var(--font-heading);
+  font-size: 24px;
+  font-weight: 400;
+}
+
+.root p {
+  margin: 12px 0;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+
+.counts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 12px;
+  margin: 20px 0;
+}
+
+.counts dt {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+
+.counts dd {
+  margin: 4px 0 0;
+  font-family: var(--font-mono);
+  font-size: 22px;
+}
+
+.objectives {
+  display: grid;
+  gap: 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.objectives a,
+.mapLink {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  padding: 8px 0;
+  color: var(--color-primary);
+  overflow-wrap: anywhere;
+}
+
+.objectives a {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 4px;
+}
+
+.detail {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+
+.root a:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 4px;
+}

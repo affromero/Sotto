@@ -32,6 +32,7 @@ export const dictionaryWordSchema = z.object({
       startOffset: z.number().int().nonnegative(),
       endOffset: z.number().int().positive(),
       quote: z.string(),
+      coordinateSystem: z.enum(['UTF16', 'MATERIAL_CODEPOINTS']).optional(),
       meaning: z.string(),
     })
   ),

@@ -1,8 +1,13 @@
 import { stat } from 'fs/promises';
+import { createHmac } from 'node:crypto';
 import { abortable } from 'thesidedoor-core/runtime/stream';
 import { ProcessExecutionError } from 'thesidedoor-core/runtime/process';
 import { AccessError } from 'thesidedoor-core/access';
 import { captureLocalUsageAccount } from '../account';
+import { deriveOwnedCredentialKey } from '@/lib/credentials/byok-crypto';
+import { getCodexSshHost } from '@/lib/agent-availability';
+import { captureCodexMaterialInvocation } from '@/lib/codex-client';
+import type { AgentEffortLevel } from '@/lib/agent-models/id';
 import { homedir } from 'os';
 import path from 'path';
 import { installCurrentProviderCredentialSnapshot } from '../../agent-credentials';
@@ -41,6 +46,8 @@ interface CodexCredentials {
   home: string;
   expiresAt: number | null;
   key: string;
+  authMode: string | null;
+  apiKeyConfigured: boolean;
 }
 
 const CODEX_TIMEOUT_MS = 5_000;
@@ -186,6 +193,12 @@ function parseCodexCredentials(
     home,
     expiresAt: expiresAt === null ? null : expiresAt * 1000,
     key: `${Math.round(authMtimeMs)}:${accountId}:${hashToken(accessToken)}:${lastRefresh}`,
+    authMode: getString(isRecord(value) ? value.auth_mode : undefined),
+    apiKeyConfigured:
+      isRecord(value) &&
+      value.OPENAI_API_KEY !== undefined &&
+      value.OPENAI_API_KEY !== null &&
+      value.OPENAI_API_KEY !== '',
   };
 }
 
@@ -202,6 +215,57 @@ async function getCodexCredentials(signal?: AbortSignal): Promise<CodexCredentia
   signal?.throwIfAborted();
   if (!authJson || !authStat) return null;
   return parseCodexCredentials(authJson, authStat.mtimeMs, codexHome);
+}
+
+/** Durable account identity intentionally excludes rotating OAuth credentials and cache keys. */
+export async function captureCodexMaterialBinding(
+  context: UsageProviderContext,
+  options: { model: string; effort?: AgentEffortLevel }
+) {
+  const capturedContext = { ...context };
+  const capturedOptions = Object.freeze({ ...options });
+  if (getCodexSshHost())
+    throw new Error('Material recognition cannot bind a remote Codex account.');
+  const captured = await captureLocalUsageAccount(capturedContext, 'codex', getCodexCredentials);
+  const credentials = captured.credentials;
+  if (
+    getCodexSshHost() ||
+    process.env.CODEX_API_KEY ||
+    !credentials ||
+    credentials.authMode !== 'chatgpt' ||
+    credentials.apiKeyConfigured ||
+    credentials.accountId.trim().toLowerCase() === 'unknown'
+  )
+    throw new Error('Material recognition requires an identifiable local Codex OAuth account.');
+  const selection = captureCodexMaterialInvocation(capturedOptions);
+  const key = deriveOwnedCredentialKey();
+  let fingerprint: string;
+  try {
+    fingerprint = createHmac('sha256', key)
+      .update(
+        JSON.stringify({
+          schemaVersion: 1,
+          purpose: 'material-recognition-local-codex',
+          provider: 'codex',
+          authority: captured.admission.identity,
+          accountId: credentials.accountId,
+          home: credentials.home,
+          selection,
+        })
+      )
+      .digest('hex');
+  } finally {
+    key.fill(0);
+  }
+  return Object.freeze({
+    fingerprint,
+    selection,
+    validate: async () => {
+      const current = await captureCodexMaterialBinding(capturedContext, capturedOptions);
+      if (current.fingerprint !== fingerprint)
+        throw new Error('The selected Codex account, model or material authority changed.');
+    },
+  });
 }
 
 export function parseCodexUsagePayload(

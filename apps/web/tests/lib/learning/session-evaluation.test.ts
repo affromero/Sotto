@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it } from 'vitest';
 import { createSkillRequirements } from '@sotto/shared';
 import {
@@ -40,6 +41,37 @@ const sections: LearningSectionWork[] = [
 ];
 
 describe('complete learning evidence', () => {
+  it('requires reference audio for read-aloud tasks while independent speaking supplies no answer audio', () => {
+    const speakingRequirements = createSkillRequirements({
+      scope: 'SPEAKING',
+      nativeLang: 'en',
+      targetLang: 'de',
+      level: 'A2',
+      ttsProvider: 'local',
+      sttProvider: 'local',
+    });
+    const speaking: LearningSectionWork = {
+      skill: 'SPEAKING',
+      itemIds: ['a', 'b', 'c', 'd'],
+      gradedItemIds: ['a', 'b', 'c', 'd'],
+      score: 0.8,
+      passThreshold: 0.7,
+      speakingTaskModes: ['COMMUNICATIVE', 'COMMUNICATIVE', 'COMMUNICATIVE', 'COMMUNICATIVE'],
+      referenceAudioUrls: [null, null, null, null],
+    };
+    expect(evaluateLearningWork(speakingRequirements, [speaking]).mastered).toBe(true);
+    expect(() =>
+      assertLearningMaterial(speakingRequirements, [
+        {
+          ...speaking,
+          speakingTaskModes: ['READ_ALOUD', 'COMMUNICATIVE', 'COMMUNICATIVE', 'COMMUNICATIVE'],
+        },
+      ])
+    ).toThrow('reference audio');
+    expect(() =>
+      assertLearningMaterial(speakingRequirements, [{ ...speaking, speakingTaskModes: undefined }])
+    ).toThrow('reference audio');
+  });
   it('permits complete text learning only with captured provider exemptions', () => {
     const result = evaluateLearningWork(requirements, sections);
     expect(result.complete).toBe(true);

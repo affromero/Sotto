@@ -216,9 +216,13 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   if (
     !terminalOperationSuperseded &&
     operation?.status === 'COMPLETED' &&
-    operation.result === 'done'
+    (operation.result === 'done' || operation.result === 'requirements')
   ) {
-    return NextResponse.json({ ...preparationProgress(operation), result: 'done', progress: 1 });
+    return NextResponse.json({
+      ...preparationProgress(operation),
+      result: operation.result,
+      progress: 1,
+    });
   }
   if (!terminalOperationSuperseded && operation && operation.status !== 'COMPLETED') {
     const preparation = preparationProgress(operation);

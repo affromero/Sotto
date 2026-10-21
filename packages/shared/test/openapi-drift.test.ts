@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
@@ -7,29 +8,8 @@ import {
   OPENAPI_TUI_VENDOR_PATH,
 } from '../scripts/generate-openapi';
 import { endpoints } from '../src/contracts';
-import { startPracticeResponseSchema, submitClassRequestSchema } from '../src/contracts/schemas';
 
 describe('openapi.json drift guard', () => {
-  it('allows class completion when writing or speaking provides the graded evidence', () => {
-    expect(submitClassRequestSchema.safeParse({ answers: [] }).success).toBe(true);
-    expect(submitClassRequestSchema.safeParse({}).success).toBe(false);
-  });
-  it('preserves a practice reading passage and accepts historical items without one', () => {
-    const base = {
-      status: 'ready',
-      sessionId: 'session',
-      kind: 'READING',
-      items: [{ id: 'r0', prompt: 'Where is Mia?', options: ['Berlin', 'Bonn'] }],
-    };
-    expect(startPracticeResponseSchema.safeParse(base).success).toBe(true);
-    const withPassage = {
-      ...base,
-      items: [{ ...base.items[0], passageText: 'Mia ist in Berlin.' }],
-    };
-    expect(startPracticeResponseSchema.parse(withPassage)).toMatchObject({
-      items: [{ passageText: 'Mia ist in Berlin.' }],
-    });
-  });
   it('matches the committed spec (run npm run gen:openapi)', () => {
     const committed = JSON.parse(readFileSync(OPENAPI_OUTPUT_PATH, 'utf8'));
     const regenerated = buildOpenApiDocument();
@@ -79,7 +59,7 @@ describe('openapi.json drift guard', () => {
               (
                 (op.responses as Record<string, Record<string, unknown>>)[s].content as Record<
                   string,
-                  Record<string, { schema: { $ref?: string } }>
+                  { schema: { $ref?: string } }
                 >
               )['application/json'].schema.$ref
           )
@@ -133,10 +113,26 @@ describe('openapi.json drift guard', () => {
         'GET /api/v1/play/phrases',
         'POST /api/v1/play/phrases',
         'GET /api/v1/courses',
+        'GET /api/v1/courses/{courseId}/notes',
+        'GET /api/v1/materials/{materialId}/legacy-text',
         'DELETE /api/v1/courses/{courseId}',
         'POST /api/v1/placement/manual',
+        'POST /api/v1/material-analyses/{analysisId}/retry',
+        'POST /api/v1/material-analyses/{analysisId}/cancellation',
+        'GET /api/v1/material-analyses/{analysisId}',
+        'GET /api/v1/material-analyses/{analysisId}/focuses/{focusId}',
         'GET /api/v1/courses/{courseId}/learning-targets',
         'GET /api/v1/courses/{courseId}/practice',
+        'GET /api/v1/courses/{courseId}/learning-map',
+        'GET /api/v1/learning-map/upgrade',
+        'GET /api/v1/courses/{courseId}/learning-map/upgrade',
+        'POST /api/v1/courses/{courseId}/learning-map/upgrade',
+        'GET /api/v1/courses/{courseId}/learning-map/levels/{level}',
+        'GET /api/v1/courses/{courseId}/learning-map/objectives/{objectiveId}',
+        'GET /api/v1/courses/{courseId}/learning-map/objectives/{objectiveId}/history',
+        'GET /api/v1/courses/{courseId}/material-analyses',
+        'POST /api/v1/courses/{courseId}/learning-map/advance',
+        'POST /api/v1/courses/{courseId}/learning-map/selection',
         'GET /api/v1/courses/{courseId}/vocabulary',
         'PATCH /api/v1/courses/{courseId}/vocabulary/{wordId}',
         'POST /api/v1/courses/{courseId}/vocabulary/study',
@@ -167,6 +163,7 @@ describe('openapi.json drift guard', () => {
         'POST /api/v1/placement',
         'POST /api/v1/placement/from-notes',
         'POST /api/v1/placement/from-notes/confirm',
+        'POST /api/v1/placement/generate',
         'GET /api/v1/courses/{courseId}/graph',
         'GET /api/v1/onboarding/config',
         'GET /api/v1/users/me',
@@ -379,8 +376,8 @@ describe('progenitor-ready OpenAPI 3.0.3 invariants', () => {
     expect(codes('/api/v1/exams', 'post')).toEqual(['201']);
     expect(codes('/api/v1/exams/{examId}', 'get')).toEqual(['200']);
     expect(codes('/api/v1/exams/{examId}/submit', 'post')).toEqual(['200']);
-    // Placement / graph / config are all single-200.
-    expect(codes('/api/v1/placement', 'get')).toEqual(['200']);
+    // Placement admission can be pending while polling retains its exact session.
+    expect(codes('/api/v1/placement', 'get')).toEqual(['200', '202']);
     expect(codes('/api/v1/placement', 'post')).toEqual(['200']);
     expect(codes('/api/v1/courses/{courseId}/graph', 'get')).toEqual(['200']);
     expect(codes('/api/v1/onboarding/config', 'get')).toEqual(['200']);
@@ -391,7 +388,7 @@ describe('progenitor-ready OpenAPI 3.0.3 invariants', () => {
     expect(codes('/api/v1/auth/pair/redeem', 'post')).toEqual(['200']);
   });
 
-  it('declares the placement native/target query parameters', () => {
+  it('declares exact placement admission, source and polling identities', () => {
     const doc = buildOpenApiDocument();
     const op = (doc.paths as Record<string, Record<string, { parameters?: unknown[] }>>)[
       '/api/v1/placement'
@@ -399,17 +396,29 @@ describe('progenitor-ready OpenAPI 3.0.3 invariants', () => {
     expect(op.parameters).toContainEqual({
       name: 'native',
       in: 'query',
-      required: true,
+      required: false,
       schema: { type: 'string' },
     });
     expect(op.parameters).toContainEqual({
       name: 'target',
       in: 'query',
-      required: true,
+      required: false,
       schema: { type: 'string' },
     });
     expect(op.parameters).toContainEqual({
-      name: 'focusLevel',
+      name: 'requestId',
+      in: 'query',
+      required: false,
+      schema: { type: 'string' },
+    });
+    expect(op.parameters).toContainEqual({
+      name: 'placementSessionId',
+      in: 'query',
+      required: false,
+      schema: { type: 'string' },
+    });
+    expect(op.parameters).toContainEqual({
+      name: 'resultDigest',
       in: 'query',
       required: false,
       schema: { type: 'string' },

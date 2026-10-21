@@ -5,6 +5,13 @@ import XCTest
 /// Practice sessions carry speaking prompts and a listening episode; both were
 /// decoded and then ignored by the iPad practice sheet.
 final class PracticeSessionContentTests: XCTestCase {
+    func testLowerPracticeDifficultyAndFrozenFocusTitlesSurviveResume() throws {
+        let session = try start(#"{"status":"ready_mc","sessionId":"saved","practiceLevel":"A1","items":[],"learningSelection":{"catalogVersion":1,"targetLang":"de","level":"A1","nodeIds":["de.a1.order"],"objectives":[{"id":"de.a1.order","title":"Finite verb in second position","level":"A1"}],"materialFocusId":null}}"#)
+        XCTAssertEqual(session.practiceLevel, .a1)
+        XCTAssertEqual(session.learningSelection?.objectives.first?.title, "Finite verb in second position")
+        XCTAssertEqual(session.learningSelection?.nodeIds, ["de.a1.order"])
+    }
+
     func testVocabularyStudyContinuesAtItsSavedWebSession() throws {
         let session = try start(#"{"status":"ready_vocabulary","sessionId":"saved-study","courseId":"german-course","kind":"VOCAB","mode":"MEANING_RECALL","cards":[]}"#)
         XCTAssertTrue(session.requiresWebVocabulary)

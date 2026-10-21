@@ -44,6 +44,13 @@ describe('formatPedagogyForPrompt', () => {
 });
 
 describe('buildLearnerContext', () => {
+  it('represents source NUL visibly at the prompt boundary without changing the source string', () => {
+    const source = 'Original source: BOM \ufeff and NUL \u0000 with supplementary 😀';
+    const context = buildLearnerContext(source, 'BALANCED');
+    expect(context).toBe('Original source: BOM \ufeff and NUL \\u0000 with supplementary 😀');
+    expect(source).toContain('\u0000');
+    expect(context).not.toContain('\u0000');
+  });
   it('is empty for BALANCED with no note (generation unchanged)', () => {
     expect(buildLearnerContext('', 'BALANCED')).toBe('');
   });

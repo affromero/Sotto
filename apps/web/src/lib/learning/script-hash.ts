@@ -12,12 +12,12 @@ const turnsSchema = z
   .min(1);
 
 /** Tuple encoding remains stable when PostgreSQL reorders JSON object keys. */
+export function learningScriptTranscript(turns: unknown): string {
+  return JSON.stringify(
+    turnsSchema.parse(turns).map((turn) => [turn.speaker, turn.text, turn.direction ?? null])
+  );
+}
+
 export function learningScriptHash(turns: unknown): string {
-  return createHash('sha256')
-    .update(
-      JSON.stringify(
-        turnsSchema.parse(turns).map((turn) => [turn.speaker, turn.text, turn.direction ?? null])
-      )
-    )
-    .digest('hex');
+  return createHash('sha256').update(learningScriptTranscript(turns)).digest('hex');
 }
