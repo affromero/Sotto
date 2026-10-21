@@ -293,6 +293,38 @@ A failed candidate leaves the old slot serving. Failures during replacement rest
 
 Matching schema-review hashes cannot bypass this restriction. Additive enum changes can still make newly written rows unreadable by older Prisma clients. Before a separate schema-changing rollout, fence HTTP admissions, preserve and pause the affected queues, verify that active jobs and provider executions have settled, and only then stop the old services. Worker shutdown cancels active jobs; it does not safely drain them. The migration procedure must define the point after which recovery keeps admissions fenced and proceeds with compatible code instead of restarting the previous release.
 
+### Isolated App Review image
+
+The official review server needs a web image built for `https://demo.sotto.fm`.
+After the exact `main` revision passes source validation, dispatch
+`deploy.yml` with the boolean `review_only` input enabled. This uses a separate
+concurrency group and skips all production image jobs. Normal production
+triggers retain their existing behavior.
+
+The review job uses the existing web Dockerfile, fixes the build origin and UID
+1000, runs the canonical web smoke checks, and publishes an immutable
+`ghcr.io/affromero/sotto-review-web` image. Its separate
+`review-release-SHA-ATTEMPT` artifact contains `review-release.json`, including
+canonical image measurements, configuration digest, origin and Actions run
+identities. The three production image roles and receipts remain unchanged.
+
+Before admitting the image, independently verify the successful source and
+builder runs at the exact SHA and download the artifact from that builder run.
+Validate the receipt against those independently observed identities:
+
+```bash
+python3 -m scripts.deploy.review.artifact validate \
+  --release-sha "$RELEASE_SHA" --reference "$REVIEW_IMAGE_REF" \
+  --run-id "$BUILDER_RUN_ID" --run-attempt "$BUILDER_RUN_ATTEMPT" \
+  --source-run-id "$SOURCE_RUN_ID" --receipt review-release.json
+```
+
+The origin field records the trusted workflow's build input and inspected image
+label. It does not inspect a runtime environment variable. This artifact supplies
+image evidence; upgrading the established review database still requires a
+reviewed migration and recovery procedure. Do not run a first-install bootstrap
+against its existing data.
+
 ### Fenced schema transitions
 
 For an established stack, `bash scripts/deploy/schema/deploy.sh REVIEW EVIDENCE`
