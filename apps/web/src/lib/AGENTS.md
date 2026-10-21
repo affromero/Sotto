@@ -248,6 +248,12 @@ for oversized identity lists. Stored vocabulary and sealed failure formats stay 
 writing drafts. Conflicts preserve local work until the learner reconciles it.
 `learning/database.ts` defines the transaction boundary shared by these helpers.
 
+Source vocabulary extraction shares one replacement between protocol correction
+and rejected lexical metadata. Retained source words use this same reviewed path;
+repair preserves quotation identity, count and order while correcting headwords
+and parts of speech. Batch feedback indices address the complete candidate.
+Source inventory remains outside this repair path. Learner memory stays unchanged.
+
 `learning/classes/current-sections.ts` selects the latest section before filtering
 its state. `class-material.ts` validates counts, reading provenance, exact scripts,
 and owned reference audio. `class-generation-state.ts` and `class-repair.ts` retain

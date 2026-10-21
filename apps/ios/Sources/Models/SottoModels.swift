@@ -65,9 +65,9 @@ struct SottoCourse: Decodable, Identifiable, Equatable {
     let startLevel: String
     let placementSource: String
     let pedagogy: SottoPedagogyStyle
-    let activeClassId: String?
+    var activeClassId: String?
     let curriculum: SottoCurriculum?
-    let classes: [SottoCourseClassSummary]
+    var classes: [SottoCourseClassSummary]
 
     private enum CodingKeys: String, CodingKey {
         case id
@@ -325,6 +325,7 @@ struct SottoClassDetail: Decodable, Identifiable, Equatable {
     var progressRevision: Int? = nil
     var attempt: Int? = nil
     var skillRequirements: SottoSkillRequirements? = nil
+    var teaching: SottoClassTeaching? = nil
 }
 
 struct SottoLesson: Decodable, Equatable {

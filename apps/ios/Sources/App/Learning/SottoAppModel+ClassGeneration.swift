@@ -56,6 +56,13 @@ extension SottoAppModel {
         guard let client = makeClient(), let selectedClass,
               let course = courses.first(where: { $0.id == selectedClass.courseId }) else { return }
         guard classGenerationObservations[course.id] == nil else {
+            if classGenerationRetryTitle(for: course.id) != nil,
+               let observation = classGenerationObservations[course.id],
+               observation.request.classId == selectedClass.id ||
+               (observation.request.classId == nil && course.activeClassId == selectedClass.id) {
+                retryClassGeneration(for: course)
+                return
+            }
             closeClass()
             checkClassGenerationStatus(for: course)
             return
@@ -159,6 +166,7 @@ extension SottoAppModel {
                 }
                 let observation = beginClassObservation(course: course, request: request, admitting: true)
                 if await admitClassGeneration(client: client, course: course, observation: observation) {
+                    if selectedClass?.id == request.classId { closeClass() }
                     await monitorClassGeneration(client: client, course: course, observationId: observation.id)
                 } else if isCurrentLearningClient(client),
                           classGenerationObservations[course.id] == nil || classGenerationObservations[course.id]?.id == observation.id {

@@ -36,7 +36,7 @@ final class LayoutAppearanceTests: XCTestCase {
 
     func testClassTeachingFitsPhoneTabletAndNarrowReadingColumns() async throws {
         let detail = try LayoutFixtures.classDetail()
-        let intro = try XCTUnwrap(detail.intro)
+        let teaching = try XCTUnwrap(detail.teaching)
         let scope = XCTAttachment(string:
             "Actual hosted SwiftUI views use synthetic viewport widths and fixtures. " +
             "Landscape-width and split-width cases do not rotate the simulator or invoke system Split View."
@@ -51,7 +51,7 @@ final class LayoutAppearanceTests: XCTestCase {
                         classDetail: detail, answeredCount: 0, questionCount: 1,
                         completionProgress: 0, completionPercent: 0
                     )
-                    ClassIntroBlock(intro: intro, onSelectionHelp: { _, _ in })
+                    ClassTeachingView(teaching: teaching, onSelectionHelp: { _, _ in })
                 }
                 .padding(viewport.layout == .compact ? 16 : 28)
                 .background(SottoTheme.paper)
@@ -65,7 +65,7 @@ final class LayoutAppearanceTests: XCTestCase {
                 await settle()
                 attach(host.content.view, name: "teaching-\(viewport.name)-\(style.rawValue)")
                 let purpose = try XCTUnwrap(descendants(of: host.content.view)
-                    .compactMap { $0 as? UITextView }.first { $0.text == intro.purpose })
+                    .compactMap { $0 as? UITextView }.first { $0.text == teaching.explanation })
                 let scroll = try XCTUnwrap(scrollAncestor(of: purpose))
                 let start = purpose.convert(purpose.bounds, to: scroll).minY
                 scroll.setContentOffset(CGPoint(x: 0, y: start), animated: false)
@@ -183,7 +183,7 @@ final class LayoutAppearanceTests: XCTestCase {
                 model.pencilWorkbook = workbook
                 let content = ClassSessionView(
                     classDetail: detail, progress: LearningProgressStore(),
-                    drafts: WritingDraftStore()
+                    drafts: WritingDraftStore(), initialSectionId: "layout-writing"
                 ).environmentObject(model)
                 let host = try mount(content, viewport: viewport, style: style)
                 defer { host.close() }
@@ -205,6 +205,50 @@ final class LayoutAppearanceTests: XCTestCase {
                 attach(host.content.view,
                        name: "class-footer-\(viewport.name)-workbook\(workbook)-\(style.rawValue)")
             }
+        }
+    }
+
+    func testClassOpensWithAcceptedTeachingAndKeepsTheGuidedAnswerHidden() async throws {
+        let detail = try LayoutFixtures.classDetail()
+        let teaching = try XCTUnwrap(detail.teaching)
+        for viewport in viewports {
+            for style in [UIUserInterfaceStyle.light, .dark] {
+                let content = ClassSessionView(classDetail: detail, progress: LearningProgressStore(),
+                    drafts: WritingDraftStore()).environmentObject(LayoutFixtures.model())
+                let host = try mount(content, viewport: viewport, style: style)
+                defer { host.close() }
+                await settle()
+                let text = descendants(of: host.content.view).compactMap { ($0 as? UITextView)?.text }
+                XCTAssertTrue(text.contains(teaching.explanation))
+                XCTAssertFalse(text.contains(teaching.guidedPractice.answer))
+                XCTAssertFalse(text.contains(detail.sections[0].questions[0].question))
+                let explanation = try XCTUnwrap(descendants(of: host.content.view)
+                    .compactMap { $0 as? UITextView }.first { $0.text == teaching.explanation })
+                let scroll = try XCTUnwrap(scrollAncestor(of: explanation))
+                XCTAssertLessThanOrEqual(scroll.contentSize.width, scroll.bounds.width + 1)
+                attach(host.content.view,
+                    name: "class-lesson-before-practice-\(viewport.name)-\(style.rawValue)")
+            }
+        }
+    }
+
+    func testClassPracticeShowsOneQuestionAndOnlyExplainsAnAnsweredChoice() async throws {
+        let detail = try LayoutFixtures.classDetail()
+        let section = try XCTUnwrap(detail.sections.first)
+        let question = try XCTUnwrap(section.questions.first)
+        for answered in [false, true] {
+            let content = ClassSectionView(classId: detail.id, section: section,
+                answers: .constant(answered ? [question.id: 0] : [:]), drafts: WritingDraftStore(),
+                pencilWorkbook: false, classAttempt: 1, pencilToolPicker: WorkbookTools.makeWorkbookToolPicker(),
+                onPencilReviewRequired: { _, _ in }, onSelectionHelp: { _, _ in })
+            let host = try mount(ScrollView { content }, viewport: viewports[0], style: .light)
+            defer { host.close() }
+            await settle()
+            let text = descendants(of: host.content.view).compactMap { ($0 as? UITextView)?.text }
+            XCTAssertTrue(text.contains(question.question))
+            XCTAssertFalse(text.contains(section.questions[1].question))
+            XCTAssertEqual(text.contains(try XCTUnwrap(question.explanation)), answered)
+            attach(host.content.view, name: "class-question-answered-\(answered)")
         }
     }
 

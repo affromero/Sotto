@@ -3,11 +3,7 @@ import { getDueItems } from '../knowledge-graph';
 import { normalizeLearningTargetText } from '../learning-targets';
 import { formatNotesForPrompt, getEditableCourseNote } from '../course-notes';
 import { readCourseMaterialContext } from './context';
-import {
-  extractSourceVocabulary,
-  reviewSourceVocabulary,
-  type SourceVocabularyWord,
-} from '../learning/reading-vocabulary';
+import { extractSourceVocabulary, type SourceVocabularyWord } from '../learning/reading-vocabulary';
 import { buildReadingVocabularyWordTable } from '../learning/reading/vocabulary-protocol';
 import { sottoTransaction } from '../sidedoor/access/state/transaction';
 import {
@@ -156,18 +152,21 @@ export async function getCourseVocabularyTargets(p: {
     })
     .slice(0, 12);
   const request = { ...p, text: captured.text };
-  if (retained.length) await reviewSourceVocabulary(request, retained);
-  const authored =
+  const needsNewWords =
     retained.length < 8 ||
-    retained.filter((word) => unseen.some((saved) => saved.lemma === word.lemma)).length < 4
-      ? await extractSourceVocabulary({
-          ...request,
-          sourceFragments,
-          preferredLemmas: observed.map((word) => word.lemma),
-        })
-      : [];
+    retained.filter((word) => unseen.some((saved) => saved.lemma === word.lemma)).length < 4;
+  const reviewed = retained.length
+    ? await extractSourceVocabulary({ ...request, sourceFragments, retainedWords: retained })
+    : [];
+  const authored = needsNewWords
+    ? await extractSourceVocabulary({
+        ...request,
+        sourceFragments,
+        preferredLemmas: observed.map((word) => word.lemma),
+      })
+    : [];
   const candidates = new Map<string, SourceVocabularyWord>();
-  for (const word of [...retained, ...authored])
+  for (const word of [...reviewed, ...authored])
     if (!candidates.has(word.lemma)) candidates.set(word.lemma, word);
   await sottoTransaction(
     prismaUnfiltered,

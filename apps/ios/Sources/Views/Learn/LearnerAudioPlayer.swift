@@ -6,8 +6,15 @@ struct LearnerAudioPlayer: View {
     let reference: String
     var turns: [SottoListeningTurn] = []
     @StateObject private var playback = LearnerAudioPlayback()
+    @State private var selectedTurnIndex = 0
 
     private var orderedTurns: [SottoListeningTurn] { turns.sorted { $0.order < $1.order } }
+    private var activeTurnIndex: Int {
+        orderedTurns.firstIndex { turn in
+            guard let playingReference = playback.reference else { return false }
+            return playingReference == reference ? turn.contains(time: playback.currentTime) : playingReference == turn.audioUrl
+        } ?? min(selectedTurnIndex, max(0, orderedTurns.count - 1))
+    }
 
     private func isActive(_ turn: SottoListeningTurn) -> Bool {
         guard playback.isPlaying else { return false }
@@ -27,9 +34,30 @@ struct LearnerAudioPlayer: View {
             }
             .buttonStyle(SottoSecondaryButtonStyle())
             .disabled(playback.isLoading && playback.reference == reference)
+            if playback.duration > 0 {
+                Slider(value: Binding(get: { playback.currentTime }, set: { playback.seek(to: $0) }),
+                    in: 0...max(playback.duration, playback.currentTime))
+                    .accessibilityLabel("Audio position")
+                HStack {
+                    Text(clockTime(playback.currentTime))
+                    Spacer()
+                    Text(clockTime(playback.duration))
+                }.font(.caption.monospacedDigit()).foregroundStyle(SottoTheme.muted)
+                HStack {
+                    Button("Back 10s") { playback.seek(to: playback.currentTime - 10) }
+                    Button("Forward 10s") { playback.seek(to: playback.currentTime + 10) }
+                }.buttonStyle(.bordered).controlSize(.large)
+            }
             if !orderedTurns.isEmpty {
-                Text("Speaker turns").font(.caption.bold()).foregroundStyle(SottoTheme.muted)
-                ForEach(orderedTurns) { turn in
+                let turn = orderedTurns[activeTurnIndex]
+                Text("Turn \(activeTurnIndex + 1) of \(orderedTurns.count) · \(turn.speaker.capitalized)")
+                    .font(.callout.bold()).foregroundStyle(SottoTheme.ink)
+                ViewThatFits(in: .horizontal) {
+                    HStack { turnActions }
+                    VStack(alignment: .leading, spacing: 12) { turnActions }
+                }.buttonStyle(.bordered).controlSize(.large)
+                DisclosureGroup("All speaker turns") {
+                    ForEach(orderedTurns) { turn in
                     if let clip = turn.audioUrl, !clip.isEmpty {
                         Button {
                             playback.toggle(reference: clip) { try await model.downloadLearningAudio(from: clip) }
@@ -51,6 +79,7 @@ struct LearnerAudioPlayer: View {
                         .disabled(playback.isLoading && playback.reference == clip)
                         .accessibilityLabel("\(playback.isPlaying && playback.reference == clip ? "Pause" : "Play") turn \(turn.order + 1), \(turn.speaker)")
                     }
+                    }
                 }
             }
             if let error = playback.errorMessage {
@@ -61,6 +90,28 @@ struct LearnerAudioPlayer: View {
         .onChange(of: reference) { _, _ in playback.stop() }
         .onChange(of: model.credentials) { _, _ in playback.stop() }
     }
+
+    @ViewBuilder
+    private var turnActions: some View {
+        Button("Previous turn") { playTurn(at: activeTurnIndex - 1) }
+            .disabled(activeTurnIndex == 0 || playback.isLoading)
+        Button(playback.isPlaying && playback.reference == orderedTurns[activeTurnIndex].audioUrl
+            ? "Pause turn" : "Play turn") { playTurn(at: activeTurnIndex) }
+            .disabled(orderedTurns[activeTurnIndex].audioUrl == nil || playback.isLoading)
+        Button("Next turn") { playTurn(at: activeTurnIndex + 1) }
+            .disabled(activeTurnIndex + 1 >= orderedTurns.count || playback.isLoading)
+    }
+
+    private func playTurn(at index: Int) {
+        guard orderedTurns.indices.contains(index), let clip = orderedTurns[index].audioUrl else { return }
+        selectedTurnIndex = index
+        playback.toggle(reference: clip) { try await model.downloadLearningAudio(from: clip) }
+    }
+
+    private func clockTime(_ time: Double) -> String {
+        let seconds = time.isFinite ? max(0, Int(time)) : 0
+        return String(format: "%d:%02d", seconds / 60, seconds % 60)
+    }
 }
 
 @MainActor
@@ -70,6 +121,7 @@ final class LearnerAudioPlayback: ObservableObject {
     @Published private(set) var errorMessage: String?
     @Published private(set) var reference: String?
     @Published private(set) var currentTime: Double = 0
+    @Published private(set) var duration: Double = 0
     private var player: AVPlayer?
     private var file: URL?
     private var load: Task<Void, Never>?
@@ -111,6 +163,9 @@ final class LearnerAudioPlayback: ObservableObject {
                     Task { @MainActor [weak self] in
                         guard let self, self.requestID == request, time.seconds.isFinite else { return }
                         self.currentTime = time.seconds
+                        if let duration = self.player?.currentItem?.duration.seconds, duration.isFinite {
+                            self.duration = max(0, duration)
+                        }
                     }
                 }
                 statusObservation = item.observe(\.status, options: [.initial, .new]) { [weak self] item, _ in
@@ -143,6 +198,13 @@ final class LearnerAudioPlayback: ObservableObject {
         return load
     }
 
+    func seek(to seconds: Double) {
+        guard seconds.isFinite, duration > 0 else { return }
+        let target = max(0, min(duration, seconds))
+        player?.seek(to: CMTime(seconds: target, preferredTimescale: 600))
+        currentTime = target
+    }
+
     func stop() {
         requestID = nil
         load?.cancel()
@@ -162,5 +224,6 @@ final class LearnerAudioPlayback: ObservableObject {
         errorMessage = nil
         reference = nil
         currentTime = 0
+        duration = 0
     }
 }

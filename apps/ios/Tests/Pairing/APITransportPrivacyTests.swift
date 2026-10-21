@@ -172,6 +172,42 @@ final class APITransportPrivacyTests: XCTestCase {
     }
 
     @MainActor
+    func testRemovingASessionDiscardsQueuedProgressWithoutASaveAfterDismissal() async throws {
+        let server = try LocalHTTPServer { _ in .json(#"{"saved":true,"progressRevision":2}"#) }
+        try await server.start()
+        defer { server.stop() }
+        let client = SottoAPIClient(serverURL: server.url, apiKey: "practice-secret", profileId: "learner", session: URLSession(configuration: .ephemeral))
+        let progress = LearningProgressStore()
+        progress.configure(client: client, path: "/api/v1/classes/removed", revision: 1)
+        await progress.suspend()
+        progress.update(answers: ["g0": 2], writingDrafts: ["w0": "Kept until deletion succeeds"])
+        progress.discard()
+        await progress.flush()
+        progress.update(answers: ["g0": 1], writingDrafts: [:])
+        await progress.flush()
+        XCTAssertTrue(server.requests.isEmpty)
+        XCTAssertNil(progress.errorMessage)
+    }
+
+    @MainActor
+    func testFailedRemovalCanResumeTheSamePendingAnswersAndDrafts() async throws {
+        let server = try LocalHTTPServer { _ in .json(#"{"saved":true,"progressRevision":2}"#) }
+        try await server.start()
+        defer { server.stop() }
+        let client = SottoAPIClient(serverURL: server.url, apiKey: "practice-secret", profileId: "learner", session: URLSession(configuration: .ephemeral))
+        let progress = LearningProgressStore()
+        progress.configure(client: client, path: "/api/v1/classes/kept", revision: 1)
+        await progress.suspend()
+        progress.update(answers: ["g0": 2], writingDrafts: ["w0": "Preserved draft"])
+        progress.resume()
+        await progress.flush()
+        let request = try XCTUnwrap(server.requests.first)
+        XCTAssertTrue(request.contains("Preserved draft"))
+        XCTAssertEqual(progress.answers, ["g0": 2])
+        XCTAssertNil(progress.errorMessage)
+    }
+
+    @MainActor
     func testConflictRecoveryPreservesLocalEditsUntilTheLearnerConfirms() async throws {
         let fixture = ProgressConflictFixture()
         let server = try LocalHTTPServer { request in fixture.respond(request) }

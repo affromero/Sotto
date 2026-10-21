@@ -485,8 +485,10 @@ final class SottoAppModel: ObservableObject {
         )
     }
 
-    func deleteSelectedClass() async {
-        guard let client = makeClient(), let selectedClass else { return }
+    @discardableResult
+    func deleteSelectedClass(classId: String, progress: LearningProgressStore? = nil) async -> Bool {
+        guard !Task.isCancelled, let client = makeClient(), let selectedClass,
+              selectedClass.id == classId else { return false }
         isLoading = true
         loadingOperation = SottoLoadingOperation(
             title: "Removing class",
@@ -498,19 +500,48 @@ final class SottoAppModel: ObservableObject {
             remainingSeconds: nil
         )
         errorMessage = nil
-
-        do {
-            try await client.deleteClass(classId: selectedClass.id)
-            self.selectedClass = nil
-            classResult = nil
-            workbook = nil
-            courses = try await client.listCourses()
-        } catch {
-            report(error)
+        defer {
+            if isCurrentLearningClient(client) {
+                loadingOperation = nil
+                isLoading = false
+            }
         }
 
-        loadingOperation = nil
-        isLoading = false
+        await progress?.suspend()
+        guard !Task.isCancelled, isCurrentLearningClient(client),
+              self.selectedClass?.id == classId else {
+            progress?.resume()
+            return false
+        }
+        do {
+            try await client.deleteClass(classId: classId)
+            progress?.discard()
+            guard isCurrentLearningClient(client) else { return true }
+            if let observation = classGenerationObservations[selectedClass.courseId],
+               observation.request.classId == selectedClass.id ||
+               (observation.request.classId == nil && courses.first(where: {
+                   $0.id == selectedClass.courseId
+               })?.activeClassId == selectedClass.id) {
+                classGenerationTasks.removeValue(forKey: selectedClass.courseId)?.cancel()
+                classGenerationObservations[selectedClass.courseId] = nil
+                classGenerationOperations[selectedClass.courseId] = nil
+                classGenerationErrors[selectedClass.courseId] = nil
+            }
+            if self.selectedClass?.id == selectedClass.id { closeClass() }
+            let remaining = courses.map { course in
+                var remaining = course
+                remaining.classes.removeAll { $0.id == selectedClass.id }
+                if remaining.activeClassId == selectedClass.id { remaining.activeClassId = nil }
+                return remaining
+            }
+            applyCourseRefresh(remaining)
+            await loadCourses(showLoading: false)
+            return true
+        } catch {
+            progress?.resume()
+            if isCurrentLearningClient(client) { report(error) }
+            return false
+        }
     }
 
     func startFullCatchUp(for course: SottoCourse) async {

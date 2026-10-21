@@ -1,4 +1,5 @@
 import AVFoundation
+import Combine
 import XCTest
 
 @testable import Sotto
@@ -65,6 +66,31 @@ final class AudioDownloadTestProtocol: URLProtocol {
 
 @MainActor
 final class AudioPlaybackTests: XCTestCase {
+    func testSeekingUsesTheDecodedAudioDurationAndClampsToItsBoundaries() async throws {
+        let file = try audioFile()
+        defer { try? FileManager.default.removeItem(at: file) }
+        let playback = LearnerAudioPlayback()
+        defer { playback.stop() }
+        let ready = expectation(description: "Decoded audio publishes its duration")
+        let observation = playback.$duration.first { $0 > 0 }.sink { _ in ready.fulfill() }
+        defer { observation.cancel() }
+        let loading = try XCTUnwrap(playback.toggle(reference: "lesson") { file })
+        await loading.value
+        await fulfillment(of: [ready], timeout: 5)
+        playback.toggle(reference: "lesson") { file }
+        playback.seek(to: -10)
+        XCTAssertEqual(playback.currentTime, 0)
+        playback.seek(to: .nan)
+        XCTAssertEqual(playback.currentTime, 0)
+        playback.seek(to: 0.5)
+        XCTAssertEqual(playback.currentTime, 0.5, accuracy: 0.01)
+        playback.seek(to: 10)
+        XCTAssertEqual(playback.currentTime, playback.duration, accuracy: 0.01)
+        playback.stop()
+        XCTAssertEqual(playback.currentTime, 0)
+        XCTAssertEqual(playback.duration, 0)
+    }
+
     func testStoppingPlaybackRemovesDownloadedAudio() async throws {
         let file = try audioFile()
         defer { try? FileManager.default.removeItem(at: file) }

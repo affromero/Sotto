@@ -90,7 +90,8 @@ export async function requestVocabularyExtraction(p: {
     throw new Error('Complete inventory requires a valid owned source range.');
   if (
     p.sourceVocabulary &&
-    (p.readingQuestions || p.readingCorrection || p.readingProtocolCorrection)
+    (p.readingQuestions ||
+      (p.sourceInventory && (p.readingCorrection || p.readingProtocolCorrection)))
   )
     throw new Error('Source vocabulary cannot invent reading questions or reading corrections.');
   if (
@@ -101,12 +102,12 @@ export async function requestVocabularyExtraction(p: {
   )
     throw new Error('Source vocabulary review preferences exceed the bounded source contract.');
   if (p.readingQuestions) assertReadingQuestionKeys(p.readingQuestions);
-  if (p.readingCorrection && !p.readingQuestions)
+  if (p.readingCorrection && !p.readingQuestions && !p.sourceVocabulary)
     throw new Error('Reading vocabulary correction requires keyed reading questions.');
   if (p.readingProtocolCorrection) {
     const correction = p.readingProtocolCorrection;
     if (
-      !p.readingQuestions ||
+      (!p.readingQuestions && !p.sourceVocabulary) ||
       p.readingCorrection ||
       !['malformed_json', 'invalid_shape', 'source_attribution'].includes(correction.code) ||
       Buffer.byteLength(JSON.stringify(correction), 'utf8') > 32 * 1024 ||
@@ -177,6 +178,10 @@ export async function requestVocabularyExtraction(p: {
               ...(p.sourceInventory ? { lines: sourceInventoryLines(p.text) } : {}),
               ...(p.sourceInventoryRange ? { requiredSpan: p.sourceInventoryRange } : {}),
               ...(p.preferredLemmas ? { preferredLemmas: p.preferredLemmas } : {}),
+              ...(p.readingCorrection ? { correction: p.readingCorrection } : {}),
+              ...(p.readingProtocolCorrection
+                ? { protocolCorrection: p.readingProtocolCorrection }
+                : {}),
             })
           : p.readingQuestions
             ? JSON.stringify({

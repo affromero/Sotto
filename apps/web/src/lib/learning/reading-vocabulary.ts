@@ -226,30 +226,86 @@ export async function extractSourceVocabulary(options: {
   text: string;
   sourceFragments: readonly string[];
   preferredLemmas?: readonly string[];
+  retainedWords?: readonly SourceVocabularyWord[];
 }) {
   const passageWords = buildReadingVocabularyWordTable(options.text, options.targetLang);
-  const words = parseExtraction(
-    await requestVocabularyExtraction({
-      ...options,
-      label: 'COURSE_NOTES',
-      usageCategory: 'course-source-vocabulary',
-      sourceVocabulary: true,
-    }),
-    options.text,
-    [],
-    passageWords
-  );
-  if (
-    words.some(
-      (word) =>
-        !options.sourceFragments.some((source) =>
-          hasSourceVocabularyQuote(source, word.sourceForm, options.targetLang)
-        )
+  const request = {
+    ...options,
+    label: 'COURSE_NOTES' as const,
+    usageCategory: 'course-source-vocabulary',
+    sourceVocabulary: true,
+  };
+  function validateSources(words: readonly SourceVocabularyWord[]) {
+    if (
+      words.some(
+        (word) =>
+          word.questionIndices.length ||
+          !hasSourceVocabularyQuote(options.text, word.sourceForm, options.targetLang) ||
+          !options.sourceFragments.some((source) =>
+            hasSourceVocabularyQuote(source, word.sourceForm, options.targetLang)
+          )
+      )
     )
-  )
-    rejectProtocol('source_attribution', options.text, []);
-  await reviewSourceVocabulary(options, words);
-  return words;
+      rejectProtocol('source_attribution', options.text, []);
+    return [...words];
+  }
+  function parseCandidate(output: string) {
+    return validateSources(parseExtraction(output, options.text, [], passageWords));
+  }
+  let replaced = false;
+  let words: SourceVocabularyWord[];
+  if (options.retainedWords) {
+    const retainedSchema = readingVocabularyResponseSchema.shape.words.element
+      .omit({ sourceSpan: true })
+      .extend({ sourceForm: z.string().min(1), questionIndices: z.array(z.number()).length(0) });
+    words = validateSources(z.array(retainedSchema).min(1).max(12).parse(options.retainedWords));
+  } else {
+    const output = await requestVocabularyExtraction(request);
+    try {
+      words = parseCandidate(output);
+    } catch (error) {
+      if (!(error instanceof ReadingVocabularyProtocolError)) throw error;
+      replaced = true;
+      words = parseCandidate(
+        await requestVocabularyExtraction({
+          ...request,
+          readingProtocolCorrection: {
+            rawCandidate: output,
+            code: error.code,
+            violations: error.violations,
+          },
+        })
+      );
+    }
+  }
+  try {
+    await reviewSourceVocabulary(options, words);
+    return words;
+  } catch (error) {
+    if (!(error instanceof TeachingQualityRejectionError) || replaced) throw error;
+    const replacement = parseCandidate(
+      await requestVocabularyExtraction({
+        ...request,
+        readingCorrection: { words, issues: error.issues, feedback: error.feedback },
+      })
+    );
+    if (
+      replacement.length !== words.length ||
+      replacement.some((word, index) => word.sourceForm !== words[index]!.sourceForm)
+    )
+      rejectProtocol('replacement_identity', options.text, []);
+    try {
+      await reviewSourceVocabulary(options, replacement);
+      return replacement;
+    } catch (replacementError) {
+      if (!(replacementError instanceof TeachingQualityRejectionError)) throw replacementError;
+      throw new TeachingQualityRejectionError(
+        replacementError.issues,
+        replacementError.feedback,
+        combineTeachingFailures(error.teachingFailure, replacementError.teachingFailure)
+      );
+    }
+  }
 }
 
 /** Reused source candidates retain the same independent lexical evidence gate. */
@@ -272,18 +328,28 @@ export async function reviewSourceVocabulary(
 ) {
   const ai = await resolveCapturedLearningAi(options.userId, options.execution);
   const provider = createAIProvider(ai.provider);
-  for (let offset = 0; offset < words.length; offset += 5)
-    await reviewReadingVocabularyContent({
-      ...options,
-      ai,
-      provider,
-      sourceVocabulary: true,
-      items: words.slice(offset, offset + 5).map((word) => ({
-        ...word,
-        passageText: options.text,
-        assessedQuestions: [],
-      })),
-    });
+  for (let offset = 0; offset < words.length; offset += 5) {
+    try {
+      await reviewReadingVocabularyContent({
+        ...options,
+        ai,
+        provider,
+        sourceVocabulary: true,
+        items: words.slice(offset, offset + 5).map((word) => ({
+          ...word,
+          passageText: options.text,
+          assessedQuestions: [],
+        })),
+      });
+    } catch (error) {
+      if (!(error instanceof TeachingQualityRejectionError)) throw error;
+      throw new TeachingQualityRejectionError(
+        error.issues,
+        error.feedback.map(({ index, feedback }) => ({ index: index + offset, feedback })),
+        error.teachingFailure
+      );
+    }
+  }
 }
 
 export async function extractReadingVocabulary(options: {

@@ -11,6 +11,9 @@ final class LearningProgressStore: ObservableObject {
     private var pending: LearningProgressRequest?
     private var saving = false
     private var paused = false
+    private var suspended = false
+    private var discarded = false
+    private var drainWaiters: [CheckedContinuation<Void, Never>] = []
     private var reconciliationRevision: Int?
 
     func configure(client: SottoAPIClient?, path: String, revision: Int) {
@@ -21,16 +24,22 @@ final class LearningProgressStore: ObservableObject {
     }
 
     func update(answers: [String: Int], writingDrafts: [String: String]) {
+        guard !discarded else { return }
         self.answers = answers
         pending = LearningProgressRequest(expectedRevision: revision, answers: answers, writingDrafts: writingDrafts)
         Task { await flush() }
     }
 
     func flush() async {
-        guard !saving, !paused, let client else { return }
+        guard !saving, !paused, !suspended, !discarded, let client else { return }
         saving = true
-        defer { saving = false }
-        while let next = pending {
+        defer {
+            saving = false
+            let waiters = drainWaiters
+            drainWaiters.removeAll()
+            for waiter in waiters { waiter.resume() }
+        }
+        while !suspended, let next = pending {
             pending = nil
             do {
                 let result = try await client.saveLearningProgress(path: path, expectedRevision: revision,
@@ -44,6 +53,25 @@ final class LearningProgressStore: ObservableObject {
                 return
             }
         }
+    }
+
+    func suspend() async {
+        suspended = true
+        if saving { await withCheckedContinuation { drainWaiters.append($0) } }
+    }
+
+    func resume() {
+        guard !discarded else { return }
+        suspended = false
+        Task { await flush() }
+    }
+
+    func discard() {
+        discarded = true
+        suspended = true
+        pending = nil
+        client = nil
+        errorMessage = nil
     }
 
     func prepareReconciliation() async throws {
