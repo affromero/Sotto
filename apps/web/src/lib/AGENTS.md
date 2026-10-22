@@ -566,6 +566,10 @@ Fresh schemas live in `classes/intro/protocol.ts` and use the trusted lesson lev
 Immersion wire examples contain only target and note; an authored meaning is rejected.
 The compiler derives meaning from the exact target before usefulness, prose limits,
 visual binding and review. A1 retains authored meanings and historical restoration is unchanged.
+Generation, repair and review share the exact-alias policy. Immersion examples whose
+meaning exactly equals target retain that public context, while their assigned audit
+fields omit the duplicate meaning. Target and note stay fully reviewed; A1 meanings
+and distinct historical meanings retain their own evidence anchors.
 About is a strict `{exampleIndex}` reference with no text. Fresh immersion renders
 the selected exact target once; A1 concatenates its target quote and exact meaning.
 This removes independently authored overview claims; target and note still receive full review.

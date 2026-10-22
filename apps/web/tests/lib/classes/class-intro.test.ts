@@ -23,24 +23,27 @@ const FALLBACK = {
 };
 
 describe('classIntroFromSeed', () => {
-  it('restores derived immersion meanings without changing their public bytes', async () => {
-    const { classIntroFromSeed } = await loadClassIntro();
-    const target = 'Ich habe gestern einen Film gesehen.';
-    const stored = {
-      purpose: 'Erzähle von gestern.',
-      about: target,
-      focus: ['„Ich habe gestern einen Film gesehen.“: Sehen verwendet hier haben.'],
-      examples: [
-        {
-          target,
-          meaning: target,
-          note: '„Ich habe gestern einen Film gesehen.“: Sehen verwendet hier haben.',
-        },
-      ],
-      tips: ['„Ich habe gestern einen Film gesehen.“: Nenne den Tag.'],
-    };
-    expect(classIntroFromSeed({ intro: stored }, { ...FALLBACK, level: 'A2' })).toEqual(stored);
-  });
+  it.each(['A2', 'B1'])(
+    'restores derived %s meanings without changing their public bytes',
+    async (level) => {
+      const { classIntroFromSeed } = await loadClassIntro();
+      const target = 'Ich habe gestern einen Film gesehen.';
+      const stored = {
+        purpose: 'Erzähle von gestern.',
+        about: target,
+        focus: ['„Ich habe gestern einen Film gesehen.“: Sehen verwendet hier haben.'],
+        examples: [
+          {
+            target,
+            meaning: target,
+            note: '„Ich habe gestern einen Film gesehen.“: Sehen verwendet hier haben.',
+          },
+        ],
+        tips: ['„Ich habe gestern einen Film gesehen.“: Nenne den Tag.'],
+      };
+      expect(classIntroFromSeed({ intro: stored }, { ...FALLBACK, level })).toEqual(stored);
+    }
+  );
   it('preserves a contextual usage note beside its complete target sentence', async () => {
     const { classIntroFromSeed } = await loadClassIntro();
     const stored = {

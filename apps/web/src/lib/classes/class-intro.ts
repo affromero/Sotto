@@ -767,9 +767,7 @@ export async function generateClassIntro(p: ClassIntroParams): Promise<ClassIntr
   const ai = await resolveCapturedLearningAi(p.userId, p.execution);
   const immersion = isImmersionLevel(p.level);
   const protocol = freshIntroProtocol(immersion);
-  const meaningPolicy = immersion
-    ? 'For fresh immersion examples, author only target and note. Do not return meaning. The application derives meaning from the exact target and renders the selected target once in about. Keep every target grammatical, idiomatic and appropriate to the lesson. Put its specific form or use explanation in note.'
-    : classIntroExampleMeaningPolicy(p);
+  const meaningPolicy = classIntroExampleMeaningPolicy(p);
   const context = {
     NATIVE: p.nativeLang,
     TARGET: p.targetLang,
