@@ -12,7 +12,7 @@ import tempfile
 import time
 from collections.abc import Mapping, Sequence
 from importlib import import_module
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 from typing import cast
 from urllib.parse import urlsplit
 
@@ -34,6 +34,12 @@ from scripts.deploy.review.runtime.policy import (
     helper_memory,
     retain_queue_intent,
     runtime_policy,
+)
+from scripts.deploy.review.runtime.release.migrations import (
+    later_stage_progress,
+    migration_inventory,
+    stage_progress,
+    verify_stage_schema,
 )
 from scripts.deploy.review.runtime.services import (
     backup_review,
@@ -652,43 +658,26 @@ class HostOperations:
         self, stage: Mapping[str, object], previous: Mapping[str, object],
     ) -> None:
         self.check_stage(stage, previous)
-        expected = {
-            PurePosixPath(name).parent.name: digest(value, 'stage SQL')
-            for name, value in record(stage['migrations'], 'stage SQL').items()
-            if name.endswith('/migration.sql')
-        }
+        expected = migration_inventory(stage)
         applied = self.applied_migrations()
         retained = self.attempt.directory / (
             'stage-' + cast(str, record(stage['receipt'], 'stage')['sha'])
             + '.json'
         )
         if retained.exists():
-            if private_json(retained) != {
-                'verified': True, 'migrations': expected,
-            }:
+            proof = private_json(retained)
+            if (proof.get('verified') is not True
+                    or proof.get('migrations') != expected):
                 raise ValueError('retained-stage-verification-changed')
-            if applied != expected:
-                final = rows(self.manifest['stages'], 'admitted stage')[-1]
-                admitted = {
-                    PurePosixPath(name).parent.name: digest(value, 'final SQL')
-                    for name, value in record(final['migrations'],
-                                              'final SQL').items()
-                    if name.endswith('/migration.sql')
-                }
-                ordered = sorted(admitted)
-                if (not expected.keys() <= applied.keys()
-                        or sorted(applied) != ordered[:len(applied)]
-                        or any(admitted.get(name) != value
-                               for name, value in applied.items())):
-                    raise ValueError('unknown-post-stage-sql-state')
-                return
-        if any(expected.get(name) != value for name, value in applied.items()):
-            raise ValueError('actual-sql-does-not-match-admitted-stage')
-        ordered = sorted(expected)
-        previous_count = sum(name.endswith('/migration.sql') for name in
-                             record(previous['migrations'], 'previous SQL'))
-        if (sorted(applied) != ordered[:len(applied)]
-                or len(applied) < previous_count):
+            inventories = [migration_inventory(item) for item in
+                           rows(self.manifest['stages'], 'admitted stage')]
+            if not later_stage_progress(applied, expected, inventories):
+                raise ValueError('unknown-post-stage-sql-state')
+            verify_stage_schema(self, stage, retained=proof)
+            return
+        if not stage_progress(
+            applied, migration_inventory(previous), expected,
+        ):
             raise ValueError('actual-sql-is-not-an-admitted-stage-prefix')
         if applied != expected:
             self.image_command(
@@ -716,15 +705,10 @@ class HostOperations:
         if (len(proofs) != 1 or proofs[0].get('established') is not True
                 or proofs[0].get('appliedMigrations') != len(expected)):
             raise ValueError('canonical-stage-establishment-failed')
-        self.image_command(receipt, 'npx', [
-            '--no-install', 'prisma', 'migrate', 'diff',
-            '--config=/app/prisma.config.ts', '--from-config-datasource',
-            '--to-schema', '/app/apps/web/prisma/schema.prisma',
-            '--script', '--exit-code',
-        ])
+        verification = verify_stage_schema(self, stage)
         atomic_json(self.attempt.directory / (
             'stage-' + cast(str, receipt['sha']) + '.json'
-        ), {'verified': True, 'migrations': expected})
+        ), {'verified': True, 'migrations': expected, **verification})
 
     def backups(self) -> None:
         backup_review(self)

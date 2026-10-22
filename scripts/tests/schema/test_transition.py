@@ -2,23 +2,114 @@
 
 from __future__ import annotations
 
-from copy import deepcopy
 import hashlib
 import json
 import os
 import subprocess
+import tempfile
 import unittest
+from collections.abc import Callable
+from copy import deepcopy
+from pathlib import Path
+from typing import cast
 from unittest.mock import patch
 
 import test_deploy_processes as process_tests
 import test_deploy_script as controller_tests
 
+from scripts.tests.review.runtime.migration_fixture import KNOWN_SQL, index_proof
 
 REVIEW = process_tests.REVIEW
 MIGRATION = (
     'apps/web/prisma/migrations/'
     '20261020120000_learner_review_events/migration.sql'
 )
+
+
+class CanonicalCatalogTests(unittest.TestCase):
+    def setUp(self) -> None:
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.directory = Path(temporary.name)
+        self.preparation: dict[str, object] = {
+            'applicationConnectionIdentity': 'c' * 64,
+            'databaseIdentity': {'schemaName': 'public'},
+        }
+        self.index = index_proof()
+        self.connection = 'c' * 64
+
+    def write_proof(self) -> None:
+        writer = cast(Callable[[Path, dict[str, object]], None], REVIEW.atomic_json)
+        writer(self.directory / 'schema-preparation.json', self.preparation)
+        writer(self.directory / 'schema-index.json', {
+            'connectionIdentity': self.connection, 'indexProof': self.index,
+        })
+
+    def test_catalog_only_verification_needs_no_prisma_result_or_sql(
+        self,
+    ) -> None:
+        self.write_proof()
+        catalog = cast(Callable[[Path], dict[str, object]], REVIEW.schema_catalog)
+        self.assertEqual(catalog(self.directory), self.index)
+        self.assertFalse((self.directory / 'schema-drift-proof.json').exists())
+
+    def test_every_catalog_field_and_strict_scalar_type_remains_required(
+        self,
+    ) -> None:
+        original = dict(self.index)
+        catalog = cast(Callable[[Path], dict[str, object]], REVIEW.schema_catalog)
+        for field, value in original.items():
+            changed: object = not value if type(value) is bool else (
+                value + 1 if type(value) is int else 'foreign'
+            )
+            cases = [changed]
+            if type(value) in (bool, int):
+                cases.append(int(value) if type(value) is bool else bool(value))
+            for replacement in cases:
+                with self.subTest(field=field, value=replacement):
+                    self.index = {**original, field: replacement}
+                    self.write_proof()
+                    with self.assertRaises(ValueError):
+                        catalog(self.directory)
+            self.index = {key: item for key, item in original.items() if key != field}
+            self.write_proof()
+            with self.assertRaises(ValueError):
+                catalog(self.directory)
+        self.index = original
+        self.connection = 'd' * 64
+        self.write_proof()
+        with self.assertRaisesRegex(ValueError, 'connection changed'):
+            catalog(self.directory)
+
+    def test_only_exact_known_sql_and_success_statuses_produce_drift_evidence(
+        self,
+    ) -> None:
+        self.write_proof()
+        drift = cast(Callable[[str, Path], None], REVIEW.schema_drift)
+        cases = [
+            ('0', b'', True), ('0', b'-- This is an empty migration.\n', True),
+            ('2', KNOWN_SQL, True), ('2', KNOWN_SQL + b'\n', True),
+            ('0', KNOWN_SQL, False), ('2', b'', False),
+            ('2', KNOWN_SQL + b'ALTER TABLE foreign;', False),
+            ('2', KNOWN_SQL.replace(b'text_pattern_ops', b'text_ops'), False),
+            ('1', b'', False), ('-9', b'', False),
+        ]
+        for status, sql, allowed in cases:
+            with self.subTest(status=status, sql=sql):
+                output = self.directory / 'schema-drift.sql'
+                output.write_bytes(sql)
+                output.chmod(0o600)
+                proof = self.directory / 'schema-drift-proof.json'
+                proof.unlink(missing_ok=True)
+                if not allowed:
+                    with self.assertRaises(ValueError):
+                        drift(status, self.directory)
+                    self.assertFalse(proof.exists())
+                    continue
+                drift(status, self.directory)
+                evidence = json.loads(proof.read_bytes())
+                self.assertEqual(evidence['diffExitCode'], int(status))
+                self.assertEqual(evidence['sqlSha256'], hashlib.sha256(sql).hexdigest())
 
 
 class SchemaReviewTests(unittest.TestCase):
