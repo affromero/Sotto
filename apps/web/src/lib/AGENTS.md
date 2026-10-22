@@ -2,6 +2,11 @@
 
 ## Vocabulary lifecycle
 
+Failed initial class preparation can retain an unpublished `GENERATING` row.
+Exact-target retry admission and terminal cancellation reuse preparation cleanup,
+including execution and audio drainage. Only confirmed row absence acknowledges
+terminal removal; changed, uncertain and published operations remain fenced.
+
 `vocabulary/` owns dictionary reads, deterministic study admission and actions,
 material-index admission, and local pronunciation. Keep answer keys in private
 study state. Public cards reveal answers only after an immutable response.

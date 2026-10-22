@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { authenticateRequest } from '@/lib/api-keys';
 import { errorResponse } from '@/lib/api-response';
 import { prisma } from '@/lib/prisma';
@@ -344,9 +345,20 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
 
   const { courseId } = await params;
   try {
+    const query = request.nextUrl.searchParams;
+    const cleanup =
+      query.has('operationId') || query.has('classId')
+        ? z.object({ operationId: z.uuid(), classId: z.string().min(1).max(200) }).safeParse({
+            operationId: query.get('operationId'),
+            classId: query.get('classId'),
+          })
+        : undefined;
+    if (cleanup && !cleanup.success)
+      return errorResponse('Invalid failed preparation target.', 400);
     const operation = await cancelClassPreparation(
       courseId,
-      sottoRequestExecution(request, authed)
+      sottoRequestExecution(request, authed),
+      ...(cleanup?.success ? ([cleanup.data] as const) : [])
     );
     if (operation?.status === 'UNRESOLVED') {
       return errorResponse('Preparation needs recovery before cancellation can finish.', 409);
@@ -357,6 +369,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
         cancelling: operation.status === 'CANCELLING',
         operationId: operation.id,
         classId: operation.classId,
+        ...(cleanup ? { deleted: true } : {}),
       });
     }
   } catch (error) {

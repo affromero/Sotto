@@ -25,7 +25,7 @@ enum SottoClassGenerationRequest {
 
 struct SottoClassGenerationObservation {
     let id = UUID()
-    let request: SottoClassGenerationRequest
+    var request: SottoClassGenerationRequest
     let startedAt = Date()
     var operationId: String?
     var operationStatus: String?
@@ -96,7 +96,9 @@ extension SottoAppModel {
                 if !observation.isAdmitting { startClassObservationTask(client: client, course: course) }
                 continue
             }
-            guard let current = course.classes.first(where: { $0.id == course.activeClassId }),
+            let unpublished = course.classes.filter { $0.status == "GENERATING" && $0.submission == nil }
+            guard let current = course.classes.first(where: { $0.id == course.activeClassId }) ??
+                    (unpublished.count == 1 ? unpublished.first : nil),
                   current.status == "GENERATING" || (current.status == "FAILED" && current.submission == nil) else { continue }
             _ = beginClassObservation(course: course,
                 request: .observe(classId: current.id, attempt: current.attempt ?? 1))
@@ -152,21 +154,38 @@ extension SottoAppModel {
                     return
                 }
                 let request: SottoClassGenerationRequest
+                var expectedPreparation: (operationId: String, classId: String)?
                 if let classId = progress.classId {
-                    let detail = try await client.fetchClass(classId: classId)
-                    guard observationIsCurrent(previous.id, courseId: course.id, client: client) else { return }
-                    guard detail.id == classId, detail.courseId == course.id, detail.status != "GENERATING", previous.request.accepts(detail),
-                          previous.request.classId == nil || previous.request.classId == classId else {
-                        throw SottoAPIError.message("The class changed. Reload before regenerating.")
+                    let detail: SottoClassDetail?
+                    do { detail = try await client.fetchClass(classId: classId) }
+                    catch SottoAPIError.http(404, _) {
+                        guard case .next = previous.request else { throw SottoAPIError.message("The class is missing. Check status.") }
+                        detail = nil
                     }
-                    request = .regenerate(classId: classId, previousAttempt: detail.attempt ?? 1)
+                    guard observationIsCurrent(previous.id, courseId: course.id, client: client) else { return }
+                    if case .next = previous.request, detail == nil || detail?.status == "GENERATING" {
+                        guard let operationId = progress.operationId,
+                              previous.observedClassId == classId,
+                              detail == nil || (detail?.id == classId && detail?.courseId == course.id && detail?.submitted == false) else {
+                            throw SottoAPIError.message("The class changed. Reload before regenerating.")
+                        }
+                        request = previous.request
+                        expectedPreparation = (operationId, classId)
+                    } else {
+                        guard let detail, detail.id == classId, detail.courseId == course.id, detail.status != "GENERATING", previous.request.accepts(detail),
+                              previous.request.classId == nil || previous.request.classId == classId else {
+                            throw SottoAPIError.message("The class changed. Reload before regenerating.")
+                        }
+                        request = .regenerate(classId: classId, previousAttempt: detail.attempt ?? 1)
+                    }
                 } else if case .next = previous.request {
                     request = previous.request
                 } else {
                     throw SottoAPIError.message("The class could not be identified. Check status.")
                 }
                 let observation = beginClassObservation(course: course, request: request, admitting: true)
-                if await admitClassGeneration(client: client, course: course, observation: observation) {
+                if await admitClassGeneration(client: client, course: course, observation: observation,
+                                              expectedPreparation: expectedPreparation) {
                     if selectedClass?.id == request.classId { closeClass() }
                     await monitorClassGeneration(client: client, course: course, observationId: observation.id)
                 } else if isCurrentLearningClient(client),
@@ -215,12 +234,14 @@ extension SottoAppModel {
     }
 
     private func admitClassGeneration(client: SottoAPIClient, course: SottoCourse,
-                                      observation: SottoClassGenerationObservation) async -> Bool {
+                                      observation: SottoClassGenerationObservation,
+                                      expectedPreparation: (operationId: String, classId: String)? = nil) async -> Bool {
         do {
             let accepted: NextClassBackgroundResponse
             switch observation.request {
             case let .next(source):
-                accepted = try await client.startNextClassGeneration(courseId: course.id, source: source)
+                accepted = try await client.startNextClassGeneration(courseId: course.id, source: source,
+                                                                      expectedPreparation: expectedPreparation)
             case let .regenerate(classId, attempt):
                 accepted = try await client.startClassRegeneration(classId: classId, expectedAttempt: attempt)
             case .observe: return false
@@ -314,6 +335,9 @@ extension SottoAppModel {
                         return
                     }
                     observation.operationId = operationId
+                    if let initial = progress.initialPreparation {
+                        observation.request = .next(initial.source)
+                    }
                 }
                 guard progress.operationId == observation.operationId,
                       observation.request.classId == nil || progress.classId == observation.request.classId else {
