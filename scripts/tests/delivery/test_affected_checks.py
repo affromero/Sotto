@@ -211,22 +211,26 @@ class AffectedChecksTests(unittest.TestCase):
         self.assertFalse(any('related' in command for command in self.calls()))
 
     def test_dynamic_inputs_and_setup_run_full_tests(self) -> None:
-        for path in (
+        paths = (
             'apps/web/prompts/class.md',
             'apps/web/tests/fixtures/reference.txt',
             'apps/web/tests/setup/index.ts',
             'apps/web/prisma/migrations/change/migration.sql',
             'apps/web/vitest.config.ts',
-        ):
-            with self.subTest(path=path):
-                self.git('reset')
-                self.log.unlink(missing_ok=True)
-                self.stage(path)
-                self.assert_passed(self.run_checks())
-                self.assertTrue(any(command[:2] == ['run', 'test']
-                                    for command in self.calls()))
-                self.assertFalse(any('related' in command
-                                     for command in self.calls()))
+        )
+        for path in paths:
+            for dependency_change in (False, True):
+                with self.subTest(path=path, dependency_change=dependency_change):
+                    self.git('reset')
+                    self.log.unlink(missing_ok=True)
+                    self.stage(path)
+                    if dependency_change:
+                        self.stage('package-lock.json')
+                    self.assert_passed(self.run_checks())
+                    self.assertTrue(any(command[:2] == ['run', 'test']
+                                        for command in self.calls()))
+                    self.assertFalse(any('related' in command
+                                         for command in self.calls()))
 
     def test_shared_changes_check_shared_and_web_consumers(self) -> None:
         self.stage('packages/shared/src/theme.ts')
@@ -431,11 +435,16 @@ class AffectedChecksTests(unittest.TestCase):
     @unittest.skipUnless(shutil.which('cargo'), 'Rust toolchain unavailable')
     def test_shared_contract_changes_check_the_tui_consumer(self) -> None:
         self.prepare_rust()
-        self.stage('packages/shared/src/contracts/endpoints.ts')
-        result = self.run_checks()
-        self.assert_passed(result)
-        self.assertIn('cargo fmt --check', result.stdout)
-        self.assertIn('cargo clippy --all-targets --locked', result.stdout)
+        for dependency_change in (False, True):
+            with self.subTest(dependency_change=dependency_change):
+                self.git('reset')
+                self.stage('packages/shared/src/contracts/endpoints.ts')
+                if dependency_change:
+                    self.stage('package-lock.json')
+                result = self.run_checks()
+                self.assert_passed(result)
+                self.assertIn('cargo fmt --check', result.stdout)
+                self.assertIn('cargo clippy --all-targets --locked', result.stdout)
 
     @unittest.skipUnless(shutil.which('cargo'), 'Rust toolchain unavailable')
     def test_both_openapi_artifacts_check_shared_drift(self) -> None:
@@ -452,22 +461,56 @@ class AffectedChecksTests(unittest.TestCase):
                      '--run', '--no-file-parallelism'], self.calls(),
                 )
 
-    @unittest.skipUnless(shutil.which('cargo'), 'Rust toolchain unavailable')
-    def test_dependency_manifests_run_full_workspace_checks(self) -> None:
-        self.prepare_rust()
+    def test_dependency_manifests_keep_types_without_repeating_ci_suites(self) -> None:
+        for path in ('package-lock.json', 'apps/web/package.json',
+                     'packages/shared/package.json'):
+            with self.subTest(path=path):
+                self.git('reset')
+                self.log.unlink(missing_ok=True)
+                self.stage(path)
+                result = self.run_checks()
+                self.assert_passed(result)
+                self.assertEqual(self.calls(), [
+                    ['run', 'type-check', '--workspace=@sotto/web'],
+                    ['run', 'type-check', '--workspace=@sotto/mcp'],
+                    ['run', 'typecheck', '--workspace=groundcheck'],
+                    ['run', 'typecheck', '--workspace=@sotto/learning-model'],
+                ])
+                self.assertNotIn('cargo', result.stdout)
+
+    def test_dependency_changes_keep_focused_source_tests(self) -> None:
+        manifest = 'apps/web/package.json'
+        source = 'apps/web/src/lib/example.ts'
+        test = 'apps/web/tests/lib/example.test.ts'
+        for changed in ((source,), (test,), (source, test)):
+            with self.subTest(changed=changed):
+                self.git('reset')
+                self.log.unlink(missing_ok=True)
+                self.stage(manifest, *changed)
+                result = self.run_checks()
+                self.assert_passed(result)
+                tests = [command for command in self.calls()
+                         if 'related' in command]
+                self.assertEqual(len(tests), 1)
+                for path in changed:
+                    self.assertIn(str(self.root / path), tests[0])
+                self.assertNotIn(str(self.root / manifest), tests[0])
+                self.assertEqual('--passWithNoTests' in tests[0],
+                                 test not in changed)
+                self.assertFalse(any(command[:2] == ['run', 'test']
+                                     for command in self.calls()))
+                self.assertNotIn('cargo', result.stdout)
+
+    def test_dependency_only_push_keeps_full_validation_in_ci(self) -> None:
+        before = self.git('rev-parse', 'HEAD')
         self.stage('package-lock.json')
-        result = self.run_checks()
+        after = self.commit()
+        self.environment['PRE_COMMIT_FROM_REF'] = before
+        self.environment['PRE_COMMIT_TO_REF'] = after
+        result = self.run_checks('--push')
         self.assert_passed(result)
-        test_workspaces = {command[2] for command in self.calls()
-                           if command[:2] == ['run', 'test']}
-        self.assertEqual(test_workspaces, {
-            '--workspace=@sotto/web', '--workspace=@sotto/shared',
-            '--workspace=groundcheck', '--workspace=@sotto/learning-model',
-        })
-        self.assertIn(['run', 'type-check', '--workspace=@sotto/mcp'],
-                      self.calls())
-        self.assertFalse(any('related' in command for command in self.calls()))
-        self.assertIn('cargo clippy', result.stdout)
+        self.assertEqual(self.calls(), [])
+        self.assertNotIn('cargo', result.stdout)
 
     def test_explicit_paths_cannot_escape_the_repository(self) -> None:
         result = self.run_checks('--files', '../outside.ts')

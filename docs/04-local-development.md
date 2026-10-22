@@ -393,7 +393,10 @@ git commit
 ```
 
 The commit gate selects type checks and related tests from staged paths,
-including deletions. Configuration and runtime inputs that cannot be covered
+including deletions. Dependency manifests run workspace type checks; GitHub
+runs the full dependency validation. Source changes in the same commit retain
+their related tests. Dependency-only changes do not trigger Rust checks.
+Configuration and runtime inputs that cannot be covered
 by the test import graph select the full affected workspace suite. Documentation
 and native-only commits avoid web validation. Pushes run Rust checks when the
 TUI or its shared contracts change, without repeating the web suite and build.
