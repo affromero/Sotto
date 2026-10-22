@@ -452,10 +452,9 @@ export function registerPreparationFailureTests(context: () => PreparationFailur
         expect((await readClassPreparation(courseId, execution.userId))?.status).toBe('FAILED');
         const activity = await readPreparationActivity(courseId, execution);
         expect(activity?.status).toBe('FAILED');
-        expect(JSON.stringify(activity)).not.toMatch(
-          /private-candidate-sentinel|private-feedback-sentinel/
-        );
-        expect(await classPreparationStore(instance.database, courseId).read()).toEqual(recovered);
+        expect(JSON.stringify(activity)).not.toMatch(/private-(candidate|feedback)-sentinel/);
+        const observed = await classPreparationStore(instance.database, courseId).read();
+        expect(observed).toEqual({ ...recovered, updatedAt: expect.any(Number) });
       }
       expect(
         (await instance.database.courseClass.findUniqueOrThrow({ where: { id: cls.id } })).status
@@ -466,7 +465,8 @@ export function registerPreparationFailureTests(context: () => PreparationFailur
         )
       ).toMatchObject({ complete: true });
       await processClassPreparation(job);
-      expect(await classPreparationStore(instance.database, courseId).read()).toEqual(recovered);
+      const replayed = await classPreparationStore(instance.database, courseId).read();
+      expect(replayed).toEqual({ ...recovered, updatedAt: expect.any(Number) });
       expect(
         await instance.database.classSection.findMany({
           where: { classId: cls.id },

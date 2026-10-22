@@ -159,12 +159,11 @@ export function registerTerminalCleanupTests(context: () => Context) {
     const operation = await requestClassPreparation(courseId, execution, {
       intent: { kind: 'REGENERATE', classId: cls.id, expectedAttempt: 1 },
     });
-    await sottoTransaction(instance.database, (database) =>
-      classPreparationStore(database, courseId).transact((state) => {
-        if (!state) throw new Error('Missing preparation fixture');
-        state.status = 'FAILED';
-      })
-    );
+    await sottoTransaction(instance.database, async (database) => {
+      const receipt = await sottoJobOutbox(database).read(operation.id);
+      if (!receipt) throw new Error('Missing preparation receipt');
+      await recordClassPreparationFailure(database, operation, receipt.fingerprint, false);
+    });
     const target = { operationId: operation.id, classId: cls.id };
     await expect(cancelClassPreparation(courseId, execution, target)).rejects.toThrow(/changed/);
     await expect(
@@ -191,6 +190,82 @@ export function registerTerminalCleanupTests(context: () => Context) {
       expect(
         await instance.database.courseClass.findUnique({ where: { id: cls.id } })
       ).toMatchObject({ status });
+    }
+  );
+
+  it.each(
+    (['REGENERATE', 'REPAIR'] as const).flatMap((kind) =>
+      (['FAILED', 'CANCELLED', 'UNRESOLVED'] as const).map((status) => ({ kind, status }))
+    )
+  )(
+    'reconciles $status $kind only after confirmed execution cleanup and preserves its material',
+    async ({ kind, status }) => {
+      const { instance, courseId, execution, lesson } = context();
+      const cls = await instance.database.courseClass.create({
+        data: { courseId, lessonId: (await lesson()).id, order: 1, status: 'FAILED' },
+      });
+      const operation = await requestClassPreparation(courseId, execution, {
+        intent: { kind, classId: cls.id, expectedAttempt: 1 },
+      });
+      const section = await instance.database.classSection.create({
+        data: {
+          classId: cls.id,
+          skill: 'GRAMMAR',
+          attempt: 2,
+          status: 'READY',
+          seed: 'retained-worked-example',
+          spec: { example: 'Ich finde das gut, weil es hilft.' },
+        },
+      });
+      const binding = await sottoTransaction(instance.database, async (database) => {
+        const receipt = await sottoJobOutbox(database).read(operation.id);
+        if (!receipt) throw new Error('Missing preparation receipt');
+        const active = {
+          id: randomUUID(),
+          parentId: operation.id,
+          fingerprint: receipt.fingerprint,
+          executorId: randomUUID(),
+        };
+        await sottoJobExecutions(database).begin(active);
+        await classPreparationStore(database, courseId).transact((state) => {
+          if (!state) throw new Error('Missing preparation fixture');
+          state.status = status === 'CANCELLED' ? 'CANCELLING' : 'RUNNING';
+        });
+        await recordClassPreparationFailure(
+          database,
+          operation,
+          receipt.fingerprint,
+          status === 'UNRESOLVED'
+        );
+        return active;
+      });
+      expect(await readClassPreparation(courseId, execution.userId)).toMatchObject({
+        id: operation.id,
+        status,
+      });
+      expect(
+        await instance.database.courseClass.findUnique({ where: { id: cls.id } })
+      ).toMatchObject({ status: 'GENERATING', attempt: 2 });
+      await sottoTransaction(instance.database, (database) =>
+        sottoJobExecutions(database).settle(binding)
+      );
+      expect(await readClassPreparation(courseId, execution.userId)).toMatchObject({
+        id: operation.id,
+        status,
+      });
+      expect(
+        await instance.database.courseClass.findUnique({ where: { id: cls.id } })
+      ).toMatchObject({
+        status: status === 'UNRESOLVED' ? 'GENERATING' : 'FAILED',
+        attempt: 2,
+      });
+      expect(
+        await instance.database.classSection.findUnique({ where: { id: section.id } })
+      ).toMatchObject({
+        status: 'READY',
+        seed: 'retained-worked-example',
+        spec: { example: 'Ich finde das gut, weil es hilft.' },
+      });
     }
   );
 }

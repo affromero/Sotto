@@ -524,7 +524,7 @@ async function reconcileKnownPreparationFailure(
     current.intent &&
     ((current.status === 'UNRESOLVED' &&
       (current.failure === 'generation_failed' || current.failure === 'source_unreadable')) ||
-      (current.intent.retry && ['FAILED', 'CANCELLED'].includes(current.status)))
+      ['FAILED', 'CANCELLED'].includes(current.status))
   )
     return settleCancelledPreparation(database, current);
   return current;
