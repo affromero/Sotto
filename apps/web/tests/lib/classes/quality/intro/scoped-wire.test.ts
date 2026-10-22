@@ -64,6 +64,20 @@ const compiled = {
   ],
   tips: ['„Wir sind gegangen.“: Lerne das Hilfsverb.'],
 };
+const compactWire = {
+  ...wire,
+  about: { exampleIndex: 0 },
+  focus: [wire.focus[0]],
+  examples: [wire.examples[0]],
+  tips: [{ ...wire.tips[0], exampleIndex: 0 }],
+};
+const compactCompiled = {
+  purpose: compactWire.purpose,
+  about: '„Ich habe gekocht.“: I cooked.',
+  focus: [compiled.focus[0]],
+  examples: [compiled.examples[0]],
+  tips: ['„Ich habe gekocht.“: Lerne das Hilfsverb.'],
+};
 const shortExample = {
   target: 'Guten Morgen',
   meaning: 'You say good morning early in the day.',
@@ -296,8 +310,8 @@ describe('strict scoped A1 intro wire', () => {
   );
 
   it('repairs teaching after a size repair and re-audits the complete merged intro', async () => {
-    const example = { ...wire.examples[1]!, meaning: 'The group went.' };
-    respond(wire, { examples: { 1: example } }, ['examples:1']);
+    const example = { ...compactWire.examples[0]!, meaning: 'I did cook.' };
+    respond(compactWire, { examples: { 0: example } }, ['examples:0']);
     const reviewAndRepair = boundary.generate.getMockImplementation()!;
     let structuralRepairPending = true;
     boundary.generate.mockImplementation(async (system, messages, options) => {
@@ -309,7 +323,7 @@ describe('strict scoped A1 intro wire', () => {
       if (options.jsonSchema.name === 'class_intro_repair' && structuralRepairPending) {
         structuralRepairPending = false;
         return {
-          content: JSON.stringify({ ...wire, visuals: undefined }),
+          content: JSON.stringify({ ...compactWire, visuals: undefined }),
           model: 'captured-model',
         };
       }
@@ -317,11 +331,13 @@ describe('strict scoped A1 intro wire', () => {
     });
     const result = await generateClassIntro(params);
     expect(result).toEqual({
-      ...compiled,
-      examples: [compiled.examples[0], { ...example, note: compiled.examples[1]!.note }],
+      ...compactCompiled,
+      examples: [{ ...example, note: compactCompiled.examples[0]!.note }],
     });
-    const finalContexts = reviewContexts().slice(2);
-    expect(finalContexts).toHaveLength(2);
+    const finalContexts = reviewContexts().filter(
+      (context) => context.examples[0].meaning === example.meaning
+    );
+    expect(finalContexts.length).toBeGreaterThan(0);
     for (const context of finalContexts) expect(context).toEqual(result);
     expect(
       boundary.generate.mock.calls
@@ -333,7 +349,7 @@ describe('strict scoped A1 intro wire', () => {
   it.each(['provider', 'cancelled', 'malformed patch', 'rejected patch'])(
     'does not retry a %s after structural repair and the semantic patch opportunity',
     async (failure) => {
-      respond(wire, { examples: { 1: wire.examples[1] } }, ['examples:1']);
+      respond(compactWire, { examples: { 0: compactWire.examples[0] } }, ['examples:0']);
       const reviewAndRepair = boundary.generate.getMockImplementation()!;
       const terminal = new Error(failure);
       if (failure === 'cancelled') terminal.name = 'AbortError';
@@ -349,7 +365,7 @@ describe('strict scoped A1 intro wire', () => {
         if (name === 'class_intro_repair' && !repairedStructure) {
           repairedStructure = true;
           return {
-            content: JSON.stringify({ ...wire, visuals: undefined }),
+            content: JSON.stringify({ ...compactWire, visuals: undefined }),
             model: 'captured-model',
           };
         }
@@ -361,7 +377,7 @@ describe('strict scoped A1 intro wire', () => {
           if (failure === 'malformed patch') return { content: '{}', model: 'captured-model' };
           if (failure === 'rejected patch')
             return {
-              content: JSON.stringify({ examples: { 1: wire.examples[1] } }),
+              content: JSON.stringify({ examples: { 0: compactWire.examples[0] } }),
               model: 'captured-model',
             };
         }
@@ -659,19 +675,115 @@ describe('strict scoped A1 intro wire', () => {
       const purpose =
         wire.purpose + ' ' + Array.from({ length: count - 48 }, () => 'größer').join(' ');
       const input = { ...wire, purpose };
-      respond(input, wire);
+      respond(input, compactWire);
       const result = await generateClassIntro(params);
       if (count === 180) {
         expect(result).toEqual({ ...compiled, purpose });
         expect(schemas()).not.toContain('class_intro_repair');
       } else {
-        expect(result).toEqual(compiled);
+        expect(result).toEqual(compactCompiled);
         const request = boundary.generate.mock.calls[1]![1][0].content;
         expect(request).toContain(
           JSON.stringify({ reason: 'prose_word_limit', maxWords: 180, actualWords: 181 })
         );
         expect(schemas().slice(0, 2)).toEqual(['class_intro_generation', 'class_intro_repair']);
       }
+    }
+  );
+
+  it.each(['A1', 'B1'])(
+    'accepts a maximum-size compact %s replacement and submits the complete teaching for review',
+    async (level) => {
+      const target =
+        'Gestern habe ich mit meiner Schwester zu Hause eine leckere Suppe für unsere Familie gekocht.';
+      const meaning =
+        'Yesterday I cooked a delicious soup at home with my sister for our whole family.';
+      const note =
+        'Das Verb „kochen“ bildet hier das Perfekt mit „habe“ und dem Partizip „gekocht“ am Satzende.';
+      const replacement = {
+        purpose:
+          'Erzähle, was du gestern zu Hause mit deiner Familie gekocht und am Tisch gegessen hast.',
+        about: { exampleIndex: 0 },
+        focus: [
+          {
+            text: 'Im Hauptsatz steht hier „habe“ an zweiter Stelle, während „gekocht“ am Ende des Satzes steht.',
+            exampleIndex: 0,
+          },
+        ],
+        examples: [{ target, note, ...(level === 'A1' ? { meaning } : {}) }],
+        tips: [
+          {
+            text: 'Lerne hier „kochen“ mit „haben“ und stelle „gekocht“ nach den Angaben zu Ort und Begleitung.',
+            exampleIndex: 0,
+          },
+        ],
+      };
+      const initial = {
+        ...replacement,
+        purpose: Array.from({ length: 363 }, () => 'größer').join(' '),
+        visuals: null,
+      };
+      respond(initial, replacement);
+      const result = await generateClassIntro({ ...params, level });
+      expect(result.examples).toEqual([
+        { target, meaning: level === 'A1' ? meaning : target, note: `„${target}“: ${note}` },
+      ]);
+      const rendered = [
+        result.purpose,
+        result.about,
+        ...result.focus,
+        ...result.tips,
+        ...result.examples.flatMap((example) => [example.target, example.meaning, example.note]),
+      ];
+      expect(rendered.join(' ').split(/\s+/u)).toHaveLength(level === 'A1' ? 165 : 150);
+      expect(reviewContexts().length).toBeGreaterThan(0);
+      for (const context of reviewContexts()) expect(context).toEqual(result);
+      const repair = boundary.generate.mock.calls.find(
+        ([, , options]) => options.jsonSchema.name === 'class_intro_repair'
+      )![2].jsonSchema.schema;
+      expect(repair.properties.examples.minItems).toBe(1);
+      expect(repair.properties.examples.maxItems).toBe(1);
+      expect(
+        new RegExp(repair.properties.purpose.pattern).test(
+          Array.from({ length: 16 }, () => 'word').join(' ')
+        )
+      ).toBe(false);
+    }
+  );
+
+  const sixteen = Array.from({ length: 16 }, () => 'word').join(' ');
+  it.each([
+    { name: 'purpose', value: { ...compactWire, purpose: sixteen } },
+    { name: 'focus text', value: { ...compactWire, focus: [{ text: sixteen, exampleIndex: 0 }] } },
+    { name: 'tip text', value: { ...compactWire, tips: [{ text: sixteen, exampleIndex: 0 }] } },
+    {
+      name: 'example target',
+      value: { ...compactWire, examples: [{ ...compactWire.examples[0], target: sixteen }] },
+    },
+    {
+      name: 'example meaning',
+      value: { ...compactWire, examples: [{ ...compactWire.examples[0], meaning: sixteen }] },
+    },
+    {
+      name: 'example note',
+      value: { ...compactWire, examples: [{ ...compactWire.examples[0], note: sixteen }] },
+    },
+    {
+      name: 'second example',
+      value: { ...compactWire, examples: [wire.examples[0], wire.examples[1]] },
+    },
+    { name: 'second focus', value: { ...compactWire, focus: [wire.focus[0], wire.focus[0]] } },
+    {
+      name: 'second tip',
+      value: { ...compactWire, tips: [compactWire.tips[0], compactWire.tips[0]] },
+    },
+  ])(
+    'rejects a compact replacement with an oversized $name even when the provider ignores its schema',
+    async ({ value }) => {
+      respond({ ...wire, purpose: Array.from({ length: 363 }, () => 'größer').join(' ') }, value);
+      await expect(generateClassIntro(params)).rejects.toThrow('educational quality');
+      expect(reviewContexts()).toEqual([]);
+      expect(schemas()).toEqual(['class_intro_generation', 'class_intro_repair']);
     }
   );
 

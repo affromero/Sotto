@@ -113,3 +113,26 @@ export function freshIntroProtocol(immersion: boolean) {
     },
   };
 }
+
+export function compactIntroRepairProtocol(immersion: boolean) {
+  const text = z
+    .string()
+    .min(1)
+    .regex(/^\S+(?:\s+\S+){0,14}$/u);
+  const atom = scopedIntroAtomSchema.extend({ text, exampleIndex: z.literal(0) });
+  const example = z.object({ target: text, note: text, meaning: text }).strict();
+  const schema = freshIntroProtocol(immersion).repairSchema.extend({
+    purpose: text,
+    about: introExampleReferenceSchema.extend({ exampleIndex: z.literal(0) }),
+    focus: z.array(atom).length(1),
+    tips: z.array(atom).length(1),
+    examples: z.array(immersion ? example.omit({ meaning: true }) : example).length(1),
+  });
+  return {
+    schema,
+    responseFormat: {
+      name: 'class_intro_repair',
+      schema: z.toJSONSchema(schema, { target: 'draft-7' }),
+    },
+  };
+}

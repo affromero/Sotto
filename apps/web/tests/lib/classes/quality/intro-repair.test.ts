@@ -332,12 +332,14 @@ describe('field-local A1 intro repair', () => {
     'repairs an initial %i-word intro using its measured rejection',
     async (count) => {
       const oversized = introWithWordCount(count);
+      const compact = structuredClone(candidate);
+      for (const entries of [compact.focus, compact.examples, compact.tips]) entries.splice(1);
       boundary.generate
         .mockResolvedValueOnce({ content: JSON.stringify(oversized) })
-        .mockResolvedValueOnce({ content: JSON.stringify(candidate) });
-      queueReview(candidate);
+        .mockResolvedValueOnce({ content: JSON.stringify(compact) });
+      queueReview(compact);
 
-      await expect(generateClassIntro(params)).resolves.toEqual(candidate);
+      await expect(generateClassIntro(params)).resolves.toEqual(compact);
       const [, messages, options] = boundary.generate.mock.calls[1]!;
       expect(options.jsonSchema.name).toBe('class_intro_repair');
       expect(messages[0].content).toContain(
@@ -356,12 +358,12 @@ describe('field-local A1 intro repair', () => {
       );
       const reviewedAddresses = reviews.flatMap(([, messages]) => {
         const batch = JSON.parse(messages[0].content);
-        expect(batch.introContext).toEqual(candidate);
+        expect(batch.introContext).toEqual(compact);
         return batch.items.map(
           ({ content }: { content: { address: IntroAddress } }) => content.address
         );
       });
-      expect(reviewedAddresses).toEqual(introAddresses(candidate));
+      expect(reviewedAddresses).toEqual(introAddresses(compact));
     }
   );
 
