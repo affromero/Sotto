@@ -33,7 +33,12 @@ final class PlayInvitationUITests: XCTestCase {
         XCTAssertTrue(name.waitForExistence(timeout: 15), app.debugDescription)
         XCTAssertFalse(name.isEnabled, "The proposed name stays local until conduct is accepted.")
         try tap("play.conductConsent", type: .switch, app: app)
-        XCTAssertTrue(name.isEnabled, app.debugDescription)
+        let conductAccepted = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "value == %@", "1"),
+            object: app.switches["play.conductConsent"]
+        )
+        await fulfillment(of: [conductAccepted], timeout: 10)
+        XCTAssertTrue(name.wait(for: \.isEnabled, toEqual: true, timeout: 10), app.debugDescription)
         try tap("play.newName", type: .textField, app: app)
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5), app.debugDescription)
         name.typeText("Native Sam")
@@ -42,6 +47,10 @@ final class PlayInvitationUITests: XCTestCase {
         let consent = app.switches["Create my learner profile on this server"]
         XCTAssertTrue(consent.waitForExistence(timeout: 5))
         try tap("Create my learner profile on this server", type: .switch, app: app)
+        let profileCreationAccepted = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "value == %@", "1"), object: consent
+        )
+        await fulfillment(of: [profileCreationAccepted], timeout: 10)
         XCTAssertEqual(consent.value as? String, "1", app.debugDescription)
         try tap("Ask to join as a new learner", app: app)
         try tap("Finish joining", app: app, timeout: 15)
@@ -132,7 +141,14 @@ final class PlayInvitationUITests: XCTestCase {
             let origin = app.coordinate(withNormalizedOffset: .zero)
             if viewport.contains(frame) {
                 if control.isEnabled {
-                    control.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+                    if type == .switch || type == .textField {
+                        guard control.wait(for: \.isHittable, toEqual: true, timeout: timeout) else {
+                            throw InteractionFailure.invisibleButton(title)
+                        }
+                        control.tap()
+                    } else {
+                        control.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+                    }
                     return
                 }
                 let deadline = ContinuousClock.now.advanced(by: .seconds(timeout))
