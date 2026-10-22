@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 from collections.abc import Callable, Mapping, Sequence
@@ -10,11 +11,15 @@ from pathlib import Path, PurePosixPath
 from types import TracebackType
 from unittest.mock import patch
 
-from scripts.deploy.images.metadata import record
+from scripts.deploy.images.metadata import digest, record
 from scripts.deploy.review.runtime.mounts import MOUNT_PROBE
 from scripts.deploy.review.runtime.operations import (
     MAINTENANCE,
     HostOperations,
+)
+from scripts.deploy.review.runtime.release.migrations import (
+    canonical_loader,
+    child_transport,
 )
 from scripts.deploy.review.state import (
     Attempt,
@@ -26,6 +31,34 @@ from scripts.tests.review.runtime import admitted_runtime_fixture
 
 ToolExecutor = Callable[[Sequence[str], bytes | None, float | None], bytes]
 PREFIX = 'apps/web/prisma/migrations/'
+DUMMY_IDENTITY: dict[str, object] = {
+    'databaseName': 'fixture', 'databaseOid': '123', 'schemaName': 'public',
+    'serverAddress': '127.0.0.1', 'serverPort': 5432,
+}
+
+
+def index_proof(schema: str = 'public') -> dict[str, object]:
+    quoted = '"' + schema.replace('"', '""') + '"'
+    return {
+        'schemaName': schema, 'quotedSchema': quoted,
+        'tableName': 'SidedoorState',
+        'indexName': 'SidedoorState_id_pattern_idx', 'accessMethod': 'btree',
+        'isValid': True, 'isReady': True, 'isLive': True,
+        'isUnique': False, 'isPrimary': False, 'isExclusion': False,
+        'keyCount': 1, 'attributeCount': 1,
+        'noExpressions': True, 'noPredicate': True, 'columnName': 'id',
+        'operatorClass': 'text_pattern_ops', 'operatorNamespace': 'pg_catalog',
+        'ordering': 0, 'defaultCollation': True, 'sameSchema': True,
+        'definition': 'CREATE INDEX "SidedoorState_id_pattern_idx" ON '
+        + quoted + '."SidedoorState" USING btree (id text_pattern_ops)',
+    }
+
+
+KNOWN_SQL = (
+    b'-- DropIndex\nDROP INDEX "SidedoorState_id_pattern_idx";\n\n'
+    b'-- CreateIndex\nCREATE INDEX "SidedoorState_id_pattern_idx" '
+    b'ON "SidedoorState"("id" text_pattern_ops);\n'
+)
 
 
 def interleaved_inventories() -> list[dict[str, str]]:
@@ -64,6 +97,10 @@ class MigrationFixture:
     addition externally for the partial-stage checkpoint, then finish through
     migrate_stage. Check the real ledger and preservation at every checkpoint.
     Docker metadata and helper lifecycle checks run through image_command.
+    External executors require ``capture_evidence`` and ``capture_queues`` from
+    independent capture, including the actual databaseIdentityHash and original
+    queue snapshot connectionIdentity. Keep that named schema throughout controller
+    verification. Public mapping is only for historical finalization.
     """
 
     def __init__(
@@ -72,6 +109,8 @@ class MigrationFixture:
         helper_sources: Sequence[bytes] | None = None,
         tool_executor: ToolExecutor | None = None,
         environment: Mapping[str, str] | None = None,
+        capture_evidence: Mapping[str, object] | None = None,
+        capture_queues: Mapping[str, object] | None = None,
     ) -> None:
         if len(inventories) < 2:
             raise ValueError('A baseline and a candidate stage are required')
@@ -84,6 +123,16 @@ class MigrationFixture:
         self.deploy_result: Mapping[str, str] | None = None
         self.establishment: Mapping[str, object] | None = None
         self.drift = False
+        self.diff_status: object = 0
+        self.diff_stdout = b''
+        self.diff_stderr = b''
+        self.transport_output: bytes | None = None
+        self.database_identity = dict(DUMMY_IDENTITY)
+        self.catalog_index: object = index_proof()
+        self.catalog_overrides: dict[str, bytes] = {}
+        self.connection_identity = 'c' * 64 if capture_queues is None else digest(
+            capture_queues.get('connectionIdentity'), 'captured queue connection',
+        )
         self.helpers: dict[str, dict[str, object]] = {}
         self.commands: dict[str, list[str]] = {}
         self.inventories = [dict(item) for item in inventories]
@@ -97,6 +146,15 @@ class MigrationFixture:
             raise ValueError('Exact receipt inventory required')
         self.receipts = [dict(item) for item in receipts]
         repository = Path(__file__).resolve().parents[4]
+        tools: dict[str, str] = {}
+        for path in (repository / 'scripts/deploy').rglob('*'):
+            if not path.is_file() or path.suffix not in {'.py', '.ts', '.cjs'}:
+                continue
+            relative = path.relative_to(repository)
+            target = root / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(path.read_bytes())
+            tools[str(relative)] = hashlib.sha256(path.read_bytes()).hexdigest()
         if helper_sources is None:
             source = repository / 'scripts/deploy/queue-lifecycle.cjs'
             helper_sources = [source.read_bytes()] * len(inventories)
@@ -132,9 +190,27 @@ class MigrationFixture:
                 'id': self.original['Id'], 'imageId': self.original['Image'],
                 'environmentHash': checksum(original_environment),
             }},
-        }, 'images': self.receipts[1:], 'stages': self.stages[1:]}
-        self.attempt = Attempt.create(root, 'migration-attempt', manifest,
-                                      'a' * 64)
+        }, 'images': self.receipts[1:], 'stages': self.stages[1:],
+            'finalWorker': self.receipts[-1], 'tools': tools,
+            'originalQueues': {'schemaVersion': 1,
+                               'connectionIdentity': self.connection_identity,
+                               'queues': [{'name': 'fixture', 'paused': True}]}
+            if capture_queues is None else dict(capture_queues)}
+        if tool_executor is not None and (
+            capture_evidence is None or capture_queues is None
+        ):
+            raise ValueError('External proof requires independent capture evidence')
+        evidence = {'databaseIdentityHash': checksum(DUMMY_IDENTITY,
+                                                    ensure_ascii=False)} \
+            if capture_evidence is None else dict(capture_evidence)
+        evidence_bytes = json.dumps(evidence).encode()
+        self.attempt = Attempt.create(
+            root, 'migration-attempt', manifest,
+            hashlib.sha256(evidence_bytes).hexdigest(),
+        )
+        evidence_path = self.attempt.directory / 'evidence.json'
+        evidence_path.write_bytes(evidence_bytes)
+        evidence_path.chmod(0o600)
         self.retention = root / 'retention'
         self.retention.mkdir()
         for receipt in self.receipts[1:]:
@@ -295,27 +371,60 @@ class MigrationFixture:
                      and arguments[0] == '-e'
                      and 'SELECT json_agg' in arguments[1]
                      and 'FROM \\"_prisma_migrations\\"' in arguments[1])
-        if self.replay_only and not inventory:
-            raise AssertionError('Replay attempted a schema-changing tool')
         deploy = entrypoint == 'npx' and arguments == [
             '--no-install', 'prisma', 'migrate', 'deploy',
             '--config=/app/prisma.config.ts',
         ]
-        diff = entrypoint == 'npx' and arguments == [
-            '--no-install', 'prisma', 'migrate', 'diff',
-            '--config=/app/prisma.config.ts', '--from-config-datasource',
-            '--to-schema', '/app/apps/web/prisma/schema.prisma',
-            '--script', '--exit-code',
+        diff = entrypoint == 'node' and arguments == [
+            '-e', child_transport([
+                'npx', '--no-install', 'prisma', 'migrate', 'diff',
+                '--config=/app/prisma.config.ts', '--from-config-datasource',
+                '--to-schema', '/app/apps/web/prisma/schema.prisma',
+                '--script', '--exit-code',
+            ]),
         ]
+        catalog = entrypoint == 'node' and arguments == [
+            '--require', 'tsx/cjs', '-e', canonical_loader((self.root
+                / 'scripts/deploy/queue-lifecycle.cjs').read_bytes()),
+        ]
+        request = record(json.loads(content or b'{}'), 'fixture tool input')
+        catalog_command = request.get('command')
+        if catalog:
+            if reference != self.receipts[-1]['reference']:
+                raise AssertionError('Catalog requires the final worker image')
+            allowed = {'command', 'manifest'} if catalog_command == 'schema-index' \
+                else {'command'}
+            if (set(request) != allowed or catalog_command not in
+                    {'snapshot', 'database-identity', 'schema-index'}):
+                raise AssertionError('Only readonly canonical catalog commands allowed')
+            if catalog_command == 'schema-index' and request['manifest'] != {
+                'schemaVersion': 1, 'connectionIdentity': self.connection_identity,
+                'queues': [{'name': 'fixture', 'paused': True}],
+            } and self.tool_executor is None:
+                raise AssertionError('Schema index requires the actual snapshot')
+        if self.replay_only and not (inventory or catalog):
+            raise AssertionError('Replay attempted a schema-changing tool')
         established = entrypoint == 'node' and arguments == [
             '--require', 'tsx/cjs', '/review-stage/queue-lifecycle.cjs',
         ] and content == b'{"command":"established"}'
-        if not any((inventory, deploy, diff, established)):
+        if not any((inventory, deploy, diff, established, catalog)):
             raise AssertionError('Unexpected maintenance tool')
         if self.tool_executor is not None:
             return self.tool_executor(command, content, timeout)
         if inventory:
             return json.dumps(self.ledger).encode()
+        if catalog:
+            result: dict[str, object] = {
+                'schemaVersion': 1, 'connectionIdentity': self.connection_identity,
+            }
+            if catalog_command == 'snapshot':
+                result['queues'] = [{'name': 'fixture', 'paused': True}]
+            elif catalog_command == 'database-identity':
+                result['databaseIdentity'] = self.database_identity
+            else:
+                result['indexProof'] = self.catalog_index
+            return self.catalog_overrides.get(str(catalog_command),
+                b'SOTTO_DEPLOY_QUEUE=' + json.dumps(result).encode())
         index = next(index for index, item in enumerate(self.receipts)
                      if reference in (item['reference'], item['imageId']))
         if deploy:
@@ -323,10 +432,17 @@ class MigrationFixture:
             self.set_inventory(expected if self.deploy_result is None
                                else self.deploy_result)
         if established:
-            result = {
+            establishment = {
                 'established': True, 'appliedMigrations': len(self.ledger),
             } if self.establishment is None else self.establishment
-            return b'SOTTO_DEPLOY_QUEUE=' + json.dumps(result).encode()
+            return b'SOTTO_DEPLOY_QUEUE=' + json.dumps(establishment).encode()
         if diff and self.drift:
             raise RuntimeError('Prisma detected schema drift')
+        if diff:
+            return self.transport_output if self.transport_output is not None \
+                else json.dumps({
+                    'status': self.diff_status, 'failure': None,
+                    'stdout': base64.b64encode(self.diff_stdout).decode(),
+                    'stderr': base64.b64encode(self.diff_stderr).decode(),
+                }).encode()
         return b''

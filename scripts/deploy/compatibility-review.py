@@ -730,12 +730,9 @@ def unchanged_queue_contract(bound: Mapping[str, object]) -> None:
         raise ValueError('Schema transition requires unchanged queue names')
 
 
-def schema_drift(status: str, directory: Path) -> None:
-    if status not in {'0', '2'}:
-        raise ValueError('Prisma schema comparison failed')
-    preparation = mapping(read_bytes(
-        directory / 'schema-preparation.json', private=True,
-    ))
+def schema_catalog(directory: Path) -> dict[str, object]:
+    """Verify the catalog invariant independently of a Prisma comparison."""
+    preparation = mapping(read_bytes(directory / 'schema-preparation.json', private=True))
     report = mapping(read_bytes(directory / 'schema-index.json', private=True))
     if report.get('connectionIdentity') != preparation.get('applicationConnectionIdentity'):
         raise ValueError('Index proof database connection changed')
@@ -771,6 +768,13 @@ def schema_drift(status: str, directory: Path) -> None:
         for key, value in expected.items()
     ):
         raise ValueError('Shared-state index definition or validity differs')
+    return proof
+
+
+def schema_drift(status: str, directory: Path) -> None:
+    if status not in {'0', '2'}:
+        raise ValueError('Prisma schema comparison failed')
+    proof = schema_catalog(directory)
     sql = read_bytes(directory / 'schema-drift.sql', private=True)
     known = (
         b'-- DropIndex\nDROP INDEX "SidedoorState_id_pattern_idx";\n\n'
@@ -783,15 +787,14 @@ def schema_drift(status: str, directory: Path) -> None:
         b'', b'-- This is an empty migration.',
     }:
         raise ValueError('Unexpected SQL from an empty schema comparison')
+    preparation_hash = hashlib.sha256(read_bytes(directory / 'schema-preparation.json', private=True)).hexdigest()
     atomic_json(directory / 'schema-drift-proof.json', {
         'diffExitCode': int(status), 'sdkLimitationVerified': status == '2',
         'sqlSha256': hashlib.sha256(sql).hexdigest(), 'indexProof': proof,
-        'preparationSha256': hashlib.sha256(read_bytes(
-            directory / 'schema-preparation.json', private=True,
-        )).hexdigest(),
+        'preparationSha256': preparation_hash,
     })
-    print('Prisma schema comparison and PostgreSQL index integrity verified.'
-          + (' Exact BTree introspection limitation recorded.' if status == '2' else ''))
+    print('Prisma schema comparison and PostgreSQL index integrity verified.' +
+          (' Exact BTree introspection limitation recorded.' if status == '2' else ''))
 
 
 def schema_connections(bound: Path, old_slot: str) -> dict[str, object]:

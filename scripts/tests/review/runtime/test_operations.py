@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import base64
 import copy
 import hashlib
 import json
 import os
 import shlex
+import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -16,6 +19,12 @@ from unittest.mock import patch
 
 from scripts.deploy.review.egress import TABLE, semantic_policy
 from scripts.deploy.review.runtime.operations import HostOperations
+from scripts.deploy.review.runtime.release.migrations import (
+    OUTPUT_LIMIT,
+    canonical_loader,
+    child_transport,
+    diff_result,
+)
 from scripts.deploy.review.state import (
     Attempt,
     DeploymentLock,
@@ -25,9 +34,12 @@ from scripts.deploy.review.state import (
 )
 from scripts.deploy.review.topology import NETWORK
 from scripts.tests.review.runtime.migration_fixture import (
+    DUMMY_IDENTITY,
+    KNOWN_SQL,
     PREFIX,
     MigrationFixture,
     ToolExecutor,
+    index_proof,
     interleaved_inventories,
     sql_names,
 )
@@ -209,6 +221,13 @@ class MigrationStageTests(unittest.TestCase):
         return MigrationFixture(
             Path(temporary.name), inventories or interleaved_inventories(),
             tool_executor=tool_executor,
+            capture_evidence={'databaseIdentityHash': checksum(
+                DUMMY_IDENTITY, ensure_ascii=False,
+            )},
+            capture_queues={
+                'schemaVersion': 1, 'connectionIdentity': 'c' * 64,
+                'queues': [{'name': 'fixture', 'paused': True}],
+            },
         )
 
     def receipts(self, host: MigrationFixture) -> dict[str, bytes]:
@@ -216,9 +235,16 @@ class MigrationStageTests(unittest.TestCase):
                 host.attempt.directory.glob('stage-*.json')}
 
     def assert_receipt(self, host: MigrationFixture, index: int) -> None:
-        self.assertEqual(private_json(host.stage_path(index)), {
-            'verified': True, 'migrations': sql_names(host.inventories[index]),
-        })
+        receipt = private_json(host.stage_path(index))
+        self.assertIs(receipt['verified'], True)
+        self.assertEqual(receipt['migrations'], sql_names(host.inventories[index]))
+        directory = host.attempt.directory / str(receipt['verificationDirectory'])
+        self.assertEqual(receipt['verificationSha256'], hashlib.sha256(
+            (directory / 'verification.json').read_bytes(),
+        ).hexdigest())
+        proof = private_json(directory / 'verification.json')
+        self.assertIs(proof['verified'], True)
+        self.assertTrue((directory / 'schema-drift-proof.json').is_file())
 
     def advance(self, host: MigrationFixture, through: int) -> HostOperations:
         operations = host.reconstruct()
@@ -485,6 +511,253 @@ class MigrationStageTests(unittest.TestCase):
                                  sql_names(expected))
                 self.assertEqual(self.receipts(host), {})
 
+    def test_verified_known_sql_and_empty_comparisons_keep_exact_evidence(
+        self,
+    ) -> None:
+        for status, sql in ((0, b''), (0, b'-- This is an empty migration.\n'),
+                            (2, KNOWN_SQL), (2, KNOWN_SQL + b'\n')):
+            with self.subTest(status=status, sql=sql), self.host() as host:
+                host.diff_status, host.diff_stdout = status, sql
+                host.diff_stderr = b'fixture diagnostic\xff'
+                self.advance(host, 1)
+                receipt = private_json(host.stage_path(1))
+                directory = host.attempt.directory / str(
+                    receipt['verificationDirectory'],
+                )
+                self.assertEqual((directory / 'schema-drift.sql').read_bytes(), sql)
+                self.assertEqual((directory / 'schema-drift.stderr').read_bytes(),
+                                 host.diff_stderr)
+                proof = private_json(directory / 'schema-drift-proof.json')
+                self.assertEqual(proof['diffExitCode'], status)
+                self.assertIs(proof['sdkLimitationVerified'], status == 2)
+
+    def test_unrelated_sql_or_failed_status_preserves_failed_invocation(
+        self,
+    ) -> None:
+        for status, sql in ((2, b'ALTER TABLE other;'), (0, KNOWN_SQL),
+                            (1, b''), (True, b''), ('0', b''), (-9, b'')):
+            with self.subTest(status=status, sql=sql), self.host() as host:
+                host.diff_status, host.diff_stdout = status, sql
+                with self.assertRaises(ValueError):
+                    host.reconstruct().migrate_stage(host.stages[1], host.stages[0])
+                self.assertFalse(host.stage_path(1).exists())
+                failures = list(host.attempt.directory.glob('stage-verification-*'))
+                self.assertEqual(len(failures), 1)
+                self.assertTrue((failures[0] / 'prisma-result.json').is_file())
+                self.assertFalse((failures[0] / 'verification.json').exists())
+                prior = {p.name: p.read_bytes() for p in failures[0].iterdir()}
+                host.diff_status, host.diff_stdout = 0, b''
+                self.advance(host, 1)
+                self.assertEqual({p.name: p.read_bytes() for p in failures[0].iterdir()},
+                                 prior)
+
+    def test_catalog_and_admitted_identity_failures_never_complete_a_stage(
+        self,
+    ) -> None:
+        for change in ('missing', 'operator', 'validity', 'boolean-count',
+                       'schema', 'extra-field', 'connection', 'identity-field',
+                       'identity-type', 'database', 'evidence'):
+            with self.subTest(change=change), self.host() as host:
+                index = index_proof()
+                if change == 'missing':
+                    host.catalog_index = None
+                elif change in ('operator', 'validity', 'boolean-count', 'schema'):
+                    key, value = {
+                        'operator': ('operatorClass', 'text_ops'),
+                        'validity': ('isValid', False),
+                        'boolean-count': ('keyCount', True),
+                        'schema': ('schemaName', 'foreign'),
+                    }[change]
+                    index[key] = value
+                    host.catalog_index = index
+                elif change == 'extra-field':
+                    host.catalog_overrides['schema-index'] = (
+                        b'SOTTO_DEPLOY_QUEUE=' + json.dumps({
+                            'schemaVersion': 1, 'connectionIdentity': 'c' * 64,
+                            'indexProof': index, 'transition': {},
+                        }).encode()
+                    )
+                elif change == 'connection':
+                    host.connection_identity = 'd' * 64
+                elif change == 'identity-field':
+                    host.database_identity['extra'] = 'foreign'
+                elif change == 'identity-type':
+                    host.database_identity['serverPort'] = True
+                elif change == 'database':
+                    host.database_identity['databaseOid'] = '456'
+                else:
+                    atomic_json(host.attempt.directory / 'evidence.json', {
+                        'databaseIdentityHash': '0' * 64,
+                    })
+                with self.assertRaises(ValueError):
+                    host.reconstruct().migrate_stage(host.stages[1], host.stages[0])
+                self.assertFalse(host.stage_path(1).exists())
+                self.assertTrue(list(host.attempt.directory.glob(
+                    'stage-verification-*/schema-index.raw',
+                )))
+
+    def test_malformed_catalog_framing_and_transport_preserve_raw_failures(
+        self,
+    ) -> None:
+        bad_catalogs = (b'', b'SOTTO_DEPLOY_QUEUE={}\nSOTTO_DEPLOY_QUEUE={}',
+                        b'SOTTO_DEPLOY_QUEUE={"schemaVersion":1,"schemaVersion":1}',
+                        b'SOTTO_DEPLOY_QUEUE={"schemaVersion":true}',
+                        b'SOTTO_DEPLOY_QUEUE=' + b'x' * 262_145)
+        for raw in bad_catalogs:
+            with self.subTest(catalog=raw[:80]), self.host() as host:
+                host.catalog_overrides['schema-index'] = raw
+                with self.assertRaises(ValueError):
+                    host.reconstruct().migrate_stage(host.stages[1], host.stages[0])
+                path = next(host.attempt.directory.glob(
+                    'stage-verification-*/schema-index.raw',
+                ))
+                self.assertEqual(path.read_bytes(), raw)
+                self.assertFalse(host.stage_path(1).exists())
+        with self.host() as host:
+            host.transport_output = b'{broken transport'
+            with self.assertRaises(ValueError):
+                host.reconstruct().migrate_stage(host.stages[1], host.stages[0])
+            path = next(host.attempt.directory.glob(
+                'stage-verification-*/prisma-result.json',
+            ))
+            self.assertEqual(path.read_bytes(), host.transport_output)
+
+    def test_utf8_database_identity_uses_the_independently_admitted_hash(
+        self,
+    ) -> None:
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        identity = {**DUMMY_IDENTITY, 'schemaName': 'cours_é'}
+        with MigrationFixture(
+            Path(temporary.name), interleaved_inventories(),
+            capture_evidence={'databaseIdentityHash': checksum(
+                identity, ensure_ascii=False,
+            )},
+        ) as host:
+            host.database_identity = identity
+            host.catalog_index = index_proof('cours_é')
+            self.advance(host, 1)
+
+    def test_retained_replay_rechecks_catalog_and_preserves_completion_proof(
+        self,
+    ) -> None:
+        with self.host() as host:
+            self.advance(host, 2)
+            receipts = self.receipts(host)
+            original = {str(p): p.read_bytes() for p in
+                        host.attempt.directory.glob('stage-verification-*/*')}
+            host.replay_only = True
+            host.reconstruct().migrate_stage(host.stages[1], host.stages[0])
+            for name, raw in original.items():
+                self.assertEqual(Path(name).read_bytes(), raw)
+            replay = [p for p in host.attempt.directory.glob('stage-verification-*')
+                      if not (p / 'prisma-result.json').exists()]
+            self.assertEqual(len(replay), 1)
+            proof = private_json(replay[0] / 'verification.json')
+            binding = proof['binding']
+            assert isinstance(binding, dict)
+            self.assertEqual(binding['mode'], 'catalog-replay')
+            self.assertFalse((replay[0] / 'schema-drift-proof.json').exists())
+            host.catalog_index = {**index_proof(), 'operatorClass': 'text_ops'}
+            with self.assertRaisesRegex(ValueError, 'index definition'):
+                host.reconstruct().migrate_stage(host.stages[1], host.stages[0])
+            self.assertEqual(self.receipts(host), receipts)
+
+    def test_retained_replay_requires_original_hash_files_and_binding(
+        self,
+    ) -> None:
+        for change in ('legacy', 'missing', 'hash', 'sql', 'directory',
+                       'attempt', 'stage', 'verifier', 'tools'):
+            with self.subTest(change=change), self.host() as host:
+                self.advance(host, 1)
+                receipt = private_json(host.stage_path(1))
+                directory = host.attempt.directory / str(
+                    receipt['verificationDirectory'],
+                )
+                if change == 'legacy':
+                    receipt = {'verified': True,
+                               'migrations': sql_names(host.inventories[1])}
+                elif change == 'missing':
+                    (directory / 'verification.json').unlink()
+                elif change == 'hash':
+                    receipt['verificationSha256'] = '0' * 64
+                elif change == 'sql':
+                    (directory / 'schema-drift.sql').write_bytes(b'changed')
+                elif change == 'directory':
+                    receipt['verificationDirectory'] = '../foreign'
+                else:
+                    proof = private_json(directory / 'verification.json')
+                    binding = proof['binding']
+                    assert isinstance(binding, dict)
+                    key = 'attemptDirectory' if change == 'attempt' else change
+                    binding[key] = 'foreign'
+                    atomic_json(directory / 'verification.json', proof)
+                    receipt['verificationSha256'] = hashlib.sha256(
+                        (directory / 'verification.json').read_bytes(),
+                    ).hexdigest()
+                atomic_json(host.stage_path(1), receipt)
+                host.replay_only = True
+                before = self.receipts(host)
+                with self.assertRaises((ValueError, OSError)):
+                    host.reconstruct().migrate_stage(host.stages[1], host.stages[0])
+                self.assertEqual(self.receipts(host), before)
+
+    def test_interrupted_completion_reruns_verification_without_losing_proof(
+        self,
+    ) -> None:
+        with self.host() as host:
+            replace = os.replace
+
+            def interrupted(source: str, destination: Path) -> None:
+                if destination == host.stage_path(1):
+                    raise OSError('fixture process loss before completed receipt')
+                replace(source, destination)
+
+            with (patch('os.replace', side_effect=interrupted),
+                  self.assertRaisesRegex(OSError, 'process loss')):
+                host.reconstruct().migrate_stage(host.stages[1], host.stages[0])
+            self.assertFalse(host.stage_path(1).exists())
+            original = {str(p): p.read_bytes() for p in
+                        host.attempt.directory.glob('stage-verification-*/*')}
+            self.advance(host, 1)
+            self.assertEqual(len(list(host.attempt.directory.glob(
+                'stage-verification-*/verification.json',
+            ))), 2)
+            for name, raw in original.items():
+                self.assertEqual(Path(name).read_bytes(), raw)
+
+    def test_changed_canonical_source_refuses_verification_without_completion(
+        self,
+    ) -> None:
+        for relative in ('scripts/deploy/queue-lifecycle.cjs',
+                         'scripts/deploy/compatibility-review.py',
+                         'scripts/deploy/review/runtime/release/migrations.py'):
+            with self.subTest(source=relative), self.host() as host:
+                (host.root / relative).write_bytes(b'changed source')
+                with self.assertRaisesRegex(ValueError, 'runtime-tool-changed'):
+                    host.reconstruct().migrate_stage(host.stages[1], host.stages[0])
+                self.assertFalse(host.stage_path(1).exists())
+                self.assertEqual(list(host.attempt.directory.glob(
+                    'stage-verification-*',
+                )), [])
+
+    def test_external_executor_errors_cannot_use_the_simulated_ledger(
+        self,
+    ) -> None:
+        def unavailable(
+            command: Sequence[str], content: bytes | None,
+            timeout: float | None,
+        ) -> bytes:
+            self.assertEqual(command[:2], ['docker', 'create'])
+            self.assertIsNone(content)
+            self.assertEqual(timeout, 900)
+            raise RuntimeError('external fixture unavailable')
+
+        with self.host(tool_executor=unavailable) as host:
+            with self.assertRaisesRegex(RuntimeError, 'external fixture'):
+                host.reconstruct().applied_migrations()
+            self.assertEqual(self.receipts(host), {})
+
     def test_supplied_process_executor_observes_canonical_rendered_tools(
         self,
     ) -> None:
@@ -511,3 +784,114 @@ class MigrationStageTests(unittest.TestCase):
                 item['status'] == 'settled' and item['exitCode'] == 0
                 for item in journals
             ))
+
+
+class PrismaTransportTests(unittest.TestCase):
+    def node(self) -> str:
+        executable = shutil.which('node')
+        if executable is None:
+            self.fail('Node is required for actual transport coverage')
+        return executable
+
+    def run_transport(
+        self, arguments: Sequence[str], *, timeout_ms: int = 5_000,
+        output_limit: int = OUTPUT_LIMIT,
+    ) -> bytes:
+        result = subprocess.run(
+            [self.node(), '-e', child_transport(
+                arguments, timeout_ms=timeout_ms, output_limit=output_limit,
+            )], capture_output=True, timeout=10, check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr.decode(errors='replace'))
+        return result.stdout
+
+    def test_actual_child_returns_exact_status_bytes_arguments_and_direct_url(
+        self,
+    ) -> None:
+        for status in (0, 2):
+            with self.subTest(status=status), patch.dict(os.environ, {
+                'DATABASE_URL': 'fixture-application',
+                'DIRECT_DATABASE_URL': 'fixture-foreign',
+            }):
+                script = (
+                    'process.stdout.write(Buffer.from([0,255,128,10]));'
+                    'process.stderr.write(Buffer.from([254,0]));'
+                    'if(process.env.DIRECT_DATABASE_URL!==process.env.DATABASE_URL'
+                    '||process.argv[1]!=="literal;$(exit 9)")process.exit(7);'
+                    f'process.exitCode={status};'
+                )
+                raw = self.run_transport([
+                    self.node(), '-e', script, 'literal;$(exit 9)',
+                ])
+                self.assertEqual(diff_result(raw), {
+                    'status': status, 'stdout': b'\x00\xff\x80\n',
+                    'stderr': b'\xfe\x00',
+                })
+
+    def test_compiled_helper_calls_exported_main_with_untouched_request_stdin(
+        self,
+    ) -> None:
+        source = b'''module.exports.main=async()=>{
+let input='';for await(const chunk of process.stdin)input+=chunk;
+process.stdout.write('SOTTO_DEPLOY_QUEUE='+JSON.stringify(JSON.parse(input)));
+};if(require.main===module)throw Error('unexpected executable entrypoint');'''
+        result = subprocess.run(
+            [self.node(), '-e', canonical_loader(source)],
+            input=b'{"command":"schema-index","manifest":{"queues":[]}}',
+            capture_output=True, timeout=10, check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr.decode(errors='replace'))
+        self.assertEqual(json.loads(result.stdout.removeprefix(b'SOTTO_DEPLOY_QUEUE=')),
+                         {'command': 'schema-index', 'manifest': {'queues': []}})
+
+    def test_actual_signal_timeout_spawn_and_overflow_fail_with_bounded_evidence(
+        self,
+    ) -> None:
+        cases = [
+            ('signal', [self.node(), '-e', 'process.kill(process.pid,"SIGTERM")']),
+            ('timeout', [self.node(), '-e', 'setInterval(()=>{},1000)']),
+            ('spawn', ['/sotto-fixture-nonexistent-executable']),
+            ('output-bound', [self.node(), '-e',
+                              'process.stdout.write(Buffer.alloc(4096,255))']),
+            ('output-bound', [self.node(), '-e',
+                              'process.stderr.write(Buffer.alloc(4096,255))']),
+        ]
+        for failure, argv in cases:
+            with self.subTest(failure=failure, argv=argv):
+                raw = self.run_transport(argv, timeout_ms=300, output_limit=1024)
+                envelope = json.loads(raw)
+                self.assertEqual(envelope['failure'], failure)
+                self.assertLessEqual(len(base64.b64decode(envelope['stdout'])), 1024)
+                self.assertLessEqual(len(base64.b64decode(envelope['stderr'])), 1024)
+                with self.assertRaisesRegex(ValueError, 'child-comparison-failed'):
+                    diff_result(raw)
+        raw = self.run_transport([self.node(), '-e',
+                                  'process.stderr.write("real failure");process.exit(17)'])
+        self.assertEqual(json.loads(raw)['status'], 17)
+        self.assertEqual(base64.b64decode(json.loads(raw)['stderr']), b'real failure')
+        with self.assertRaises(ValueError):
+            diff_result(raw)
+
+    def test_python_rejects_duplicate_extra_malformed_or_noncanonical_envelopes(
+        self,
+    ) -> None:
+        valid: dict[str, object] = {'status': 0, 'failure': None,
+                                    'stdout': '', 'stderr': ''}
+        changes: list[dict[str, object]] = [
+            {'status': True}, {'status': 0.0}, {'status': '0'},
+            {'status': None}, {'failure': 'signal'}, {'extra': True},
+            {'stdout': 'AA'}, {'stdout': 'AB=='}, {'stderr': '%%%%'},
+            {'stdout': 1}, {'stdout': 'AA==\n'},
+            {'stderr': base64.b64encode(b'x' * (OUTPUT_LIMIT + 1)).decode()},
+        ]
+        malformed = [json.dumps({**valid, **change}).encode() for change in changes]
+        malformed.extend([
+            b'{"status":0,"status":2,"failure":null,"stdout":"","stderr":""}',
+            b'{"status":NaN,"failure":null,"stdout":"","stderr":""}',
+            b'{"status":Infinity,"failure":null,"stdout":"","stderr":""}',
+            b'{}', b'[]', b'{', json.dumps(valid).encode() + b'{}',
+            b'x' * 262_145,
+        ])
+        for raw in malformed:
+            with self.subTest(raw=raw[:100]), self.assertRaises(ValueError):
+                diff_result(raw)

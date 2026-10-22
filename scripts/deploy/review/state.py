@@ -24,9 +24,9 @@ PHASES = (
 )
 
 
-def checksum(value: object) -> str:
+def checksum(value: object, *, ensure_ascii: bool = True) -> str:
     return hashlib.sha256(json.dumps(
-        value, sort_keys=True, separators=(',', ':'),
+        value, sort_keys=True, separators=(',', ':'), ensure_ascii=ensure_ascii,
     ).encode()).hexdigest()
 
 

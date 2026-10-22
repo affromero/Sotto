@@ -39,6 +39,7 @@ from scripts.deploy.review.runtime.release.migrations import (
     later_stage_progress,
     migration_inventory,
     stage_progress,
+    verify_stage_schema,
 )
 from scripts.deploy.review.runtime.services import (
     backup_review,
@@ -665,14 +666,14 @@ class HostOperations:
         )
         if retained.exists():
             proof = private_json(retained)
-            if proof.get('verified') is not True or proof != {
-                'verified': True, 'migrations': expected,
-            }:
+            if (proof.get('verified') is not True
+                    or proof.get('migrations') != expected):
                 raise ValueError('retained-stage-verification-changed')
             inventories = [migration_inventory(item) for item in
                            rows(self.manifest['stages'], 'admitted stage')]
             if not later_stage_progress(applied, expected, inventories):
                 raise ValueError('unknown-post-stage-sql-state')
+            verify_stage_schema(self, stage, retained=proof)
             return
         if not stage_progress(
             applied, migration_inventory(previous), expected,
@@ -704,15 +705,10 @@ class HostOperations:
         if (len(proofs) != 1 or proofs[0].get('established') is not True
                 or proofs[0].get('appliedMigrations') != len(expected)):
             raise ValueError('canonical-stage-establishment-failed')
-        self.image_command(receipt, 'npx', [
-            '--no-install', 'prisma', 'migrate', 'diff',
-            '--config=/app/prisma.config.ts', '--from-config-datasource',
-            '--to-schema', '/app/apps/web/prisma/schema.prisma',
-            '--script', '--exit-code',
-        ])
+        verification = verify_stage_schema(self, stage)
         atomic_json(self.attempt.directory / (
             'stage-' + cast(str, receipt['sha']) + '.json'
-        ), {'verified': True, 'migrations': expected})
+        ), {'verified': True, 'migrations': expected, **verification})
 
     def backups(self) -> None:
         backup_review(self)
