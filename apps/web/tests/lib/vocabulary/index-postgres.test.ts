@@ -351,6 +351,90 @@ suite('complete material vocabulary with durable source coverage', () => {
     vi.unstubAllEnvs();
   });
 
+  it.each([
+    ['QUEUED', 'PENDING'],
+    ['EXTRACTING', 'PENDING'],
+    ['LEGACY', 'NOT_INDEXED'],
+    ['READY', 'NOT_INDEXED'],
+    ['PARTIAL', 'NOT_INDEXED'],
+    ['RETAINED', 'NOT_INDEXED'],
+    ['AWAITING_UPLOAD', 'NOT_INDEXED'],
+    ['FAILED', 'NOT_INDEXED'],
+    ['CANCELLED', 'NOT_INDEXED'],
+    ['EXPIRED', 'NOT_INDEXED'],
+    ['RECOVERY_REQUIRED', 'NOT_INDEXED'],
+  ])(
+    'shows unindexed %s material as %s without admitting work or changing mastery',
+    async (processingStatus, status) => {
+      const text = 'Bahnhof = station';
+      const material = await upload(text, false);
+      await instance.database.courseMaterial.update({
+        where: { id: material.id },
+        data: {
+          courseId,
+          processingStatus,
+          originalSha256:
+            processingStatus === 'LEGACY' ? null : createHash('sha256').update(text).digest('hex'),
+          extractedText: processingStatus === 'LEGACY' ? text : '',
+        },
+      });
+      const known = await instance.database.learnerVocab.create({
+        data: {
+          courseId,
+          lemma: 'Bahnhof',
+          translation: 'station',
+          mastery: 0.91,
+          reps: 8,
+          lastReviewed: new Date(),
+        },
+      });
+      expect(await instance.database.materialVocabularyIndex.count()).toBe(0);
+
+      const dictionary = await readDictionary(courseId, identity.ownerId, {});
+
+      expect(dictionary.materials).toEqual([
+        expect.objectContaining({ id: material.id, status, totalChunks: 0, entries: 0 }),
+      ]);
+      expect(await instance.database.materialVocabularyIndex.count()).toBe(0);
+      expect(await instance.database.learnerVocab.findMany({ where: { courseId } })).toEqual([
+        known,
+      ]);
+      expect(await instance.database.learnerReviewEvent.count({ where: { courseId } })).toBe(0);
+      expect(requests).toEqual([]);
+    }
+  );
+
+  it.each(['PENDING', 'ACTIVE', 'COMPLETE', 'FAILED', 'NEEDS_TEXT', 'UNRESOLVED'])(
+    'preserves a current %s index while material processing is queued or extracting',
+    async (status) => {
+      const material = await upload('Bahnhof = station');
+      const existing = await instance.database.materialVocabularyIndex.findFirstOrThrow({
+        where: { materialId: material.id },
+      });
+      const current = await instance.database.materialVocabularyIndex.update({
+        where: { id: existing.id },
+        data: { status },
+      });
+      for (const processingStatus of ['QUEUED', 'EXTRACTING']) {
+        await instance.database.courseMaterial.update({
+          where: { id: material.id },
+          data: { processingStatus },
+        });
+
+        const dictionary = await readDictionary(courseId, identity.ownerId, {});
+
+        expect(dictionary.materials[0]).toMatchObject({ id: material.id, status });
+        expect(
+          await instance.database.materialVocabularyIndex.findMany({
+            where: { materialId: material.id },
+          })
+        ).toEqual([current]);
+      }
+      expect(await instance.database.learnerVocab.count({ where: { courseId } })).toBe(0);
+      expect(requests).toEqual([]);
+    }
+  );
+
   it('reports a bootstrap workspace failure and retries without a previous model request', async () => {
     const blocked = join(root, 'not-an-execution-directory');
     await writeFile(blocked, 'blocked');
@@ -609,6 +693,33 @@ suite('complete material vocabulary with durable source coverage', () => {
         quote: 'Bahnhof\u0000 Fahrkarte',
         coordinateSystem: 'MATERIAL_CODEPOINTS',
       });
+      if (complete) {
+        const words = await instance.database.learnerVocab.findMany({
+          where: { courseId },
+          orderBy: { id: 'asc' },
+        });
+        for (const processingStatus of ['QUEUED', 'EXTRACTING']) {
+          await instance.database.courseMaterial.update({
+            where: { id },
+            data: { processingRevision: 2, processingStatus },
+          });
+
+          const pending = await readDictionary(courseId, actor.userId, {});
+
+          expect(pending.materials[0]).toMatchObject({ id, status: 'PENDING' });
+          expect(
+            await instance.database.materialVocabularyIndex.findMany({
+              where: { materialId: id },
+            })
+          ).toEqual([indexed]);
+          expect(
+            await instance.database.learnerVocab.findMany({
+              where: { courseId },
+              orderBy: { id: 'asc' },
+            })
+          ).toEqual(words);
+        }
+      }
     },
     60000
   );
