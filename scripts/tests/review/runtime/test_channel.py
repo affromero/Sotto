@@ -28,11 +28,13 @@ class ReviewChannelTests(unittest.TestCase):
         self.addCleanup(self.lock.close)
         self.fences = 0
         self.fence_failure = False
+        self.fence_failure_after: int | None = None
         self.manifests: list[dict[str, object]] = []
 
     def fence(self) -> None:
         self.lock.validate()
-        if self.fence_failure:
+        if (self.fence_failure or self.fence_failure_after is not None
+                and self.fences >= self.fence_failure_after):
             raise ValueError('actual-fence-missing')
         self.fences += 1
 
@@ -40,6 +42,7 @@ class ReviewChannelTests(unittest.TestCase):
         self, body: str, *, mode: str = 'providers', timeout: float = 2,
     ) -> object:
         preamble = '''import json,os,sys,time
+from pathlib import Path
 initial=json.loads(sys.stdin.readline())
 def emit(value):
  print('SOTTO_REVIEW_IPC='+json.dumps(value),flush=True)
@@ -56,6 +59,76 @@ def ack(identity):
             ),
             timeout=timeout,
         )
+
+    def test_default_budget_accepts_100_then_refuses_101_without_ack(
+        self,
+    ) -> None:
+        accepted = '''for identity in range(1,101):
+ emit({'type':'fence','id':identity});ack(identity)
+'''
+        self.assertEqual(self.run_child(accepted + '''emit({
+ 'type':'result','value':{'accepted':100}})
+'''), {'accepted': 100})
+        self.assertEqual(self.fences, 100)
+        rejected = self.root / 'rejected-ack'
+        with self.assertRaisesRegex(ValueError, 'ack-sequence-changed'):
+            self.run_child(accepted + '''emit({'type':'fence','id':101})
+Path(REJECTED).write_text(sys.stdin.readline())
+'''.replace('REJECTED', repr(str(rejected))))
+        self.assertEqual(self.fences, 200)
+        self.assertEqual(rejected.read_bytes(), b'')
+
+    def test_workload_budget_completes_after_4096_acknowledgements(
+        self,
+    ) -> None:
+        result = self.run_child('''for identity in range(1,4097):
+ emit({'type':'fence','id':identity});ack(identity)
+emit({'type':'result','value':{'accepted':4096}})
+''', mode='workloads')
+        self.assertEqual(result, {'accepted': 4096})
+        self.assertEqual(self.fences, 4096)
+
+    def workload_checkpoint_script(self, accepted: int) -> str:
+        return '''checkpoint={'version':1,'inputHash':'a'*64,'startedAt':123,
+ 'profiles':[{'courseIntent':True},{'courseIntent':False}]}
+emit({'type':'workloadCheckpoint','id':1,'value':checkpoint});ack(1)
+Path(SNAPSHOT).write_bytes(Path(CHECKPOINT).read_bytes())
+for identity in range(2,ACCEPTED+1):
+ emit({'type':'fence','id':identity});ack(identity)
+checkpoint['startedAt']=456
+emit({'type':'workloadCheckpoint','id':ACCEPTED+1,'value':checkpoint})
+Path(REJECTED).write_text(sys.stdin.readline())
+'''.replace('ACCEPTED', str(accepted)).replace('SNAPSHOT', repr(str(
+            self.root / 'checkpoint-snapshot',
+        ))).replace('CHECKPOINT', repr(str(
+            self.root / 'workload-checkpoint.json',
+        ))).replace('REJECTED', repr(str(self.root / 'rejected-ack')))
+
+    def assert_workload_checkpoint_retained(self, accepted: int) -> None:
+        retained = self.root / 'workload-checkpoint.json'
+        self.assertEqual(self.fences, accepted)
+        self.assertEqual(retained.read_bytes(),
+                         (self.root / 'checkpoint-snapshot').read_bytes())
+        self.assertEqual(private_json(retained)['startedAt'], 123)
+        self.assertEqual(retained.stat().st_mode & 0o777, 0o600)
+        self.assertEqual((self.root / 'rejected-ack').read_bytes(), b'')
+
+    def test_workload_overflow_4097_preserves_durable_checkpoint_without_ack(
+        self,
+    ) -> None:
+        with self.assertRaisesRegex(ValueError, 'ack-sequence-changed'):
+            self.run_child(self.workload_checkpoint_script(4096),
+                           mode='workloads')
+        self.assert_workload_checkpoint_retained(4096)
+
+    def test_workload_fence_loss_after_100_preserves_checkpoint_without_ack(
+        self,
+    ) -> None:
+        self.fence_failure_after = 120
+        with self.assertRaisesRegex(ValueError, 'actual-fence-missing'):
+            self.run_child(self.workload_checkpoint_script(120),
+                           mode='workloads')
+        self.assert_workload_checkpoint_retained(120)
 
     def test_acknowledges_only_after_durable_checkpoint_and_actual_fence(
         self,
@@ -195,8 +268,8 @@ emit({'type':'result','value':{'prepared':True}})
         for script, message in [
             ("sys.stdout.write('SOTTO_REVIEW_IPC={');sys.stdout.flush()",
              'result-unresolved'),
-            ("emit({'type':'result','value':{}});"
-             "emit({'type':'result','value':{}})", 'message-after-result'),
+            (("emit({'type':'result','value':{}});"
+              "emit({'type':'result','value':{}})"), 'message-after-result'),
         ]:
             with self.subTest(script=script), self.assertRaisesRegex(
                 ValueError, message,
