@@ -141,7 +141,7 @@ final class PlayInvitationUITests: XCTestCase {
             let origin = app.coordinate(withNormalizedOffset: .zero)
             if viewport.contains(frame) {
                 if control.isEnabled {
-                    if type == .switch {
+                    if type == .switch || type == .textField {
                         guard control.wait(for: \.isHittable, toEqual: true, timeout: timeout) else {
                             throw InteractionFailure.invisibleButton(title)
                         }
