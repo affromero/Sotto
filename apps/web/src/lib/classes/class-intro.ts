@@ -17,6 +17,7 @@ import {
 import { combineTeachingFailures, retainTeachingFailure } from './quality/teaching-failure';
 import {
   classIntroExampleMeaningPolicy,
+  classIntroFieldRolePolicy,
   classIntroGrammarRulePolicy,
   classLanguagePolicy,
   isImmersionLevel,
@@ -773,6 +774,7 @@ export async function generateClassIntro(p: ClassIntroParams): Promise<ClassIntr
     TARGET: p.targetLang,
     LEVEL: p.level,
     EXAMPLE_MEANING_POLICY: meaningPolicy,
+    INTRO_FIELD_ROLE_POLICY: classIntroFieldRolePolicy(),
     GRAMMAR_RULE_POLICY: classIntroGrammarRulePolicy(),
     INTRO_SCHEMA: JSON.stringify(protocol.generationResponseFormat.schema),
     INTRO_EXAMPLE: JSON.stringify(

@@ -211,43 +211,49 @@ describe('terminal generation failure classification', () => {
     expect(generationCleanupUnconfirmed('Private transport text.')).toBe(false);
   });
 
-  it('seals ordered actual shape and teaching attempts without exposing error text', () => {
-    const teaching = captureTeachingFailure('speaking', [{ targetPhrase: 'Private phrase.' }], {
-      items: [
-        {
-          index: 0,
-          acceptable: false,
-          issues: ['incorrect'],
-          feedback: ['Private teaching feedback.'],
-        },
-      ],
-    });
-    const error = new Error('Private provider response diagnostic.');
-    recordGenerationAttemptFailures(error, [
-      captureTeachingAttempt(1, teaching),
-      captureStructureAttempt('speaking', 2, 'Private malformed output.', [
-        { code: 'invalid_json' },
-      ]),
-    ]);
+  it.each(['speaking', 'teaching'] as const)(
+    'seals ordered actual %s shape and teaching attempts without exposing error text',
+    (kind) => {
+      const teaching = captureTeachingFailure(kind, [{ targetPhrase: 'Private phrase.' }], {
+        items: [
+          {
+            index: 0,
+            acceptable: false,
+            issues: ['incorrect'],
+            feedback: ['Private teaching feedback.'],
+          },
+        ],
+      });
+      const error = new Error('Private provider response diagnostic.');
+      recordGenerationAttemptFailures(error, [
+        captureTeachingAttempt(1, teaching),
+        captureStructureAttempt(kind, 2, 'Private malformed output.', [
+          { code: kind === 'teaching' ? 'teaching_word_limit' : 'invalid_json' },
+        ]),
+      ]);
 
-    const captured = captureGenerationFailure(error);
-    expect(captured).toEqual({
-      category: 'generation_failed',
-      attemptFailures: [
-        { attempt: 1, type: 'teaching', failure: teaching },
-        {
-          attempt: 2,
-          type: 'structure',
-          kind: 'speaking',
-          candidate: 'Private malformed output.',
-          issues: [{ code: 'invalid_json' }],
-        },
-      ],
-    });
-    expect(generationFailureSchema.parse(captured)).toEqual(captured);
-    expect(JSON.stringify(error)).not.toContain('Private');
-    expect(JSON.stringify(captured)).not.toContain('provider response diagnostic');
-  });
+      const captured = captureGenerationFailure(error);
+      expect(captured).toEqual({
+        category: 'generation_failed',
+        attemptFailures: [
+          { attempt: 1, type: 'teaching', failure: teaching },
+          {
+            attempt: 2,
+            type: 'structure',
+            kind,
+            candidate: 'Private malformed output.',
+            issues: [{ code: kind === 'teaching' ? 'teaching_word_limit' : 'invalid_json' }],
+          },
+        ],
+      });
+      expect(generationFailureSchema.parse(captured)).toEqual(captured);
+      expect(durableGenerationFailure(captured).attemptFailures?.[1]).toEqual(
+        captured.attemptFailures?.[1]
+      );
+      expect(JSON.stringify(error)).not.toContain('Private');
+      expect(JSON.stringify(captured)).not.toContain('provider response diagnostic');
+    }
+  );
 
   it.each(['wrong_count', 'script_dialogue_turn_too_long'] as const)(
     'omits oversized malformed candidates while retaining the static %s issue',

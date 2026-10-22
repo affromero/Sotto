@@ -17,6 +17,8 @@ Learner context:
 Language policy:
 {{LANGUAGE_POLICY}}
 
+{{INTRO_FIELD_ROLE_POLICY}}
+
 Write the material the learner should see before any questions. It must explain the purpose of the class, what the class is about, the main rules/patterns, practical tricks, concrete examples, and the visual aids that would help the learner remember it.
 
 Rules:

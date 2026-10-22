@@ -8,6 +8,8 @@ Selected new or review vocabulary: {{VOCABULARY}}
 Language policy:
 {{LANGUAGE_POLICY}}
 
+The input title is a curriculum reference. Write the returned learner-visible title in the language required by this policy, even when the reference title uses another language.
+
 {{NOTES}}
 
 Supplied source material, when available:

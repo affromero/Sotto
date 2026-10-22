@@ -9,6 +9,7 @@ const structureIssueSchema = z
       'invalid_container',
       'wrong_count',
       'invalid_item',
+      'teaching_word_limit',
       'script_vocabulary_duplicate_number',
       'script_vocabulary_ambiguous_identity',
       'script_vocabulary_missing_identity',
@@ -25,7 +26,7 @@ const structureAttemptSchema = z
   .object({
     attempt: z.union([z.literal(1), z.literal(2)]),
     type: z.literal('structure'),
-    kind: z.enum(['speaking', 'writing', 'listening']),
+    kind: z.enum(['speaking', 'writing', 'listening', 'teaching']),
     candidate: z
       .string()
       .refine((value) => Buffer.byteLength(value, 'utf8') <= MAX_CANDIDATE_BYTES)
@@ -82,7 +83,7 @@ export function generationAttemptFailures(error: unknown): GenerationAttemptFail
 }
 
 export function captureStructureAttempt(
-  kind: 'speaking' | 'writing' | 'listening',
+  kind: 'speaking' | 'writing' | 'listening' | 'teaching',
   attempt: 1 | 2,
   candidate: string | null,
   issues: readonly GenerationStructureIssue[]

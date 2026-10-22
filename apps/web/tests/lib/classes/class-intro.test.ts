@@ -24,7 +24,7 @@ const FALLBACK = {
 
 describe('classIntroFromSeed', () => {
   it.each(['A2', 'B1'])(
-    'restores derived %s meanings without changing their public bytes',
+    'restores brief purpose and derived %s meanings without changing their public bytes',
     async (level) => {
       const { classIntroFromSeed } = await loadClassIntro();
       const target = 'Ich habe gestern einen Film gesehen.';

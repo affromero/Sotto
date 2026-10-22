@@ -5,6 +5,14 @@ export function isImmersionLevel(level: string): boolean {
   return cefrRank(level as CefrLevel) >= cefrRank('A2');
 }
 
+export function classIntroFieldRolePolicy(): string {
+  return [
+    'The intro is a short opening brief, separate from the full teaching unit and assessment. Purpose names one concrete learner action aligned with the trusted objective. It is orientation, not a complete restatement of the objective or assessment rubric.',
+    'About introduces the objective through one selected example. Examples, focus points and tips teach useful forms or uses from that example; they need not each demonstrate every component of the objective. Complete lesson coverage belongs to the separate full teaching unit and assessment.',
+    'Omitting an objective component from a brief purpose or one illustrative opening entry alone is not a defect. Still reject an off-topic or contradictory action, a false claim of complete coverage, incorrect model language, changed meaning, and unsupported or misleading grammar or usage claims. This field-role distinction does not excuse errors in what an entry actually teaches.',
+  ].join(' ');
+}
+
 export function classIntroExampleMeaningPolicy(p: {
   level: string;
   nativeLang: string;
