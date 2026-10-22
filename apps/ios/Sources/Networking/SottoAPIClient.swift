@@ -197,10 +197,17 @@ struct SottoAPIClient {
     @discardableResult
     func startNextClassGeneration(
         courseId: String,
-        source: SottoClassGenerationSource = .curriculum
+        source: SottoClassGenerationSource = .curriculum,
+        expectedPreparation: (operationId: String, classId: String)? = nil
     ) async throws -> NextClassBackgroundResponse {
-        try await post(
-            "/api/v1/courses/\(courseId)/next-class?background=1",
+        var path = URLComponents(string: "/api/v1/courses/\(courseId)/next-class?background=1")!
+        if let expectedPreparation {
+            path.queryItems = (path.queryItems ?? []) + [
+                URLQueryItem(name: "expectedOperationId", value: expectedPreparation.operationId),
+                URLQueryItem(name: "expectedClassId", value: expectedPreparation.classId)]
+        }
+        return try await post(
+            path.string!,
             body: NextClassGenerationRequest(source: source),
             acceptedStatuses: [202]
         )
@@ -212,6 +219,16 @@ struct SottoAPIClient {
 
     func cancelClassGeneration(courseId: String) async throws {
         let _: ClassGenerationCancelResponse = try await delete("/api/v1/courses/\(courseId)/generation")
+    }
+
+    func removeFailedPreparation(courseId: String, operationId: String, classId: String) async throws {
+        var path = URLComponents(string: "/api/v1/courses/\(courseId)/generation")!
+        path.queryItems = [URLQueryItem(name: "operationId", value: operationId),
+                           URLQueryItem(name: "classId", value: classId)]
+        let result: ClassGenerationCancelResponse = try await delete(path.string!)
+        guard result.deleted == true, result.operationId == operationId, result.classId == classId else {
+            throw SottoAPIError.message("Removal could not be confirmed. Check status before trying again.")
+        }
     }
 
     func fetchClass(classId: String) async throws -> SottoClassDetail {
@@ -961,4 +978,7 @@ private struct EmptyBody: Encodable {}
 
 private struct ClassGenerationCancelResponse: Decodable {
     let cancelled: Bool
+    let deleted: Bool?
+    let operationId: String?
+    let classId: String?
 }

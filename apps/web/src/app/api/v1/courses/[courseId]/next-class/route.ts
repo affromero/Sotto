@@ -1,5 +1,6 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { sottoRequestExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import { authenticateRequest } from '@/lib/api-keys';
 import { errorResponse } from '@/lib/api-response';
@@ -29,10 +30,23 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     if (!course) return errorResponse('Course not found', 404);
     const parsed = sourcedClassSchema.safeParse(await request.json().catch(() => ({})));
     if (!parsed.success) return errorResponse(parsed.error.flatten(), 400);
+    const query = request.nextUrl.searchParams;
+    const expected =
+      query.has('expectedOperationId') || query.has('expectedClassId')
+        ? z.object({ operationId: z.uuid(), classId: z.string().min(1).max(200) }).safeParse({
+            operationId: query.get('expectedOperationId'),
+            classId: query.get('expectedClassId'),
+          })
+        : undefined;
+    if (expected && !expected.success)
+      return errorResponse('Invalid failed preparation target.', 400);
     const admitted = await requestClassPreparation(
       courseId,
       sottoRequestExecution(request, authed),
-      parsed.data
+      {
+        ...parsed.data,
+        ...(expected?.success ? { expectedPreviousPreparation: expected.data } : {}),
+      }
     );
     const accepted = () =>
       NextResponse.json(

@@ -181,6 +181,7 @@ export async function requestClassPreparation(
     maxProviderRequests?: number;
     deferAudio?: boolean;
     timeZone?: string;
+    expectedPreviousPreparation?: { operationId: string; classId: string };
   } = {}
 ): Promise<ClassPreparation> {
   const now = Date.now();
@@ -286,9 +287,23 @@ export async function requestClassPreparation(
       });
       const store = classPreparationStore(database, courseId);
       let current = await store.read();
+      if (input.expectedPreviousPreparation) {
+        const expected = input.expectedPreviousPreparation;
+        if (
+          !current ||
+          current.id !== expected.operationId ||
+          current.classId !== expected.classId ||
+          current.intent ||
+          current.result === 'created' ||
+          !['FAILED', 'CANCELLED'].includes(current.status)
+        )
+          throw new PreparationConflictError('The failed preparation changed. Refresh its status.');
+        await validateClassPreparation(database, courseId, current.id, true);
+      }
       if (
         current?.status === 'FAILED' ||
-        (input.intent?.retry && current?.status === 'CANCELLED')
+        ((input.intent?.retry || input.expectedPreviousPreparation) &&
+          current?.status === 'CANCELLED')
       ) {
         const cleanup = await settlePreparationCleanup(database, current);
         current = cleanup.operation;
@@ -296,6 +311,14 @@ export async function requestClassPreparation(
           throw new PreparationConflictError(
             'The previous preparation still needs execution cleanup.'
           );
+        if (
+          input.expectedPreviousPreparation &&
+          (await database.courseClass.findUnique({
+            where: { id: input.expectedPreviousPreparation.classId },
+            select: { id: true },
+          }))
+        )
+          throw new PreparationConflictError('The unpublished class changed. Refresh its status.');
       }
       if (input.intent?.retry)
         await database.$queryRaw`SELECT id FROM "CourseClass" WHERE id = ${input.intent.classId} FOR UPDATE`;
@@ -501,7 +524,7 @@ async function reconcileKnownPreparationFailure(
     current.intent &&
     ((current.status === 'UNRESOLVED' &&
       (current.failure === 'generation_failed' || current.failure === 'source_unreadable')) ||
-      (current.intent.retry && ['FAILED', 'CANCELLED'].includes(current.status)))
+      ['FAILED', 'CANCELLED'].includes(current.status))
   )
     return settleCancelledPreparation(database, current);
   return current;
@@ -516,7 +539,26 @@ export async function readClassPreparation(courseId: string, userId: string) {
     if (!course) return null;
     const operation = await classPreparationStore(database, courseId).read();
     if (!operation) return null;
-    return reconcileKnownPreparationFailure(database, operation);
+    const reconciled = await reconcileKnownPreparationFailure(database, operation);
+    if (reconciled.intent) return reconciled;
+    const receipt = await sottoJobOutbox(database).read(reconciled.id);
+    const payload = classPreparationPayload.safeParse(receipt?.job.payload);
+    if (
+      receipt?.job.namespace !== SIDEDOOR_STATE_ID ||
+      receipt.job.handler !== CLASS_PREPARATION_QUEUE ||
+      receipt.job.version !== 1 ||
+      !payload.success ||
+      payload.data.courseId !== courseId ||
+      payload.data.operationId !== reconciled.id
+    )
+      throw new PreparationConflictError('The initial preparation receipt changed.');
+    return {
+      ...reconciled,
+      initialPreparation: {
+        sourceUrl: payload.data.sourceUrl ?? null,
+        topic: payload.data.topic ?? null,
+      },
+    };
   });
 }
 
@@ -572,23 +614,51 @@ export async function readPreparationActivity(
   );
 }
 
-export async function cancelClassPreparation(courseId: string, execution: SottoProviderExecution) {
+export async function cancelClassPreparation(
+  courseId: string,
+  execution: SottoProviderExecution,
+  terminalCleanup?: { operationId: string; classId: string }
+) {
   return sottoTransaction(
     prisma,
     async (database) => {
       const actor = await execution.authorize(database);
       const operation = await classPreparationStore(database, courseId).read();
-      if (!operation) return null;
+      if (!operation) {
+        if (terminalCleanup) throw new PreparationConflictError('The failed preparation changed.');
+        return null;
+      }
       await validateClassPreparation(database, courseId, operation.id, true);
       if (actor.userId !== operation.userId)
         throw new PreparationConflictError('Course not found.');
+      if (
+        terminalCleanup &&
+        (operation.id !== terminalCleanup.operationId ||
+          operation.classId !== terminalCleanup.classId ||
+          operation.intent ||
+          operation.result === 'created' ||
+          !['FAILED', 'CANCELLED'].includes(operation.status))
+      )
+        throw new PreparationConflictError('The failed preparation changed. Refresh its status.');
       await classPreparationGrant(database, operation).revoke(operation.grant);
       const cancelled = await classPreparationStore(database, courseId).transact((current) => {
         if (!current || current.id !== operation.id) throw new PreparationConflictError();
         Object.assign(current, cancelPreparation(current, Date.now()));
         return current;
       });
-      return settleCancelledPreparation(database, cancelled);
+      if (!terminalCleanup) return settleCancelledPreparation(database, cancelled);
+      const cleanup = await settlePreparationCleanup(database, cancelled);
+      if (
+        !cleanup.settled ||
+        (await database.courseClass.findUnique({
+          where: { id: terminalCleanup.classId },
+          select: { id: true },
+        }))
+      )
+        throw new PreparationConflictError(
+          'Execution cleanup is not confirmed. Check status before removing this class.'
+        );
+      return cleanup.operation;
     },
     { signal: execution.signal }
   );
@@ -759,7 +829,11 @@ export async function recordClassPreparationFailure(
   if (!uncertain) await sottoJobOutbox(database).complete(operation.id, fingerprint);
 }
 
-export function preparationProgress(operation: ClassPreparation) {
+export function preparationProgress(
+  operation: ClassPreparation & {
+    initialPreparation?: { sourceUrl: string | null; topic: string | null };
+  }
+) {
   const detail = {
     QUEUED: 'Preparation is saved and will run when a worker is available.',
     RUNNING: 'Preparing this class from your course, notes, and review targets.',
@@ -772,6 +846,7 @@ export function preparationProgress(operation: ClassPreparation) {
   }[operation.status];
   return {
     operationId: operation.id,
+    ...(operation.initialPreparation ? { initialPreparation: operation.initialPreparation } : {}),
     operationStatus: operation.status,
     status:
       operation.status === 'QUEUED' || operation.status === 'RUNNING'

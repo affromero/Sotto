@@ -94,6 +94,10 @@ their UDIDs to `xcodebuild`. Test **both** families: the layout differs by size 
   Explanations appear after a choice, and guided answers require disclosure.
   Removing a class drains and suspends its progress writer before DELETE, then
   discards it only after confirmed removal. Failed removal resumes pending work.
+  A terminal initial preparation may retain a `GENERATING` row or an already
+  removed row. Retry uses next-class admission with the exact failed operation
+  and class. Remove uses generation DELETE with that same target and requires
+  its deletion receipt. The server verifies execution and audio cleanup.
 
 - Native class Workbook uses per-exercise Pencil canvases without requiring a PDF.
   `Read my marks` sends the complete exercise and ink image for queued AI interpretation.

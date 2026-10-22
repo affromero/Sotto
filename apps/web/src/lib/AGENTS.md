@@ -2,6 +2,11 @@
 
 ## Vocabulary lifecycle
 
+Failed initial class preparation can retain an unpublished `GENERATING` row.
+Exact-target retry admission and terminal cancellation reuse preparation cleanup,
+including execution and audio drainage. Only confirmed row absence acknowledges
+terminal removal; changed, uncertain and published operations remain fenced.
+
 `vocabulary/` owns dictionary reads, deterministic study admission and actions,
 material-index admission, and local pronunciation. Keep answer keys in private
 study state. Public cards reveal answers only after an immutable response.
@@ -603,6 +608,10 @@ quoted-example scope. Fresh intros and complete merged replacements must fit the
 Structural repair receives measured word-limit and address-limit diagnostics,
 may remove redundant whole entries, and aims for 80 raw words to leave room for
 compiled quotes. Semantic repair preserves every accepted entry even when shortening.
+An overlength structural repair uses one example, one focus point and one tip,
+with each authored text limited to fifteen whitespace-separated words. Validate
+the selected compact schema locally before compilation; the complete rendered
+brief still passes its word limit and independent teaching reviews.
 Intro semantic repair returns a strict patch of the actual rejected addresses.
 Only authorized authored entries and compiler-rendered references can change.
 Accepted visuals remain present, and

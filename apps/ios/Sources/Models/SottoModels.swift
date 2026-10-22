@@ -252,6 +252,18 @@ struct SottoGenerationProgress: Decodable, Equatable {
     var operationId: String? = nil
     var operationStatus: String? = nil
     var result: String? = nil
+    var initialPreparation: SottoInitialPreparation? = nil
+}
+
+struct SottoInitialPreparation: Decodable, Equatable {
+    let sourceUrl: String?
+    let topic: String?
+
+    var source: SottoClassGenerationSource {
+        if let sourceUrl { return .sourceUrl(sourceUrl) }
+        if let topic { return .topic(topic) }
+        return .curriculum
+    }
 }
 
 struct SottoGenerationSection: Decodable, Equatable {

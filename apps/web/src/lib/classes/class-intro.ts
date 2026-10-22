@@ -30,6 +30,7 @@ import {
 } from './intro/bindings';
 import {
   freshIntroProtocol,
+  compactIntroRepairProtocol,
   introSchema,
   introVisualsSchema,
   scopedIntroAtomSchema,
@@ -310,10 +311,19 @@ function parseIntro(
   content: string,
   stage: 'initial' | 'replacement',
   immersion: boolean,
-  diagnostics?: IntroStructuralDiagnostic[]
+  diagnostics?: IntroStructuralDiagnostic[],
+  repairSchema?: z.ZodType
 ): IntroCandidate | null {
   try {
-    return compileFreshIntro(JSON.parse(cleanJson(content)), stage, immersion, diagnostics);
+    const value: unknown = JSON.parse(cleanJson(content));
+    if (repairSchema && !repairSchema.safeParse(value).success) {
+      logger.warn('Class intro protocol rejected content', {
+        stage,
+        reason: 'compact_repair_schema',
+      });
+      return null;
+    }
+    return compileFreshIntro(value, stage, immersion, diagnostics);
   } catch (error) {
     if (error instanceof SyntaxError) {
       logger.warn('Class intro protocol rejected content', { stage, reason: 'invalid_json' });
@@ -834,13 +844,20 @@ export async function generateClassIntro(p: ClassIntroParams): Promise<ClassIntr
       if (!normalized || normalized.examples.length === 0) throw new SectionQualityError();
       return { intro: normalized, bindings: null };
     }
-    const repairSchema = semanticSchema?.responseFormat ?? protocol.repairResponseFormat;
+    const compact =
+      !repairPlan && structuralDiagnostics.some(({ reason }) => reason === 'prose_word_limit')
+        ? compactIntroRepairProtocol(immersion)
+        : undefined;
+    const repairSchema =
+      semanticSchema?.responseFormat ?? compact?.responseFormat ?? protocol.repairResponseFormat;
     const repairSystemPrompt = loadAndRender('class/repair-class-intro.md', {
       ...context,
       INTRO_SCHEMA: JSON.stringify(repairSchema.schema),
       REPAIR_MODE_POLICY: repairPlan
         ? 'Return a semantic patch containing exactly the schema-authorized fields and indices. Establish each defect from the lesson context before correcting it. Previously accepted observation bodies remain fixed. The application alone updates their displayed quotations when an authorized example target changes, then submits the complete candidate for review again.'
-        : 'Structural repair receives the full repair schema. Replace missing or unusable fields and return the complete object.',
+        : compact
+          ? 'Return one complete example, one focus observation and one tip. Every authored text field has at most 15 whitespace-separated words. Use exampleIndex:0 throughout. Shorten the purpose when needed while preserving the objective. Keep all teaching specific and grammatical. The application adds exact quotes and derived meanings; this compact structure fits its rendered word budget. Return no visuals.'
+          : 'Structural repair receives the full repair schema. Replace missing or unusable fields and return the complete object.',
     });
     const repairResponse = await provider.generateResponse(
       repairSystemPrompt,
@@ -860,7 +877,7 @@ export async function generateClassIntro(p: ClassIntroParams): Promise<ClassIntr
               : buildIntroRepairPrompt(
                   content,
                   meaningPolicy,
-                  protocol.repairResponseFormat.schema,
+                  repairSchema.schema,
                   structuralDiagnostics
                 ),
         },
@@ -896,7 +913,13 @@ export async function generateClassIntro(p: ClassIntroParams): Promise<ClassIntr
       if (!repaired || repaired.examples.length === 0) throw new SectionQualityError();
       return { intro: repaired, bindings: null };
     }
-    const structural = parseIntro(repairResponse.content, 'replacement', immersion);
+    const structural = parseIntro(
+      repairResponse.content,
+      'replacement',
+      immersion,
+      undefined,
+      compact?.schema
+    );
     if (!structural || structural.intro.examples.length === 0) throw new SectionQualityError();
     return structural;
   };

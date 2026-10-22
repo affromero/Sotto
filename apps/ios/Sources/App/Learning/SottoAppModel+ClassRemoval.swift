@@ -34,20 +34,39 @@ extension SottoAppModel {
     @discardableResult
     func removeFailedClass(_ target: SottoFailedClassRemoval) async -> Bool {
         guard removalIsCurrent(target) else { return false }
+        var requiresPreparationCleanup = false
         return await removeClass(classId: target.classId, courseId: target.courseId,
-            client: target.client, progress: nil, stillCurrent: { self.removalIsCurrent(target) }) {
+            client: target.client, progress: nil, stillCurrent: { self.removalIsCurrent(target) }, delete: {
+                if requiresPreparationCleanup {
+                    try await target.client.removeFailedPreparation(courseId: target.courseId,
+                        operationId: target.operationId, classId: target.classId)
+                } else { try await target.client.deleteClass(classId: target.classId) }
+            }) {
             let operation = try await target.client.fetchClassGenerationProgress(courseId: target.courseId)
             guard self.removalIsCurrent(target) else { throw CancellationError() }
             guard operation.operationId == target.operationId, operation.classId == target.classId,
                   ["FAILED", "CANCELLED"].contains(operation.operationStatus ?? "") else {
                 throw SottoAPIError.message("Preparation changed. Check status before removing a class.")
             }
-            let detail = try await target.client.fetchClass(classId: target.classId)
+            let detail: SottoClassDetail
+            do { detail = try await target.client.fetchClass(classId: target.classId) }
+            catch SottoAPIError.http(404, _) {
+                guard case .next = target.request else { throw SottoAPIError.message("The class is missing. Check status.") }
+                guard self.removalIsCurrent(target) else { throw CancellationError() }
+                requiresPreparationCleanup = true
+                return nil
+            }
             guard self.removalIsCurrent(target) else { throw CancellationError() }
             guard detail.id == target.classId, detail.courseId == target.courseId,
-                  detail.status != "GENERATING", detail.status != "PASSED", !detail.submitted,
+                  detail.status != "PASSED", !detail.submitted,
                   target.request.accepts(detail) else {
                 throw SottoAPIError.message("The class changed. Reload before removing it.")
+            }
+            if detail.status == "GENERATING" {
+                guard case .next = target.request else {
+                    throw SottoAPIError.message("The class changed. Reload before removing it.")
+                }
+                requiresPreparationCleanup = true
             }
             return detail
         }
@@ -65,7 +84,8 @@ extension SottoAppModel {
 
     private func removeClass(classId: String, courseId: String, client: SottoAPIClient,
         progress: LearningProgressStore?, stillCurrent: () -> Bool,
-        prepare: () async throws -> SottoClassDetail) async -> Bool {
+        delete: (() async throws -> Void)? = nil,
+        prepare: () async throws -> SottoClassDetail?) async -> Bool {
         let removalId = UUID()
         classRemovalId = removalId
         isLoading = true
@@ -86,14 +106,15 @@ extension SottoAppModel {
             guard !Task.isCancelled, isCurrentLearningClient(client), stillCurrent() else { return false }
             if writer == nil {
                 writer = learningSessionState(path: "/api/v1/classes/\(classId)",
-                    attempt: detail.attempt ?? 1, revision: detail.progressRevision ?? 0).progress
+                    attempt: detail?.attempt ?? 1, revision: detail?.progressRevision ?? 0).progress
             }
             await writer?.suspend()
             guard !Task.isCancelled, isCurrentLearningClient(client), stillCurrent() else {
                 writer?.resume()
                 return false
             }
-            try await client.deleteClass(classId: classId)
+            if let delete { try await delete() }
+            else { try await client.deleteClass(classId: classId) }
             writer?.discard()
             guard isCurrentLearningClient(client) else { return true }
             finishClassRemoval(classId: classId, courseId: courseId)
