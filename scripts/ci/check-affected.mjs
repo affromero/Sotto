@@ -62,11 +62,11 @@ const files = [
     })
   ),
 ];
-const manifests = files.some((file) =>
+const isManifest = (file) =>
   /^(?:package(?:-lock)?\.json|apps\/(?!desktop\/)[^/]+\/package(?:-lock)?\.json|(?:packages|services)\/[^/]+\/package(?:-lock)?\.json)$/.test(
     file
-  )
-);
+  );
+const manifests = files.some(isManifest);
 const globalConfig = files.some((file) =>
   /^(?:vitest\.config\.[^/]+|tsconfig[^/]*\.json)$/.test(file)
 );
@@ -75,7 +75,7 @@ const sharedContract = files.some((file) =>
     file
   )
 );
-const rust = manifests || sharedContract || files.some((file) => file.startsWith('tui/'));
+const rust = sharedContract || files.some((file) => file.startsWith('tui/'));
 const openApiArtifact = files.some((file) =>
   /^(?:packages\/shared\/|tui\/)openapi[^/]*\.json$/.test(file)
 );
@@ -137,7 +137,15 @@ if (allScriptTests) {
 } else {
   for (const test of scriptTests) {
     run('python3', [
-      '-m', 'unittest', 'discover', '-s', dirname(test), '-t', 'scripts/tests', '-p', basename(test),
+      '-m',
+      'unittest',
+      'discover',
+      '-s',
+      dirname(test),
+      '-t',
+      'scripts/tests',
+      '-p',
+      basename(test),
     ]);
   }
 }
@@ -148,13 +156,18 @@ for (const workspace of workspaces) {
   const browserInputs = files.filter(isBrowserInput);
   const own = files.filter(
     (file) =>
-      file.startsWith(`${workspace.directory}/`) && source.test(file) && !isBrowserInput(file)
+      file.startsWith(`${workspace.directory}/`) &&
+      source.test(file) &&
+      !isBrowserInput(file) &&
+      !isManifest(file)
   );
   const dependencies =
     workspace.name === '@sotto/web'
       ? files.filter(
           (file) =>
-            /^packages\/(?:shared|groundcheck|learning-model)\//.test(file) && source.test(file)
+            /^packages\/(?:shared|groundcheck|learning-model)\//.test(file) &&
+            source.test(file) &&
+            !isManifest(file)
         )
       : [];
   const prisma =
@@ -184,7 +197,6 @@ for (const workspace of workspaces) {
   if (workspace.tests === false) continue;
   const related = [...new Set([...own, ...dependencies, ...dynamicInputs])];
   const full =
-    manifests ||
     globalConfig ||
     prisma ||
     sharedArtifact ||
@@ -207,7 +219,7 @@ for (const workspace of workspaces) {
   }
   if (!related.length) {
     console.log(
-      `Affected checks: browser inputs are type-checked; browser CI runs their journeys.`
+      `Affected checks: type checks passed; full source and browser validation run in CI.`
     );
     continue;
   }
