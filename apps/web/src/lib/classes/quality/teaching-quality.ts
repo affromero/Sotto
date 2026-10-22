@@ -15,6 +15,7 @@ import {
 import { logger } from '../../logger';
 import {
   classIntroExampleMeaningPolicy,
+  classIntroFieldRolePolicy,
   classIntroGrammarRulePolicy,
   classLanguagePolicy,
   classListeningTranscriptPolicy,
@@ -418,6 +419,7 @@ export async function reviewTeachingContent(options: {
       ...(options.kind === 'intro'
         ? {
             EXAMPLE_MEANING_POLICY: classIntroExampleMeaningPolicy(options),
+            INTRO_FIELD_ROLE_POLICY: classIntroFieldRolePolicy(),
             GRAMMAR_RULE_POLICY: classIntroGrammarRulePolicy(),
           }
         : {}),

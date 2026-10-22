@@ -20,6 +20,9 @@ Language and source policy:
 Intro meaning policy when applicable:
 {{EXAMPLE_MEANING_POLICY}}
 
+Intro field-role policy when applicable:
+{{INTRO_FIELD_ROLE_POLICY}}
+
 Intro grammatical scope policy when applicable:
 {{GRAMMAR_RULE_POLICY}}
 
