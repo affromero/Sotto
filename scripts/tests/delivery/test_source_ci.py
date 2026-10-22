@@ -12,7 +12,7 @@ import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[3]
-WORKFLOW = ROOT / '.github/workflows/source-ci.yml'
+WORKFLOWS = ROOT / '.github/workflows'
 GATES = {'web', 'packages', 'tooling', 'speech'}
 
 
@@ -20,14 +20,16 @@ class SourceValidationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         # The tooling gate installs the repository's pinned npm dependencies.
-        result = subprocess.run(
-            [shutil.which('node'), '-e',
-             "process.stdout.write(JSON.stringify(require('yaml').parse("
-             "require('node:fs').readFileSync(process.argv[1], 'utf8'))))",
-             str(WORKFLOW)],
-            cwd=ROOT, text=True, capture_output=True, check=True,
-        )
-        cls.jobs = json.loads(result.stdout)['jobs']
+        cls.jobs = {}
+        for name in ('source-ci.yml', 'browser.yml'):
+            result = subprocess.run(
+                [shutil.which('node'), '-e',
+                 "process.stdout.write(JSON.stringify(require('yaml').parse("
+                 "require('node:fs').readFileSync(process.argv[1], 'utf8'))))",
+                 str(WORKFLOWS / name)],
+                cwd=ROOT, text=True, capture_output=True, check=True,
+            )
+            cls.jobs.update(json.loads(result.stdout)['jobs'])
 
     def setUp(self) -> None:
         self.directory = tempfile.TemporaryDirectory()
@@ -36,6 +38,8 @@ class SourceValidationTests(unittest.TestCase):
         self.log = self.root / 'commands.jsonl'
         self.bin = self.root / 'bin'
         self.bin.mkdir()
+        self.mirrors = self.root / 'apt-mirrors.txt'
+        self.mirrors.write_text('http://azure.archive.ubuntu.com/ubuntu/\n')
         self.home = self.root / 'home'
         uv_directory = self.home / '.local/bin'
         uv_directory.mkdir(parents=True)
@@ -48,6 +52,12 @@ class SourceValidationTests(unittest.TestCase):
             '"postgres": os.environ.get("SOTTO_TEST_POSTGRES")}) + "\\n")\n'
             'if command == json.loads(os.environ["FAIL_COMMAND"]):\n'
             '    raise SystemExit(7)\n'
+            'mirror = pathlib.Path(os.environ["APT_MIRRORS_FILE"])\n'
+            'if command == ["sudo", "test", "-f", '
+            '"/etc/apt/apt-mirrors.txt"] and not mirror.is_file():\n'
+            '    raise SystemExit(1)\n'
+            'if command == ["sudo", "tee", "/etc/apt/apt-mirrors.txt"]:\n'
+            '    mirror.write_text(sys.stdin.read())\n'
         )
         for name in ('npm', 'npx', 'node', 'python3', 'go', 'sudo', 'curl'):
             executable = self.bin / name
@@ -63,6 +73,7 @@ class SourceValidationTests(unittest.TestCase):
             'HOME': str(self.home),
             'COMMAND_LOG': str(self.log),
             'FAIL_COMMAND': '[]',
+            'APT_MIRRORS_FILE': str(self.mirrors),
         }
         self.environment.pop('SOTTO_TEST_POSTGRES', None)
         self.command_output = ''
@@ -175,6 +186,7 @@ class SourceValidationTests(unittest.TestCase):
     def test_failed_validation_commands_fail_their_job(self) -> None:
         failures = [
             ('web', ['npm', 'run', 'ci:web']),
+            ('browser', ['npm', 'run', 'test:browser']),
             ('packages', ['npm', 'run', 'ci:packages']),
             ('tooling', ['node', 'scripts/ci/audit-gate.mjs']),
             ('tooling', ['uvx', '--from', 'mypy==2.4.0', 'mypy', '--strict',
@@ -189,6 +201,46 @@ class SourceValidationTests(unittest.TestCase):
                 status, records = self.run_job(name, command)
                 self.assertNotEqual(status, 0)
                 self.assertEqual(records[-1]['command'], command)
+
+    def test_media_installation_selects_the_official_ubuntu_archive(
+        self,
+    ) -> None:
+        for name, validation in (
+            ('web', 'ci:web'), ('browser', 'test:browser'),
+        ):
+            with self.subTest(job=name):
+                self.mirrors.write_text(
+                    'http://azure.archive.ubuntu.com/ubuntu/\n')
+                status, records = self.run_job(name)
+                self.assertEqual(status, 0, self.command_output)
+                self.assertEqual(
+                    self.mirrors.read_text(),
+                    'https://archive.ubuntu.com/ubuntu/\n',
+                )
+                self.assertIn(['npm', 'run', validation],
+                              [record['command'] for record in records])
+
+    def test_mirror_setup_failure_stops_before_installation_or_validation(
+        self,
+    ) -> None:
+        for name, validation in (
+            ('web', 'ci:web'), ('browser', 'test:browser'),
+        ):
+            for failure in ('missing', 'write'):
+                with self.subTest(job=name, failure=failure):
+                    self.mirrors.write_text(
+                        'http://azure.archive.ubuntu.com/ubuntu/\n')
+                    command = None
+                    if failure == 'missing':
+                        self.mirrors.unlink()
+                    else:
+                        command = ['sudo', 'tee',
+                                   '/etc/apt/apt-mirrors.txt']
+                    status, records = self.run_job(name, command)
+                    self.assertNotEqual(status, 0)
+                    commands = [record['command'] for record in records]
+                    self.assertNotIn(['sudo', 'apt-get', 'update'], commands)
+                    self.assertNotIn(['npm', 'run', validation], commands)
 
     def test_only_web_uses_shared_database_and_redis_services(self) -> None:
         self.assertEqual(

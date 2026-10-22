@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { blockedProviderExecution } from '../../../../helpers/runtime/provider-execution';
 import { novelFindingCorroborationFixture } from '../intro-provider-fixture';
-import type { AIOptions } from '@/lib/providers/ai';
+import { createAIProvider, type AIOptions } from '@/lib/providers/ai';
 
 const boundary = vi.hoisted(() => ({ generate: vi.fn(), resolve: vi.fn() }));
 vi.unmock('@/lib/classes/class-intro');
@@ -27,7 +27,10 @@ vi.mock('@/lib/usage-logger', () => ({ logUsage: vi.fn() }));
 
 import { classIntroFromSeed, generateClassIntro } from '@/lib/classes/class-intro';
 import { SectionQualityError } from '@/lib/classes/section-quality';
-import { TeachingQualityRejectionError } from '@/lib/classes/quality/teaching-quality';
+import {
+  TeachingQualityRejectionError,
+  reviewTeachingContent,
+} from '@/lib/classes/quality/teaching-quality';
 
 const params = {
   userId: 'fixture',
@@ -63,7 +66,11 @@ type Payload = {
   criticisms?: { items: Array<{ index: number; findings: unknown[] }> };
 };
 
-function respond(initial: unknown = raw, replacement?: unknown, defect?: 'target' | 'note') {
+function respond(
+  initial: unknown = raw,
+  replacement?: unknown,
+  defect?: 'target' | 'note' | 'meaning'
+) {
   boundary.generate.mockImplementation(async (_system, messages, options) => {
     const role = options.jsonSchema.name;
     if (role === 'class_intro_generation')
@@ -75,14 +82,16 @@ function respond(initial: unknown = raw, replacement?: unknown, defect?: 'target
       content: JSON.stringify({
         items: payload.items.map((row) => {
           const example = row.content.fields.example as
-            { target: string; note: string } | undefined;
-          const field = defect === 'note' ? 'note' : 'target';
+            { target: string; note: string; meaning?: string } | undefined;
+          const field = defect ?? 'target';
           const bad =
             example &&
             defect &&
             (field === 'target'
               ? example.target.includes('ist gestern einen Film')
-              : example.note.includes('„sein“ bildet das Perfekt von „sehen“'));
+              : field === 'note'
+                ? example.note.includes('„sein“ bildet das Perfekt von „sehen“')
+                : example.meaning?.includes('keinen Film'));
           const part = row.sourceParts.find(
             (p) => JSON.stringify(p.fieldPath) === JSON.stringify(['example', field])
           );
@@ -94,11 +103,20 @@ function respond(initial: unknown = raw, replacement?: unknown, defect?: 'target
                     {
                       sourcePartIndex: part!.index,
                       issue: 'incorrect',
-                      rule: 'Use the correct auxiliary.',
-                      defect: 'Sehen uses haben in this example.',
+                      rule:
+                        field === 'meaning' ? 'Preserve negation.' : 'Use the correct auxiliary.',
+                      defect:
+                        field === 'meaning'
+                          ? 'The example watched a film.'
+                          : 'Sehen uses haben in this example.',
                       remedy: {
                         kind: 'correction',
-                        text: field === 'target' ? target : raw.examples[0]!.note,
+                        text:
+                          field === 'target'
+                            ? target
+                            : field === 'note'
+                              ? raw.examples[0]!.note
+                              : 'Die sprechende Person sah gestern einen Film.',
                       },
                     },
                   ]
@@ -111,7 +129,10 @@ function respond(initial: unknown = raw, replacement?: unknown, defect?: 'target
             ).map((_, findingIndex) => ({
               findingIndex,
               decision: 'supported',
-              reason: 'The auxiliary claim is false.',
+              reason:
+                field === 'meaning'
+                  ? 'The meaning reverses the event.'
+                  : 'The auxiliary claim is false.',
             })),
             newFindings: [],
           };
@@ -141,6 +162,70 @@ beforeEach(() => {
 });
 
 describe('fresh intro meanings', () => {
+  it.each([
+    { level: 'A2', meaning: target, alias: true },
+    { level: 'B1', meaning: target, alias: true },
+    { level: 'A1', meaning: target, alias: false },
+    { level: 'B1', meaning: target + ' ', alias: false },
+    { level: 'A2', meaning: 'Die sprechende Person sah gestern einen Film.', alias: false },
+  ])(
+    'reviews only independent example claims at $level with alias=$alias',
+    async ({ level, meaning, alias }) => {
+      respond();
+      const example = { ...raw.examples[0]!, meaning };
+      const intro = {
+        purpose: raw.purpose,
+        about: target,
+        focus: ['Achte auf habe.'],
+        tips: ['Nenne den Tag.'],
+        examples: [example],
+      };
+      await reviewTeachingContent({
+        ...params,
+        level,
+        ai: await boundary.resolve(),
+        provider: createAIProvider('fixture'),
+        kind: 'intro',
+        items: [intro],
+      });
+      for (const [, messages] of boundary.generate.mock.calls) {
+        const payload: Payload = JSON.parse(messages[0].content);
+        expect(payload.introContext).toEqual(intro);
+        const row = payload.items.find((item) => item.content.address.field === 'examples')!;
+        expect(row.content.fields.example).toEqual(
+          alias ? { target, note: example.note } : example
+        );
+        const paths = row.sourceParts.map((part) => part.fieldPath);
+        expect(paths).toContainEqual(['example', 'target']);
+        expect(paths).toContainEqual(['example', 'note']);
+        if (alias) expect(paths).not.toContainEqual(['example', 'meaning']);
+        else expect(paths).toContainEqual(['example', 'meaning']);
+      }
+    }
+  );
+
+  it('rejects a distinct historical immersion meaning that reverses the event', async () => {
+    respond(raw, undefined, 'meaning');
+    const intro = {
+      purpose: raw.purpose,
+      about: target,
+      focus: ['Achte auf habe.'],
+      tips: ['Nenne den Tag.'],
+      examples: [
+        { ...raw.examples[0]!, meaning: 'Die sprechende Person sah gestern keinen Film.' },
+      ],
+    };
+    await expect(
+      reviewTeachingContent({
+        ...params,
+        ai: await boundary.resolve(),
+        provider: createAIProvider('fixture'),
+        kind: 'intro',
+        items: [intro],
+      })
+    ).rejects.toBeInstanceOf(TeachingQualityRejectionError);
+  });
+
   it.each(['initial', 'structural repair'])(
     'derives exact immersion meaning before review after %s',
     async (path) => {

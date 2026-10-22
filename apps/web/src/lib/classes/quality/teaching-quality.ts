@@ -19,6 +19,7 @@ import {
   classLanguagePolicy,
   classListeningTranscriptPolicy,
   classSpeakingMeaningPolicy,
+  isImmersionLevel,
 } from '../class-language-policy';
 import { learningCredentialFingerprint } from '../preparation-selection';
 import {
@@ -306,7 +307,10 @@ export async function reviewTeachingContent(options: {
   }
   if (options.previousIntroRejection && options.kind !== 'intro')
     throw new ReviewerProtocolError(authenticIntroTeachingFailure(options.previousIntroRejection));
-  const introAudit = options.kind === 'intro' ? buildIntroAuditItems(options.items) : undefined;
+  const introAudit =
+    options.kind === 'intro'
+      ? buildIntroAuditItems(options.items, isImmersionLevel(options.level))
+      : undefined;
   const introItems = introAudit?.items;
   if (introItems && introItems.length > 10) throw new ReviewerProtocolError();
   const listeningAudit =
@@ -774,7 +778,7 @@ export async function reviewTeachingContent(options: {
   }
 }
 
-function buildIntroAuditItems(items: readonly unknown[]): IntroAudit {
+function buildIntroAuditItems(items: readonly unknown[], immersion = false): IntroAudit {
   if (items.length !== 1 || !items[0] || typeof items[0] !== 'object' || Array.isArray(items[0]))
     throw new ReviewerProtocolError();
 
@@ -800,8 +804,24 @@ function buildIntroAuditItems(items: readonly unknown[]): IntroAudit {
     scopes.push({ address: { field: 'focus', index }, fields: { focus } });
   for (const [index, tip] of (Array.isArray(intro.tips) ? intro.tips : []).entries())
     scopes.push({ address: { field: 'tips', index }, fields: { tips: tip } });
-  for (const [index, example] of (Array.isArray(intro.examples) ? intro.examples : []).entries())
-    scopes.push({ address: { field: 'examples', index }, fields: { example } });
+  for (const [index, example] of (intro.examples as unknown[]).entries()) {
+    let reviewedExample: unknown = example;
+    if (
+      immersion &&
+      example &&
+      typeof example === 'object' &&
+      !Array.isArray(example) &&
+      'target' in example &&
+      typeof example.target === 'string' &&
+      'meaning' in example &&
+      example.meaning === example.target
+    ) {
+      const fields: Record<string, unknown> = { ...example };
+      delete fields.meaning;
+      reviewedExample = fields;
+    }
+    scopes.push({ address: { field: 'examples', index }, fields: { example: reviewedExample } });
+  }
   if (intro.visuals !== undefined)
     scopes.push({ address: { field: 'visuals' }, fields: { visuals: intro.visuals } });
 
