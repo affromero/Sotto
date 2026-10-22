@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import stat
@@ -15,6 +16,7 @@ from scripts.deploy.review.state import (
     PHASES,
     Attempt,
     atomic_json,
+    checksum,
     private_json,
 )
 
@@ -22,6 +24,16 @@ ROOT = Path(__file__).resolve().parents[3]
 
 
 class DurableAttemptTests(unittest.TestCase):
+    def test_identity_hash_supports_javascript_utf8_without_changing_defaults(
+        self,
+    ) -> None:
+        value = {'schemaName': 'cours_é', 'serverPort': 5432}
+        javascript = '{"schemaName":"cours_é","serverPort":5432}'.encode()
+        escaped = b'{"schemaName":"cours_\\u00e9","serverPort":5432}'
+        self.assertEqual(checksum(value, ensure_ascii=False),
+                         hashlib.sha256(javascript).hexdigest())
+        self.assertEqual(checksum(value), hashlib.sha256(escaped).hexdigest())
+
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)

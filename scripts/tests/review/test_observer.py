@@ -581,6 +581,9 @@ m.exports[input.operation](input.options).then(r=>console.log(JSON.stringify(r))
                             'scripts/deploy/review/readiness.ts',
                             'scripts/deploy/review/runtime/channel.ts',
                             'scripts/deploy/review/runtime/channel.py',
+                            'scripts/deploy/review/runtime/operations.py',
+                            'scripts/deploy/review/runtime/release/'
+                            'migrations.py',
                             'scripts/deploy/review/runtime/services.py',
                             'apps/web/tests/lib/deployment/'
                             'review-worksheet-admission.test.ts',
