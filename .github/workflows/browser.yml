@@ -60,7 +60,13 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg libchromaprint-tools
+      - name: Install media tools
+        run: |
+          sudo test -f /etc/apt/apt-mirrors.txt
+          printf '%s\n' 'https://archive.ubuntu.com/ubuntu/' |
+            sudo tee /etc/apt/apt-mirrors.txt >/dev/null
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ffmpeg libchromaprint-tools
       - run: npx --no-install playwright install --with-deps chromium
       - run: npm run test:browser
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

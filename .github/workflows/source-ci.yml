@@ -48,7 +48,12 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Install media tools
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg libchromaprint-tools qpdf redis-server
+        run: |
+          sudo test -f /etc/apt/apt-mirrors.txt
+          printf '%s\n' 'https://archive.ubuntu.com/ubuntu/' |
+            sudo tee /etc/apt/apt-mirrors.txt >/dev/null
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg libchromaprint-tools qpdf redis-server
       - run: npx --no-install prisma generate --schema=apps/web/prisma/schema.prisma
       - name: Validate web application
         run: npm run ci:web
