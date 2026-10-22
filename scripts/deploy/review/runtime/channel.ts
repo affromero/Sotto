@@ -72,6 +72,10 @@ export async function main(): Promise<void> {
   );
   const initial = initialSchema.parse(JSON.parse(first.value));
   if (initial.policy !== undefined) reviewRuntimePolicySchema.parse(initial.policy);
+  // Workloads share 3300s: 3300s / 5s * 3 poll acknowledgements = 1980.
+  // Fewer than 200 nonpoll acknowledgements keep the total below 2200;
+  // 4096 leaves headroom while other modes retain their 100-event budget.
+  const acknowledgementLimit = initial.mode === 'workloads' ? 4096 : 100;
   const pending = new Map<number, { resolve: () => void; reject: (error: Error) => void }>();
   let sequence = 0;
   let completed = false;
@@ -101,7 +105,7 @@ export async function main(): Promise<void> {
   acknowledgements.catch(fail);
   const request = async (type: string, value?: unknown) => {
     controller.signal.throwIfAborted();
-    assert(++sequence <= 100, 'Review acknowledgement count exceeded');
+    assert(++sequence <= acknowledgementLimit, 'Review acknowledgement count exceeded');
     const id = sequence;
     await new Promise<void>((resolve, reject) => {
       pending.set(id, { resolve, reject });

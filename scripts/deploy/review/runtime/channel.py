@@ -36,6 +36,10 @@ def exchange(
     encoded = json.dumps(initial, separators=(',', ':')).encode() + b'\n'
     if len(encoded) > MAX_LINE:
         raise ValueError('runtime-input-bound-exceeded')
+    # Workloads share 3300s: 3300s / 5s * 3 poll acknowledgements = 1980.
+    # Fewer than 200 nonpoll acknowledgements keep the total below 2200;
+    # 4096 leaves headroom while other modes retain their 100-event budget.
+    acknowledgement_limit = 4096 if initial.get('mode') == 'workloads' else 100
     deadline = time.monotonic() + timeout
     with tempfile.TemporaryFile() as errors:
         process = subprocess.Popen(
@@ -102,7 +106,8 @@ def exchange(
                         process.stdin.close()
                         continue
                     sequence += 1
-                    if (sequence > 100 or message.get('id') != sequence
+                    if (sequence > acknowledgement_limit
+                            or message.get('id') != sequence
                             or type(message.get('id')) is not int):
                         raise ValueError('runtime-ack-sequence-changed')
                     if kind == 'fence':
