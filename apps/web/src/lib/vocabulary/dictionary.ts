@@ -85,6 +85,7 @@ export async function readDictionary(courseId: string, userId: string, input: un
         originalUrl: true,
         originalSha256: true,
         processingRevision: true,
+        processingStatus: true,
         createdAt: true,
         vocabularyIndexes: {
           orderBy: { createdAt: 'desc' },
@@ -148,7 +149,11 @@ export async function readDictionary(courseId: string, userId: string, input: un
       return {
         id: material.id,
         name: material.name,
-        status: !current ? 'NOT_INDEXED' : index.status,
+        status: current
+          ? index.status
+          : ['QUEUED', 'EXTRACTING'].includes(material.processingStatus)
+            ? 'PENDING'
+            : 'NOT_INDEXED',
         error: index?.error ?? null,
         processedChunks: index?.chunks.filter((chunk) => chunk.status === 'COMPLETE').length ?? 0,
         totalChunks: index?.chunks.length ?? 0,
