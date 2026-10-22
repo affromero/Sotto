@@ -439,6 +439,8 @@ actual rejected attempts through the existing sealed generation-failure snapshot
 Original output is limited to 32 KiB per attempt with explicit size omission.
 Static structural diagnostics remain distinct from real teaching verdicts. The
 ledger is private error metadata and never enters ordinary error serialization.
+Full lesson teaching uses this same ledger for malformed JSON, invalid unit
+structure and the 600-word limit, alongside actual semantic review failures.
 
 `classes/section-quality.ts` validates independent review verdicts for grammar,
 reading, and contextual vocabulary. `class-generation.ts` rejects malformed
@@ -554,6 +556,9 @@ issue codes. Generated and restored intros preserve absent visuals; only explici
 metadata fallback construction derives visuals. Intro repair uses its dedicated
 trusted-context template without the initial generation template's visual schema.
 Generation, repair and review share example-meaning and grammar-scope policies.
+They also share intro field roles: a brief purpose or illustrative entry need
+not restate every objective component. Full coverage belongs to the teaching
+unit and assessment; every actual claim still requires independent review.
 Fresh generation uses the strict `class_intro_generation` wire schema. Every
 object declares all its keys required and rejects additional properties, including
 nullable visual branches. The root visuals field is required and nullable;

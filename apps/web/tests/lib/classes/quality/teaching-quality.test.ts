@@ -4,7 +4,6 @@ import {
   novelFindingCorroborationFixture,
   shapeIntroProviderFixture,
 } from './intro-provider-fixture';
-
 const boundary = vi.hoisted(() => ({ generate: vi.fn(), resolve: vi.fn() }));
 vi.unmock('@/lib/classes/class-intro');
 vi.mock('@/lib/providers/ai', () => ({
@@ -34,6 +33,7 @@ vi.mock('@/lib/usage-logger', () => ({ logUsage: vi.fn() }));
 import { generateClassIntro } from '@/lib/classes/class-intro';
 import {
   classIntroExampleMeaningPolicy,
+  classIntroFieldRolePolicy,
   classIntroGrammarRulePolicy,
   classListeningTranscriptPolicy,
   classSpeakingMeaningPolicy,
@@ -46,7 +46,6 @@ import {
   TeachingQualityRejectionError,
   reviewTeachingContent,
 } from '@/lib/classes/quality/teaching-quality';
-
 const approved = { items: [{ index: 0, acceptable: true, issues: [], feedback: [] }] };
 const nativeIntroParams = { ...params, level: 'A1' };
 function quotedExample(example: (typeof intro.examples)[number]) {
@@ -466,6 +465,7 @@ describe('intro teaching gate', () => {
       const [reviewSystem, messages] = reviewRequests.at(-1)!;
       expect(reviewSystem).toContain(classIntroExampleMeaningPolicy(nativeIntroParams));
       expect(reviewSystem).toContain(classIntroGrammarRulePolicy());
+      expect(reviewSystem).toContain(classIntroFieldRolePolicy());
       expect(
         JSON.parse(messages[0].content).items.find(
           ({ content }: { content: { address: { field: string } } }) =>

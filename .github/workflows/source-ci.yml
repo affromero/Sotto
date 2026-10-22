@@ -9,6 +9,54 @@ permissions:
 jobs:
   web:
     name: Web
+    if: always()
+    needs: [web-checks, web-tests]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require web checks and every test shard
+        env:
+          WEB_JOB_RESULTS: ${{ toJSON(needs) }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+
+          results = json.loads(os.environ['WEB_JOB_RESULTS'])
+          if set(results) != {'web-checks', 'web-tests'} or any(
+              result.get('result') != 'success' for result in results.values()
+          ):
+              raise SystemExit(f'Web validation did not pass: {results}')
+          print('Web checks and every test shard passed.')
+          PY
+
+  web-checks:
+    name: Web lint, types and build
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_APP_URL: https://selfhost.example.com
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx --no-install prisma generate --schema=apps/web/prisma/schema.prisma
+      - name: Validate web source and production build
+        run: |
+          npm run speech:config:check --workspace=@sotto/web
+          npm run lint --workspace=@sotto/web
+          npm run type-check --workspace=@sotto/web
+          npm run build
+
+  web-tests:
+    name: Web tests (${{ matrix.shard }}/4)
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     runs-on: ubuntu-latest
     env:
       NEXT_PUBLIC_APP_URL: https://selfhost.example.com
@@ -55,8 +103,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ffmpeg libchromaprint-tools qpdf redis-server
       - run: npx --no-install prisma generate --schema=apps/web/prisma/schema.prisma
-      - name: Validate web application
-        run: npm run ci:web
+      - name: Run web test shard
+        run: npm test --workspace=@sotto/web -- --run --no-file-parallelism --shard=${{ matrix.shard }}/4
 
   packages:
     name: Packages

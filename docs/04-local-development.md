@@ -393,7 +393,10 @@ git commit
 ```
 
 The commit gate selects type checks and related tests from staged paths,
-including deletions. Configuration and runtime inputs that cannot be covered
+including deletions. Dependency manifests run workspace type checks; GitHub
+runs the full dependency validation. Source changes in the same commit retain
+their related tests. Dependency-only changes do not trigger Rust checks.
+Configuration and runtime inputs that cannot be covered
 by the test import graph select the full affected workspace suite. Documentation
 and native-only commits avoid web validation. Pushes run Rust checks when the
 TUI or its shared contracts change, without repeating the web suite and build.
@@ -401,7 +404,10 @@ Use `npm run check:affected` to run the staged gate manually during debugging;
 the commit hook already runs it.
 
 GitHub runs full source validation for web, package, and tooling changes before
-merge. Production and OSS images share the main revision's validation. Native
+merge. Web tests run in four independent shards, each with its own PostgreSQL
+and Redis services. Lint, types and the web build run once. The Web check requires
+the build checks and every shard to pass. Production and OSS images share the
+main revision's validation. Native
 and documentation changes avoid backend validation. Run `npm run ci` locally
 to investigate broader failures or qualify an offline release. A passing focused
 check does not replace applicable remote checks for the exact release revision.

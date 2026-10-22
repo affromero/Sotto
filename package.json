@@ -90,7 +90,7 @@
     "vitest": "4.1.11"
   },
   "optionalDependencies": {
-    "@next/swc-darwin-arm64": "^16.4.0"
+    "@next/swc-darwin-arm64": "^16.4.1"
   },
   "engines": {
     "node": ">=24 <25"

@@ -14,6 +14,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[3]
 WORKFLOWS = ROOT / '.github/workflows'
 GATES = {'web', 'packages', 'tooling', 'speech'}
+WEB_GATES = {'web-checks', 'web-tests'}
 
 
 class SourceValidationTests(unittest.TestCase):
@@ -80,6 +81,7 @@ class SourceValidationTests(unittest.TestCase):
 
     def run_job(
         self, name: str, failure: list[str] | None = None,
+        shard: int = 1,
     ) -> tuple[int, list[dict[str, object]]]:
         job = self.jobs[name]
         environment = {
@@ -90,8 +92,9 @@ class SourceValidationTests(unittest.TestCase):
         for step in job['steps']:
             if 'run' not in step:
                 continue
+            script = step['run'].replace('${{ matrix.shard }}', str(shard))
             result = subprocess.run(
-                ['bash', '-e', '-o', 'pipefail', '-c', step['run']],
+                ['bash', '-e', '-o', 'pipefail', '-c', script],
                 cwd=ROOT / step.get('working-directory', ''),
                 env={**environment, **step.get('env', {})},
                 text=True, capture_output=True,
@@ -107,25 +110,36 @@ class SourceValidationTests(unittest.TestCase):
         return status, records
 
     def aggregate(
-        self, results: dict[str, object],
+        self, results: dict[str, object], job: str = 'source',
     ) -> subprocess.CompletedProcess[str]:
-        step = self.jobs['source']['steps'][0]
+        step = self.jobs[job]['steps'][0]
+        variable = 'WEB_JOB_RESULTS' if job == 'web' else 'SOURCE_JOB_RESULTS'
         return subprocess.run(
             ['bash', '-e', '-c', step['run']], cwd=ROOT,
-            env={**os.environ, 'SOURCE_JOB_RESULTS': json.dumps(results)},
+            env={**os.environ, variable: json.dumps(results)},
             text=True, capture_output=True,
         )
 
-    def successful_results(self) -> dict[str, object]:
-        return {name: {'result': 'success'} for name in GATES}
+    def successful_results(self, gates: set[str] = GATES) -> dict[str, object]:
+        return {name: {'result': 'success'} for name in gates}
 
     def test_independent_jobs_keep_every_validation_command(self) -> None:
         expected = {
-            'web': [
+            'web-checks': [
                 ['npm', 'ci'],
                 ['npx', '--no-install', 'prisma', 'generate',
                  '--schema=apps/web/prisma/schema.prisma'],
-                ['npm', 'run', 'ci:web'],
+                ['npm', 'run', 'speech:config:check', '--workspace=@sotto/web'],
+                ['npm', 'run', 'lint', '--workspace=@sotto/web'],
+                ['npm', 'run', 'type-check', '--workspace=@sotto/web'],
+                ['npm', 'run', 'build'],
+            ],
+            'web-tests': [
+                ['npm', 'ci'],
+                ['npx', '--no-install', 'prisma', 'generate',
+                 '--schema=apps/web/prisma/schema.prisma'],
+                ['npm', 'test', '--workspace=@sotto/web', '--', '--run',
+                 '--no-file-parallelism', '--shard=1/4'],
             ],
             'packages': [['npm', 'ci'], ['npm', 'run', 'ci:packages']],
             'tooling': [
@@ -163,13 +177,13 @@ class SourceValidationTests(unittest.TestCase):
                 actual = [record['command'] for record in records]
                 for command in commands:
                     self.assertIn(command, actual)
-                if name == 'web':
+                if name == 'web-tests':
                     install = next(command for command in actual
                                    if command[:3] == ['sudo', 'apt-get',
                                                       'install'])
                     self.assertIn('redis-server', install)
                     self.assertLess(actual.index(install),
-                                    actual.index(['npm', 'run', 'ci:web']))
+                                    actual.index(commands[-1]))
                 checkouts = [
                     step for step in self.jobs[name]['steps']
                     if step.get('uses', '').startswith('actions/checkout@')
@@ -185,7 +199,12 @@ class SourceValidationTests(unittest.TestCase):
 
     def test_failed_validation_commands_fail_their_job(self) -> None:
         failures = [
-            ('web', ['npm', 'run', 'ci:web']),
+            ('web-checks', ['npm', 'run', 'speech:config:check',
+                            '--workspace=@sotto/web']),
+            ('web-checks', ['npm', 'run', 'lint', '--workspace=@sotto/web']),
+            ('web-checks', ['npm', 'run', 'type-check',
+                            '--workspace=@sotto/web']),
+            ('web-checks', ['npm', 'run', 'build']),
             ('browser', ['npm', 'run', 'test:browser']),
             ('packages', ['npm', 'run', 'ci:packages']),
             ('tooling', ['node', 'scripts/ci/audit-gate.mjs']),
@@ -206,7 +225,9 @@ class SourceValidationTests(unittest.TestCase):
         self,
     ) -> None:
         for name, validation in (
-            ('web', 'ci:web'), ('browser', 'test:browser'),
+            ('web-tests', ['npm', 'test', '--workspace=@sotto/web', '--',
+                           '--run', '--no-file-parallelism', '--shard=1/4']),
+            ('browser', ['npm', 'run', 'test:browser']),
         ):
             with self.subTest(job=name):
                 self.mirrors.write_text(
@@ -217,14 +238,16 @@ class SourceValidationTests(unittest.TestCase):
                     self.mirrors.read_text(),
                     'https://archive.ubuntu.com/ubuntu/\n',
                 )
-                self.assertIn(['npm', 'run', validation],
+                self.assertIn(validation,
                               [record['command'] for record in records])
 
     def test_mirror_setup_failure_stops_before_installation_or_validation(
         self,
     ) -> None:
         for name, validation in (
-            ('web', 'ci:web'), ('browser', 'test:browser'),
+            ('web-tests', ['npm', 'test', '--workspace=@sotto/web', '--',
+                           '--run', '--no-file-parallelism', '--shard=1/4']),
+            ('browser', ['npm', 'run', 'test:browser']),
         ):
             for failure in ('missing', 'write'):
                 with self.subTest(job=name, failure=failure):
@@ -240,13 +263,13 @@ class SourceValidationTests(unittest.TestCase):
                     self.assertNotEqual(status, 0)
                     commands = [record['command'] for record in records]
                     self.assertNotIn(['sudo', 'apt-get', 'update'], commands)
-                    self.assertNotIn(['npm', 'run', validation], commands)
+                    self.assertNotIn(validation, commands)
 
-    def test_only_web_uses_shared_database_and_redis_services(self) -> None:
+    def test_every_test_shard_has_its_own_database_and_redis_services(self) -> None:
         self.assertEqual(
-            set(self.jobs['web']['services']), {'redis', 'postgres'},
+            set(self.jobs['web-tests']['services']), {'redis', 'postgres'},
         )
-        self.assertEqual(self.jobs['web']['env'], {
+        self.assertEqual(self.jobs['web-tests']['env'], {
             'NEXT_PUBLIC_APP_URL': 'https://selfhost.example.com',
             'SIDEDOOR_TEST_DATABASE_URL': (
                 'postgresql://postgres:sidedoor-test-only'
@@ -255,9 +278,32 @@ class SourceValidationTests(unittest.TestCase):
             'SIDEDOOR_TEST_REDIS_URL': 'redis://127.0.0.1:6379/15',
             'REDIS_URL': 'redis://127.0.0.1:6379/14',
         })
-        for name in GATES - {'web'}:
+        for name in GATES | {'web-checks'}:
             with self.subTest(job=name):
                 self.assertNotIn('services', self.jobs[name])
+
+    def test_all_four_shards_run_serial_files_with_complete_partition_indices(self) -> None:
+        strategy = self.jobs['web-tests']['strategy']
+        shards = strategy['matrix']['shard']
+        self.assertEqual(shards, [1, 2, 3, 4])
+        self.assertFalse(strategy['fail-fast'])
+        for shard in shards:
+            with self.subTest(shard=shard):
+                status, records = self.run_job('web-tests', shard=shard)
+                self.assertEqual(status, 0, self.command_output)
+                self.assertEqual(records[-1]['command'], [
+                    'npm', 'test', '--workspace=@sotto/web', '--', '--run',
+                    '--no-file-parallelism', f'--shard={shard}/{len(shards)}',
+                ])
+
+    def test_failure_in_any_test_shard_fails_its_job(self) -> None:
+        for shard in self.jobs['web-tests']['strategy']['matrix']['shard']:
+            command = ['npm', 'test', '--workspace=@sotto/web', '--', '--run',
+                       '--no-file-parallelism', f'--shard={shard}/4']
+            with self.subTest(shard=shard):
+                status, records = self.run_job('web-tests', command, shard)
+                self.assertNotEqual(status, 0)
+                self.assertEqual(records[-1]['command'], command)
 
     def test_named_check_waits_for_every_gate_after_failure(self) -> None:
         aggregate = self.jobs['source']
@@ -268,24 +314,35 @@ class SourceValidationTests(unittest.TestCase):
                          '${{ toJSON(needs) }}')
         result = self.aggregate(self.successful_results())
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        web = self.jobs['web']
+        self.assertEqual(web['name'], 'Web')
+        self.assertEqual(web['if'], 'always()')
+        self.assertEqual(set(web['needs']), WEB_GATES)
+        self.assertEqual(web['steps'][0]['env']['WEB_JOB_RESULTS'],
+                         '${{ toJSON(needs) }}')
+        result = self.aggregate(self.successful_results(WEB_GATES), 'web')
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_failed_skipped_and_cancelled_gates_never_pass(self) -> None:
-        for name in GATES:
-            for state in ('failure', 'skipped', 'cancelled'):
-                with self.subTest(job=name, state=state):
-                    results = self.successful_results()
-                    results[name] = {'result': state}
-                    result = self.aggregate(results)
-                    self.assertNotEqual(result.returncode, 0)
-                    self.assertIn(name, result.stderr)
+        for job, gates in (('source', GATES), ('web', WEB_GATES)):
+            for name in gates:
+                for state in ('failure', 'skipped', 'cancelled'):
+                    with self.subTest(aggregate=job, gate=name, state=state):
+                        results = self.successful_results(gates)
+                        results[name] = {'result': state}
+                        result = self.aggregate(results, job)
+                        self.assertNotEqual(result.returncode, 0)
+                        self.assertIn(name, result.stderr)
 
     def test_missing_and_unexpected_gates_never_pass_aggregate(self) -> None:
-        missing = self.successful_results()
-        del missing['web']
-        extra = {**self.successful_results(), 'unknown': {'result': 'success'}}
-        for results in ({}, missing, extra):
-            with self.subTest(results=results):
-                self.assertNotEqual(self.aggregate(results).returncode, 0)
+        for job, gates in (('source', GATES), ('web', WEB_GATES)):
+            missing = self.successful_results(gates)
+            del missing[next(iter(gates))]
+            extra = {**self.successful_results(gates),
+                     'unknown': {'result': 'success'}}
+            for results in ({}, missing, extra):
+                with self.subTest(aggregate=job, results=results):
+                    self.assertNotEqual(self.aggregate(results, job).returncode, 0)
 
 
 if __name__ == '__main__':
