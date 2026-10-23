@@ -388,6 +388,7 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
   'class/generate-listening-quiz.md': [
     'COUNT',
     'LANGUAGE_POLICY',
+    'LESSON_CONTEXT',
     'LEVEL',
     'NATIVE',
     'NOTES',

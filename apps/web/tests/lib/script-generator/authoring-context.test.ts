@@ -61,6 +61,72 @@ describe('listening authoring context', () => {
     });
   });
 
+  it.each([
+    { nativeLang: 'en', targetLang: 'de' },
+    { nativeLang: 'es', targetLang: 'de' },
+    { nativeLang: 'es', targetLang: 'en' },
+  ])(
+    'keeps A1 $targetLang dialogue dominant with concise $nativeLang support',
+    async ({ nativeLang, targetLang }) => {
+      await generateScript({
+        ...params,
+        audienceLevel: 'A1',
+        languageMode: 'conversational_mix',
+        targetLanguage: targetLang,
+        forLearning: true,
+        learningNativeLanguage: nativeLang,
+      });
+      const [system] = generateResponse.mock.calls[0] as [string];
+      expect(system).toContain(`target language (${targetLang}) dominant`);
+      expect(system).toContain(
+        `native-language (${nativeLang}) support is allowed when it prevents confusion`
+      );
+      expect(system).not.toContain('~40% English');
+      expect(system).not.toContain('English for explanations and transitions');
+      expect(system).not.toContain('Include brief inline translations when introducing new words');
+      expect(system).toContain('[V{N}:word]');
+      expect(system).toContain('- besuchen — to visit');
+      expect(system).toContain('Check every spoken clause for grammatical and idiomatic wording');
+    }
+  );
+
+  it.each([
+    { forLearning: false, learningNativeLanguage: 'es', audienceLevel: 'A1' },
+    { forLearning: true, learningNativeLanguage: undefined, audienceLevel: 'A1' },
+    { forLearning: true, learningNativeLanguage: 'es', audienceLevel: 'A2' },
+  ])(
+    'retains the existing mix outside native-language A1 learning ($forLearning, $audienceLevel, $learningNativeLanguage)',
+    async (scope) => {
+      await generateScript({ ...params, languageMode: 'conversational_mix', ...scope });
+      const [system] = generateResponse.mock.calls[0] as [string];
+      expect(system).toContain('~40% English / ~60% German');
+      expect(system).toContain('English for explanations and transitions');
+    }
+  );
+
+  it('keeps A2 learning in target-language immersion with a captured native language', async () => {
+    await generateScript({ ...params, forLearning: true, learningNativeLanguage: 'es' });
+    const [system] = generateResponse.mock.calls[0] as [string];
+    expect(system).toContain('Generate the learner-facing script in German only');
+    expect(system).toContain(
+      'Do not use English, source-language explanations, inline translations, or bilingual transitions'
+    );
+    expect(system).not.toContain('A1 scaffolding');
+  });
+
+  it('keeps ordinary English podcasts free of language-learning instructions', async () => {
+    await generateScript({
+      ...params,
+      targetLanguage: 'en',
+      languageMode: 'conversational_mix',
+      learningNativeLanguage: 'es',
+    });
+    const [system] = generateResponse.mock.calls[0] as [string];
+    expect(system).toContain('HOST: Warm, curious, asks great questions');
+    expect(system).not.toContain('A1 scaffolding');
+    expect(system).not.toContain('Conversational Mix Mode');
+  });
+
   it.each([true, false])(
     'preserves source and output while scoping conversational roles and objective to learning %s',
     async (forLearning) => {

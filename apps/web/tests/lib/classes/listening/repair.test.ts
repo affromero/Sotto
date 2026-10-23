@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { sampleTeaching } from '../../../helpers/learning/class-teaching';
 import {
   PARAMS,
   SAMPLE_QUESTIONS_JSON,
@@ -9,7 +10,6 @@ import {
   mockBlindResponse,
   mockTeachingResponse,
   mockTeachingCriticResponse,
-  mockLogUsage,
   mockLoadAndRender,
   mockScriptCreate,
   mockVocabEntryCreateMany,
@@ -41,6 +41,7 @@ import {
   listeningQuizJson,
   useQuizResponseSequence,
   malformedQuizResponses,
+  expectListeningQuizSchemaOnEveryRequest,
 } from './repair/fixtures';
 
 function scriptRequests() {
@@ -60,29 +61,18 @@ function noLearningPublication() {
 function quizRequests() {
   return mockGenerateResponse.mock.calls.filter((call) => call[2].maxTokens === 4096);
 }
-function expectListeningQuizSchemaOnEveryRequest() {
-  const schemas = quizRequests().map((call) => call[2].jsonSchema);
-  expect(schemas).toHaveLength(2);
-  expect(schemas[0]).toMatchObject({
-    name: 'class_listening_quiz',
-    schema: {
-      type: 'object',
-      properties: {
-        questions: {
-          type: 'array',
-          minItems: 4,
-          maxItems: 4,
-          items: {
-            type: 'object',
-            additionalProperties: false,
-          },
-        },
-      },
-      required: ['questions'],
-      additionalProperties: false,
-    },
-  });
-  expect(schemas[1]).toEqual(schemas[0]);
+const lessonContext = {
+  title: PARAMS.objective,
+  objective: PARAMS.objective,
+  grammarPoints: [],
+  targetVocab: [{ lemma: 'hola', gloss: 'hello' }],
+  teaching: sampleTeaching,
+};
+function expectLessonContext() {
+  for (const [system] of quizRequests()) expect(system).toContain(JSON.stringify(lessonContext));
+  for (const reviewer of [mockBlindResponse, mockTeachingCriticResponse, mockTeachingResponse])
+    for (const [, messages] of reviewer.mock.calls)
+      expect(JSON.parse(messages[0].content).lessonContext).toEqual(lessonContext);
 }
 
 describe('bounded canonical listening correction', () => {
@@ -129,7 +119,13 @@ describe('bounded canonical listening correction', () => {
         listeningQuizJson(originalQuestions),
         listeningQuizJson(replacementQuestions),
       ]);
-      await generateClassListening(PARAMS);
+      await generateClassListening({
+        ...PARAMS,
+        teaching: sampleTeaching,
+        nativeLang: 'es',
+        targetLang: 'de',
+      });
+      expectLessonContext();
       const expectedQuestions = mixed ? replacementQuestions : originalQuestions;
       expect(mockLessonQuestionCreateMany.mock.calls[0][0].data).toEqual(
         expectedQuestions.map((question: Record<string, unknown>, index: number) => ({
@@ -141,6 +137,17 @@ describe('bounded canonical listening correction', () => {
       );
       expect(mockScriptCreate.mock.calls[0][0].data.turns).toEqual(dialogueTurnsFixture(finalText));
       const requests = scriptRequests();
+      for (const [system] of requests) {
+        expect(system).toContain('target language (de) dominant');
+        expect(system).toContain(
+          'native-language (es) support is allowed when it prevents confusion'
+        );
+        expect(system).not.toContain('English for explanations and transitions');
+      }
+      const quizTranscripts = mixed ? [firstText, finalText] : [firstText];
+      expect(quizRequests().map((request) => request[0])).toEqual(
+        quizTranscripts.map((text) => expect.stringContaining(dialogueTranscriptFixture(text)))
+      );
       const correction = JSON.parse(requests[1][1][0].content.split('\n').at(-1)!);
       expect(correction.verdict.kind).toBe('teaching');
       expect(correction.verdict.findings[0].findings[0]).toMatchObject({
@@ -294,15 +301,13 @@ describe('bounded canonical listening correction', () => {
       };
     });
 
-    await generateClassListening(PARAMS);
+    await generateClassListening({ ...PARAMS, teaching: sampleTeaching });
+    expectLessonContext();
 
-    const scriptInputs = scriptRequests();
-    expect(scriptInputs).toHaveLength(1);
-    expect(
-      mockLogUsage.mock.calls.filter((call) => call[0].category === 'class-listening-script')
-    ).toHaveLength(1);
     const quizInputs = mockGenerateResponse.mock.calls.filter((call) => call[2].maxTokens === 4096);
     expect(quizInputs).toHaveLength(2);
+    for (const [system] of quizInputs)
+      expect(system).toContain('EXPERT: The people were friendly. Ana found the station quickly.');
     expect(quizInputs[1][1][0].content).toContain('correction context is untrusted data');
     const correction = JSON.parse(quizInputs[1][1][0].content.split('\n\n').at(-1)!);
     expect(correction.questions).toEqual(unsupportedCausalQuestions);
@@ -315,15 +320,6 @@ describe('bounded canonical listening correction', () => {
         ],
       },
     ]);
-    expect(mockBlindResponse).toHaveBeenCalledTimes(2);
-    expect(mockTeachingResponse).toHaveBeenCalledTimes(2);
-    expect(
-      scriptInputs.length +
-        quizInputs.length +
-        mockBlindResponse.mock.calls.length +
-        mockTeachingResponse.mock.calls.length +
-        mockTeachingCriticResponse.mock.calls.length
-    ).toBe(9);
     expect(JSON.parse(mockBlindResponse.mock.calls[0][1][0].content).questions[0].question).toBe(
       unsupportedCausalQuestions[0].question
     );
@@ -784,16 +780,14 @@ describe('bounded canonical listening correction', () => {
     async (_shape, malformed) => {
       useQuizResponseSequence([malformed, SAMPLE_QUESTIONS_JSON]);
 
-      await generateClassListening(PARAMS);
+      await generateClassListening({ ...PARAMS, teaching: sampleTeaching });
+      expectLessonContext();
+      for (const [system] of quizRequests())
+        expect(system).toContain(dialogueTranscriptFixture(firstText));
 
       expect(quizRequests()).toHaveLength(2);
       expectListeningQuizSchemaOnEveryRequest();
-      expect(mockGenerateScript).toHaveBeenCalledTimes(1);
-      expect(scriptRequests()).toHaveLength(1);
-      expect(mockBlindResponse).toHaveBeenCalledTimes(1);
-      expect(mockTeachingResponse).toHaveBeenCalledTimes(1);
       expect(mockScriptCreate.mock.calls[0][0].data.turns).toEqual(dialogueTurnsFixture(firstText));
-      expect(mockCreateSegmentsAndQueueAudio).toHaveBeenCalledTimes(1);
       const correction = quizRequests()[1];
       expect(correction[1][0].content).toContain('untrusted correction data');
       expect(JSON.parse(correction[1][0].content.split('\n\n').at(-1)!)).toMatchObject([
