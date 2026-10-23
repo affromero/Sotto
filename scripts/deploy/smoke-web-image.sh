@@ -48,7 +48,29 @@ for attempt in $(seq 1 60); do
       if (!response.ok || body.status !== "healthy" || body.version !== process.argv[1]) process.exit(1);
       console.log("Standalone web, Prisma database query and Redis health passed: " + body.version);
     }).catch(() => process.exit(1));
-  ' "$expected"; then exit 0; fi
+  ' "$expected"; then
+    docker exec "${suffix}-web" node --input-type=module -e '
+      import assert from "node:assert/strict";
+      const url = "http://127.0.0.1:3000/.well-known/apple-app-site-association";
+      for (const method of ["GET", "HEAD"]) {
+        const response = await fetch(url, { method, redirect: "error" });
+        assert.equal(response.status, 200, `${method} Apple association status`);
+        assert.match(response.headers.get("content-type") || "", /^application\/json(?:;|$)/i);
+        if (method === "HEAD") {
+          assert.equal(await response.text(), "", "Apple association HEAD body");
+          continue;
+        }
+        assert.deepEqual(await response.json(), {
+          applinks: { details: [{
+            appIDs: ["2HVQQ4W769.fm.sotto.app"],
+            components: [{ "/": "/play/join" }],
+          }] },
+        });
+      }
+      console.log("Unauthenticated Apple invitation association GET and HEAD passed");
+    '
+    exit 0
+  fi
   sleep 2
 done
 echo "Web image did not pass its database, Redis and release health checks" >&2
