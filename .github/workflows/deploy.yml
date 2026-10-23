@@ -481,7 +481,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Install audio decoder
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+        run: |
+          sudo test -f /etc/apt/apt-mirrors.txt
+          printf '%s\n' 'https://archive.ubuntu.com/ubuntu/' |
+            sudo tee /etc/apt/apt-mirrors.txt >/dev/null
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
       - name: Build local transcription candidate
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc
         with:

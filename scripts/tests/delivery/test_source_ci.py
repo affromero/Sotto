@@ -22,7 +22,7 @@ class SourceValidationTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         # The tooling gate installs the repository's pinned npm dependencies.
         cls.jobs = {}
-        for name in ('source-ci.yml', 'browser.yml'):
+        for name in ('source-ci.yml', 'browser.yml', 'deploy.yml'):
             result = subprocess.run(
                 [shutil.which('node'), '-e',
                  "process.stdout.write(JSON.stringify(require('yaml').parse("
@@ -82,16 +82,20 @@ class SourceValidationTests(unittest.TestCase):
     def run_job(
         self, name: str, failure: list[str] | None = None,
         shard: int = 1,
+        step_name: str | None = None,
     ) -> tuple[int, list[dict[str, object]]]:
         job = self.jobs[name]
+        steps = [step for step in job['steps'] if 'run' in step
+                 and (step_name is None or step.get('name') == step_name)]
+        if step_name is not None:
+            self.assertEqual(len(steps), 1,
+                             'Select exactly one runnable workflow step')
         environment = {
             **self.environment, **job.get('env', {}),
             'FAIL_COMMAND': json.dumps(failure or []),
         }
         status = 0
-        for step in job['steps']:
-            if 'run' not in step:
-                continue
+        for step in steps:
             script = step['run'].replace('${{ matrix.shard }}', str(shard))
             result = subprocess.run(
                 ['bash', '-e', '-o', 'pipefail', '-c', script],
@@ -264,6 +268,44 @@ class SourceValidationTests(unittest.TestCase):
                     commands = [record['command'] for record in records]
                     self.assertNotIn(['sudo', 'apt-get', 'update'], commands)
                     self.assertNotIn(validation, commands)
+
+    def test_production_audio_uses_canonical_mirror_before_installing(
+        self,
+    ) -> None:
+        status, records = self.run_job(
+            'local-stt', step_name='Install audio decoder')
+        self.assertEqual(status, 0, self.command_output)
+        self.assertEqual(self.mirrors.read_text(),
+                         'https://archive.ubuntu.com/ubuntu/\n')
+        commands = [record['command'] for record in records]
+        write = ['sudo', 'tee', '/etc/apt/apt-mirrors.txt']
+        update = ['sudo', 'apt-get', 'update']
+        install = ['sudo', 'apt-get', 'install', '-y', 'ffmpeg']
+        self.assertLess(commands.index(write), commands.index(update))
+        self.assertLess(commands.index(update), commands.index(install))
+
+    def test_production_audio_setup_failure_prevents_installation(
+        self,
+    ) -> None:
+        for failure in ('missing', 'write', 'update'):
+            with self.subTest(failure=failure):
+                self.mirrors.write_text(
+                    'http://azure.archive.ubuntu.com/ubuntu/\n')
+                command = None
+                if failure == 'missing':
+                    self.mirrors.unlink()
+                elif failure == 'write':
+                    command = ['sudo', 'tee', '/etc/apt/apt-mirrors.txt']
+                else:
+                    command = ['sudo', 'apt-get', 'update']
+                status, records = self.run_job(
+                    'local-stt', command, step_name='Install audio decoder')
+                self.assertNotEqual(status, 0)
+                commands = [record['command'] for record in records]
+                self.assertNotIn(
+                    ['sudo', 'apt-get', 'install', '-y', 'ffmpeg'], commands)
+                if failure != 'update':
+                    self.assertNotIn(['sudo', 'apt-get', 'update'], commands)
 
     def test_every_test_shard_has_its_own_database_and_redis_services(self) -> None:
         self.assertEqual(
