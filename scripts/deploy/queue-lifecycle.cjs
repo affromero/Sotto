@@ -318,8 +318,17 @@ async function established(runtime) {
       LEGACY_TABLES
     );
     assert.equal(legacy.length, 0, 'Platform conversion is not finalized');
+    const relations = await transaction.$queryRawUnsafe(
+      "SELECT pg_catalog.format('%I.%I', current_schema(), '_prisma_migrations') AS \"migrationTable\""
+    );
+    assert.equal(relations.length, 1, 'Unique migration relation required');
+    const migrationTable = relations[0].migrationTable;
+    assert(
+      typeof migrationTable === 'string' && migrationTable.length > 0,
+      'Qualified migration relation required'
+    );
     const applied = await transaction.$queryRawUnsafe(
-      'SELECT migration_name, checksum, finished_at, rolled_back_at FROM "_prisma_migrations"'
+      `SELECT migration_name, checksum, finished_at, rolled_back_at FROM ${migrationTable}`
     );
     assert.equal(applied.length, migrations.size, 'Applied migration inventory differs');
     const seen = new Set();

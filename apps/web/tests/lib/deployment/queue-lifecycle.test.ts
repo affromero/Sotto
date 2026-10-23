@@ -6,10 +6,12 @@ import { createRequire } from 'node:module';
 import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { tmpdir } from 'node:os';
+import { PrismaPg } from '@prisma/adapter-pg';
 import { FlowProducer, Queue, Worker } from 'bullmq';
 import Redis from 'ioredis';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { prepareJob } from 'thesidedoor-core/runtime/outbox';
+import { PrismaClient } from '@/generated/prisma/client';
 import { ALL_QUEUE_NAMES } from '@/lib/queue';
 import { sottoJobOutbox } from '@/lib/sidedoor/jobs/core/job-delivery';
 import { sottoJobExecutions } from '@/lib/sidedoor/jobs/core/job-execution-lifetime';
@@ -689,6 +691,73 @@ suite('deployment queue and execution settlement', () => {
       before
     );
   });
+
+  it.each(['complete', 'incomplete', 'missing'])(
+    'validates the %s application ledger independently of a later schema',
+    async (condition) => {
+      const decoy = `migration_decoy_${randomUUID().replaceAll('-', '')}`;
+      const ledger = `"${instance.schema}"."_prisma_migrations"`;
+      const saved = `"${instance.schema}"."saved_migrations"`;
+      let renamed = false;
+      await instance.database.$executeRawUnsafe(`CREATE SCHEMA "${decoy}"`);
+      const database = new PrismaClient({
+        adapter: new PrismaPg(
+          {
+            connectionString: process.env.SIDEDOOR_TEST_DATABASE_URL!,
+            options: `-c search_path=${instance.schema},${decoy},public`,
+          },
+          { schema: instance.schema }
+        ),
+      });
+      try {
+        await instance.database.$executeRawUnsafe(
+          `CREATE TABLE "${decoy}"."_prisma_migrations" AS TABLE ${ledger}`
+        );
+        const isolated = { ...runtime, database };
+        expect(
+          (await run({ command: 'database-identity' }, isolated)).databaseIdentity
+        ).toMatchObject({
+          schemaName: instance.schema,
+        });
+        if (condition === 'complete')
+          await instance.database.$executeRawUnsafe(
+            `UPDATE "${decoy}"."_prisma_migrations" SET checksum = $1`,
+            '0'.repeat(64)
+          );
+        if (condition === 'incomplete')
+          await instance.database.$executeRawUnsafe(
+            `DELETE FROM ${ledger} WHERE migration_name = $1`,
+            migrations.keys().next().value!
+          );
+        if (condition === 'missing') {
+          await instance.database.$executeRawUnsafe(
+            `ALTER TABLE ${ledger} RENAME TO "saved_migrations"`
+          );
+          renamed = true;
+        }
+        const result = run({ command: 'established' }, isolated);
+        if (condition === 'complete')
+          await expect(result).resolves.toMatchObject({
+            established: true,
+            appliedMigrations: migrations.size,
+          });
+        else await expect(result).rejects.toThrow();
+      } finally {
+        try {
+          await database.$disconnect();
+        } finally {
+          try {
+            if (renamed)
+              await instance.database.$executeRawUnsafe(
+                `ALTER TABLE ${saved} RENAME TO "_prisma_migrations"`
+              );
+          } finally {
+            await instance.database.$executeRawUnsafe(`DROP SCHEMA "${decoy}" CASCADE`);
+          }
+        }
+      }
+    }
+  );
 
   it('proves the actual database and schema behind the configured connection', async () => {
     const report = await run({ command: 'database-identity' }, runtime);
