@@ -91,6 +91,30 @@ beforeEach(() => {
 });
 
 describe('indexed listening teaching repair', () => {
+  it('preserves the A1 native-language policy through a bound turn-text correction', async () => {
+    const source = fixture();
+    provider.generateResponse.mockResolvedValue({
+      content: JSON.stringify({ turnTexts: source.turnTexts }),
+      model: 'captured-model',
+    });
+    const repaired = await generateScript({
+      ...source.params,
+      audienceLevel: 'A1',
+      languageMode: 'conversational_mix',
+      learningNativeLanguage: 'es',
+    });
+    const [system, messages, options] = provider.generateResponse.mock.calls[0];
+    expect(system).toContain('target language (de) dominant');
+    expect(system).toContain('native-language (es) support is allowed when it prevents confusion');
+    expect(system).not.toContain('~40% English');
+    expect(system).not.toContain('English for explanations and transitions');
+    expect(system).toContain('Check every spoken clause for grammatical and idiomatic wording');
+    expect(options.jsonSchema.name).toBe('learning_script_turn_repair');
+    expect(messages[0].content).toContain(source.params.topic);
+    expect(repaired.turns[20]).toEqual(source.candidate.turns[20]);
+    expect(repaired.vocabulary).toEqual(source.candidate.vocabulary);
+  });
+
   it('repairs the retained localized defects while preserving the original cake speaker and metadata', async () => {
     const source = fixture();
     expect(source.scope.turnIndices).toEqual([8, 9, 17, 20]);

@@ -322,6 +322,7 @@ export async function composeListeningContent(
             targetLanguage: p.targetLang,
             languageMode: isImmersionLevel(p.level) ? 'full_immersion' : 'conversational_mix',
             forLearning: true,
+            learningNativeLanguage: p.nativeLang,
             mustIncludeVocabulary: p.mustIncludeVocab,
             sourceContent,
             sourceMetadata,
@@ -381,6 +382,7 @@ export async function composeListeningContent(
             targetLang: p.targetLang,
           }),
           TRANSCRIPT: transcript,
+          LESSON_CONTEXT: JSON.stringify(lessonContext),
           NOTES: formatNotesForPrompt(p.note ?? ''),
         }) +
         buildQuizRetryPrompt(p.retry) +

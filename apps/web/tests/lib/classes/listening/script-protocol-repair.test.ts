@@ -118,6 +118,13 @@ describe('bounded listening script correction', () => {
     expect(requests).toHaveLength(2);
     const correction = JSON.parse(requests[1][1][0].content.split('\n').at(-1)!);
     expect(correction).toEqual({ kind: 'script_protocol', candidate: raw, issues: [{ code }] });
+    for (const [system] of requests) {
+      expect(system).toContain('target language (es) dominant');
+      expect(system).toContain(
+        'native-language (en) support is allowed when it prevents confusion'
+      );
+      expect(system).not.toContain('~40% English');
+    }
     expect(requests[1][2]).toMatchObject({ model: requests[0][2].model, maxTokens: 12288 });
     expect(mockBlindResponse).toHaveBeenCalledTimes(1);
     expect(mockTeachingCriticResponse).toHaveBeenCalled();
@@ -260,11 +267,29 @@ describe('bounded listening script correction', () => {
     expectUnpublished();
   });
 
-  it('publishes an initially valid script without consuming a replacement', async () => {
-    useScripts([valid]);
-    mockBlindResponse.mockResolvedValue({ content: JSON.stringify(approved), model: 'm' });
-    await generateClassListening(PARAMS);
-    expect(scriptRequests()).toHaveLength(1);
-    expect(mockScriptCreate.mock.calls[0][0].data.turns).toEqual(SAMPLE_SCRIPT_RESULT.turns);
-  });
+  it.each([
+    { nativeLang: 'en', targetLang: 'es', level: 'A1' },
+    { nativeLang: 'es', targetLang: 'de', level: 'A1' },
+    { nativeLang: 'es', targetLang: 'en', level: 'A1' },
+    { nativeLang: 'es', targetLang: 'de', level: 'A2' },
+  ])(
+    'publishes reviewed $level $targetLang listening with the captured $nativeLang language policy',
+    async (languages) => {
+      useScripts([valid]);
+      mockBlindResponse.mockResolvedValue({ content: JSON.stringify(approved), model: 'm' });
+      await generateClassListening({ ...PARAMS, ...languages });
+      const [system] = scriptRequests()[0];
+      if (languages.level === 'A1') {
+        expect(system).toContain(`target language (${languages.targetLang}) dominant`);
+        expect(system).toContain(
+          `native-language (${languages.nativeLang}) support is allowed when it prevents confusion`
+        );
+        expect(system).not.toContain('~40% English');
+      } else {
+        expect(system).toContain('Generate the learner-facing script in German only');
+        expect(system).not.toContain('A1 scaffolding');
+      }
+      expect(mockScriptCreate.mock.calls[0][0].data.turns).toEqual(SAMPLE_SCRIPT_RESULT.turns);
+    }
+  );
 });

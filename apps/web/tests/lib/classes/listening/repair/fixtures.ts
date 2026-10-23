@@ -1,7 +1,35 @@
+import { expect } from 'vitest';
 import {
   SAMPLE_QUESTIONS_JSON,
   mockGenerateResponse,
 } from '../../../../helpers/runtime/listening-generation';
+
+export function expectListeningQuizSchemaOnEveryRequest() {
+  const schemas = mockGenerateResponse.mock.calls
+    .filter((call) => call[2].maxTokens === 4096)
+    .map((call) => call[2].jsonSchema);
+  expect(schemas).toHaveLength(2);
+  expect(schemas[0]).toMatchObject({
+    name: 'class_listening_quiz',
+    schema: {
+      type: 'object',
+      properties: {
+        questions: {
+          type: 'array',
+          minItems: 4,
+          maxItems: 4,
+          items: {
+            type: 'object',
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ['questions'],
+      additionalProperties: false,
+    },
+  });
+  expect(schemas[1]).toEqual(schemas[0]);
+}
 
 export const causalCandidateQuestions = [
   {

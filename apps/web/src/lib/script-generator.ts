@@ -4,6 +4,7 @@ import { VOICE_REALISM_INSTRUCTIONS } from './voice-realism-prompts';
 import { loadPrompt, loadAndRender } from './prompt-loader';
 import { minutesToWords, wordCountBounds } from './duration';
 import { formatLearningAuthoringContext } from './classes/lesson/teaching-context';
+import { classLanguagePolicy } from './classes/class-language-policy';
 import type { ClassTeaching } from '@sotto/shared';
 import { getMinReferenceCount, getMinSeriousRatio } from './reference-thresholds';
 import { generatedScriptSchema } from './validations';
@@ -419,11 +420,6 @@ function coerceScriptOutput(raw: Record<string, unknown>): Record<string, unknow
   return result;
 }
 
-/**
- * Generate a 2-voice episode script from discovery metadata.
- * Produces natural, immersive dialogue with delivery directions, sound effect cues,
- * and inline citations backed by real references.
- */
 const VALID_AUDIENCES = new Set(['kids', 'teens', 'family', 'general', 'mature']);
 
 function getAudienceGuidance(audience: string | undefined): string {
@@ -492,22 +488,23 @@ function renderBiasGuidance(sourceMetadata?: SourceMetadata): string {
   );
 }
 
-function buildLanguageInstruction(
-  lang: string | null | undefined,
-  mode: string | null | undefined,
-  opts?: {
-    mustIncludeVocabulary?: Array<{ word: string; translation: string }>;
-    forLearning?: boolean;
-  }
-): { languageInstruction: string; vocabularyInstruction: string } {
-  if (!lang || (lang === 'en' && !opts?.forLearning)) {
-    return {
-      languageInstruction: '',
-      vocabularyInstruction: '',
-    };
-  }
+function buildLanguageInstruction(opts: Parameters<typeof generateScript>[0]): {
+  languageInstruction: string;
+  vocabularyInstruction: string;
+} {
+  const { targetLanguage: lang, languageMode: mode } = opts;
+  if (!lang || (lang === 'en' && !opts.forLearning))
+    return { languageInstruction: '', vocabularyInstruction: '' };
 
   const langName = LANGUAGE_DISPLAY[lang as keyof typeof LANGUAGE_DISPLAY] ?? lang;
+  const scaffoldedMix =
+    opts.forLearning && opts.audienceLevel === 'A1' && opts.learningNativeLanguage
+      ? classLanguagePolicy({
+          level: opts.audienceLevel,
+          nativeLang: opts.learningNativeLanguage,
+          targetLang: lang,
+        })
+      : undefined;
 
   const modeInstructions: Record<string, string> = {
     vocabulary_intro: `## Language: ${langName} — Vocabulary Introduction Mode
@@ -523,11 +520,14 @@ This is a LANGUAGE LEARNING audio lesson. Speak primarily in English (~90%).
 
     conversational_mix: `## Language: ${langName} — Conversational Mix Mode
 
-This is a LANGUAGE LEARNING audio lesson. Mix ${langName} and English (~40% English / ~60% ${langName}).
-- Use ${langName} for full sentences and dialogue; English for explanations and transitions
+${
+  scaffoldedMix ??
+  `This is a LANGUAGE LEARNING audio lesson. Mix ${langName} and English (~40% English / ~60% ${langName}).
+- Use ${langName} for full sentences and dialogue; English for explanations and transitions`
+}
 - Wrap 10-15 vocabulary words with [V{N}:word] notation (e.g., [V1:Guten Morgen], [V2:sprechen]). The word inside the marker is the exact target-language text that should be highlighted.
 - Use anticipation prompts for new words before revealing them
-- Include brief inline translations when introducing new words
+- ${scaffoldedMix ? "Keep any inline translation concise and in the learner's native language, only when needed to prevent confusion" : 'Include brief inline translations when introducing new words'}
 - Build on vocabulary from previous episodes (spaced repetition)
 - Introduce grammar patterns organically through usage, not explicit rules
 - Source articles may be in English — adapt and translate key content into ${langName}`,
@@ -536,7 +536,7 @@ This is a LANGUAGE LEARNING audio lesson. Mix ${langName} and English (~40% Engl
 
 This is a LANGUAGE LEARNING audio lesson. Generate the learner-facing script in ${langName} only.
 - ${
-      opts?.forLearning
+      opts.forLearning
         ? 'Wrap vocabulary appropriate to the requested CEFR level and supplied review targets'
         : 'Wrap 5-8 advanced or nuanced vocabulary items'
     } with [V{N}:word] notation (e.g., [V1:Guten Morgen], [V2:sprechen]). The word inside the marker is the exact target-language text that should be highlighted.
@@ -549,7 +549,7 @@ This is a LANGUAGE LEARNING audio lesson. Generate the learner-facing script in 
   const instruction =
     modeInstructions[mode ?? 'conversational_mix'] ?? modeInstructions.conversational_mix;
 
-  const teachingCorrectness = opts?.forLearning
+  const teachingCorrectness = opts.forLearning
     ? `\n\n## Private author accuracy checks
 
 Use these checks while composing and revising the script. They are not a spoken lesson outline or a request to explain grammar rules aloud.
@@ -587,7 +587,7 @@ Rules:
 - "exampleSentence" shows the word used in a natural sentence with translation in parentheses
 - "difficulty" is beginner/intermediate/advanced`;
 
-  const requiredItems = opts?.mustIncludeVocabulary?.length
+  const requiredItems = opts.mustIncludeVocabulary?.length
     ? `\n\n## REQUIRED review items (from the learner's spaced-repetition queue)
 These are lexical review targets, not mandatory verbatim sentence fragments. Write complete natural sentences before adding markers. Keep each target unchanged as a vocabulary entry; its numbered marker contains the actual grammatical surface already present in the sentence. A noun's dictionary article need not appear inside the marker, and a verb may appear in its inflected form. Never splice a dictionary article or base form into an incompatible surrounding phrase or add a spoken dictionary citation merely to repeat the entry verbatim. ${authoringContext.scriptReviewTargetInstruction(mode, opts.forLearning)}:
 ${opts.mustIncludeVocabulary.map((v) => `- ${v.word} — ${v.translation}`).join('\n')}`
@@ -624,6 +624,7 @@ export async function generateScript(params: {
   languageMode?: string | null;
   mustIncludeVocabulary?: Array<{ word: string; translation: string }>;
   forLearning?: boolean;
+  learningNativeLanguage?: string;
   learnerContext?: string;
   teaching?: ClassTeaching;
   learningRepair?:
@@ -672,10 +673,7 @@ export async function generateScript(params: {
 
   const eli5Section = params.depth === 'eli5' ? loadPrompt('generation/eli5-section.md') : '';
 
-  const langInstr = buildLanguageInstruction(params.targetLanguage, params.languageMode, {
-    mustIncludeVocabulary: params.mustIncludeVocabulary,
-    forLearning: params.forLearning,
-  });
+  const langInstr = buildLanguageInstruction(params);
   const generationPrompt = params.forLearning
     ? 'generation/learning-script-generator.md'
     : 'generation/script-generator.md';
