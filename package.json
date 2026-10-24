@@ -63,8 +63,11 @@
     "prisma": {
       "mysql2": "3.24.2"
     },
-    "react-dom": "19.3.0",
+    "react-dom": "19.3.1",
     "shell-quote": "1.11.0",
+    "thesidedoor-core": {
+      "zod": "$zod"
+    },
     "tsx": "4.23.15"
   },
   "dependencies": {
@@ -87,7 +90,7 @@
     "prisma": "7.10.1",
     "sharp": "0.35.5",
     "sort-package-json": "^4.1.0",
-    "vitest": "4.1.11"
+    "vitest": "4.1.12"
   },
   "optionalDependencies": {
     "@next/swc-darwin-arm64": "^16.4.2"
