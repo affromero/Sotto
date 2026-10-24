@@ -123,6 +123,66 @@ export function buildSourceVocabularyJsonSchema(sourceWordCount: number) {
   };
 }
 
+function vocabularyMetadataRepairSchema(wordCount: number) {
+  if (!Number.isSafeInteger(wordCount) || wordCount < 1 || wordCount > 12)
+    throw new Error('Vocabulary metadata repair requires one through twelve original words.');
+  return z
+    .object({
+      words: z
+        .array(
+          z
+            .object({
+              wordIndex: z
+                .number()
+                .int()
+                .min(0)
+                .max(wordCount - 1),
+              lemma: z.string().trim().min(1),
+              gloss: z.string().trim().min(1),
+              pos: z.string().trim().min(1),
+            })
+            .strict()
+        )
+        .length(wordCount),
+    })
+    .strict();
+}
+
+/** Metadata repair cannot author source quotations or assessment associations. */
+export function buildVocabularyMetadataRepairJsonSchema(wordCount: number) {
+  return {
+    name: 'vocabulary_metadata_repair',
+    schema: z.toJSONSchema(vocabularyMetadataRepairSchema(wordCount), { target: 'draft-7' }),
+  };
+}
+
+/** Apply a complete indexed repair to the validated original words in their original order. */
+export function compileVocabularyMetadataRepair<
+  Word extends { lemma: string; gloss: string; pos: string },
+>(content: string, words: readonly Word[]): Word[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    throw new ReadingVocabularyProtocolError('malformed_json');
+  }
+  const repair = vocabularyMetadataRepairSchema(words.length).safeParse(parsed);
+  if (!repair.success) throw new ReadingVocabularyProtocolError('invalid_shape');
+  const byIndex = new Map(repair.data.words.map((word) => [word.wordIndex, word]));
+  if (byIndex.size !== words.length)
+    throw new ReadingVocabularyProtocolError('replacement_identity');
+  const lemmas = new Set<string>();
+  return words.map((word, wordIndex) => {
+    const { lemma, gloss, pos } = byIndex.get(wordIndex)!;
+    if (lemmas.has(lemma))
+      throw new ReadingVocabularyProtocolError('source_attribution', [
+        { code: 'dup_lemma', wordIndex },
+      ]);
+    lemmas.add(lemma);
+    return { ...word, lemma, gloss, pos };
+  });
+}
+
 const protocolMessages = {
   malformed_json: 'Reading vocabulary extraction returned malformed JSON.',
   invalid_shape: 'Reading vocabulary extraction returned invalid vocabulary.',

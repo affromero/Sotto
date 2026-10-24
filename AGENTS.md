@@ -177,6 +177,9 @@ formatting and secret checks. `npm run check:affected` runs the same scoped
 gate manually when needed. Avoid running it again immediately before the hook.
 Use focused tests during development. Run the full `npm run ci` locally when
 investigating a cross-workspace failure or verifying a release offline.
+The three sampled vocabulary prompts use related local tests plus prompt
+integrity checks when their consuming source and test change together. Other
+dynamic inputs retain the full local workspace gate.
 
 GitHub runs the full source gate for web, package, and tooling changes. Native
 changes run their own checks. Require successful applicable checks at the exact

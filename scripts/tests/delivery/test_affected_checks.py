@@ -243,6 +243,91 @@ class AffectedChecksTests(unittest.TestCase):
         })
         self.assertNotIn('cargo', result.stdout)
 
+    def test_vocabulary_prompts_use_changed_consumer_and_integrity_tests(
+        self,
+    ) -> None:
+        consumer = 'apps/web/src/lib/live-vocab.ts'
+        test = 'apps/web/tests/lib/live-vocab.test.ts'
+        integrity = 'apps/web/tests/lib/prompt-integrity.test.ts'
+        self.write(integrity)
+        for name in ('extract-reading-vocab', 'extract-source-vocab',
+                     'repair-source-vocab'):
+            for manifest in (False, True):
+                with self.subTest(name=name, manifest=manifest):
+                    self.git('reset')
+                    self.log.unlink(missing_ok=True)
+                    prompt = f'apps/web/prompts/live/{name}.md'
+                    self.stage(prompt, consumer, test)
+                    if manifest:
+                        self.stage('package-lock.json')
+                    self.assert_passed(self.run_checks())
+                    related = next(call for call in self.calls()
+                                   if 'related' in call)
+                    for path in (consumer, test, integrity):
+                        self.assertIn(str(self.root / path), related)
+                    self.assertNotIn(str(self.root / prompt), related)
+                    self.assertNotIn('--passWithNoTests', related)
+                    self.assertFalse(any(call[:2] == ['run', 'test']
+                                         for call in self.calls()))
+
+    def test_prompt_exemption_requires_exact_staged_present_companions(
+        self,
+    ) -> None:
+        prompt = 'apps/web/prompts/live/repair-source-vocab.md'
+        consumer = 'apps/web/src/lib/live-vocab.ts'
+        test = 'apps/web/tests/lib/live-vocab.test.ts'
+        integrity = 'apps/web/tests/lib/prompt-integrity.test.ts'
+        for companions in ((), (consumer,), (test,),
+                           ('apps/web/src/lib/other.ts',
+                            'apps/web/tests/lib/other.test.ts')):
+            with self.subTest(companions=companions):
+                self.git('reset')
+                self.log.unlink(missing_ok=True)
+                self.write(consumer)
+                self.write(test)
+                self.write(integrity)
+                self.stage(prompt, *companions)
+                self.assert_passed(self.run_checks())
+                self.assertTrue(any(call[:2] == ['run', 'test']
+                                    for call in self.calls()))
+        for missing in (prompt, consumer, test, integrity):
+            with self.subTest(missing=missing):
+                self.git('reset')
+                self.log.unlink(missing_ok=True)
+                self.write(integrity)
+                self.stage(prompt, consumer, test)
+                (self.root / missing).unlink()
+                self.assert_passed(self.run_checks())
+                self.assertTrue(any(call[:2] == ['run', 'test']
+                                    for call in self.calls()))
+
+    def test_other_dynamic_inputs_keep_full_gate_with_vocabulary_prompts(
+        self,
+    ) -> None:
+        for additional in (
+            'apps/web/prompts/live/unknown.md',
+            'apps/web/tests/fixtures/reference.txt',
+            'apps/web/models/weights.bin',
+            'apps/web/tests/setup/index.ts',
+            'apps/web/prisma/migrations/change/migration.sql',
+            'apps/web/vitest.config.ts',
+        ):
+            with self.subTest(additional=additional):
+                self.git('reset')
+                self.log.unlink(missing_ok=True)
+                self.write('apps/web/tests/lib/prompt-integrity.test.ts')
+                self.stage(
+                    'apps/web/prompts/live/repair-source-vocab.md',
+                    'apps/web/src/lib/live-vocab.ts',
+                    'apps/web/tests/lib/live-vocab.test.ts',
+                    additional,
+                )
+                self.assert_passed(self.run_checks())
+                self.assertTrue(any(call[:2] == ['run', 'test']
+                                    for call in self.calls()))
+                self.assertFalse(any('related' in call
+                                     for call in self.calls()))
+
     def test_tool_failure_is_returned_with_its_diagnostic(self) -> None:
         self.stage('apps/web/src/lib/example.ts')
         self.environment['SOTTO_AFFECTED_TEST_FAIL'] = '1'

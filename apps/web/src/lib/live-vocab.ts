@@ -22,6 +22,7 @@ import {
 import {
   buildReadingVocabularyJsonSchema,
   buildSourceVocabularyJsonSchema,
+  buildVocabularyMetadataRepairJsonSchema,
   buildReadingVocabularyWordTable,
   type ReadingAttributionViolation,
   type ReadingVocabularyProtocolCode,
@@ -151,19 +152,23 @@ export async function requestVocabularyExtraction(p: {
       : undefined;
   const ai = await resolveCapturedLearningAi(p.userId, p.execution);
   const systemPrompt = loadAndRender(
-    p.sourceInventory
-      ? 'live/index-source-vocab.md'
-      : p.sourceVocabulary
-        ? 'live/extract-source-vocab.md'
-        : p.readingQuestions
-          ? 'live/extract-reading-vocab.md'
-          : 'live/extract-vocab.md',
+    p.readingCorrection
+      ? 'live/repair-source-vocab.md'
+      : p.sourceInventory
+        ? 'live/index-source-vocab.md'
+        : p.sourceVocabulary
+          ? 'live/extract-source-vocab.md'
+          : p.readingQuestions
+            ? 'live/extract-reading-vocab.md'
+            : 'live/extract-vocab.md',
     {
       TARGET: p.targetLang,
       NATIVE: p.nativeLang,
       LEVEL: p.level,
       MAX: String(p.sourceInventory ? 64 : MAX_ITEMS),
-      ...(p.readingQuestions ? { MAX_QUESTION_INDEX: String(p.readingQuestions.length - 1) } : {}),
+      ...(p.readingQuestions && !p.readingCorrection
+        ? { MAX_QUESTION_INDEX: String(p.readingQuestions.length - 1) }
+        : {}),
     }
   );
   const res = await createAIProvider(ai.provider).generateResponse(
@@ -202,23 +207,25 @@ export async function requestVocabularyExtraction(p: {
     ],
     {
       ...(await capturedLearningAiOptions(ai)),
-      ...(p.sourceInventory
-        ? {
-            jsonSchema: sourceInventoryJsonSchema(
-              passageWords!.length,
-              sourceInventoryLines(p.text).length
-            ),
-          }
-        : p.sourceVocabulary
-          ? { jsonSchema: buildSourceVocabularyJsonSchema(passageWords!.length) }
-          : p.readingQuestions
-            ? {
-                jsonSchema: buildReadingVocabularyJsonSchema(
-                  p.readingQuestions.length,
-                  passageWords!.length
-                ),
-              }
-            : {}),
+      ...(p.readingCorrection
+        ? { jsonSchema: buildVocabularyMetadataRepairJsonSchema(p.readingCorrection.words.length) }
+        : p.sourceInventory
+          ? {
+              jsonSchema: sourceInventoryJsonSchema(
+                passageWords!.length,
+                sourceInventoryLines(p.text).length
+              ),
+            }
+          : p.sourceVocabulary
+            ? { jsonSchema: buildSourceVocabularyJsonSchema(passageWords!.length) }
+            : p.readingQuestions
+              ? {
+                  jsonSchema: buildReadingVocabularyJsonSchema(
+                    p.readingQuestions.length,
+                    passageWords!.length
+                  ),
+                }
+              : {}),
       maxTokens: p.sourceInventory ? 12000 : p.readingQuestions || p.sourceVocabulary ? 2048 : 1024,
       temperature: 0.2,
     }

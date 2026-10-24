@@ -27,6 +27,7 @@ import {
   type ReadingVocabularyProtocolCode,
   type ReadingAttributionViolation,
   buildReadingVocabularyWordTable,
+  compileVocabularyMetadataRepair,
   hasSourceVocabularyQuote,
   type ReadingPassageWord,
 } from './reading/vocabulary-protocol';
@@ -94,6 +95,20 @@ function parseExtraction(
 }
 
 export type SourceVocabularyWord = ReturnType<typeof parseExtraction>[number];
+
+function parseMetadataRepair(
+  content: string,
+  words: readonly SourceVocabularyWord[],
+  passageText: string,
+  questionIds: readonly string[]
+) {
+  try {
+    return compileVocabularyMetadataRepair(content, words);
+  } catch (error) {
+    if (!(error instanceof ReadingVocabularyProtocolError)) throw error;
+    rejectProtocol(error.code, passageText, questionIds, error.violations);
+  }
+}
 
 /** Complete document indexing shares the authoring transport and canonical lexical review. */
 export async function extractSourceVocabularyInventory(options: {
@@ -283,17 +298,17 @@ export async function extractSourceVocabulary(options: {
     return words;
   } catch (error) {
     if (!(error instanceof TeachingQualityRejectionError) || replaced) throw error;
-    const replacement = parseCandidate(
-      await requestVocabularyExtraction({
-        ...request,
-        readingCorrection: { words, issues: error.issues, feedback: error.feedback },
-      })
+    const replacement = validateSources(
+      parseMetadataRepair(
+        await requestVocabularyExtraction({
+          ...request,
+          readingCorrection: { words, issues: error.issues, feedback: error.feedback },
+        }),
+        words,
+        options.text,
+        []
+      )
     );
-    if (
-      replacement.length !== words.length ||
-      replacement.some((word, index) => word.sourceForm !== words[index]!.sourceForm)
-    )
-      rejectProtocol('replacement_identity', options.text, []);
     try {
       await reviewSourceVocabulary(options, replacement);
       return replacement;
@@ -437,7 +452,7 @@ export async function extractReadingVocabulary(options: {
     words = await reviewWords(words);
   } catch (error) {
     if (!(error instanceof TeachingQualityRejectionError) || replaced) throw error;
-    const replacement = parseExtraction(
+    const replacement = parseMetadataRepair(
       await requestVocabularyExtraction({
         ...request,
         readingCorrection: {
@@ -449,15 +464,10 @@ export async function extractReadingVocabulary(options: {
           })),
         },
       }),
+      words,
       passageText,
-      questionIds,
-      passageWords
+      questionIds
     );
-    if (
-      replacement.length !== words.length ||
-      replacement.some((word, index) => word.sourceForm !== words[index]!.sourceForm)
-    )
-      rejectProtocol('replacement_identity', passageText, questionIds);
     try {
       words = await reviewWords(replacement);
     } catch (replacementError) {
