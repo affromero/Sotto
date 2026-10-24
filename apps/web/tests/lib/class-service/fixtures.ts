@@ -4,7 +4,6 @@ import { createHash } from 'node:crypto';
 import { createSkillRequirements, learningSkills } from '@sotto/shared';
 import { expect, vi } from 'vitest';
 import { sampleTeaching } from '../../helpers/learning/class-teaching';
-import { teachingProviderDraft } from '../classes/lesson/provider-fixture';
 import {
   emptyTeachingCriticFixture,
   shapeTeachingProviderFixture,
@@ -29,7 +28,7 @@ vi.mock('@/lib/providers/ai', () => ({
       if (options.jsonSchema?.name?.startsWith('class_teaching_'))
         mockTeachingProviderInput(system, messages, options);
       if (options.jsonSchema?.name === 'class_teaching_generation')
-        return { content: JSON.stringify(teachingProviderDraft(sampleTeaching)), model: 'fixture' };
+        return { content: JSON.stringify(sampleTeaching), model: 'fixture' };
       if (options.jsonSchema?.name === 'class_teaching_critic')
         return emptyTeachingCriticFixture(messages, options);
       if (options.jsonSchema?.name === 'class_teaching_adjudicator')

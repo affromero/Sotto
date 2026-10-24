@@ -409,12 +409,11 @@ feedback only. Metadata failure evidence labels the complete actual private deci
 and its derived metadata-only outer verdict inside the unchanged sealed envelope.
 
 New classes generate a reviewed unit through `classes/lesson/teaching.ts` before
-their questions. `classes/lesson/teaching-protocol.ts` bounds private authoring
-fields within the reading budget and supplies canonical word-count diagnostics.
-Providers author bounded arrays of words, with optional paragraph endings attached
-to the preceding word. One canonical decoder restores ordinary text before the
-existing character limits, word limits and independent teaching reviews. Invalid
-word tokens fail explicitly; ignored array limits retain field-count diagnostics.
+their questions. Providers return ordinary text under the stored schema's character
+limits. `classes/lesson/teaching-protocol.ts` measures every learner-visible field
+with the canonical counter. The complete unit must fit 600 words before independent
+teaching review; individual fields have no word quotas. An oversized unit receives
+its actual total and field counts within the existing single replacement budget.
 Saved teaching retains its existing schema. The unit and selected vocabulary are frozen in `adaptiveSeed`
 and reused during section repair. Historical classes preserve missing teaching;
 invalid present teaching fails explicitly. Every skill and reviewer receives the
