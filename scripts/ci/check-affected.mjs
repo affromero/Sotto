@@ -121,13 +121,22 @@ const knownScriptTests = new Map([
   ['.pre-commit-config.yaml', 'scripts/tests/delivery/test_affected_checks.py'],
   ['scripts/ci/native-scope.mjs', 'scripts/tests/delivery/test_native_scope.py'],
 ]);
-const vocabularyPrompts = new Set([
-  'apps/web/prompts/live/extract-reading-vocab.md',
-  'apps/web/prompts/live/extract-source-vocab.md',
-  'apps/web/prompts/live/repair-source-vocab.md',
-]);
-const vocabularyConsumer = 'apps/web/src/lib/live-vocab.ts';
-const vocabularyTest = 'apps/web/tests/lib/live-vocab.test.ts';
+const promptConsumers = [
+  {
+    prompts: new Set([
+      'apps/web/prompts/live/extract-reading-vocab.md',
+      'apps/web/prompts/live/extract-source-vocab.md',
+      'apps/web/prompts/live/repair-source-vocab.md',
+    ]),
+    consumer: 'apps/web/src/lib/live-vocab.ts',
+    test: 'apps/web/tests/lib/live-vocab.test.ts',
+  },
+  {
+    prompts: new Set(['apps/web/prompts/class/generate-class-teaching.md']),
+    consumer: 'apps/web/src/lib/classes/lesson/teaching.ts',
+    test: 'apps/web/tests/lib/classes/lesson/teaching.test.ts',
+  },
+];
 const promptIntegrityTest = 'apps/web/tests/lib/prompt-integrity.test.ts';
 let allScriptTests = false;
 for (const file of scripts) {
@@ -204,13 +213,12 @@ for (const workspace of workspaces) {
     run('npm', ['run', workspace.typecheck, `--workspace=${workspace.name}`]);
   if (workspace.tests === false) continue;
   const scopedPrompts = new Set(
-    workspace.name === '@sotto/web' &&
-      [vocabularyConsumer, vocabularyTest].every((file) => files.includes(file)) &&
-      [vocabularyConsumer, vocabularyTest, promptIntegrityTest].every((file) =>
-        existsSync(resolve(root, file))
-      )
-      ? dynamicInputs.filter(
-          (file) => vocabularyPrompts.has(file) && existsSync(resolve(root, file))
+    workspace.name === '@sotto/web'
+      ? promptConsumers.flatMap(({ prompts, consumer, test }) =>
+          [consumer, test].every((file) => files.includes(file)) &&
+          [consumer, test, promptIntegrityTest].every((file) => existsSync(resolve(root, file)))
+            ? dynamicInputs.filter((file) => prompts.has(file) && existsSync(resolve(root, file)))
+            : []
         )
       : []
   );

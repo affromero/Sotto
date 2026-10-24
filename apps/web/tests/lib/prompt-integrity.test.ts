@@ -420,6 +420,7 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
     'LEVEL',
     'NOTES',
     'OBJECTIVE',
+    'READING_BUDGET',
     'SOURCE',
     'TARGET',
     'TEACHING_SCHEMA',

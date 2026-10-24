@@ -409,7 +409,9 @@ feedback only. Metadata failure evidence labels the complete actual private deci
 and its derived metadata-only outer verdict inside the unchanged sealed envelope.
 
 New classes generate a reviewed unit through `classes/lesson/teaching.ts` before
-their questions. The unit and selected vocabulary are frozen in `adaptiveSeed`
+their questions. `classes/lesson/teaching-protocol.ts` bounds private authoring
+fields within the reading budget and supplies canonical word-count diagnostics.
+Saved teaching retains its existing schema. The unit and selected vocabulary are frozen in `adaptiveSeed`
 and reused during section repair. Historical classes preserve missing teaching;
 invalid present teaching fails explicitly. Every skill and reviewer receives the
 accepted unit and targets. `learning/classes/class-memory.ts` seeds vocabulary
