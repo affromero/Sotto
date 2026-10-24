@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import Ajv from 'ajv';
 import type { SourceDocuments } from '@/lib/providers/ai';
 import { sampleTeaching } from '../../../helpers/learning/class-teaching';
 import { blockedProviderExecution } from '../../../helpers/runtime/provider-execution';
@@ -51,6 +52,7 @@ vi.mock('@/lib/providers/ai', () => ({
 import { generateClassTeaching, teachingFromSeed } from '@/lib/classes/lesson/teaching';
 import { TeachingQualityRejectionError } from '@/lib/classes/quality/teaching-quality';
 import { SectionQualityError } from '@/lib/classes/section-quality';
+import { countWords } from '@/lib/duration';
 import {
   captureGenerationFailure,
   durableGenerationFailure,
@@ -171,6 +173,71 @@ describe('class teaching', () => {
     );
     expect(JSON.parse(review![1][0].content).items[0].content).toEqual(sampleTeaching);
     expect(boundary.author.mock.calls).toHaveLength(2);
+  });
+
+  it('rejects an ignored field limit locally and supplies exact field budgets to the complete repair', async () => {
+    const candidate = { ...sampleTeaching, explanation: 'idea '.repeat(171).trim() };
+    boundary.author.mockResolvedValueOnce({
+      content: JSON.stringify(candidate),
+      model: 'captured-model',
+    });
+    expect(await generateClassTeaching(params)).toEqual(sampleTeaching);
+    for (const [, , options] of boundary.author.mock.calls) {
+      const validate = new Ajv().compile(options.jsonSchema.schema);
+      expect(validate(candidate)).toBe(false);
+      expect(validate(sampleTeaching)).toBe(true);
+    }
+    const correction = JSON.parse(
+      boundary.author.mock.calls[1][1][0].content.split('\n').slice(1).join('\n')
+    );
+    expect(correction.candidate).toEqual(candidate);
+    expect(correction).toMatchObject({ issues: ['teaching_word_limit'], maxWords: 600 });
+    expect(correction.fields).toContainEqual({
+      field: 'explanation',
+      actualWords: 171,
+      maxWords: 170,
+    });
+    const reviewed = boundary.requests.mock.calls
+      .filter(([, , options]) => options.jsonSchema.name === 'class_teaching_critic')
+      .map(([, messages]) => JSON.parse(messages[0].content).items[0].content);
+    expect(reviewed).toEqual([sampleTeaching]);
+  });
+
+  it('retains both over-budget drafts when a provider ignores the initial and repair word constraints', async () => {
+    function oversized(total: number) {
+      const unit = structuredClone(sampleTeaching);
+      unit.explanation = 'idea '.repeat(200).trim();
+      for (const example of unit.workedExamples) example.explanation = 'idea '.repeat(100).trim();
+      unit.commonMistake.explanation = 'idea '.repeat(50).trim();
+      unit.guidedPractice.explanation = 'idea '.repeat(50).trim();
+      const count = countWords(
+        [
+          unit.title,
+          unit.explanation,
+          ...unit.workedExamples.flatMap((item) => Object.values(item)),
+          ...Object.values(unit.commonMistake),
+          ...Object.values(unit.guidedPractice),
+        ].join(' ')
+      );
+      unit.explanation += ' idea'.repeat(total - count);
+      return JSON.stringify(unit);
+    }
+    const candidates = [oversized(629), oversized(615)];
+    boundary.author
+      .mockResolvedValueOnce({ content: candidates[0], model: 'captured-model' })
+      .mockResolvedValueOnce({ content: candidates[1], model: 'captured-model' });
+    const error = await generateClassTeaching(params).catch((failure: unknown) => failure);
+    expect(error).toBeInstanceOf(SectionQualityError);
+    expect(captureGenerationFailure(error).attemptFailures).toEqual(
+      candidates.map((candidate, index) => ({
+        attempt: index + 1,
+        type: 'structure',
+        kind: 'teaching',
+        candidate,
+        issues: [{ code: 'teaching_word_limit' }],
+      }))
+    );
+    expect(JSON.stringify(error)).not.toContain('idea');
   });
 
   it('repairs coupled teaching fields with indexed feedback and reviews the complete replacement', async () => {
@@ -322,5 +389,7 @@ describe('class teaching', () => {
     expect(teachingFromSeed({ intro: { purpose: 'Old notes' } })).toBeUndefined();
     expect(teachingFromSeed({ teaching: sampleTeaching })).toEqual(sampleTeaching);
     expect(() => teachingFromSeed({ teaching: { title: 'Broken saved unit' } })).toThrow();
+    const historical = { ...sampleTeaching, explanation: 'idea '.repeat(171).trim() };
+    expect(teachingFromSeed({ teaching: historical })).toEqual(historical);
   });
 });

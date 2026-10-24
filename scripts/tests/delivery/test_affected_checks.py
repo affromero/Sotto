@@ -61,6 +61,11 @@ class AffectedChecksTests(unittest.TestCase):
             '    print("TypeScript boundary failed: test diagnostic", '
             'file=sys.stderr)\n'
             '    sys.exit(42)\n'
+            'if os.environ.get("SOTTO_AFFECTED_RELATED_FAIL") '
+            'and "related" in sys.argv:\n'
+            '    print("Teaching related tests failed: test diagnostic", '
+            'file=sys.stderr)\n'
+            '    sys.exit(43)\n'
         )
         npm.chmod(0o700)
         self.environment['PATH'] = (
@@ -337,6 +342,82 @@ class AffectedChecksTests(unittest.TestCase):
                       result.stderr)
         self.assertEqual(self.calls(),
                          [['run', 'type-check', '--workspace=@sotto/web']])
+
+    def prepare_teaching_prompt(self) -> tuple[str, str, str, str]:
+        prompt = 'apps/web/prompts/class/generate-class-teaching.md'
+        consumer = 'apps/web/src/lib/classes/lesson/teaching.ts'
+        test = 'apps/web/tests/lib/classes/lesson/teaching.test.ts'
+        integrity = 'apps/web/tests/lib/prompt-integrity.test.ts'
+        self.write(integrity)
+        self.stage(prompt, consumer, test)
+        return prompt, consumer, test, integrity
+
+    def test_teaching_prompt_checks_changed_author_and_integrity(self) -> None:
+        prompt, consumer, test, integrity = self.prepare_teaching_prompt()
+        self.assert_passed(self.run_checks())
+        related = next(call for call in self.calls() if 'related' in call)
+        for path in (consumer, test, integrity):
+            self.assertIn(str(self.root / path), related)
+        self.assertNotIn(str(self.root / prompt), related)
+        self.assertNotIn('--passWithNoTests', related)
+        self.assertFalse(any(call[:2] == ['run', 'test']
+                             for call in self.calls()))
+
+    def test_teaching_scope_requires_staged_and_present_companions(
+        self,
+    ) -> None:
+        prompt, consumer, test, integrity = self.prepare_teaching_prompt()
+        for companions in ((), (consumer,), (test,),
+                           ('apps/web/src/lib/other.ts',
+                            'apps/web/tests/lib/other.test.ts')):
+            with self.subTest(companions=companions):
+                self.git('reset')
+                self.log.unlink(missing_ok=True)
+                self.stage(prompt, *companions)
+                self.assert_passed(self.run_checks())
+                self.assertTrue(any(call[:2] == ['run', 'test']
+                                    for call in self.calls()))
+        for missing in (prompt, consumer, test, integrity):
+            with self.subTest(missing=missing):
+                self.git('reset')
+                self.log.unlink(missing_ok=True)
+                self.prepare_teaching_prompt()
+                (self.root / missing).unlink()
+                self.assert_passed(self.run_checks())
+                self.assertTrue(any(call[:2] == ['run', 'test']
+                                    for call in self.calls()))
+
+    def test_teaching_scope_preserves_full_gate_for_other_dynamic_inputs(
+        self,
+    ) -> None:
+        for additional in (
+            'apps/web/prompts/class/unknown.md',
+            'apps/web/tests/fixtures/reference.txt',
+            'apps/web/models/weights.bin',
+            'apps/web/tests/setup/index.ts',
+            'apps/web/prisma/migrations/change/migration.sql',
+            'apps/web/vitest.config.ts',
+        ):
+            with self.subTest(additional=additional):
+                self.git('reset')
+                self.log.unlink(missing_ok=True)
+                self.prepare_teaching_prompt()
+                self.stage(additional)
+                self.assert_passed(self.run_checks())
+                self.assertTrue(any(call[:2] == ['run', 'test']
+                                    for call in self.calls()))
+                self.assertFalse(any('related' in call
+                                     for call in self.calls()))
+
+    def test_teaching_related_failure_preserves_exit_and_diagnostic(
+        self,
+    ) -> None:
+        self.prepare_teaching_prompt()
+        self.environment['SOTTO_AFFECTED_RELATED_FAIL'] = '1'
+        result = self.run_checks()
+        self.assertEqual(result.returncode, 43)
+        self.assertIn('Teaching related tests failed: test diagnostic',
+                      result.stderr)
 
     def test_changed_python_test_excludes_unrelated_suites(self) -> None:
         selected = 'scripts/tests/test_selected.py'
