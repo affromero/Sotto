@@ -33,7 +33,7 @@ android {
         applicationId = "fm.sotto.app"
         minSdk = 26
         targetSdk = 37
-        versionCode = 1
+        versionCode = 2
         versionName = "1.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         testInstrumentationRunnerArguments["notAnnotation"] = "fm.sotto.app.process.ExternalProcessTest"
