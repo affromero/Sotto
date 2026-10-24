@@ -23,19 +23,20 @@ const FALLBACK = {
 };
 
 describe('classIntroFromSeed', () => {
-  it.each(['A2', 'B1'])(
+  it.each(['A1', 'A2', 'B1'])(
     'restores brief purpose and derived %s meanings without changing their public bytes',
     async (level) => {
       const { classIntroFromSeed } = await loadClassIntro();
       const target = 'Ich habe gestern einen Film gesehen.';
+      const meaning = level === 'A1' ? 'I watched a film yesterday.' : target;
       const stored = {
         purpose: 'Erzähle von gestern.',
-        about: target,
+        about: level === 'A1' ? `„${target}“: ${meaning}` : target,
         focus: ['„Ich habe gestern einen Film gesehen.“: Sehen verwendet hier haben.'],
         examples: [
           {
             target,
-            meaning: target,
+            meaning,
             note: '„Ich habe gestern einen Film gesehen.“: Sehen verwendet hier haben.',
           },
         ],

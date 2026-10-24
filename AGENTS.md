@@ -177,7 +177,7 @@ formatting and secret checks. `npm run check:affected` runs the same scoped
 gate manually when needed. Avoid running it again immediately before the hook.
 Use focused tests during development. Run the full `npm run ci` locally when
 investigating a cross-workspace failure or verifying a release offline.
-The three sampled vocabulary prompts and the class teaching prompt use related
+The three sampled vocabulary prompts, class teaching prompt and intro repair prompt use related
 local tests plus prompt integrity checks when their exact consuming source and
 test change together. Other dynamic inputs retain the full local workspace gate.
 

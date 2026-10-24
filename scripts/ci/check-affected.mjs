@@ -136,6 +136,11 @@ const promptConsumers = [
     consumer: 'apps/web/src/lib/classes/lesson/teaching.ts',
     test: 'apps/web/tests/lib/classes/lesson/teaching.test.ts',
   },
+  {
+    prompts: new Set(['apps/web/prompts/class/repair-class-intro.md']),
+    consumer: 'apps/web/src/lib/classes/class-intro.ts',
+    test: 'apps/web/tests/lib/classes/intro/repair.test.ts',
+  },
 ];
 const promptIntegrityTest = 'apps/web/tests/lib/prompt-integrity.test.ts';
 let allScriptTests = false;

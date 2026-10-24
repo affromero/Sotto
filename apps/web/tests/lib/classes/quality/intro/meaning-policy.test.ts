@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { blockedProviderExecution } from '../../../../helpers/runtime/provider-execution';
-import { novelFindingCorroborationFixture } from '../intro-provider-fixture';
+import {
+  novelFindingCorroborationFixture,
+  unchangedIntroCoherenceFixture,
+} from '../intro-provider-fixture';
 import { createAIProvider, type AIOptions } from '@/lib/providers/ai';
 
 const boundary = vi.hoisted(() => ({ generate: vi.fn(), resolve: vi.fn() }));
@@ -76,7 +79,11 @@ function respond(
     if (role === 'class_intro_generation')
       return { content: typeof initial === 'string' ? initial : JSON.stringify(initial) };
     if (role === 'class_intro_repair')
-      return { content: JSON.stringify(replacement ?? { ...raw, visuals: undefined }) };
+      return {
+        content: JSON.stringify(
+          unchangedIntroCoherenceFixture(replacement ?? { ...raw, visuals: undefined }, options)
+        ),
+      };
     const payload: Payload = JSON.parse(messages[0].content);
     return {
       content: JSON.stringify({

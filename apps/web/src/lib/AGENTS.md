@@ -606,7 +606,7 @@ snapshots from `classes/intro/bindings.ts`. Snapshots retain each observation bo
 its rendered value and its example index. Repair validates this evidence against
 the original candidate before rendering target changes through the compiler.
 Equal target strings at different indices remain distinct examples. Accepted bodies
-and unrelated strings stay exact. A meaning-only repair preserves accepted overview
+outside explicit coherence permission and unrelated strings stay exact. A meaning-only repair preserves accepted overview
 text unless that overview was also rejected. The final review evaluates the whole
 candidate again. Restored historical content uses its existing parser without new
 framing. Local example scope alone does not establish linguistic correctness.
@@ -624,12 +624,20 @@ quoted-example scope. Fresh intros and complete merged replacements must fit the
 180-word prose budget and ten-address limit; historical seed restoration preserves existing content.
 Structural repair receives measured word-limit and address-limit diagnostics,
 may remove redundant whole entries, and aims for 80 raw words to leave room for
-compiled quotes. Semantic repair preserves every accepted entry even when shortening.
+compiled quotes. Semantic repair preserves accepted entries outside explicit coherence permission even when shortening.
 An overlength structural repair uses one example, one focus point and one tip,
 with each authored text limited to fifteen whitespace-separated words. Validate
 the selected compact schema locally before compilation; the complete rendered
 brief still passes its word limit and independent teaching reviews.
-Intro semantic repair returns a strict patch of the actual rejected addresses.
+`classes/intro/repair.ts` builds strict semantic patches from the actual rejected
+addresses and captured bindings. A rejected focus, tip or example also permits
+necessary coherence corrections to other observations bound to that exact example
+and its note. This separately labelled scope never changes rejection evidence.
+Its required nullable envelope contains strict address variants; null retains every
+accepted byte. Accepted observations keep their original example index, and note-only
+variants never grant target or meaning authority. Duplicate addresses and overlap
+with required root patches fail closed. Purpose, about and unrelated entries stay exact.
+Required example changes and canonical quotation rebinding precede coherence patches.
 Only authorized authored entries and compiler-rendered references can change.
 Accepted visuals remain present, and
 rejected optional visuals are removed. The initial full audit binds its private
