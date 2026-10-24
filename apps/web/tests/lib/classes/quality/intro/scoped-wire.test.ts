@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { novelFindingCorroborationFixture } from '../intro-provider-fixture';
+import {
+  novelFindingCorroborationFixture,
+  unchangedIntroCoherenceFixture,
+} from '../intro-provider-fixture';
 import { blockedProviderExecution } from '../../../../helpers/runtime/provider-execution';
 import { teachingFindingFixture } from '../intro-provider-fixture';
 
@@ -153,7 +156,10 @@ function respond(
         replacement && typeof replacement === 'object' && rejected.length === 0
           ? Object.fromEntries(Object.entries(replacement).filter(([field]) => field !== 'visuals'))
           : replacement;
-      return { content: JSON.stringify(payload), model: 'captured-model' };
+      return {
+        content: JSON.stringify(unchangedIntroCoherenceFixture(payload, options)),
+        model: 'captured-model',
+      };
     }
     const payload: Payload = JSON.parse(messages[0].content);
     return {
@@ -343,7 +349,10 @@ describe('strict scoped A1 intro wire', () => {
       boundary.generate.mock.calls
         .filter(([, , options]) => options.jsonSchema.name === 'class_intro_repair')
         .map(([, , options]) => Object.keys(options.jsonSchema.schema.properties))
-    ).toEqual([['purpose', 'about', 'focus', 'examples', 'tips'], ['examples']]);
+    ).toEqual([
+      ['purpose', 'about', 'focus', 'examples', 'tips'],
+      ['examples', 'coherence'],
+    ]);
   });
 
   it.each(['provider', 'cancelled', 'malformed patch', 'rejected patch'])(
@@ -377,7 +386,12 @@ describe('strict scoped A1 intro wire', () => {
           if (failure === 'malformed patch') return { content: '{}', model: 'captured-model' };
           if (failure === 'rejected patch')
             return {
-              content: JSON.stringify({ examples: { 0: compactWire.examples[0] } }),
+              content: JSON.stringify(
+                unchangedIntroCoherenceFixture(
+                  { examples: { 0: compactWire.examples[0] } },
+                  options
+                )
+              ),
               model: 'captured-model',
             };
         }
@@ -586,7 +600,10 @@ describe('strict scoped A1 intro wire', () => {
     const repair = boundary.generate.mock.calls.find(
       ([, , options]) => options.jsonSchema.name === 'class_intro_repair'
     );
-    expect(Object.keys(repair?.[2].jsonSchema.schema.properties ?? {})).toEqual(['focus']);
+    expect(Object.keys(repair?.[2].jsonSchema.schema.properties ?? {})).toEqual([
+      'focus',
+      'coherence',
+    ]);
   });
 
   it.each(['about', 'focus', 'tips'] as const)(

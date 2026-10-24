@@ -44,6 +44,7 @@ const initial = {
   visuals: null,
 };
 const patch = {
+  coherence: null,
   examples: {
     '0': { target, note: '„Würde“ + Infinitiv drückt hier eine hypothetische Absicht aus.' },
   },
@@ -187,7 +188,11 @@ describe('intro field roles', () => {
   });
 
   it('still blocks the same false usage claims after the permitted replacement', async () => {
-    respond({ examples: { '0': initial.examples[0] }, tips: { '0': initial.tips[0] } });
+    respond({
+      examples: { '0': initial.examples[0] },
+      tips: { '0': initial.tips[0] },
+      coherence: null,
+    });
     await expect(generateClassIntro(params)).rejects.toBeInstanceOf(TeachingQualityRejectionError);
   });
 

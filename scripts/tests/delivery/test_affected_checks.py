@@ -343,6 +343,41 @@ class AffectedChecksTests(unittest.TestCase):
         self.assertEqual(self.calls(),
                          [['run', 'type-check', '--workspace=@sotto/web']])
 
+    def test_intro_prompt_checks_its_changed_author_and_integrity(self) -> None:
+        prompt = 'apps/web/prompts/class/repair-class-intro.md'
+        consumer = 'apps/web/src/lib/classes/class-intro.ts'
+        test = 'apps/web/tests/lib/classes/intro/repair.test.ts'
+        integrity = 'apps/web/tests/lib/prompt-integrity.test.ts'
+        self.write(integrity)
+        self.stage(prompt, consumer, test)
+        self.assert_passed(self.run_checks())
+        related = next(call for call in self.calls() if 'related' in call)
+        for path in (consumer, test, integrity):
+            self.assertIn(str(self.root / path), related)
+        self.assertNotIn(str(self.root / prompt), related)
+        self.assertFalse(any(call[:2] == ['run', 'test']
+                             for call in self.calls()))
+
+    def test_intro_prompt_requires_exact_present_companions(self) -> None:
+        prompt = 'apps/web/prompts/class/repair-class-intro.md'
+        consumer = 'apps/web/src/lib/classes/class-intro.ts'
+        test = 'apps/web/tests/lib/classes/intro/repair.test.ts'
+        integrity = 'apps/web/tests/lib/prompt-integrity.test.ts'
+        for companions in ((), (consumer,), (test,), (consumer, test)):
+            for missing in (None, prompt, consumer, test, integrity):
+                with self.subTest(companions=companions, missing=missing):
+                    self.git('reset')
+                    self.log.unlink(missing_ok=True)
+                    self.write(integrity)
+                    self.stage(prompt, *companions)
+                    if missing is not None:
+                        (self.root / missing).unlink(missing_ok=True)
+                    self.assert_passed(self.run_checks())
+                    full = any(call[:2] == ['run', 'test']
+                               for call in self.calls())
+                    self.assertEqual(full, missing is not None or
+                                     companions != (consumer, test))
+
     def prepare_teaching_prompt(self) -> tuple[str, str, str, str]:
         prompt = 'apps/web/prompts/class/generate-class-teaching.md'
         consumer = 'apps/web/src/lib/classes/lesson/teaching.ts'

@@ -506,6 +506,22 @@ function introExampleWireFixture(value: Record<string, unknown>, options: unknow
   return value;
 }
 
+export function unchangedIntroCoherenceFixture(value: unknown, options: unknown): unknown {
+  const properties = (
+    options as { jsonSchema?: { schema?: { properties?: Record<string, unknown> } } }
+  ).jsonSchema?.schema?.properties;
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    Array.isArray(value) ||
+    !properties ||
+    !Object.hasOwn(properties, 'coherence') ||
+    Object.hasOwn(value, 'coherence')
+  )
+    return value;
+  return { ...value, coherence: null };
+}
+
 export function shapeIntroProviderFixture(
   system: string,
   messages: Array<{ content: string }>,
@@ -520,14 +536,13 @@ export function shapeIntroProviderFixture(
       const legacy = shapeLegacyIntroFixture(system, messages, options, response);
       const parsed: unknown = JSON.parse(legacy.content);
       if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return response;
+      const fixture = unchangedIntroCoherenceFixture(parsed, options) as Record<string, unknown>;
       return {
         ...legacy,
         content: JSON.stringify(
           introExampleWireFixture(
             scopedIntroFixture(
-              schemaName === 'class_intro_generation'
-                ? generationVisualFixture(parsed as Record<string, unknown>)
-                : (parsed as Record<string, unknown>)
+              schemaName === 'class_intro_generation' ? generationVisualFixture(fixture) : fixture
             ),
             options
           )

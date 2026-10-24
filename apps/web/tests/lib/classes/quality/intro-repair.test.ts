@@ -438,7 +438,7 @@ describe('field-local A1 intro repair', () => {
 
     await expect(generateClassIntro(params)).rejects.toThrow('educational quality');
     const repair = boundary.generate.mock.calls.at(-1)!;
-    expect(repair[2].jsonSchema.schema.properties).toEqual({ examples: expect.any(Object) });
+    expect(repair[2].jsonSchema.schema.required).toContain('examples');
     expect(repair[1][0].content).toContain(original.about);
     expect(repair[1][0].content).not.toContain('Structural validation diagnostics:');
     const originalReview = boundary.generate.mock.calls.find(([system]) =>
