@@ -642,7 +642,7 @@ com.google.j2objc:j2objc-annotations:3.0.0|j2objc-annotations-3.0.0.jar
 com.google.zxing:core:3.5.4|core-3.5.4.jar
   The Apache Software License, Version 2.0: https://www.apache.org/licenses/LICENSE-2.0.txt
 
-com.squareup.okhttp3:okhttp-android:5.5.0|okhttp.aar
+com.squareup.okhttp3:okhttp-android:5.5.1|okhttp.aar
   The Apache Software License, Version 2.0: https://www.apache.org/licenses/LICENSE-2.0.txt
 
 com.squareup.okio:okio-jvm:3.18.1|okio-jvm-3.18.1.jar

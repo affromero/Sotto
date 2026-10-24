@@ -63,34 +63,37 @@
     "prisma": {
       "mysql2": "3.24.2"
     },
-    "react-dom": "19.3.0",
+    "react-dom": "19.3.1",
     "shell-quote": "1.11.0",
+    "thesidedoor-core": {
+      "zod": "$zod"
+    },
     "tsx": "4.23.15"
   },
   "dependencies": {
-    "@prisma/client": "7.10.0",
-    "bullmq": "6.3.13",
+    "@prisma/client": "7.10.1",
+    "bullmq": "6.3.15",
     "ioredis": "6.0.0",
     "pg": "^8.23.1",
     "thesidedoor-core": "0.5.7",
-    "zod": "^4.6.6"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@playwright/test": "^1.64.0",
+    "@playwright/test": "^1.64.1",
     "braces": "file:vendor/braces",
     "esbuild": "0.28.2",
-    "eslint": "10.12.0",
+    "eslint": "10.13.0",
     "knip": "6.41.0",
     "lint-staged": "^17.6.0",
-    "postcss": "^8.5.29",
+    "postcss": "^8.5.30",
     "prettier": "^3.9.10",
-    "prisma": "7.10.0",
+    "prisma": "7.10.1",
     "sharp": "0.35.5",
-    "sort-package-json": "^4.0.0",
-    "vitest": "4.1.11"
+    "sort-package-json": "^4.1.0",
+    "vitest": "4.1.12"
   },
   "optionalDependencies": {
-    "@next/swc-darwin-arm64": "^16.4.1"
+    "@next/swc-darwin-arm64": "^16.4.2"
   },
   "engines": {
     "node": ">=24 <25"
