@@ -2,7 +2,7 @@
 name = "sotto-tools"
 version = "0.1.0"
 description = "Development tooling for Sotto"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 
 [dependency-groups]
 dev = [
