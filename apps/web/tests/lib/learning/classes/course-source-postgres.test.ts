@@ -488,17 +488,18 @@ suite('owned imported course source against PostgreSQL', () => {
     });
     boundary.generate.mockImplementation(async (_prompt, messages, request) => {
       const payload = JSON.parse(messages[0].content);
-      if (request.jsonSchema.name === 'source_vocabulary_extraction') {
-        expect(payload.correction).toBeDefined();
+      if (request.jsonSchema.name === 'vocabulary_metadata_repair') {
+        expect(request.jsonSchema.schema.properties.words.items).toMatchObject({
+          required: ['wordIndex', 'lemma', 'gloss', 'pos'],
+          additionalProperties: false,
+        });
         return {
           model: 'captured',
           content: JSON.stringify({
             words: payload.correction.words.map(
-              (word: { lemma: string; gloss: string; pos: string; sourceForm: string }) => {
-                const start = payload.passageWords.findIndex(
-                  (token: { surface: string }) => token.surface === word.sourceForm.split(' ')[0]
-                );
+              (word: { lemma: string; gloss: string; pos: string }, wordIndex: number) => {
                 return {
+                  wordIndex,
                   lemma:
                     word.lemma === 'gesehen'
                       ? 'sehen'
@@ -507,11 +508,6 @@ suite('owned imported course source against PostgreSQL', () => {
                         : word.lemma,
                   gloss: word.gloss,
                   pos: word.pos === 'participle' ? 'verb' : word.pos,
-                  sourceSpan: {
-                    startWordIndex: start,
-                    endWordIndex: start + word.sourceForm.split(' ').length - 1,
-                  },
-                  questionIndices: [],
                 };
               }
             ),

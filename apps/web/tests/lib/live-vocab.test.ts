@@ -99,7 +99,8 @@ describe('keyed reading extraction requests', () => {
     const payload = JSON.parse(messages[0].content);
     expect(payload.correction).toEqual(correction);
     expect(payload.questions).toBeUndefined();
-    expect(options.jsonSchema.name).toBe('source_vocabulary_extraction');
+    expect(options.jsonSchema.name).toBe('vocabulary_metadata_repair');
+    expect(options.jsonSchema.schema.properties.words).toMatchObject({ minItems: 1, maxItems: 1 });
   });
 
   it('keeps complete source inventories outside the sample metadata repair protocol', async () => {
@@ -218,10 +219,12 @@ describe('keyed reading extraction requests', () => {
       requestVocabularyExtraction({ ...reading, readingCorrection: correction })
     ).resolves.toBe(READING_SAMPLE);
     const [system, messages, options] = mockGenerateResponse.mock.calls[0]!;
-    expect(system).toContain('same number of words, in the same order');
-    expect(system).toContain('word need not itself be the answer');
-    expect(system).toContain('Understanding the word must be necessary');
-    expect(system).toContain('including associations not mentioned in the feedback');
+    expect(system).toContain('wordIndex');
+    expect(system).toContain('immutable quotation');
+    expect(system).toContain(
+      'independently reviews the corrected metadata and assessment associations'
+    );
+    expect(system).not.toContain('{{');
     expect(JSON.parse(messages[0].content)).toEqual({
       passageText: reading.text,
       passageWords: [
@@ -234,7 +237,7 @@ describe('keyed reading extraction requests', () => {
     });
     expect(options).toMatchObject({ model: 'captured', apiKeyOverride: 'key', maxTokens: 2048 });
     expect(options.jsonSchema).toMatchObject({
-      name: 'reading_vocabulary_extraction',
+      name: 'vocabulary_metadata_repair',
       schema: {
         type: 'object',
         required: ['words'],
@@ -243,17 +246,13 @@ describe('keyed reading extraction requests', () => {
           words: {
             type: 'array',
             minItems: 1,
-            maxItems: 12,
+            maxItems: 1,
             items: {
               type: 'object',
-              required: ['lemma', 'gloss', 'pos', 'sourceSpan', 'questionIndices'],
+              required: ['wordIndex', 'lemma', 'gloss', 'pos'],
               additionalProperties: false,
               properties: {
-                questionIndices: {
-                  type: 'array',
-                  maxItems: 1,
-                  items: { type: 'integer', minimum: 0, maximum: 0 },
-                },
+                wordIndex: { type: 'integer', minimum: 0, maximum: 0 },
               },
             },
           },
@@ -262,7 +261,7 @@ describe('keyed reading extraction requests', () => {
     });
     expect(mockResolveLearningAi).toHaveBeenCalledWith(PARAMS.userId, PARAMS.execution);
   });
-  it('binds initial and correction requests to their own question range without mutating earlier schemas', async () => {
+  it('keeps initial assessment ranges separate from indexed metadata repairs', async () => {
     const sent: { questionCount: number; schema: unknown; prompt: string }[] = [];
     mockGenerateResponse.mockImplementation(async (system, messages, requestOptions) => {
       sent.push({
@@ -288,7 +287,7 @@ describe('keyed reading extraction requests', () => {
       });
     }
     expect(sent.map(({ questionCount }) => questionCount)).toEqual([1, 1, 5, 5]);
-    for (const { questionCount, schema, prompt } of sent) {
+    for (const { questionCount, schema, prompt } of [sent[0]!, sent[2]!]) {
       expect(schema).toMatchObject({
         name: 'reading_vocabulary_extraction',
         schema: {
@@ -313,6 +312,29 @@ describe('keyed reading extraction requests', () => {
       expect(prompt).toContain('Every canonical lemma must be unique');
       expect(prompt).toContain('retaining spelling, case, spacing and punctuation');
     }
+    for (const { schema, prompt } of [sent[1]!, sent[3]!]) {
+      expect(schema).toMatchObject({
+        name: 'vocabulary_metadata_repair',
+        schema: {
+          properties: {
+            words: {
+              minItems: 1,
+              maxItems: 1,
+              items: {
+                additionalProperties: false,
+                required: ['wordIndex', 'lemma', 'gloss', 'pos'],
+              },
+            },
+          },
+        },
+      });
+      expect(prompt).not.toContain('{{');
+      expect(
+        mockLoadAndRender.mock.calls
+          .filter(([name]) => name === 'live/repair-source-vocab.md')
+          .every(([, variables]) => !('MAX_QUESTION_INDEX' in variables))
+      ).toBe(true);
+    }
   });
   it('sends invalid output as untrusted protocol data without requiring its source identities', async () => {
     const protocolCorrection = {
@@ -327,7 +349,6 @@ describe('keyed reading extraction requests', () => {
     expect(system).toContain(
       'Invalid prior source spans and counts are not identities to preserve'
     );
-    expect(system).toContain('rules above apply only when correction is supplied');
     expect(JSON.parse(messages[0].content)).toEqual({
       passageText: reading.text,
       passageWords: [

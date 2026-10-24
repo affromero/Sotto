@@ -76,7 +76,7 @@ describe('source vocabulary evidence', () => {
     ];
     boundary.generate.mockImplementation(async (_prompt, messages, request) => {
       const payload = JSON.parse(messages[0].content);
-      if (request.jsonSchema.name === 'source_vocabulary_extraction') {
+      if (request.jsonSchema.name === 'vocabulary_metadata_repair') {
         expect(payload.correction.words).toEqual(retainedWords);
         expect(payload.correction.feedback.map((item: { index: number }) => item.index)).toEqual([
           0, 1,
@@ -86,18 +86,16 @@ describe('source vocabulary evidence', () => {
           content: JSON.stringify({
             words: [
               {
-                lemma: 'Mechaniker',
-                gloss: 'mechanic',
-                pos: 'noun',
-                sourceSpan: { startWordIndex: 0, endWordIndex: 1 },
-                questionIndices: [],
-              },
-              {
+                wordIndex: 1,
                 lemma: 'sehen',
                 gloss: 'see',
                 pos: 'verb',
-                sourceSpan: { startWordIndex: 5, endWordIndex: 5 },
-                questionIndices: [],
+              },
+              {
+                wordIndex: 0,
+                lemma: 'Mechaniker',
+                gloss: 'mechanic',
+                pos: 'noun',
               },
             ],
           }),
@@ -143,17 +141,16 @@ describe('source vocabulary evidence', () => {
     }));
     boundary.generate.mockImplementation(async (_prompt, messages, request) => {
       const payload = JSON.parse(messages[0].content);
-      if (request.jsonSchema.name === 'source_vocabulary_extraction') {
+      if (request.jsonSchema.name === 'vocabulary_metadata_repair') {
         expect(payload.correction.feedback).toEqual([{ index: 5, feedback: ['Use sehen.'] }]);
         return {
           model: 'captured',
           content: JSON.stringify({
             words: retainedWords.map((word, index) => ({
+              wordIndex: index,
               lemma: index === 5 ? 'sehen' : word.lemma,
               gloss: word.gloss,
               pos: 'verb',
-              sourceSpan: { startWordIndex: index, endWordIndex: index },
-              questionIndices: [],
             })),
           }),
         };
@@ -190,10 +187,11 @@ describe('source vocabulary evidence', () => {
     boundary.generate.mockImplementation(async (_prompt, _messages, request) => ({
       model: 'captured',
       content: JSON.stringify(
-        request.jsonSchema.name === 'source_vocabulary_extraction'
+        request.jsonSchema.name === 'vocabulary_metadata_repair'
           ? {
               words: [
                 {
+                  wordIndex: 0,
                   lemma: 'gehen',
                   gloss: 'go',
                   pos: 'verb',
@@ -228,7 +226,7 @@ describe('source vocabulary evidence', () => {
           },
         ],
       })
-    ).rejects.toMatchObject({ code: 'replacement_identity' });
+    ).rejects.toMatchObject({ code: 'invalid_shape' });
   });
 
   it('propagates provider failure without attempting metadata repair', async () => {
@@ -298,23 +296,27 @@ describe('source vocabulary evidence', () => {
       content: JSON.stringify(
         request.jsonSchema.name === 'source_vocabulary_extraction'
           ? extracted('schlafen')
-          : {
-              items: [
-                {
-                  index: 0,
-                  metadata: {
-                    acceptable: false,
-                    issues: ['incorrect'],
-                    feedback: ['Gehen is represented by gegangen; schlafen is unrelated.'],
+          : request.jsonSchema.name === 'vocabulary_metadata_repair'
+            ? { words: [{ wordIndex: 0, lemma: 'schlafen', gloss: 'sleep', pos: 'verb' }] }
+            : {
+                items: [
+                  {
+                    index: 0,
+                    metadata: {
+                      acceptable: false,
+                      issues: ['incorrect'],
+                      feedback: ['Gehen is represented by gegangen; schlafen is unrelated.'],
+                    },
+                    associations: [],
                   },
-                  associations: [],
-                },
-              ],
-            }
+                ],
+              }
       ),
       model: 'captured',
     }));
-    await expect(extractSourceVocabulary(options)).rejects.toThrow();
+    await expect(extractSourceVocabulary(options)).rejects.toMatchObject({
+      name: 'TeachingQualityRejectionError',
+    });
     expect(boundary.upsert).not.toHaveBeenCalled();
   });
   it('rejects invented assessment associations before metadata admission', async () => {

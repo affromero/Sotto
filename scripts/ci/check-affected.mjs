@@ -121,6 +121,14 @@ const knownScriptTests = new Map([
   ['.pre-commit-config.yaml', 'scripts/tests/delivery/test_affected_checks.py'],
   ['scripts/ci/native-scope.mjs', 'scripts/tests/delivery/test_native_scope.py'],
 ]);
+const vocabularyPrompts = new Set([
+  'apps/web/prompts/live/extract-reading-vocab.md',
+  'apps/web/prompts/live/extract-source-vocab.md',
+  'apps/web/prompts/live/repair-source-vocab.md',
+]);
+const vocabularyConsumer = 'apps/web/src/lib/live-vocab.ts';
+const vocabularyTest = 'apps/web/tests/lib/live-vocab.test.ts';
+const promptIntegrityTest = 'apps/web/tests/lib/prompt-integrity.test.ts';
 let allScriptTests = false;
 for (const file of scripts) {
   const test = knownScriptTests.get(file);
@@ -195,12 +203,30 @@ for (const workspace of workspaces) {
   if (workspace.typecheck)
     run('npm', ['run', workspace.typecheck, `--workspace=${workspace.name}`]);
   if (workspace.tests === false) continue;
-  const related = [...new Set([...own, ...dependencies, ...dynamicInputs])];
+  const scopedPrompts = new Set(
+    workspace.name === '@sotto/web' &&
+      [vocabularyConsumer, vocabularyTest].every((file) => files.includes(file)) &&
+      [vocabularyConsumer, vocabularyTest, promptIntegrityTest].every((file) =>
+        existsSync(resolve(root, file))
+      )
+      ? dynamicInputs.filter(
+          (file) => vocabularyPrompts.has(file) && existsSync(resolve(root, file))
+        )
+      : []
+  );
+  const related = [
+    ...new Set([
+      ...own,
+      ...dependencies,
+      ...dynamicInputs.filter((file) => !scopedPrompts.has(file)),
+      ...(scopedPrompts.size ? [promptIntegrityTest] : []),
+    ]),
+  ];
   const full =
     globalConfig ||
     prisma ||
     sharedArtifact ||
-    dynamicInputs.length > 0 ||
+    dynamicInputs.length > scopedPrompts.size ||
     related.some(
       (file) =>
         !existsSync(resolve(root, file)) ||

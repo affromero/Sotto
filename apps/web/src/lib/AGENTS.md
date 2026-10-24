@@ -233,7 +233,7 @@ Usage metadata does not prove restored credits, and no backend fallback is autom
 `learning/reading-vocabulary.ts` extracts passage vocabulary independently of
 listening and credits only assessed targets backed by course memory.
 `learning/reading/vocabulary-protocol.ts` shares the strict private model-output
-schema between reading requests and parsing. Initial and replacement responses
+schema between reading requests and parsing. Initial and protocol-repair responses
 use a structured `words` object. Private source spans use inclusive word indices from the canonical
 `Intl.Segmenter` table for the target language. Both request and parser use the
 same original UTF16 offsets; the parser derives public `sourceForm` strings from
@@ -246,6 +246,12 @@ A first parse rejection may consume the same single replacement as teaching reje
 at most 32KiB of untrusted output and static indexed violations. Invalid original
 forms and counts are not identity anchors; the replacement must pass full parsing
 and teaching review. A later teaching rejection cannot add a third extraction.
+Metadata repair uses a separate strict `wordIndex`, `lemma`, `gloss`, `pos`
+response. The canonical compiler requires a complete unique index set and unique
+lemmas, then applies only metadata to the validated original words. Quotations,
+word order and proposed question indices remain unchanged. Independent lexical
+and assessment association review still decides admission. Both repair paths
+share the existing single replacement budget.
 Protocol rejection logs contain only static codes,
 the passage hash, and bounded question identities with an explicit hash and omission
 for oversized identity lists. Stored vocabulary and sealed failure formats stay unchanged.
