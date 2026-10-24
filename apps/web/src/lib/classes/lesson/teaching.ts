@@ -23,6 +23,8 @@ import {
 } from '../quality/generation-structure';
 import {
   classTeachingAuthoringSchema,
+  classTeachingDraftSchema,
+  classTeachingProviderSchema,
   MAX_TEACHING_WORDS,
   teachingWordCounts,
   teachingWordLimits,
@@ -53,7 +55,7 @@ export async function generateClassTeaching(p: TeachingParams): Promise<ClassTea
   const provider = createAIProvider(ai.provider);
   const jsonSchema = {
     name: 'class_teaching_generation',
-    schema: classTeachingAuthoringSchema.toJSONSchema({ target: 'draft-7' }),
+    schema: classTeachingProviderSchema.toJSONSchema({ target: 'draft-7' }),
   };
   const system = loadAndRender('class/generate-class-teaching.md', {
     LEVEL: p.level,
@@ -119,7 +121,7 @@ export async function generateClassTeaching(p: TeachingParams): Promise<ClassTea
         correction = { candidate: response.content.slice(0, 16000), issues: ['invalid_json'] };
         continue;
       }
-      const parsed = classTeachingSchema.safeParse(raw);
+      const parsed = classTeachingDraftSchema.pipe(classTeachingSchema).safeParse(raw);
       if (!parsed.success) {
         attempts.push(
           captureStructureAttempt('teaching', attempt === 0 ? 1 : 2, response.content, [

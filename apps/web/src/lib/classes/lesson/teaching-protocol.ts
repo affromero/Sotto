@@ -15,6 +15,83 @@ function boundedWords(text: z.ZodString, maximum: number) {
   return text.regex(new RegExp(`^\\S+(?:\\s+\\S+){0,${maximum - 1}}$`, 'u'));
 }
 
+const wireWord = z.string().regex(/^[^\s\x00-\x1f\x7f-\x9f]+(?:\n\n)?$/u);
+const decodedWord = wireWord.refine((value) => {
+  const word = value.endsWith('\n\n') ? value.slice(0, -2) : value;
+  return word.length > 0 && !/\s/u.test(word);
+});
+
+function draftSchema(bounded: boolean) {
+  const words = (maximum: number) => {
+    const list = z.array(bounded ? wireWord : decodedWord).min(1);
+    return bounded ? list.max(maximum) : list;
+  };
+  return z
+    .object({
+      version: z.literal(1),
+      title: words(teachingWordLimits.title),
+      explanation: words(teachingWordLimits.explanation),
+      workedExamples: z
+        .array(
+          z
+            .object({
+              prompt: words(teachingWordLimits.workedExample.prompt),
+              answer: words(teachingWordLimits.workedExample.answer),
+              explanation: words(teachingWordLimits.workedExample.explanation),
+            })
+            .strict()
+        )
+        .min(2)
+        .max(3),
+      commonMistake: z
+        .object({
+          incorrect: words(teachingWordLimits.commonMistake.incorrect),
+          correction: words(teachingWordLimits.commonMistake.correction),
+          explanation: words(teachingWordLimits.commonMistake.explanation),
+        })
+        .strict(),
+      guidedPractice: z
+        .object({
+          prompt: words(teachingWordLimits.guidedPractice.prompt),
+          hint: words(teachingWordLimits.guidedPractice.hint),
+          answer: words(teachingWordLimits.guidedPractice.answer),
+          explanation: words(teachingWordLimits.guidedPractice.explanation),
+        })
+        .strict(),
+    })
+    .strict();
+}
+
+/** Private word slots avoid intersecting long counted patterns with character limits. */
+export const classTeachingProviderSchema = draftSchema(true);
+
+function joinWords(words: string[]) {
+  return words.join(' ').replaceAll('\n\n ', '\n\n');
+}
+
+/** Decode before local budgets so ignored provider limits retain exact field diagnostics. */
+export const classTeachingDraftSchema = draftSchema(false).transform((draft) => ({
+  version: draft.version,
+  title: joinWords(draft.title),
+  explanation: joinWords(draft.explanation),
+  workedExamples: draft.workedExamples.map((example) => ({
+    prompt: joinWords(example.prompt),
+    answer: joinWords(example.answer),
+    explanation: joinWords(example.explanation),
+  })),
+  commonMistake: {
+    incorrect: joinWords(draft.commonMistake.incorrect),
+    correction: joinWords(draft.commonMistake.correction),
+    explanation: joinWords(draft.commonMistake.explanation),
+  },
+  guidedPractice: {
+    prompt: joinWords(draft.guidedPractice.prompt),
+    hint: joinWords(draft.guidedPractice.hint),
+    answer: joinWords(draft.guidedPractice.answer),
+    explanation: joinWords(draft.guidedPractice.explanation),
+  },
+}));
+
 const shape = classTeachingSchema.shape;
 const example = shape.workedExamples.element.shape;
 const mistake = shape.commonMistake.shape;

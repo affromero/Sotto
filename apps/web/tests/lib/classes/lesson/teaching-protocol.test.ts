@@ -1,12 +1,17 @@
 import Ajv from 'ajv';
 import { describe, expect, it } from 'vitest';
 import { classTeachingSchema, type ClassTeaching } from '@sotto/shared';
-import { classTeachingAuthoringSchema } from '@/lib/classes/lesson/teaching-protocol';
+import {
+  classTeachingAuthoringSchema,
+  classTeachingDraftSchema,
+  classTeachingProviderSchema,
+} from '@/lib/classes/lesson/teaching-protocol';
 import { countWords } from '@/lib/duration';
 import { sampleTeaching } from '../../../helpers/learning/class-teaching';
+import { teachingProviderDraft } from './provider-fixture';
 
 const validateWire = new Ajv().compile(
-  classTeachingAuthoringSchema.toJSONSchema({ target: 'draft-7' })
+  classTeachingProviderSchema.toJSONSchema({ target: 'draft-7' })
 );
 const words = (count: number) => Array.from({ length: count }, () => 'idea').join(' \t\n');
 const fields: Array<{
@@ -119,10 +124,10 @@ describe('teaching authoring reading budget', () => {
       const unit = structuredClone(sampleTeaching);
       write(unit, words(maximum));
       expect(countWords(words(maximum))).toBe(maximum);
-      expect(validateWire(unit)).toBe(true);
+      expect(validateWire(teachingProviderDraft(unit))).toBe(true);
       expect(classTeachingAuthoringSchema.safeParse(unit).success).toBe(true);
       write(unit, words(maximum + 1));
-      expect(validateWire(unit)).toBe(false);
+      expect(validateWire(teachingProviderDraft(unit))).toBe(false);
       expect(classTeachingAuthoringSchema.safeParse(unit).success).toBe(false);
       expect(classTeachingSchema.safeParse(unit).success).toBe(true);
     }
@@ -132,7 +137,7 @@ describe('teaching authoring reading budget', () => {
     const unit = structuredClone(sampleTeaching);
     for (const { maximum, write } of fields) write(unit, words(maximum));
     unit.workedExamples = Array.from({ length: 3 }, () => structuredClone(unit.workedExamples[0]!));
-    expect(validateWire(unit)).toBe(true);
+    expect(validateWire(teachingProviderDraft(unit))).toBe(true);
     expect(classTeachingAuthoringSchema.parse(unit)).toEqual(unit);
     expect(totalWords(unit)).toBe(595);
     unit.workedExamples.pop();
@@ -140,16 +145,80 @@ describe('teaching authoring reading budget', () => {
     expect(totalWords(unit)).toBe(510);
   });
 
-  it('retains the existing character caps and rejects incomplete or extra teaching fields', () => {
+  it('retains decoded character caps independently of provider word slots', () => {
     for (const unit of [
       { ...sampleTeaching, title: 'x'.repeat(161) },
       { ...sampleTeaching, explanation: 'x'.repeat(1801) },
+    ]) {
+      const draft = teachingProviderDraft(unit);
+      expect(validateWire(draft)).toBe(true);
+      expect(classTeachingDraftSchema.pipe(classTeachingSchema).safeParse(draft).success).toBe(
+        false
+      );
+    }
+  });
+
+  it('rejects incomplete or extra teaching fields at both boundaries', () => {
+    for (const unit of [
       { ...sampleTeaching, workedExamples: [sampleTeaching.workedExamples[0]] },
       { ...sampleTeaching, guidedPractice: undefined },
       { ...sampleTeaching, extra: 'untrusted' },
     ]) {
-      expect(validateWire(unit)).toBe(false);
+      expect(validateWire(teachingProviderDraft(unit))).toBe(false);
       expect(classTeachingAuthoringSchema.safeParse(unit).success).toBe(false);
     }
+  });
+
+  it('restores punctuation and paragraph endings without adding learner-visible word lists', () => {
+    const draft = {
+      ...(teachingProviderDraft(sampleTeaching) as Record<string, unknown>),
+      explanation: ['Er', 'sagt:\n\n', '„Natürlich!“', 'Danach', 'geht', 'er.'],
+    };
+    expect(validateWire(draft)).toBe(true);
+    expect(classTeachingDraftSchema.pipe(classTeachingSchema).parse(draft)).toEqual({
+      ...sampleTeaching,
+      explanation: 'Er sagt:\n\n„Natürlich!“ Danach geht er.',
+    });
+  });
+
+  it.each([
+    '',
+    '\n\n',
+    'two words',
+    'word\n',
+    'word\r',
+    '\u0000',
+    'word\u0000',
+    'word\u007f',
+    'word\u0085',
+    'two\u00a0words',
+    'two\u2003words',
+    'word\n\n\n\n',
+  ])('rejects a malformed word token without splitting or repairing it: %j', (token) => {
+    const draft = {
+      ...(teachingProviderDraft(sampleTeaching) as Record<string, unknown>),
+      explanation: [token],
+    };
+    expect(classTeachingDraftSchema.safeParse(draft).success).toBe(false);
+  });
+
+  it('decodes ignored provider limits without truncation so local budgets reject the whole draft', () => {
+    const draft = {
+      ...(teachingProviderDraft(sampleTeaching) as Record<string, unknown>),
+      explanation: Array.from({ length: 171 }, () => 'idea'),
+    };
+    expect(validateWire(draft)).toBe(false);
+    const decoded = classTeachingDraftSchema.pipe(classTeachingSchema).parse(draft);
+    expect(countWords(decoded.explanation)).toBe(171);
+    expect(classTeachingAuthoringSchema.safeParse(decoded).success).toBe(false);
+  });
+
+  it('rejects an empty word array before decoding', () => {
+    const draft = {
+      ...(teachingProviderDraft(sampleTeaching) as Record<string, unknown>),
+      explanation: [],
+    };
+    expect(validateWire(draft)).toBe(false);
+    expect(classTeachingDraftSchema.safeParse(draft).success).toBe(false);
   });
 });

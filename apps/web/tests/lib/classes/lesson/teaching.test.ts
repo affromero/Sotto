@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Ajv from 'ajv';
 import type { SourceDocuments } from '@/lib/providers/ai';
 import { sampleTeaching } from '../../../helpers/learning/class-teaching';
+import { teachingProviderDraft } from './provider-fixture';
 import { blockedProviderExecution } from '../../../helpers/runtime/provider-execution';
 import {
   emptyTeachingCriticFixture,
@@ -44,7 +45,15 @@ vi.mock('@/lib/providers/ai', () => ({
           options,
           await boundary.adjudicator(system, messages, options)
         );
-      return boundary.author(system, messages, options);
+      const response = await boundary.author(system, messages, options);
+      try {
+        return {
+          ...response,
+          content: JSON.stringify(teachingProviderDraft(JSON.parse(response.content))),
+        };
+      } catch {
+        return response;
+      }
     },
   }),
 }));
@@ -184,8 +193,8 @@ describe('class teaching', () => {
     expect(await generateClassTeaching(params)).toEqual(sampleTeaching);
     for (const [, , options] of boundary.author.mock.calls) {
       const validate = new Ajv().compile(options.jsonSchema.schema);
-      expect(validate(candidate)).toBe(false);
-      expect(validate(sampleTeaching)).toBe(true);
+      expect(validate(teachingProviderDraft(candidate))).toBe(false);
+      expect(validate(teachingProviderDraft(sampleTeaching))).toBe(true);
     }
     const correction = JSON.parse(
       boundary.author.mock.calls[1][1][0].content.split('\n').slice(1).join('\n')
@@ -233,7 +242,7 @@ describe('class teaching', () => {
         attempt: index + 1,
         type: 'structure',
         kind: 'teaching',
-        candidate,
+        candidate: JSON.stringify(teachingProviderDraft(JSON.parse(candidate))),
         issues: [{ code: 'teaching_word_limit' }],
       }))
     );
@@ -323,7 +332,16 @@ describe('class teaching', () => {
       expect(captured.category).toBe('section_quality');
       expect(captured.attemptFailures).toEqual([
         { attempt: 1, type: 'teaching', failure: captured.teachingFailure },
-        { attempt: 2, type: 'structure', kind: 'teaching', candidate: content, issues: [{ code }] },
+        {
+          attempt: 2,
+          type: 'structure',
+          kind: 'teaching',
+          candidate:
+            code === 'invalid_json'
+              ? content
+              : JSON.stringify(teachingProviderDraft(JSON.parse(content))),
+          issues: [{ code }],
+        },
       ]);
       expect(JSON.parse(captured.teachingFailure!.reviews[0]!.candidate!)[0].items).toEqual([
         sampleTeaching,
