@@ -20,8 +20,14 @@ export async function readLocalStorageFile(
   let handle;
   try {
     handle = await open(/* turbopackIgnore: true */ filePath, 'r');
-  } catch {
-    return null;
+  } catch (error: unknown) {
+    if (
+      error instanceof Error &&
+      'code' in error &&
+      (error.code === 'ENOENT' || error.code === 'ENOTDIR')
+    )
+      return null;
+    throw error;
   }
   try {
     const size = (await handle.stat()).size;

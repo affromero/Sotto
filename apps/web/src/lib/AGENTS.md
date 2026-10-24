@@ -1106,6 +1106,12 @@ durable job admission before they can use this protocol.
 
 ### Shared Access And Storage
 
+`storage/sidedoor/local-object-access.ts` checks the selected profile against the
+current application field and owning record before generic local downloads.
+`readLocalObject` combines that policy with canonical current consumer resolution
+in one transaction. Historical attribution and household owner role grant no
+private learner access. Local download responses are private and uncached.
+
 `sidedoor/redis-semaphore.ts` adapts one unused ioredis connection to the shared
 exact-token capacity lease. Reconnect, offline queuing and command replay stay off.
 Connection loss poisons the session; cleanup closes the socket and preserves unknown

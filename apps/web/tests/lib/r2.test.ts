@@ -96,7 +96,7 @@ describe('shared storage runtime', () => {
     const url = await uploadFile('episodes/one/audio.mp3', Buffer.from('audio'), 'audio/mpeg');
     expect(url).toBe('/api/v1/storage/episodes/one/audio.mp3');
     expect(await readFile(join(directory, 'episodes/one/audio.mp3'), 'utf8')).toBe('audio');
-    expect(await readLocalObject('episodes/one/audio.mp3')).toBeNull();
+    expect(await readLocalObject('episodes/one/audio.mp3', 'learner')).toBeNull();
     expect(await resolveAudioUrl(url)).toBe(url);
   });
 

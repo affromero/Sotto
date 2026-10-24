@@ -41,6 +41,7 @@ import {
 import { SIDEDOOR_STATE_ID } from '@/lib/sidedoor/access/state/store';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 import { readLocalStorageFile } from '@/lib/storage/sidedoor/local-object-read';
+import { canReadLocalObjectConsumer } from '@/lib/storage/sidedoor/local-object-access';
 
 function localBaseDir(): string {
   return configuredLocalStorageRoot();
@@ -422,12 +423,35 @@ async function attributedStorageReference(reference: string) {
   );
 }
 
-async function attributedLocalPath(key: string): Promise<string | null> {
-  const attributed = await attributedStorageReference(localUrlForKey(key));
-  if (!attributed || attributed.backend.descriptor.kind !== 'local') return null;
-  if (attributed.asset.prepared.target.key !== key)
-    throw new Error('Local storage route attribution changed');
-  return pathInsideRoot(attributed.backend.descriptor.referenceRoot, key);
+async function attributedLocalPath(key: string, userId: string): Promise<string | null> {
+  const reference = localUrlForKey(key);
+  return sottoTransaction(prismaUnfiltered, async (database) => {
+    const registry = new StorageReferenceRegistry(
+      {
+        query: (sql, values) => database.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...values),
+      },
+      'postgres',
+      SIDEDOOR_STATE_ID
+    );
+    const attributed = await registry.readReference(reference);
+    if (!attributed || attributed.backend.descriptor.kind !== 'local') return null;
+    if (attributed.asset.prepared.target.key !== key)
+      throw new Error('Local storage route attribution changed');
+    for (const consumer of attributed.asset.consumers) {
+      if (!(await canReadLocalObjectConsumer(database, userId, reference, consumer))) continue;
+      const current = await registry.resolve({ consumer, reference });
+      if (
+        !current ||
+        current.assetId !== attributed.asset.id ||
+        current.backend.id !== attributed.backend.id ||
+        current.backend.binding !== attributed.backend.binding ||
+        current.prepared.target.key !== key
+      )
+        continue;
+      return pathInsideRoot(attributed.backend.descriptor.referenceRoot, key);
+    }
+    return null;
+  });
 }
 
 /**
@@ -523,16 +547,17 @@ export async function getPresignedUrl(reference: string, expiresIn = 3600): Prom
 }
 
 /**
- * Read an attributed local object using its immutable captured root.
+ * Read a currently attributed local object authorized for the selected profile.
+ * Application access and current consumer attribution share one transaction.
  * An optional HTTP Range yields the requested slice.
- * Returns null when local storage is not the configured provider, the key does
- * not exist, or the range is unsatisfiable.
+ * Returns null for inaccessible or missing local objects and unsatisfiable ranges.
  */
 export async function readLocalObject(
   key: string,
+  userId: string,
   range?: string | null
 ): Promise<{ body: Buffer; size: number; contentType: string; start: number; end: number } | null> {
-  const filePath = await attributedLocalPath(key);
+  const filePath = await attributedLocalPath(key, userId);
   if (!filePath) return null;
   return readLocalStorageFile(filePath, key, range);
 }
