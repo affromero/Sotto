@@ -15,9 +15,11 @@ import { materialStorageScopes } from '@/lib/course-materials';
 import { materialUploadStorageScopes } from '@/lib/course-materials/uploads/scopes';
 import {
   consumerForStorageField,
+  parseStorageConsumer,
   readStorageConsumerReference,
   replaceStorageConsumerReference,
 } from '@/lib/sidedoor/storage/core/storage-consumers';
+
 import {
   visitStorageDeletionReferences,
   type StorageDeletionReferencePage,
@@ -34,6 +36,18 @@ import {
   type SharedTestInstance,
   type SharedTestIdentity,
 } from '../../../../helpers/setup/shared-instance';
+
+describe('storage consumer identifier boundary', () => {
+  it.each([
+    'class:lesson:worksheet:extra',
+    'class::worksheet',
+    'profile:owner:passwordHash',
+    'UnknownRecord:id:original',
+    'class:lesson:worksheet"; DROP TABLE "User"',
+  ])('rejects unsupported consumer %s before database access', (consumer) => {
+    expect(() => parseStorageConsumer(consumer)).toThrow();
+  });
+});
 
 const suite = process.env.SIDEDOOR_TEST_DATABASE_URL ? describe : describe.skip;
 suite('resumable upload storage ownership', () => {

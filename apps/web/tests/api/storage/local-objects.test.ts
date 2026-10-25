@@ -52,6 +52,7 @@ describe('GET /api/v1/storage/[...key]', () => {
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toBe('audio/mpeg');
     expect(res.headers.get('accept-ranges')).toBe('bytes');
+    expect(res.headers.get('cache-control')).toBe('private, no-store');
     expect(Buffer.from(await res.arrayBuffer())).toEqual(AUDIO);
   });
 
@@ -91,6 +92,7 @@ describe('GET /api/v1/storage/[...key]', () => {
     const res = await GET(request(), params('speaking-ref', 'abc', '0.mp3'));
 
     expect(res.status).toBe(401);
+    expect(res.headers.get('cache-control')).toBe('private, no-store');
   });
 
   it('404s a key that does not exist', async () => {
@@ -101,7 +103,6 @@ describe('GET /api/v1/storage/[...key]', () => {
   });
 
   it('refuses a key that escapes the storage root', async () => {
-    mockReadLocalObject.mockRejectedValue(new Error('Invalid storage key'));
     const res = await GET(request(), params('..', '..', 'etc', 'passwd'));
 
     expect(res.status).toBe(404);

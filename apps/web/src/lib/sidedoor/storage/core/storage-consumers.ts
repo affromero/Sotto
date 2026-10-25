@@ -25,7 +25,7 @@ export function consumerForStorageField(source: string, id: string, field: strin
   return mapping ? `${mapping[2]}:${id}:${mapping[3]}` : null;
 }
 
-function consumerField(consumer: string) {
+export function parseStorageConsumer(consumer: string) {
   const parts = consumer.split(':');
   if (parts.length !== 3 || !parts[1]) throw new Error('Invalid storage consumer');
   const mapping = storageConsumerFields.find(
@@ -39,7 +39,7 @@ export async function readStorageConsumerReference(
   database: Prisma.TransactionClient,
   consumer: string
 ) {
-  const { model, field, id } = consumerField(consumer);
+  const { model, field, id } = parseStorageConsumer(consumer);
   const rows = await database.$queryRawUnsafe<Array<{ reference: string | null }>>(
     `SELECT "${field}" AS reference FROM "${model}" WHERE id = $1`,
     id
@@ -54,7 +54,7 @@ export async function replaceStorageConsumerReference(
   previous: string,
   next: string
 ) {
-  const { model, field, id } = consumerField(consumer);
+  const { model, field, id } = parseStorageConsumer(consumer);
   const rows = await database.$queryRawUnsafe<Array<{ id: string }>>(
     `UPDATE "${model}" SET "${field}" = $1 WHERE id = $2 AND "${field}" = $3 RETURNING id`,
     next,

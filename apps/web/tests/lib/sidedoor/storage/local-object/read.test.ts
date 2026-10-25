@@ -2,7 +2,22 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const boundary = vi.hoisted(() => ({ failureCode: null as string | null }));
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>();
+  return {
+    ...actual,
+    open: (...parameters: Parameters<typeof actual.open>) => {
+      if (boundary.failureCode)
+        return Promise.reject(
+          Object.assign(new Error('File open failed'), { code: boundary.failureCode })
+        );
+      return actual.open(...parameters);
+    },
+  };
+});
 import {
   contentTypeForStorageKey,
   readLocalStorageFile,
@@ -13,6 +28,7 @@ describe('canonical local object reads', () => {
   let file: string;
 
   beforeEach(async () => {
+    boundary.failureCode = null;
     directory = await mkdtemp(join(tmpdir(), 'sotto-local-object-'));
     file = join(directory, 'audio.mp3');
     await writeFile(file, '0123456789');
@@ -53,6 +69,17 @@ describe('canonical local object reads', () => {
 
   it('returns null for a missing attributed file', async () => {
     expect(await readLocalStorageFile(join(directory, 'missing'), 'missing.bin')).toBeNull();
+  });
+
+  it('returns null when a missing path traverses a regular file', async () => {
+    expect(await readLocalStorageFile(join(file, 'missing'), 'missing.bin')).toBeNull();
+  });
+
+  it.each(['EACCES', 'EIO', 'EMFILE'])('surfaces filesystem failure %s', async (code) => {
+    boundary.failureCode = code;
+    await expect(readLocalStorageFile(file, 'recordings/audio.mp3')).rejects.toMatchObject({
+      code,
+    });
   });
 
   it('maps supported extensions and defaults unknown content', () => {
