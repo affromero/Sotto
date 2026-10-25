@@ -16,37 +16,12 @@
 import { settleSynchronousProviderResponse, type TtsProvider, type SpeechParams } from '../tts';
 import type { ProviderTransport } from 'thesidedoor-core/providers/transport';
 import type { TtsProviderId } from '../tts-registry';
-import {
-  selectVoicePair,
-  resolveVoiceId,
-  findByVoiceId,
-  type VoiceMatchMetadata,
-} from '../../voice-pool';
+import { selectVoicePair, resolveVoiceId, type VoiceMatchMetadata } from '../../voice-pool';
 import { mapDirectionToExpression, convertInlineAudioTags } from '../../tts-expression-mapper';
-
-/** All voices available across OpenAI TTS models */
-const OPENAI_VOICES = [
-  // Available on all models
-  'alloy',
-  'echo',
-  'fable',
-  'onyx',
-  'nova',
-  'shimmer',
-  // Additional voices on gpt-4o-mini-tts
-  'ash',
-  'ballad',
-  'coral',
-  'sage',
-  'verse',
-  // Highest-quality recommended voices (gpt-4o-mini-tts)
-  'marin',
-  'cedar',
-] as const;
+import { getOpenAIVoicePool, resolveOpenAIVoice } from './openai/voices';
 
 // Speakers at even indices (HOST, GUEST) → host voice slot; odd (EXPERT, SKEPTIC) → expert slot.
 const SPEAKER_VOICE_HOST_SET = new Set(['HOST', 'GUEST']);
-type OpenAIVoice = (typeof OPENAI_VOICES)[number];
 
 /** Models that support the `instructions` parameter */
 const INSTRUCTION_MODELS = new Set([
@@ -87,17 +62,8 @@ export class OpenAITtsProvider implements TtsProvider {
   }
 
   async generateSpeech(params: SpeechParams): Promise<Buffer> {
+    const voice = resolveOpenAIVoice(params.voiceId, this.model);
     const client = await this.getClient(params);
-
-    let openaiVoice: string = params.voiceId;
-    const entry = findByVoiceId(params.voiceId);
-    if (entry?.ids.openai) {
-      openaiVoice = entry.ids.openai;
-    }
-
-    const voice: OpenAIVoice = OPENAI_VOICES.includes(openaiVoice as OpenAIVoice)
-      ? (openaiVoice as OpenAIVoice)
-      : 'alloy';
 
     // Build request — add instructions for gpt-4o-mini-tts models
     const supportsInstructions = INSTRUCTION_MODELS.has(this.model);
@@ -131,7 +97,7 @@ export class OpenAITtsProvider implements TtsProvider {
     if (!episodeId) {
       return isHostVoice ? 'nova' : 'onyx';
     }
-    const pair = selectVoicePair(episodeId, metadata);
+    const pair = selectVoicePair(episodeId, metadata, getOpenAIVoicePool(this.model));
     const entry = isHostVoice ? pair.host : pair.expert;
     return resolveVoiceId(entry, 'openai');
   }

@@ -3,6 +3,7 @@ import { assignVoicesForEpisode } from '@/lib/voice-assigner';
 
 const mockEpisodeVoiceFindMany = vi.fn();
 const mockEpisodeVoiceCreateMany = vi.fn();
+const mockEpisodeFindUniqueOrThrow = vi.fn();
 const serverConfiguration = vi.hoisted(() => ({ ttsVoices: null as string | null }));
 
 vi.mock('@/lib/server-config', () => ({
@@ -12,6 +13,7 @@ vi.mock('@/lib/server-config', () => ({
 
 vi.mock('@/lib/prisma', () => {
   const _mockPrisma = {
+    episode: { findUniqueOrThrow: (...args: unknown[]) => mockEpisodeFindUniqueOrThrow(...args) },
     episodeVoice: {
       findMany: (...args: unknown[]) => mockEpisodeVoiceFindMany(...args),
       createMany: (...args: unknown[]) => mockEpisodeVoiceCreateMany(...args),
@@ -35,6 +37,7 @@ describe('assignVoicesForEpisode', () => {
     serverConfiguration.ttsVoices = null;
     mockEpisodeVoiceFindMany.mockResolvedValue([]);
     mockEpisodeVoiceCreateMany.mockResolvedValue({ count: 0 });
+    mockEpisodeFindUniqueOrThrow.mockResolvedValue({ ttsModel: null });
   });
 
   afterEach(() => {
@@ -93,6 +96,59 @@ describe('assignVoicesForEpisode', () => {
     );
 
     expect(mockEpisodeVoiceCreateMany).not.toHaveBeenCalled();
+  });
+
+  it.each([null, 'tts-1', 'tts-1-hd'])(
+    'persists model-compatible distinct OpenAI voices for %s',
+    async (ttsModel) => {
+      mockEpisodeFindUniqueOrThrow.mockResolvedValue({ ttsModel });
+      await assignVoicesForEpisode(
+        'cmvoal7ql003701pj1bes6bvg',
+        [{ name: 'HOST' }, { name: 'EXPERT' }],
+        'openai'
+      );
+      const rows = mockEpisodeVoiceCreateMany.mock.calls[0][0].data as Array<{ voiceId: string }>;
+      expect(rows).toHaveLength(2);
+      expect(new Set(rows.map((row) => row.voiceId)).size).toBe(2);
+      for (const row of rows) {
+        expect([
+          'alloy',
+          'ash',
+          'coral',
+          'echo',
+          'fable',
+          'onyx',
+          'nova',
+          'sage',
+          'shimmer',
+        ]).toContain(row.voiceId);
+      }
+    }
+  );
+
+  it('retains modern OpenAI voices for the captured modern episode model', async () => {
+    mockEpisodeFindUniqueOrThrow.mockResolvedValue({ ttsModel: 'gpt-4o-mini-tts' });
+    await assignVoicesForEpisode(
+      'cmvoal7ql003701pj1bes6bvg',
+      [{ name: 'HOST' }, { name: 'EXPERT' }],
+      'openai'
+    );
+    const rows = mockEpisodeVoiceCreateMany.mock.calls[0][0].data as Array<{ voiceId: string }>;
+    expect(rows.map((row) => row.voiceId)).toContain('cedar');
+  });
+
+  it('keeps legacy OpenAI casting deterministic and varied between episodes', async () => {
+    mockEpisodeFindUniqueOrThrow.mockResolvedValue({ ttsModel: 'tts-1-hd' });
+    const cast = async (episodeId: string) => {
+      await assignVoicesForEpisode(episodeId, [{ name: 'HOST' }, { name: 'EXPERT' }], 'openai');
+      const rows = mockEpisodeVoiceCreateMany.mock.lastCall![0].data as Array<{ voiceId: string }>;
+      return rows.map((row) => row.voiceId);
+    };
+    expect(await cast('same-episode')).toEqual(await cast('same-episode'));
+    const pairs: string[][] = [];
+    for (let index = 0; index < 24; index++) pairs.push(await cast(`voice-variety-${index}`));
+    expect(new Set(pairs.flat()).size).toBeGreaterThan(2);
+    for (const pair of pairs) expect(new Set(pair).size).toBe(2);
   });
 
   it('assigns 3 distinct voices deterministically for 3+ speakers', async () => {

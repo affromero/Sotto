@@ -3,9 +3,27 @@ import {
   scoreToneMatch,
   scoreVoice,
   selectVoicePair,
+  selectVoiceSet,
   VOICE_POOL,
   type VoiceMatchMetadata,
 } from '@/lib/voice-pool';
+
+describe('eligible voice selection', () => {
+  const eligible = VOICE_POOL.filter((voice) => ['Aria', 'Adam'].includes(voice.name));
+
+  it.each([undefined, { tone: 'socratic', audienceLevel: 'expert' } as const])(
+    'keeps both role voices inside the eligible pool with metadata %j',
+    (metadata) => {
+      for (let index = 0; index < 32; index++) {
+        const pair = selectVoicePair(`eligible-${index}`, metadata, eligible);
+        expect(new Set([pair.host.name, pair.expert.name])).toEqual(new Set(['Aria', 'Adam']));
+        for (const voice of selectVoiceSet(`eligible-${index}`, 2, metadata, eligible)) {
+          expect(eligible).toContain(voice);
+        }
+      }
+    }
+  );
+});
 
 describe('scoreToneMatch', () => {
   it('boosts casual keywords in character string', () => {

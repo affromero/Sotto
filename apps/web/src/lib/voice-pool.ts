@@ -280,20 +280,21 @@ function hashString(s: string): number {
 export function selectVoiceSet(
   episodeId: string,
   speakerCount: number,
-  metadata?: VoiceMatchMetadata
+  metadata?: VoiceMatchMetadata,
+  eligiblePool: VoicePoolEntry[] = VOICE_POOL
 ): VoicePoolEntry[] {
-  const count = Math.max(1, Math.min(speakerCount, VOICE_POOL.length));
+  const count = Math.max(1, Math.min(speakerCount, eligiblePool.length));
   const index = hashString(episodeId);
 
   const hasMetadata = metadata && (metadata.tone || metadata.audienceLevel || metadata.audience);
 
   const pool = hasMetadata
     ? (() => {
-        const scored = VOICE_POOL.map((v) => ({ voice: v, score: scoreVoice(v, metadata!) }));
+        const scored = eligiblePool.map((v) => ({ voice: v, score: scoreVoice(v, metadata!) }));
         const maxScore = Math.max(...scored.map((s) => s.score));
         return scored.filter((s) => s.score >= maxScore - 3).map((s) => s.voice);
       })()
-    : VOICE_POOL;
+    : eligiblePool;
 
   const selected: VoicePoolEntry[] = [];
   const usedNames = new Set<string>();
@@ -320,19 +321,21 @@ export function selectVoiceSet(
  */
 export function selectVoicePair(
   episodeId: string,
-  metadata?: VoiceMatchMetadata
+  metadata?: VoiceMatchMetadata,
+  eligiblePool: VoicePoolEntry[] = VOICE_POOL
 ): {
   host: VoicePoolEntry;
   expert: VoicePoolEntry;
 } {
+  if (eligiblePool.length < 2) throw new Error('At least two eligible voices are required');
   const index = hashString(episodeId);
 
   const hasMetadata = metadata && (metadata.tone || metadata.audienceLevel || metadata.audience);
 
   if (!hasMetadata) {
-    const hostIndex = index % VOICE_POOL.length;
-    const host = VOICE_POOL[hostIndex];
-    const candidates = VOICE_POOL.filter((v) => v.name !== host.name);
+    const hostIndex = index % eligiblePool.length;
+    const host = eligiblePool[hostIndex];
+    const candidates = eligiblePool.filter((v) => v.name !== host.name);
     const contrastCandidates = candidates.filter((v) => v.gender !== host.gender);
     const expertPool = contrastCandidates.length > 0 ? contrastCandidates : candidates;
     const expertIndex = (index >>> 8) % expertPool.length;
@@ -340,7 +343,7 @@ export function selectVoicePair(
     return { host, expert };
   }
 
-  const scored = VOICE_POOL.map((v) => ({ voice: v, score: scoreVoice(v, metadata!) }));
+  const scored = eligiblePool.map((v) => ({ voice: v, score: scoreVoice(v, metadata!) }));
   const maxScore = Math.max(...scored.map((s) => s.score));
   const tier = scored.filter((s) => s.score >= maxScore - 3).map((s) => s.voice);
 
@@ -348,10 +351,15 @@ export function selectVoicePair(
   const host = tier[hostIndex];
 
   const expertCandidates = tier.filter((v) => v.name !== host.name && v.gender !== host.gender);
+  const contrastCandidates = eligiblePool.filter(
+    (v) => v.name !== host.name && v.gender !== host.gender
+  );
   const expertPool =
     expertCandidates.length > 0
       ? expertCandidates
-      : VOICE_POOL.filter((v) => v.name !== host.name && v.gender !== host.gender);
+      : contrastCandidates.length > 0
+        ? contrastCandidates
+        : eligiblePool.filter((v) => v.name !== host.name);
   const expertIndex = (index >>> 8) % expertPool.length;
   const expert = expertPool[expertIndex];
 
