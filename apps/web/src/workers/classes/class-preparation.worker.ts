@@ -2,6 +2,8 @@ import type { Job } from 'bullmq';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { createNextClass, regenerateCurrentClass } from '@/lib/class-service';
 import { ClassSourceError } from '@/lib/class-source';
+import { logger } from '@/lib/logger';
+import { generationDiagnostic } from '@/lib/classes/quality/failure/diagnostic';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 import { readSottoWorkerJob, sottoJobOutbox } from '@/lib/sidedoor/jobs/core/job-delivery';
 import { withSottoJobExecution } from '@/lib/sidedoor/jobs/core/job-execution-lifetime';
@@ -249,6 +251,14 @@ export async function processClassPreparation(job: Job<unknown>, workerSignal?: 
           isDurableQueueCleanupFailure(error) ||
           workerSignal?.aborted;
         if (isDurableQueueCleanupFailure(error)) markCleanupUnconfirmed();
+        const failure = captureGenerationFailure(error);
+        logger.error('Class preparation failed', {
+          operationId,
+          courseId,
+          uncertain: Boolean(uncertain),
+          category: failure.category,
+          ...generationDiagnostic(error),
+        });
         await sottoTransaction(prisma, (database) =>
           recordClassPreparationFailure(
             database,
@@ -256,7 +266,7 @@ export async function processClassPreparation(job: Job<unknown>, workerSignal?: 
             work.fingerprint,
             Boolean(uncertain),
             error instanceof ClassSourceError ? 'source_unreadable' : 'generation_failed',
-            captureGenerationFailure(error)
+            failure
           )
         );
         if (uncertain) throw error;

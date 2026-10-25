@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Ajv from 'ajv';
+import type { ClassTeaching } from '@sotto/shared';
 import type { SourceDocuments } from '@/lib/providers/ai';
 import { sampleTeaching } from '../../../helpers/learning/class-teaching';
 import { blockedProviderExecution } from '../../../helpers/runtime/provider-execution';
@@ -88,6 +89,25 @@ const rejected = {
   model: 'captured-model',
 };
 
+function withWordCount(total: number): ClassTeaching {
+  const unit = structuredClone(sampleTeaching);
+  unit.explanation = 'idea '.repeat(200).trim();
+  for (const example of unit.workedExamples) example.explanation = 'idea '.repeat(100).trim();
+  unit.commonMistake.explanation = 'idea '.repeat(50).trim();
+  unit.guidedPractice.explanation = 'idea '.repeat(50).trim();
+  const words = countWords(
+    [
+      unit.title,
+      unit.explanation,
+      ...unit.workedExamples.flatMap((item) => Object.values(item)),
+      ...Object.values(unit.commonMistake),
+      ...Object.values(unit.guidedPractice),
+    ].join(' ')
+  );
+  unit.explanation += ' idea'.repeat(total - words);
+  return unit;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   boundary.author
@@ -175,28 +195,68 @@ describe('class teaching', () => {
     expect(boundary.author.mock.calls).toHaveLength(2);
   });
 
-  it('rejects an ignored field limit locally and supplies exact field budgets to the complete repair', async () => {
-    const candidate = { ...sampleTeaching, explanation: 'idea '.repeat(171).trim() };
+  it('reviews complete fields above the old word caps unchanged within the whole-unit budget', async () => {
+    const candidate = structuredClone(sampleTeaching);
+    candidate.explanation = 'Una explicación completa. '.repeat(60).trim();
+    candidate.workedExamples[0]!.answer =
+      'Ayer visité el museo con Ana porque queríamos conocer la historia de nuestra ciudad. Vimos una exposición sobre la vida cotidiana, hablamos con la guía y terminamos la visita en la sala de arte. Después fuimos a casa.';
+    boundary.author.mockResolvedValueOnce({
+      content: JSON.stringify(candidate),
+      model: 'captured-model',
+    });
+    expect(countWords(candidate.explanation)).toBeGreaterThan(170);
+    expect(countWords(candidate.workedExamples[0]!.answer)).toBeGreaterThan(35);
+    expect(await generateClassTeaching(params)).toEqual(candidate);
+    const validate = new Ajv().compile(boundary.author.mock.calls[0][2].jsonSchema.schema);
+    expect(validate(candidate)).toBe(true);
+    const reviewed = boundary.requests.mock.calls
+      .filter(([, , options]) => options.jsonSchema.name === 'class_teaching_critic')
+      .map(([, messages]) => JSON.parse(messages[0].content).items[0].content);
+    expect(reviewed).toEqual([candidate]);
+    expect(boundary.author.mock.calls).toHaveLength(1);
+  });
+
+  it('accepts exactly 600 words after the complete teaching review', async () => {
+    const candidate = withWordCount(600);
+    boundary.author.mockResolvedValueOnce({
+      content: JSON.stringify(candidate),
+      model: 'captured-model',
+    });
+    expect(await generateClassTeaching(params)).toEqual(candidate);
+    const reviewed = boundary.requests.mock.calls
+      .filter(([, , options]) => options.jsonSchema.name === 'class_teaching_critic')
+      .map(([, messages]) => JSON.parse(messages[0].content).items[0].content);
+    expect(reviewed).toEqual([candidate]);
+    expect(boundary.author.mock.calls).toHaveLength(1);
+  });
+
+  it('repairs 601 words before review with exact total and field counts', async () => {
+    const candidate = withWordCount(601);
     boundary.author.mockResolvedValueOnce({
       content: JSON.stringify(candidate),
       model: 'captured-model',
     });
     expect(await generateClassTeaching(params)).toEqual(sampleTeaching);
-    for (const [, , options] of boundary.author.mock.calls) {
-      const validate = new Ajv().compile(options.jsonSchema.schema);
-      expect(validate(candidate)).toBe(false);
-      expect(validate(sampleTeaching)).toBe(true);
-    }
     const correction = JSON.parse(
       boundary.author.mock.calls[1][1][0].content.split('\n').slice(1).join('\n')
     );
     expect(correction.candidate).toEqual(candidate);
-    expect(correction).toMatchObject({ issues: ['teaching_word_limit'], maxWords: 600 });
+    expect(correction).toMatchObject({
+      issues: ['teaching_word_limit'],
+      maxWords: 600,
+      actualWords: 601,
+    });
     expect(correction.fields).toContainEqual({
       field: 'explanation',
-      actualWords: 171,
-      maxWords: 170,
+      actualWords: countWords(candidate.explanation),
     });
+    expect(
+      correction.fields.reduce(
+        (total: number, field: { actualWords: number }) => total + field.actualWords,
+        0
+      )
+    ).toBe(601);
+    expect(correction.fields.every((field: object) => !('maxWords' in field))).toBe(true);
     const reviewed = boundary.requests.mock.calls
       .filter(([, , options]) => options.jsonSchema.name === 'class_teaching_critic')
       .map(([, messages]) => JSON.parse(messages[0].content).items[0].content);
@@ -204,25 +264,7 @@ describe('class teaching', () => {
   });
 
   it('retains both over-budget drafts when a provider ignores the initial and repair word constraints', async () => {
-    function oversized(total: number) {
-      const unit = structuredClone(sampleTeaching);
-      unit.explanation = 'idea '.repeat(200).trim();
-      for (const example of unit.workedExamples) example.explanation = 'idea '.repeat(100).trim();
-      unit.commonMistake.explanation = 'idea '.repeat(50).trim();
-      unit.guidedPractice.explanation = 'idea '.repeat(50).trim();
-      const count = countWords(
-        [
-          unit.title,
-          unit.explanation,
-          ...unit.workedExamples.flatMap((item) => Object.values(item)),
-          ...Object.values(unit.commonMistake),
-          ...Object.values(unit.guidedPractice),
-        ].join(' ')
-      );
-      unit.explanation += ' idea'.repeat(total - count);
-      return JSON.stringify(unit);
-    }
-    const candidates = [oversized(629), oversized(615)];
+    const candidates = [629, 615].map((total) => JSON.stringify(withWordCount(total)));
     boundary.author
       .mockResolvedValueOnce({ content: candidates[0], model: 'captured-model' })
       .mockResolvedValueOnce({ content: candidates[1], model: 'captured-model' });
@@ -296,6 +338,47 @@ describe('class teaching', () => {
     expect(boundary.author.mock.calls).toHaveLength(2);
   });
 
+  it('shares the single replacement between an oversized unit and rejected teaching', async () => {
+    boundary.author.mockResolvedValueOnce({
+      content: JSON.stringify(withWordCount(601)),
+      model: 'captured-model',
+    });
+    boundary.adjudicator.mockResolvedValue(rejected);
+    const error = await generateClassTeaching(params).catch((failure: unknown) => failure);
+    expect(error).toBeInstanceOf(TeachingQualityRejectionError);
+    expect(captureGenerationFailure(error).attemptFailures).toMatchObject([
+      { attempt: 1, type: 'structure', issues: [{ code: 'teaching_word_limit' }] },
+      { attempt: 2, type: 'teaching' },
+    ]);
+    expect(boundary.author.mock.calls).toHaveLength(2);
+  });
+
+  it.each([
+    { ...sampleTeaching, title: 'x'.repeat(161) },
+    { ...sampleTeaching, explanation: 'x'.repeat(1801) },
+    { ...sampleTeaching, workedExamples: [sampleTeaching.workedExamples[0]] },
+    {
+      ...sampleTeaching,
+      guidedPractice: { ...sampleTeaching.guidedPractice, answer: 'x'.repeat(801) },
+    },
+    { ...sampleTeaching, extra: 'untrusted' },
+  ])(
+    'rejects invalid structure and stored character limits before review: %#',
+    async (candidate) => {
+      boundary.author.mockResolvedValueOnce({
+        content: JSON.stringify(candidate),
+        model: 'captured-model',
+      });
+      expect(await generateClassTeaching(params)).toEqual(sampleTeaching);
+      const validate = new Ajv().compile(boundary.author.mock.calls[0][2].jsonSchema.schema);
+      expect(validate(candidate)).toBe(false);
+      const reviewed = boundary.requests.mock.calls
+        .filter(([, , options]) => options.jsonSchema.name === 'class_teaching_critic')
+        .map(([, messages]) => JSON.parse(messages[0].content).items[0].content);
+      expect(reviewed).toEqual([sampleTeaching]);
+    }
+  );
+
   it.each([
     ['invalid_json', '{incomplete'],
     ['invalid_item', JSON.stringify({ ...sampleTeaching, guidedPractice: undefined })],
@@ -323,7 +406,13 @@ describe('class teaching', () => {
       expect(captured.category).toBe('section_quality');
       expect(captured.attemptFailures).toEqual([
         { attempt: 1, type: 'teaching', failure: captured.teachingFailure },
-        { attempt: 2, type: 'structure', kind: 'teaching', candidate: content, issues: [{ code }] },
+        {
+          attempt: 2,
+          type: 'structure',
+          kind: 'teaching',
+          candidate: content,
+          issues: [{ code }],
+        },
       ]);
       expect(JSON.parse(captured.teachingFailure!.reviews[0]!.candidate!)[0].items).toEqual([
         sampleTeaching,

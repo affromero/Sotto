@@ -44,6 +44,8 @@ private retained receipts. Exposure and placement never award objective mastery.
 `classes/class-preparation.worker.ts` consumes the `class-preparation` queue with concurrency 2.
 Admission and outbox writes precede all generation. It pins learner/course identity and
 model credentials, preserves unknown outcomes, and validates inherited audio authority.
+Failures log the original operation and trusted canonical diagnostic codes before
+settlement. Provider messages, source content and private review payloads stay out of logs.
 See `docs/background-preparation.md` for scheduling and recovery semantics.
 
 | Worker                 | Queue Name             | Concurrency | Input                                                                                                                                                                                                                                                     | Output                                                                                                    |
