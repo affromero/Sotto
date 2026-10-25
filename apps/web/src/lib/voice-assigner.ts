@@ -20,6 +20,7 @@ import {
 } from './providers/tts-voices';
 import type { TtsProviderId } from './providers/tts-registry';
 import { logger } from './logger';
+import { getOpenAIVoicePool } from './providers/tts/openai/voices';
 
 interface SpeakerInput {
   name: string;
@@ -65,7 +66,12 @@ async function assignDeterministicVoices(
   providerId: TtsProviderId,
   metadata?: VoiceMatchMetadata
 ): Promise<void> {
-  const voiceIds = selectDeterministicVoiceIds(episodeId, speakers.length, providerId, metadata);
+  const voiceIds = await selectDeterministicVoiceIds(
+    episodeId,
+    speakers.length,
+    providerId,
+    metadata
+  );
   if (voiceIds.length < speakers.length) {
     throw new Error(
       `Unable to assign ${speakers.length} voices for provider "${providerId}"; only ${voiceIds.length} voices are available.`
@@ -97,12 +103,12 @@ async function assignDeterministicVoices(
   });
 }
 
-function selectDeterministicVoiceIds(
+async function selectDeterministicVoiceIds(
   episodeId: string,
   speakerCount: number,
   providerId: TtsProviderId,
   metadata?: VoiceMatchMetadata
-): string[] {
+): Promise<string[]> {
   switch (providerId) {
     case 'elevenlabs': {
       const entries = selectVoiceSet(episodeId, speakerCount, metadata);
@@ -110,7 +116,16 @@ function selectDeterministicVoiceIds(
     }
 
     case 'openai': {
-      const entries = selectVoiceSet(episodeId, speakerCount, metadata);
+      const episode = await prisma.episode.findUniqueOrThrow({
+        where: { id: episodeId },
+        select: { ttsModel: true },
+      });
+      const entries = selectVoiceSet(
+        episodeId,
+        speakerCount,
+        metadata,
+        getOpenAIVoicePool(episode.ttsModel)
+      );
       return entries.map((e) => resolveVoiceId(e, 'openai'));
     }
 
