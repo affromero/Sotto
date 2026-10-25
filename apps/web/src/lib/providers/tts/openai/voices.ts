@@ -16,7 +16,7 @@ const LEGACY_VOICES = [
 const ALL_VOICES = [...LEGACY_VOICES, 'ballad', 'verse', 'marin', 'cedar'] as const;
 type OpenAIVoice = (typeof ALL_VOICES)[number];
 
-export function getOpenAIVoiceIds(model: string | null = null): readonly OpenAIVoice[] {
+function getOpenAIVoiceIds(model: string | null = null): readonly OpenAIVoice[] {
   const selected = model ?? getProviderMeta('openai').defaultModel;
   return selected === 'tts-1' || selected === 'tts-1-hd' ? LEGACY_VOICES : ALL_VOICES;
 }
