@@ -6,16 +6,13 @@ struct LearnerAudioPlayer: View {
     let reference: String
     var turns: [SottoListeningTurn] = []
     @StateObject private var playback = LearnerAudioPlayback()
-    @State private var selectedTurnIndex = 0
 
     private var orderedTurns: [SottoListeningTurn] { turns.sorted { $0.order < $1.order } }
-    private var activeTurnIndex: Int {
-        orderedTurns.firstIndex { turn in
-            guard let playingReference = playback.reference else { return false }
-            return playingReference == reference ? turn.contains(time: playback.currentTime) : playingReference == turn.audioUrl
-        } ?? min(selectedTurnIndex, max(0, orderedTurns.count - 1))
+    private var speakers: [String] {
+        orderedTurns.reduce(into: []) { names, turn in
+            if !names.contains(turn.speaker) { names.append(turn.speaker) }
+        }
     }
-
     private func isActive(_ turn: SottoListeningTurn) -> Bool {
         guard playback.isPlaying else { return false }
         if playback.reference == reference { return turn.contains(time: playback.currentTime) }
@@ -28,12 +25,13 @@ struct LearnerAudioPlayer: View {
                 playback.toggle(reference: reference) { try await model.downloadLearningAudio(from: reference) }
             } label: {
                 let playing = playback.isPlaying && playback.reference == reference
-                Label(playback.isLoading && playback.reference == reference ? "Loading audio" : playing ? "Pause audio" : "Play audio",
+                Label(playback.isLoading && playback.reference == reference ? "Loading audio" : playing ? "Pause audio" : orderedTurns.isEmpty ? "Play audio" : "Play full conversation",
                       systemImage: playing ? "pause.fill" : "play.fill")
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             .buttonStyle(SottoSecondaryButtonStyle())
             .disabled(playback.isLoading && playback.reference == reference)
+            .accessibilityIdentifier("lesson-audio-full")
             if playback.duration > 0 {
                 Slider(value: Binding(get: { playback.currentTime }, set: { playback.seek(to: $0) }),
                     in: 0...max(playback.duration, playback.currentTime))
@@ -49,37 +47,17 @@ struct LearnerAudioPlayer: View {
                 }.buttonStyle(.bordered).controlSize(.large)
             }
             if !orderedTurns.isEmpty {
-                let turn = orderedTurns[activeTurnIndex]
-                Text("Turn \(activeTurnIndex + 1) of \(orderedTurns.count) · \(turn.speaker.capitalized)")
-                    .font(.callout.bold()).foregroundStyle(SottoTheme.ink)
-                ViewThatFits(in: .horizontal) {
-                    HStack { turnActions }
-                    VStack(alignment: .leading, spacing: 12) { turnActions }
-                }.buttonStyle(.bordered).controlSize(.large)
-                DisclosureGroup("All speaker turns") {
-                    ForEach(orderedTurns) { turn in
-                    if let clip = turn.audioUrl, !clip.isEmpty {
-                        Button {
-                            playback.toggle(reference: clip) { try await model.downloadLearningAudio(from: clip) }
-                        } label: {
-                            HStack(spacing: 10) {
-                                Image(systemName: isActive(turn) ? "waveform" : "play.fill")
-                                    .frame(width: 20)
-                                Text("Turn \(turn.order + 1) · \(turn.speaker)")
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                if isActive(turn) { Text("Speaking").font(.caption) }
-                            }
-                            .padding(.horizontal, 12)
-                            .frame(minHeight: 44)
-                            .foregroundStyle(SottoTheme.ink)
-                            .background(isActive(turn) ? SottoTheme.primary.opacity(0.14) : SottoTheme.paper)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(playback.isLoading && playback.reference == clip)
-                        .accessibilityLabel("\(playback.isPlaying && playback.reference == clip ? "Pause" : "Play") turn \(turn.order + 1), \(turn.speaker)")
-                    }
-                    }
+                if let speaking = orderedTurns.first(where: { isActive($0) }) {
+                    Label("\(speaking.speaker.capitalized) is speaking", systemImage: "waveform")
+                        .font(.callout.bold()).foregroundStyle(SottoTheme.primary)
+                }
+                Divider().padding(.top, 12)
+                Text("The conversation")
+                    .font(.system(.title2, design: .serif)).foregroundStyle(SottoTheme.ink)
+                Text("Follow who is speaking. Play any turn on its own.")
+                    .font(.callout).foregroundStyle(SottoTheme.muted)
+                ForEach(Array(orderedTurns.enumerated()), id: \.element.id) { index, turn in
+                    turnRow(turn, index: index)
                 }
             }
             if let error = playback.errorMessage {
@@ -91,20 +69,54 @@ struct LearnerAudioPlayer: View {
         .onChange(of: model.credentials) { _, _ in playback.stop() }
     }
 
-    @ViewBuilder
-    private var turnActions: some View {
-        Button("Previous turn") { playTurn(at: activeTurnIndex - 1) }
-            .disabled(activeTurnIndex == 0 || playback.isLoading)
-        Button(playback.isPlaying && playback.reference == orderedTurns[activeTurnIndex].audioUrl
-            ? "Pause turn" : "Play turn") { playTurn(at: activeTurnIndex) }
-            .disabled(orderedTurns[activeTurnIndex].audioUrl == nil || playback.isLoading)
-        Button("Next turn") { playTurn(at: activeTurnIndex + 1) }
-            .disabled(activeTurnIndex + 1 >= orderedTurns.count || playback.isLoading)
+    private func turnRow(_ turn: SottoListeningTurn, index: Int) -> some View {
+        let active = isActive(turn)
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 12) {
+                Text(avatar(for: turn.speaker))
+                    .font(.title2).frame(width: 38, height: 38)
+                    .background(SottoTheme.surface).clipShape(Circle())
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(turn.speaker.capitalized).font(.subheadline.bold())
+                    Text("Turn \(index + 1)\(active ? " · Speaking" : "")")
+                        .font(.caption).foregroundStyle(active ? SottoTheme.primary : SottoTheme.muted)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                Button {
+                    playTurn(at: index)
+                } label: {
+                    Image(systemName: active && playback.reference == turn.audioUrl ? "pause.fill" : "play.fill")
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(.bordered)
+                .disabled(turn.audioUrl?.isEmpty != false || (playback.isLoading && playback.reference == turn.audioUrl))
+                .accessibilityLabel("\(active && playback.reference == turn.audioUrl ? "Pause" : "Play") turn \(index + 1), \(turn.speaker)")
+                .accessibilityIdentifier("lesson-audio-turn-\(turn.id)")
+            }
+            if let text = turn.text, !text.isEmpty {
+                Text(text).font(.body).textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            if turn.audioUrl?.isEmpty != false {
+                Text("Turn audio unavailable").font(.caption).foregroundStyle(SottoTheme.muted)
+            }
+        }
+        .foregroundStyle(SottoTheme.ink)
+        .padding(14)
+        .background(active ? SottoTheme.primary.opacity(0.12) : SottoTheme.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(active ? SottoTheme.primary : SottoTheme.line))
+    }
+
+    private func avatar(for speaker: String) -> String {
+        let avatars = ["🦊", "🐻", "🐼", "🐨", "🦁", "🐰"]
+        return avatars[(speakers.firstIndex(of: speaker) ?? 0) % avatars.count]
     }
 
     private func playTurn(at index: Int) {
         guard orderedTurns.indices.contains(index), let clip = orderedTurns[index].audioUrl else { return }
-        selectedTurnIndex = index
         playback.toggle(reference: clip) { try await model.downloadLearningAudio(from: clip) }
     }
 

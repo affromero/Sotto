@@ -1,14 +1,6 @@
 'use client';
 
-/**
- * GrammarSection renders the drill card module from the design bundle
- * (`class-grammar.jsx`), adapted to our `Question` shape. Reused for READING:
- * when a question carries a `passageRef`, it renders as a passage above the
- * prompt. Client-side mastery gate accumulates correctness and reports the
- * running score upward; the authoritative grade still comes from `/submit`.
- */
-
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { parseTextWithCitations } from '@/lib/citation-parser';
 import guardStyles from '@/components/ui/LearningTextGuard.module.css';
 import { learningTextGuardProps } from '@/components/ui/learningTextGuard';
@@ -25,16 +17,10 @@ interface GrammarSectionProps {
   skill: 'GRAMMAR' | 'READING';
   questions: ClassQuestion[];
   savedAnswers?: Record<string, number>;
-  gate: number; // 0..100
+  gate: number;
   nextName: string | null;
-  /**
-   * The class's verified sources, used to resolve `[N]` markers inside a sourced
-   * READING passage. Empty for curriculum classes (markers then stay plain text).
-   */
   references?: ReferenceData[];
-  /** Record a selected answer into the shell's answer map. */
   onAnswer: (questionId: string, selectedIndex: number) => void;
-  /** Report the running 0..100 score for the rail/meter. */
   onScore: (score: number) => void;
   onFeedback?: (note: ClassFeedbackNote) => void;
   feedbackHref?: string;
@@ -43,20 +29,6 @@ interface GrammarSectionProps {
   onRetry?: () => void;
   retrying?: boolean;
 }
-
-const SKILL_COPY: Record<'GRAMMAR' | 'READING', { eyebrow: string; title: string; lede: string }> =
-  {
-    GRAMMAR: {
-      eyebrow: 'Grammar',
-      title: 'The form that fits.',
-      lede: 'Pick the option that completes each line. Reasoning lands the moment you choose, drawn from your week.',
-    },
-    READING: {
-      eyebrow: 'Reading',
-      title: 'Read, then decide.',
-      lede: 'Each passage carries a question. Read closely, choose the answer it supports, and the explanation follows.',
-    },
-  };
 
 export function GrammarSection({
   courseId,
@@ -76,8 +48,6 @@ export function GrammarSection({
   onRetry,
   retrying = false,
 }: GrammarSectionProps) {
-  const total = questions.length;
-  // picked[questionId] = selected option index
   const [picked, setPicked] = useState<Record<string, number>>(() =>
     Object.fromEntries(
       questions.flatMap((question) => {
@@ -88,256 +58,227 @@ export function GrammarSection({
       })
     )
   );
-  const [pos, setPos] = useState(() => {
-    const unanswered = questions.findIndex((question) => picked[question.id] === undefined);
-    return unanswered < 0 ? total : unanswered;
-  });
-
-  const cur = questions[pos];
-  const done = pos >= total;
-
-  const correctCount = useMemo(
-    () =>
-      questions.reduce((n, q) => {
-        const sel = picked[q.id];
-        if (sel === undefined || q.correctIndex === undefined) return n;
-        return n + (sel === q.correctIndex ? 1 : 0);
-      }, 0),
-    [questions, picked]
-  );
-
+  const total = questions.length;
+  const answered = questions.filter((question) => picked[question.id] !== undefined).length;
+  const correctCount = questions.filter(
+    (question) =>
+      question.correctIndex !== undefined && picked[question.id] === question.correctIndex
+  ).length;
   const recall = total > 0 ? (correctCount / total) * 100 : 0;
-  const passed = done && total > 0 && correctCount / total >= gate / 100;
+  const complete = total > 0 && answered === total;
+  const passed = complete && correctCount / total >= gate / 100;
+  const label = skill === 'GRAMMAR' ? 'Grammar' : 'Reading';
+  const firstUnanswered = questions.findIndex((question) => picked[question.id] === undefined);
+  const dotStates: DotState[] = questions.map((question, index) => {
+    if (picked[question.id] === undefined) return index === firstUnanswered ? 'now' : 'idle';
+    return question.correctIndex === undefined || picked[question.id] === question.correctIndex
+      ? 'done'
+      : 'miss';
+  });
 
   useEffect(() => {
     onScore(recall);
   }, [recall, onScore]);
-
   useEffect(() => {
-    onCompletionChange?.(done && total > 0, passed);
-  }, [done, total, passed, onCompletionChange]);
+    onCompletionChange?.(complete, passed);
+  }, [complete, passed, onCompletionChange]);
 
-  function pick(optIndex: number) {
-    if (!cur || picked[cur.id] !== undefined) return;
-    setPicked((prev) => ({ ...prev, [cur.id]: optIndex }));
-    onAnswer(cur.id, optIndex);
-    if (cur.explanation) {
-      const correct = cur.correctIndex !== undefined && optIndex === cur.correctIndex;
+  function pick(question: ClassQuestion, option: number) {
+    if (picked[question.id] !== undefined) return;
+    setPicked((previous) => ({ ...previous, [question.id]: option }));
+    onAnswer(question.id, option);
+    if (question.explanation) {
+      const correct = question.correctIndex !== undefined && option === question.correctIndex;
       onFeedback?.({
-        id: `${skill}:${cur.id}`,
+        id: skill + ':' + question.id,
         skill,
-        title: correct ? `${copy.eyebrow}: right choice` : `${copy.eyebrow}: review this`,
-        body: cur.explanation,
+        title: label + (correct ? ': right choice' : ': review this'),
+        body: question.explanation,
         returnHref: '#class-active-stage',
         tone: correct ? 'good' : 'review',
       });
     }
   }
 
-  function next() {
-    setPos((p) => p + 1);
-  }
-
-  const dotStates: DotState[] = questions.map((q, i) => {
-    const sel = picked[q.id];
-    if (!done && i === pos) return 'now';
-    if (sel === undefined) return 'idle';
-    if (q.correctIndex === undefined) return 'done';
-    return sel === q.correctIndex ? 'done' : 'miss';
-  });
-
-  const copy = SKILL_COPY[skill];
-  const curPicked = cur ? picked[cur.id] : undefined;
-  const curCorrect = cur?.correctIndex !== undefined && curPicked === cur.correctIndex;
-  const sharedReadingPassage =
-    skill === 'READING'
-      ? questions.find((q) => q.passageText?.trim())?.passageText?.trim()
-      : undefined;
-
   return (
     <div className={styles.root}>
       <div className={styles.segEnter}>
-        <div className={styles.eyebrow}>
-          <span className={styles.eyebrowIdx}>{skill === 'GRAMMAR' ? '01 ·' : 'Reading ·'}</span>{' '}
-          {copy.eyebrow}
-        </div>
-        <h1 className={styles.title}>{copy.title}</h1>
-        <p className={styles.modLede}>{copy.lede}</p>
-
+        <header>
+          <p className={styles.eyebrow}>{label}</p>
+          <h1 className={styles.title}>{label} practice</h1>
+          <p className={styles.modLede}>
+            {skill === 'GRAMMAR'
+              ? 'Choose the form that completes each sentence.'
+              : 'Read the passage, then answer its questions.'}{' '}
+            Work in any order. Each explanation appears after you answer.
+          </p>
+        </header>
         <MasteryMeter value={recall} gate={gate} label="Recall" />
-
-        <DotRail states={dotStates} countLabel={`${correctCount}/${total} correct`} />
-
-        {sharedReadingPassage && !done && (
-          <LearningSelectionMenu
-            courseId={courseId}
-            sourceType="CLASS"
-            sourceId={sourceId}
-            sourceLabel={copy.eyebrow}
-          >
-            <article
-              className={`${styles.readingPassage} ${guardStyles.guarded}`}
-              {...learningTextGuardProps<HTMLElement>()}
-            >
-              {parseTextWithCitations(sharedReadingPassage, references)}
-            </article>
-          </LearningSelectionMenu>
-        )}
-
-        {!done && cur ? (
-          <div className={styles.drillCard} id={`question-${cur.id}`} key={cur.id}>
-            {!sharedReadingPassage && cur.passageText ? (
-              <LearningSelectionMenu
-                courseId={courseId}
-                sourceType="CLASS"
-                sourceId={sourceId}
-                sourceLabel={copy.eyebrow}
-              >
-                <blockquote
-                  className={`${styles.passage} ${guardStyles.guarded}`}
-                  {...learningTextGuardProps<HTMLQuoteElement>()}
-                >
-                  {parseTextWithCitations(cur.passageText, references)}
-                </blockquote>
-              </LearningSelectionMenu>
-            ) : (
-              cur.passageRef && (
-                <LearningSelectionMenu
-                  courseId={courseId}
-                  sourceType="CLASS"
-                  sourceId={sourceId}
-                  sourceLabel={copy.eyebrow}
-                >
-                  <blockquote
-                    className={`${styles.passage} ${guardStyles.guarded}`}
-                    {...learningTextGuardProps<HTMLQuoteElement>()}
-                  >
-                    {cur.passageRef}
-                  </blockquote>
-                </LearningSelectionMenu>
-              )
-            )}
-
-            <div className={styles.drillMeta}>
-              <span className={styles.verb}>
-                {skill === 'READING' ? 'comprehension' : 'choose'}
-              </span>
-              <span>
-                · {pos + 1} of {total}
-              </span>
-            </div>
-
-            <LearningSelectionMenu
-              courseId={courseId}
-              sourceType="CLASS"
-              sourceId={sourceId}
-              sourceLabel={copy.eyebrow}
-            >
-              <p
-                className={`${styles.drillPrompt} ${guardStyles.guarded}`}
-                {...learningTextGuardProps<HTMLParagraphElement>()}
-              >
-                {cur.question}
-              </p>
-            </LearningSelectionMenu>
-
-            <div className={styles.optRow} role="group" aria-label={`Options for: ${cur.question}`}>
-              {cur.options.map((opt, idx) => {
-                let optClass = styles.opt;
-                if (curPicked !== undefined) {
-                  if (cur.correctIndex === idx) optClass += ` ${styles.optCorrect}`;
-                  else if (curPicked === idx) optClass += ` ${styles.optWrong}`;
-                  else optClass += ` ${styles.optDim}`;
-                }
-                return (
+        <DotRail
+          states={dotStates}
+          countLabel={answered + '/' + total + ' answered · ' + correctCount + ' correct'}
+        />
+        <ol className={styles.questionList} aria-label={label + ' exercises'}>
+          {questions.map((question, index) => {
+            const selected = picked[question.id];
+            const correct =
+              question.correctIndex !== undefined && selected === question.correctIndex;
+            const passage = question.passageText?.trim();
+            const previousPassage = questions[index - 1]?.passageText?.trim();
+            return (
+              <li key={question.id}>
+                {passage && passage !== previousPassage && (
                   <LearningSelectionMenu
-                    key={idx}
                     courseId={courseId}
                     sourceType="CLASS"
                     sourceId={sourceId}
-                    sourceLabel={copy.eyebrow}
+                    sourceLabel={label}
                   >
-                    <button
-                      type="button"
-                      className={`${optClass} ${guardStyles.guarded}`}
-                      {...learningTextGuardProps<HTMLButtonElement>()}
-                      disabled={curPicked !== undefined}
-                      aria-pressed={curPicked === idx}
-                      aria-label={`Option ${idx + 1}: ${opt}`}
-                      onClick={() => pick(idx)}
+                    <article
+                      className={styles.readingPassage + ' ' + guardStyles.guarded}
+                      aria-label="Reading passage"
+                      {...learningTextGuardProps<HTMLElement>()}
                     >
-                      {opt}
-                    </button>
+                      {parseTextWithCitations(passage, references)}
+                    </article>
                   </LearningSelectionMenu>
-                );
-              })}
-            </div>
-
-            {curPicked !== undefined && cur.explanation && (
-              <div
-                className={`${styles.drillWhy} ${curCorrect ? styles.drillWhyOk : styles.drillWhyNo}`}
-              >
-                <div className={styles.whyHead}>
-                  <ClassGlyph name={curCorrect ? 'check' : 'x'} size={13} />
-                  {curCorrect
-                    ? 'Right'
-                    : cur.correctIndex !== undefined
-                      ? `Not quite. It's “${cur.options[cur.correctIndex]}”`
-                      : 'Not quite'}
-                </div>
-                <p>{cur.explanation}</p>
-                <a className={styles.feedbackLink} href={feedbackHref}>
-                  Go to Feedback Clinic
-                </a>
-              </div>
-            )}
-
-            {curPicked !== undefined && (
-              <div className={styles.cactions}>
-                <span className={styles.grow} />
-                <button
-                  type="button"
-                  className={`${styles.btn} ${styles.btnPrimary}`}
-                  onClick={next}
+                )}
+                <section
+                  className={styles.drillCard}
+                  id={'question-' + question.id}
+                  aria-label={'Question ' + (index + 1)}
                 >
-                  {pos + 1 >= total ? 'See result' : 'Next'} <ClassGlyph name="arrow" size={16} />
-                </button>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className={`${styles.drillCard} ${styles.segEnter}`}>
-            <div className={styles.drillMeta}>
-              <span className={styles.verb}>recall</span>
-              <span>
-                · {correctCount} of {total}
-              </span>
-            </div>
-            <h2 className={`${styles.drillPrompt} ${styles.resultTitle}`}>
+                  <div className={styles.drillMeta}>
+                    <span className={styles.questionNumber}>
+                      {String(index + 1).padStart(2, '0')}
+                    </span>
+                    <span>{selected === undefined ? 'Choose an answer' : 'Answered'}</span>
+                  </div>
+                  {!passage && question.passageRef && (
+                    <LearningSelectionMenu
+                      courseId={courseId}
+                      sourceType="CLASS"
+                      sourceId={sourceId}
+                      sourceLabel={label}
+                    >
+                      <blockquote
+                        className={styles.passage + ' ' + guardStyles.guarded}
+                        {...learningTextGuardProps<HTMLQuoteElement>()}
+                      >
+                        {question.passageRef}
+                      </blockquote>
+                    </LearningSelectionMenu>
+                  )}
+                  <LearningSelectionMenu
+                    courseId={courseId}
+                    sourceType="CLASS"
+                    sourceId={sourceId}
+                    sourceLabel={label}
+                  >
+                    <h2
+                      className={styles.drillPrompt + ' ' + guardStyles.guarded}
+                      {...learningTextGuardProps<HTMLHeadingElement>()}
+                    >
+                      {question.question}
+                    </h2>
+                  </LearningSelectionMenu>
+                  <div
+                    className={styles.optRow}
+                    role="group"
+                    aria-label={'Options for: ' + question.question}
+                  >
+                    {question.options.map((option, optionIndex) => {
+                      let optionClass = styles.opt;
+                      if (selected !== undefined) {
+                        if (question.correctIndex === optionIndex)
+                          optionClass += ' ' + styles.optCorrect;
+                        else if (selected === optionIndex) optionClass += ' ' + styles.optWrong;
+                        else optionClass += ' ' + styles.optDim;
+                      }
+                      return (
+                        <LearningSelectionMenu
+                          key={optionIndex}
+                          courseId={courseId}
+                          sourceType="CLASS"
+                          sourceId={sourceId}
+                          sourceLabel={label}
+                        >
+                          <button
+                            type="button"
+                            className={optionClass + ' ' + guardStyles.guarded}
+                            {...learningTextGuardProps<HTMLButtonElement>()}
+                            disabled={selected !== undefined}
+                            aria-pressed={selected === optionIndex}
+                            aria-label={'Option ' + (optionIndex + 1) + ': ' + option}
+                            onClick={() => pick(question, optionIndex)}
+                          >
+                            <span className={styles.optionLetter} aria-hidden="true">
+                              {String.fromCharCode(65 + optionIndex)}
+                            </span>
+                            <span>{option}</span>
+                            {selected !== undefined &&
+                              (question.correctIndex === optionIndex ||
+                                selected === optionIndex) && (
+                                <ClassGlyph
+                                  name={question.correctIndex === optionIndex ? 'check' : 'x'}
+                                  size={16}
+                                />
+                              )}
+                          </button>
+                        </LearningSelectionMenu>
+                      );
+                    })}
+                  </div>
+                  {selected !== undefined && question.explanation && (
+                    <div
+                      className={
+                        styles.drillWhy + ' ' + (correct ? styles.drillWhyOk : styles.drillWhyNo)
+                      }
+                    >
+                      <p className={styles.whyHead}>
+                        {correct
+                          ? 'Correct'
+                          : question.correctIndex === undefined
+                            ? 'Answer saved'
+                            : 'Review: ' + question.options[question.correctIndex]}
+                      </p>
+                      <p>{question.explanation}</p>
+                      <a className={styles.feedbackLink} href={feedbackHref}>
+                        Go to Feedback Clinic
+                      </a>
+                    </div>
+                  )}
+                </section>
+              </li>
+            );
+          })}
+        </ol>
+        {complete && (
+          <section className={styles.result} aria-label={label + ' result'}>
+            <h2 className={styles.resultTitle}>
               {passed ? 'Ready to continue' : 'More practice needed'}
             </h2>
-            <div className={styles.drillEn}>
+            <p>
               {passed
-                ? 'You reached the mastery gate. Continue when you are ready.'
-                : `You need ${gate}% to continue. Practise the missed concepts with new questions.`}
-            </div>
-            {!passed && onRetry && total > 0 && (
-              <div className={styles.cactions}>
-                <button
-                  type="button"
-                  className={`${styles.btn} ${styles.btnPrimary}`}
-                  onClick={onRetry}
-                  disabled={retrying}
-                  aria-busy={retrying}
-                >
-                  {retrying ? 'Preparing new questions...' : 'Practise with new questions'}
-                  <ClassGlyph name="retry" size={16} />
-                </button>
-              </div>
+                ? 'You reached the mastery gate. Your answers and explanations stay above.'
+                : 'You need ' +
+                  gate +
+                  '% to continue. Review the explanations, then practise with new questions.'}
+            </p>
+            {!passed && onRetry && (
+              <button
+                type="button"
+                className={styles.btn + ' ' + styles.btnPrimary}
+                onClick={onRetry}
+                disabled={retrying}
+                aria-busy={retrying}
+              >
+                {retrying ? 'Preparing new questions...' : 'Practise with new questions'}
+                <ClassGlyph name="retry" size={16} />
+              </button>
             )}
-          </div>
+          </section>
         )}
-
         <ContinueBar
           passed={passed}
           gate={gate}

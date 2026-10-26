@@ -152,7 +152,7 @@ struct ClassSessionView: View {
             pencilReviewStatus
             if selectedStage == "lesson" {
                 if let teaching = currentClass.teaching {
-                    ClassTeachingView(teaching: teaching, onSelectionHelp: openSelectionHelp)
+                    ClassTeachingView(teaching: teaching, intro: currentClass.intro, onSelectionHelp: openSelectionHelp)
                     if let intro = currentClass.intro {
                         DisclosureGroup("Class summary") {
                             ClassIntroBlock(intro: intro, onSelectionHelp: openSelectionHelp)
@@ -168,7 +168,7 @@ struct ClassSessionView: View {
             } else if let section = orderedSections.first(where: { $0.id == selectedStage }) {
                 DisclosureGroup("Lesson notes") {
                     if let teaching = currentClass.teaching {
-                        ClassTeachingView(teaching: teaching, onSelectionHelp: openSelectionHelp)
+                        ClassTeachingView(teaching: teaching, intro: currentClass.intro, onSelectionHelp: openSelectionHelp)
                     } else if let intro = currentClass.intro {
                         ClassIntroBlock(intro: intro, onSelectionHelp: openSelectionHelp)
                     }

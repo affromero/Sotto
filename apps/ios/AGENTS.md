@@ -92,6 +92,11 @@ their UDIDs to `xcodebuild`. Test **both** families: the layout differs by size 
   Keep answers and writing drafts in the parent while navigating sections.
   Ordinary practice presents one question; Workbook retains its exercise pages.
   Explanations appear after a choice, and guided answers require disclosure.
+  Teaching retains authored paragraphs and all worked examples in the normal
+  class screen, with the accepted intro figures and sentence correction.
+  Class listening shows transcript turns and stable speaker avatars directly.
+  Individual replay uses each turn's protected audio through the existing
+  downloader; recording timing gaps have no current speaker.
   Removing a class drains and suspends its progress writer before DELETE, then
   discards it only after confirmed removal. Failed removal resumes pending work.
   A terminal initial preparation may retain a `GENERATING` row or an already

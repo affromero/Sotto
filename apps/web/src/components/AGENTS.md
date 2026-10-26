@@ -39,11 +39,19 @@ old invitation commands and proofs retain their original session recovery.
   their answer through labels, audio URLs, or surrounding content.
 
 - `LessonAudioPlayer` uses the owned episode detail endpoint for native seeking,
-  existing turn replay and ordered speaker playback. Switching audio or leaving
+  visible speaker avatars and transcript turns, existing turn replay and ordered
+  speaker playback. Full-recording highlighting respects real timing gaps.
+  Switching audio or leaving
   the section pauses playback; replay never generates speech or changes answers.
 - `ClassTeachingNotes` shows the class's accepted teaching before activities and
   keeps it open above every skill. Historical classes retain their saved intro;
   guided answers stay behind an explicit disclosure and never affect quiz gates.
+  Authored paragraphs, worked examples and correction comparisons use distinct
+  layouts; accepted timeline and contrast figures remain available with teaching.
+- `GrammarSection` shows all grammar and reading questions together. Retain
+  answered questions, conceal each unanswered question's feedback, and require
+  every valid answer plus the exact section threshold before continuing. Keep
+  each reading passage with the questions that supplied it.
 - `PracticeRunner` groups full practice into native collapsible skill sections,
   keeps answer/draft state mounted, and shows one MC question at a time. Listening
   readiness appears in its summary; pending, failed, and playback-error states

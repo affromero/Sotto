@@ -76,9 +76,10 @@ describe('live feedback recovery', () => {
     render(<RecoveryFlow />);
     for (let index = 0; index < questions.length; index += 1) {
       fireEvent.click(
-        screen.getByRole('button', { name: index < 2 ? 'Option 2: bin' : 'Option 1: habe' })
+        within(screen.getByRole('region', { name: `Question ${index + 1}` })).getByRole('button', {
+          name: index < 2 ? 'Option 2: bin' : 'Option 1: habe',
+        })
       );
-      fireEvent.click(screen.getByRole('button', { name: index === 4 ? 'See result' : 'Next' }));
     }
     const clinic = within(screen.getByRole('region', { name: 'Feedback Clinic' }));
     const liveNotes = clinic.getByRole('heading', { name: 'Live notes' }).closest('article')!;

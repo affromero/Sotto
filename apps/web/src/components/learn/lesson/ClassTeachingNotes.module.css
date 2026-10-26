@@ -226,6 +226,9 @@
 }
 .explanation {
   white-space: pre-line;
+  display: grid;
+  gap: 20px;
+  max-width: 66ch;
 }
 .example h4 {
   margin: 0;
@@ -265,4 +268,137 @@
 .visualSummary > summary:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 4px;
+}
+
+.lessonHeader {
+  display: grid;
+  align-items: center;
+  gap: 20px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--line-strong);
+}
+.classNotes .lessonLabel {
+  margin: 0 0 10px;
+  color: var(--accent);
+  font: 500 11px/1.5 var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.lessonHeader .teachingTitle {
+  max-width: 30ch;
+  font-size: clamp(25px, 3vw, 34px);
+  text-wrap: balance;
+}
+.classNotes .lessonGoal {
+  max-width: 54ch;
+  margin: 0;
+  color: var(--ink-soft);
+  font: 16px/1.65 var(--sans);
+}
+.illustration {
+  width: min(100%, 260px);
+  height: auto;
+  justify-self: center;
+}
+.lessonLayout {
+  display: grid;
+  align-items: start;
+  gap: 28px;
+}
+.correction {
+  min-width: 0;
+  padding: 22px;
+  background: color-mix(in oklab, var(--accent) 5%, var(--paper));
+  border-block: 1px solid var(--line-strong);
+}
+.correctionTitle {
+  margin: 0 0 20px;
+  color: var(--ink);
+  font: 420 25px/1.3 var(--serif);
+}
+.incorrect,
+.corrected {
+  border-left: 3px solid var(--line-strong);
+  padding-left: 14px;
+}
+.incorrect {
+  border-color: var(--bad);
+}
+.corrected {
+  border-color: var(--good);
+}
+.classNotes .comparisonLabel,
+.classNotes .reasonLabel {
+  display: block;
+  color: var(--ink-soft);
+  font: 600 12px/1.5 var(--sans);
+}
+.incorrect p,
+.corrected p {
+  margin: 8px 0 0;
+  color: var(--ink);
+  font: 420 21px/1.5 var(--serif);
+}
+.correctionArrow {
+  display: block;
+  margin: 12px 0 12px 12px;
+  color: var(--accent);
+  font-size: 24px;
+}
+.classNotes .correctionNote {
+  margin: 20px 0 0;
+  color: var(--ink-soft);
+  font: 15px/1.65 var(--sans);
+}
+.workedExamples {
+  list-style: none;
+  margin: 18px 0 0;
+  padding: 0;
+}
+.workedExample {
+  display: grid;
+  gap: 18px;
+  padding-block: 26px;
+  border-top: 1px solid var(--line);
+}
+.exampleSituation h4 {
+  margin: 0;
+  color: var(--ink);
+  font: 400 16px/1.65 var(--sans);
+}
+.exampleResponse {
+  min-width: 0;
+}
+.classNotes .response {
+  margin: 8px 0 18px;
+  padding: 18px 20px;
+  border-radius: 0 16px 16px;
+  background: color-mix(in oklab, var(--accent) 8%, var(--paper));
+  color: var(--ink);
+  font: 420 21px/1.6 var(--serif);
+}
+.classNotes .exampleReason {
+  margin: 6px 0 0;
+  color: var(--ink-soft);
+  font: 15px/1.65 var(--sans);
+}
+.guidedPractice {
+  padding: 24px;
+  border: 1px solid var(--line-strong);
+  background: var(--well);
+}
+@media (min-width: 640px) {
+  .lessonHeader {
+    grid-template-columns: minmax(0, 1fr) 220px;
+  }
+  .workedExample {
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+    gap: 30px;
+  }
+}
+@media (min-width: 1000px) {
+  .lessonLayout {
+    grid-template-columns: minmax(0, 1.65fr) minmax(240px, 1fr);
+    gap: 36px;
+  }
 }

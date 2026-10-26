@@ -6,6 +6,35 @@ import XCTest
 
 @MainActor
 final class LayoutAppearanceTests: XCTestCase {
+    func testClassDialogueFitsPhoneTabletAndLargeText() async throws {
+        let episode = try JSONDecoder().decode(SottoEpisode.self, from: Data(#"""
+        {"id":"layout-conversation","audioUrl":"/api/v1/storage/conversation.mp3","status":"READY",
+         "segments":[
+          {"id":"turn-one","speaker":"Mia","text":"Ich finde kurze Reisen sinnvoll, weil man auch in kurzer Zeit Neues entdecken kann.","audioUrl":"/api/v1/storage/mia.mp3","order":0,"startTime":0,"duration":4},
+          {"id":"turn-two","speaker":"Leo","text":"Ich verstehe deinen Punkt. Trotzdem würde ich lieber länger an einem Ort bleiben.","audioUrl":"/api/v1/storage/leo.mp3","order":1,"startTime":4.5,"duration":5}
+         ]}
+        """#.utf8))
+        for viewport in [viewports[0], viewports[1], viewports[2], viewports[3]] {
+            for style in [UIUserInterfaceStyle.light, .dark] {
+                let content = LearnerAudioPlayer(reference: try XCTUnwrap(episode.audioUrl),
+                    turns: try XCTUnwrap(episode.segments))
+                    .environmentObject(LayoutFixtures.model())
+                    .padding(18).background(SottoTheme.paper)
+                XCTAssertLessThanOrEqual(measuredSize(content, viewport: viewport).width,
+                    viewport.size.width + 1, "The dialogue must wrap in \(viewport.name).")
+                let host = try mount(ScrollView { content }, viewport: viewport, style: style)
+                defer { host.close() }
+                await settle()
+                attach(host.content.view, name: "class-dialogue-\(viewport.name)-\(style.rawValue)")
+                if let scroll = verticalScrollView(in: host.content.view) {
+                    scrollToEnd(scroll)
+                    await settle()
+                    attach(host.content.view, name: "class-dialogue-end-\(viewport.name)-\(style.rawValue)")
+                }
+            }
+        }
+    }
+
     func testNativePartnerGamesWrapAt375PointsAndLargeTabletTextInBothAppearances() async throws {
         let fixtures = try PlayTestFixtures.load()
         let phone = Viewport(name: "play-phone-375", size: CGSize(width: 375, height: 812),
@@ -65,7 +94,9 @@ final class LayoutAppearanceTests: XCTestCase {
                 await settle()
                 attach(host.content.view, name: "teaching-\(viewport.name)-\(style.rawValue)")
                 let purpose = try XCTUnwrap(descendants(of: host.content.view)
-                    .compactMap { $0 as? UITextView }.first { $0.text == teaching.explanation })
+                    .compactMap { $0 as? UITextView }.first {
+                        $0.text == teaching.explanation.components(separatedBy: "\n\n").first
+                    })
                 let scroll = try XCTUnwrap(scrollAncestor(of: purpose))
                 let start = purpose.convert(purpose.bounds, to: scroll).minY
                 scroll.setContentOffset(CGPoint(x: 0, y: start), animated: false)
@@ -219,14 +250,23 @@ final class LayoutAppearanceTests: XCTestCase {
                 defer { host.close() }
                 await settle()
                 let text = descendants(of: host.content.view).compactMap { ($0 as? UITextView)?.text }
-                XCTAssertTrue(text.contains(teaching.explanation))
+                for paragraph in teaching.explanation.components(separatedBy: "\n\n") {
+                    XCTAssertTrue(text.contains(paragraph))
+                }
+                for example in teaching.workedExamples {
+                    XCTAssertTrue(text.contains(example.prompt))
+                    XCTAssertTrue(text.contains(example.answer))
+                    XCTAssertTrue(text.contains(example.explanation))
+                }
                 let navigation = try XCTUnwrap(descendants(of: host.content.view)
                     .compactMap { $0 as? UINavigationBar }.first)
                 XCTAssertEqual(navigation.topItem?.title, "Class \(detail.order)")
                 XCTAssertFalse(text.contains(teaching.guidedPractice.answer))
                 XCTAssertFalse(text.contains(detail.sections[0].questions[0].question))
                 let explanation = try XCTUnwrap(descendants(of: host.content.view)
-                    .compactMap { $0 as? UITextView }.first { $0.text == teaching.explanation })
+                    .compactMap { $0 as? UITextView }.first {
+                        $0.text == teaching.explanation.components(separatedBy: "\n\n").first
+                    })
                 let scroll = try XCTUnwrap(scrollAncestor(of: explanation))
                 XCTAssertLessThanOrEqual(scroll.contentSize.width, scroll.bounds.width + 1)
                 attach(host.content.view,

@@ -22,6 +22,6 @@ final class ListeningTurnTests: XCTestCase {
     }
 
     private func turn(_ speaker: String, start: Double?, duration: Double?) -> SottoListeningTurn {
-        SottoListeningTurn(id: speaker, speaker: speaker, audioUrl: nil, order: 0, startTime: start, duration: duration)
+        SottoListeningTurn(id: speaker, speaker: speaker, text: nil, audioUrl: nil, order: 0, startTime: start, duration: duration)
     }
 }

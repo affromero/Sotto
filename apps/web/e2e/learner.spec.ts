@@ -173,15 +173,13 @@ test('a learner plays audio and completes all five skills on a narrow screen', a
     ['GRAMMAR', 'Reading'],
     ['READING', 'Listening'],
   ] as const) {
-    for (let index = 0; index < fixture.counts[skill]; index++) {
-      await page.getByRole('button', { name: 'Option 1: Hallo' }).click();
-      await expect(page.getByText('Hallo is a greeting.').first()).toBeVisible();
-      await page
-        .getByRole('button', {
-          name: index + 1 === fixture.counts[skill] ? 'See result' : 'Next',
-          exact: true,
-        })
-        .click();
+    const questions = page.getByRole('region', { name: /^Question \d+$/ });
+    await expect(questions).toHaveCount(fixture.counts[skill]);
+    for (let index = fixture.counts[skill] - 1; index >= 0; index--) {
+      const question = page.getByRole('region', { name: `Question ${index + 1}`, exact: true });
+      await expect(question.getByText('Hallo is a greeting.')).toHaveCount(0);
+      await question.getByRole('button', { name: 'Option 1: Hallo' }).click();
+      await expect(question.getByText('Hallo is a greeting.')).toBeVisible();
     }
     await page.getByRole('button', { name: `Continue · ${next}` }).click();
   }

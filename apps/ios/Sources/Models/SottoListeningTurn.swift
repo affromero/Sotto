@@ -3,6 +3,7 @@ import Foundation
 struct SottoListeningTurn: Decodable, Equatable, Identifiable {
     let id: String
     let speaker: String
+    let text: String?
     let audioUrl: String?
     let order: Int
     let startTime: Double?
