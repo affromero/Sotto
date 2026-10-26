@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { execFileSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { Queue, Worker } from 'bullmq';
 import Redis from 'ioredis';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -43,6 +44,11 @@ vi.mock('@/lib/prisma', async () => {
 });
 
 const suite = process.env.SIDEDOOR_TEST_DATABASE_URL ? describe : describe.skip;
+const lifecycle = createRequire(import.meta.url)(
+  '../../../../../scripts/deploy/queue-lifecycle.cjs'
+) as {
+  connectionIdentity(environment: ReviewQueueRuntime['environment'], namespace: string): string;
+};
 
 it('loads the mounted adapter and canonical lifecycle through the actual Node tsx entrypoint', () => {
   const output = execFileSync(
@@ -698,42 +704,92 @@ suite('bounded canonical review first-worker admission', () => {
     }
   });
 
-  it('pauses the exact final inventory and returns original absent/unpaused flags without delivering work', async () => {
-    const before = await preservedState();
-    const result = await prepareReviewQueues(runtime, evidence, redis);
-    expect(result).toMatchObject({ prepared: true, zeroWork: false, pending: 3 });
-    expect(result.manifest.queues).toEqual(
-      [...ALL_QUEUE_NAMES].sort().map((name) => ({ name, paused: false }))
-    );
-    for (const name of ALL_QUEUE_NAMES) {
-      const queue = runtime.createQueue(name);
+  it.each(['', '/0'])(
+    'prepares dedicated DB0 with Redis URL path %j and preserves its connection identity',
+    async (path) => {
+      const url = new URL(redisUrl);
+      url.pathname = path;
+      runtime.environment.REDIS_URL = url.toString();
+      const connectionIdentity = lifecycle.connectionIdentity(
+        runtime.environment,
+        runtime.namespace
+      );
+      const before = await preservedState();
+      const result = await prepareReviewQueues(runtime, evidence, redis);
+      expect(result).toMatchObject({ prepared: true, zeroWork: false, pending: 3 });
+      expect(result.manifest.connectionIdentity).toBe(connectionIdentity);
+      expect(runtime.environment.REDIS_URL).toBe(url.toString());
+      expect(result.manifest.queues).toEqual(
+        [...ALL_QUEUE_NAMES].sort().map((name) => ({ name, paused: false }))
+      );
+      for (const name of ALL_QUEUE_NAMES) {
+        const queue = runtime.createQueue(name);
+        try {
+          expect(await queue.isPaused()).toBe(true);
+          expect(await queue.getJobCounts()).toMatchObject({
+            active: 0,
+            waiting: 0,
+            completed: 0,
+            failed: 0,
+          });
+        } finally {
+          await queue.close();
+        }
+      }
+      expect(await preservedState()).toEqual(before);
+      const ownedKeys = (await redis.keys('*')).sort();
+      const ownedValues = await Promise.all(ownedKeys.map((key) => redis.dump(key)));
+      await expect(prepareReviewQueues(runtime, evidence, redis)).resolves.toEqual(result);
+      expect((await redis.keys('*')).sort()).toEqual(ownedKeys);
+      expect(await Promise.all(ownedKeys.map((key) => redis.dump(key)))).toEqual(ownedValues);
+      await redis.set('foreign-preparation-state', 'retained');
+      await expect(prepareReviewQueues(runtime, evidence, redis)).rejects.toThrow(/unowned/);
+      expect(await redis.get('foreign-preparation-state')).toBe('retained');
+      await redis.del('foreign-preparation-state');
+      await expect(
+        prepareReviewQueues({ ...runtime, policyIntent: null }, evidence, redis)
+      ).rejects.toThrow(/Redis/);
+      expect(await preservedState()).toEqual(before);
+    }
+  );
+
+  it.each([
+    ['/1', 0, false],
+    ['/1', 0, true],
+    ['', 1, false],
+    ['', 1, true],
+    ['/0', 1, false],
+    ['/0', 1, true],
+  ] as const)(
+    'refuses Redis URL path %j and actual DB %i with retained preparation %j',
+    async (path, database, retained) => {
+      if (retained) await prepareReviewQueues(runtime, evidence, redis);
+      const connection = redis.duplicate({ db: database });
       try {
-        expect(await queue.isPaused()).toBe(true);
-        expect(await queue.getJobCounts()).toMatchObject({
-          active: 0,
-          waiting: 0,
-          completed: 0,
-          failed: 0,
-        });
+        const url = new URL(redisUrl);
+        url.pathname = path;
+        const before = await preservedState();
+        const keys = (await connection.keys('*')).sort();
+        const values = await Promise.all(keys.map((key) => connection.dump(key)));
+        await expect(
+          prepareReviewQueues(
+            {
+              ...runtime,
+              environment: { ...runtime.environment, REDIS_URL: url.toString() },
+              createQueue: (name) => new Queue(name, { connection, skipMetasUpdate: true }),
+            },
+            evidence,
+            connection
+          )
+        ).rejects.toThrow(/Dedicated review Redis database 0/);
+        expect((await connection.keys('*')).sort()).toEqual(keys);
+        expect(await Promise.all(keys.map((key) => connection.dump(key)))).toEqual(values);
+        expect(await preservedState()).toEqual(before);
       } finally {
-        await queue.close();
+        connection.disconnect();
       }
     }
-    expect(await preservedState()).toEqual(before);
-    const ownedKeys = (await redis.keys('*')).sort();
-    const ownedValues = await Promise.all(ownedKeys.map((key) => redis.dump(key)));
-    await expect(prepareReviewQueues(runtime, evidence, redis)).resolves.toEqual(result);
-    expect((await redis.keys('*')).sort()).toEqual(ownedKeys);
-    expect(await Promise.all(ownedKeys.map((key) => redis.dump(key)))).toEqual(ownedValues);
-    await redis.set('foreign-preparation-state', 'retained');
-    await expect(prepareReviewQueues(runtime, evidence, redis)).rejects.toThrow(/unowned/);
-    expect(await redis.get('foreign-preparation-state')).toBe('retained');
-    await redis.del('foreign-preparation-state');
-    await expect(
-      prepareReviewQueues({ ...runtime, policyIntent: null }, evidence, redis)
-    ).rejects.toThrow(/Redis/);
-    expect(await preservedState()).toEqual(before);
-  });
+  );
 
   it('proves zero consumers across all actual paused queues and refuses a live foreign consumer', async () => {
     await prepareReviewQueues(runtime, evidence, redis);

@@ -496,7 +496,8 @@ export async function prepareReviewQueues(
   assert.equal(runtime.namespace, SIDEDOOR_STATE_ID);
   const redisUrl = new URL(runtime.environment.REDIS_URL);
   assert(['redis:', 'rediss:'].includes(redisUrl.protocol));
-  assert.equal(redisUrl.pathname, '/0');
+  assert(['', '/0'].includes(redisUrl.pathname), 'Dedicated review Redis database 0 required');
+  assert.equal(redis.options.db ?? 0, 0, 'Dedicated review Redis database 0 required');
   assert(!redis.options.path, 'TCP review Redis identity required');
   assert.equal(redis.options.host, redisUrl.hostname);
   assert.equal(redis.options.port, Number(redisUrl.port || 6379));
