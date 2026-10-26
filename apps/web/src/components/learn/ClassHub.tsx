@@ -49,7 +49,7 @@ export function ClassHub({
             Class {order} · {lesson.level}
           </p>
           <h1 className={styles.title}>{lesson.title}</h1>
-          <p className={styles.readingGuide}>Read the class notes, then begin the activities.</p>
+          <p className={styles.readingGuide}>Study the explanation and examples, then practise.</p>
         </header>
 
         <ClassTeachingNotes

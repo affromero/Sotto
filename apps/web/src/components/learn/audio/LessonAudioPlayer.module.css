@@ -104,10 +104,76 @@
   gap: 12px;
 }
 .turnList li {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 12px;
   padding: 14px;
   border: 1px solid var(--line);
   border-radius: var(--r);
   min-width: 0;
+}
+.turnList li > button {
+  grid-column: 2;
+  justify-self: start;
+}
+.turnBody {
+  min-width: 0;
+}
+.turnsTitle {
+  margin: 20px 0 0;
+  color: var(--ink);
+  font: 420 26px/1.3 var(--serif);
+}
+.turnsTitle > span {
+  margin-left: 12px;
+  color: var(--ink-soft);
+  font: 12px var(--mono);
+}
+.speakerKey {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  margin-block: 16px;
+}
+.speakerKey > span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font: 600 14px var(--sans);
+}
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--paper);
+  font-size: 24px;
+}
+.turnHeading {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  color: var(--ink);
+  font: 14px var(--sans);
+}
+.turnHeading > span {
+  color: var(--ink-soft);
+  font: 11px var(--mono);
+}
+.turnHeading .currentLabel {
+  color: var(--accent);
+}
+@media (min-width: 640px) {
+  .turnList li {
+    grid-template-columns: 38px minmax(0, 1fr) auto;
+    align-items: start;
+  }
+  .turnList li > button {
+    grid-column: 3;
+  }
 }
 .turnList li[aria-current='true'] {
   border-color: var(--accent);

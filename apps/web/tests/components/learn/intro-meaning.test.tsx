@@ -152,12 +152,8 @@ describe('class reading flow', () => {
       expect(examples.getByText(example.explanation)).toBeVisible();
     }
     const mistake = within(screen.getByRole('region', { name: 'Common mistake' }));
-    expect(mistake.getByText(/Incorrect:/).closest('p')).toHaveTextContent(
-      teaching.commonMistake.incorrect
-    );
-    expect(mistake.getByText(/Correction:/).closest('p')).toHaveTextContent(
-      teaching.commonMistake.correction
-    );
+    expect(mistake.getByText(teaching.commonMistake.incorrect)).toBeVisible();
+    expect(mistake.getByText(teaching.commonMistake.correction)).toBeVisible();
     expect(screen.getByText(teaching.guidedPractice.prompt)).toBeVisible();
     expect(screen.getByText(teaching.guidedPractice.answer)).not.toBeVisible();
     fireEvent.click(screen.getByText('Show the worked answer'));

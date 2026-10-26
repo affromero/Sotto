@@ -147,7 +147,7 @@ final class PracticeSessionContentTests: XCTestCase {
             from: Data("""
             { "id": "ep1", "audioUrl": "https://example.test/ep1.mp3", "status": "READY",
               "segments": [
-                {"id":"turn1","speaker":"Mia","audioUrl":"/api/v1/storage/turn1.mp3","order":0,"startTime":0,"duration":3},
+                {"id":"turn1","speaker":"Mia","text":"Gestern war ich in Berlin.","audioUrl":"/api/v1/storage/turn1.mp3","order":0,"startTime":0,"duration":3},
                 {"id":"turn2","speaker":"Leo","audioUrl":"/api/v1/storage/turn2.mp3","order":1,"startTime":3.5,"duration":2}
               ] }
             """.utf8)
@@ -155,6 +155,8 @@ final class PracticeSessionContentTests: XCTestCase {
         XCTAssertEqual(ready.audioUrl, "https://example.test/ep1.mp3")
         XCTAssertEqual(ready.segments?.map(\.speaker), ["Mia", "Leo"])
         XCTAssertEqual(ready.segments?.last?.audioUrl, "/api/v1/storage/turn2.mp3")
+        XCTAssertEqual(ready.segments?.first?.text, "Gestern war ich in Berlin.")
+        XCTAssertNil(ready.segments?.last?.text)
     }
 
     func testEveryPromptSourceHasAnUploadPath() {

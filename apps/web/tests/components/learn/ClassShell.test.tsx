@@ -162,9 +162,10 @@ function recoverableClass(id: string): ClassData {
 function answerReading(correct: number) {
   for (let index = 0; index < 5; index += 1) {
     fireEvent.click(
-      screen.getByRole('button', { name: index < correct ? 'Option 1: A' : 'Option 2: B' })
+      within(screen.getByRole('region', { name: `Question ${index + 1}` })).getByRole('button', {
+        name: index < correct ? 'Option 1: A' : 'Option 2: B',
+      })
     );
-    fireEvent.click(screen.getByRole('button', { name: index === 4 ? 'See result' : 'Next' }));
   }
 }
 
@@ -189,11 +190,13 @@ describe('ClassShell', () => {
       return jsonResponse(cls);
     });
     render(<ClassShell classId={cls.id} initialSectionId={reading.id} />);
-    await screen.findByRole('heading', { name: 'Read, then decide.' });
+    await screen.findByRole('heading', { name: 'Reading practice' });
     const notes = screen.getByText('Lesson notes').closest('details')!;
     expect(notes).toHaveAttribute('open');
     expect(screen.getByText(teaching.explanation)).toBeVisible();
-    const option = screen.getByRole('button', { name: 'Option 1: A' });
+    const option = within(screen.getByRole('region', { name: 'Question 1' })).getByRole('button', {
+      name: 'Option 1: A',
+    });
     expect(notes.compareDocumentPosition(option) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     fireEvent.click(screen.getByText('Lesson notes'));
     expect(screen.getByText(teaching.explanation)).not.toBeVisible();
@@ -202,7 +205,11 @@ describe('ClassShell', () => {
     fireEvent.click(screen.getByText('Lesson notes'));
     expect(screen.getByText(teaching.explanation)).toBeVisible();
     expect(option).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled();
+    expect(
+      within(screen.getByRole('region', { name: 'Question 2' })).getByRole('button', {
+        name: 'Option 1: A',
+      })
+    ).toBeEnabled();
     await waitFor(() =>
       expect(writes).toEqual([
         expect.objectContaining({
@@ -233,7 +240,7 @@ describe('ClassShell', () => {
       };
       (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(jsonResponse(cls));
       render(<ClassShell classId={cls.id} initialSectionId={reading.id} />);
-      await screen.findByRole('heading', { name: 'Read, then decide.' });
+      await screen.findByRole('heading', { name: 'Reading practice' });
       const next = screen.getByRole('button', { name: 'Continue · Listening' });
       if (passed) expect(next).toBeEnabled();
       else expect(next).toBeDisabled();
@@ -311,7 +318,7 @@ describe('ClassShell', () => {
       return jsonResponse(next);
     });
     render(<ClassShell classId={initial.id} initialSectionId={oldReading.id} />);
-    await screen.findByRole('heading', { name: 'Read, then decide.' });
+    await screen.findByRole('heading', { name: 'Reading practice' });
     answerReading(3);
     expect(screen.getByRole('button', { name: 'Continue · Listening' })).toBeDisabled();
     const stage = within(document.getElementById('class-active-stage')!);
@@ -371,7 +378,7 @@ describe('ClassShell', () => {
       return jsonResponse(cls);
     });
     render(<ClassShell classId={cls.id} initialSectionId={reading.id} />);
-    await screen.findByRole('heading', { name: 'Read, then decide.' });
+    await screen.findByRole('heading', { name: 'Reading practice' });
     answerReading(3);
     fireEvent.click(
       within(document.getElementById('class-active-stage')!).getByRole('button', {
@@ -459,7 +466,7 @@ describe('ClassShell', () => {
     render(<ClassShell classId={cls.id} initialSectionId={reading.id} />);
     const stage = within(
       await screen
-        .findByRole('heading', { name: 'Read, then decide.' })
+        .findByRole('heading', { name: 'Reading practice' })
         .then((heading) => heading.closest('#class-active-stage')! as HTMLElement)
     );
     fireEvent.click(stage.getByRole('button', { name: 'Practise with new questions' }));
@@ -544,7 +551,7 @@ describe('ClassShell', () => {
         return jsonResponse(accepted ? staged : cls);
       });
       render(<ClassShell classId={cls.id} initialSectionId={reading.id} />);
-      await screen.findByRole('heading', { name: 'Read, then decide.' });
+      await screen.findByRole('heading', { name: 'Reading practice' });
       fireEvent.click(
         within(document.getElementById('class-active-stage')!).getByRole('button', {
           name: 'Practise with new questions',

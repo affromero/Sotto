@@ -68,14 +68,35 @@ afterEach(() => {
 });
 
 async function openTurns() {
-  const summary = await screen.findByText('Replay turns and speakers (3 turns)');
-  fireEvent.click(summary);
+  await screen.findByRole('region', { name: 'Speaker turns' });
   await waitFor(() =>
     expect(screen.getByRole('button', { name: 'Play turn 1: Anna' })).toBeVisible()
   );
 }
 
 describe('lesson audio playback', () => {
+  it('shows speaker avatars, transcript and every turn without opening a disclosure', async () => {
+    render(<LessonAudioPlayer episode={episode} />);
+    const region = await screen.findByRole('region', { name: 'Speaker turns' });
+    expect(region).toHaveTextContent('🦊');
+    expect(region).toHaveTextContent('🐻');
+    for (const turn of detail.segments) expect(screen.getByText(turn.text)).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Play turn 2: Ben' })).toBeVisible();
+  });
+
+  it('highlights the timed speaker during full playback and clears the highlight in a gap', async () => {
+    render(<LessonAudioPlayer episode={episode} />);
+    await openTurns();
+    const audio = screen.getByLabelText('Lesson audio') as HTMLAudioElement;
+    const ben = screen.getByRole('button', { name: 'Play turn 2: Ben' }).closest('li')!;
+    audio.currentTime = 42;
+    fireEvent.timeUpdate(audio);
+    expect(ben).toHaveAttribute('aria-current', 'true');
+    audio.currentTime = 60;
+    fireEvent.timeUpdate(audio);
+    expect(ben).not.toHaveAttribute('aria-current');
+  });
+
   it('removes loaded turns and pauses the previous speaker when switching lessons', async () => {
     const view = render(<LessonAudioPlayer episode={episode} />);
     await openTurns();
@@ -93,7 +114,7 @@ describe('lesson audio playback', () => {
     );
     expect(retired.paused).toBe(true);
     expect(screen.getByLabelText('Lesson audio')).toHaveAttribute('src', '/different.mp3');
-    expect(screen.queryByText(/Replay turns and speakers/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Speaker turns' })).not.toBeInTheDocument();
     await act(async () => {
       next.resolve({ ok: false, status: 403 } as Response);
     });
@@ -119,7 +140,7 @@ describe('lesson audio playback', () => {
       oldRequest.resolve({ ok: true, json: async () => detail } as Response);
     });
     expect(screen.getByLabelText('Lesson audio')).toHaveAttribute('src', '/new.mp3');
-    expect(screen.queryByText(/Replay turns and speakers/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Speaker turns' })).not.toBeInTheDocument();
   });
 
   it('ignores a retired audio element ending after a new speaker queue starts', async () => {
@@ -227,7 +248,7 @@ describe('lesson audio playback', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Could not load lesson audio and turns'
     );
-    expect(screen.queryByText(/Replay turns and speakers/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Speaker turns' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Reload audio links' }));
     await openTurns();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
@@ -242,7 +263,7 @@ describe('lesson audio playback', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Could not read lesson audio and turns'
     );
-    expect(screen.queryByText(/Replay turns and speakers/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Speaker turns' })).not.toBeInTheDocument();
     first.unmount();
     let signal: AbortSignal | undefined;
     vi.mocked(fetch).mockImplementationOnce((_url, options) => {

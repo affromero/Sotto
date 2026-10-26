@@ -24,12 +24,28 @@ function EpisodeAudioPlayer({ episode }: { episode: ClassSectionEpisode | null }
   const [reload, setReload] = useState(0);
   const [speaker, setSpeaker] = useState('');
   const [speed, setSpeed] = useState(1);
+  const [elapsed, setElapsed] = useState(0);
   const [playback, setPlayback] = useState<Playback>({ index: 0, serial: 0, autoplay: false });
   const turns = detail?.segments.toSorted((a, b) => a.order - b.order) ?? [];
   const speakers = [...new Set(turns.map((turn) => turn.speaker))];
   const currentTurn = playback.turns
     ? turns.find((turn) => turn.id === playback.turns?.[playback.index])
     : undefined;
+  const timelineTurn = !playback.turns
+    ? turns.find(
+        (turn) =>
+          turn.startTime !== null &&
+          turn.duration !== null &&
+          Number.isFinite(turn.startTime) &&
+          Number.isFinite(turn.duration) &&
+          turn.startTime >= 0 &&
+          turn.duration > 0 &&
+          elapsed >= turn.startTime &&
+          elapsed < turn.startTime + turn.duration
+      )
+    : undefined;
+  const activeTurn = currentTurn ?? timelineTurn;
+  const speakerAvatars = ['🦊', '🐻', '🐼', '🐨', '🦁', '🐰'];
   const fullUrl = detail ? detail.audioUrl : episode?.audioUrl;
   const source = playback.turns ? currentTurn?.audioUrl : fullUrl;
   const status = detail?.status ?? episode?.status;
@@ -75,6 +91,7 @@ function EpisodeAudioPlayer({ episode }: { episode: ClassSectionEpisode | null }
     if (!audio) return;
     let cancelled = false;
     audio.pause();
+    setElapsed(0);
     audio.defaultPlaybackRate = speedRef.current;
     audio.playbackRate = speedRef.current;
     if (playback.autoplay && source) {
@@ -140,6 +157,7 @@ function EpisodeAudioPlayer({ episode }: { episode: ClassSectionEpisode | null }
         preload="metadata"
         aria-label={currentTurn ? `Turn ${turns.indexOf(currentTurn) + 1} audio` : 'Lesson audio'}
         onPlay={() => setAudioError('')}
+        onTimeUpdate={(event) => setElapsed(event.currentTarget.currentTime)}
         onError={() =>
           setAudioError('Audio could not be played. Reload audio links and try again.')
         }
@@ -208,8 +226,23 @@ function EpisodeAudioPlayer({ episode }: { episode: ClassSectionEpisode | null }
         </div>
       )}
       {detail && turns.length > 0 && (
-        <details className={styles.turns}>
-          <summary>Replay turns and speakers ({turns.length} turns)</summary>
+        <section className={styles.turns} aria-label="Speaker turns">
+          <h3 className={styles.turnsTitle}>
+            The conversation <span>{turns.length} turns</span>
+          </h3>
+          <p className={styles.help}>
+            Follow who is speaking. Select any turn to play it on its own.
+          </p>
+          <div className={styles.speakerKey} aria-label="Speakers">
+            {speakers.map((name, index) => (
+              <span key={name}>
+                <span className={styles.avatar} aria-hidden="true">
+                  {speakerAvatars[index % speakerAvatars.length]}
+                </span>
+                {name}
+              </span>
+            ))}
+          </div>
           <div className={styles.speakerControls}>
             <label>
               Speaker
@@ -241,21 +274,33 @@ function EpisodeAudioPlayer({ episode }: { episode: ClassSectionEpisode | null }
           )}
           <ol className={styles.turnList}>
             {turns.map((turn, index) => (
-              <li key={turn.id} aria-current={currentTurn?.id === turn.id ? 'true' : undefined}>
+              <li key={turn.id} aria-current={activeTurn?.id === turn.id ? 'true' : undefined}>
+                <span className={styles.avatar} aria-hidden="true">
+                  {speakerAvatars[speakers.indexOf(turn.speaker) % speakerAvatars.length]}
+                </span>
+                <div className={styles.turnBody}>
+                  <div className={styles.turnHeading}>
+                    <strong>{turn.speaker}</strong>
+                    <span>Turn {index + 1}</span>
+                    {activeTurn?.id === turn.id && (
+                      <span className={styles.currentLabel}>Current turn</span>
+                    )}
+                  </div>
+                  <p>{turn.text}</p>
+                  {!turn.audioUrl && <span className={styles.notice}>Turn audio unavailable</span>}
+                </div>
                 <button
                   type="button"
                   disabled={!turn.audioUrl}
                   aria-label={`Play turn ${index + 1}: ${turn.speaker}`}
                   onClick={() => play([turn.id])}
                 >
-                  Replay {index + 1} · {turn.speaker}
+                  <span aria-hidden="true">▶</span> Replay
                 </button>
-                <p>{turn.text}</p>
-                {!turn.audioUrl && <span className={styles.notice}>Turn audio unavailable</span>}
               </li>
             ))}
           </ol>
-        </details>
+        </section>
       )}
       {detail && turns.length === 0 && (
         <p className={styles.notice}>

@@ -77,19 +77,6 @@
   opacity: 0.5;
 }
 
-.meterGate::after {
-  content: 'gate';
-  position: absolute;
-  top: -16px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-family: var(--mono);
-  font-size: 8.5px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--ink-mute);
-}
-
 /* ---- score dial ---- */
 .dial {
   composes: surface from './sottoLearn.module.css';
@@ -237,7 +224,11 @@
 
 @media (prefers-reduced-motion: reduce) {
   .btn {
-    transition: background 0.2s, border-color 0.2s, opacity 0.2s, filter 0.2s;
+    transition:
+      background 0.2s,
+      border-color 0.2s,
+      opacity 0.2s,
+      filter 0.2s;
   }
   .btn:active {
     transform: none;
