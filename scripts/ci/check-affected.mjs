@@ -112,8 +112,27 @@ if (mode === '--push') {
 }
 
 const source = /\.(?:[cm]?[jt]sx?|css|jsonc?)$/;
+const scriptTestConsumers = new Map([
+  [
+    'scripts/deploy/review/first-worker.ts',
+    'apps/web/tests/lib/deployment/review-first-worker.test.ts',
+  ],
+]);
+const scriptInputs = [...scriptTestConsumers].flatMap(([helper, test]) => {
+  if (!files.includes(helper) && !files.includes(test)) return [];
+  for (const file of [helper, test]) {
+    if (!existsSync(resolve(root, file))) {
+      console.error(`Required deployment helper or regression test is missing: ${file}`);
+      process.exit(1);
+    }
+  }
+  return [helper, test];
+});
 const scripts = files.filter(
-  (file) => /^(?:scripts\/|\.pre-commit-config\.yaml$)/.test(file) && !/\.md$/.test(file)
+  (file) =>
+    /^(?:scripts\/|\.pre-commit-config\.yaml$)/.test(file) &&
+    !/\.md$/.test(file) &&
+    !scriptTestConsumers.has(file)
 );
 const scriptTests = new Set();
 const knownScriptTests = new Map([
@@ -173,6 +192,7 @@ if (allScriptTests) {
 }
 
 for (const workspace of workspaces) {
+  const ownedScriptInputs = workspace.name === '@sotto/web' ? scriptInputs : [];
   const isBrowserInput = (file) =>
     workspace.name === '@sotto/web' && file.startsWith('apps/web/e2e/');
   const browserInputs = files.filter(isBrowserInput);
@@ -210,6 +230,7 @@ for (const workspace of workspaces) {
     !own.length &&
     !browserInputs.length &&
     !dependencies.length &&
+    !ownedScriptInputs.length &&
     !dynamicInputs.length
   )
     continue;
@@ -230,6 +251,7 @@ for (const workspace of workspaces) {
   const related = [
     ...new Set([
       ...own,
+      ...ownedScriptInputs,
       ...dependencies,
       ...dynamicInputs.filter((file) => !scopedPrompts.has(file)),
       ...(scopedPrompts.size ? [promptIntegrityTest] : []),

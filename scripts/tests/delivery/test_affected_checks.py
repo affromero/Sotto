@@ -164,6 +164,83 @@ class AffectedChecksTests(unittest.TestCase):
         self.assertIn(str(self.root / test), tests)
         self.assertNotIn('--passWithNoTests', tests)
 
+    def prepare_review_helper(self) -> tuple[str, str]:
+        helper = 'scripts/deploy/review/first-worker.ts'
+        test = ('apps/web/tests/lib/deployment/'
+                'review-first-worker.test.ts')
+        self.write(helper)
+        self.write(test)
+        return helper, test
+
+    def test_review_helper_runs_its_companion_without_python(self) -> None:
+        helper, test = self.prepare_review_helper()
+        self.write('scripts/tests/test_unrelated.py',
+                   'raise RuntimeError("Unrelated Python suite ran")\n')
+        self.git('add', helper)
+        self.assert_passed(self.run_checks())
+        self.assertIn(['run', 'type-check', '--workspace=@sotto/web'],
+                      self.calls())
+        selected = next(call for call in self.calls() if 'related' in call)
+        self.assertIn(str(self.root / helper), selected)
+        self.assertIn(str(self.root / test), selected)
+        self.assertNotIn('--passWithNoTests', selected)
+
+    def test_review_helper_and_companion_share_one_gate(self) -> None:
+        helper, test = self.prepare_review_helper()
+        self.git('add', helper, test)
+        self.assert_passed(self.run_checks())
+        selected = [call for call in self.calls() if 'related' in call]
+        self.assertEqual(len(selected), 1)
+        self.assertIn(str(self.root / helper), selected[0])
+        self.assertIn(str(self.root / test), selected[0])
+
+    def test_review_helper_requires_its_companion_test(self) -> None:
+        helper, test = self.prepare_review_helper()
+        (self.root / test).unlink()
+        self.git('add', helper)
+        result = self.run_checks()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(test, result.stderr)
+        self.assertEqual(self.calls(), [])
+
+    def test_deleting_review_companion_requires_updated_coverage(self) -> None:
+        helper, test = self.prepare_review_helper()
+        self.git('add', helper, test)
+        self.commit()
+        self.git('rm', test)
+        result = self.run_checks()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(test, result.stderr)
+        self.assertEqual(self.calls(), [])
+
+    def test_deleting_review_helper_requires_updated_coverage(self) -> None:
+        helper, test = self.prepare_review_helper()
+        self.git('add', helper, test)
+        self.commit()
+        self.git('rm', helper)
+        result = self.run_checks()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(helper, result.stderr)
+        self.assertEqual(self.calls(), [])
+
+    def test_review_helper_preserves_related_test_failure(self) -> None:
+        helper = self.prepare_review_helper()[0]
+        self.git('add', helper)
+        self.environment['SOTTO_AFFECTED_RELATED_FAIL'] = '1'
+        result = self.run_checks()
+        self.assertEqual(result.returncode, 43)
+        self.assertIn('related tests failed', result.stderr)
+
+    def test_unknown_script_still_runs_python_with_review_helper(self) -> None:
+        helper = self.prepare_review_helper()[0]
+        self.stage('scripts/deploy/unknown-script.ts')
+        self.git('add', helper)
+        self.write('scripts/tests/test_unknown.py',
+                   'raise RuntimeError("Unknown script suite ran")\n')
+        result = self.run_checks()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('Unknown script suite ran', result.stderr)
+
     def test_browser_changes_keep_types_without_running_vitest(self) -> None:
         self.stage('apps/web/e2e/vocabulary.spec.ts',
                    'apps/web/e2e/fixtures/source.json')
