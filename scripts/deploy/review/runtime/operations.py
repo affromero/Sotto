@@ -232,12 +232,16 @@ class HostOperations:
 
     @staticmethod
     def writer_binding(container: Mapping[str, object]) -> dict[str, object]:
+        host = dict(record(container['HostConfig'], 'writer host'))
+        if host.get('OomKillDisable') is None:
+            host['OomKillDisable'] = False
+        mounts = sorted(rows(container['Mounts'], 'writer mounts'),
+                        key=checksum)
         return {
             'id': container['Id'], 'imageId': container['Image'],
             'name': container['Name'],
             'configHash': checksum(container['Config']),
-            'hostHash': checksum(container['HostConfig']),
-            'mountsHash': checksum(container['Mounts']),
+            'hostHash': checksum(host), 'mountsHash': checksum(mounts),
         }
 
     def verify_storage(self) -> None:

@@ -335,12 +335,16 @@ def validate_created_candidate(
     base = record(image['Config'], 'admitted image configuration')
     labels = record(config.get('Labels'), 'candidate labels')
     supplied = record(desired['environment'], 'candidate environment')
+    state = record(actual['State'], 'candidate state')
     if (actual['Image'] != expected_image['imageId']
             or actual['Name'] != '/' + str(desired['container_name'])
             or config.get('User') != desired['user']
             or labels.get('io.sotto.review-attempt')
             != operations.attempt.manifest_hash
-            or record(actual['State'], 'candidate state').get('Running')
+            or state.get('Running') is not False
+            or state.get('Status') != 'created' or state.get('Pid') != 0
+            or state.get('StartedAt') != '0001-01-01T00:00:00Z'
+            or state.get('ExitCode') != 0 or state.get('OOMKilled') is not False
             or environment(actual) != {**environment(image), **supplied}):
         raise ValueError('created-review-candidate-not-admitted')
     if config.get('Cmd') != desired['command']:
@@ -402,12 +406,27 @@ def validate_created_candidate(
     ipam = record(review.get('IPAMConfig'), 'candidate IPAM')
     proof = private_json(operations.attempt.directory / 'egress.json')
     guarded = record(networks[PROJECT + '_egress'], 'guarded endpoint')
+    expected_ids = {
+        NETWORK: record(topology['network'], 'review network')['id'],
+        PROJECT + '_egress': proof['networkId'],
+    }
+    resolved = rows(json.loads(operations.docker(
+        'network', 'inspect', NETWORK, PROJECT + '_egress',
+    )), 'created candidate networks')
+    if (len(resolved) != 2 or {item.get('Name'): item.get('Id')
+                              for item in resolved} != expected_ids):
+        raise ValueError('created-candidate-network-changed')
+    for name, expected_id in expected_ids.items():
+        endpoint = record(networks[name], 'created candidate endpoint')
+        if endpoint.get('NetworkID') == '':
+            if endpoint.get('EndpointID') != '':
+                raise ValueError('created-candidate-address-changed')
+        elif endpoint.get('NetworkID') != expected_id:
+            raise ValueError('created-candidate-address-changed')
     if (ipam.get('IPv4Address') != expected_ip
             or ipam.get('IPv6Address') not in ('', None)
             or review.get('GlobalIPv6Address') not in ('', None)
-            or review.get('NetworkID')
-            != record(topology['network'], 'review network')['id']
-            or guarded.get('NetworkID') != proof['networkId']):
+            or guarded.get('GlobalIPv6Address') not in ('', None)):
         raise ValueError('created-candidate-address-changed')
 
 

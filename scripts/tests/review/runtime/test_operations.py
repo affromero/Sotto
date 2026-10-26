@@ -17,6 +17,7 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from unittest.mock import patch
 
+from scripts.deploy.images.metadata import record
 from scripts.deploy.review.egress import TABLE, semantic_policy
 from scripts.deploy.review.runtime.operations import HostOperations
 from scripts.deploy.review.runtime.release.migrations import (
@@ -32,7 +33,7 @@ from scripts.deploy.review.state import (
     checksum,
     private_json,
 )
-from scripts.deploy.review.topology import NETWORK
+from scripts.deploy.review.topology import NETWORK, rows
 from scripts.tests.review.runtime.migration_fixture import (
     DUMMY_IDENTITY,
     KNOWN_SQL,
@@ -43,6 +44,56 @@ from scripts.tests.review.runtime.migration_fixture import (
     interleaved_inventories,
     sql_names,
 )
+
+
+class WriterBindingTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.container: dict[str, object] = {
+            'Id': 'candidate', 'Image': 'admitted-image', 'Name': '/candidate',
+            'Config': {'User': '1000', 'Env': ['PRIVATE=retained']},
+            'HostConfig': {'OomKillDisable': False, 'Memory': 512,
+                           'PortBindings': {}},
+            'Mounts': [
+                {'Type': 'bind', 'Source': '/private/auth',
+                 'Destination': '/auth', 'RW': True},
+                {'Type': 'volume', 'Name': 'executions',
+                 'Source': '/volumes/executions',
+                 'Destination': '/runtime', 'RW': True},
+            ],
+        }
+
+    def test_writer_identity_survives_normal_docker_start_representation(
+        self,
+    ) -> None:
+        binding = HostOperations.writer_binding(self.container)
+        running = copy.deepcopy(self.container)
+        record(running['HostConfig'], 'host')['OomKillDisable'] = None
+        running['Mounts'] = list(reversed(rows(running['Mounts'], 'mounts')))
+        self.assertEqual(HostOperations.writer_binding(running), binding)
+
+    def test_writer_identity_rejects_changed_permissions_and_storage(
+        self,
+    ) -> None:
+        binding = HostOperations.writer_binding(self.container)
+        for section, field, value in (
+            ('HostConfig', 'OomKillDisable', True),
+            ('HostConfig', 'Memory', 1024),
+            ('HostConfig', 'PortBindings', {'3000/tcp': [{'HostPort': '3000'}]}),
+            ('Config', 'User', '0'),
+            ('Config', 'Env', ['PRIVATE=changed']),
+        ):
+            changed = copy.deepcopy(self.container)
+            record(changed[section], 'section')[field] = value
+            with self.subTest(field=field):
+                self.assertNotEqual(HostOperations.writer_binding(changed),
+                                    binding)
+        for field, value in (('Source', '/other'), ('RW', False),
+                             ('Destination', '/elsewhere')):
+            changed = copy.deepcopy(self.container)
+            rows(changed['Mounts'], 'mounts')[0][field] = value
+            with self.subTest(mount=field):
+                self.assertNotEqual(HostOperations.writer_binding(changed),
+                                    binding)
 
 
 class HostCommandTests(unittest.TestCase):
