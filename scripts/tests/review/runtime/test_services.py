@@ -330,7 +330,9 @@ class CandidateAdmissionTests(unittest.TestCase):
                                   attempt.manifest_hash},
                        'Env': ['IMAGE_DEFAULT=retained',
                                'NODE_ENV=production']},
-            'State': {'Running': False, 'Status': 'created'},
+            'State': {'Running': False, 'Status': 'created', 'Pid': 0,
+                      'StartedAt': '0001-01-01T00:00:00Z',
+                      'ExitCode': 0, 'OOMKilled': False},
             'HostConfig': {
                 'Privileged': False, 'PublishAllPorts': False,
                 'ReadonlyRootfs': False, 'NetworkMode': NETWORK,
@@ -349,6 +351,115 @@ class CandidateAdmissionTests(unittest.TestCase):
             }},
         }
 
+    def docker(self, *arguments: str) -> bytes:
+        if arguments[:2] == ('image', 'inspect'):
+            return json.dumps([self.image]).encode()
+        if arguments[:2] == ('network', 'inspect'):
+            return json.dumps([
+                {'Name': NETWORK, 'Id': 'review-network'},
+                {'Name': 'sotto-review_egress', 'Id': 'egress-network'},
+            ]).encode()
+        raise AssertionError('Unexpected Docker boundary: ' + repr(arguments))
+
+    def test_created_networks_are_admitted_before_endpoint_allocation(
+        self,
+    ) -> None:
+        networks = record(record(self.actual['NetworkSettings'], 'settings')
+                          ['Networks'], 'networks')
+        for endpoint in networks.values():
+            record(endpoint, 'endpoint')['NetworkID'] = ''
+            record(endpoint, 'endpoint')['EndpointID'] = ''
+        with patch.object(HostOperations, 'docker', side_effect=self.docker):
+            validate_created_candidate(self.operations, self.actual,
+                                       self.desired,
+                                       {'imageId': 'admitted-image'})
+
+    def test_created_networks_reject_changed_live_identity(self) -> None:
+        for name in (NETWORK, 'sotto-review_egress'):
+            with self.subTest(network=name):
+                def changed(*arguments: str) -> bytes:
+                    raw = self.docker(*arguments)
+                    if arguments[:2] != ('network', 'inspect'):
+                        return raw
+                    networks = json.loads(raw)
+                    for item in networks:
+                        if item['Name'] == name:
+                            item['Id'] = 'replaced-network'
+                    return json.dumps(networks).encode()
+
+                with (patch.object(HostOperations, 'docker',
+                                   side_effect=changed),
+                      self.assertRaisesRegex(ValueError, 'network-changed')):
+                    validate_created_candidate(self.operations, self.actual,
+                                               self.desired,
+                                               {'imageId': 'admitted-image'})
+
+    def test_lazy_network_ids_require_a_never_started_created_container(
+        self,
+    ) -> None:
+        networks = record(record(self.actual['NetworkSettings'], 'settings')
+                          ['Networks'], 'networks')
+        record(networks[NETWORK], 'endpoint')['NetworkID'] = ''
+        record(networks[NETWORK], 'endpoint')['EndpointID'] = ''
+        for key, value in [('Running', True), ('Status', 'exited'),
+                           ('Pid', 123), ('StartedAt', '2026-10-25T00:00:00Z'),
+                           ('ExitCode', 1), ('OOMKilled', True)]:
+            changed = copy.deepcopy(self.actual)
+            record(changed['State'], 'state')[key] = value
+            with (self.subTest(state=key),
+                  patch.object(HostOperations, 'docker', side_effect=self.docker),
+                  self.assertRaises(ValueError)):
+                validate_created_candidate(self.operations, changed,
+                                           self.desired,
+                                           {'imageId': 'admitted-image'})
+
+    def test_created_networks_require_two_exact_unique_names(self) -> None:
+        review = {'Name': NETWORK, 'Id': 'review-network'}
+        egress = {'Name': 'sotto-review_egress', 'Id': 'egress-network'}
+        for networks in ([review], [review, review],
+                         [review, {**egress, 'Name': 'unexpected-network'}],
+                         [review, egress, egress]):
+            def changed(*arguments: str) -> bytes:
+                if arguments[:2] == ('network', 'inspect'):
+                    return json.dumps(networks).encode()
+                return self.docker(*arguments)
+
+            with (self.subTest(networks=networks),
+                  patch.object(HostOperations, 'docker', side_effect=changed),
+                  self.assertRaisesRegex(ValueError, 'network-changed')):
+                validate_created_candidate(self.operations, self.actual,
+                                           self.desired,
+                                           {'imageId': 'admitted-image'})
+
+    def test_created_networks_reject_an_incorrect_configured_identity(
+        self,
+    ) -> None:
+        for name in (NETWORK, 'sotto-review_egress'):
+            changed = copy.deepcopy(self.actual)
+            networks = record(record(changed['NetworkSettings'], 'settings')
+                              ['Networks'], 'networks')
+            record(networks[name], 'endpoint')['NetworkID'] = 'other-network'
+            with (self.subTest(network=name),
+                  patch.object(HostOperations, 'docker', side_effect=self.docker),
+                  self.assertRaisesRegex(ValueError, 'address-changed')):
+                validate_created_candidate(self.operations, changed,
+                                           self.desired,
+                                           {'imageId': 'admitted-image'})
+
+    def test_lazy_network_id_rejects_an_existing_endpoint(self) -> None:
+        for name in (NETWORK, 'sotto-review_egress'):
+            changed = copy.deepcopy(self.actual)
+            selected = record(record(changed['NetworkSettings'], 'settings')
+                              ['Networks'], 'networks')
+            record(selected[name], 'endpoint')['NetworkID'] = ''
+            record(selected[name], 'endpoint')['EndpointID'] = 'allocated-endpoint'
+            with (self.subTest(network=name),
+                  patch.object(HostOperations, 'docker', side_effect=self.docker),
+                  self.assertRaisesRegex(ValueError, 'address-changed')):
+                validate_created_candidate(self.operations, changed,
+                                           self.desired,
+                                           {'imageId': 'admitted-image'})
+
     def test_unknown_candidate_cannot_adopt_changed_command_host_or_network(
         self,
     ) -> None:
@@ -357,8 +468,7 @@ class CandidateAdmissionTests(unittest.TestCase):
                  ('HostConfig', 'Memory', 999),
                  ('HostConfig', 'CapAdd', ['SYS_ADMIN']),
                  ('Config', 'Env', ['NODE_ENV=production'])]
-        with patch.object(HostOperations, 'docker',
-                          return_value=json.dumps([self.image]).encode()):
+        with patch.object(HostOperations, 'docker', side_effect=self.docker):
             validate_created_candidate(self.operations, self.actual,
                                        self.desired,
                                        {'imageId': 'admitted-image'})
