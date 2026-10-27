@@ -16,7 +16,7 @@ export class ClassLessonHelpError extends Error {
   }
 }
 
-export const lessonHelpSourceSchema = classTeachingSchema.omit({ guidedPractice: true }).extend({
+const lessonHelpSourceSchema = classTeachingSchema.omit({ guidedPractice: true }).extend({
   guidedPractice: classTeachingSchema.shape.guidedPractice.omit({
     answer: true,
     explanation: true,
