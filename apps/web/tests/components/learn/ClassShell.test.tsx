@@ -177,6 +177,71 @@ describe('ClassShell', () => {
   });
   afterEach(() => vi.restoreAllMocks());
 
+  it('identifies the class and current section, returns to its overview and retains an answer', async () => {
+    const cls = recoverableClass('navigation-class');
+    const reading = cls.sections.find((item) => item.skill === 'READING')!;
+    const writes: Record<string, unknown>[] = [];
+    global.fetch = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === 'PATCH') {
+        writes.push(JSON.parse(String(init.body)) as Record<string, unknown>);
+        return jsonResponse({ progressRevision: 11 });
+      }
+      return jsonResponse(cls);
+    });
+    render(<ClassShell classId={cls.id} initialSectionId={reading.id} />);
+    await screen.findByRole('heading', { name: 'Reading practice' });
+    const header = screen.getByRole('banner', { name: 'Class header' });
+    expect(within(header).getByRole('link', { name: 'Sotto home' })).toHaveAttribute(
+      'href',
+      '/learn'
+    );
+    expect(within(header).getByRole('link', { name: 'Back to Learn' })).toHaveAttribute(
+      'href',
+      '/learn'
+    );
+    expect(within(header).getByText('Class 15 · B1')).toBeVisible();
+    expect(within(header).getByText(cls.lesson.title)).toBeVisible();
+    expect(within(header).getByText('Reading')).toHaveAttribute('aria-current', 'page');
+    fireEvent.click(
+      within(screen.getByRole('region', { name: 'Question 1' })).getByRole('button', {
+        name: 'Option 1: A',
+      })
+    );
+    await waitFor(() =>
+      expect(writes).toEqual([
+        expect.objectContaining({
+          expectedRevision: 10,
+          answers: expect.objectContaining({ [reading.questions[0].id]: 0 }),
+        }),
+      ])
+    );
+    fireEvent.click(within(header).getByRole('button', { name: 'Lesson overview' }));
+    await screen.findByRole('heading', { name: cls.lesson.title });
+    expect(within(header).getByText('Lesson overview')).toHaveAttribute('aria-current', 'page');
+    fireEvent.click(screen.getByRole('button', { name: 'Begin the class' }));
+    await screen.findByRole('heading', { name: 'Grammar practice' });
+    fireEvent.click(screen.getByRole('button', { name: 'Continue · Reading' }));
+    await screen.findByRole('heading', { name: 'Reading practice' });
+    expect(
+      within(screen.getByRole('region', { name: 'Question 1' })).getByRole('button', {
+        name: 'Option 1: A',
+      })
+    ).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Check saved progress' })).not.toBeInTheDocument();
+  });
+
+  it('keeps a way home while loading and when the class cannot be loaded', async () => {
+    const response = Promise.withResolvers<Response>();
+    global.fetch = vi.fn(() => response.promise);
+    render(<ClassShell classId="missing-class" />);
+    expect(screen.getByRole('status', { name: 'Loading class' })).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Back to Learn' })).toHaveAttribute('href', '/learn');
+    response.resolve(jsonResponse({}, 404));
+    await screen.findByRole('alert');
+    expect(screen.getByRole('link', { name: 'Sotto home' })).toHaveAttribute('href', '/learn');
+    expect(screen.getByRole('link', { name: 'Back to Learn' })).toBeVisible();
+  });
+
   it('keeps teaching open on a section deep link and preserves an answer when returning to notes', async () => {
     const cls = recoverableClass('teaching-deep-link');
     cls.teaching = teaching;
@@ -185,7 +250,7 @@ describe('ClassShell', () => {
     global.fetch = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
       if (init?.method === 'PATCH') {
         writes.push(JSON.parse(String(init.body)) as Record<string, unknown>);
-        return jsonResponse({ revision: 11 });
+        return jsonResponse({ progressRevision: 11 });
       }
       return jsonResponse(cls);
     });
@@ -324,7 +389,7 @@ describe('ClassShell', () => {
     const stage = within(document.getElementById('class-active-stage')!);
     fireEvent.click(stage.getByRole('button', { name: 'Practise with new questions' }));
     expect(stage.getByRole('button', { name: 'Preparing new questions...' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: /Leave class/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Lesson overview' })).toBeDisabled();
     await screen.findByText('Fresh reading question 1', {}, { timeout: 6000 });
     const retryWrite = writes.find((write) => write.method === 'POST');
     expect(retryWrite?.body).toEqual({

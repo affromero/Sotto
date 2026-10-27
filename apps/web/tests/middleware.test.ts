@@ -76,6 +76,9 @@ describe('public proxy routes without a database', () => {
     '/.well-known/apple-app-site-association/private',
     '/.well-known/other-file',
     '/terms/private',
+    '/illustrations/class-conversation.svg/private',
+    '/illustrations/private.svg',
+    '/illustrations-private/class-conversation.svg',
     '/access/security',
     '/api/v1/storage/recordings/private.wav',
     '/api/v1/onboarding/config',
@@ -115,7 +118,7 @@ describe('public proxy routes without a database', () => {
     'serves exact public support reads without shared state in self-hosted mode %s',
     async (mode) => {
       vi.stubEnv('SELF_HOSTED', mode);
-      for (const path of ['/support', '/about']) {
+      for (const path of ['/support', '/about', '/illustrations/class-conversation.svg']) {
         const url = new URL(path, 'http://localhost:3000');
         for (const method of ['GET', 'HEAD']) {
           const response = await proxy(new NextRequest(url, { method }));
