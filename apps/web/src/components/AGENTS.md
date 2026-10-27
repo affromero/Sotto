@@ -48,6 +48,9 @@ old invitation commands and proofs retain their original session recovery.
   guided answers stay behind an explicit disclosure and never affect quiz gates.
   Authored paragraphs, worked examples and correction comparisons use distinct
   layouts; accepted timeline and contrast figures remain available with teaching.
+- `learn/navigation/ClassNavigation` keeps the home link, return to Learn and
+  class location visible throughout the class. Return to its overview retains
+  answers and drafts in `ClassShell`; section gates still control advancement.
 - `GrammarSection` shows all grammar and reading questions together. Retain
   answered questions, conceal each unanswered question's feedback, and require
   every valid answer plus the exact section threshold before continuing. Keep

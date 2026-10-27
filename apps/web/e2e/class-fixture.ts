@@ -111,6 +111,36 @@ export async function seedClass() {
       lessonId: curriculum.lessons[0].id,
       order: 1,
       status: 'AVAILABLE',
+      adaptiveSeed: {
+        teaching: {
+          version: 1,
+          title: 'Greet a friend in German',
+          explanation: 'Say Hallo to greet someone you know. Add their name after the greeting.',
+          workedExamples: [
+            {
+              prompt: 'Greet Anna.',
+              answer: 'Hallo, Anna!',
+              explanation: 'Hallo comes before the name.',
+            },
+            {
+              prompt: 'Greet Ben.',
+              answer: 'Hallo, Ben!',
+              explanation: 'Use the same greeting with a different name.',
+            },
+          ],
+          commonMistake: {
+            incorrect: 'Anna Hallo.',
+            correction: 'Hallo, Anna!',
+            explanation: 'Put the greeting first when you address your friend.',
+          },
+          guidedPractice: {
+            prompt: 'Greet Mia.',
+            hint: 'Start with Hallo.',
+            answer: 'Hallo, Mia!',
+            explanation: 'The greeting comes before Mia’s name.',
+          },
+        },
+      },
       skillRequirements: requirements as unknown as Prisma.InputJsonValue,
     },
   });

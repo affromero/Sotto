@@ -168,7 +168,44 @@ test('a learner plays audio and completes all five skills on a narrow screen', a
   await page.getByRole('button', { name: /Browser learner/ }).click();
   await expect(page).toHaveURL(/\/(dashboard|learn)$/);
   await page.goto(`/learn/class/${fixture.classId}`);
+  const header = page.getByRole('banner', { name: 'Class header' });
+  await expect(header.getByRole('link', { name: 'Back to Learn' })).toHaveAttribute(
+    'href',
+    '/learn'
+  );
+  await expect(header.getByRole('navigation', { name: 'Class location' })).toContainText(
+    'Lesson overview'
+  );
+  const illustration = page.locator('img[src*="class-conversation"]');
+  await expect(illustration).toBeVisible();
+  await illustration.evaluate(async (image: HTMLImageElement) => {
+    await image.decode();
+  });
+  expect(
+    await illustration.evaluate((image: HTMLImageElement) => image.naturalWidth)
+  ).toBeGreaterThan(0);
+  for (const width of [375, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    for (const theme of ['light', 'dark']) {
+      await page.evaluate(
+        (value) => document.documentElement.setAttribute('data-theme', value),
+        theme
+      );
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+        width
+      );
+      await expect(header.getByRole('link', { name: 'Back to Learn' })).toBeInViewport();
+      await page.screenshot({
+        path: test.info().outputPath(`class-navigation-${width}-${theme}.png`),
+      });
+    }
+  }
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.getByRole('button', { name: 'Begin the class' }).scrollIntoViewIfNeeded();
+  await expect(header.getByRole('link', { name: 'Back to Learn' })).toBeInViewport();
   await page.getByRole('button', { name: 'Begin the class' }).click();
+  await expect(header.getByRole('navigation', { name: 'Class location' })).toContainText('Grammar');
+  await expect(header.getByRole('button', { name: 'Lesson overview' })).toBeVisible();
   for (const [skill, next] of [
     ['GRAMMAR', 'Reading'],
     ['READING', 'Listening'],

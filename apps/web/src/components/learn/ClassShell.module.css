@@ -7,10 +7,11 @@
   --voice-fg: #ecedf2;
   --voice-soft: #969baa;
 
-  height: 100%;
+  height: 100dvh;
   min-height: 100dvh;
   display: grid;
   grid-template-columns: 312px 1fr;
+  grid-template-rows: auto minmax(0, 1fr);
   background: var(--paper);
   overflow: hidden;
 }
@@ -25,7 +26,7 @@
 @media (max-width: 880px) {
   .cshell {
     grid-template-columns: 1fr;
-    grid-template-rows: auto 1fr;
+    grid-template-rows: auto auto minmax(0, 1fr);
   }
 }
 
@@ -76,42 +77,6 @@
   }
 }
 
-/* ---- brand ---- */
-.cbrand {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.cwordmark {
-  font-family: var(--serif);
-  font-style: italic;
-  font-weight: 400;
-  font-size: 27px;
-  line-height: 1;
-  letter-spacing: -0.01em;
-  display: flex;
-  align-items: center;
-  gap: 9px;
-}
-
-.wordmarkDot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--accent);
-  flex: none;
-}
-
-.cwordmarkSub {
-  font-family: var(--mono);
-  font-size: 9px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--voice-soft);
-}
-
 /* ---- hub rail nav ---- */
 .cnav {
   display: flex;
@@ -129,6 +94,14 @@
   color: var(--voice-soft);
   font-family: var(--sans);
   font-size: 14px;
+}
+
+.cnavItem[aria-current] {
+  color: var(--voice-fg);
+  background: rgba(255, 255, 255, 0.06);
+  border-left: 2px solid var(--accent);
+  margin: 0 0 8px;
+  display: block;
 }
 
 .cnavIco {
@@ -190,37 +163,10 @@
 }
 
 /* ---- timeline rail ---- */
-.ctlHead {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
 .classProgress {
   display: grid;
   gap: 8px;
   padding: 2px 4px 6px;
-}
-
-.ctlLeave {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-  padding: 8px 4px;
-  min-height: 44px;
-  font-family: var(--mono);
-  font-size: 10.5px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--voice-soft);
-  transition: color 0.2s;
-}
-
-.ctlLeave:hover {
-  color: var(--voice-fg);
 }
 
 .ctl {
@@ -382,27 +328,9 @@
 
 @media (max-width: 880px) {
   .crail {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    display: flex;
     gap: 10px;
     padding: 14px 20px;
-  }
-  .cbrand {
-    grid-column: 1;
-    grid-row: 1;
-  }
-  .cstamp {
-    display: none;
-  }
-  .cwordmark {
-    font-size: 24px;
-  }
-  .ctlHead {
-    grid-column: 2;
-    grid-row: 1;
-  }
-  .ctlLeave {
-    padding: 4px;
   }
   .classProgress {
     grid-column: 1 / -1;
@@ -474,7 +402,7 @@
 /* ---- loading / submitting / error states ---- */
 .fullState {
   composes: surface from './sottoLearn.module.css';
-  min-height: 100dvh;
+  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -485,6 +413,13 @@
   text-align: center;
   color: var(--ink-soft);
   font-family: var(--sans);
+}
+
+.stateShell {
+  composes: surface from './sottoLearn.module.css';
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
 }
 
 .stageState {

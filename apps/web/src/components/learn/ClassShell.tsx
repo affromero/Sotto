@@ -1,18 +1,5 @@
 'use client';
 
-/**
- * ClassShell renders the full-screen two-panel class experience (left rail + stage)
- * and the view state machine (hub → hour → summary), ported from the design
- * bundle (`class-app.jsx`). Owns the class fetch, the cross-section answer map,
- * the gated advance flow, the final `/submit`, and failed-section regeneration.
- *
- * Skill mapping: our skills (GRAMMAR, READING, LISTENING, SPEAKING, WRITING)
- * map onto the design's module styles. Grammar + reading render as the drill
- * MC card (reading shows its passage), listening is the waveform player + MCQ
- * wired to the real audio, speaking is record + rubric bars, writing is the
- * task card + textarea + inline corrections.
- */
-
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LearningSaveRecovery } from './progress/LearningSaveRecovery';
 import {
@@ -24,6 +11,7 @@ import { useRouter } from 'next/navigation';
 import { SottoSpinner } from '@/components/ui/SottoSpinner';
 import { ClassGlyph } from './ClassGlyph';
 import { ClassHub } from './ClassHub';
+import { ClassNavigation } from './navigation/ClassNavigation';
 import { ClassTeachingNotes } from './lesson/ClassTeachingNotes';
 import { ClassSummary, FeedbackClinic } from './ClassSummary';
 import { GrammarSection } from './GrammarSection';
@@ -533,12 +521,15 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
   // ---- loading / error ----
   if (view === 'loading') {
     return (
-      <div className={styles.fullState} role="status" aria-label="Loading class">
-        <SottoSpinner
-          size="large"
-          label={autoRefreshing ? 'Preparing this class' : 'Loading your class'}
-          orientation="stack"
-        />
+      <div className={styles.stateShell}>
+        <ClassNavigation currentSection="Loading class" />
+        <div className={styles.fullState} role="status" aria-label="Loading class">
+          <SottoSpinner
+            size="large"
+            label={autoRefreshing ? 'Preparing this class' : 'Loading your class'}
+            orientation="stack"
+          />
+        </div>
       </div>
     );
   }
@@ -549,34 +540,41 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
     const backToLearn = returnToLearn || canRegenerate;
 
     return (
-      <div className={styles.fullState} role="alert">
-        <p>{errorMessage || 'An unexpected error occurred.'}</p>
-        {canRegenerate ? (
+      <div className={styles.stateShell}>
+        <ClassNavigation currentSection="Class unavailable" />
+        <div className={styles.fullState} role="alert">
+          <p>{errorMessage || 'An unexpected error occurred.'}</p>
+          {canRegenerate ? (
+            <button
+              type="button"
+              className={styles.retryBtn}
+              onClick={() => void handleRegenerateClass()}
+              disabled={regenerating}
+              aria-busy={regenerating}
+            >
+              {regenerating ? 'Regenerating...' : 'Regenerate class'}
+            </button>
+          ) : null}
           <button
             type="button"
             className={styles.retryBtn}
-            onClick={() => void handleRegenerateClass()}
-            disabled={regenerating}
-            aria-busy={regenerating}
+            onClick={() => {
+              if (backToLearn) {
+                router.push('/learn');
+                return;
+              }
+              setView('loading');
+              setErrorMessage('');
+              void loadClass();
+            }}
           >
-            {regenerating ? 'Regenerating...' : 'Regenerate class'}
+            {returnToLearn
+              ? 'View progress in Learn'
+              : canRegenerate
+                ? 'Back to Learn'
+                : 'Try again'}
           </button>
-        ) : null}
-        <button
-          type="button"
-          className={styles.retryBtn}
-          onClick={() => {
-            if (backToLearn) {
-              router.push('/learn');
-              return;
-            }
-            setView('loading');
-            setErrorMessage('');
-            void loadClass();
-          }}
-        >
-          {returnToLearn ? 'View progress in Learn' : canRegenerate ? 'Back to Learn' : 'Try again'}
-        </button>
+        </div>
       </div>
     );
   }
@@ -732,15 +730,22 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
 
   return (
     <div className={styles.cshell}>
+      <ClassNavigation
+        classInfo={cls}
+        currentSection={
+          view === 'hour' && activeSection
+            ? skillLabel(activeSection.skill)
+            : view === 'summary'
+              ? 'Class results'
+              : view === 'submitting'
+                ? 'Grading class'
+                : 'Lesson overview'
+        }
+        onOverview={view === 'hour' ? () => setView('hub') : undefined}
+        busy={regenerating}
+      />
       <aside className={styles.crail} aria-label="Class navigation">
         <div className={styles.crailGlow} aria-hidden="true" />
-        <div className={styles.cbrand}>
-          <div className={styles.cwordmark}>
-            <span className={styles.wordmarkDot} aria-hidden="true" />
-            sotto
-          </div>
-          <div className={styles.cwordmarkSub}>v0 · self hosted</div>
-        </div>
 
         {onHub ? (
           <HubRail
@@ -759,7 +764,6 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
             gate={gate}
             isSummary={view === 'summary'}
             busy={regenerating}
-            onLeave={() => setView('hub')}
             onJump={(i) => {
               if (view === 'hour' && i <= segIdx) {
                 setSegIdx(i);
@@ -831,6 +835,9 @@ function HubRail({ level, sections, scores, completionPct }: HubRailProps) {
   return (
     <>
       <nav className={styles.cnav} aria-label="Class sections">
+        <p className={styles.cnavItem} aria-current="step">
+          Lesson overview
+        </p>
         {sections.map((s) => {
           const done = (scores[s.id] ?? 0) > 0;
           return (
@@ -881,7 +888,6 @@ interface TimelineRailProps {
   gate: number;
   isSummary: boolean;
   busy: boolean;
-  onLeave: () => void;
   onJump: (index: number) => void;
 }
 
@@ -894,16 +900,10 @@ function TimelineRail({
   gate,
   isSummary,
   busy,
-  onLeave,
   onJump,
 }: TimelineRailProps) {
   return (
     <>
-      <div className={styles.ctlHead}>
-        <button type="button" className={styles.ctlLeave} onClick={onLeave} disabled={busy}>
-          <ClassGlyph name="back" size={13} /> Leave class
-        </button>
-      </div>
       <div className={styles.classProgress}>
         <div className={styles.lvlTop}>
           <span>Class completion</span>

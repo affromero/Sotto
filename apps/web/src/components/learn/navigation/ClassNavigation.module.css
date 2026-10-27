@@ -1,0 +1,145 @@
+.root {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 264px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 24px;
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  justify-self: start;
+  min-height: 44px;
+  color: var(--ink);
+  text-decoration: none;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 28px;
+}
+
+.brand span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.context {
+  min-width: 0;
+}
+
+.location {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--ink-soft);
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.location li + li::before {
+  content: '/';
+  margin-right: 10px;
+  color: var(--ink-mute);
+}
+
+.location [aria-current] {
+  color: var(--accent);
+}
+
+.title {
+  margin: 3px 0 0;
+  font-family: var(--sans);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+
+.back,
+.overview {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 4px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 13px;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.overview {
+  color: var(--accent);
+}
+
+.overview:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.back:hover,
+.overview:not(:disabled):hover {
+  text-decoration: underline;
+}
+
+.brand:focus-visible,
+.back:focus-visible,
+.overview:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+@media (max-width: 1100px) {
+  .root {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+}
+
+@media (max-width: 600px) {
+  .root {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 4px 12px;
+    padding: 8px 20px 12px;
+  }
+
+  .brand {
+    font-size: 25px;
+  }
+
+  .context {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .actions {
+    justify-content: flex-end;
+    gap: 4px;
+  }
+
+  .title {
+    font-size: 14px;
+  }
+}
