@@ -165,6 +165,8 @@ describe('openapi.json drift guard', () => {
         'GET /api/v1/classes/{classId}',
         'GET /api/v1/classes/{classId}/pencil',
         'POST /api/v1/classes/{classId}/pencil',
+        'GET /api/v1/classes/{classId}/lesson-help',
+        'POST /api/v1/classes/{classId}/lesson-help',
         'POST /api/v1/classes/{classId}',
         'POST /api/v1/classes/{classId}/submit',
         'POST /api/v1/exams',

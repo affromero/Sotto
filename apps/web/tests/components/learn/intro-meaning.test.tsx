@@ -142,6 +142,7 @@ function renderClass(
 describe('class reading flow', () => {
   it('teaches through worked examples before beginning and reveals guided answers only on request', () => {
     const { onBegin } = renderClass({ teaching });
+    expect(screen.getByRole('button', { name: 'Help in your language' })).toBeVisible();
     const lesson = screen.getByRole('heading', { name: teaching.title });
     expect(lesson).toBeVisible();
     expect(screen.getByText(teaching.explanation)).toBeVisible();

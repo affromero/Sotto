@@ -155,6 +155,7 @@ import type { Job } from 'bullmq';
 
 function createMockJob(data: ProcessInteractionPayload): Job<ProcessInteractionPayload> {
   return {
+    name: 'interactions.v1',
     data,
     updateProgress: vi.fn().mockResolvedValue(undefined),
   } as unknown as Job<ProcessInteractionPayload>;

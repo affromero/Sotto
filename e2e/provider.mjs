@@ -73,7 +73,44 @@ export async function startProvider() {
         const messages = body.messages.map((message) => message.content).join('\n');
         const system = body.messages.find((message) => message.role === 'system')?.content || '';
         let content;
-        if (system.startsWith('Inventory every ')) {
+        if (system.startsWith('Provide optional native-language support')) {
+          const input = JSON.parse(
+            body.messages.find((message) => message.role === 'user').content
+          );
+          if (
+            input.source?.title !== 'Greet a friend in German' ||
+            Object.keys(input.source.guidedPractice).sort().join(',') !== 'hint,prompt'
+          )
+            throw new Error('Lesson help received an unexpected or concealed source');
+          content = JSON.stringify({
+            title: 'Greet a friend in German',
+            explanation: 'Use Hallo before your friend’s name. The German greeting stays the same.',
+            workedExamples: input.source.workedExamples.map((example, index) => ({
+              prompt: example.prompt,
+              meaning: index === 0 ? 'Hello, Anna!' : 'Hello, Ben!',
+              explanation: example.explanation,
+            })),
+            correctionExplanation: 'Put the greeting first when you address your friend.',
+            guidedPrompt: 'Greet Mia.',
+            guidedHint: 'Start with Hallo.',
+          });
+        } else if (system.startsWith('Independently verify native-language support')) {
+          const input = JSON.parse(
+            body.messages.find((message) => message.role === 'user').content
+          );
+          if (
+            input.source?.workedExamples[0].answer !== 'Hallo, Anna!' ||
+            input.support?.workedExamples[0].meaning !== 'Hello, Anna!' ||
+            Object.keys(input.source.guidedPractice).sort().join(',') !== 'hint,prompt'
+          )
+            throw new Error('Lesson help review received unexpected source or meanings');
+          content = JSON.stringify({
+            accurate: true,
+            nativeLanguageCorrect: true,
+            targetExamplesPreserved: true,
+            issues: [],
+          });
+        } else if (system.startsWith('Inventory every ')) {
           content = JSON.stringify(
             vocabularyInventoryFixture(
               JSON.parse(body.messages.find((message) => message.role === 'user').content)

@@ -46,6 +46,7 @@ import {
   vocabularyStudyActionSchema,
 } from '../learning/vocabulary-study';
 import { pencilHomeworkRequestSchema, pencilHomeworkResponseSchema } from './pencil-homework';
+import { classLessonHelpRequestSchema, classLessonHelpResponseSchema } from './class-teaching';
 import {
   classRegenerationRequestSchema,
   classRegenerationAcceptedSchema,
@@ -491,6 +492,25 @@ export const endpoints: EndpointDef[] = [
     request: submitClassRequestSchema,
     response: submitClassResponseSchema,
     successStatuses: [200],
+  },
+  {
+    id: 'getClassLessonHelp',
+    method: 'GET',
+    path: '/api/v1/classes/{classId}/lesson-help',
+    summary: 'Read private native-language help for the accepted lesson.',
+    auth: 'bearer',
+    response: classLessonHelpResponseSchema,
+    successStatuses: [200],
+  },
+  {
+    id: 'prepareClassLessonHelp',
+    method: 'POST',
+    path: '/api/v1/classes/{classId}/lesson-help',
+    summary: 'Prepare optional native-language help without changing the target-language lesson.',
+    auth: 'bearer',
+    request: classLessonHelpRequestSchema,
+    response: classLessonHelpResponseSchema,
+    successStatuses: [200, 202],
   },
   {
     id: 'interpretPencilHomework',

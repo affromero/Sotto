@@ -4,6 +4,7 @@ import type { ClassTeaching } from '@sotto/shared';
 import { LearningSelectionMenu } from '../LearningSelectionMenu';
 import type { ClassIntroData } from '../classTypes';
 import styles from './ClassTeachingNotes.module.css';
+import { ClassLanguageHelp } from './ClassLanguageHelp';
 interface ClassTeachingNotesProps {
   classId: string;
   courseId: string;
@@ -124,6 +125,7 @@ export function ClassTeachingNotes({
   );
   const content = teaching ? (
     <div className={styles.root}>
+      <ClassLanguageHelp classId={classId} teaching={teaching} />
       <LearningSelectionMenu
         courseId={courseId}
         sourceType="CLASS"

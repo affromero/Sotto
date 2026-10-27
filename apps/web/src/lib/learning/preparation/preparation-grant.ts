@@ -18,7 +18,7 @@ export function learningPreparationGrantSpec(
     | 'expiresAt'
     | 'maxProviderRequests'
   >,
-  kind: 'class' | 'practice' | 'writing' | 'pencil' | 'vocabulary'
+  kind: 'class' | 'practice' | 'writing' | 'pencil' | 'vocabulary' | 'lesson-help'
 ): DelegationGrant {
   return {
     id: operation.id,
@@ -37,7 +37,7 @@ export function learningPreparationGrantSpec(
 export function learningPreparationGrant(
   database: Prisma.TransactionClient,
   operation: Pick<ClassPreparation, 'id' | 'courseId' | 'userId'>,
-  kind: 'class' | 'practice' | 'writing' | 'pencil' | 'vocabulary'
+  kind: 'class' | 'practice' | 'writing' | 'pencil' | 'vocabulary' | 'lesson-help'
 ) {
   const captured = structuredClone(operation);
   return new DelegationStore({

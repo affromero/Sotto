@@ -191,6 +191,11 @@ and clears its latch only after valid audio, without changing speech preferences
 
 ## Adding Routes
 
+`classes/[classId]/lesson-help` GET reads private saved help; POST admits optional
+native-language support through `interactions.v2`. Server-derived request IDs
+bind class ownership, attempt, languages and accepted teaching. Neither operation
+changes the class, grades answers or regenerates teaching.
+
 `welcome/welcome-snapshot.ts` and `welcome/resume-security.ts` discard browser-stored
 secrets and retain safe endpoint URLs. `welcome/credential-discovery.ts` projects
 personal credential metadata into wizard cards. The final onboarding request
