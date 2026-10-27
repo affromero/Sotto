@@ -408,6 +408,13 @@ evidence preserves batch-local candidates/verdicts; offsets apply to correction
 feedback only. Metadata failure evidence labels the complete actual private decision
 and its derived metadata-only outer verdict inside the unchanged sealed envelope.
 
+Optional support in `classes/help/` uses only the accepted teaching,
+excluding the concealed guided answer and its explanation. Server-owned course
+languages, source hash, attempt and ownership generations bind a saved result.
+An independent fidelity review must pass before publication. Confirmed failures
+allow explicit bounded retries; unknown provider or cleanup outcomes block replay.
+The target-language generation policy and learner progress stay unchanged.
+
 New classes generate a reviewed unit through `classes/lesson/teaching.ts` before
 their questions. Providers return ordinary text under the stored schema's character
 limits. `classes/lesson/teaching-protocol.ts` measures every learner-visible field

@@ -56,6 +56,10 @@ import {
   pencilHomeworkResponseSchema,
 } from '../src/contracts/pencil-homework';
 import {
+  classLessonHelpRequestSchema,
+  classLessonHelpResponseSchema,
+} from '../src/contracts/class-teaching';
+import {
   classRegenerationRequestSchema,
   classRegenerationAcceptedSchema,
   practicePreparingSchema,
@@ -200,6 +204,8 @@ const namedSchemas: Record<string, z.ZodType> = {
   VocabularyStudyAction: vocabularyStudyActionSchema,
   PencilHomeworkRequest: pencilHomeworkRequestSchema,
   PencilHomeworkResponse: pencilHomeworkResponseSchema,
+  ClassLessonHelpRequest: classLessonHelpRequestSchema,
+  ClassLessonHelpResponse: classLessonHelpResponseSchema,
   ClassRegenerationRequest: classRegenerationRequestSchema,
   ClassRegenerationAccepted: classRegenerationAcceptedSchema,
   StartPracticePreparing: practicePreparingSchema,

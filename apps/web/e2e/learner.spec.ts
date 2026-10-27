@@ -184,6 +184,48 @@ test('a learner plays audio and completes all five skills on a narrow screen', a
   expect(
     await illustration.evaluate((image: HTMLImageElement) => image.naturalWidth)
   ).toBeGreaterThan(0);
+  const helpButton = page.getByRole('button', { name: 'Help in your language' });
+  let helpAdmissions = 0;
+  page.on('request', (request) => {
+    if (request.method() === 'POST' && request.url().endsWith('/lesson-help')) helpAdmissions++;
+  });
+  await helpButton.click();
+  const languageHelp = page.getByRole('dialog', { name: 'Greet a friend in German' });
+  await expect(languageHelp.getByText('Hello, Anna!', { exact: true })).toBeVisible();
+  await expect(languageHelp.getByText('Hallo, Anna!', { exact: true }).first()).toHaveAttribute(
+    'lang',
+    'de'
+  );
+  await expect(languageHelp.getByText('Hallo, Mia!', { exact: true })).toHaveCount(0);
+  for (const width of [375, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    for (const theme of ['light', 'dark']) {
+      await page.evaluate(
+        (value) => document.documentElement.setAttribute('data-theme', value),
+        theme
+      );
+      expect(
+        await languageHelp.evaluate((element) => element.scrollWidth <= element.clientWidth)
+      ).toBe(true);
+      const bounds = await languageHelp.boundingBox();
+      expect(bounds?.x).toBeGreaterThanOrEqual(15);
+      expect((bounds?.x ?? 0) + (bounds?.width ?? 0)).toBeLessThanOrEqual(width - 15);
+      await page.screenshot({
+        path: test.info().outputPath(`class-language-help-${width}-${theme}.png`),
+      });
+    }
+  }
+  await page.keyboard.press('Escape');
+  await expect(languageHelp).not.toBeVisible();
+  await expect(helpButton).toBeFocused();
+  await helpButton.click();
+  await expect(languageHelp.getByText('Hello, Anna!', { exact: true })).toBeVisible();
+  expect(helpAdmissions).toBe(1);
+  await languageHelp.getByRole('button', { name: 'Back to lesson' }).click();
+  await expect(helpButton).toBeFocused();
+  expect(
+    (await database.courseClass.findUniqueOrThrow({ where: { id: fixture.classId } })).adaptiveSeed
+  ).toEqual(preparedClass.adaptiveSeed);
   for (const width of [375, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     for (const theme of ['light', 'dark']) {

@@ -33,7 +33,7 @@ const SOTTO_DURABLE_JOB_VERSIONS: ReadonlyMap<string, readonly number[]> = new M
   ['script-writing', [1]],
   ['compile-script', [1]],
   ['audio-generation', [1]],
-  ['interactions', [1]],
+  ['interactions', [1, 2]],
   ['segment-regeneration', [1]],
   ['audio-stitching', [1, 2]],
   ['notifications', [1, 2, 3, 4]],

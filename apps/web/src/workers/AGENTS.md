@@ -14,6 +14,12 @@ synthesizes audio, and profile/course erasure retires these cached references.
 
 BullMQ workers that process async jobs. Each worker runs in a separate thread with its own Redis connection.
 
+`interactions.v2` prepares optional native-language lesson help without an
+episode. It shares the existing queue with unchanged v1 episode questions and
+owns its durable execution lifetime. Saved help requires fresh source/ownership
+checks, independent fidelity review and confirmed execution cleanup. Unknown
+provider or cleanup outcomes stay fenced after Redis delivery records disappear.
+
 PDF generation accepts canonical v1 stitching children and v2 export requests.
 Raw `generate_pdf` payloads are rejected. Both contracts use the same transcript
 renderer and attributed publication transaction. Cancellation propagates through

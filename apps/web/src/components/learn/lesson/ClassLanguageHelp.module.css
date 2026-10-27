@@ -1,0 +1,152 @@
+.root {
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 0 16px;
+}
+
+.openButton,
+.closeButton {
+  min-height: 44px;
+  padding: 10px 15px;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  background: var(--paper);
+  color: var(--accent);
+  font-family: var(--sans);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.openButton:focus-visible,
+.closeButton:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.dialog {
+  margin: auto;
+  width: min(880px, calc(100% - 32px));
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  background: var(--paper);
+  color: var(--ink);
+  overflow-y: auto;
+  font-family: var(--sans);
+}
+
+.dialog::backdrop {
+  background: rgba(0, 0, 0, 0.65);
+}
+
+.header {
+  position: sticky;
+  top: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  padding: 24px 28px;
+  border-bottom: 1px solid var(--line);
+  background: var(--paper);
+}
+
+.header > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.header h2 {
+  margin: 6px 0 0;
+  font-family: var(--serif);
+  font-size: 25px;
+  font-weight: 500;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.label {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--accent);
+}
+
+.closeButton {
+  flex: none;
+}
+
+.content,
+.status,
+.failure {
+  padding: 24px 28px;
+}
+
+.content {
+  font-size: 16px;
+  line-height: 1.75;
+}
+
+.content section + section {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+}
+
+.content h3 {
+  font-size: 16px;
+  color: var(--accent);
+}
+
+.nativeTitle {
+  margin-top: 0;
+  font-size: 18px;
+  color: var(--ink-soft);
+}
+
+.examples {
+  padding: 0;
+  list-style: none;
+}
+
+.examples li + li {
+  margin-top: 28px;
+}
+
+.target,
+.incorrect {
+  font-family: var(--serif);
+  font-size: 25px;
+  line-height: 1.5;
+}
+
+.target {
+  border-left: 3px solid var(--accent);
+  padding-left: 16px;
+}
+
+.incorrect,
+.meaning {
+  color: var(--ink-soft);
+}
+
+.failure {
+  color: var(--bad);
+}
+
+@media (max-width: 600px) {
+  .header {
+    flex-direction: column-reverse;
+    gap: 14px;
+    padding: 16px 20px;
+  }
+
+  .closeButton {
+    align-self: flex-end;
+  }
+
+  .content,
+  .status,
+  .failure {
+    padding: 20px;
+  }
+}

@@ -4758,6 +4758,128 @@
           }
         ]
       },
+      "ClassLessonHelpRequest": {
+        "type": "object",
+        "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "attempt": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "maximum": 9007199254740991
+          },
+          "sourceHash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "retryOf": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+            "nullable": true
+          }
+        },
+        "required": ["operationId", "attempt", "sourceHash", "retryOf"],
+        "additionalProperties": false
+      },
+      "ClassLessonHelpResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["AVAILABLE", "PENDING", "READY", "FAILED"]
+          },
+          "request": {
+            "$ref": "#/components/schemas/ClassLessonHelpRequest"
+          },
+          "nativeLang": {
+            "type": "string",
+            "minLength": 1
+          },
+          "targetLang": {
+            "type": "string",
+            "minLength": 1
+          },
+          "canRetry": {
+            "type": "boolean"
+          },
+          "help": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1800
+              },
+              "explanation": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 6000
+              },
+              "workedExamples": {
+                "minItems": 2,
+                "maxItems": 3,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "prompt": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 1800
+                    },
+                    "meaning": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 1800
+                    },
+                    "explanation": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 1800
+                    }
+                  },
+                  "required": ["prompt", "meaning", "explanation"],
+                  "additionalProperties": false
+                }
+              },
+              "correctionExplanation": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1800
+              },
+              "guidedPrompt": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1800
+              },
+              "guidedHint": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1800
+              }
+            },
+            "required": [
+              "title",
+              "explanation",
+              "workedExamples",
+              "correctionExplanation",
+              "guidedPrompt",
+              "guidedHint"
+            ],
+            "additionalProperties": false
+          },
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": ["status", "request", "nativeLang", "targetLang", "canRetry"],
+        "additionalProperties": false
+      },
       "ClassRegenerationRequest": {
         "type": "object",
         "properties": {
@@ -17010,6 +17132,90 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/SubmitClassRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/classes/{classId}/lesson-help": {
+      "get": {
+        "operationId": "getClassLessonHelp",
+        "summary": "Read private native-language help for the accepted lesson.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClassLessonHelpResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "classId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "prepareClassLessonHelp",
+        "summary": "Prepare optional native-language help without changing the target-language lesson.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClassLessonHelpResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClassLessonHelpResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "classId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClassLessonHelpRequest"
               }
             }
           }

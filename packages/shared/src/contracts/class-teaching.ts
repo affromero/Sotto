@@ -21,3 +21,57 @@ export const classTeachingSchema = z
   .strict();
 
 export type ClassTeaching = z.infer<typeof classTeachingSchema>;
+
+/** Optional native-language scaffolding. Target sentences remain in the accepted lesson. */
+export const classLessonHelpSchema = z
+  .object({
+    title: explanation,
+    explanation: z.string().trim().min(1).max(6000),
+    workedExamples: z
+      .array(
+        z
+          .object({
+            prompt: explanation,
+            meaning: explanation,
+            explanation,
+          })
+          .strict()
+      )
+      .min(2)
+      .max(3),
+    correctionExplanation: explanation,
+    guidedPrompt: explanation,
+    guidedHint: explanation,
+  })
+  .strict();
+
+export type ClassLessonHelp = z.infer<typeof classLessonHelpSchema>;
+
+export const classLessonHelpRequestSchema = z
+  .object({
+    operationId: z.uuid(),
+    attempt: z.number().int().positive(),
+    sourceHash: z.string().regex(/^[a-f0-9]{64}$/),
+    retryOf: z.uuid().nullable(),
+  })
+  .strict();
+
+export const classLessonHelpResponseSchema = z
+  .object({
+    status: z.enum(['AVAILABLE', 'PENDING', 'READY', 'FAILED']),
+    request: classLessonHelpRequestSchema,
+    nativeLang: z.string().min(1),
+    targetLang: z.string().min(1),
+    canRetry: z.boolean(),
+    help: classLessonHelpSchema.optional(),
+    error: z.string().optional(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.status === 'READY' && !value.help)
+      context.addIssue({ code: 'custom', message: 'Ready help requires its saved content.' });
+    if (value.status === 'FAILED' && !value.error)
+      context.addIssue({ code: 'custom', message: 'Failed help requires an explanation.' });
+  });
+
+export type ClassLessonHelpResponse = z.infer<typeof classLessonHelpResponseSchema>;

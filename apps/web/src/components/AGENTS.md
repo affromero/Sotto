@@ -48,6 +48,10 @@ old invitation commands and proofs retain their original session recovery.
   guided answers stay behind an explicit disclosure and never affect quiz gates.
   Authored paragraphs, worked examples and correction comparisons use distinct
   layouts; accepted timeline and contrast figures remain available with teaching.
+- `ClassLanguageHelp` opens optional native-language explanations in a modal
+  reading pane. The original teaching stays primary and mounted. Target examples
+  remain unchanged; concealed guided answers and their explanations stay excluded.
+  Results bind to the exact class and accepted teaching and reset on source changes.
 - `learn/navigation/ClassNavigation` keeps the home link, return to Learn and
   class location visible throughout the class. Return to its overview retains
   answers and drafts in `ClassShell`; section gates still control advancement.
