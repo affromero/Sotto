@@ -70,9 +70,9 @@ class ProviderActivationGateTests(unittest.TestCase):
         }
 
     def detect(self):
-        def docker(command, **kwargs):
+        def docker(command, **options):
             self.assertEqual(command[:2], ['docker', 'inspect'])
-            self.assertTrue(kwargs.get('check'), 'Docker inspection errors must fail closed')
+            self.assertTrue(options.get('check'), 'Docker inspection errors must fail closed')
             return subprocess.CompletedProcess(
                 command, 0, json.dumps([self.rows[command[2]]]).encode(), b''
             )
