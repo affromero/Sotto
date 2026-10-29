@@ -132,7 +132,7 @@ final class PlayInvitationUITests: XCTestCase {
     private func tap(_ title: String, type: XCUIElement.ElementType = .button,
                      app: XCUIApplication, timeout: TimeInterval = 10) throws {
         let named = app.descendants(matching: type)[title].firstMatch
-        let control = type == .switch ? named.switches.firstMatch : named
+        let control = named
         guard control.waitForExistence(timeout: timeout) else {
             let hierarchy = XCTAttachment(string: app.debugDescription)
             hierarchy.name = "missing-control-\(title)"
