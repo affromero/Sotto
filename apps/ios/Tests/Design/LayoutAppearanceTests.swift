@@ -80,7 +80,7 @@ final class LayoutAppearanceTests: XCTestCase {
                         classDetail: detail, answeredCount: 0, questionCount: 1,
                         completionProgress: 0, completionPercent: 0
                     )
-                    ClassTeachingView(teaching: teaching, onSelectionHelp: { _, _ in })
+                    ClassTeachingView(classId: "class-layout", teaching: teaching, onSelectionHelp: { _, _ in })
                 }
                 .padding(viewport.layout == .compact ? 16 : 28)
                 .background(SottoTheme.paper)
