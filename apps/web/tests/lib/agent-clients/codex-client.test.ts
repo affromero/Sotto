@@ -785,7 +785,23 @@ describe('Codex CLI execution', () => {
     expect(usageFromGenerationError(failure)).toMatchObject({ inputTokens: 20, outputTokens: 7 });
   });
 
+  it('accepts a completed answer after a recoverable CLI error', async () => {
+    executable(
+      event({ type: 'error', message: 'Temporary connection error, retrying' }) +
+        event(answer('Recovered')) +
+        event(done)
+    );
+    const result = await executeCodex('', 'Prompt');
+    expect(result.content).toBe('Recovered');
+    expect(result.inputTokens).toBe(20);
+  });
+
   it.each([
+    [
+      event({ type: 'error', message: 'Temporary connection error, retrying' }) +
+        event({ type: 'turn.failed', error: { message: 'Usage limit reached' } }),
+      'Switch to another AI model',
+    ],
     [
       event({
         type: 'turn.failed',

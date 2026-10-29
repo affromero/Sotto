@@ -513,7 +513,10 @@ describe('generateClassListening', () => {
           status: 'SCRIPT_READY',
           audioGenerationKey: null,
         },
-        data: { status: 'FAILED' },
+        data: {
+          status: 'FAILED',
+          failureReason: expect.stringContaining('Audio generation did not start'),
+        },
       });
     });
 

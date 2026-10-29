@@ -439,6 +439,8 @@ async function* runCodexProcess(
   function* observe(events: Iterable<CliOutputEvent>): Generator<string> {
     for (const event of events) {
       if (event.type === 'usage') {
+        // The Codex decoder emits usage only after a completed turn.
+        terminalFailure = false;
         usage = { ...event.usage };
         opts.onUsage?.({ ...usage, model: modelIdentity(selection) });
       }
