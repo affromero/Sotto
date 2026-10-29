@@ -73,7 +73,7 @@ struct PlayRoomView: View {
             }
             Button(coordinator.invitation == nil ? "Create invitation" : "Replace invitation code") {
                 coordinator.run { try await coordinator.rotateInvitation() }
-            }.buttonStyle(SottoSecondaryButtonStyle()).disabled(coordinator.busy || coordinator.state?.pending != nil)
+            }.buttonStyle(SottoSecondaryButtonStyle()).disabled(!coordinator.active || coordinator.busy || coordinator.state?.pending != nil)
             PlayAdmissionList(coordinator: coordinator)
         }
     }

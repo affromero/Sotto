@@ -61,7 +61,7 @@ struct PlayLobbyView: View {
                     }
                     if coordinator.roomsCursor != nil {
                         Button("Older games") { coordinator.run { try await coordinator.loadOlderRooms() } }
-                            .buttonStyle(SottoSecondaryButtonStyle()).disabled(coordinator.busy)
+                            .buttonStyle(SottoSecondaryButtonStyle()).disabled(!coordinator.active || coordinator.busy)
                     }
                 }
             } else {
@@ -89,7 +89,7 @@ struct PlayAdmissionList: View {
                     Button(label(action, request: request)) {
                         coordinator.run { try await coordinator.approve(request, type: action) }
                     }.buttonStyle(SottoSecondaryButtonStyle())
-                        .disabled(coordinator.busy || coordinator.state?.pending != nil)
+                        .disabled(!coordinator.active || coordinator.busy || coordinator.state?.pending != nil)
                 }
             }
             Divider()

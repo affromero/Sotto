@@ -84,13 +84,13 @@ struct PlaySafetyView: View {
                 Button("Unblock \(value.name)") {
                     unblocking = nil
                     coordinator.runSafety { try await coordinator.unblock(value) }
-                }
+                }.disabled(controlsDisabled)
             }
             Button("Cancel", role: .cancel) { unblocking = nil }
         }
     }
 
-    private var controlsDisabled: Bool { coordinator.safetyBusy || coordinator.state?.pendingSafety != nil }
+    private var controlsDisabled: Bool { !coordinator.active || coordinator.safetyBusy || coordinator.state?.pendingSafety != nil }
 }
 
 struct PlayConductPanel: View {

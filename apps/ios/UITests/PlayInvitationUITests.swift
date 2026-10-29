@@ -40,6 +40,21 @@ final class PlayInvitationUITests: XCTestCase {
         await fulfillment(of: [conductAccepted], timeout: 10)
         XCTAssertTrue(name.wait(for: \.isEnabled, toEqual: true, timeout: 10), app.debugDescription)
         try fill("play.newName", value: "Native Sam", app: app)
+        let preview = app.staticTexts["Alex invited you to a little of everything."]
+        XCTAssertTrue(preview.waitForExistence(timeout: 15), app.debugDescription)
+        let previewReads = server.requests.filter { $0.hasPrefix("GET /api/v1/play/invitations?") }.count
+        try tap("Play menu", app: app)
+        let joinMenuItem = app.buttons["Join a game"]
+        XCTAssertTrue(joinMenuItem.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(joinMenuItem.wait(for: \.isHittable, toEqual: true, timeout: 10), app.debugDescription)
+        joinMenuItem.tap()
+        let refreshedPreview = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            server.requests.filter { $0.hasPrefix("GET /api/v1/play/invitations?") }.count > previewReads
+        }, object: nil)
+        await fulfillment(of: [refreshedPreview], timeout: 15)
+        XCTAssertTrue(preview.waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertEqual(name.value as? String, "Native Sam")
+        XCTAssertTrue(name.isEnabled)
         app.swipeUp()
         let consent = app.switches["Create my learner profile on this server"]
         XCTAssertTrue(consent.waitForExistence(timeout: 5))

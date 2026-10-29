@@ -22,7 +22,7 @@ struct PlayPhraseCapture: View {
                 Button("Save privately") {
                     coordinator.run { try await coordinator.keep(text: text, context: context, kind: kind, round: round) }
                 }.buttonStyle(SottoSecondaryButtonStyle())
-                    .disabled(coordinator.busy || coordinator.state?.pending != nil || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .disabled(!coordinator.active || coordinator.busy || coordinator.state?.pending != nil || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }.padding(.top, 12)
         }.onChange(of: context) { _, value in text = value }
     }
@@ -38,7 +38,7 @@ struct PlayNotebookView: View {
             Text("Your phrase notebook").font(.system(.largeTitle, design: .serif))
             Text("Words and sentences you chose to keep. Only you can see these.").foregroundStyle(SottoTheme.muted)
             Button("Refresh notebook") { coordinator.run { try await coordinator.loadPhrases() } }
-                .buttonStyle(SottoSecondaryButtonStyle()).disabled(coordinator.busy)
+                .buttonStyle(SottoSecondaryButtonStyle()).disabled(!coordinator.active || coordinator.busy)
             if coordinator.phrases.isEmpty { Text("Keep a word during a game. It will be here when you return.") }
             ForEach(coordinator.phrases) { phrase in
                 VStack(alignment: .leading, spacing: 12) {
@@ -65,13 +65,13 @@ struct PlayNotebookView: View {
                                             saved[phrase.id] = course.id
                                         }
                                     }.buttonStyle(SottoSecondaryButtonStyle())
-                                        .disabled(coordinator.busy || saved[phrase.id] == course.id)
+                                        .disabled(!coordinator.active || coordinator.busy || saved[phrase.id] == course.id)
                                 }
                             }
                         } else {
                             Button("Load my courses") {
                                 coordinator.run { courses = try await coordinator.studyCourses() }
-                            }.frame(minHeight: 44).disabled(coordinator.busy)
+                            }.frame(minHeight: 44).disabled(!coordinator.active || coordinator.busy)
                         }
                     }
                 }
@@ -79,7 +79,7 @@ struct PlayNotebookView: View {
             }
             if coordinator.phrasesCursor != nil {
                 Button("Older phrases") { coordinator.run { try await coordinator.loadPhrases(older: true) } }
-                    .buttonStyle(SottoSecondaryButtonStyle()).disabled(coordinator.busy)
+                    .buttonStyle(SottoSecondaryButtonStyle()).disabled(!coordinator.active || coordinator.busy)
             }
         }
     }

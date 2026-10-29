@@ -25,7 +25,7 @@ struct PlaySavedDataView: View {
                         VStack(alignment: .leading) {
                             Button("Use \(connection.selectedProfile?.name ?? "Unselected profile") at \(connection.serverURL.host() ?? "server")") {
                                 coordinator.run { try await coordinator.switchConnection(connection) }
-                            }.frame(minHeight: 44).disabled(coordinator.busy)
+                            }.frame(minHeight: 44).disabled(!coordinator.active || coordinator.busy)
                             Button("Remove saved copy", role: .destructive) {
                                 do { try coordinator.save { $0.archivedConnections.removeAll { $0 == connection } } }
                                 catch { coordinator.report(error) }

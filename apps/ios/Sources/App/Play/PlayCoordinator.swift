@@ -39,7 +39,8 @@ final class PlayCoordinator: ObservableObject {
     @Published var accessRevoked = false
     @Published var boundConnection: SottoCredentials?
     @Published var connectionGeneration = UUID()
-    var active = false
+    @Published var navigationGeneration = UUID()
+    @Published var active = false
     var epoch = UUID()
     var lease: (roomID: String, nonce: String, renewed: Date, client: SottoAPIClient)?
     var ownerCapability: Bool?
@@ -162,6 +163,7 @@ final class PlayCoordinator: ObservableObject {
         error = nil
         notice = nil
         screen = destination
+        navigationGeneration = UUID()
     }
     func receive(_ value: String) {
         guard let invite = PlayInvitation.parse(value) else {
