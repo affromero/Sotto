@@ -39,10 +39,7 @@ final class PlayInvitationUITests: XCTestCase {
         )
         await fulfillment(of: [conductAccepted], timeout: 10)
         XCTAssertTrue(name.wait(for: \.isEnabled, toEqual: true, timeout: 10), app.debugDescription)
-        try tap("play.newName", type: .textField, app: app)
-        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5), app.debugDescription)
-        name.typeText("Native Sam")
-        XCTAssertEqual(name.value as? String, "Native Sam")
+        try fill("play.newName", value: "Native Sam", app: app)
         app.swipeUp()
         let consent = app.switches["Create my learner profile on this server"]
         XCTAssertTrue(consent.waitForExistence(timeout: 5))
@@ -62,21 +59,20 @@ final class PlayInvitationUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Go for a walk"].waitForExistence(timeout: 5))
         try tap("Hide meanings", app: app)
         XCTAssertFalse(app.staticTexts["Go for a walk"].exists)
-        firstCard.tap()
+        try tap("play.choice.A", app: app)
         try tap("Next round", app: app)
         let guess = app.textFields["play.draft.GUESS"]
         XCTAssertTrue(guess.waitForExistence(timeout: 10), app.debugDescription)
-        guess.tap(); guess.typeText("Giraffe")
+        try fill("play.draft.GUESS", value: "Giraffe", app: app)
         try tap("Guess", app: app)
         try tap("Understood", app: app)
         try tap("Next round", app: app)
         let line = app.textFields["play.draft.MESSAGE"]
         XCTAssertTrue(line.waitForExistence(timeout: 10), app.debugDescription)
-        line.tap(); line.typeText("Wir kochen zusammen.")
+        try fill("play.draft.MESSAGE", value: "Wir kochen zusammen.", app: app)
         try tap("Send line", app: app)
         XCTAssertTrue(app.staticTexts["Plot twist"].waitForExistence(timeout: 10))
-        let nextLine = app.textFields["play.draft.MESSAGE"]
-        nextLine.tap(); nextLine.typeText("Dann nehmen wir mehr Essen mit.")
+        try fill("play.draft.MESSAGE", value: "Dann nehmen wir mehr Essen mit.", app: app)
         try tap("Send line", app: app)
         try tap("Yes, mission done", app: app)
         try tap("Understood", app: app)
@@ -108,6 +104,29 @@ final class PlayInvitationUITests: XCTestCase {
 
     private enum InteractionFailure: Error {
         case missingButton(String), invisibleButton(String), disabledButton(String)
+        case fieldNotReady(String), unexpectedFieldValue(String)
+    }
+
+    private func fill(_ identifier: String, value: String, app: XCUIApplication) throws {
+        let field = app.textFields[identifier].firstMatch
+        guard field.waitForExistence(timeout: 15) else {
+            throw InteractionFailure.fieldNotReady(identifier)
+        }
+        let empty = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            let text = field.value as? String
+            return text == nil || text == "" || text == field.placeholderValue
+        }, object: field)
+        guard XCTWaiter.wait(for: [empty], timeout: 10) == .completed else {
+            throw InteractionFailure.fieldNotReady(identifier)
+        }
+        try tap(identifier, type: .textField, app: app)
+        field.typeText(value)
+        let entered = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "value == %@", value), object: field
+        )
+        guard XCTWaiter.wait(for: [entered], timeout: 10) == .completed else {
+            throw InteractionFailure.unexpectedFieldValue(identifier)
+        }
     }
 
     private func tap(_ title: String, type: XCUIElement.ElementType = .button,
@@ -141,14 +160,10 @@ final class PlayInvitationUITests: XCTestCase {
             let origin = app.coordinate(withNormalizedOffset: .zero)
             if viewport.contains(frame) {
                 if control.isEnabled {
-                    if type == .switch || type == .textField {
-                        guard control.wait(for: \.isHittable, toEqual: true, timeout: timeout) else {
-                            throw InteractionFailure.invisibleButton(title)
-                        }
-                        control.tap()
-                    } else {
-                        control.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+                    guard control.wait(for: \.isHittable, toEqual: true, timeout: timeout) else {
+                        throw InteractionFailure.invisibleButton(title)
                     }
+                    control.tap()
                     return
                 }
                 let deadline = ContinuousClock.now.advanced(by: .seconds(timeout))
