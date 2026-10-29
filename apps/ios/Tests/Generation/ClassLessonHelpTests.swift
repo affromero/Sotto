@@ -69,9 +69,19 @@ private final class ClassLessonHelpProtocol: URLProtocol {
         let isPost = request.httpMethod == "POST"
         if !isPost { XCTAssertEqual(request.cachePolicy, .reloadIgnoringLocalCacheData) }
         if isPost {
-            let body = try? JSONSerialization.jsonObject(with: request.httpBody ?? Data()) as? [String: Any]
-            XCTAssertEqual(body?["operationId"] as? String, "2c157df4-a35d-4e3f-bbd6-670d9b200e2f")
-            XCTAssertTrue(body?["retryOf"] is NSNull)
+            do {
+                let captured = try request.capturingNativeTestBody()
+                guard let data = captured.httpBody,
+                      let body = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                    throw URLError(.cannotDecodeRawData)
+                }
+                XCTAssertEqual(body["operationId"] as? String, "2c157df4-a35d-4e3f-bbd6-670d9b200e2f")
+                XCTAssertTrue(body["retryOf"] is NSNull)
+            } catch {
+                XCTFail("Could not read lesson-help admission: \(error)")
+                client?.urlProtocol(self, didFailWithError: error)
+                return
+            }
         }
         let data = isPost ? Self.response.replacingOccurrences(of: "AVAILABLE", with: "PENDING") : Self.response
         let response = HTTPURLResponse(url: request.url!, statusCode: isPost ? 202 : 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
