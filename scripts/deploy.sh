@@ -422,14 +422,26 @@ if [ "$OLD_SLOT" != none ]; then
     printf '%s %s\n' "$previous_image" "$previous_contract" >> "$previous_contracts"
     if [ "$previous_contract" != "$candidate_contract" ]; then contracts_match=false; fi
   done < <(python3 -c 'import json,sys; print("\n".join(sorted({item["image"] for item in json.load(open(sys.argv[1]))["services"].values()})))' "$PREVIOUS_WORKER_IMAGES")
-  if [ "$contracts_match" != true ] || [ "$SCHEMA_TRANSITION" = true ]; then
+  established_provider_gate=$(python3 scripts/deploy/provider-activation-gate.py)
+  if { [ -n "${SOTTO_COMPATIBILITY_REVIEW_FILE:-}" ] && [ -z "${SOTTO_COMPATIBILITY_EVIDENCE_FILE:-}" ]; } || \
+     { [ -z "${SOTTO_COMPATIBILITY_REVIEW_FILE:-}" ] && [ -n "${SOTTO_COMPATIBILITY_EVIDENCE_FILE:-}" ]; }; then
+    echo "ERROR: compatibility review and evidence must be supplied together." >&2
+    exit 1
+  fi
+  if [ "$contracts_match" != true ] || [ "$SCHEMA_TRANSITION" = true ] || \
+     [ "$established_provider_gate" = true ] || [ -n "${SOTTO_COMPATIBILITY_REVIEW_FILE:-}" ]; then
     if [ -z "${SOTTO_COMPATIBILITY_REVIEW_FILE:-}" ] || [ -z "${SOTTO_COMPATIBILITY_EVIDENCE_FILE:-}" ]; then
-      echo "ERROR: job, authority, storage or shared-runtime contracts differ. Use a separately reviewed compatibility procedure." >&2
+      echo "ERROR: runtime contracts or an existing provider gate require a separately reviewed compatibility procedure." >&2
       exit 1
     fi
     python3 scripts/deploy/compatibility-review.py validate "$SOTTO_COMPATIBILITY_REVIEW_FILE" "$SOTTO_COMPATIBILITY_EVIDENCE_FILE" "$candidate_contract" "$previous_contracts" > "$IMAGE_OVERRIDES/compatibility-review.json"
     chmod 600 "$IMAGE_OVERRIDES/compatibility-review.json"
     COMPATIBILITY_REVIEWED=true
+    if [ "$established_provider_gate" = true ] && \
+       [ "$(python3 scripts/deploy/compatibility-review.py activation-mode "$IMAGE_OVERRIDES/compatibility-review.json")" != preserve-existing ]; then
+      echo "ERROR: an established provider gate requires reviewed provider continuity." >&2
+      exit 1
+    fi
   fi
 fi
 

@@ -165,6 +165,9 @@ def runtime_row(identifier):
     if not candidate and state.get('implicit_without_release'):
         row['Config']['Env'] = [entry for entry in row['Config']['Env'] if not entry.startswith(('SOTTO_RELEASE_SHA=', 'SOTTO_PROVIDER_ACTIVATION_FILE='))]
         row['Mounts'] = []
+    elif not candidate and not state.get('old_activation'):
+        row['Config']['Env'] = [entry for entry in row['Config']['Env'] if not entry.startswith('SOTTO_PROVIDER_ACTIVATION_FILE=')]
+        row['Mounts'] = []
     return row
 if name == 'sleep': finish()
 if name == 'flock':
@@ -289,7 +292,7 @@ if args[0] == 'run':
         transition = state.get('queue_transition')
         finish(json.dumps(transition['previousQueues' if old in args else 'candidateQueues'] if transition else sorted(state['queue_flags'])))
     if (mode == 'contract' or mode.startswith(('compat-', 'migration-'))) and 'schema.prisma' not in args[-1]:
-        if mode == 'migration-schema-only': finish('d' * 64)
+        if mode == 'migration-schema-only' or state.get('matching_contracts'): finish('d' * 64)
         finish(('d' if old in args else 'e') * 64)
     if mode.startswith('migration-'): finish(('d' if old in args else 'e') * 64)
     if mode.startswith('schema-'): finish(('d' if old in args else 'e') * 64)
@@ -459,7 +462,9 @@ class DeploymentFailureTests(unittest.TestCase):
     def run_deployment(self, failure, stack='sotto-test', reviewed_schema=False, success=False,
                        expect_rollback=True, prepaused=False, retained_candidate=False, rollback_blocked=False,
                        old_slot='blue', reviewed_runtime=False, stale_review=False, provider_continuity=False,
-                       schema_transition=False, additive_queues=False, implicit_without_release=False):
+                       schema_transition=False, additive_queues=False, implicit_without_release=False,
+                       matching_contracts=False, old_gate=False, partial_review=False,
+                       controller_timeout=30):
         if schema_transition:
             reviewed_runtime = provider_continuity = True
         with tempfile.TemporaryDirectory() as directory:
@@ -484,6 +489,7 @@ class DeploymentFailureTests(unittest.TestCase):
                      'active': 1, 'journal_pending': failure == 'unknown-cleanup', 'unsafe_stops': [],
                      'unsafe_starts': [], 'stopped': [], 'worker_generation': 'old'}
             state['implicit_without_release'] = implicit_without_release
+            state['matching_contracts'] = matching_contracts
             if additive_queues or failure.startswith('migration-additions'):
                 previous = sorted(state['queue_flags'])
                 added = {'material-analysis': True, 'vocabulary-audio': False} if additive_queues else {'vocabulary-audio': True}
@@ -492,7 +498,7 @@ class DeploymentFailureTests(unittest.TestCase):
                     'previousQueues': previous, 'candidateQueues': sorted(state['queue_flags']),
                     'addedQueues': sorted(added),
                 }
-            if provider_continuity:
+            if provider_continuity or old_gate:
                 activation = root / 'previous-activation'
                 activation.mkdir()
                 (activation / 'fish.json').write_text(json.dumps({'releaseSha': 'd' * 40, 'fishEnabled': True}))
@@ -539,7 +545,7 @@ class DeploymentFailureTests(unittest.TestCase):
                     'candidateWorkersImage': values['SOTTO_WORKERS_IMAGE_REF'],
                     'previousWebImage': OLD,
                     'previousWorkerContracts': {OLD: 'd' * 64},
-                    'candidateContract': ('f' if stale_review else 'd' if failure == 'migration-schema-only' else 'e') * 64,
+                    'candidateContract': ('f' if stale_review else 'd' if matching_contracts or failure == 'migration-schema-only' else 'e') * 64,
                     'reviewer': 'Independent fixture reviewer',
                     'evidenceSha256': hashlib.sha256(evidence).hexdigest(),
                 }
@@ -564,7 +570,8 @@ class DeploymentFailureTests(unittest.TestCase):
                 review_path.write_text(json.dumps(review))
                 review_path.chmod(0o600)
                 values['SOTTO_COMPATIBILITY_REVIEW_FILE'] = str(review_path)
-                values['SOTTO_COMPATIBILITY_EVIDENCE_FILE'] = str(evidence_path)
+                if not partial_review:
+                    values['SOTTO_COMPATIBILITY_EVIDENCE_FILE'] = str(evidence_path)
                 if schema_transition:
                     schema_evidence = root / 'schema-evidence.txt'
                     schema_evidence.write_bytes(b'Independent exact fenced migration review.')
@@ -623,7 +630,7 @@ class DeploymentFailureTests(unittest.TestCase):
                 else:
                     try:
                         result = subprocess.run(command, env=environment, text=True,
-                                                capture_output=True, timeout=30)
+                                                capture_output=True, timeout=controller_timeout)
                     except subprocess.TimeoutExpired as error:
                         streams = [value.decode() if isinstance(value, bytes) else value or ''
                                    for value in (error.stdout, error.stderr)]
@@ -730,7 +737,7 @@ class DeploymentFailureTests(unittest.TestCase):
         self.assertEqual(state['observations'][-1], (200, SHA))
 
     def test_code_only_deployment_keeps_http_serving_through_warmup_and_drain(self):
-        state, output = self.run_deployment('none', success=True, expect_rollback=False)
+        state, output = self.run_deployment('none', success=True, expect_rollback=False, controller_timeout=60)
         self.assertIn((200, 'd' * 40), state['observations'])
         self.assertIn((200, SHA), state['observations'])
         for phase in ('backup', 'warmup', 'drain'):
@@ -809,6 +816,49 @@ class DeploymentFailureTests(unittest.TestCase):
             'releaseSha': 'd' * 40, 'fishEnabled': True}, output)
         self.assertIsNone(state['unresolved_marker'], output)
         self.assertTrue(all(not paused for paused in state['queue_flags'].values()), output)
+
+    def test_matching_contracts_preserve_reviewed_enabled_provider(self):
+        state, output = self.run_deployment(
+            'compat-provider-success', reviewed_runtime=True, provider_continuity=True,
+            matching_contracts=True, success=True, expect_rollback=False,
+            controller_timeout=60)
+        self.assertTrue(state['provider_enabled_at_web_start'], output)
+        self.assertFalse(state['gate_disabled_before_cutover'], output)
+        self.assertTrue(state['gate_enabled_after_controller'], output)
+        self.assertTrue(state['previous_activation']['fishEnabled'], output)
+        self.assertIsNone(state['unresolved_marker'], output)
+
+    def test_matching_contracts_use_supplied_first_activation_review(self):
+        state, output = self.run_deployment('compat-success', reviewed_runtime=True,
+            matching_contracts=True, success=True, expect_rollback=False, controller_timeout=60)
+        self.assertTrue(state['gate_disabled_before_cutover'], output)
+        self.assertTrue(state['gate_enabled_after_controller'], output)
+
+    def test_matching_contracts_with_enabled_gate_require_review_and_evidence(self):
+        for partial in (False, True):
+            with self.subTest(partial=partial):
+                state, output = self.run_deployment(
+                    'compat-provider-success', provider_continuity=True,
+                    matching_contracts=True, reviewed_runtime=partial, partial_review=partial)
+                self.assertTrue(state['previous_activation']['fishEnabled'], output)
+                self.assertFalse(state['stopped'], output)
+                self.assertFalse(any('up' in call and 'web' in call for call in state['calls']), output)
+
+    def test_matching_contracts_cannot_replace_existing_gate_with_first_activation_review(self):
+        state, output = self.run_deployment(
+            'compat-provider-success', matching_contracts=True, old_gate=True,
+            reviewed_runtime=True)
+        self.assertIn('established provider gate requires reviewed provider continuity', output)
+        self.assertFalse(state['stopped'], output)
+        self.assertFalse(any('up' in call and 'web' in call for call in state['calls']), output)
+
+    def test_matching_contracts_reject_writable_previous_provider_gate(self):
+        state, output = self.run_deployment(
+            'compat-provider-old-mount', matching_contracts=True,
+            reviewed_runtime=True, provider_continuity=True)
+        self.assertTrue(state['previous_activation']['fishEnabled'], output)
+        self.assertFalse(state['stopped'], output)
+        self.assertFalse(any('up' in call and 'web' in call for call in state['calls']), output)
 
     def test_unreviewed_provider_assets_or_writable_old_mount_never_start_candidate(self):
         for failure in ('compat-provider-assets', 'compat-provider-old-mount'):
