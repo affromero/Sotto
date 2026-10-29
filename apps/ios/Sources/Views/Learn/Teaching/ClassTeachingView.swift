@@ -3,9 +3,11 @@ import UIKit
 
 struct ClassTeachingView: View {
     @Environment(\.sottoLayout) private var layout
+    let classId: String
     let teaching: SottoClassTeaching
     var intro: SottoClassIntro? = nil
     let onSelectionHelp: (String, String) -> Void
+    @State private var showingLanguageHelp = false
 
     private var paragraphs: [String] {
         teaching.explanation.components(separatedBy: "\n\n")
@@ -27,6 +29,10 @@ struct ClassTeachingView: View {
                     .frame(maxWidth: 220, maxHeight: 160)
                     .accessibilityHidden(true)
             }
+            Button("Help in your language") { showingLanguageHelp = true }
+                .buttonStyle(.bordered)
+                .frame(minHeight: 44)
+                .accessibilityIdentifier("class-language-help")
             Divider()
             VStack(alignment: .leading, spacing: 18) {
                 Text("How it works").font(.headline).foregroundStyle(SottoTheme.primary)
@@ -80,6 +86,9 @@ struct ClassTeachingView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .tint(SottoTheme.primary)
+        .sheet(isPresented: $showingLanguageHelp) {
+            ClassLanguageHelpSheet(classId: classId, teaching: teaching)
+        }
     }
 
     private var correction: some View {
