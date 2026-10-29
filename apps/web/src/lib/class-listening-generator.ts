@@ -773,7 +773,10 @@ export async function failUnqueuedClassListening(episodeId: string, userId: stri
         status: 'SCRIPT_READY',
         audioGenerationKey: null,
       },
-      data: { status: 'FAILED' },
+      data: {
+        status: 'FAILED',
+        failureReason: 'Audio generation did not start because preparation did not finish.',
+      },
     })
     .catch((error: unknown) => {
       logger.error('Failed to retire unqueued class listening', {

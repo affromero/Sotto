@@ -5,7 +5,13 @@ struct LearnerAudioPlayer: View {
     @EnvironmentObject private var model: SottoAppModel
     let reference: String
     var turns: [SottoListeningTurn] = []
-    @StateObject private var playback = LearnerAudioPlayback()
+    @StateObject private var playback: LearnerAudioPlayback
+
+    @MainActor init(reference: String, turns: [SottoListeningTurn] = [], playback: LearnerAudioPlayback? = nil) {
+        self.reference = reference
+        self.turns = turns
+        _playback = StateObject(wrappedValue: playback ?? LearnerAudioPlayback())
+    }
 
     private var orderedTurns: [SottoListeningTurn] { turns.sorted { $0.order < $1.order } }
     private var speakers: [String] {
@@ -25,32 +31,33 @@ struct LearnerAudioPlayer: View {
                 playback.toggle(reference: reference) { try await model.downloadLearningAudio(from: reference) }
             } label: {
                 let playing = playback.isPlaying && playback.reference == reference
-                Label(playback.isLoading && playback.reference == reference ? "Loading audio" : playing ? "Pause audio" : orderedTurns.isEmpty ? "Play audio" : "Play full conversation",
-                      systemImage: playing ? "pause.fill" : "play.fill")
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                ZStack(alignment: .leading) {
+                    Label(orderedTurns.isEmpty ? "Play audio" : "Play full conversation", systemImage: "play.fill")
+                        .hidden()
+                        .accessibilityHidden(true)
+                    Label(playback.isLoading && playback.reference == reference ? "Loading audio" : playing ? "Pause audio" : orderedTurns.isEmpty ? "Play audio" : "Play full conversation",
+                          systemImage: playing ? "pause.fill" : "play.fill")
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             .buttonStyle(SottoSecondaryButtonStyle())
             .disabled(playback.isLoading && playback.reference == reference)
             .accessibilityIdentifier("lesson-audio-full")
-            if playback.duration > 0 {
-                Slider(value: Binding(get: { playback.currentTime }, set: { playback.seek(to: $0) }),
-                    in: 0...max(playback.duration, playback.currentTime))
-                    .accessibilityLabel("Audio position")
-                HStack {
-                    Text(clockTime(playback.currentTime))
-                    Spacer()
-                    Text(clockTime(playback.duration))
-                }.font(.caption.monospacedDigit()).foregroundStyle(SottoTheme.muted)
-                HStack {
-                    Button("Back 10s") { playback.seek(to: playback.currentTime - 10) }
-                    Button("Forward 10s") { playback.seek(to: playback.currentTime + 10) }
-                }.buttonStyle(.bordered).controlSize(.large)
-            }
+            Slider(value: Binding(get: { playback.currentTime }, set: { playback.seek(to: $0) }),
+                in: 0...(playback.duration > 0 ? max(playback.duration, playback.currentTime) : 1))
+                .accessibilityLabel("Audio position")
+                .disabled(playback.duration <= 0)
+            HStack {
+                Text(clockTime(playback.currentTime))
+                Spacer()
+                Text(clockTime(playback.duration))
+            }.font(.caption.monospacedDigit()).foregroundStyle(SottoTheme.muted)
+            HStack {
+                Button("Back 10s") { playback.seek(to: playback.currentTime - 10) }
+                Button("Forward 10s") { playback.seek(to: playback.currentTime + 10) }
+            }.buttonStyle(.bordered).controlSize(.large)
+                .disabled(playback.duration <= 0)
             if !orderedTurns.isEmpty {
-                if let speaking = orderedTurns.first(where: { isActive($0) }) {
-                    Label("\(speaking.speaker.capitalized) is speaking", systemImage: "waveform")
-                        .font(.callout.bold()).foregroundStyle(SottoTheme.primary)
-                }
                 Divider().padding(.top, 12)
                 Text("The conversation")
                     .font(.system(.title2, design: .serif)).foregroundStyle(SottoTheme.ink)
@@ -79,8 +86,9 @@ struct LearnerAudioPlayer: View {
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 8) {
                     Text(turn.speaker.capitalized).font(.subheadline.bold())
-                    Text("Turn \(index + 1)\(active ? " · Speaking" : "")")
+                    Text("Turn \(index + 1)")
                         .font(.caption).foregroundStyle(active ? SottoTheme.primary : SottoTheme.muted)
+                        .accessibilityLabel("Turn \(index + 1)\(active ? ", speaking" : "")")
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 Button {
@@ -95,7 +103,7 @@ struct LearnerAudioPlayer: View {
                 .accessibilityIdentifier("lesson-audio-turn-\(turn.id)")
             }
             if let text = turn.text, !text.isEmpty {
-                Text(text).font(.body).textSelection(.enabled)
+                Text(ListeningTranscriptText.display(text)).font(.body).textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
