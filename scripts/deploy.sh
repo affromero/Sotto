@@ -28,6 +28,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 source scripts/deploy/schema/rollout.sh
+source scripts/deploy/bootstrap/lifecycle.sh
 
 COMPOSE_INFRA="docker-compose.infra.yml"
 COMPOSE_APP="docker-compose.app.yml"
@@ -177,12 +178,21 @@ if [ ! -f "$ENV_FILE" ]; then
   exit 1
 fi
 
-cp "$ENV_FILE" "$COMPOSE_ENV_FILE"
-chmod 600 "$COMPOSE_ENV_FILE"
+ENV_SNAPSHOT=$(mktemp "${TMPDIR:-/tmp}/sotto-deploy-env.XXXXXXXX")
+readonly ENV_SNAPSHOT
+trap 'rm -f "$ENV_SNAPSHOT"' EXIT
+cp "$ENV_FILE" "$ENV_SNAPSHOT"
+chmod 600 "$ENV_SNAPSHOT"
 set -a
-source "$COMPOSE_ENV_FILE"
+source "$ENV_SNAPSHOT"
 set +a
+BOOTSTRAP_CLEAN_PRIMARY=false
+if [ "${1:-}" = --bootstrap-clean-primary ]; then
+  BOOTSTRAP_CLEAN_PRIMARY=true
+  shift
+fi
 configure_schema_transition "$@"
+bootstrap_validate_mode
 require_env NEXT_PUBLIC_APP_URL
 require_env_min_length BYOK_ENCRYPTION_KEY 32
 
@@ -200,11 +210,38 @@ WEB_PORT_GREEN="${SOTTO_WEB_PORT_GREEN:-3010}"
 
 # --- Slot resolution ---
 
-if [ -f "$SLOT_FILE" ]; then
+if [ -e "$SLOT_FILE" ] || [ -L "$SLOT_FILE" ]; then
+  if [ "$BOOTSTRAP_CLEAN_PRIMARY" = true ]; then
+    echo "ERROR: clean bootstrap cannot adopt an existing deployment slot." >&2
+    exit 1
+  fi
+  if [ ! -f "$SLOT_FILE" ]; then
+    echo "ERROR: deployment slot must be a readable file; inspect the stack before deploying." >&2
+    exit 1
+  fi
   ACTIVE_SLOT=$(cat "$SLOT_FILE")
+  if [ "$ACTIVE_SLOT" != blue ] && [ "$ACTIVE_SLOT" != green ]; then
+    echo "ERROR: existing deployment slot is invalid; inspect the stack before deploying." >&2
+    exit 1
+  fi
 else
-  ACTIVE_SLOT="none"
+  if [ "$BOOTSTRAP_CLEAN_PRIMARY" != true ]; then
+    echo "ERROR: deployment slot is missing; use clean primary bootstrap or reviewed recovery." >&2
+    exit 1
+  fi
+  ACTIVE_SLOT=none
+  BOOTSTRAP_ADMISSION=$(python3 scripts/deploy/bootstrap/admission.py preflight)
+  BOOTSTRAP_ENV_HASH=$(python3 -c 'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$ENV_SNAPSHOT")
 fi
+
+if [ "$BOOTSTRAP_CLEAN_PRIMARY" != true ]; then
+  require_review_inputs
+fi
+
+cp "$ENV_SNAPSHOT" "$COMPOSE_ENV_FILE"
+chmod 600 "$COMPOSE_ENV_FILE"
+rm -f "$ENV_SNAPSHOT"
+trap - EXIT
 
 if [ "$ACTIVE_SLOT" = "blue" ]; then
   NEW_SLOT="green"
@@ -413,24 +450,21 @@ PRESERVE_EXISTING_PROVIDER=false
 if [ "$OLD_SLOT" != none ]; then
   rolling_contract_source=$(<scripts/deploy/checks/rolling-contract.cjs)
   candidate_contract=$(docker run --rm --pull never --network none --entrypoint node "$SOTTO_WORKERS_IMAGE_REF" -e "$rolling_contract_source")
-  contracts_match=true
   previous_contracts="$IMAGE_OVERRIDES/previous-contracts.txt"
   : > "$previous_contracts"
   while IFS= read -r previous_image; do
     [ -z "$previous_image" ] && continue
     previous_contract=$(docker run --rm --pull never --network none --entrypoint node "$previous_image" -e "$rolling_contract_source")
     printf '%s %s\n' "$previous_image" "$previous_contract" >> "$previous_contracts"
-    if [ "$previous_contract" != "$candidate_contract" ]; then contracts_match=false; fi
   done < <(python3 -c 'import json,sys; print("\n".join(sorted({item["image"] for item in json.load(open(sys.argv[1]))["services"].values()})))' "$PREVIOUS_WORKER_IMAGES")
-  if [ "$contracts_match" != true ] || [ "$SCHEMA_TRANSITION" = true ]; then
-    if [ -z "${SOTTO_COMPATIBILITY_REVIEW_FILE:-}" ] || [ -z "${SOTTO_COMPATIBILITY_EVIDENCE_FILE:-}" ]; then
-      echo "ERROR: job, authority, storage or shared-runtime contracts differ. Use a separately reviewed compatibility procedure." >&2
-      exit 1
-    fi
-    python3 scripts/deploy/compatibility-review.py validate "$SOTTO_COMPATIBILITY_REVIEW_FILE" "$SOTTO_COMPATIBILITY_EVIDENCE_FILE" "$candidate_contract" "$previous_contracts" > "$IMAGE_OVERRIDES/compatibility-review.json"
-    chmod 600 "$IMAGE_OVERRIDES/compatibility-review.json"
-    COMPATIBILITY_REVIEWED=true
+  python3 scripts/deploy/provider-activation-gate.py >/dev/null
+  python3 scripts/deploy/compatibility-review.py validate "$SOTTO_COMPATIBILITY_REVIEW_FILE" "$SOTTO_COMPATIBILITY_EVIDENCE_FILE" "$candidate_contract" "$previous_contracts" > "$IMAGE_OVERRIDES/compatibility-review.json"
+  chmod 600 "$IMAGE_OVERRIDES/compatibility-review.json"
+  if [ "$(python3 scripts/deploy/compatibility-review.py activation-mode "$IMAGE_OVERRIDES/compatibility-review.json")" != preserve-existing ]; then
+    echo "ERROR: established deployments require schema-v2 reviewed provider continuity." >&2
+    exit 1
   fi
+  COMPATIBILITY_REVIEWED=true
 fi
 
 if [ "$SCHEMA_TRANSITION" = true ]; then
@@ -440,8 +474,17 @@ if [ "$SCHEMA_TRANSITION" = true ]; then
 fi
 
 DEPLOY_STATE_DIR="$DEPLOY_STATE_ROOT/$SOTTO_RELEASE_SHA-$RETENTION_ATTEMPT_KEY"
-mkdir -p "$DEPLOY_STATE_DIR"
+if [ "$BOOTSTRAP_CLEAN_PRIMARY" = true ]; then
+  mkdir -p "$DEPLOY_STATE_ROOT"
+  chmod 700 "$DEPLOY_STATE_ROOT"
+  mkdir -m 700 "$DEPLOY_STATE_DIR"
+else
+  mkdir -p "$DEPLOY_STATE_DIR"
+fi
 chmod 700 "$DEPLOY_STATE_DIR"
+if [ "$BOOTSTRAP_CLEAN_PRIMARY" = true ]; then
+  bootstrap_prepare
+fi
 if [ "$COMPATIBILITY_REVIEWED" = true ]; then
   review_records=("$IMAGE_OVERRIDES/compatibility-review.json" "$DEPLOY_STATE_DIR/compatibility-review.json")
   if [ "$SCHEMA_TRANSITION" = true ]; then review_records+=("$IMAGE_OVERRIDES/schema-review.json" "$DEPLOY_STATE_DIR/schema-review.json"); fi
@@ -511,6 +554,9 @@ finish_deployment() {
   local status=$?
   trap - EXIT
   set +e
+  if [ "$status" -ne 0 ] && [ "$BOOTSTRAP_CLEAN_PRIMARY" = true ]; then
+    hold_unresolved
+  fi
   if [ "$status" -ne 0 ] && [ "$SCHEMA_FENCED" = true ]; then
     retain_schema_fence
     hold_unresolved
@@ -599,7 +645,7 @@ finish_deployment() {
       python3 scripts/deploy/compatibility-review.py clear "$UNRESOLVED_DEPLOYMENT" "$DEPLOY_STATE_DIR" compatibility-preparation || hold_unresolved
     fi
   fi
-  rm -rf "$IMAGE_OVERRIDES"
+  if [ "$BOOTSTRAP_CLEAN_PRIMARY" != true ]; then rm -rf "$IMAGE_OVERRIDES"; fi
   exit "$status"
 }
 trap finish_deployment EXIT
@@ -646,11 +692,11 @@ else
 
 echo ""
 echo "=== Ensuring infrastructure is running ==="
-docker compose -f "$COMPOSE_INFRA" up -d --no-build --pull never
+docker compose -f "$COMPOSE_INFRA" -p sotto up -d --no-build --pull never
 
 echo "Waiting for postgres..."
 for i in $(seq 1 30); do
-  if docker compose -f "$COMPOSE_INFRA" exec -T postgres pg_isready -h 127.0.0.1 -U "${POSTGRES_USER:-sotto}" >/dev/null 2>&1; then
+  if docker compose -f "$COMPOSE_INFRA" -p sotto exec -T postgres pg_isready -h 127.0.0.1 -U "${POSTGRES_USER:-sotto}" >/dev/null 2>&1; then
     echo "Postgres ready"
     break
   fi
@@ -663,7 +709,7 @@ done
 
 echo "Waiting for redis..."
 for i in $(seq 1 30); do
-  if docker compose -f "$COMPOSE_INFRA" exec -T redis redis-cli -a "$REDIS_PASSWORD" --no-auth-warning ping 2>/dev/null | grep -q PONG; then
+  if docker compose -f "$COMPOSE_INFRA" -p sotto exec -T redis redis-cli -a "$REDIS_PASSWORD" --no-auth-warning ping 2>/dev/null | grep -q PONG; then
     echo "Redis ready"
     break
   fi
@@ -676,7 +722,7 @@ done
 
 echo "Waiting for pgbouncer..."
 for i in $(seq 1 30); do
-  if docker compose -f "$COMPOSE_INFRA" exec -T pgbouncer pg_isready -h 127.0.0.1 -p 5432 -U "${POSTGRES_USER:-sotto}" >/dev/null 2>&1; then
+  if docker compose -f "$COMPOSE_INFRA" -p sotto exec -T pgbouncer pg_isready -h 127.0.0.1 -p 5432 -U "${POSTGRES_USER:-sotto}" >/dev/null 2>&1; then
     echo "PgBouncer ready"
     break
   fi
@@ -687,6 +733,11 @@ for i in $(seq 1 30); do
   sleep 1
 done
 
+fi
+
+# Validate actual service identities before any database mutation.
+if [ "$BOOTSTRAP_CLEAN_PRIMARY" = true ]; then
+  bootstrap_verify_infrastructure
 fi
 
 # The agent CLIs rotate their OAuth refresh token in place and the previous one
@@ -856,6 +907,7 @@ if [ "$COMPATIBILITY_REVIEWED" = true ] && [ "$COMPATIBILITY_CUTOVER" != true ];
   COMPATIBILITY_CUTOVER=true
 fi
 CADDY_CHANGED=true
+if [ "$BOOTSTRAP_CLEAN_PRIMARY" = true ]; then bootstrap_assert_caddy_absent; fi
 sudo install -m 0644 "$TMP_CADDY" "$CADDY_SITE_PATH"
 sudo caddy validate --config /etc/caddy/Caddyfile
 sudo caddy reload --config /etc/caddy/Caddyfile --force
@@ -877,8 +929,12 @@ else
   QUEUES_PAUSED=false
 fi
 
-echo "$NEW_SLOT" > "$SLOT_FILE.next-$$"
-mv "$SLOT_FILE.next-$$" "$SLOT_FILE"
+if [ "$BOOTSTRAP_CLEAN_PRIMARY" = true ]; then
+  bootstrap_save_slot
+else
+  echo "$NEW_SLOT" > "$SLOT_FILE.next-$$"
+  mv "$SLOT_FILE.next-$$" "$SLOT_FILE"
+fi
 TRAFFIC_COMMITTED=true
 echo ""
 echo "=== Saved active slot: $NEW_SLOT ==="
@@ -922,6 +978,9 @@ DEPLOYMENT_COMPLETE=true
 python3 scripts/deploy/production-retention.py backups-success
 if [ -n "${SOTTO_WORKERS_ROLLBACK_TAG:-}" ]; then docker tag "$previous_worker_id" "$SOTTO_WORKERS_ROLLBACK_TAG"; fi
 if [ -n "${SOTTO_WEB_ROLLBACK_TAG:-}" ]; then docker tag "$previous_web_id" "$SOTTO_WEB_ROLLBACK_TAG"; fi
+if [ "$BOOTSTRAP_CLEAN_PRIMARY" = true ]; then
+  bootstrap_clear_marker
+fi
 if [ "$COMPATIBILITY_CUTOVER" = true ]; then
   if [ "$PRESERVE_EXISTING_PROVIDER" = true ]; then
     python3 scripts/deploy/compatibility-review.py continuity-final "$IMAGE_OVERRIDES/compatibility-review.json" "$SOTTO_PROVIDER_ACTIVATION_DIR" "$NEW_SLOT"

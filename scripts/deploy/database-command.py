@@ -35,11 +35,16 @@ def connection_input(url):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('operation', choices=('size', 'dump'))
+    parser.add_argument('operation', choices=('size', 'dump', 'empty'))
     parser.add_argument('--container', default='sotto-prod-postgres')
     args = parser.parse_args()
     payload = connection_input(sys.stdin.read().rstrip('\n'))
-    command = 'psql --no-psqlrc --dbname="$connection" -Atc "SELECT pg_database_size(current_database())"' if args.operation == 'size' else 'pg_dump --dbname="$connection" --format=custom'
+    if args.operation == 'size':
+        command = 'psql --no-psqlrc --dbname="$connection" -Atc "SELECT pg_database_size(current_database())"'
+    elif args.operation == 'empty':
+        command = '''psql --no-psqlrc --dbname="$connection" -v ON_ERROR_STOP=1 -Atc "SELECT (SELECT count(*) FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace WHERE left(n.nspname,3) <> 'pg_' AND n.nspname <> 'information_schema' AND c.relkind IN ('r','p','v','m','S','f')) + (SELECT count(*) FROM pg_catalog.pg_proc p JOIN pg_catalog.pg_namespace n ON n.oid=p.pronamespace WHERE left(n.nspname,3) <> 'pg_' AND n.nspname <> 'information_schema') + (SELECT count(*) FROM pg_catalog.pg_type t JOIN pg_catalog.pg_namespace n ON n.oid=t.typnamespace WHERE left(n.nspname,3) <> 'pg_' AND n.nspname <> 'information_schema') + (SELECT count(*) FROM pg_catalog.pg_namespace n WHERE left(n.nspname,3) <> 'pg_' AND n.nspname NOT IN ('information_schema','public')) + (SELECT count(*) FROM pg_catalog.pg_extension WHERE extname <> 'plpgsql')"'''
+    else:
+        command = 'pg_dump --dbname="$connection" --format=custom'
     script = 'IFS= read -r PGPASSWORD; export PGPASSWORD; IFS= read -r connection; exec ' + command
     try:
         os.fstat(9)
