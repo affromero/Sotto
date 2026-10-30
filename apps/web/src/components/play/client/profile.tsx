@@ -55,7 +55,7 @@ export function PlayProfileBoundary({
       }
       const current = new AbortController();
       controller = current;
-      setChecking(true);
+      if (foreground) setChecking(true);
       if (foreground) setHidden(true);
       try {
         await verifyProfile(profileId, current.signal);
