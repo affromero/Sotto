@@ -102,6 +102,8 @@ class ImageWorkflowTests(ReceiptFixture):
         self.assertGreater(metadata, source.rfind('\nRUN '))
         self.assertGreater(metadata, source.rfind('\nCOPY '))
         self.assertIn('ENV COMMIT_SHA=${COMMIT_SHA}', source[metadata:])
+        cleanup = source.index('RUN node /tmp/prune-worker.cjs')
+        self.assertLess(cleanup, source.index('# ---- Stage 2:'))
 
     def test_browser_cache_input_tracks_only_exact_locked_version(
         self,

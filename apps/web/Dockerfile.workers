@@ -27,6 +27,11 @@ RUN --mount=type=cache,target=/root/.npm npm ci --omit=dev --ignore-scripts \
 RUN npm rebuild esbuild
 RUN npx --no-install prisma generate --schema=apps/web/prisma/schema.prisma
 
+# Workers transpile TypeScript with tsx and never build or serve the Next app.
+# Keep runtime code, types and licenses; omit common dependency source maps.
+COPY scripts/deploy/images/prune-worker.cjs /tmp/prune-worker.cjs
+RUN node /tmp/prune-worker.cjs
+
 # ---- Stage 2: Production runner ----
 FROM ${WORKER_BASE_IMAGE} AS runner
 ARG RUNTIME_UID=1001
