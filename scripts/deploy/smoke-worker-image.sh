@@ -41,7 +41,7 @@ docker run --rm --network "$suffix" \
       import assert from "node:assert/strict";
       import { chromium } from "playwright";
       const require = createRequire(import.meta.url);
-      for (const name of ["vitest", "eslint"]) {
+      for (const name of ["vitest", "eslint", "next"]) {
         assert.throws(() => require.resolve(name), { code: "MODULE_NOT_FOUND" });
       }
       await import("./src/generated/prisma/client.ts");
@@ -54,6 +54,12 @@ docker run --rm --network "$suffix" \
       const pdf = await page.pdf();
       assert.equal(pdf.subarray(0, 5).toString(), "%PDF-");
       await browser.close();
+      const { extractViaMarkit } = await import("./src/lib/extractors/markit.ts");
+      const converted = await extractViaMarkit(pdf, { extension: ".pdf", url: "smoke://worker.pdf" });
+      assert.match(converted.text, /Worker image smoke/);
+      const sharp = require("sharp");
+      const png = await sharp({ create: { width: 1, height: 1, channels: 3, background: "white" } }).png().toBuffer();
+      assert.equal(png.subarray(1, 4).toString(), "PNG");
       const directory = await mkdtemp(join(tmpdir(), "sotto-material-smoke-"));
       try {
         const original = join(directory, "original.pdf");
@@ -68,7 +74,7 @@ docker run --rm --network "$suffix" \
         assert.equal(receipt.text.manifest.hasNonWhitespace, true);
         assert.equal(receipt.image.mimeType, "image/png");
       } finally { await rm(directory, { recursive: true, force: true }); }
-      console.log("Worker imports, migrations, CLIs, Chromium PDF and native page rendering passed");
+      console.log("Worker imports, migrations, CLIs, Chromium, Markit, sharp and native page rendering passed");
       process.exit(0);
     '\''
   '

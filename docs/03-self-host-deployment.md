@@ -277,6 +277,13 @@ SOTTO_ENV_FILE=~/sotto/.env.production bash scripts/deploy.sh
 
 Production deployment uses `SOTTO_IMAGE_SOURCE=registry` and rejects server builds. Build the web and worker images on a separate machine or CI runner. The web image must include your `NEXT_PUBLIC_APP_URL` and `NEXT_PUBLIC_VAPID_PUBLIC_KEY` at build time. Local development and the OSS installer keep their existing compose workflows.
 
+The worker image processes jobs with `tsx`; it does not build or serve the Next.js
+application. Its dependency layer excludes Next.js, its compiler, musl-only native
+packages and common dependency source maps. It retains first-party source, declarations,
+licenses, Prisma tooling, agent CLIs and the glibc native document/image libraries.
+Dependency stack traces may therefore refer to distributed JavaScript rather than
+the original library source. The separate web image retains Next.js.
+
 Set `SOTTO_RELEASE_SHA` to the full committed checkout SHA and provide complete digest references in `SOTTO_WEB_IMAGE_REF` and `SOTTO_WORKERS_IMAGE_REF`. Both images must carry that revision in the `org.opencontainers.image.revision` label. Supply measured positive byte counts from the builder: `SOTTO_WEB_IMAGE_BYTES`, `SOTTO_WEB_TRANSFER_BYTES`, `SOTTO_WORKERS_IMAGE_BYTES`, and `SOTTO_WORKERS_TRANSFER_BYTES`. Expanded image sizes and compressed transfer sizes are separate inputs. The checkout and submodules must be clean and match the selected release; the script does not pull a moving branch.
 
 The production image workflow publishes `production-release.json` and
