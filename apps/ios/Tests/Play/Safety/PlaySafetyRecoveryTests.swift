@@ -36,7 +36,9 @@ final class PlaySafetyRecoveryTests: XCTestCase {
         let polling = Task { await restored.foreground() }
         defer { polling.cancel(); restored.endForeground() }
         try await waitForPlay("The original connection is active after relaunch") { restored.active && restored.boundConnection == connection }
-        try await restored.retryAction(slot: .safety)
+        XCTAssertTrue(restored.gameControlsDisabled)
+        restored.runSafety { try await restored.retryAction(slot: .safety) }
+        try await waitForPlay("The saved safety action is recovered") { restored.state?.pendingSafety == nil }
         let saved = try harness.vault.load()
         XCTAssertNil(saved.pendingSafety)
         XCTAssertEqual(saved.pending, ordinary)

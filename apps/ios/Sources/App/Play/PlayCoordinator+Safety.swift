@@ -14,7 +14,7 @@ extension PlayCoordinator {
     }
 
     var sharingAllowed: Bool { conductAccepted && safetyStatus?.sharingRestricted == false }
-    var gameControlsDisabled: Bool { busy || safetyBusy || state?.pending != nil || state?.pendingSafety != nil || !sharingAllowed }
+    var gameControlsDisabled: Bool { !active || busy || safetyBusy || state?.pending != nil || state?.pendingSafety != nil || !sharingAllowed }
 
     func loadSafetyPolicy(generation: UUID) async throws {
         guard let server = safetyServer else { return }

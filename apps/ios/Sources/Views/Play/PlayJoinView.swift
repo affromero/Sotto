@@ -28,11 +28,11 @@ struct PlayJoinView: View {
                         PlayConductPanel(coordinator: coordinator, accepted: $conduct)
                         Button("Accept conduct for saved invitation") {
                             coordinator.run { try await coordinator.acceptSavedAdmissionConduct() }
-                        }.buttonStyle(SottoPrimaryButtonStyle()).disabled(coordinator.busy || !conduct)
+                        }.buttonStyle(SottoPrimaryButtonStyle()).disabled(!coordinator.active || coordinator.busy || !conduct)
                         if pending.delivery == nil {
                             Button("Keep unavailable old request and start again") {
                                 coordinator.run { try await coordinator.retainUnknownLegacyAdmission() }
-                            }.buttonStyle(SottoSecondaryButtonStyle()).disabled(coordinator.busy || !conduct)
+                            }.buttonStyle(SottoSecondaryButtonStyle()).disabled(!coordinator.active || coordinator.busy || !conduct)
                             Text("Use this only if the server cannot find the saved request. Its original proof is kept in recoveries.")
                                 .font(.caption).foregroundStyle(SottoTheme.muted)
                         }
@@ -43,17 +43,17 @@ struct PlayJoinView: View {
                     if let original = pending.existingConnection, original != model.credentials {
                         Button("Return to \(original.selectedProfile?.name ?? "original profile") at \(original.serverURL.host() ?? "server")") {
                             coordinator.run { try await coordinator.switchConnection(original) }
-                        }.buttonStyle(SottoSecondaryButtonStyle()).disabled(coordinator.busy)
+                        }.buttonStyle(SottoSecondaryButtonStyle()).disabled(!coordinator.active || coordinator.busy)
                     }
                     if coordinator.joinStatus == .accepted || coordinator.joinStatus == .claimed || pending.delivery != nil {
                         Text("Join as \(pending.delivery?.profile.name ?? pending.command.candidate.name ?? pending.existingConnection?.selectedProfile?.name ?? "your profile") at \(invite.serverURL.host() ?? "this server").\(pending.command.candidate.kind == .new ? " Your current connection, \(model.activeProfile?.name ?? "unpaired") at \(model.credentials?.serverURL.host() ?? "this device"), stays saved." : "")")
                             .font(.callout)
                         Button("Finish joining") { coordinator.run { try await coordinator.finishAdmission() } }
-                            .buttonStyle(SottoPrimaryButtonStyle()).disabled(coordinator.busy
+                            .buttonStyle(SottoPrimaryButtonStyle()).disabled(!coordinator.active || coordinator.busy
                                 || (pending.command.acceptedConductVersion == nil && pending.conductVersion == nil))
                     } else {
                         Button("Retry saved request") { coordinator.run { try await coordinator.retryIntake() } }
-                            .buttonStyle(SottoSecondaryButtonStyle()).disabled(coordinator.busy)
+                            .buttonStyle(SottoSecondaryButtonStyle()).disabled(!coordinator.active || coordinator.busy)
                     }
                     if pending.delivery == nil {
                         Button("Discard this invitation", role: .destructive) {
@@ -70,7 +70,7 @@ struct PlayJoinView: View {
                     if let profile = model.activeProfile, model.credentials?.serverURL == invite.serverURL {
                         Button("Ask to join as \(profile.name)") {
                             coordinator.run { try await coordinator.join(settings: settings, name: "", existing: true, acceptedConduct: conduct) }
-                        }.buttonStyle(SottoPrimaryButtonStyle()).disabled(coordinator.busy || !settings.isValid || !conduct
+                        }.buttonStyle(SottoPrimaryButtonStyle()).disabled(!coordinator.active || coordinator.busy || !settings.isValid || !conduct
                             || coordinator.policyServer != invite.serverURL)
                         Divider()
                     }
@@ -83,7 +83,7 @@ struct PlayJoinView: View {
                     Button("Ask to join as a new learner") {
                         coordinator.run { try await coordinator.join(settings: settings, name: name, existing: false, acceptedConduct: conduct) }
                     }.buttonStyle(SottoSecondaryButtonStyle())
-                        .disabled(coordinator.busy || !conduct || coordinator.policyServer != invite.serverURL
+                        .disabled(!coordinator.active || coordinator.busy || !conduct || coordinator.policyServer != invite.serverURL
                             || !consent || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !settings.isValid)
                     Button("Use another invitation") {
                         do { try coordinator.discardInvitation() } catch { coordinator.report(error) }

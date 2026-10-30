@@ -46,9 +46,10 @@ struct PlayReportView: View {
         .confirmationDialog("Block this partner and end your games together?", isPresented: $confirmingBlock, titleVisibility: .visible) {
             if let room = coordinator.reportRoom {
                 Button("Block partner", role: .destructive) { coordinator.runSafety { try await coordinator.blockPartner(in: room) } }
+                    .disabled(controlsDisabled)
             }
             Button("Cancel", role: .cancel) { }
         }
     }
-    private var controlsDisabled: Bool { coordinator.safetyBusy || coordinator.state?.pendingSafety != nil }
+    private var controlsDisabled: Bool { !coordinator.active || coordinator.safetyBusy || coordinator.state?.pendingSafety != nil }
 }

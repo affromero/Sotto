@@ -37,11 +37,11 @@ struct PlayRootView: View {
                             if pending.connection != model.credentials {
                                 Button("Restore safety action's original connection") {
                                     coordinator.runSafety { try await coordinator.switchConnection(pending.connection) }
-                                }.buttonStyle(SottoSecondaryButtonStyle()).disabled(coordinator.safetyBusy)
+                                }.buttonStyle(SottoSecondaryButtonStyle()).disabled(!coordinator.active || coordinator.safetyBusy)
                             } else {
                                 Button("Recover saved safety action") {
                                     coordinator.runSafety { try await coordinator.retryAction(slot: .safety) }
-                                }.buttonStyle(SottoPrimaryButtonStyle()).disabled(coordinator.safetyBusy)
+                                }.buttonStyle(SottoPrimaryButtonStyle()).disabled(!coordinator.active || coordinator.safetyBusy)
                             }
                             Button("Discard saved safety action", role: .destructive) { discardingSafety = pending.id }
                                 .frame(minHeight: 44).disabled(coordinator.safetyBusy)
@@ -52,10 +52,10 @@ struct PlayRootView: View {
                             if pending.connection != model.credentials {
                                 Button("Restore original connection") {
                                     coordinator.run { try await coordinator.switchConnection(pending.connection) }
-                                }.buttonStyle(SottoSecondaryButtonStyle()).disabled(normalLocked || coordinator.busy)
+                                }.buttonStyle(SottoSecondaryButtonStyle()).disabled(normalLocked || !coordinator.active || coordinator.busy)
                             } else {
                                 Button("Recover pending action") { coordinator.run { try await coordinator.retryAction() } }
-                                    .buttonStyle(SottoSecondaryButtonStyle()).disabled(normalLocked || coordinator.busy)
+                                    .buttonStyle(SottoSecondaryButtonStyle()).disabled(normalLocked || !coordinator.active || coordinator.busy)
                             }
                             Button("Discard pending action", role: .destructive) { discardingAction = pending.id }
                                 .frame(minHeight: 44).disabled(normalLocked || coordinator.busy)
@@ -100,7 +100,8 @@ struct PlayRootView: View {
             }
         }
         .task(id: Lifecycle(scene: scenePhase, screen: coordinator.screen,
-            connection: coordinator.connectionGeneration, recovery: recovery)) {
+            connection: coordinator.connectionGeneration, navigation: coordinator.navigationGeneration, recovery: recovery)) {
+            guard !Task.isCancelled else { return }
             guard scenePhase == .active else { coordinator.endForeground(); return }
             await coordinator.foreground()
         }
@@ -137,6 +138,7 @@ struct PlayRootView: View {
         let scene: ScenePhase
         let screen: PlayScreen
         let connection: UUID
+        let navigation: UUID
         let recovery: UUID
     }
     private var discardBinding: Binding<Bool> {

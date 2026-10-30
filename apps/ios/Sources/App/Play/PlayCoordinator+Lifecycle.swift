@@ -2,6 +2,7 @@ import Foundation
 
 extension PlayCoordinator {
     func foreground() async {
+        guard !Task.isCancelled else { return }
         endForeground()
         active = true
         accessRevoked = false

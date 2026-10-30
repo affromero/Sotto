@@ -4,6 +4,40 @@ import XCTest
 
 @MainActor
 final class PlayLifecycleTests: XCTestCase {
+    func testReselectingTheSameRoomKeepsTheNewForegroundAndPreservesDrafts() async throws {
+        let fixtures = try PlayTestFixtures.load()
+        let old = try fixtures.room(revision: 3)
+        let current = try fixtures.room(revision: 4)
+        let after = try fixtures.room(round: "one-pick-0-HOST", revision: 5)
+        let scenario = PlayHTTPScenario()
+        scenario.set("GET /api/v1/play/rooms/fixture-room", [try .json(old, delay: 1), try .json(current)])
+        scenario.set("POST /api/v1/play/rooms/fixture-room/actions", [try .json(after)])
+        let harness = try await PlaySafetyHarness.start(scenario: scenario, screen: .room(current.id))
+        defer { harness.stop() }
+        try await waitForPlay("The first room request is in flight") {
+            harness.server.requests.contains { $0.hasPrefix("GET /api/v1/play/rooms/fixture-room ") }
+        }
+        try harness.coordinator.save { $0.drafts["turn"] = "Keep this draft" }
+        harness.coordinator.navigate(.room(current.id))
+        XCTAssertTrue(harness.coordinator.gameControlsDisabled)
+        let replacement = Task { await harness.coordinator.foreground() }
+        defer { replacement.cancel(); harness.coordinator.endForeground() }
+        try await waitForPlay("The replacement foreground displays the current room") {
+            harness.coordinator.room == current && !harness.coordinator.gameControlsDisabled
+        }
+        await harness.polling.value
+        try await Task.sleep(for: .seconds(1))
+        let cancelledForeground = Task { await harness.coordinator.foreground() }
+        cancelledForeground.cancel()
+        await cancelledForeground.value
+        XCTAssertTrue(harness.coordinator.active)
+        XCTAssertEqual(harness.coordinator.room, current)
+        XCTAssertEqual(try harness.vault.load().drafts["turn"], "Keep this draft")
+        harness.coordinator.run { try await harness.coordinator.command(.choose(.A), in: current) }
+        try await waitForPlay("One choice reaches the current room") { harness.coordinator.room == after }
+        XCTAssertEqual(harness.server.requests.filter { $0.hasPrefix("POST /api/v1/play/rooms/fixture-room/actions ") }.count, 1)
+    }
+
     func testSavingVisibleLanguageSendsRequiredNullOrSelectedContextAndCompletesRecovery() async throws {
         let room = try PlayTestFixtures.load().room(round: "finished-0-HOST")
         let round = try XCTUnwrap(room.round)
