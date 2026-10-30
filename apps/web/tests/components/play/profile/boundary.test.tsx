@@ -1,15 +1,101 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PlayProfileBoundary } from '@/components/play/client/profile';
 import { PlayNotebook } from '@/components/play/PlayNotebook';
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: () => {} }) }));
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
+function deferredResponse() {
+  let resolve: (value: Response) => void = () => {
+    throw new Error('Response resolver is unavailable');
+  };
+  let reject: (reason: Error) => void = () => {
+    throw new Error('Response rejecter is unavailable');
+  };
+  const promise = new Promise<Response>((onResolve, onReject) => {
+    resolve = onResolve;
+    reject = onReject;
+  });
+  return { promise, resolve, reject };
+}
+
+function PrivateAction() {
+  const [count, setCount] = useState(0);
+  return (
+    <>
+      <p>Private game content</p>
+      <button onClick={() => setCount((value) => value + 1)}>Take action</button>
+      <output aria-label="completed actions">{count}</output>
+    </>
+  );
+}
+
+async function startWithPendingPeriodicCheck() {
+  vi.useFakeTimers();
+  vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible');
+  const pending = deferredResponse();
+  const foreground = deferredResponse();
+  let requests = 0;
+  vi.stubGlobal('fetch', async () => {
+    requests += 1;
+    if (requests === 1) return Response.json({ id: 'first' });
+    return requests === 2 ? pending.promise : foreground.promise;
+  });
+  render(
+    <PlayProfileBoundary profileId="first">
+      <PrivateAction />
+    </PlayProfileBoundary>
+  );
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(0);
+  });
+  expect(screen.getByRole('button', { name: 'Take action' })).toBeEnabled();
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(5000);
+  });
+  return { pending, foreground };
+}
+
 describe('private Play profile lifetime', () => {
+  it('allows one action while a periodic profile check is pending', async () => {
+    const { pending } = await startWithPendingPeriodicCheck();
+    const action = screen.getByRole('button', { name: 'Take action' });
+    expect(action).toBeEnabled();
+    fireEvent.click(action);
+    expect(screen.getByLabelText('completed actions')).toHaveTextContent('1');
+    await act(async () => pending.resolve(Response.json({ id: 'first' })));
+  });
+
+  it('removes private content when a pending periodic check finds another profile', async () => {
+    const { pending } = await startWithPendingPeriodicCheck();
+    await act(async () => pending.resolve(Response.json({ id: 'second' })));
+    expect(screen.getByRole('alert')).toHaveTextContent(/active profile changed/);
+    expect(screen.queryByText('Private game content')).not.toBeInTheDocument();
+  });
+
+  it('disables the private view if a periodic profile check fails', async () => {
+    const { pending } = await startWithPendingPeriodicCheck();
+    await act(async () => pending.reject(new Error('Profile check failed')));
+    expect(screen.getByRole('alert')).toHaveTextContent('Profile check failed');
+    expect(screen.getByRole('button', { name: 'Take action' })).toBeDisabled();
+  });
+
+  it('keeps content hidden until a foreground check supersedes a pending periodic check', async () => {
+    const { pending, foreground } = await startWithPendingPeriodicCheck();
+    act(() => window.dispatchEvent(new Event('focus')));
+    expect(screen.queryByText('Private game content')).not.toBeVisible();
+    await act(async () => pending.resolve(Response.json({ id: 'first' })));
+    expect(screen.queryByText('Private game content')).not.toBeVisible();
+    await act(async () => foreground.resolve(Response.json({ id: 'first' })));
+    expect(screen.getByText('Private game content')).toBeVisible();
+  });
+
   it('clears notebook and course caches on a foreground profile change and sends the original profile assertion', async () => {
     let current = 'first';
     const assertions: (string | null)[] = [];
