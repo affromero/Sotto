@@ -205,10 +205,13 @@ Actions runs and image identities. Use the published canonical measurements and
 worker runtime inventories for preflight. Do not download images locally just
 to repeat measurements or compatibility probes already verified by CI.
 
-Use the committed deployment runner for reviewed provider continuity. Review
-schema version 2 binds all four previous container identities, both complete
-provider asset inventories and every changed runtime file. It preserves an
-already-enabled provider; first activation keeps its separate readiness checks.
+Use the committed deployment runner for reviewed provider continuity. Every
+established deployment requires a schema version 2 review binding all four
+previous container identities, both complete provider asset inventories and
+every changed runtime file. Independently verify implicit provider activation
+before selecting it in the review. Use the explicit clean-primary bootstrap only
+for fresh production setup; existing stacks with missing slots require reviewed
+recovery.
 Never replace this with a temporary runner that skips those checks.
 
 After both stacks are healthy, finalize only the successful release's exact

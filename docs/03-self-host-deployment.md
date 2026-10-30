@@ -253,6 +253,23 @@ sudo systemctl reload caddy
 
 ## 6. Deploy
 
+The production runner requires a valid saved slot and a schema version 2
+continuity review for established stacks. A missing or invalid slot on an
+existing stack requires separately reviewed recovery. For a clean primary
+production installation, use the explicit setup command below. For a dedicated
+self-hosted install, use the installer in the opening section instead.
+
+```bash
+SOTTO_ENV_FILE=~/sotto/.env.production bash scripts/deploy.sh --bootstrap-clean-primary
+```
+
+Clean bootstrap accepts only the primary `sotto` stack with new local data
+volumes and the documented PostgreSQL and Redis service endpoints. It rejects
+existing containers, volumes, networks, backup or retention records, and Caddy
+destinations. Preinstall the infrastructure images and capacity checker. An
+interrupted setup retains its resources and unresolved marker for reviewed
+recovery. Do not remove the marker or retry setup against the same data.
+
 ```bash
 cd ~/sotto
 SOTTO_ENV_FILE=~/sotto/.env.production bash scripts/deploy.sh
@@ -515,24 +532,34 @@ resolution or marker deletion is never a retry strategy.
 
 ### Reviewed runtime compatibility
 
+Every deployment to an established stack requires a schema version 2 runtime
+continuity review, including deployments with matching rolling contracts and
+no configured Fish state. A missing or invalid deployment slot on an existing
+stack stops the production runner and requires reviewed recovery.
+For a new self-hosted installation on a dedicated host, use the installer in
+the opening section of this guide. The installer does not bootstrap a shared
+production stack. The previous schema version 1 first-activation procedure no
+longer applies to established stacks.
+
 For a runtime upgrade with unchanged Prisma assets, independently review the
 exact current and candidate immutable images before enabling overlap. Compare
 installed dependency versions and executable changes, existing queued job
 versions and payloads, credential envelopes, authority checks, storage records,
 provider execution ownership, and cleanup semantics. Verify that old HTTP
 requests can finish safely while new workers run. Verify that shared state
-written before old HTTP retirement remains readable by the old code. Defer
-new provider state when the old catalog cannot read it. A version number or passing schema hash does not establish
-that compatibility.
+written before old HTTP retirement remains readable by the old code. If the old
+catalog cannot read new provider state, stop and prepare a separately reviewed
+procedure. A version number or passing schema hash does not establish that
+compatibility.
 
 Set `SOTTO_COMPATIBILITY_REVIEW_FILE` and
 `SOTTO_COMPATIBILITY_EVIDENCE_FILE` to private, operator-owned regular files.
-The evidence contains the actual independent review. A schema version 1 review
-file is JSON with exactly these fields:
+The evidence contains the actual independent review. A schema version 2 review
+file is JSON with these fields and the `providerActivation` object below:
 
 | Field                     | Required value                                                              |
 | ------------------------- | --------------------------------------------------------------------------- |
-| `schemaVersion`           | Integer `1`                                                                 |
+| `schemaVersion`           | Integer `2`                                                                 |
 | `procedure`               | `compatible-runtime-overlap`                                                |
 | `stack`                   | Exact `SOTTO_STACK`                                                         |
 | `releaseSha`              | Full candidate source SHA                                                   |
@@ -551,27 +578,12 @@ duplicate JSON fields, stale identities, extra fields, changed evidence, and
 unreviewed mismatches. Accepted review and evidence bytes are saved together
 in the durable attempt directory before services change.
 
-For first activation, the Fish upgrade also inspects existing credentials, profile and server
-selections, episodes, segments, voice assignments, and queued work without
-changing them. Existing Fish state rejects
-this procedure. The candidate web and workers receive a read-only directory
-mount with `SOTTO_PROVIDER_ACTIVATION_FILE`, bound to `SOTTO_RELEASE_SHA`.
-It keeps Fish credential saves, selections, configuration writes, episode
-admission, audio retries, and HTTP dispatch disabled while old HTTP remains
-active. Other providers stay usable.
-The mounted gate is readable by the verified runtime UID without exposing the
-private review directory. Missing, unreadable, malformed, oversized, symlinked,
-empty, or mismatched configured gates fail closed. An absent variable preserves
-ordinary local behavior.
-
-An already-enabled Fish installation can instead use a schema version 2 review.
-It retains every version 1 field and adds `providerActivation` with these exact
-fields:
+The `providerActivation` object contains exactly these fields:
 
 | Field                  | Required value                                                                                                                       |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | `mode`                 | `preserve-existing`                                                                                                                  |
-| `previousReleaseSha`   | Full source SHA of the currently enabled installation                                                                                |
+| `previousReleaseSha`   | Full source SHA of the previous installation                                                                                         |
 | `previousAssetsHash`   | Complete protected asset hash of the previous workers                                                                                |
 | `candidateAssetsHash`  | Complete protected asset hash of the candidate workers                                                                               |
 | `reviewedRuntimeFiles` | Exact changed file paths, each with `previousSha256` and `candidateSha256`; use `null` only for an added or removed file             |
@@ -582,23 +594,29 @@ Generate both asset inventories with
 changed file set and the resulting behavior. Every changed asset must appear in
 the review; wildcards, missing changes and unrelated entries are rejected. By
 default, the runner verifies each captured runtime's source revision, enabled
-activation record and unique read-only mount. It prepares an enabled candidate record,
-then checks old and candidate mounts again before switching traffic. This
-preserves the existing activation while retaining compatibility, backup, queue,
-capacity and recovery checks. It does not authorize first activation or accept
-provider changes without review.
+activation record and unique read-only mount. It prepares an enabled candidate
+record before starting the candidate services, then checks the old and
+candidate runtimes again before switching traffic. The reviewer must establish
+that this overlap is safe, including when Fish has never been configured.
+Compatibility, backup, queue, capacity and recovery checks still apply.
 
 Each previous runtime defaults to `activationMode: "release-record"`, which
 requires the enabled release-bound record and read-only mount. An independent
 review may explicitly select `activationMode: "implicit-enabled"` when that
 exact previous runtime already permits the provider with its activation variable
-absent. The complete protected inventories bind the reviewed activation code.
+absent. Independently verify this behavior for each runtime. An absent variable
+alone does not prove that the old runtime supports Fish or can safely overlap
+with the candidate. The protected inventories bind the reviewed activation code.
 The guard still checks its container, image, release, ownership and running
 state. It rejects any activation environment entry, including an empty or bare
 entry, and any mount covering or inside the activation directory. This mode
 applies only to captured previous runtimes and the old web during overlap.
-Every candidate still requires a new enabled release-bound record and read-only
-mount. First activation retains its separate readiness checks.
+Every candidate requires a new enabled release-bound record and read-only mount.
+The mounted gate is readable by the verified runtime UID without exposing the
+private review directory. Missing, unreadable, malformed, oversized, symlinked,
+empty, or mismatched configured gates fail closed. An absent variable preserves
+ordinary local behavior. If a previous runtime cannot satisfy the reviewed
+continuity requirements, stop and prepare a separately reviewed procedure.
 
 After saving original queue flags, a compatibility rollout persists a
 `compatibility-preparation` recovery marker before pausing or replacing
@@ -618,10 +636,11 @@ code. Do not clear the marker to retry a deployment.
 
 Successful rollout clears its cutover marker only after public health, old
 HTTP retirement, image retention, backup retention and rollback-tag updates
-finish. Only then does a first-activation rollout atomically enable Fish. The mounted gate
-directory remains available for the active containers. Saved old image digests remain recovery evidence. They do not authorize
-rolling back after a new provider or job format has been activated. Register
-the operator's Fish key and test it after old services have fully settled.
+finish. The enabled candidate gate directory remains available for the active
+containers. Saved old image digests remain recovery evidence. They do not
+authorize rolling back after a new provider or job format has been activated.
+Register the operator's Fish key and test it after old services have fully
+settled.
 
 Rollback protection records live in `PRODUCTION_IMAGE_RETENTION_DIR`, defaulting to `$HOME/.local/state/production-image-retention`. Each attempt protects its incoming and existing image IDs before service changes. Success retains the new images and pre-deploy images; failed-attempt records remain until reviewed maintenance retires them. Deployment does not prune images, build caches or volumes.
 
@@ -633,7 +652,7 @@ The deploy script:
 2. copies `.env.production` to `.env` for Docker Compose;
 3. admits the measured image budget, pulls verified digests and rechecks capacity;
 4. records rollback image protection and validates Caddy;
-5. verifies existing infrastructure, access state and migration checksums (first install starts infrastructure and initializes the database);
+5. verifies existing infrastructure, access state and migration checksums;
 6. backs up the database while the current site serves, then checks RAM for overlapping web slots;
 7. starts and health-checks the new web slot, then runs `scripts/smoke-prod.sh`;
 8. preserves queue flags, pauses delivery and drains jobs before replacing idle workers individually;
