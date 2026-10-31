@@ -72,7 +72,7 @@
   },
   "dependencies": {
     "@prisma/client": "7.10.1",
-    "bullmq": "6.3.15",
+    "bullmq": "6.4.1",
     "ioredis": "6.0.0",
     "pg": "^8.23.1",
     "thesidedoor-core": "0.5.7",
@@ -83,9 +83,9 @@
     "braces": "file:vendor/braces",
     "esbuild": "0.28.2",
     "eslint": "10.13.0",
-    "knip": "6.41.0",
+    "knip": "6.43.0",
     "lint-staged": "^17.6.0",
-    "postcss": "^8.5.30",
+    "postcss": "^8.5.31",
     "prettier": "^3.9.10",
     "prisma": "7.10.1",
     "sharp": "0.35.5",
@@ -93,7 +93,7 @@
     "vitest": "4.1.12"
   },
   "optionalDependencies": {
-    "@next/swc-darwin-arm64": "^16.4.2"
+    "@next/swc-darwin-arm64": "^16.4.3"
   },
   "engines": {
     "node": ">=24 <25"
