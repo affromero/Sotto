@@ -284,13 +284,27 @@ jobs:
           -destination "platform=iOS Simulator,id=$SOTTO_IPHONE_SIMULATOR"
           -destination "platform=iOS Simulator,id=$SOTTO_IPAD_SIMULATOR"
           -maximum-concurrent-test-simulator-destinations 1
+          -skip-testing:SottoUITests/PlayInvitationUITests
           -resultBundlePath "$RUNNER_TEMP/sotto-ios-results.xcresult"
+          CODE_SIGN_IDENTITY=-
+      - name: Run invitation journey without parallel test workers
+        run: >-
+          xcodebuild test
+          -project apps/ios/Sotto.xcodeproj
+          -scheme Sotto
+          -destination "platform=iOS Simulator,id=$SOTTO_IPHONE_SIMULATOR"
+          -destination "platform=iOS Simulator,id=$SOTTO_IPAD_SIMULATOR"
+          -parallel-testing-enabled NO
+          -only-testing:SottoUITests/PlayInvitationUITests
+          -resultBundlePath "$RUNNER_TEMP/sotto-ios-invitation-results.xcresult"
           CODE_SIGN_IDENTITY=-
       - name: Preserve failed iOS test results
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ios-test-results-${{ github.sha }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/sotto-ios-results.xcresult
+          path: |
+            ${{ runner.temp }}/sotto-ios-results.xcresult
+            ${{ runner.temp }}/sotto-ios-invitation-results.xcresult
           retention-days: 7
           if-no-files-found: warn
