@@ -28,6 +28,14 @@ import {
   placementInputSchema,
 } from './journal';
 
+export class PlacementSessionResumeRequired extends MaterialAnalysisConflict {
+  constructor(readonly placementSessionId: string) {
+    super(
+      `Resume placement session ${placementSessionId}. An equivalent quiz is already retained or requires explicit recovery.`
+    );
+  }
+}
+
 const placementGenerationPayload = (userId: string, placementSessionId: string) => ({
   userId,
   placementSessionId,
@@ -137,10 +145,7 @@ export async function requestPlacementSession(
           ],
         },
       });
-      if (unresolved)
-        throw new MaterialAnalysisConflict(
-          `Resume placement session ${unresolved.id}. An equivalent quiz is already retained or requires explicit recovery.`
-        );
+      if (unresolved) throw new PlacementSessionResumeRequired(unresolved.id);
       const source = reference(input);
       const analysis = source
         ? await readPlacementAnalysis(database, {

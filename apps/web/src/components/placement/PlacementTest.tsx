@@ -27,7 +27,8 @@ const placementResponseSchema = placementSessionPublicSchema
     questions: true,
   })
   .partial()
-  .extend({ error: z.string().optional() });
+  .extend({ error: z.string().optional() })
+  .strip();
 
 interface PlacementResult {
   courseId: string;
@@ -110,6 +111,14 @@ export function PlacementTest({
       });
       let data = placementResponseSchema.parse(await res.json());
       if (!current()) return;
+      if (res.status === 409 && data.placementSessionId) {
+        res = await fetch(
+          `/api/v1/placement?placementSessionId=${encodeURIComponent(data.placementSessionId)}`,
+          { signal: controller.signal }
+        );
+        data = placementResponseSchema.parse(await res.json());
+        if (!current()) return;
+      }
       while (res.ok && res.status === 202) {
         if (!data.placementSessionId || !data.questionsDigest)
           throw new Error('Missing placement preparation receipt.');

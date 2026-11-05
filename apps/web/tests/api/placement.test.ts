@@ -169,6 +169,30 @@ suite('profile-bound asynchronous placement HTTP', () => {
     });
     expect((await POST(invalid)).status).toBe(400);
   });
+  it('returns an owned retained session identity so a reopened browser can resume without another generation', async () => {
+    const headers = {
+      cookie: `sotto_session=${owner.ownerToken}`,
+      origin,
+      'content-type': 'application/json',
+    };
+    const request = () =>
+      new NextRequest(`${origin}/api/v1/placement/generate`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          schemaVersion: 1,
+          requestId: randomUUID(),
+          native: 'en',
+          target: 'de',
+        }),
+      });
+    const first = await generate(request());
+    const saved = await first.json();
+    const reopened = await generate(request());
+    expect(reopened.status).toBe(409);
+    expect((await reopened.json()).placementSessionId).toBe(saved.placementSessionId);
+    expect(await instance.database.placementSession.count()).toBe(1);
+  });
   it('preserves the admission rate limit while allowing exact receipt replay and polling after it is exhausted', async () => {
     const query = 'native=en&target=de&requestId=' + randomUUID();
     const first = await get(query),
