@@ -93,8 +93,8 @@ afterEach(() => {
 });
 
 describe('optional lesson language help', () => {
-  it('keeps the reported beginner request explanation concealed while help is opened and reopened', async () => {
-    // The teaching is synthetic; the Spanish help preserves the reported excerpts.
+  it('keeps the guided answer concealed while beginner help is opened and reopened', async () => {
+    // Only the translated guided prompt and hint are taken from the report.
     const savedLesson = {
       ...lesson,
       title: 'Primeras palabras en ruso',
