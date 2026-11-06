@@ -39,6 +39,7 @@ describe('offline recognition comparison', () => {
   it('scores held-out answers before observing their outcomes', () => {
     const correct = compareReviewEvents(history([1, 1, 1]), cutoff);
     const incorrect = compareReviewEvents(history([1, 1, 0]), cutoff);
+    expect(correct.fsrsRecall?.meanPrediction).toBeCloseTo(0.94461078, 8);
     expect(correct.fsrsRecall?.meanPrediction).toBe(incorrect.fsrsRecall?.meanPrediction);
     expect(correct.currentMasteryBaseline?.meanPrediction).toBe(
       incorrect.currentMasteryBaseline?.meanPrediction
