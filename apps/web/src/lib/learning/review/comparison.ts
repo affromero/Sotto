@@ -136,7 +136,7 @@ export function compareReviewEvents(input: readonly ComparisonEvent[], testAfter
       else {
         fsrsPredictions.push({
           expected: event.quality,
-          predicted: scheduler.get_retrievability(card, now, false),
+          predicted: scheduler.retrievability(card, now),
         });
         masteryPredictions.push({ expected: event.quality, predicted: event.before.mastery });
         coverage.heldOutObservations++;
