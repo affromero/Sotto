@@ -8,6 +8,24 @@ final class NativeLearningSessionState {
 }
 
 extension SottoAppModel {
+    func startVocabularyStudy(courseId: String, mode: SottoVocabularyMode, requestId: UUID, wordIds: [String] = []) async throws -> SottoPracticeStart {
+        guard let client = makeClient() else { throw SottoAPIError.message("Pair this device to study vocabulary.") }
+        let response = try await client.startVocabularyStudy(courseId: courseId, requestId: requestId, mode: mode, wordIds: wordIds)
+        guard isCurrentLearningClient(client), courses.contains(where: { $0.id == courseId }) else { throw CancellationError() }
+        guard response.isVocabularyStudy, response.courseId == courseId,
+              response.sessionId.lowercased() == requestId.uuidString.lowercased(), response.mode == mode.rawValue,
+              response.cards?.isEmpty == false, response.progressRevision != nil else {
+            throw SottoAPIError.message("The saved vocabulary session could not be verified. Retry the same request.")
+        }
+        return response
+    }
+
+    func presentVocabularyStudy(_ response: SottoPracticeStart, courseId: String) {
+        practiceCourses[response.sessionId] = courseId
+        practiceResult = nil
+        practiceStart = response
+    }
+
     func speakingState(source: SpeakingPromptSource, promptId: String) -> NativeSpeakingState {
         let attempt: Int
         if case let .classSession(id) = source, selectedClass?.id == id { attempt = selectedClass?.attempt ?? 1 }

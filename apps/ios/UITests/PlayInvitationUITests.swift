@@ -33,11 +33,6 @@ final class PlayInvitationUITests: XCTestCase {
         XCTAssertTrue(name.waitForExistence(timeout: 15), app.debugDescription)
         XCTAssertFalse(name.isEnabled, "The proposed name stays local until conduct is accepted.")
         try tap("play.conductConsent", type: .switch, app: app)
-        let conductAccepted = XCTNSPredicateExpectation(
-            predicate: NSPredicate(format: "value == %@", "1"),
-            object: app.switches["play.conductConsent"]
-        )
-        await fulfillment(of: [conductAccepted], timeout: 10)
         XCTAssertTrue(name.wait(for: \.isEnabled, toEqual: true, timeout: 10), app.debugDescription)
         try fill("play.newName", value: "Native Sam", app: app)
         let preview = app.staticTexts["Alex invited you to a little of everything."]
@@ -58,12 +53,11 @@ final class PlayInvitationUITests: XCTestCase {
         app.swipeUp()
         let consent = app.switches["Create my learner profile on this server"]
         XCTAssertTrue(consent.waitForExistence(timeout: 5))
+        let join = app.buttons["Ask to join as a new learner"]
+        XCTAssertTrue(join.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertFalse(join.isEnabled, "Joining requires explicit profile creation consent.")
         try tap("Create my learner profile on this server", type: .switch, app: app)
-        let profileCreationAccepted = XCTNSPredicateExpectation(
-            predicate: NSPredicate(format: "value == %@", "1"), object: consent
-        )
-        await fulfillment(of: [profileCreationAccepted], timeout: 10)
-        XCTAssertEqual(consent.value as? String, "1", app.debugDescription)
+        XCTAssertTrue(join.wait(for: \.isEnabled, toEqual: true, timeout: 10), app.debugDescription)
         try tap("Ask to join as a new learner", app: app)
         try tap("Finish joining", app: app, timeout: 15)
         let firstCard = app.buttons["play.choice.A"]

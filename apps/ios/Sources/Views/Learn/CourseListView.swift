@@ -343,6 +343,7 @@ private struct CourseDetailPane: View {
     @State private var showingExams = false
     @State private var showingPlacement = false
     @State private var showingMemory = false
+    @State private var vocabularyAfterMemory = false
     @State private var showingLive = false
     @State private var showingLearningMap = false
     @State private var pendingFailedClassRemoval: SottoFailedClassRemoval?
@@ -472,8 +473,16 @@ private struct CourseDetailPane: View {
             LiveConversationView(course: course)
                 .environmentObject(model)
         }
-        .sheet(isPresented: $showingMemory) {
-            MemoryGraphView(course: course)
+        .sheet(isPresented: $showingMemory, onDismiss: {
+            if vocabularyAfterMemory {
+                vocabularyAfterMemory = false
+                model.vocabularyCourseId = course.id
+            }
+        }) {
+            MemoryGraphView(course: course, onReview: {
+                vocabularyAfterMemory = true
+                showingMemory = false
+            })
                 .environmentObject(model)
         }
         .sheet(isPresented: $showingPlacement) {
@@ -509,6 +518,10 @@ private struct CourseDetailPane: View {
     }
 
     private func startPractice(_ kind: String) {
+        if kind == "VOCAB" {
+            model.vocabularyCourseId = course.id
+            return
+        }
         model.run {
             await model.startPractice(courseId: course.id, kind: kind)
         }

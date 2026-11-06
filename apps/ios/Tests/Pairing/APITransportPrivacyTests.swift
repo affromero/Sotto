@@ -3,6 +3,80 @@ import XCTest
 
 @testable import Sotto
 
+private final class VocabularyTransportProtocol: URLProtocol {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        do {
+            let captured = try request.capturingNativeTestBody()
+            let body = try XCTUnwrap(captured.httpBody)
+            let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer practice-secret")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "X-Sotto-Profile-Id"), "learner")
+            switch request.url?.path {
+            case "/api/v1/courses/course/vocabulary/study":
+                XCTAssertEqual(json["requestId"] as? String, "3c6d131f-4d72-47e5-8431-d0588d4e8609")
+                XCTAssertEqual(json["mode"] as? String, "FLASHCARDS")
+                XCTAssertEqual(json["wordIds"] as? [String], ["word-1"])
+            case "/api/v1/practice/study/vocabulary":
+                XCTAssertEqual(json["expectedRevision"] as? Int, 2)
+                XCTAssertEqual(json["action"] as? String, "REVEAL")
+                XCTAssertEqual(json["itemId"] as? String, "card")
+            default: XCTFail("Unexpected vocabulary path: \(request.url?.path ?? "")")
+            }
+            let data = Data(#"{"status":"ready_vocabulary","kind":"VOCAB","sessionId":"study","courseId":"course","mode":"FLASHCARDS","progressRevision":2,"writingDrafts":{},"cards":[{"id":"card","prompt":"Haus","feedback":null}],"receipt":null}"#.utf8)
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: data)
+            client?.urlProtocolDidFinishLoading(self)
+        } catch { client?.urlProtocol(self, didFailWithError: error) }
+    }
+    override func stopLoading() {}
+}
+
+private final class VocabularyProgressProtocol: URLProtocol {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Data(#"{"saved":true,"progressRevision":5}"#.utf8))
+        client?.urlProtocolDidFinishLoading(self)
+    }
+    override func stopLoading() {}
+}
+
+private final class VocabularyDictionaryProtocol: URLProtocol {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        do {
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer practice-secret")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "X-Sotto-Profile-Id"), "learner")
+            let data: Data
+            if request.httpMethod == "GET" {
+                let query = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems
+                XCTAssertEqual(query?.first(where: { $0.name == "search" })?.value, "Straße & Haus")
+                XCTAssertEqual(query?.first(where: { $0.name == "state" })?.value, "due")
+                XCTAssertEqual(query?.first(where: { $0.name == "page" })?.value, "2")
+                data = Data(#"{"words":[{"id":"word","lemma":"Haus","translation":"house","acceptedMeanings":["home"],"partOfSpeech":null,"state":"due","mastery":0.4,"reviews":2,"dueAt":null,"lastReviewed":null,"sourceCount":0,"sources":[]}],"total":1,"page":2,"pages":2,"counts":{"unseen":0,"due":1,"strong":0},"vocabularySupport":"WORD_RECALL","materials":[]}"#.utf8)
+            } else {
+                let body = try XCTUnwrap(request.capturingNativeTestBody().httpBody)
+                let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+                XCTAssertEqual(request.url?.path, "/api/v1/courses/course/vocabulary/word")
+                XCTAssertEqual(json["translation"] as? String, "house")
+                XCTAssertEqual(json["acceptedMeanings"] as? [String], ["home"])
+                data = Data(#"{"saved":true}"#.utf8)
+            }
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: data)
+            client?.urlProtocolDidFinishLoading(self)
+        } catch { client?.urlProtocol(self, didFailWithError: error) }
+    }
+    override func stopLoading() {}
+}
+
 final class APITransportPrivacyTests: XCTestCase {
     func testProofOnlyGamePostRejectsSameOriginRedirectsWithoutCookiesBearerOrBrowserOrigin() async throws {
         let server = try LocalHTTPServer { _ in .init(status: 307, headers: ["Location": "/api/v1/play/retargeted"], body: "") }
@@ -136,6 +210,40 @@ final class APITransportPrivacyTests: XCTestCase {
         }
     }
 
+    func testVocabularyStudyUsesTheSharedStudyAndAnswerEndpoints() async throws {
+        let requestID = UUID(uuidString: "3C6D131F-4D72-47E5-8431-D0588D4E8609")!
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [VocabularyTransportProtocol.self]
+        let client = SottoAPIClient(serverURL: URL(string: "https://school.example")!, apiKey: "practice-secret", profileId: "learner", session: URLSession(configuration: configuration))
+        let session = try await client.startVocabularyStudy(courseId: "course", requestId: requestID, mode: .flashcards, wordIds: ["word-1"])
+        XCTAssertEqual(session.cards?.first?.prompt, "Haus")
+        _ = try await client.vocabularyAction(sessionId: session.sessionId,
+            action: SottoVocabularyAction(action: "REVEAL", expectedRevision: 2, itemId: "card"))
+    }
+
+    func testDictionarySearchAndMeaningEditsUseTheOwnedCourse() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [VocabularyDictionaryProtocol.self]
+        let client = SottoAPIClient(serverURL: URL(string: "https://school.example")!, apiKey: "practice-secret", profileId: "learner", session: URLSession(configuration: configuration))
+        let dictionary = try await client.vocabularyDictionary(courseId: "course", search: "Straße & Haus", state: "due", page: 2)
+        XCTAssertEqual(dictionary.words.first?.lemma, "Haus")
+        XCTAssertEqual(dictionary.vocabularySupport, "WORD_RECALL")
+        try await client.saveVocabularyMeaning(courseId: "course", wordId: "word", meaning: SottoVocabularyMeaning(translation: "house", acceptedMeanings: ["home"]))
+    }
+
+    @MainActor
+    func testVocabularyAnswerWaitsForTheSavedDraftRevision() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [VocabularyProgressProtocol.self]
+        let client = SottoAPIClient(serverURL: URL(string: "https://school.example")!, apiKey: "practice-secret", profileId: "learner", session: URLSession(configuration: configuration))
+        let progress = LearningProgressStore()
+        progress.configure(client: client, path: "/api/v1/practice/study", revision: 4)
+        progress.update(answers: [:], writingDrafts: ["card": "house"])
+        let revision = try await progress.flushRevision()
+        XCTAssertEqual(revision, 5)
+        XCTAssertNil(progress.errorMessage)
+    }
+
     func testClassRegenerationAccepts202AndPinsTheObservedAttempt() async throws {
         let server = try LocalHTTPServer { _ in
             .init(status: 202, headers: [:], body: #"{"started":true,"status":"GENERATING","scope":"class","operationId":"9ad1cf1c-ec3a-4605-8a85-d0a5b95160ac","courseId":"course"}"#)
@@ -228,6 +336,25 @@ final class APITransportPrivacyTests: XCTestCase {
         XCTAssertNil(progress.errorMessage)
         XCTAssertEqual(fixture.answers, ["g0": 2])
         XCTAssertEqual(fixture.drafts, ["w0": "Local draft"])
+    }
+
+    @MainActor
+    func testChoosingServerDraftDiscardsTheConflictingQueuedSave() async throws {
+        let fixture = ProgressConflictFixture()
+        let server = try LocalHTTPServer { request in fixture.respond(request) }
+        try await server.start()
+        defer { server.stop() }
+        let client = SottoAPIClient(serverURL: server.url, apiKey: "practice-secret", profileId: "learner", session: URLSession(configuration: .ephemeral))
+        let progress = LearningProgressStore()
+        progress.configure(client: client, path: "/api/v1/practice/saved", revision: 1)
+        progress.update(answers: ["g0": 2], writingDrafts: ["w0": "Local draft"])
+        await progress.flush()
+        XCTAssertNotNil(progress.errorMessage)
+        await progress.suspend()
+        progress.replacePendingWithServerRevision(2)
+        await progress.flush()
+        XCTAssertNil(progress.errorMessage)
+        XCTAssertEqual(fixture.answers, ["g0": 1])
     }
 
     func test307DoesNotForwardHouseholdPasswordToAnotherOrigin() async throws {

@@ -12,11 +12,14 @@ final class PracticeSessionContentTests: XCTestCase {
         XCTAssertEqual(session.learningSelection?.nodeIds, ["de.a1.order"])
     }
 
-    func testVocabularyStudyContinuesAtItsSavedWebSession() throws {
-        let session = try start(#"{"status":"ready_vocabulary","sessionId":"saved-study","courseId":"german-course","kind":"VOCAB","mode":"MEANING_RECALL","cards":[]}"#)
-        XCTAssertTrue(session.requiresWebVocabulary)
-        let url = try XCTUnwrap(session.vocabularyStudyURL(serverURL: URL(string: "https://sotto.example")!))
-        XCTAssertEqual(url.absoluteString, "https://sotto.example/learn/vocabulary?course=german-course&session=saved-study")
+    func testVocabularyStudyRestoresCardsDraftsAndFeedback() throws {
+        let session = try start(#"{"status":"ready_vocabulary","sessionId":"saved-study","courseId":"german-course","kind":"VOCAB","mode":"MEANING_RECALL","progressRevision":3,"writingDrafts":{"card":"house"},"cards":[{"id":"card","prompt":"Haus","feedback":{"outcome":"ANSWERED","lemma":"Haus","meaning":"house","answer":"house","correct":true}}]}"#)
+        XCTAssertTrue(session.isVocabularyStudy)
+        XCTAssertEqual(session.mode, "MEANING_RECALL")
+        XCTAssertEqual(session.progressRevision, 3)
+        XCTAssertEqual(session.writingDrafts?["card"], "house")
+        XCTAssertEqual(session.cards?.first?.feedback?.meaning, "house")
+        XCTAssertEqual(session.cards?.first?.feedback?.correct, true)
         XCTAssertNil(session.submissionResult)
     }
     func testReadingPracticePreservesTheSourceAndAcceptsHistoricalQuestions() throws {
