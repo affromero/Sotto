@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct RootView: View {
+    @State private var admittedVocabulary: (SottoPracticeStart, String)?
     @EnvironmentObject private var model: SottoAppModel
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.scenePhase) private var scenePhase
@@ -78,6 +79,19 @@ struct RootView: View {
                 let state = model.learningSessionState(path: "/api/v1/practice/\(practiceStart.sessionId)",
                     attempt: 1, revision: practiceStart.progressRevision ?? 0)
                 PracticeStartView(start: practiceStart, progress: state.progress, drafts: state.drafts)
+                    .environmentObject(model)
+                    .id(practiceStart.sessionId)
+            }
+        }
+        .sheet(isPresented: Binding(get: { model.vocabularyCourseId != nil }, set: { if !$0 { model.vocabularyCourseId = nil } }), onDismiss: {
+            if let (session, courseId) = admittedVocabulary, model.courses.contains(where: { $0.id == courseId }) {
+                admittedVocabulary = nil
+                model.presentVocabularyStudy(session, courseId: courseId)
+            }
+            admittedVocabulary = nil
+        }) {
+            if let courseId = model.vocabularyCourseId {
+                VocabularyStudyPicker(courseId: courseId) { session in admittedVocabulary = (session, courseId) }
                     .environmentObject(model)
             }
         }

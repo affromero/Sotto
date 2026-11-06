@@ -4626,6 +4626,31 @@
               },
               "action": {
                 "type": "string",
+                "enum": ["RATE"]
+              },
+              "itemId": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "rating": {
+                "type": "string",
+                "enum": ["KNOWN", "UNKNOWN"]
+              }
+            },
+            "required": ["expectedRevision", "action", "itemId", "rating"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "expectedRevision": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "action": {
+                "type": "string",
                 "enum": ["COMPLETE"]
               }
             },
@@ -4633,6 +4658,132 @@
             "additionalProperties": false
           }
         ]
+      },
+      "VocabularyExamplesRequest": {
+        "type": "object",
+        "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "retryOf": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+            "nullable": true
+          },
+          "sourceHash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": ["operationId", "retryOf", "sourceHash"],
+        "additionalProperties": false
+      },
+      "VocabularyExamplesResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["AVAILABLE", "PENDING", "READY", "FAILED"]
+          },
+          "request": {
+            "$ref": "#/components/schemas/VocabularyExamplesRequest"
+          },
+          "canRetry": {
+            "type": "boolean"
+          },
+          "error": {
+            "type": "string"
+          },
+          "examples": {
+            "minItems": 2,
+            "maxItems": 2,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "sentence": {
+                  "type": "string"
+                },
+                "translation": {
+                  "type": "string",
+                  "nullable": true
+                }
+              },
+              "required": ["sentence", "translation"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["status", "request", "canRetry"],
+        "additionalProperties": false
+      },
+      "VocabularyRefillRequest": {
+        "type": "object",
+        "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "generation": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "maximum": 9007199254740991
+          },
+          "triggerSessionId": {
+            "type": "string",
+            "nullable": true
+          },
+          "sourceHash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": ["operationId", "generation", "triggerSessionId", "sourceHash"],
+        "additionalProperties": false
+      },
+      "VocabularyRefillResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["NOT_NEEDED", "AVAILABLE", "PENDING", "READY", "FAILED"]
+          },
+          "canRetry": {
+            "type": "boolean"
+          },
+          "request": {
+            "$ref": "#/components/schemas/VocabularyRefillRequest"
+          },
+          "added": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "nextSessionId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "wordIds": {
+            "minItems": 1,
+            "maxItems": 8,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": ["status", "canRetry"],
+        "additionalProperties": false
       },
       "PencilHomeworkRequest": {
         "type": "object",
@@ -5472,6 +5623,18 @@
             "allOf": [
               {
                 "$ref": "#/components/schemas/CefrLevel"
+              }
+            ]
+          },
+          "vocabularyFormat": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": ["FLASHCARDS", "MEANING_RECALL", "WORD_RECALL", "LISTENING_RECALL"]
+              },
+              {
+                "type": "string",
+                "enum": ["GENERATED"]
               }
             ]
           },
@@ -8699,9 +8862,37 @@
           "courseId": {
             "type": "string"
           },
+          "profileId": {
+            "type": "string"
+          },
           "mode": {
             "type": "string",
             "enum": ["FLASHCARDS", "MEANING_RECALL", "WORD_RECALL", "LISTENING_RECALL"]
+          },
+          "selfRatingSupported": {
+            "type": "boolean"
+          },
+          "ratingSummary": {
+            "type": "object",
+            "properties": {
+              "known": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "unknown": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "studied": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": ["known", "unknown", "studied"],
+            "additionalProperties": false
           },
           "nativeLang": {
             "type": "string"
@@ -8760,6 +8951,10 @@
                     "correct": {
                       "type": "boolean",
                       "nullable": true
+                    },
+                    "selfRating": {
+                      "type": "string",
+                      "enum": ["KNOWN", "UNKNOWN"]
                     },
                     "reviewedAt": {
                       "type": "string",
@@ -16574,6 +16769,198 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/VocabularyWorkRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/practice/{sessionId}/vocabulary/{cardId}/examples": {
+      "get": {
+        "operationId": "getVocabularyExamples",
+        "summary": "Read private examples for an owned flashcard.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VocabularyExamplesResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cardId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "prepareVocabularyExamples",
+        "summary": "Prepare two reviewed usage examples for an owned flashcard.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VocabularyExamplesResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VocabularyExamplesResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cardId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VocabularyExamplesRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/courses/{courseId}/vocabulary/refill": {
+      "get": {
+        "operationId": "getVocabularyRefill",
+        "summary": "Read the current owned vocabulary replenishment status.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VocabularyRefillResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "courseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sessionId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "prepareVocabularyRefill",
+        "summary": "Prepare new words for an exhausted owned vocabulary.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VocabularyRefillResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VocabularyRefillResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "courseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VocabularyRefillRequest"
               }
             }
           }

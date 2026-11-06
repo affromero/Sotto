@@ -34,7 +34,7 @@ export default async function PracticePage({ searchParams }: PracticePageProps) 
   const params = (await searchParams) ?? {};
 
   const courses = await prisma.course.findMany({
-    where: { userId },
+    where: { userId, ...(params.course ? { id: params.course } : {}) },
     select: { id: true, targetLang: true, curriculum: { select: { title: true } } },
     orderBy: { createdAt: 'desc' },
   });
@@ -52,7 +52,9 @@ export default async function PracticePage({ searchParams }: PracticePageProps) 
       {courses.length === 0 ? (
         <section className={styles.empty}>
           <p className={styles.emptyText}>
-            You have no active courses yet. Take a placement test to get started.
+            {params.course
+              ? 'Course not found.'
+              : 'You have no active courses yet. Take a placement test to get started.'}
           </p>
           <Link href="/learn/placement" className={styles.ctaButton}>
             Take Placement Test

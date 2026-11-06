@@ -20,6 +20,10 @@ owns its durable execution lifetime. Saved help requires fresh source/ownership
 checks, independent fidelity review and confirmed execution cleanup. Unknown
 provider or cleanup outcomes stay fenced after Redis delivery records disappear.
 
+`interactions.v3` generates reviewed vocabulary examples, and `interactions.v4`
+replenishes an exhausted vocabulary with reviewed words. Both capture ownership and
+provider authority, retain durable outcomes, and fence uncertain executions.
+
 PDF generation accepts canonical v1 stitching children and v2 export requests.
 Raw `generate_pdf` payloads are rejected. Both contracts use the same transcript
 renderer and attributed publication transaction. Cancellation propagates through

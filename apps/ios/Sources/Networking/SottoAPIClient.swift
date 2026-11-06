@@ -693,7 +693,7 @@ struct SottoAPIClient {
         return try await send(request, acceptedStatuses: acceptedStatuses)
     }
 
-    private func patch<Body: Encodable, Response: Decodable>(
+    func patch<Body: Encodable, Response: Decodable>(
         _ path: String,
         body: Body,
         authorized: Bool = true,

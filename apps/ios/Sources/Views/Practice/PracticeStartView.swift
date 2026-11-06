@@ -11,6 +11,9 @@ struct PracticeStartView: View {
     @State private var hydrated = false
     @State private var preparationError: String?
     @State private var showingRecovery = false
+    @State private var vocabularyBlocksDismissal = false
+    @State private var vocabularyCloseError: String?
+    @State private var vocabularyDraftDurable = true
     @State private var submittedAnswers: [String: Int] = [:]
     @ObservedObject var drafts: WritingDraftStore
 
@@ -50,7 +53,7 @@ struct PracticeStartView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
-                    header
+                    if !currentStart.isVocabularyStudy { header }
                     if let level = currentStart.practiceLevel {
                         Text("Practice difficulty: \(level.rawValue). This does not change your course level.")
                             .font(.callout).foregroundStyle(SottoTheme.muted)
@@ -72,12 +75,9 @@ struct PracticeStartView: View {
                         preparationControls
                     } else if currentStart.status == "unavailable" {
                         UnavailablePractice(reason: currentStart.reason)
-                    } else if currentStart.requiresWebVocabulary {
-                        if let server = model.credentials?.serverURL,
-                           let url = currentStart.vocabularyStudyURL(serverURL: server) {
-                            Link("Continue vocabulary study on the web", destination: url)
-                                .buttonStyle(.borderedProminent)
-                        }
+                    } else if currentStart.isVocabularyStudy {
+                        VocabularyStudyView(progress: progress, blocksDismissal: $vocabularyBlocksDismissal, draftDurable: $vocabularyDraftDurable, start: currentStart)
+                        if let vocabularyCloseError { Text(vocabularyCloseError).foregroundStyle(.red) }
                     } else if model.practiceResult == nil && currentStart.submissionResult == nil {
                         if let episodeId = currentStart.episodeId {
                             PracticeListeningPlayer(episodeId: episodeId)
@@ -104,7 +104,7 @@ struct PracticeStartView: View {
                             return
                         }
                     }
-                } else if !hydrated && !currentStart.requiresWebVocabulary {
+                } else if !hydrated && !currentStart.isVocabularyStudy {
                     progress.configure(client: model.makeClient(), path: "/api/v1/practice/\(start.sessionId)",
                         revision: currentStart.progressRevision ?? 0)
                     answers = progress.answers ?? currentStart.learnerAnswers ?? [:]
@@ -121,16 +121,24 @@ struct PracticeStartView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") {
-                        model.closePractice()
-                        dismiss()
-                    }
+                        if currentStart.isVocabularyStudy {
+                            Task {
+                                do { _ = try await progress.flushRevision(); model.closePractice(); dismiss() }
+                                catch {
+                                    if vocabularyDraftDurable { model.closePractice(); dismiss() }
+                                    else { vocabularyCloseError = error.localizedDescription }
+                                }
+                            }
+                        } else { model.closePractice(); dismiss() }
+                    }.disabled(vocabularyBlocksDismissal)
                 }
                 ToolbarItem(placement: .primaryAction) {
-                    ProfileToolbarMenu {
-                        dismiss()
+                    if !currentStart.isVocabularyStudy {
+                        ProfileToolbarMenu { dismiss() }
                     }
                 }
             }
+            .interactiveDismissDisabled(currentStart.isVocabularyStudy)
         }
     }
 
@@ -257,7 +265,7 @@ struct PracticeStartView: View {
     }
 
     private var statusCopy: String {
-        if currentStart.requiresWebVocabulary { return "Your saved flashcards and recall answers are available in the web app." }
+        if currentStart.isVocabularyStudy { return "Study your saved words and continue where you left off." }
         if currentStart.status == "preparing" { return currentStart.preparationDetail }
         if currentStart.status == "unavailable" {
             return "Sotto does not have enough due material for this practice type yet."

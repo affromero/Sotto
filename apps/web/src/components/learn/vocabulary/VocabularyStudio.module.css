@@ -52,6 +52,30 @@
   display: grid;
   gap: 0.75rem;
 }
+.modes {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+.modes legend {
+  color: var(--color-text-secondary);
+  font-size: 0.8rem;
+  margin-bottom: 0.5rem;
+}
+.startControls .mode {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 44px;
+  color: var(--color-text-primary);
+  font-size: 1rem;
+  cursor: pointer;
+}
+.mode input {
+  accent-color: var(--color-primary);
+}
 .startControls label,
 .tools label,
 .editor label {

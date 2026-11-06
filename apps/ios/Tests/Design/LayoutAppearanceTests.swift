@@ -6,6 +6,21 @@ import XCTest
 
 @MainActor
 final class LayoutAppearanceTests: XCTestCase {
+    func testCoursePracticeAndVocabularyActionsFitPhoneTabletAndLargeText() async throws {
+        let actions = CourseActionGrid(primaryTitle: "Resume class", primaryIcon: "play.fill",
+            generating: false, onPrimary: {}, onPractice: { _ in }, due: nil,
+            onLive: {}, onExam: {}, onPlacement: {}, onWorkbook: {}, onMemory: {})
+            .padding(18).background(SottoTheme.paper)
+        for viewport in [viewports[0], viewports[1], viewports[2], viewports[3]] {
+            let size = measuredSize(actions, viewport: viewport)
+            XCTAssertLessThanOrEqual(size.width, viewport.size.width + 1)
+            let host = try mount(ScrollView { actions }, viewport: viewport, style: .light)
+            await settle()
+            attach(host.content.view, name: "course-practice-actions-\(viewport.name)")
+            host.close()
+        }
+    }
+
     func testClassDialogueFitsPhoneTabletAndLargeText() async throws {
         let episode = try JSONDecoder().decode(SottoEpisode.self, from: Data(#"""
         {"id":"layout-conversation","audioUrl":"/api/v1/storage/conversation.mp3","status":"READY",
@@ -462,6 +477,23 @@ final class LayoutAppearanceTests: XCTestCase {
             await settle()
             attach(host.content.view, name: "practice-unsuccessful-\(viewport.name)")
             host.close()
+        }
+    }
+
+    func testVocabularyStudyFitsPhoneAndTablet() async throws {
+        let start = try JSONDecoder().decode(SottoPracticeStart.self, from: Data(#"{"status":"ready_vocabulary","sessionId":"vocabulary-layout","courseId":"course","kind":"VOCAB","mode":"FLASHCARDS","selfRatingSupported":true,"progressRevision":0,"writingDrafts":{},"cards":[{"id":"card","prompt":"Bahnhof","feedback":null}],"receipt":null}"#.utf8))
+        for viewport in [viewports[0], viewports[1], viewports[2], viewports[3]] {
+            let model = LayoutFixtures.model()
+            model.practiceStart = start
+            for style in [UIUserInterfaceStyle.light, .dark] {
+                let host = try mount(PracticeStartView(start: start, progress: LearningProgressStore(), drafts: WritingDraftStore())
+                    .environmentObject(model), viewport: viewport, style: style)
+                await settle()
+                let scroll = try XCTUnwrap(descendants(of: host.content.view).compactMap { $0 as? UIScrollView }.first)
+                XCTAssertLessThanOrEqual(scroll.contentSize.width, scroll.bounds.width + 1)
+                attach(host.content.view, name: "vocabulary-study-\(viewport.name)-\(style.rawValue)")
+                host.close()
+            }
         }
     }
 

@@ -7,6 +7,7 @@ import { sottoTransaction } from '../sidedoor/access/state/transaction';
 import type { SottoProviderExecution } from '../sidedoor/credentials/runtime/provider-execution';
 import {
   publicVocabularyStudy,
+  readFlashcardRatings,
   recommendedVocabularyMode,
   vocabularyStudyStateSchema,
   VocabularyStudyConflict,
@@ -61,7 +62,11 @@ export async function startVocabularyStudy(
           JSON.stringify(state.requestedWordIds) !== JSON.stringify(requestedWordIds)
         )
           throw new VocabularyStudyConflict('This request identity belongs to different study.');
-        return publicVocabularyStudy(state, existing);
+        return publicVocabularyStudy(
+          state,
+          existing,
+          await readFlashcardRatings(database, state, existing.id)
+        );
       }
       if (await database.practiceRequestReceipt.findUnique({ where: { id: request.requestId } }))
         throw new VocabularyStudyConflict('This practice was discarded. Start with a new request.');

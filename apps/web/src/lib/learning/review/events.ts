@@ -19,6 +19,7 @@ export const assessmentSchema = z.enum([
   'READING_VOCABULARY',
   'SECTION_AGGREGATE',
   'MEANING_RECALL',
+  'FLASHCARD_SELF_ASSESSMENT',
   'WORD_RECALL',
   'LISTENING_RECALL',
 ]);

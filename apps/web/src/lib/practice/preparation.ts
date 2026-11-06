@@ -94,7 +94,7 @@ export function practicePreparationProgress(
     };
   const messages = {
     QUEUED: 'Practice is saved and waiting for a worker.',
-    RUNNING: 'Preparing exercises and reference audio.',
+    RUNNING: 'Preparing exercises.',
     CANCELLING: 'Stopping generation and waiting for active work to settle.',
     CANCELLED: 'Practice generation was cancelled.',
     COMPLETED: 'Practice preparation finished.',

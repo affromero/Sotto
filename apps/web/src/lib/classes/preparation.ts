@@ -38,6 +38,7 @@ import {
   cancelPreparation,
   preparationStore,
   PreparationConflictError,
+  newClassPreparationId,
   type ClassPreparation,
 } from './preparation-state';
 
@@ -212,16 +213,9 @@ export async function requestClassPreparation(
     availableAt > now + 7 * 86_400_000
   )
     throw new PreparationConflictError('Choose a preparation time within the next seven days.');
-  const id = randomUUID();
   const revision = randomUUID();
-  const payload = classPreparationPayload.parse({
-    courseId,
-    operationId: id,
-    ...(input.sourceUrl ? { sourceUrl: input.sourceUrl } : {}),
-    ...(input.topic ? { topic: input.topic } : {}),
-  });
   const inputFingerprint = createHash('sha256')
-    .update(JSON.stringify({ sourceUrl: payload.sourceUrl ?? null, topic: payload.topic ?? null }))
+    .update(JSON.stringify({ sourceUrl: input.sourceUrl || null, topic: input.topic || null }))
     .digest('hex');
   const ai = await resolveCapturedLearningAi(execution.userId, execution);
   const moderationCredential = await captureLearningModerationCredential(execution);
@@ -266,17 +260,6 @@ export async function requestClassPreparation(
       const userScope = ownership.scopes.find(
         (scope) => scope.subjectId === `profile:${actor.userId}`
       )!;
-      const grantSpec: DelegationGrant = {
-        id,
-        revision,
-        instanceId: ownership.instanceId,
-        subject: { id: `profile:${actor.userId}`, generation: userScope.generation },
-        resource: { id: `course:${courseId}`, generation: courseScope.generation },
-        operationId: id,
-        action: 'class-parent-provider-request',
-        expiresAt: availableAt + 86_400_000,
-        maxRequests: maxProviderRequests ?? 1000,
-      };
       const course = await database.course.findUniqueOrThrow({
         where: { id: courseId },
         select: {
@@ -364,6 +347,24 @@ export async function requestClassPreparation(
           },
           select: { id: true },
         }));
+      const id = newClassPreparationId(initialA1Class);
+      const payload = classPreparationPayload.parse({
+        courseId,
+        operationId: id,
+        ...(input.sourceUrl ? { sourceUrl: input.sourceUrl } : {}),
+        ...(input.topic ? { topic: input.topic } : {}),
+      });
+      const grantSpec: DelegationGrant = {
+        id,
+        revision,
+        instanceId: ownership.instanceId,
+        subject: { id: `profile:${actor.userId}`, generation: userScope.generation },
+        resource: { id: `course:${courseId}`, generation: courseScope.generation },
+        operationId: id,
+        action: 'class-parent-provider-request',
+        expiresAt: availableAt + 86_400_000,
+        maxRequests: maxProviderRequests ?? 1000,
+      };
       const speechFingerprint = await learningSpeechFingerprint(
         database,
         execution.authorize,
@@ -442,7 +443,6 @@ export async function requestClassPreparation(
           )
           .digest('hex'),
         requirements,
-        initialA1Class,
         courseLevel: course.currentLevel,
         speechFingerprint,
         status: 'QUEUED',

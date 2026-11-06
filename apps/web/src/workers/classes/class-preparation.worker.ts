@@ -16,7 +16,11 @@ import {
   recordClassPreparationFailure,
   settleCancelledPreparation,
 } from '@/lib/classes/preparation';
-import { PreparationConflictError, startPreparation } from '@/lib/classes/preparation-state';
+import {
+  classPreparationInitialA1,
+  PreparationConflictError,
+  startPreparation,
+} from '@/lib/classes/preparation-state';
 import { classPreparationGrant } from '@/lib/classes/preparation-grant';
 import { preparationProviderRequest } from '@/lib/classes/preparation-provider';
 import { registerPreparationAudio } from '@/lib/classes/preparation-audio';
@@ -112,7 +116,7 @@ export async function processClassPreparation(job: Job<unknown>, workerSignal?: 
               signal,
               onCleanupError: markCleanupUnconfirmed,
               learningSelection: operation.selection,
-              initialA1Class: operation.initialA1Class ?? true,
+              initialA1Class: classPreparationInitialA1(operation),
               isolatedWorkspace: { directory, markCleanupUnconfirmed },
               registerAudioEpisode: (database, episodeId, key) =>
                 registerPreparationAudio(database, operation, episodeId, key),
@@ -171,7 +175,7 @@ export async function processClassPreparation(job: Job<unknown>, workerSignal?: 
             signal,
             onCleanupError: markCleanupUnconfirmed,
             learningSelection: operation.selection,
-            initialA1Class: operation.initialA1Class ?? true,
+            initialA1Class: classPreparationInitialA1(operation),
             isolatedWorkspace: { directory, markCleanupUnconfirmed },
             registerAudioEpisode: (database, episodeId, audioGenerationKey) =>
               registerPreparationAudio(database, operation, episodeId, audioGenerationKey),
