@@ -51,6 +51,53 @@ final class PlacementTransportTests: XCTestCase {
         }
     }
 
+    func testReopeningResumesTheRetainedQuizAndPollsUntilReady() async throws {
+        let fixture = try await client(mode: .resume)
+        let batch = try await fixture.client.fetchPlacement(native: "en", target: "de", requestId: UUID(), pollInterval: .zero)
+        XCTAssertEqual(batch.placementSessionId.uuidString.lowercased(), PlacementTransportServer.sessionId)
+        XCTAssertEqual(batch.status, "READY")
+        let requests = await PlacementTransportServer.shared.requests(host: fixture.host)
+        XCTAssertEqual(requests.map(\.httpMethod), ["POST", "GET", "GET"])
+        XCTAssertTrue(requests.dropFirst().allSatisfy { $0.url?.query == "placementSessionId=\(PlacementTransportServer.sessionId)" })
+    }
+
+    func testUnrelatedConflictDoesNotFetchOrReplaceASavedQuiz() async throws {
+        let fixture = try await client(mode: .conflict)
+        do {
+            _ = try await fixture.client.fetchPlacement(native: "en", target: "de", requestId: UUID(), pollInterval: .zero)
+            XCTFail("Expected a conflict")
+        } catch let SottoAPIError.http(status, message) {
+            XCTAssertEqual(status, 409)
+            XCTAssertTrue(message.contains("different inputs"))
+        }
+        let requests = await PlacementTransportServer.shared.requests(host: fixture.host)
+        XCTAssertEqual(requests.map(\.httpMethod), ["POST"])
+    }
+
+    func testResumptionRejectsADifferentSessionIdentity() async throws {
+        let fixture = try await client(mode: .wrongResume)
+        do {
+            _ = try await fixture.client.fetchPlacement(native: "en", target: "de", requestId: UUID(), pollInterval: .zero)
+            XCTFail("Expected an identity error")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("identity"))
+        }
+        let requests = await PlacementTransportServer.shared.requests(host: fixture.host)
+        XCTAssertEqual(requests.map(\.httpMethod), ["POST", "GET"])
+    }
+
+    func testAdmissionRejectsBodiesThatDoNotMatchTheHTTPStatus() async throws {
+        for mode in [PlacementTransportServer.Mode.successConflict, .conflictBatch] {
+            let fixture = try await client(mode: mode)
+            do {
+                _ = try await fixture.client.fetchPlacement(native: "en", target: "de", requestId: UUID(), pollInterval: .zero)
+                XCTFail("Expected an invalid admission response")
+            } catch { XCTAssertFalse(error.localizedDescription.isEmpty) }
+            let requests = await PlacementTransportServer.shared.requests(host: fixture.host)
+            XCTAssertEqual(requests.map(\.httpMethod), ["POST"])
+        }
+    }
+
     func testSourceDiagnosticCarriesTheObservedAnalysisAndExplicitPartialConsent() async throws {
         let fixture = try await client(mode: .source)
         let source = SottoPlacementAnalysisReference(analysisId: UUID(uuidString: PlacementTransportServer.analysisId)!, analysisRevision: 3, resultDigest: String(repeating: "e", count: 64))
@@ -117,7 +164,7 @@ private actor PlacementTransportServer {
     static let shared = PlacementTransportServer()
     static let sessionId = "d1438bc6-a9a6-4c4a-bf12-e7b11c79110a"
     static let analysisId = "d1438bc6-a9a6-4c4a-bf12-e7b11c79110b"
-    enum Mode: Sendable, Equatable { case queued, lostResponse, source, changedIdentity, recovery, neverReady }
+    enum Mode: Sendable, Equatable { case queued, lostResponse, source, changedIdentity, recovery, neverReady, resume, conflict, wrongResume, successConflict, conflictBatch }
     private var modes: [String: Mode] = [:]
     private var captured: [String: [URLRequest]] = [:]
     func register(host: String, mode: Mode) { modes[host] = mode; captured[host] = [] }
@@ -141,15 +188,25 @@ private actor PlacementTransportServer {
         captured[host, default: []].append(preserved)
         let count = captured[host]!.count
         if mode == .lostResponse && count == 1 { throw URLError(.timedOut) }
+        if count == 1 && [.resume, .wrongResume].contains(mode) {
+            return (409, Data("{\"error\":\"Resume the saved quiz.\",\"placementSessionId\":\"\(Self.sessionId)\"}".utf8))
+        }
+        if count == 1 && mode == .conflict {
+            return (409, Data("{\"error\":\"Request ID belongs to different inputs.\"}".utf8))
+        }
+        if count == 1 && mode == .successConflict {
+            return (200, Data("{\"error\":\"Resume.\",\"placementSessionId\":\"\(Self.sessionId)\"}".utf8))
+        }
         if request.httpMethod == "POST" && request.url?.path == "/api/v1/placement" {
             return (200, Data("{\"courseId\":\"course\",\"level\":\"A2\",\"assessedLevel\":\"B1\",\"confirmationReceiptId\":\"\(Self.sessionId)\"}".utf8))
         }
         let status = mode == .recovery ? "RECOVERY_REQUIRED" : mode == .neverReady || count == 1 ? "QUEUED" : count == 2 && mode != .source && mode != .lostResponse && mode != .changedIdentity ? "GENERATING" : "READY"
-        var body: [String: Any] = ["native": "en", "target": "de", "placementSessionId": mode == .changedIdentity && count > 1 ? Self.analysisId : Self.sessionId,
+        var body: [String: Any] = ["native": "en", "target": "de", "placementSessionId": (mode == .changedIdentity || mode == .wrongResume) && count > 1 ? Self.analysisId : Self.sessionId,
             "status": status, "questionsDigest": String(repeating: "d", count: 64), "expiresAt": "2099-01-01T00:00:00.000Z",
             "questions": status == "READY" ? (0..<6).map { ["id": "pq_\($0)", "cefr": "A1", "skill": "grammar", "prompt": "Choose the form \($0).", "options": ["a", "b", "c", "d", "I do not know"]] } : []]
         if mode == .source { body["analysisId"] = Self.analysisId; body["analysisRevision"] = 3; body["resultDigest"] = String(repeating: "e", count: 64) }
-        return (status == "READY" || status == "RECOVERY_REQUIRED" ? 200 : 202, try JSONSerialization.data(withJSONObject: body))
+        let responseStatus = mode == .conflictBatch ? 409 : status == "READY" || status == "RECOVERY_REQUIRED" ? 200 : 202
+        return (responseStatus, try JSONSerialization.data(withJSONObject: body))
     }
 }
 

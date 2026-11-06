@@ -98,14 +98,45 @@ impl SottoClient {
             body["analysisRevision"] = serde_json::json!(source.analysis_revision);
             body["resultDigest"] = serde_json::json!(source.result_digest);
         }
-        let mut batch: types::GeneratePlacementResponse = self
-            .placement_json(
-                self.http
-                    .post(format!("{}/api/v1/placement/generate", self.base_url))
-                    .json(&body),
-            )
+        let response = self
+            .http
+            .post(format!("{}/api/v1/placement/generate", self.base_url))
+            .json(&body)
+            .timeout(std::time::Duration::from_secs(30))
+            .send()
             .await?;
+        let status = response.status();
+        let mut expected_session = None;
+        let mut batch: types::GeneratePlacementResponse = if status.as_u16() == 409 {
+            #[derive(serde::Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct Conflict {
+                error: String,
+                placement_session_id: Option<uuid::Uuid>,
+            }
+            let conflict: Conflict = response.json().await?;
+            let session_id = conflict
+                .placement_session_id
+                .ok_or_else(|| eyre!("Placement request failed ({status}): {}", conflict.error))?;
+            expected_session = Some(session_id);
+            self.placement_json(
+                self.http
+                    .get(format!("{}/api/v1/placement", self.base_url))
+                    .query(&[("placementSessionId", session_id.to_string())]),
+            )
+            .await?
+        } else if matches!(status.as_u16(), 200..=202) {
+            response.json().await?
+        } else {
+            return Err(eyre!(
+                "Placement request failed ({status}): {}",
+                response.text().await?
+            ));
+        };
         let session_id = batch.placement_session_id;
+        if expected_session.is_some_and(|expected| expected != session_id) {
+            return Err(eyre!("The saved placement identity changed."));
+        }
         let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(300);
         loop {
             if batch.native.to_string() != native

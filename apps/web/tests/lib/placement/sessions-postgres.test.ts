@@ -773,6 +773,32 @@ suite('immutable private placement receipts against PostgreSQL', () => {
     expect(await instance.database.placementSession.count()).toBe(1);
   });
 
+  it('returns a retained session when its generation provider is no longer configured', async () => {
+    await instance.configureInfrastructure({
+      aiProvider: 'local',
+      aiModel: 'local:owned-quiz-fixture',
+      aiBaseUrl: 'http://127.0.0.1:9999/v1',
+    });
+    await instance.database.user.update({
+      where: { id: userId },
+      data: { preferredAiProvider: 'local', preferredAiModel: 'local:owned-quiz-fixture' },
+    });
+    const input = { schemaVersion: 1, requestId: randomUUID(), native: 'en', target: 'de' };
+    const saved = await requestPlacementSession(execution(), input);
+    await instance.configureInfrastructure({ aiProvider: null, aiModel: null, aiBaseUrl: null });
+    await instance.database.user.update({
+      where: { id: userId },
+      data: { preferredAiProvider: null, preferredAiModel: null },
+    });
+    await expect(
+      requestPlacementSession(execution(), { ...input, target: 'es', requestId: randomUUID() })
+    ).rejects.toThrow();
+    await expect(
+      requestPlacementSession(execution(), { ...input, requestId: randomUUID() })
+    ).rejects.toMatchObject({ placementSessionId: saved.placementSessionId });
+    expect(await instance.database.placementSession.count()).toBe(1);
+  });
+
   it('keeps an accepted decision when failure reconciliation arrives before outbox completion', async () => {
     const f = await session();
     const record = await tx((database) =>

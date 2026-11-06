@@ -9,11 +9,23 @@ extension SottoAPIClient {
     ) async throws -> SottoPlacementBatch {
         let clock = ContinuousClock()
         let deadline = clock.now.advanced(by: .seconds(Self.generationTimeout))
-        var batch: SottoPlacementBatch = try await post("/api/v1/placement/generate", body: SottoPlacementAdmission(
+        var request = try makeRequest(path: "/api/v1/placement/generate", method: "POST", authorized: true,
+                                      timeout: Self.generationTimeout)
+        request.httpBody = try JSONEncoder().encode(SottoPlacementAdmission(
             requestId: requestId.uuidString.lowercased(), native: native, target: target,
             analysisId: source?.analysisId.uuidString.lowercased(), analysisRevision: source?.analysisRevision,
-            resultDigest: source?.resultDigest, acceptPartial: acceptPartial),
-            acceptedStatuses: [200, 202], timeout: Self.generationTimeout)
+            resultDigest: source?.resultDigest, acceptPartial: acceptPartial))
+        let (data, response) = try await session.data(for: request, delegate: SottoAPIRedirectPolicy(serverURL: serverURL))
+        var batch: SottoPlacementBatch
+        if (response as? HTTPURLResponse)?.statusCode == 409 {
+            let conflict: SottoPlacementConflict = try decodeResponse(data, response: response, acceptedStatuses: [409])
+            guard let sessionId = conflict.placementSessionId else { throw SottoAPIError.http(409, conflict.error.description) }
+            batch = try await get("/api/v1/placement?placementSessionId=\(sessionId.uuidString.lowercased())",
+                                  acceptedStatuses: [200, 202], timeout: Self.defaultTimeout)
+            try batch.validateIdentity(native: native, target: target, sessionId: sessionId)
+        } else {
+            batch = try decodeResponse(data, response: response, acceptedStatuses: [200, 202])
+        }
         let sessionId = batch.placementSessionId
         while true {
             try Task.checkCancellation()
@@ -50,6 +62,11 @@ extension SottoAPIClient {
             resultDigest: batch.resultDigest, acceptPartial: acceptPartial, answers: answers),
             acceptedStatuses: [200], timeout: Self.generationTimeout)
     }
+}
+
+private struct SottoPlacementConflict: Decodable {
+    let placementSessionId: UUID?
+    let error: FlexibleError
 }
 
 private struct SottoPlacementAdmission: Encodable {

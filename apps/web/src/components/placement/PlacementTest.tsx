@@ -112,16 +112,23 @@ export function PlacementTest({
       let data = placementResponseSchema.parse(await res.json());
       if (!current()) return;
       if (res.status === 409 && data.placementSessionId) {
+        const expectedSessionId = data.placementSessionId;
         res = await fetch(
-          `/api/v1/placement?placementSessionId=${encodeURIComponent(data.placementSessionId)}`,
+          `/api/v1/placement?placementSessionId=${encodeURIComponent(expectedSessionId)}`,
           { signal: controller.signal }
         );
         data = placementResponseSchema.parse(await res.json());
         if (!current()) return;
+        if (res.ok && data.placementSessionId !== expectedSessionId) {
+          setErrorMessage('The saved placement session identity changed. Please try again.');
+          setPhase('error');
+          return;
+        }
       }
       while (res.ok && res.status === 202) {
         if (!data.placementSessionId || !data.questionsDigest)
           throw new Error('Missing placement preparation receipt.');
+        const expectedSessionId = data.placementSessionId;
         session.current = {
           placementSessionId: data.placementSessionId,
           questionsDigest: data.questionsDigest,
@@ -147,6 +154,11 @@ export function PlacementTest({
         );
         data = placementResponseSchema.parse(await res.json());
         if (!current()) return;
+        if (res.ok && data.placementSessionId !== expectedSessionId) {
+          setErrorMessage('The saved placement session identity changed. Please try again.');
+          setPhase('error');
+          return;
+        }
       }
       if (res.status === 401) {
         setErrorMessage('You must be signed in to take the placement test.');
@@ -376,7 +388,14 @@ export function PlacementTest({
         <p className={styles.errorMessage}>
           Your placement session expired. Start a fresh test to continue.
         </p>
-        <button className={styles.retryButton} onClick={() => void loadQuestions()}>
+        <button
+          className={styles.retryButton}
+          onClick={() => {
+            setPhase('loading');
+            setErrorMessage('');
+            void loadQuestions();
+          }}
+        >
           Start a new test
         </button>
       </div>
