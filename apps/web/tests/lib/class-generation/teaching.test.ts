@@ -143,6 +143,32 @@ beforeEach(() => {
 });
 
 describe('assessing the accepted lesson', () => {
+  it('does not require later beginner lessons to reteach every background word', async () => {
+    const questions = await generateSectionQuestions({ ...params, level: 'A1' });
+    expect(questions).toHaveLength(authored.length);
+    const review = boundary.requests.mock.calls.find(
+      ([, , options]) => options.jsonSchema.name === 'class_teaching_critic'
+    );
+    expect(review?.[0]).toContain(
+      'Do not require later A1 lessons to reteach every background word'
+    );
+  });
+
+  it('keeps standalone beginner practice usable without an invented prior lesson', async () => {
+    const questions = await generateSectionQuestions({
+      ...params,
+      level: 'A1',
+      teaching: undefined,
+    });
+    expect(questions).toHaveLength(authored.length);
+    const review = boundary.requests.mock.calls.find(
+      ([, , options]) => options.jsonSchema.name === 'class_teaching_critic'
+    );
+    expect(review?.[0]).toContain('When no teaching is supplied, assess standalone practice');
+    const input = JSON.parse(review![1][0].content);
+    expect(input.lessonContext.teaching).toBeUndefined();
+  });
+
   it('reviews the exact published choices and accepted teaching without exposing the private answer key to blind review', async () => {
     const questions = await generateSectionQuestions(params);
     expect(new Set(questions.map(({ correctIndex }) => correctIndex)).size).toBeGreaterThan(1);

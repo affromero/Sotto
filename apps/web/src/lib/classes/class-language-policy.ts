@@ -58,8 +58,10 @@ export function classLanguagePolicy(p: {
   }
 
   return [
-    `A1 scaffolding: keep the target language (${p.targetLang}) dominant, but concise native-language (${p.nativeLang}) support is allowed when it prevents confusion.`,
-    'Examples and answer options should still exercise the target language.',
+    `A1 scaffolding: teach target-language (${p.targetLang}) forms and uses with the native-language (${p.nativeLang}) explanations the learner needs.`,
+    `Write learner-facing task directions outside target-language passages and spoken dialogue, and the explanations needed to understand those directions, in ${p.nativeLang}. Do not assume the learner understands untaught ${p.targetLang} instructions.`,
+    'Examples, passages and answer options should still exercise the target language. Keep the intended skill and assessment difficulty.',
+    `For spoken dialogue, keep the target language (${p.targetLang}) dominant, with concise native-language support when it prevents confusion.`,
   ].join(' ');
 }
 

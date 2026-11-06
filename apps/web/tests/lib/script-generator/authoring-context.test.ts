@@ -78,9 +78,7 @@ describe('listening authoring context', () => {
       });
       const [system] = generateResponse.mock.calls[0] as [string];
       expect(system).toContain(`target language (${targetLang}) dominant`);
-      expect(system).toContain(
-        `native-language (${nativeLang}) support is allowed when it prevents confusion`
-      );
+      expect(system).toContain(`native-language (${nativeLang}) explanations the learner needs`);
       expect(system).not.toContain('~40% English');
       expect(system).not.toContain('English for explanations and transitions');
       expect(system).not.toContain('Include brief inline translations when introducing new words');

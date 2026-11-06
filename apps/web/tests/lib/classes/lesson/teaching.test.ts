@@ -51,6 +51,7 @@ vi.mock('@/lib/providers/ai', () => ({
 }));
 
 import { generateClassTeaching, teachingFromSeed } from '@/lib/classes/lesson/teaching';
+import { classLanguagePolicy } from '@/lib/classes/class-language-policy';
 import { TeachingQualityRejectionError } from '@/lib/classes/quality/teaching-quality';
 import { SectionQualityError } from '@/lib/classes/section-quality';
 import { countWords } from '@/lib/duration';
@@ -117,6 +118,95 @@ beforeEach(() => {
 });
 
 describe('class teaching', () => {
+  it('provides beginner directions in the learner language and keeps higher levels immersive', () => {
+    const beginner = classLanguagePolicy({ level: 'A1', nativeLang: 'es', targetLang: 'ru' });
+    const intermediate = classLanguagePolicy({ level: 'A2', nativeLang: 'es', targetLang: 'ru' });
+    expect(beginner).toContain('outside target-language passages and spoken dialogue');
+    expect(beginner).toContain('understand those directions, in es');
+    expect(beginner).toContain(
+      'Examples, passages and answer options should still exercise the target language'
+    );
+    expect(intermediate).toContain(
+      'every learner-visible field must be in the target language (ru)'
+    );
+  });
+
+  it('repairs a beginner unit rejected for an untaught guided request before publishing it', async () => {
+    const candidate: ClassTeaching = {
+      ...sampleTeaching,
+      explanation: 'Saluda e identifica a una persona.',
+      workedExamples: [
+        {
+          prompt: 'Saluda a un amigo.',
+          answer: 'Привет!',
+          explanation: '«Привет» significa «hola».',
+        },
+        {
+          prompt: 'Da las gracias.',
+          answer: 'Спасибо за чай. Пожалуйста.',
+          explanation: 'Aquí «пожалуйста» significa «de nada».',
+        },
+      ],
+      commonMistake: {
+        incorrect: 'Привед!',
+        correction: 'Привет!',
+        explanation: '«Привет» es el saludo informal; se escribe con «т» al final.',
+      },
+      guidedPractice: {
+        prompt: 'En una cafetería, pide «чай» con cortesía.',
+        hint: 'Añade la fórmula de cortesía que acompaña una petición.',
+        answer: 'Чай, пожалуйста.',
+        explanation: '«Пожалуйста» significa «por favor» al pedir.',
+      },
+    };
+    const replacement: ClassTeaching = {
+      ...candidate,
+      explanation:
+        '«Чай» significa «té». Para pedir algo con cortesía, di el nombre y añade «пожалуйста», que aquí significa «por favor».',
+      workedExamples: [
+        {
+          prompt: 'Pide agua.',
+          answer: 'Вода, пожалуйста.',
+          explanation: '«Вода» es agua; añade «пожалуйста» para pedirla con cortesía.',
+        },
+        candidate.workedExamples[1]!,
+      ],
+    };
+    boundary.author
+      .mockResolvedValueOnce({ content: JSON.stringify(candidate), model: 'captured-model' })
+      .mockResolvedValueOnce({ content: JSON.stringify(replacement), model: 'captured-model' });
+    boundary.adjudicator.mockResolvedValueOnce({
+      content: JSON.stringify({
+        items: [
+          {
+            index: 0,
+            acceptable: false,
+            issues: ['level'],
+            feedback: ['The polite request pattern is only explained behind the guided answer.'],
+          },
+        ],
+      }),
+      model: 'captured-model',
+    });
+    const unit = await generateClassTeaching({
+      ...params,
+      level: 'A1',
+      nativeLang: 'es',
+      targetLang: 'ru',
+    });
+    expect(unit).toEqual(replacement);
+    expect(unit.guidedPractice.answer).toBe(candidate.guidedPractice.answer);
+    expect(unit.workedExamples[0]?.answer).not.toBe(unit.guidedPractice.answer);
+    expect(boundary.author.mock.calls[0][0]).toContain(
+      'they cannot teach a prerequisite for attempting that task'
+    );
+    const critic = boundary.requests.mock.calls.find(
+      ([, , options]) => options.jsonSchema?.name === 'class_teaching_critic'
+    );
+    expect(critic?.[0]).toContain(
+      'Do not use the concealed answer or its explanation as prior teaching'
+    );
+  });
   it('reads the original workbook when authoring while keeping critic and adjudicator inputs isolated', async () => {
     const sourceDocuments: SourceDocuments = {
       parts: [
