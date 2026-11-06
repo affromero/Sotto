@@ -767,6 +767,9 @@ suite('immutable private placement receipts against PostgreSQL', () => {
     await expect(
       requestPlacementSession(execution(), { ...input, requestId: randomUUID() })
     ).rejects.toThrow('explicit recovery');
+    await expect(
+      requestPlacementSession(execution(), { ...input, requestId: randomUUID() })
+    ).rejects.toMatchObject({ placementSessionId: first.placementSessionId });
     expect(await instance.database.placementSession.count()).toBe(1);
   });
 

@@ -73,13 +73,79 @@ describe('placement entry with exact receipt transport', () => {
   });
   it('opens the multiple-choice test with its saved session receipt', async () => {
     vi.mocked(fetch).mockResolvedValue(
-      Response.json({ status: 'READY', placementSessionId, questionsDigest, questions: [question] })
+      Response.json({
+        native: 'en',
+        target: 'es',
+        status: 'READY',
+        placementSessionId,
+        questionsDigest,
+        analysisId: null,
+        analysisRevision: null,
+        resultDigest: null,
+        expiresAt: '2099-01-01T00:00:00.000Z',
+        failureReason: null,
+        questions: [question],
+      })
     );
     render(<PlacementEntry native="en" target="es" />);
     fireEvent.click(screen.getByText('Take the placement test'));
     expect(await screen.findByText(question.prompt)).toBeInTheDocument();
     expect(JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body)).requestId).toMatch(
       /^[a-f0-9-]{36}$/
+    );
+  });
+  it('polls the complete queued response before showing the saved quiz', async () => {
+    const response = {
+      native: 'en',
+      target: 'es',
+      placementSessionId,
+      questionsDigest,
+      analysisId: null,
+      analysisRevision: null,
+      resultDigest: null,
+      expiresAt: '2099-01-01T00:00:00.000Z',
+      failureReason: null,
+    };
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(
+        Response.json({ ...response, status: 'QUEUED', questions: [] }, { status: 202 })
+      )
+      .mockResolvedValueOnce(
+        Response.json({ ...response, status: 'READY', questions: [question] })
+      );
+    render(<PlacementEntry native="en" target="es" />);
+    fireEvent.click(screen.getByText('Take the placement test'));
+    expect(await screen.findByText(question.prompt, {}, { timeout: 3000 })).toBeInTheDocument();
+    expect(vi.mocked(fetch).mock.calls[1][0]).toBe(
+      `/api/v1/placement?placementSessionId=${placementSessionId}`
+    );
+    expect(screen.queryByText(/network error/i)).not.toBeInTheDocument();
+  });
+  it('resumes the exact retained quiz supplied by the server when reopening the test', async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(
+        Response.json({ error: 'Resume the saved quiz.', placementSessionId }, { status: 409 })
+      )
+      .mockResolvedValueOnce(
+        Response.json({
+          native: 'en',
+          target: 'es',
+          status: 'READY',
+          placementSessionId,
+          questionsDigest,
+          analysisId: null,
+          analysisRevision: null,
+          resultDigest: null,
+          expiresAt: '2099-01-01T00:00:00.000Z',
+          failureReason: null,
+          questions: [question],
+        })
+      );
+    render(<PlacementEntry native="en" target="es" />);
+    fireEvent.click(screen.getByText('Take the placement test'));
+    expect(await screen.findByText(question.prompt)).toBeInTheDocument();
+    expect(vi.mocked(fetch).mock.calls[1][0]).toBe(
+      `/api/v1/placement?placementSessionId=${placementSessionId}`
     );
   });
   it('opens the materials path and can go back', () => {
