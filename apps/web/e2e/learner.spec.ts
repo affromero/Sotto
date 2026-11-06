@@ -387,7 +387,7 @@ test('full practice keeps skill sections usable on desktop and a 375px screen', 
   await page.getByRole('button', { name: /Browser learner/ }).click();
   await expect(page).toHaveURL(/\/(dashboard|learn)$/);
   await page.goto('/learn/practice');
-  await page.getByRole('button', { name: 'Resume Full catch-up practice' }).click();
+  await page.getByRole('button', { name: /^Resume Full catch-up, Started .* practice$/ }).click();
   const grammar = page
     .locator('details')
     .filter({ has: page.locator('summary', { hasText: 'Grammar' }) });
