@@ -29,6 +29,13 @@ struct SottoVocabularyFeedback: Decodable, Equatable {
     let meaning: String
     let answer: String
     let correct: Bool?
+    let selfRating: String?
+}
+
+struct SottoVocabularyRatingSummary: Decodable, Equatable {
+    let known: Int
+    let unknown: Int
+    let studied: Int
 }
 
 struct SottoVocabularyReceipt: Decodable, Equatable {
@@ -48,10 +55,39 @@ struct SottoVocabularyAction: Codable, Equatable {
     let expectedRevision: Int
     var itemId: String?
     var answer: String?
+    var rating: String?
 }
 
 struct SottoVocabularyAudioRequest: Encodable { let retry: Bool }
 struct SottoVocabularyAudioStatus: Decodable { let status: String; let error: String? }
+struct SottoVocabularyExamplesRequest: Codable {
+    let operationId: String
+    let retryOf: String?
+    let sourceHash: String
+}
+struct SottoVocabularyExamplesResponse: Decodable {
+    struct Example: Decodable { let sentence: String; let translation: String? }
+    let status: String
+    let request: SottoVocabularyExamplesRequest
+    let canRetry: Bool
+    let error: String?
+    let examples: [Example]?
+}
+struct SottoVocabularyRefillRequest: Codable {
+    let operationId: String
+    let generation: Int
+    let triggerSessionId: String?
+    let sourceHash: String
+}
+struct SottoVocabularyRefillResponse: Decodable {
+    let status: String
+    let canRetry: Bool
+    let request: SottoVocabularyRefillRequest?
+    let added: Int?
+    let nextSessionId: String?
+    let wordIds: [String]?
+    let error: String?
+}
 struct SottoVocabularyImportResult: Decodable { let status: String }
 
 struct SottoDictionary: Decodable {

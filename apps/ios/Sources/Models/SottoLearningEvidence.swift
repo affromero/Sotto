@@ -59,6 +59,8 @@ struct SottoPracticeStart: Decodable, Identifiable, Equatable {
     let practiceLevel: SottoLearningLevel?
     let learningSelection: SottoLearningSelectionPreview.Snapshot?
     let mode: String?
+    let selfRatingSupported: Bool?
+    let ratingSummary: SottoVocabularyRatingSummary?
     let nativeLang: String?
     let targetLang: String?
     let cards: [SottoVocabularyCard]?
@@ -119,7 +121,7 @@ struct SottoPracticeStart: Decodable, Identifiable, Equatable {
         case learnerAnswers, writingDrafts, progressRevision, submissionResult
         case preparationStatus, message, canRecover
         case practiceLevel, learningSelection
-        case mode, nativeLang, targetLang, cards, receipt
+        case mode, selfRatingSupported, ratingSummary, nativeLang, targetLang, cards, receipt
     }
 
     init(from decoder: Decoder) throws {
@@ -146,6 +148,8 @@ struct SottoPracticeStart: Decodable, Identifiable, Equatable {
         practiceLevel = try values.decodeIfPresent(SottoLearningLevel.self, forKey: .practiceLevel)
         learningSelection = try values.decodeIfPresent(SottoLearningSelectionPreview.Snapshot.self, forKey: .learningSelection)
         mode = try values.decodeIfPresent(String.self, forKey: .mode)
+        selfRatingSupported = try values.decodeIfPresent(Bool.self, forKey: .selfRatingSupported)
+        ratingSummary = try values.decodeIfPresent(SottoVocabularyRatingSummary.self, forKey: .ratingSummary)
         nativeLang = try values.decodeIfPresent(String.self, forKey: .nativeLang)
         targetLang = try values.decodeIfPresent(String.self, forKey: .targetLang)
         cards = try values.decodeIfPresent([SottoVocabularyCard].self, forKey: .cards)
@@ -202,6 +206,19 @@ struct SottoPracticeSessionSummary: Decodable, Equatable, Identifiable {
     let score: Double?
     let startedAt: String?
     let completedAt: String?
+    let vocabularyFormat: String?
+
+    var displayTitle: String {
+        guard kind == "VOCAB" else { return kind.capitalized }
+        switch vocabularyFormat {
+        case "GENERATED": return "Vocabulary · Exercises"
+        case "FLASHCARDS": return "Vocabulary · Flashcards"
+        case "MEANING_RECALL": return "Vocabulary · Remember the meaning"
+        case "WORD_RECALL": return "Vocabulary · Find the word"
+        case "LISTENING_RECALL": return "Vocabulary · Listen and remember"
+        default: return "Vocabulary"
+        }
+    }
 
     var statusLabel: String {
         switch status {

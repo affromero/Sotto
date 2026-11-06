@@ -397,12 +397,12 @@ suite('durable reconciliation with PostgreSQL and Redis', () => {
 });
 
 describe('durable queue contract isolation', () => {
-  it('accepts both episode interactions and lesson help while rejecting unknown versions', () => {
+  it('accepts episode interactions, lesson help and vocabulary examples while rejecting unknown versions', () => {
     const data = { operationId: randomUUID(), fingerprint: 'a'.repeat(64) };
-    for (const name of ['interactions.v1', 'interactions.v2'])
+    for (const name of ['interactions.v1', 'interactions.v2', 'interactions.v3', 'interactions.v4'])
       expect(() => validateSottoQueueContract('interactions', { name, data })).not.toThrow();
     expect(() =>
-      validateSottoQueueContract('interactions', { name: 'interactions.v3', data })
+      validateSottoQueueContract('interactions', { name: 'interactions.v5', data })
     ).toThrow();
   });
   it.each([

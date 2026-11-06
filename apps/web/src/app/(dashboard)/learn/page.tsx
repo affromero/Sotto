@@ -194,25 +194,28 @@ export default async function LearnPage() {
                 <div className={styles.sourcedRow}>
                   <StartNextClass courseId={course.id} activeClassId={activeClassId}>
                     <div className={styles.courseActions}>
+                      <div className={styles.studyActions}>
+                        <Link
+                          href={`/learn/practice?course=${encodeURIComponent(course.id)}`}
+                          className={styles.studyAction}
+                        >
+                          <strong>Practice</strong>
+                          <span>Skills and exercises</span>
+                        </Link>
+                        <Link
+                          href={`/learn/vocabulary?course=${encodeURIComponent(course.id)}`}
+                          className={styles.studyAction}
+                        >
+                          <strong>Vocabulary</strong>
+                          <span>Flashcards and word review</span>
+                        </Link>
+                      </div>
                       <Link
                         href={`/learn/map?course=${encodeURIComponent(course.id)}`}
                         className={styles.practiceLink}
                         aria-label={`Learning map and level requirements for ${courseTitle}`}
                       >
                         Learning map
-                      </Link>
-                      <Link
-                        href="/learn/practice"
-                        className={styles.practiceLink}
-                        aria-label={`Practice a single skill for ${courseTitle}`}
-                      >
-                        Practice
-                      </Link>
-                      <Link
-                        href={`/learn/vocabulary?course=${course.id}`}
-                        className={styles.practiceLink}
-                      >
-                        Vocabulary
                       </Link>
                       <Link
                         href={`/learn/live?course=${course.id}`}

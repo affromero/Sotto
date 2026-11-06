@@ -7,11 +7,30 @@ const mockDelete = vi.fn();
 const mockFindMany = vi.fn();
 const mockVocabDeleteMany = vi.fn();
 const mockGrammarDeleteMany = vi.fn();
+const mockExampleFindFirst = vi.fn();
+const mockRefillFindFirst = vi.fn();
+
+vi.mock('@/lib/sidedoor/access/state/transaction', () => ({
+  sottoTransaction: async (...args: [unknown, (database: unknown) => Promise<unknown>]) =>
+    args[1]({
+      $queryRaw: async () => [],
+      practiceSession: {
+        findFirst: (...a: unknown[]) => mockFindFirst(...a),
+        delete: (...a: unknown[]) => mockDelete(...a),
+      },
+      flashcardExample: { findFirst: (...a: unknown[]) => mockExampleFindFirst(...a) },
+      vocabularyRefill: { findFirst: (...a: unknown[]) => mockRefillFindFirst(...a) },
+    }),
+}));
+vi.mock('@/lib/sidedoor/credentials/runtime/provider-execution', () => ({
+  sottoRequestExecution: () => ({ authorize: async () => ({ userId: 'u1' }) }),
+}));
 
 vi.mock('@/lib/api-keys', () => ({
   authenticateRequest: (...a: unknown[]) => mockAuthenticateRequest(...a),
 }));
 vi.mock('@/lib/prisma', () => ({
+  prismaUnfiltered: {},
   prisma: {
     practiceSession: {
       findFirst: (...a: unknown[]) => mockFindFirst(...a),
@@ -53,9 +72,18 @@ beforeEach(() => {
   mockFindMany.mockResolvedValue([]);
   mockVocabDeleteMany.mockResolvedValue({ count: 2 });
   mockGrammarDeleteMany.mockResolvedValue({ count: 1 });
+  mockExampleFindFirst.mockResolvedValue(null);
+  mockRefillFindFirst.mockResolvedValue(null);
 });
 
 describe('DELETE /api/v1/practice/[sessionId]', () => {
+  it('keeps a vocabulary session while example generation is unresolved', async () => {
+    mockFindFirst.mockResolvedValue(session({ vocabularyStudy: { version: 1 } }));
+    mockExampleFindFirst.mockResolvedValue({ cardId: 'card' });
+    const response = await DELETE(request(), PARAMS);
+    expect(response.status).toBe(409);
+    expect(mockDelete).not.toHaveBeenCalled();
+  });
   it('discards the session', async () => {
     const res = await DELETE(request(), PARAMS);
 

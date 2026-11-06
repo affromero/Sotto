@@ -51,6 +51,46 @@ afterEach(() => {
 });
 
 describe('PracticePanel recent sessions', () => {
+  it('distinguishes saved vocabulary formats and same-time sessions', async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse({
+        ...OVERVIEW,
+        recent: [
+          {
+            id: 'a',
+            kind: 'VOCAB',
+            vocabularyFormat: 'FLASHCARDS',
+            status: 'ACTIVE',
+            score: null,
+            startedAt: '2026-11-06T12:00:00.100Z',
+          },
+          {
+            id: 'b',
+            kind: 'VOCAB',
+            vocabularyFormat: 'FLASHCARDS',
+            status: 'ACTIVE',
+            score: null,
+            startedAt: '2026-11-06T12:00:00.900Z',
+          },
+          {
+            id: 'c',
+            kind: 'VOCAB',
+            vocabularyFormat: 'GENERATED',
+            status: 'ACTIVE',
+            score: null,
+            startedAt: '2026-11-06T13:00:00.000Z',
+          },
+        ],
+      })
+    );
+    render(<PracticePanel courseId="course-1" courseName="German" />);
+    expect(await screen.findAllByText('Vocabulary · Flashcards')).toHaveLength(2);
+    expect(screen.getByText('Vocabulary · Exercises')).toBeInTheDocument();
+    const first = screen.getByRole('button', { name: /Resume Vocabulary · Flashcards.*1 of 2/ });
+    const second = screen.getByRole('button', { name: /Resume Vocabulary · Flashcards.*2 of 2/ });
+    expect(first).toBeInTheDocument();
+    expect(second).toBeInTheDocument();
+  });
   it('shows qualified objective reviews once in full catch-up and in each applicable channel', async () => {
     fetchMock.mockResolvedValue(
       jsonResponse({
@@ -94,7 +134,7 @@ describe('PracticePanel recent sessions', () => {
       name: /^Resume /,
     });
     expect(resumeButtons).toHaveLength(1);
-    expect(resumeButtons[0]).toHaveAccessibleName('Resume Full catch-up practice');
+    expect(resumeButtons[0]).toHaveAccessibleName('Resume Full catch-up, Started earlier practice');
     expect(screen.getAllByRole('button', { name: /^View results for / })).toHaveLength(2);
   });
 
@@ -221,7 +261,9 @@ describe('PracticePanel durable generation', () => {
     expect(screen.getByText('Generation failed')).toBeInTheDocument();
     expect(screen.getByText('Cancelled')).toBeInTheDocument();
     fetchMock.mockResolvedValueOnce(jsonResponse(queued));
-    fireEvent.click(screen.getByRole('button', { name: 'Resume Grammar practice' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Resume Grammar, Started earlier practice' })
+    );
     expect(await screen.findByText(queued.message)).toBeInTheDocument();
   });
 

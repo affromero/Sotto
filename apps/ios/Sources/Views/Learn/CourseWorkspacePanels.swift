@@ -94,6 +94,7 @@ struct CourseHeroPanel: View {
 }
 
 struct CourseActionGrid: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let primaryTitle: String
     let primaryIcon: String
     let generating: Bool
@@ -127,18 +128,13 @@ struct CourseActionGrid: View {
                 action: onPrimary
             )
 
-            LazyVGrid(columns: secondaryColumns, alignment: .leading, spacing: 8) {
-                Menu {
-                    ForEach(practiceOptions) { option in
-                        Button(practiceLabel(option)) {
-                            onPractice(option.kind)
-                        }
-                    }
-                } label: {
-                    SecondaryActionLabel(title: "Practice", icon: "target")
-                }
-                .buttonStyle(.plain)
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(spacing: 8) { practiceActions }
+            } else {
+                HStack(spacing: 8) { practiceActions }
+            }
 
+            LazyVGrid(columns: secondaryColumns, alignment: .leading, spacing: 8) {
                 SecondaryAction(title: "Live", icon: "waveform", action: onLive)
                 SecondaryAction(title: "Exam", icon: "checklist", action: onExam)
                 SecondaryAction(title: "Placement", icon: "checkmark.seal", action: onPlacement)
@@ -146,6 +142,21 @@ struct CourseActionGrid: View {
                 SecondaryAction(title: "Memory", icon: "brain", action: onMemory)
             }
         }
+    }
+
+    @ViewBuilder private var practiceActions: some View {
+        Menu {
+            ForEach(practiceOptions) { option in
+                Button(practiceLabel(option)) { onPractice(option.kind) }
+            }
+        } label: {
+            SecondaryActionLabel(title: "Practice", icon: "target", detail: "Skills and exercises")
+        }
+        .buttonStyle(.plain)
+        SecondaryAction(title: "Vocabulary", icon: "character.book.closed", detail: "Flashcards and word review") {
+            onPractice("VOCAB")
+        }
+        .accessibilityHint("Flashcards and word review")
     }
 }
 
@@ -182,11 +193,12 @@ private struct ActionButton: View {
 private struct SecondaryAction: View {
     let title: String
     let icon: String
+    var detail: String? = nil
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            SecondaryActionLabel(title: title, icon: icon)
+            SecondaryActionLabel(title: title, icon: icon, detail: detail)
         }
         .buttonStyle(.plain)
     }
@@ -195,19 +207,25 @@ private struct SecondaryAction: View {
 private struct SecondaryActionLabel: View {
     let title: String
     let icon: String
+    var detail: String? = nil
 
     var body: some View {
         HStack(spacing: 7) {
             Image(systemName: icon)
                 .font(.callout.weight(.semibold))
                 .foregroundStyle(SottoTheme.primary)
-            Text(title)
-                .font(.callout.weight(.semibold))
-                .foregroundStyle(SottoTheme.ink)
-                .lineLimit(1)
-                .minimumScaleFactor(0.88)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.callout.weight(.semibold))
+                    .foregroundStyle(SottoTheme.ink)
+                if let detail {
+                    Text(detail).font(.caption).foregroundStyle(SottoTheme.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
         }
         .padding(.horizontal, 12)
+        .padding(.vertical, detail == nil ? 0 : 8)
         .frame(minHeight: 44)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(SottoTheme.surface.opacity(0.72))

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { LearningDatabase } from '../learning/database';
 import {
   vocabularyStudyModeSchema,
   vocabularyStudySessionSchema,
@@ -63,6 +64,34 @@ export const vocabularyStudyStateSchema = z
     'Study card identities must be unique.'
   );
 export type VocabularyStudyState = z.infer<typeof vocabularyStudyStateSchema>;
+type FlashcardRatings = ReadonlyMap<string, 'KNOWN' | 'UNKNOWN'>;
+
+export async function readFlashcardRatings(
+  database: Pick<LearningDatabase, 'flashcardRating'>,
+  state: VocabularyStudyState,
+  sessionId: string
+): Promise<FlashcardRatings> {
+  if (state.mode !== 'FLASHCARDS') return new Map();
+  const rows = await database.flashcardRating.findMany({
+    where: { practiceSessionId: sessionId, courseId: state.courseId },
+    select: { cardId: true, rating: true },
+    take: 25,
+  });
+  const ratings = new Map<string, 'KNOWN' | 'UNKNOWN'>();
+  for (const row of rows) {
+    const card = state.cards.find((item) => item.id === row.cardId);
+    if (
+      !card ||
+      card.response?.outcome !== 'STUDIED' ||
+      ratings.has(row.cardId) ||
+      (row.rating !== 'KNOWN' && row.rating !== 'UNKNOWN')
+    ) {
+      throw new VocabularyStudyConflict('Saved flashcard ratings could not be verified.');
+    }
+    ratings.set(row.cardId, row.rating);
+  }
+  return ratings;
+}
 
 export class VocabularyStudyConflict extends Error {}
 export class VocabularyStudyNotFound extends Error {}
@@ -112,7 +141,8 @@ export function publicVocabularyStudy(
     progressRevision: number;
     writingDrafts: unknown;
     submissionResult: unknown;
-  }
+  },
+  ratings: FlashcardRatings = new Map()
 ) {
   const drafts = z.record(z.string(), z.string()).safeParse(session.writingDrafts);
   const receipt = vocabularyStudyReceiptSchema.nullable().parse(session.submissionResult);
@@ -121,7 +151,18 @@ export function publicVocabularyStudy(
     kind: 'VOCAB',
     sessionId: session.id,
     courseId: state.courseId,
+    profileId: state.userId,
     mode: state.mode,
+    selfRatingSupported: true,
+    ...(state.mode === 'FLASHCARDS' && {
+      ratingSummary: {
+        known: [...ratings.values()].filter((rating) => rating === 'KNOWN').length,
+        unknown: [...ratings.values()].filter((rating) => rating === 'UNKNOWN').length,
+        studied: state.cards.filter(
+          (card) => card.response?.outcome === 'STUDIED' && !ratings.has(card.id)
+        ).length,
+      },
+    }),
     nativeLang: state.nativeLang,
     targetLang: state.targetLang,
     progressRevision: session.progressRevision,
@@ -136,6 +177,7 @@ export function publicVocabularyStudy(
             : card.lemma,
       feedback: card.response && {
         ...card.response,
+        ...(ratings.has(card.id) && { selfRating: ratings.get(card.id) }),
         lemma: card.lemma,
         meaning: card.meaning,
         acceptedMeanings: card.acceptedMeanings,

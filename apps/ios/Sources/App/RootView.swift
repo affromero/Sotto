@@ -80,6 +80,7 @@ struct RootView: View {
                     attempt: 1, revision: practiceStart.progressRevision ?? 0)
                 PracticeStartView(start: practiceStart, progress: state.progress, drafts: state.drafts)
                     .environmentObject(model)
+                    .id(practiceStart.sessionId)
             }
         }
         .sheet(isPresented: Binding(get: { model.vocabularyCourseId != nil }, set: { if !$0 { model.vocabularyCourseId = nil } }), onDismiss: {

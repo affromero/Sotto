@@ -13,12 +13,16 @@ import { getLanguageLabel } from '@sotto/shared';
 import { CHARS_PER_SECOND } from '@/lib/duration';
 import { logger } from '@/lib/logger';
 import { processClassLessonHelp } from './interactions/class-lesson-help.worker';
+import { processVocabularyExamples } from './interactions/vocabulary-examples.worker';
+import { processVocabularyRefill } from './interactions/vocabulary-refill.worker';
 
 export async function processInteraction(
   job: Job<ProcessInteractionPayload>,
   signal?: AbortSignal
 ): Promise<void> {
   if (job.name === 'interactions.v2') return processClassLessonHelp(job, signal);
+  if (job.name === 'interactions.v3') return processVocabularyExamples(job, signal);
+  if (job.name === 'interactions.v4') return processVocabularyRefill(job, signal);
   const { episodeId, interactionId, userId, question, timestamp } = job.data;
 
   logger.info('Processing interaction', { episodeId, interactionId });

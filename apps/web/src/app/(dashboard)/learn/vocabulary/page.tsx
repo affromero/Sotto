@@ -38,6 +38,7 @@ export default async function VocabularyPage({
         courseId={course.id}
         courseName={course.curriculum.title || course.targetLang}
         support={course.vocabularySupport}
+        profileId={userId}
         sessionId={params.session}
       />
     </main>

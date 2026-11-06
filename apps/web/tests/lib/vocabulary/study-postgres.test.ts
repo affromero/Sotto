@@ -243,6 +243,159 @@ suite('owned dictionary study against PostgreSQL', () => {
     ).toBe(true);
   });
 
+  it.each(['KNOWN', 'UNKNOWN'] as const)(
+    'records a %s self-rating once, preserves it on resume, and updates the review schedule',
+    async (rating) => {
+      const study = await start('FLASHCARDS');
+      const action = { action: 'RATE', itemId: study.cards[0]!.id, rating, expectedRevision: 0 };
+      const rated = await actOnVocabularyStudy(study.sessionId, execution(), action);
+      expect(rated.cards[0]!.feedback).toMatchObject({ outcome: 'STUDIED', selfRating: rating });
+      const retried = await actOnVocabularyStudy(study.sessionId, execution(), action);
+      expect(retried.cards[0]!.feedback?.selfRating).toBe(rating);
+      await expect(
+        actOnVocabularyStudy(study.sessionId, execution(), {
+          ...action,
+          rating: rating === 'KNOWN' ? 'UNKNOWN' : 'KNOWN',
+        })
+      ).rejects.toThrow('already has feedback');
+      const resumed = await resumePractice(study.sessionId, userId);
+      expect(resumed).toMatchObject({
+        ratingSummary: {
+          known: Number(rating === 'KNOWN'),
+          unknown: Number(rating === 'UNKNOWN'),
+          studied: 0,
+        },
+        cards: [{ feedback: { selfRating: rating } }],
+      });
+      const events = await instance.database.learnerReviewEvent.findMany({ where: { courseId } });
+      expect(events).toHaveLength(1);
+      expect(events[0]).toMatchObject({
+        assessment: 'FLASHCARD_SELF_ASSESSMENT',
+        quality: rating === 'KNOWN' ? 1 : 0,
+      });
+      expect(
+        (await instance.database.learnerVocab.findUniqueOrThrow({ where: { id: wordId } }))
+          .lastReviewed
+      ).not.toBeNull();
+    }
+  );
+
+  it('enforces the migrated flashcard and refill constraints in PostgreSQL', async () => {
+    const study = await start('FLASHCARDS');
+    await actOnVocabularyStudy(study.sessionId, execution(), {
+      action: 'RATE',
+      itemId: study.cards[0]!.id,
+      rating: 'KNOWN',
+      expectedRevision: 0,
+    });
+    await expect(
+      instance.database.flashcardRating.update({
+        where: {
+          practiceSessionId_cardId: {
+            practiceSessionId: study.sessionId,
+            cardId: study.cards[0]!.id,
+          },
+        },
+        data: { rating: 'INVALID' },
+      })
+    ).rejects.toThrow(/FlashcardRating_rating_check/);
+    const event = await instance.database.learnerReviewEvent.findFirstOrThrow({
+      where: { courseId },
+    });
+    await expect(
+      instance.database.learnerReviewEvent.update({
+        where: { sequence: event.sequence },
+        data: { assessment: 'INVALID' },
+      })
+    ).rejects.toThrow(/LearnerReviewEvent_assessment_check/);
+    await expect(
+      instance.database.flashcardExample.create({
+        data: {
+          practiceSessionId: study.sessionId,
+          courseId,
+          cardId: study.cards[0]!.id,
+          sourceHash: 'hash',
+          operationId: randomUUID(),
+          status: 'INVALID',
+        },
+      })
+    ).rejects.toThrow(/FlashcardExample_status_check/);
+    await expect(
+      instance.database.vocabularyRefill.create({
+        data: {
+          courseId,
+          generation: 1,
+          operationId: randomUUID(),
+          sourceHash: 'hash',
+          status: 'INVALID',
+        },
+      })
+    ).rejects.toThrow(/VocabularyRefill_status_check/);
+    expect(
+      (await instance.database.flashcardRating.findFirstOrThrow({ where: { courseId } })).rating
+    ).toBe('KNOWN');
+  });
+
+  it('retains the self-rating when its dictionary word is deleted', async () => {
+    const study = await start('FLASHCARDS');
+    await actOnVocabularyStudy(study.sessionId, execution(), {
+      action: 'RATE',
+      itemId: study.cards[0]!.id,
+      rating: 'UNKNOWN',
+      expectedRevision: 0,
+    });
+    await instance.database.learnerVocab.delete({ where: { id: wordId } });
+    expect(await resumePractice(study.sessionId, userId)).toMatchObject({
+      ratingSummary: { known: 0, unknown: 1, studied: 0 },
+      cards: [{ feedback: { selfRating: 'UNKNOWN' } }],
+    });
+  });
+
+  it('does not retroactively rate a legacy flashcard reveal', async () => {
+    const study = await start('FLASHCARDS');
+    await actOnVocabularyStudy(study.sessionId, execution(), {
+      action: 'REVEAL',
+      itemId: study.cards[0]!.id,
+      expectedRevision: 0,
+    });
+    await expect(
+      actOnVocabularyStudy(study.sessionId, execution(), {
+        action: 'RATE',
+        itemId: study.cards[0]!.id,
+        rating: 'UNKNOWN',
+        expectedRevision: 0,
+      })
+    ).rejects.toThrow('already has feedback');
+    expect(await instance.database.learnerReviewEvent.count({ where: { courseId } })).toBe(0);
+    expect(
+      await instance.database.flashcardRating.count({
+        where: { practiceSessionId: study.sessionId },
+      })
+    ).toBe(0);
+  });
+
+  it('accepts only one of two conflicting concurrent self-ratings', async () => {
+    const study = await start('FLASHCARDS');
+    const result = await Promise.allSettled(
+      ['KNOWN', 'UNKNOWN'].map((rating) =>
+        actOnVocabularyStudy(study.sessionId, execution(), {
+          action: 'RATE',
+          itemId: study.cards[0]!.id,
+          rating,
+          expectedRevision: 0,
+        })
+      )
+    );
+    expect(result.filter((item) => item.status === 'fulfilled')).toHaveLength(1);
+    expect(result.filter((item) => item.status === 'rejected')).toHaveLength(1);
+    expect(
+      await instance.database.flashcardRating.count({
+        where: { practiceSessionId: study.sessionId },
+      })
+    ).toBe(1);
+    expect(await instance.database.learnerReviewEvent.count({ where: { courseId } })).toBe(1);
+  });
+
   it('treats answer reveal as a miss and prevents correcting it for additional credit', async () => {
     const session = await start();
     const revealed = await actOnVocabularyStudy(session.sessionId, execution(), {

@@ -3,6 +3,37 @@ import XCTest
 @testable import Sotto
 
 final class PracticeOverviewTests: XCTestCase {
+    func testVisibleSessionsStartedWithinTheSameSecondAreDistinguished() throws {
+        let result = try overview("""
+        {"due":{"vocab":0,"grammar":0},"totalVocab":1,"recent":[
+          {"id":"a","kind":"VOCAB","status":"ACTIVE","vocabularyFormat":"FLASHCARDS","startedAt":"2026-11-06T12:00:00.100Z"},
+          {"id":"b","kind":"VOCAB","status":"ACTIVE","vocabularyFormat":"FLASHCARDS","startedAt":"2026-11-06T12:00:00.900Z"},
+          {"id":"c","kind":"VOCAB","status":"COMPLETED","vocabularyFormat":"FLASHCARDS","startedAt":"2026-11-06T12:00:00.500Z"},
+          {"id":"d","kind":"VOCAB","status":"ACTIVE","vocabularyFormat":"FLASHCARDS","startedAt":"2026-11-06T12:00:00.600Z","completedAt":"2026-11-06T12:00:01.000Z"}
+        ]}
+        """)
+        XCTAssertTrue(practiceStartedLabel(result.recent[0], among: result.recent).hasSuffix("1 of 2"))
+        XCTAssertTrue(practiceStartedLabel(result.recent[1], among: result.recent).hasSuffix("2 of 2"))
+    }
+
+    func testSavedVocabularyFormatsHaveClearNamesAndOldServersRemainReadable() throws {
+        let result = try overview("""
+        {"due":{"vocab":0,"grammar":0},"totalVocab":1,"recent":[
+          {"id":"a","kind":"VOCAB","status":"ACTIVE","vocabularyFormat":"FLASHCARDS"},
+          {"id":"b","kind":"VOCAB","status":"ACTIVE","vocabularyFormat":"MEANING_RECALL"},
+          {"id":"c","kind":"VOCAB","status":"ACTIVE","vocabularyFormat":"WORD_RECALL"},
+          {"id":"d","kind":"VOCAB","status":"ACTIVE","vocabularyFormat":"LISTENING_RECALL"},
+          {"id":"e","kind":"VOCAB","status":"ACTIVE","vocabularyFormat":"GENERATED"},
+          {"id":"f","kind":"VOCAB","status":"ACTIVE"},
+          {"id":"g","kind":"VOCAB","status":"ACTIVE","vocabularyFormat":"FUTURE"}
+        ]}
+        """)
+        XCTAssertEqual(result.recent.map(\.displayTitle), [
+            "Vocabulary · Flashcards", "Vocabulary · Remember the meaning", "Vocabulary · Find the word",
+            "Vocabulary · Listen and remember", "Vocabulary · Exercises", "Vocabulary", "Vocabulary"
+        ])
+    }
+
     func testCanonicalOnlyReviewAppearsOverallAndInItsQualifiedSkills() throws {
         let result = try overview("""
         {"due":{"vocab":0,"grammar":0,"objectives":1,"bySkill":{"GRAMMAR":1,"WRITING":1}},"totalVocab":0,"recent":[]}

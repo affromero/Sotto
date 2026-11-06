@@ -272,6 +272,7 @@
 
 .recentRow {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
   padding: 10px 14px;
@@ -283,6 +284,12 @@
   font-family: var(--serif);
   font-size: 15px;
   color: var(--ink);
+}
+
+.recentTime {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink-mute);
 }
 
 .recentScore {

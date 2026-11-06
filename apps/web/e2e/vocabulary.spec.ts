@@ -118,7 +118,7 @@ test('uploaded words flow through the dictionary, local pronunciation, study, an
   });
   expect(word).toMatchObject({ mastery: 0, reps: 0, lastReviewed: null, introducedAt: null });
   await page.getByRole('checkbox', { name: 'Select Bahnhof', exact: true }).check();
-  await page.getByLabel('Practice mode').selectOption('FLASHCARDS');
+  await page.getByRole('radio', { name: 'Flashcards' }).check();
   await page.getByRole('button', { name: 'Practice selection' }).click();
   await expect(page.getByRole('heading', { name: 'Bahnhof', exact: true })).toBeVisible();
   await expect(page.getByText('station', { exact: true })).toHaveCount(0);
@@ -142,15 +142,18 @@ test('uploaded words flow through the dictionary, local pronunciation, study, an
   ).toEqual(audio);
   await page.getByRole('button', { name: 'Reveal meaning' }).click();
   await expect(page.getByText('station', { exact: true })).toBeVisible();
-  expect(await database.learnerVocab.findUniqueOrThrow({ where: { id: word.id } })).toMatchObject({
-    mastery: 0,
-    reps: 0,
-    lastReviewed: null,
-  });
+  expect(
+    (await database.learnerVocab.findUniqueOrThrow({ where: { id: word.id } })).lastReviewed
+  ).not.toBeNull();
+  expect(
+    await database.learnerReviewEvent.count({
+      where: { vocabId: word.id, assessment: 'FLASHCARD_SELF_ASSESSMENT', quality: 0 },
+    })
+  ).toBe(1);
   await page.getByRole('button', { name: 'Finish session' }).click();
-  await expect(page.getByText(/1 word studied/)).toBeVisible();
+  await expect(page.getByText('0 known · 1 still learning.', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Back to vocabulary' }).click();
-  await page.getByLabel('Practice mode').selectOption('MEANING_RECALL');
+  await page.getByRole('radio', { name: 'Remember the meaning' }).check();
   await page.getByRole('button', { name: 'Practice selection' }).click();
   await page.getByRole('textbox', { name: 'Its meaning' }).fill('station');
   await page.getByRole('textbox', { name: 'Its meaning' }).press('Enter');
@@ -176,7 +179,7 @@ test('uploaded words flow through the dictionary, local pronunciation, study, an
   const reviewedWord = page.getByRole('listitem').filter({
     has: page.getByRole('checkbox', { name: 'Select Bahnhof', exact: true }),
   });
-  await expect(reviewedWord.getByText('Recall estimate <1%', { exact: false })).toBeVisible();
+  await expect(reviewedWord.getByText('2 recorded reviews', { exact: false })).toBeVisible();
   for (const [width, height, theme] of [
     [375, 812, 'light'],
     [812, 375, 'light'],
@@ -190,10 +193,13 @@ test('uploaded words flow through the dictionary, local pronunciation, study, an
     await expect
       .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
       .toBe(true);
-    const practiceTitle = await page
-      .getByRole('heading', { name: 'Make the meaning stick.' })
-      .boundingBox();
-    expect(practiceTitle?.width).toBeGreaterThanOrEqual(200);
+    await expect
+      .poll(
+        async () =>
+          (await page.getByRole('heading', { name: 'Make the meaning stick.' }).boundingBox())
+            ?.width ?? 0
+      )
+      .toBeGreaterThanOrEqual(200);
     for (const button of await page
       .getByRole('region', { name: 'Vocabulary', exact: true })
       .getByRole('button')

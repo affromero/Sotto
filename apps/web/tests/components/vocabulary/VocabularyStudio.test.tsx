@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import type { DictionaryWord } from '@sotto/shared';
 import { VocabularyStudio } from '@/components/learn/vocabulary/VocabularyStudio';
 import type { VocabularyImport } from '@/components/learn/vocabulary/VocabularyImports';
@@ -79,6 +79,16 @@ afterEach(() => {
 });
 
 describe('vocabulary import progress', () => {
+  it('shows the available practice modes and lets learners select flashcards', async () => {
+    fetchMock.mockResolvedValue(Response.json(dictionary({}, [importedWord])));
+    render(<VocabularyStudio courseId="german" courseName="German" support={null} />);
+    await advance(0);
+    const flashcards = screen.getByRole('radio', { name: 'Flashcards' });
+    expect(flashcards).toBeVisible();
+    expect(screen.getByRole('radio', { name: 'Remember the meaning' })).toBeChecked();
+    fireEvent.click(flashcards);
+    expect(flashcards).toBeChecked();
+  });
   it('follows extraction and indexing until imported words appear, then stops polling', async () => {
     fetchMock
       .mockResolvedValueOnce(Response.json(dictionary()))

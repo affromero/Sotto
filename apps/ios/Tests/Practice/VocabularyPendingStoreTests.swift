@@ -2,6 +2,16 @@ import XCTest
 @testable import Sotto
 
 final class VocabularyPendingStoreTests: XCTestCase {
+    func testPendingFlashcardRatingRetainsItsExactChoice() throws {
+        let client = SottoAPIClient(serverURL: URL(string: "https://school.example")!, apiKey: "key", profileId: UUID().uuidString)
+        let store = VocabularyPendingStore(client: client, scope: "action/rating")
+        defer { try? store.clear() }
+        let rating = SottoVocabularyAction(action: "RATE", expectedRevision: 4, itemId: "card", rating: "UNKNOWN")
+        try store.save(rating)
+        XCTAssertEqual(try store.load(SottoVocabularyAction.self), rating)
+        XCTAssertThrowsError(try store.save(SottoVocabularyAction(action: "RATE", expectedRevision: 4, itemId: "card", rating: "KNOWN")))
+    }
+
     func testUncertainVocabularyResponseSurvivesReopeningAndCannotBeReplaced() throws {
         let client = SottoAPIClient(serverURL: URL(string: "https://school.example")!, apiKey: "key", profileId: UUID().uuidString)
         let store = VocabularyPendingStore(client: client, scope: "action/study")
