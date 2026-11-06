@@ -49,6 +49,7 @@ struct VocabularyDictionaryView: View {
                                     Image(systemName: selected.contains(word.id) ? "checkmark.circle.fill" : "circle")
                                         .frame(width: 44, height: 44)
                                 }
+                                .buttonStyle(.borderless)
                                 .accessibilityLabel("Select \(word.lemma)")
                                 .disabled(disabled || (!selected.contains(word.id) && selected.count >= 24))
                                 VStack(alignment: .leading) {
@@ -71,16 +72,18 @@ struct VocabularyDictionaryView: View {
                                     }
                                 }
                             }
-                            Button("Edit meanings") { editing = word }.disabled(disabled)
+                            Button("Edit meanings") { editing = word }
+                                .buttonStyle(.borderless)
+                                .disabled(disabled)
                         }
                     }
                     if dictionary.pages > 1 {
                         HStack {
-                            Button("Previous") { page -= 1 }.disabled(page <= 1)
+                            Button("Previous") { page -= 1 }.buttonStyle(.borderless).disabled(page <= 1)
                             Spacer()
                             Text("\(page) / \(dictionary.pages)")
                             Spacer()
-                            Button("Next") { page += 1 }.disabled(page >= dictionary.pages)
+                            Button("Next") { page += 1 }.buttonStyle(.borderless).disabled(page >= dictionary.pages)
                         }
                     }
                 } else if error == nil { ProgressView("Loading dictionary") }
