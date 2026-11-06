@@ -143,6 +143,17 @@ beforeEach(() => {
 });
 
 describe('assessing the accepted lesson', () => {
+  it('does not require later beginner lessons to reteach every background word', async () => {
+    const questions = await generateSectionQuestions({ ...params, level: 'A1' });
+    expect(questions).toHaveLength(authored.length);
+    const review = boundary.requests.mock.calls.find(
+      ([, , options]) => options.jsonSchema.name === 'class_teaching_critic'
+    );
+    expect(review?.[0]).toContain(
+      'Do not require later A1 lessons to reteach every background word'
+    );
+  });
+
   it('keeps standalone beginner practice usable without an invented prior lesson', async () => {
     const questions = await generateSectionQuestions({
       ...params,
