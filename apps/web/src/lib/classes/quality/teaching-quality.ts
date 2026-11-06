@@ -106,6 +106,7 @@ type PriorIntroReview = {
     authorize: CapturedLearningAi['execution']['authorize'];
     onCleanupError: CapturedLearningAi['execution']['onCleanupError'];
     learningSelection: CapturedLearningAi['execution']['learningSelection'];
+    initialA1Class: boolean | undefined;
     providerRequest: CapturedLearningAi['execution']['providerRequest'];
     isolatedWorkspace: { directory: string; markCleanupUnconfirmed: () => void } | undefined;
     registerAudioEpisode: CapturedLearningAi['execution']['registerAudioEpisode'];
@@ -390,15 +391,21 @@ export async function reviewTeachingContent(options: {
     }
   }
   try {
-    let languagePolicy = classLanguagePolicy(options);
+    const languageContext = {
+      ...options,
+      initialA1Class: options.ai.execution.initialA1Class,
+    };
+    let languagePolicy = classLanguagePolicy(languageContext);
     if (options.kind === 'vocabulary')
       languagePolicy = [
         `Vocabulary metadata has field-specific languages at every CEFR level: lemma and sourceForm are in the target language (${options.targetLang}), while gloss is a dictionary meaning in the native language (${options.nativeLang}).`,
         'The gloss may be a word or short dictionary phrase. Part-of-speech labels and question indices are structural metadata. Do not reject these metadata fields merely for using their required language or dictionary form.',
         `Apply the class language policy only to the embedded passage, questions, options and explanations, never to vocabulary metadata: ${languagePolicy}`,
       ].join(' ');
-    else if (options.kind === 'listening') languagePolicy = classListeningTranscriptPolicy(options);
-    else if (options.kind === 'speaking') languagePolicy = classSpeakingMeaningPolicy(options);
+    else if (options.kind === 'listening')
+      languagePolicy = classListeningTranscriptPolicy(languageContext);
+    else if (options.kind === 'speaking')
+      languagePolicy = classSpeakingMeaningPolicy(languageContext);
     else if (
       options.kind === 'writing' &&
       options.items.some(
@@ -747,6 +754,7 @@ export async function reviewTeachingContent(options: {
             learningSelection: options.ai.execution.learningSelection
               ? structuredClone(options.ai.execution.learningSelection)
               : undefined,
+            initialA1Class: options.ai.execution.initialA1Class,
             providerRequest: options.ai.execution.providerRequest,
             isolatedWorkspace: options.ai.execution.isolatedWorkspace
               ? {
@@ -926,6 +934,7 @@ function takePriorIntroReview(
     prior.selection.authorize !== options.ai.execution.authorize ||
     prior.selection.onCleanupError !== options.ai.execution.onCleanupError ||
     !isDeepStrictEqual(prior.selection.learningSelection, options.ai.execution.learningSelection) ||
+    prior.selection.initialA1Class !== options.ai.execution.initialA1Class ||
     prior.selection.providerRequest !== options.ai.execution.providerRequest ||
     !isDeepStrictEqual(prior.selection.isolatedWorkspace, options.ai.execution.isolatedWorkspace) ||
     prior.selection.registerAudioEpisode !== options.ai.execution.registerAudioEpisode

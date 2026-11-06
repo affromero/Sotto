@@ -61,6 +61,16 @@ describe('durable class preparation state', () => {
     expect(() => admitPreparation(current, { ...current, userCreatedAt: 2 })).toThrow();
   });
 
+  it('preserves the admitted beginner policy when later course state changes', () => {
+    const current = { ...fixture(), initialA1Class: true };
+    const replay = admitPreparation(current, {
+      ...current,
+      id: randomUUID(),
+      initialA1Class: false,
+    });
+    expect(replay.initialA1Class).toBe(true);
+  });
+
   it('starts only at the scheduled time and fails expired work without running it', () => {
     const queued = fixture();
     expect(() => startPreparation(queued, 1999)).toThrow();

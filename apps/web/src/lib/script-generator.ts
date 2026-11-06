@@ -503,6 +503,7 @@ function buildLanguageInstruction(opts: Parameters<typeof generateScript>[0]): {
           level: opts.audienceLevel,
           nativeLang: opts.learningNativeLanguage,
           targetLang: lang,
+          initialA1Class: opts.initialA1Class,
         })
       : undefined;
 
@@ -625,6 +626,7 @@ export async function generateScript(params: {
   mustIncludeVocabulary?: Array<{ word: string; translation: string }>;
   forLearning?: boolean;
   learningNativeLanguage?: string;
+  initialA1Class?: boolean;
   learnerContext?: string;
   teaching?: ClassTeaching;
   learningRepair?:

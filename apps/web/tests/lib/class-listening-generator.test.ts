@@ -729,6 +729,18 @@ describe('composeListeningContent', () => {
     mustIncludeVocab: [{ word: 'hola', translation: 'hello' }],
   };
 
+  it('asks the listening quiz author to teach prerequisites for an initial A1 class', async () => {
+    setupHappyPath();
+    const { loadAndRender } =
+      await vi.importActual<typeof import('@/lib/prompt-loader')>('@/lib/prompt-loader');
+    mockLoadAndRender.mockImplementation(loadAndRender);
+    await composeListeningContent({
+      ...CONTENT_PARAMS,
+      execution: { ...CONTENT_PARAMS.execution, initialA1Class: true },
+    });
+    expect(mockGenerateResponse.mock.calls[0][0]).toContain('do not assume prior es knowledge');
+  });
+
   it('requests a shorter conversation for class practice with the accepted lesson context', async () => {
     setupHappyPath();
     await composeListeningContent({

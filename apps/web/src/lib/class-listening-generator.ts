@@ -323,6 +323,7 @@ export async function composeListeningContent(
             languageMode: isImmersionLevel(p.level) ? 'full_immersion' : 'conversational_mix',
             forLearning: true,
             learningNativeLanguage: p.nativeLang,
+            initialA1Class: p.execution.initialA1Class,
             mustIncludeVocabulary: p.mustIncludeVocab,
             sourceContent,
             sourceMetadata,
@@ -380,6 +381,7 @@ export async function composeListeningContent(
             level: p.level,
             nativeLang: p.nativeLang,
             targetLang: p.targetLang,
+            initialA1Class: p.execution.initialA1Class,
           }),
           TRANSCRIPT: transcript,
           LESSON_CONTEXT: JSON.stringify(lessonContext),
@@ -523,7 +525,10 @@ export async function composeListeningContent(
           NATIVE: p.nativeLang,
           SKILL: 'LISTENING',
           REVIEW_SCHEMA: JSON.stringify(blindSchema.schema),
-          LANGUAGE_POLICY: classListeningTranscriptPolicy(p),
+          LANGUAGE_POLICY: classListeningTranscriptPolicy({
+            ...p,
+            initialA1Class: p.execution.initialA1Class,
+          }),
         }),
         [
           {

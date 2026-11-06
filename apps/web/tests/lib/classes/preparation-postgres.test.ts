@@ -41,6 +41,7 @@ import { registerQuizRetryAdmissionTests } from './quiz-retry/admission-cases';
 import { registerDocumentRequestTests } from './preparation/document-request-cases';
 import { registerTerminalCleanupTests } from './preparation/terminal-cleanup-cases';
 import { registerPreparationDiagnosticTests } from './preparation/worker-diagnostic-cases';
+import { registerInitialA1Tests } from './preparation/initial-a1-cases';
 import { preparationProviderRequest } from '@/lib/classes/preparation-provider';
 import { capturedLearningAiOptions, resolveCapturedLearningAi } from '@/lib/learning-ai';
 import { createAIProvider } from '@/lib/providers/ai';
@@ -304,6 +305,14 @@ suite('durable preparation admission and provider accounting', () => {
       },
     });
   }
+
+  registerInitialA1Tests(() => ({
+    instance,
+    courseId,
+    execution,
+    lesson,
+    ownerId: identity.ownerId,
+  }));
 
   it('commits exact scoped work and grant before acknowledgement and reuses admitted requests', async () => {
     const input = { topic: 'Private learner topic', maxProviderRequests: 3 };

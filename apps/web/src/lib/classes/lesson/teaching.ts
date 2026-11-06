@@ -56,7 +56,7 @@ export async function generateClassTeaching(p: TeachingParams): Promise<ClassTea
     OBJECTIVE: p.objective,
     GRAMMAR_POINTS: p.grammarPoints.join(', '),
     VOCABULARY: JSON.stringify(p.targetVocab),
-    LANGUAGE_POLICY: classLanguagePolicy(p),
+    LANGUAGE_POLICY: classLanguagePolicy({ ...p, initialA1Class: p.execution.initialA1Class }),
     NOTES: formatNotesForPrompt(p.note ?? ''),
     SOURCE: p.sourceContent ? formatSourceBlock(p.sourceContent) : '',
     TEACHING_SCHEMA: JSON.stringify(jsonSchema.schema),

@@ -112,6 +112,7 @@ export async function processClassPreparation(job: Job<unknown>, workerSignal?: 
               signal,
               onCleanupError: markCleanupUnconfirmed,
               learningSelection: operation.selection,
+              initialA1Class: operation.initialA1Class ?? true,
               isolatedWorkspace: { directory, markCleanupUnconfirmed },
               registerAudioEpisode: (database, episodeId, key) =>
                 registerPreparationAudio(database, operation, episodeId, key),
@@ -170,6 +171,7 @@ export async function processClassPreparation(job: Job<unknown>, workerSignal?: 
             signal,
             onCleanupError: markCleanupUnconfirmed,
             learningSelection: operation.selection,
+            initialA1Class: operation.initialA1Class ?? true,
             isolatedWorkspace: { directory, markCleanupUnconfirmed },
             registerAudioEpisode: (database, episodeId, audioGenerationKey) =>
               registerPreparationAudio(database, operation, episodeId, audioGenerationKey),

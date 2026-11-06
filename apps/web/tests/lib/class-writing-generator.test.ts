@@ -129,6 +129,9 @@ beforeEach(() => {
 
 describe('composeWritingPrompts', () => {
   it('uses original material for writing authors while keeping independent review inputs restricted', async () => {
+    const { loadAndRender } =
+      await vi.importActual<typeof import('@/lib/prompt-loader')>('@/lib/prompt-loader');
+    mockLoadAndRender.mockImplementation(loadAndRender);
     const sourceDocuments: SourceDocuments = {
       parts: [
         {
@@ -145,7 +148,13 @@ describe('composeWritingPrompts', () => {
       model: 'm',
       execution: { ...PARAMS.execution, sourceDocuments },
     });
-    await composeWritingPrompts(PARAMS);
+    await composeWritingPrompts({
+      ...PARAMS,
+      level: 'A1',
+      targetLang: 'ru',
+      execution: { ...PARAMS.execution, initialA1Class: true },
+    });
+    expect(mockGenerateResponse.mock.calls[0][0]).toContain('do not assume prior ru knowledge');
     expect(mockGenerateResponse.mock.calls[0][2].sourceDocuments).toBe(sourceDocuments);
     for (const request of mockTeachingResponse.mock.calls)
       expect(request[2]?.sourceDocuments).toBeUndefined();
@@ -180,7 +189,6 @@ describe('composeWritingPrompts', () => {
     expect(mockTeachingResponse.mock.calls).toHaveLength(1);
     expect(mockGenerateResponse.mock.calls[1][1][0].content).toContain('invalid_item');
   });
-
   it('fails before review or publication when neither candidate supplies a worked answer', async () => {
     const missing = SAMPLE_PROMPTS.map((item) => ({ ...item, modelAnswer: undefined }));
     mockGenerateResponse.mockResolvedValue({ content: writingResponse(missing), model: 'm' });
@@ -195,7 +203,6 @@ describe('composeWritingPrompts', () => {
     expect(mockTeachingResponse).not.toHaveBeenCalled();
     expect(mockWritingPromptCreateMany).not.toHaveBeenCalled();
   });
-
   it('keeps a nonzero paraphrase subject to independent correction review', async () => {
     const paraphrase = SAMPLE_PROMPTS.map((item, index) =>
       index === 1
@@ -282,7 +289,6 @@ describe('composeWritingPrompts', () => {
       expect(mockWritingPromptCreateMany).not.toHaveBeenCalled();
     }
   );
-
   it('uses the existing replacement for a structurally invalid first candidate', async () => {
     const malformed = writingResponse([
       { task: 'Missing source text.', taskType: 'completion' },
@@ -345,7 +351,6 @@ describe('composeWritingPrompts', () => {
       })
     );
   });
-
   it('retains both a malformed first candidate and an actual final teaching rejection', async () => {
     mockGenerateResponse
       .mockResolvedValueOnce({ content: '{', model: 'm' })
@@ -382,7 +387,6 @@ describe('composeWritingPrompts', () => {
     expect(mockGenerateResponse).toHaveBeenCalledTimes(2);
     expect(mockTeachingResponse).toHaveBeenCalledTimes(1);
   });
-
   it('stops after one replacement when both writing candidates are structurally invalid', async () => {
     mockGenerateResponse.mockResolvedValueOnce({ content: '{', model: 'm' }).mockResolvedValueOnce({
       content: writingResponse([{ task: 'No source.', taskType: 'completion' }]),
@@ -404,7 +408,6 @@ describe('composeWritingPrompts', () => {
     expect(mockTeachingResponse).not.toHaveBeenCalled();
     expect(mockWritingPromptCreateMany).not.toHaveBeenCalled();
   });
-
   it('preserves structural evidence when the replacement provider fails', async () => {
     mockGenerateResponse
       .mockResolvedValueOnce({ content: '{', model: 'm' })

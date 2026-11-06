@@ -6,7 +6,11 @@ vi.mock('@/lib/providers/ai', () => ({
   createAIProvider: () => ({ generateResponse: boundary.generate }),
 }));
 vi.mock('@/lib/learning-ai', () => ({
-  resolveCapturedLearningAi: async () => ({ provider: 'fixture', model: 'fixture' }),
+  resolveCapturedLearningAi: async (...args: [string, unknown]) => ({
+    provider: 'fixture',
+    model: 'fixture',
+    execution: args[1],
+  }),
   capturedLearningAiOptions: async () => ({ model: 'fixture' }),
 }));
 vi.mock('@/lib/usage-logger', () => ({ logUsage: vi.fn() }));

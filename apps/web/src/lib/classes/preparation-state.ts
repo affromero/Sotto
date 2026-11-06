@@ -48,6 +48,7 @@ export const preparationSchema = z
     deferAudio: z.boolean(),
     maxProviderRequests: z.number().int().min(1).max(256).nullable(),
     requirements: skillRequirementsSchema.optional(),
+    initialA1Class: z.boolean().optional(),
     intent: z
       .object({
         kind: z.enum(['REGENERATE', 'REPAIR']),

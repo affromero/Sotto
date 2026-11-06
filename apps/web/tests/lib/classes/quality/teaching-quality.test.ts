@@ -36,7 +36,6 @@ import {
   classIntroFieldRolePolicy,
   classIntroGrammarRulePolicy,
   classListeningTranscriptPolicy,
-  classSpeakingMeaningPolicy,
 } from '@/lib/classes/class-language-policy';
 import { logger } from '@/lib/logger';
 import { createAIProvider } from '@/lib/providers/ai';
@@ -123,13 +122,18 @@ describe('intro teaching gate', () => {
       await reviewTeachingContent({
         ...params,
         level,
-        ai: await boundary.resolve(),
+        ai: {
+          ...(await boundary.resolve()),
+          execution: { ...params.execution, initialA1Class: true },
+        },
         provider: createAIProvider('fixture'),
         kind: 'speaking',
         items: [content],
       });
       for (const [system, messages] of boundary.generate.mock.calls) {
-        expect(system).toContain(classSpeakingMeaningPolicy({ ...params, level }));
+        expect(system).toContain('targetPhrase is the exact utterance the learner practices aloud');
+        if (level === 'A1') expect(system).toContain('do not assume prior');
+        else expect(system).not.toContain('do not assume prior');
         expect(JSON.parse(messages[0].content).items[0].content).toEqual(content);
       }
     }
@@ -186,7 +190,6 @@ describe('intro teaching gate', () => {
       }
     }
   );
-
   it('reviews a partial reply opening without inventing a completed travel event', async () => {
     const content = {
       taskType: 'guided_reply',
@@ -474,7 +477,6 @@ describe('intro teaching gate', () => {
       ).toEqual(quotedExample(usageIntro.examples[0]!));
     }
   );
-
   it('keeps rejecting a native-language explanation with an unsupported result after bounded replacement', async () => {
     const unsupported = {
       ...intro,
@@ -514,7 +516,6 @@ describe('intro teaching gate', () => {
       ).toEqual(quotedExample(unsupported.examples[0]!));
     }
   });
-
   it('preserves accurate native-language meaning instructions for A1 initial and repaired intros', async () => {
     queueResponses([intro, rejected, { examples: { 0: intro.examples[0] } }, approved]);
     const result = await generateClassIntro({ ...params, level: 'A1' });

@@ -58,7 +58,6 @@ import {
   captureReviewerProtocolEvidence,
   retainReviewerProtocolEvidence,
 } from './classes/quality/private-protocol-evidence';
-
 const QUESTIONS_PER_SECTION = 5;
 const MAX_GENERATION_ATTEMPTS = 2;
 const LOGGED_OUTPUT_SNIPPET_CHARS = 500;
@@ -487,6 +486,7 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
               level: p.level,
               nativeLang: p.nativeLang,
               targetLang: p.targetLang,
+              initialA1Class: p.execution.initialA1Class,
             })
           ),
         }
@@ -504,6 +504,7 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
                 level: p.level,
                 nativeLang: p.nativeLang,
                 targetLang: p.targetLang,
+                initialA1Class: p.execution.initialA1Class,
               }),
               OBJECTIVE: p.objective,
               GRAMMAR_POINTS: p.grammarPoints.join(', '),
@@ -544,6 +545,7 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
         level: p.level,
         nativeLang: p.nativeLang,
         targetLang: p.targetLang,
+        initialA1Class: p.execution.initialA1Class,
       }),
     });
   let teachingRejection: TeachingQualityRejectionError | undefined;
