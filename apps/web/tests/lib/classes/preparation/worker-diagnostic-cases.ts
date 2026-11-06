@@ -1,5 +1,6 @@
 import type { Job } from 'bullmq';
 import { expect, it, vi } from 'vitest';
+import { createSkillRequirements } from '@sotto/shared';
 import { requestClassPreparation, classPreparationStore } from '@/lib/classes/preparation';
 import { readPristineRegenerationSnapshot } from '@/lib/classes/regeneration/pristine';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
@@ -16,9 +17,26 @@ export function registerPreparationDiagnosticTests(
     lesson: () => Promise<{ id: string }>;
   }
 ) {
-  it('supplies the beginner policy when preparing a new A1 class', async () => {
+  it.each([true, false])('uses the admitted beginner policy %s in the worker', async (initial) => {
     const { instance, courseId, execution, lesson } = context();
-    await lesson();
+    const priorLesson = await lesson();
+    if (!initial)
+      await instance.database.courseClass.create({
+        data: {
+          courseId,
+          lessonId: priorLesson.id,
+          order: 1,
+          status: 'PASSED',
+          skillRequirements: createSkillRequirements({
+            scope: 'CLASS',
+            nativeLang: 'en',
+            targetLang: 'de',
+            level: 'A1',
+            ttsProvider: 'disabled',
+            sttProvider: 'disabled',
+          }),
+        },
+      });
     const operation = await requestClassPreparation(courseId, execution, {
       maxProviderRequests: 2,
     });
@@ -41,14 +59,33 @@ export function registerPreparationDiagnosticTests(
       name: 'class-preparation.v1',
       data: { operationId: operation.id, fingerprint: parent.fingerprint },
     } as Job<unknown>);
-    expect(requests.join('\n')).toContain('do not assume prior de knowledge');
+    expect(requests.length).toBeGreaterThan(0);
+    expect(requests.join('\n').includes('do not assume prior de knowledge')).toBe(initial);
   });
 
-  it.each([false, true])(
-    'applies beginner policy and records safe worker failure with legacy state: %s',
-    async (legacy) => {
+  it.each([true, false])(
+    'uses the saved policy for regeneration and records safe worker failure: %s',
+    async (initial) => {
       const { instance, courseId, execution, lesson } = context();
       const target = await lesson();
+      if (!initial)
+        await instance.database.courseClass.create({
+          data: {
+            courseId,
+            lessonId: target.id,
+            order: 1,
+            status: 'PASSED',
+            createdAt: new Date('2020-01-01T00:00:00Z'),
+            skillRequirements: createSkillRequirements({
+              scope: 'CLASS',
+              nativeLang: 'en',
+              targetLang: 'de',
+              level: 'A1',
+              ttsProvider: 'disabled',
+              sttProvider: 'disabled',
+            }),
+          },
+        });
       const cls = await instance.database.courseClass.create({
         data: { courseId, lessonId: target.id, order: 1, status: 'AVAILABLE' },
       });
@@ -61,13 +98,6 @@ export function registerPreparationDiagnosticTests(
           pristineSnapshot: await readPristineRegenerationSnapshot(cls.id, execution),
         },
       });
-      if (legacy)
-        await sottoTransaction(instance.database, (database) =>
-          classPreparationStore(database, courseId).transact((current) => {
-            if (!current) throw new Error('Missing preparation');
-            delete current.initialA1Class;
-          })
-        );
       const parent = await sottoTransaction(instance.database, (database) =>
         sottoJobOutbox(database).read(operation.id)
       );
@@ -94,7 +124,10 @@ export function registerPreparationDiagnosticTests(
         data: { operationId: operation.id, fingerprint: parent.fingerprint },
       } as Job<unknown>;
       await processClassPreparation(job);
-      expect(providerRequests.join('\n')).toContain('do not assume prior de knowledge');
+      expect(providerRequests.length).toBeGreaterThan(0);
+      expect(providerRequests.join('\n').includes('do not assume prior de knowledge')).toBe(
+        initial
+      );
       expect(await classPreparationStore(instance.database, courseId).read()).toMatchObject({
         id: operation.id,
         status: 'FAILED',

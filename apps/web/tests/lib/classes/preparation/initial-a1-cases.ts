@@ -1,6 +1,7 @@
 import { it, expect } from 'vitest';
 import { createSkillRequirements } from '@sotto/shared';
 import { requestClassPreparation } from '@/lib/classes/preparation';
+import { classPreparationInitialA1 } from '@/lib/classes/preparation-state';
 import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import type { SharedTestInstance } from '../../../helpers/setup/shared-instance';
 
@@ -16,7 +17,7 @@ export function registerInitialA1Tests(
   it('keeps the first A1 policy on replay after course history changes', async () => {
     const { instance, courseId, execution, lesson } = context();
     const operation = await requestClassPreparation(courseId, execution);
-    expect(operation.initialA1Class).toBe(true);
+    expect(classPreparationInitialA1(operation)).toBe(true);
     const priorLesson = await lesson();
     await instance.database.courseClass.create({
       data: {
@@ -36,7 +37,7 @@ export function registerInitialA1Tests(
     });
     const replay = await requestClassPreparation(courseId, execution);
     expect(replay.id).toBe(operation.id);
-    expect(replay.initialA1Class).toBe(true);
+    expect(classPreparationInitialA1(replay)).toBe(true);
   });
 
   it('distinguishes a later A1 class from a first class in another course', async () => {
@@ -59,7 +60,7 @@ export function registerInitialA1Tests(
       },
     });
     const later = await requestClassPreparation(courseId, execution);
-    expect(later.initialA1Class).toBe(false);
+    expect(classPreparationInitialA1(later)).toBe(false);
     const otherCurriculum = await instance.database.curriculum.create({
       data: { nativeLang: 'en', targetLang: 'ru', title: 'Russian fixture' },
     });
@@ -72,7 +73,7 @@ export function registerInitialA1Tests(
       },
     });
     const first = await requestClassPreparation(otherCourse.id, execution);
-    expect(first.initialA1Class).toBe(true);
+    expect(classPreparationInitialA1(first)).toBe(true);
   });
 
   it.each(['A2', null] as const)(
@@ -101,7 +102,7 @@ export function registerInitialA1Tests(
         },
       });
       const operation = await requestClassPreparation(courseId, execution);
-      expect(operation.initialA1Class).toBe(true);
+      expect(classPreparationInitialA1(operation)).toBe(true);
     }
   );
 
@@ -141,7 +142,7 @@ export function registerInitialA1Tests(
       const operation = await requestClassPreparation(courseId, execution, {
         intent: { kind: 'REGENERATE', classId: target.id, expectedAttempt: 1 },
       });
-      expect(operation.initialA1Class).toBe(!earlierClass);
+      expect(classPreparationInitialA1(operation)).toBe(!earlierClass);
     }
   );
 }
