@@ -190,6 +190,7 @@ describe('class teaching', () => {
     });
     const unit = await generateClassTeaching({
       ...params,
+      execution: { ...params.execution, initialA1Class: true },
       level: 'A1',
       nativeLang: 'es',
       targetLang: 'ru',
@@ -200,12 +201,22 @@ describe('class teaching', () => {
     expect(boundary.author.mock.calls[0][0]).toContain(
       'they cannot teach a prerequisite for attempting that task'
     );
+    expect(boundary.author.mock.calls[0][0]).toContain('do not assume prior ru knowledge');
     const critic = boundary.requests.mock.calls.find(
       ([, , options]) => options.jsonSchema?.name === 'class_teaching_critic'
     );
     expect(critic?.[0]).toContain(
       'Do not use the concealed answer or its explanation as prior teaching'
     );
+    const adjudicator = boundary.requests.mock.calls.find(
+      ([, , options]) => options.jsonSchema?.name === 'class_teaching_adjudicator'
+    );
+    const corroborator = boundary.requests.mock.calls.find(
+      ([, , options]) => options.jsonSchema?.name === 'class_teaching_novel_finding_corroboration'
+    );
+    expect(critic?.[0]).toContain('do not assume prior ru knowledge');
+    expect(adjudicator?.[0]).toContain('do not assume prior ru knowledge');
+    expect(corroborator?.[0]).toContain('do not assume prior ru knowledge');
   });
   it('reads the original workbook when authoring while keeping critic and adjudicator inputs isolated', async () => {
     const sourceDocuments: SourceDocuments = {

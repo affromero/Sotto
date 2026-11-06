@@ -353,6 +353,17 @@ export async function requestClassPreparation(
             ? target.lesson.level
             : course.currentLevel) as CefrLevel,
         }));
+      const initialA1Class =
+        requirements.level === 'A1' &&
+        !(await database.courseClass.findFirst({
+          where: {
+            courseId,
+            status: 'PASSED',
+            skillRequirements: { path: ['level'], equals: 'A1' },
+            ...(target ? { createdAt: { lt: target.createdAt } } : {}),
+          },
+          select: { id: true },
+        }));
       const speechFingerprint = await learningSpeechFingerprint(
         database,
         execution.authorize,
@@ -431,6 +442,7 @@ export async function requestClassPreparation(
           )
           .digest('hex'),
         requirements,
+        initialA1Class,
         courseLevel: course.currentLevel,
         speechFingerprint,
         status: 'QUEUED',

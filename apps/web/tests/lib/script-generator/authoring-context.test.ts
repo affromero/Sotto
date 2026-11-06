@@ -31,6 +31,20 @@ const params = {
 };
 
 describe('listening authoring context', () => {
+  it('prepares an initial Russian A1 listening lesson without assuming prior Russian', async () => {
+    await generateScript({
+      ...params,
+      audienceLevel: 'A1',
+      languageMode: 'conversational_mix',
+      targetLanguage: 'ru',
+      forLearning: true,
+      learningNativeLanguage: 'es',
+      initialA1Class: true,
+    });
+    const [system] = generateResponse.mock.calls[0] as [string];
+    expect(system).toContain('do not assume prior ru knowledge');
+    expect(system).toContain('with explained examples that transfer to the task');
+  });
   it('passes original PDF input unchanged to the selected script author', async () => {
     const sourceDocuments = {
       parts: [

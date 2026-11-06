@@ -47,6 +47,7 @@ export function classLanguagePolicy(p: {
   level: string;
   nativeLang: string;
   targetLang: string;
+  initialA1Class?: boolean;
 }): string {
   if (isImmersionLevel(p.level)) {
     return [
@@ -62,6 +63,11 @@ export function classLanguagePolicy(p: {
     `Write learner-facing task directions outside target-language passages and spoken dialogue, and the explanations needed to understand those directions, in ${p.nativeLang}. Do not assume the learner understands untaught ${p.targetLang} instructions.`,
     'Examples, passages and answer options should still exercise the target language. Keep the intended skill and assessment difficulty.',
     `For spoken dialogue, keep the target language (${p.targetLang}) dominant, with concise native-language support when it prevents confusion.`,
+    ...(p.initialA1Class
+      ? [
+          `For this initial A1 class, do not assume prior ${p.targetLang} knowledge. Before each task, teach the vocabulary, script, grammar, communicative use and directions needed for that task in understandable ${p.nativeLang}, with explained examples that transfer to the task. A glossary or concealed solution is not prior teaching. Keep the independent assessment answer concealed and preserve its intended challenge.`,
+        ]
+      : []),
   ].join(' ');
 }
 
@@ -69,6 +75,7 @@ export function classSpeakingMeaningPolicy(p: {
   level: string;
   nativeLang: string;
   targetLang: string;
+  initialA1Class?: boolean;
 }): string {
   return [
     classLanguagePolicy(p),
@@ -85,6 +92,7 @@ export function classListeningTranscriptPolicy(p: {
   level: string;
   nativeLang: string;
   targetLang: string;
+  initialA1Class?: boolean;
 }): string {
   return [
     'The listening transcript is supplied as passage or passageText. The spoken-content rules below apply only to that shared passage.',

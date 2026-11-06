@@ -519,6 +519,7 @@ describe('generateSectionQuestions', () => {
       apiKey: 'captured-key',
       signal,
       authenticatedFetch,
+      execution: BASE.execution,
     });
     await generateSectionQuestions(BASE);
     for (const boundary of [mockGenerateResponse, mockReviewResponse]) {

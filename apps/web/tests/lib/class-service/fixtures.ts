@@ -15,7 +15,11 @@ export { mockTeachingProviderInput };
 
 export { mockReadingProviderInput };
 vi.mock('@/lib/learning-ai', () => ({
-  resolveCapturedLearningAi: async () => ({ provider: 'anthropic', model: 'fixture' }),
+  resolveCapturedLearningAi: async (...args: [string, unknown]) => ({
+    provider: 'anthropic',
+    model: 'fixture',
+    execution: args[1],
+  }),
   capturedLearningAiOptions: async () => ({}),
 }));
 vi.mock('@/lib/providers/ai', () => ({

@@ -584,6 +584,22 @@ describe('composeSpeakingPrompts', () => {
     vi.clearAllMocks();
   });
 
+  it('prepares initial A1 speaking practice without assuming target-language knowledge', async () => {
+    setupHappyPath();
+    const { loadAndRender } =
+      await vi.importActual<typeof import('@/lib/prompt-loader')>('@/lib/prompt-loader');
+    mockLoadAndRender.mockImplementation(loadAndRender);
+    await composeSpeakingPrompts({
+      ...PARAMS,
+      level: 'A1',
+      nativeLang: 'es',
+      targetLang: 'ru',
+      execution: { ...PARAMS.execution, initialA1Class: true },
+      refId: 'class-1',
+    });
+    expect(mockGenerateResponse.mock.calls[0][0]).toContain('do not assume prior ru knowledge');
+  });
+
   it('uses the accepted class teaching in the speaking task and its quality review', async () => {
     setupHappyPath();
     await composeSpeakingPrompts({ ...PARAMS, refId: 'class-1', teaching: sampleTeaching });

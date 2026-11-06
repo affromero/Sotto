@@ -163,6 +163,7 @@ export async function composeWritingPrompts(
         level: p.level,
         nativeLang: p.nativeLang,
         targetLang: p.targetLang,
+        initialA1Class: p.execution.initialA1Class,
       }),
       OBJECTIVE: p.objective,
       VOCAB: vocabList,

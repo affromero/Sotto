@@ -150,7 +150,7 @@ describe('assessing the accepted lesson', () => {
       ([, , options]) => options.jsonSchema.name === 'class_teaching_critic'
     );
     expect(review?.[0]).toContain(
-      'Do not require later A1 lessons to reteach every background word'
+      'do not require later A1 lessons to reteach every background word'
     );
   });
 

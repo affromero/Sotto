@@ -29,6 +29,8 @@ import type { SourceDocuments } from '@/lib/providers/ai';
 
 export interface SottoProviderExecution {
   sourceDocuments?: SourceDocuments;
+  /** Admission-time teaching policy for an initial A1 class. */
+  initialA1Class?: boolean;
   userId: string;
   authorize: CredentialExecutionAuthority;
   credential?: SottoExecutionCredential | null;

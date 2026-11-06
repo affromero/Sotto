@@ -769,6 +769,7 @@ export async function generateClassIntro(p: ClassIntroParams): Promise<ClassIntr
       level: p.level,
       nativeLang: p.nativeLang,
       targetLang: p.targetLang,
+      initialA1Class: p.execution.initialA1Class,
     }),
     TITLE: p.title,
     OBJECTIVE: p.objective,
