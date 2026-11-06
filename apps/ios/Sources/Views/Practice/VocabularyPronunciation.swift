@@ -14,7 +14,7 @@ struct VocabularyPronunciation: View {
         VStack(alignment: .leading) {
             Button(busy ? "Preparing local audio…" : failed ? "Retry pronunciation" : "Hear pronunciation", systemImage: "speaker.wave.2") {
                 task = Task { await play() }
-            }.disabled(busy)
+            }.buttonStyle(.borderless).disabled(busy)
             if let error { Text(error).font(.caption).foregroundStyle(.red) }
         }
         .onDisappear { task?.cancel(); player?.stop() }
