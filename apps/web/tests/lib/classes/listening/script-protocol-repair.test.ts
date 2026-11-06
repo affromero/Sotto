@@ -119,10 +119,8 @@ describe('bounded listening script correction', () => {
     const correction = JSON.parse(requests[1][1][0].content.split('\n').at(-1)!);
     expect(correction).toEqual({ kind: 'script_protocol', candidate: raw, issues: [{ code }] });
     for (const [system] of requests) {
-      expect(system).toContain('target language (es) dominant');
-      expect(system).toContain(
-        'native-language (en) support is allowed when it prevents confusion'
-      );
+      expect(system).toContain('teach target-language (es) forms and uses');
+      expect(system).toContain('native-language (en) explanations the learner needs');
       expect(system).not.toContain('~40% English');
     }
     expect(requests[1][2]).toMatchObject({ model: requests[0][2].model, maxTokens: 12288 });
@@ -280,9 +278,9 @@ describe('bounded listening script correction', () => {
       await generateClassListening({ ...PARAMS, ...languages });
       const [system] = scriptRequests()[0];
       if (languages.level === 'A1') {
-        expect(system).toContain(`target language (${languages.targetLang}) dominant`);
+        expect(system).toContain(`teach target-language (${languages.targetLang}) forms and uses`);
         expect(system).toContain(
-          `native-language (${languages.nativeLang}) support is allowed when it prevents confusion`
+          `native-language (${languages.nativeLang}) explanations the learner needs`
         );
         expect(system).not.toContain('~40% English');
       } else {

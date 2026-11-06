@@ -138,10 +138,8 @@ describe('bounded canonical listening correction', () => {
       expect(mockScriptCreate.mock.calls[0][0].data.turns).toEqual(dialogueTurnsFixture(finalText));
       const requests = scriptRequests();
       for (const [system] of requests) {
-        expect(system).toContain('target language (de) dominant');
-        expect(system).toContain(
-          'native-language (es) support is allowed when it prevents confusion'
-        );
+        expect(system).toContain('teach target-language (de) forms and uses');
+        expect(system).toContain('native-language (es) explanations the learner needs');
         expect(system).not.toContain('English for explanations and transitions');
       }
       const quizTranscripts = mixed ? [firstText, finalText] : [firstText];
