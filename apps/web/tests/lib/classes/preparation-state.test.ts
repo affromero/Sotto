@@ -8,6 +8,9 @@ import {
   cancelPreparation,
   startPreparation,
   preparationStore,
+  preparationSchema,
+  classPreparationInitialA1,
+  newClassPreparationId,
   type ClassPreparation,
 } from '@/lib/classes/preparation-state';
 
@@ -62,13 +65,31 @@ describe('durable class preparation state', () => {
   });
 
   it('preserves the admitted beginner policy when later course state changes', () => {
-    const current = { ...fixture(), initialA1Class: true };
+    const current = { ...fixture(), id: newClassPreparationId(true) };
     const replay = admitPreparation(current, {
       ...current,
-      id: randomUUID(),
-      initialA1Class: false,
+      id: newClassPreparationId(false),
     });
-    expect(replay.initialA1Class).toBe(true);
+    expect(classPreparationInitialA1(replay)).toBe(true);
+  });
+
+  it.each([true, false])('retains policy %s in old-compatible state', (policy) => {
+    const operation = { ...fixture(), id: newClassPreparationId(policy) };
+    expect(preparationSchema.omit({ initialA1Class: true }).parse(operation)).toEqual(operation);
+    expect(classPreparationInitialA1(operation)).toBe(policy);
+  });
+
+  it('reads legacy decisions and rejects a conflicting captured policy', () => {
+    const legacy = fixture();
+    expect(classPreparationInitialA1(legacy)).toBe(true);
+    expect(classPreparationInitialA1({ ...legacy, initialA1Class: false })).toBe(false);
+    expect(() =>
+      classPreparationInitialA1({
+        ...legacy,
+        id: newClassPreparationId(true),
+        initialA1Class: false,
+      })
+    ).toThrow('The preparation policy changed.');
   });
 
   it('starts only at the scheduled time and fails expired work without running it', () => {

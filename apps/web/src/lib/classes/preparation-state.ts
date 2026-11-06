@@ -3,6 +3,23 @@ import { z } from 'zod';
 import { OptimisticStateStore } from 'thesidedoor-core/storage/optimistic';
 import type { AtomicStateBackend } from 'thesidedoor-core/storage/optimistic';
 import { delegationBindingSchema } from 'thesidedoor-core/runtime/delegation';
+import { randomUUID } from 'node:crypto';
+
+// Version 8 keeps the admission decision in the existing durable identity, so
+// older web instances can read the strict preparation record during cutover.
+export function newClassPreparationId(initialA1Class: boolean): string {
+  const id = randomUUID();
+  const last = Number.parseInt(id[35], 16);
+  return `${id.slice(0, 14)}8${id.slice(15, 35)}${((last & 14) | Number(initialA1Class)).toString(16)}`;
+}
+
+export function classPreparationInitialA1(operation: ClassPreparation): boolean {
+  if (operation.id[14] !== '8') return operation.initialA1Class ?? true;
+  const captured = (Number.parseInt(operation.id[35], 16) & 1) === 1;
+  if (operation.initialA1Class !== undefined && operation.initialA1Class !== captured)
+    throw new PreparationConflictError('The preparation policy changed.');
+  return captured;
+}
 
 export const quizRetryContextSchema = z
   .object({
