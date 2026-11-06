@@ -148,6 +148,82 @@ describe('placement entry with exact receipt transport', () => {
       `/api/v1/placement?placementSessionId=${placementSessionId}`
     );
   });
+  it('polls a retained quiz that is still generating before showing its questions', async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(
+        Response.json({ error: 'Resume the saved quiz.', placementSessionId }, { status: 409 })
+      )
+      .mockResolvedValueOnce(
+        Response.json(
+          { status: 'GENERATING', placementSessionId, questionsDigest, questions: [] },
+          { status: 202 }
+        )
+      )
+      .mockResolvedValueOnce(
+        Response.json({
+          status: 'READY',
+          placementSessionId,
+          questionsDigest,
+          questions: [question],
+        })
+      );
+    render(<PlacementEntry native="en" target="es" />);
+    fireEvent.click(screen.getByText('Take the placement test'));
+    expect(await screen.findByText(question.prompt, {}, { timeout: 3000 })).toBeInTheDocument();
+  });
+  it('shows a retained session recovery error without generating another quiz', async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(
+        Response.json({ error: 'Resume the saved quiz.', placementSessionId }, { status: 409 })
+      )
+      .mockResolvedValueOnce(
+        Response.json({
+          status: 'RECOVERY_REQUIRED',
+          placementSessionId,
+          questionsDigest,
+          questions: [],
+          failureReason: 'Resolve the previous request before trying again.',
+        })
+      );
+    render(<PlacementEntry native="en" target="es" />);
+    fireEvent.click(screen.getByText('Take the placement test'));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Resolve the previous request before trying again.'
+    );
+    expect(screen.queryByText(question.prompt)).not.toBeInTheDocument();
+    expect(vi.mocked(fetch).mock.calls.map(([url]) => url)).toEqual([
+      '/api/v1/placement/generate',
+      `/api/v1/placement?placementSessionId=${placementSessionId}`,
+    ]);
+  });
+  it.each(['reopened', 'polled'])(
+    'rejects a different session returned for a %s quiz',
+    async (stage) => {
+      const first =
+        stage === 'reopened'
+          ? Response.json({ error: 'Resume the saved quiz.', placementSessionId }, { status: 409 })
+          : Response.json(
+              { status: 'QUEUED', placementSessionId, questionsDigest, questions: [] },
+              { status: 202 }
+            );
+      vi.mocked(fetch)
+        .mockResolvedValueOnce(first)
+        .mockResolvedValueOnce(
+          Response.json({
+            status: 'READY',
+            placementSessionId: 'e5af2e73-1a12-467c-94e2-a3e89b2641cc',
+            questionsDigest,
+            questions: [question],
+          })
+        );
+      render(<PlacementEntry native="en" target="es" />);
+      fireEvent.click(screen.getByText('Take the placement test'));
+      expect(await screen.findByRole('alert', {}, { timeout: 3000 })).toHaveTextContent(
+        /identity changed/i
+      );
+      expect(screen.queryByText(question.prompt)).not.toBeInTheDocument();
+    }
+  );
   it('opens the materials path and can go back', () => {
     render(<PlacementEntry native="en" target="es" />);
     fireEvent.click(screen.getByText('I have materials from my level'));
@@ -178,6 +254,42 @@ describe('placement entry with exact receipt transport', () => {
     await screen.findByText(/skill breakdown/i);
     expect(vi.mocked(fetch).mock.calls[1][1]?.body).toBe(vi.mocked(fetch).mock.calls[2][1]?.body);
     expect(vi.mocked(fetch).mock.calls[2][1]?.method).toBe('POST');
+  });
+  it('shows cancellable preparation while starting a new test after a submission conflict', async () => {
+    let finishPreparation: (response: Response) => void = () => {};
+    const preparation = new Promise<Response>((resolve) => {
+      finishPreparation = resolve;
+    });
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(
+        Response.json({
+          status: 'READY',
+          placementSessionId,
+          questionsDigest,
+          questions: [question],
+        })
+      )
+      .mockResolvedValueOnce(Response.json({ error: 'Session expired' }, { status: 409 }))
+      .mockImplementationOnce(() => preparation);
+    render(<PlacementEntry native="en" target="es" />);
+    fireEvent.click(screen.getByText('Take the placement test'));
+    await screen.findByText(question.prompt);
+    fireEvent.click(screen.getByRole('radio', { name: 'A' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Start a new test' }));
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Start a new test' })).not.toBeInTheDocument();
+    await act(async () => {
+      finishPreparation(
+        Response.json({
+          status: 'READY',
+          placementSessionId,
+          questionsDigest,
+          questions: [question],
+        })
+      );
+    });
+    expect(await screen.findByText(question.prompt)).toBeInTheDocument();
   });
   it('carries the exact analyzed source receipt into verification and the saved quiz receipt into submission', async () => {
     const analysis = {

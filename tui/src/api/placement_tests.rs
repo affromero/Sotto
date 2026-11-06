@@ -123,6 +123,60 @@ async fn recovery_and_changed_session_stop_without_another_admission() {
 }
 
 #[tokio::test]
+async fn reopening_a_retained_quiz_fetches_and_polls_its_exact_session() {
+    let session = "d1438bc6-a9a6-4c4a-bf12-e7b11c79110a";
+    let (url, server) = placement_server(vec![
+        (409, serde_json::json!({"error":"Resume the saved quiz.","placementSessionId":session})),
+        (202, placement_batch("GENERATING")),
+        (200, placement_batch("READY")),
+    ])
+    .await;
+    let client = SottoClient::new(&url, "test-key").unwrap();
+    let request_id = uuid::Uuid::new_v4();
+    let batch = client
+        .generate_placement("en", "es", request_id, None, false)
+        .await
+        .unwrap();
+    assert_eq!(batch.placement_session_id.to_string(), session);
+    let requests = server.await.unwrap();
+    assert_eq!(request_json(&requests[0])["requestId"], request_id.to_string());
+    for request in &requests[1..] {
+        assert!(request.starts_with(&format!("GET /api/v1/placement?placementSessionId={session} ")));
+        assert!(request.to_lowercase().contains("authorization: bearer test-key"));
+    }
+}
+
+#[tokio::test]
+async fn unrelated_conflicts_and_mismatched_retained_sessions_fail_closed() {
+    let session = "d1438bc6-a9a6-4c4a-bf12-e7b11c79110a";
+    for mismatch in [false, true] {
+        let mut replies = if mismatch {
+            vec![(409, serde_json::json!({"error":"Resume.","placementSessionId":session}))]
+        } else {
+            vec![(409, serde_json::json!({"error":"Request ID belongs to different inputs."}))]
+        };
+        if mismatch {
+            let mut batch = placement_batch("READY");
+            batch["placementSessionId"] = serde_json::json!(uuid::Uuid::new_v4());
+            replies.push((200, batch));
+        }
+        let (url, server) = placement_server(replies).await;
+        let client = SottoClient::new(&url, "test-key").unwrap();
+        let error = client
+            .generate_placement("en", "es", uuid::Uuid::new_v4(), None, false)
+            .await
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains(if mismatch { "identity" } else { "different inputs" }));
+        let requests = server.await.unwrap();
+        request_json(&requests[0]);
+        if mismatch {
+            assert!(requests[1].starts_with(&format!("GET /api/v1/placement?placementSessionId={session} ")));
+        }
+    }
+}
+
+#[tokio::test]
 async fn source_placement_confirmation_uses_observed_revision_digest_and_explicit_partial_consent()
 {
     let analysis_id = uuid::Uuid::new_v4();

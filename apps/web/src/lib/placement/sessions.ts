@@ -58,6 +58,25 @@ const semantic = (input: PlacementGenerateRequest) =>
     scoringVersion: PLACEMENT_SCORING_VERSION,
   });
 
+async function requireNoEquivalentSession(
+  database: Prisma.TransactionClient,
+  userId: string,
+  semanticDigest: string
+) {
+  const unresolved = await database.placementSession.findFirst({
+    where: {
+      userId,
+      semanticDigest,
+      OR: [
+        { status: { in: ['RECOVERY_REQUIRED', 'DISPATCHING', 'GENERATING'] } },
+        { status: { in: ['QUEUED', 'SUCCEEDED', 'READY'] }, expiresAt: { gt: new Date() } },
+      ],
+    },
+    select: { id: true },
+  });
+  if (unresolved) throw new PlacementSessionResumeRequired(unresolved.id);
+}
+
 export async function readPlacementSessionStatus(
   database: Prisma.TransactionClient,
   input: { userId: string; placementSessionId: string }
@@ -102,6 +121,7 @@ export async function requestPlacementSession(
       });
       if (prior && prior.semanticDigest !== semanticDigest)
         throw new MaterialAnalysisConflict('This request ID belongs to another placement quiz.');
+      if (!prior) await requireNoEquivalentSession(database, execution.userId, semanticDigest);
       return prior
         ? readPlacementSessionStatus(database, {
             userId: execution.userId,
@@ -135,17 +155,7 @@ export async function requestPlacementSession(
           placementSessionId: prior.id,
         });
       }
-      const unresolved = await database.placementSession.findFirst({
-        where: {
-          userId: execution.userId,
-          semanticDigest,
-          OR: [
-            { status: { in: ['RECOVERY_REQUIRED', 'DISPATCHING', 'GENERATING'] } },
-            { status: { in: ['QUEUED', 'SUCCEEDED', 'READY'] }, expiresAt: { gt: new Date() } },
-          ],
-        },
-      });
-      if (unresolved) throw new PlacementSessionResumeRequired(unresolved.id);
+      await requireNoEquivalentSession(database, execution.userId, semanticDigest);
       const source = reference(input);
       const analysis = source
         ? await readPlacementAnalysis(database, {
