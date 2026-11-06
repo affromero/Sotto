@@ -465,6 +465,21 @@ final class LayoutAppearanceTests: XCTestCase {
         }
     }
 
+    func testVocabularyStudyFitsPhoneAndTablet() async throws {
+        let start = try JSONDecoder().decode(SottoPracticeStart.self, from: Data(#"{"status":"ready_vocabulary","sessionId":"vocabulary-layout","courseId":"course","kind":"VOCAB","mode":"FLASHCARDS","progressRevision":0,"writingDrafts":{},"cards":[{"id":"card","prompt":"Bahnhof","feedback":null}],"receipt":null}"#.utf8))
+        for viewport in [viewports[0], viewports[2]] {
+            let model = LayoutFixtures.model()
+            model.practiceStart = start
+            let host = try mount(PracticeStartView(start: start, progress: LearningProgressStore(), drafts: WritingDraftStore())
+                .environmentObject(model), viewport: viewport, style: .light)
+            defer { host.close() }
+            await settle()
+            let scroll = try XCTUnwrap(descendants(of: host.content.view).compactMap { $0 as? UIScrollView }.first)
+            XCTAssertLessThanOrEqual(scroll.contentSize.width, scroll.bounds.width + 1)
+            attach(host.content.view, name: "vocabulary-study-\(viewport.name)")
+        }
+    }
+
     func testFailedClassRecoveryActionsFitPhoneAndTabletAtLargeTextSizes() async throws {
         for viewport in [viewports[0], viewports[3]] {
             let content = ClassGenerationErrorPanel(

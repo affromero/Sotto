@@ -10,6 +10,7 @@ final class SottoAppModel: ObservableObject {
     var learningSessions: [String: NativeLearningSessionState] = [:]
     var pendingPracticeAdmissions: [String: UUID] = [:]
     @Published var practiceStart: SottoPracticeStart?
+    @Published var vocabularyCourseId: String?
     @Published private(set) var practiceOverview: SottoPracticeOverview?
     @Published var classResult: SottoClassSubmitResult?
     @Published var practiceResult: SottoPracticeSubmitResult?
@@ -145,6 +146,8 @@ final class SottoAppModel: ObservableObject {
 
     @discardableResult
     func signOut() -> Bool {
+        do { try VocabularyPendingStore.clearAll() }
+        catch { report(error); return false }
         do { try play.clearProtectedData() }
         catch { report(error); return false }
         do { try credentialStore.delete() }
@@ -239,6 +242,7 @@ final class SottoAppModel: ObservableObject {
         courses = []
         selectedClass = nil
         practiceStart = nil
+        vocabularyCourseId = nil
         pencilWorkbook = false
         classResult = nil
         practiceResult = nil
@@ -514,6 +518,8 @@ final class SottoAppModel: ObservableObject {
 
         do {
             try await client.deletePractice(sessionId: sessionId)
+            try VocabularyPendingStore(client: client, scope: "action/\(courseId)/\(sessionId)").clear()
+            try VocabularyPendingStore(client: client, scope: "draft/\(courseId)/\(sessionId)").clear()
             await loadPracticeOverview(courseId: courseId)
         } catch {
             report(error)

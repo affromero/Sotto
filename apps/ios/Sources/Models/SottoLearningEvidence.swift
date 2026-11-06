@@ -58,6 +58,11 @@ struct SottoPracticeStart: Decodable, Identifiable, Equatable {
     let canRecover: Bool?
     let practiceLevel: SottoLearningLevel?
     let learningSelection: SottoLearningSelectionPreview.Snapshot?
+    let mode: String?
+    let nativeLang: String?
+    let targetLang: String?
+    let cards: [SottoVocabularyCard]?
+    let receipt: SottoVocabularyReceipt?
 
     func preservingContext(kind knownKind: String?, sessionId knownId: String) -> Self {
         var response = self
@@ -83,14 +88,7 @@ struct SottoPracticeStart: Decodable, Identifiable, Equatable {
         status == "preparing" && ["QUEUED", "RUNNING", "CANCELLING"].contains(preparationStatus ?? "")
     }
 
-    var requiresWebVocabulary: Bool { status == "ready_vocabulary" }
-
-    func vocabularyStudyURL(serverURL: URL) -> URL? {
-        guard requiresWebVocabulary, let courseId else { return nil }
-        var url = URLComponents(url: serverURL.appending(path: "learn/vocabulary"), resolvingAgainstBaseURL: false)
-        url?.queryItems = [URLQueryItem(name: "course", value: courseId), URLQueryItem(name: "session", value: sessionId)]
-        return url?.url
-    }
+    var isVocabularyStudy: Bool { status == "ready_vocabulary" }
 
     var preparationTitle: String {
         switch preparationStatus {
@@ -121,6 +119,7 @@ struct SottoPracticeStart: Decodable, Identifiable, Equatable {
         case learnerAnswers, writingDrafts, progressRevision, submissionResult
         case preparationStatus, message, canRecover
         case practiceLevel, learningSelection
+        case mode, nativeLang, targetLang, cards, receipt
     }
 
     init(from decoder: Decoder) throws {
@@ -146,6 +145,11 @@ struct SottoPracticeStart: Decodable, Identifiable, Equatable {
         canRecover = try values.decodeIfPresent(Bool.self, forKey: .canRecover)
         practiceLevel = try values.decodeIfPresent(SottoLearningLevel.self, forKey: .practiceLevel)
         learningSelection = try values.decodeIfPresent(SottoLearningSelectionPreview.Snapshot.self, forKey: .learningSelection)
+        mode = try values.decodeIfPresent(String.self, forKey: .mode)
+        nativeLang = try values.decodeIfPresent(String.self, forKey: .nativeLang)
+        targetLang = try values.decodeIfPresent(String.self, forKey: .targetLang)
+        cards = try values.decodeIfPresent([SottoVocabularyCard].self, forKey: .cards)
+        receipt = try values.decodeIfPresent(SottoVocabularyReceipt.self, forKey: .receipt)
     }
 }
 

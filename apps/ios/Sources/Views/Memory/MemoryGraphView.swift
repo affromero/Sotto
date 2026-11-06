@@ -10,6 +10,7 @@ struct MemoryGraphView: View {
     @Environment(\.sottoLayout) private var layout
 
     let course: SottoCourse
+    let onReview: () -> Void
 
     @State private var graph: SottoMemoryGraph?
     @State private var errorMessage: String?
@@ -88,12 +89,11 @@ struct MemoryGraphView: View {
                 }
                 ToolbarItem(placement: .primaryAction) {
                     Button {
-                        dismiss()
-                        model.run { await model.startPractice(courseId: course.id, kind: "VOCAB") }
+                        onReview()
                     } label: {
                         Label("Review", systemImage: "target")
                     }
-                    .disabled((graph?.dueNodes.isEmpty ?? true))
+                    .disabled(!(graph?.nodes.contains(where: \.isVocab) ?? false))
                 }
             }
             .task { await load() }

@@ -12,6 +12,7 @@ final class LearningProgressStore: ObservableObject {
     private var saving = false
     private var paused = false
     private var suspended = false
+    var isSuspended: Bool { suspended }
     private var discarded = false
     private var drainWaiters: [CheckedContinuation<Void, Never>] = []
     private var reconciliationRevision: Int?
@@ -53,6 +54,27 @@ final class LearningProgressStore: ObservableObject {
                 return
             }
         }
+    }
+
+    func flushRevision() async throws -> Int {
+        while saving { await withCheckedContinuation { drainWaiters.append($0) } }
+        await flush()
+        if let errorMessage { throw SottoAPIError.message(errorMessage) }
+        guard pending == nil else { throw SottoAPIError.message("Your changes have not been saved yet.") }
+        return revision
+    }
+
+    func acceptRevision(_ value: Int) {
+        revision = value
+    }
+
+    func replacePendingWithServerRevision(_ value: Int) {
+        guard suspended, !saving, !discarded else { return }
+        pending = nil
+        revision = value
+        paused = false
+        errorMessage = nil
+        suspended = false
     }
 
     func suspend() async {

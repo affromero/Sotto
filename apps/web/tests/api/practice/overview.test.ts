@@ -47,6 +47,8 @@ import { POST as submitPost } from '@/app/api/v1/practice/[sessionId]/submit/rou
 import { PracticeCourseNotFoundError, PracticeSessionNotFoundError } from '@/lib/practice-service';
 import { PreparationConflictError } from '@/lib/classes/preparation-state';
 import { ProviderCreditsExhaustedError } from '@/lib/providers/shared/speech-availability';
+import { practicePreparationProgress } from '@/lib/practice/preparation';
+import { practicePreparationSchema } from '@/lib/practice/preparation-state';
 
 const courseParams = { params: Promise.resolve({ courseId: 'c1' }) };
 const sessionParams = { params: Promise.resolve({ sessionId: 'ps1' }) };
@@ -125,6 +127,36 @@ describe('Practice HTTP contract', () => {
       expect.objectContaining({ userId: 'u1' }),
       expect.objectContaining({ focusTargetId: 'ft1' })
     );
+  });
+
+  it('reports running practice without claiming audio is being generated', () => {
+    const id = randomUUID();
+    const operation = practicePreparationSchema.parse({
+      id,
+      sessionId: id,
+      courseId: 'course',
+      userId: 'learner',
+      instanceId: randomUUID(),
+      courseCreatedAt: 1,
+      userCreatedAt: 1,
+      createdAt: 1,
+      availableAt: 1,
+      expiresAt: 1000,
+      updatedAt: 1,
+      maxProviderRequests: 20,
+      selection: { provider: 'local', model: 'fixture', credentialFingerprint: null },
+      grant: { id, revision: randomUUID(), fingerprint: 'a'.repeat(64) },
+      inputFingerprint: 'b'.repeat(64),
+      speechFingerprint: 'c'.repeat(64),
+      status: 'RUNNING',
+      audioEpisodeIds: [],
+      failure: null,
+      unavailableReason: null,
+      focusTargetId: null,
+    });
+    const progress = practicePreparingSchema.parse(practicePreparationProgress(operation));
+    expect(progress.message).toMatch(/preparing exercises/i);
+    expect(progress.message).not.toMatch(/audio/i);
   });
 
   it('returns already published material when the original admission acknowledgement is retried', async () => {
