@@ -33,4 +33,23 @@ extension SottoAPIClient {
     func prepareVocabularyAudio(path: String, retry: Bool) async throws -> SottoVocabularyAudioStatus {
         try await post(path, body: SottoVocabularyAudioRequest(retry: retry), acceptedStatuses: [200, 202])
     }
+
+    func vocabularyExamples(path: String) async throws -> SottoVocabularyExamplesResponse {
+        try await get(path)
+    }
+
+    func prepareVocabularyExamples(path: String, request: SottoVocabularyExamplesRequest) async throws -> SottoVocabularyExamplesResponse {
+        try await post(path, body: request, acceptedStatuses: [200, 202])
+    }
+
+    func vocabularyRefill(courseId: String, sessionId: String?) async throws -> SottoVocabularyRefillResponse {
+        var query = URLComponents()
+        if let sessionId { query.queryItems = [URLQueryItem(name: "sessionId", value: sessionId)] }
+        let suffix = query.percentEncodedQuery.map { "?\($0)" } ?? ""
+        return try await get("/api/v1/courses/\(courseId)/vocabulary/refill\(suffix)")
+    }
+
+    func prepareVocabularyRefill(courseId: String, request: SottoVocabularyRefillRequest) async throws -> SottoVocabularyRefillResponse {
+        try await post("/api/v1/courses/\(courseId)/vocabulary/refill", body: request, acceptedStatuses: [200, 202])
+    }
 }

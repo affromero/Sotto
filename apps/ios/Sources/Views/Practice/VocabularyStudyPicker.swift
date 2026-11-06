@@ -29,15 +29,21 @@ struct VocabularyStudyPicker: View {
                         ForEach(SottoVocabularyMode.allCases) { mode in
                             Text(mode.title).tag(mode)
                         }
-                    }.disabled(busy || pending != nil).onChange(of: mode) { _, _ in modeChosen = true }
-                    Text("Flashcards build familiarity. Recall checks update your review schedule.")
+                    }
+                    .pickerStyle(.inline)
+                    .disabled(busy || pending != nil)
+                    .onChange(of: mode) { _, _ in modeChosen = true }
+                    Text("Swipe to rate flashcards. Your ratings update your review schedule.")
                         .font(.callout).foregroundStyle(SottoTheme.muted)
                 }
                 if let error { Text(error).foregroundStyle(.red) }
                 Button(pending != nil ? "Retry saved attempt" : selected.isEmpty ? "Start practice" : "Practice selection (\(selected.count))") {
                     Task { await start() }
                 }.disabled(busy)
-                VocabularyDictionaryView(courseId: courseId, selected: $selected, mode: $mode, modeChosen: $modeChosen, disabled: busy || pending != nil)
+                VocabularyDictionaryView(courseId: courseId, selected: $selected, mode: $mode, modeChosen: $modeChosen, disabled: busy || pending != nil) { session in
+                    onAdmitted(session)
+                    dismiss()
+                }
             }
             .navigationTitle("Vocabulary")
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() }.disabled(busy) } }
@@ -87,7 +93,7 @@ struct VocabularyStudyPicker: View {
         do {
             pending = try VocabularyPendingStore(client: client, scope: "admission/\(courseId)").load(SottoVocabularyAdmission.self)
             pendingSessions = try VocabularyPendingStore(client: client, scope: "admission/\(courseId)").pendingSessions(courseId: courseId)
-            if let pending { mode = pending.mode; selected = Set(pending.wordIds ?? []) }
+            if let pending { modeChosen = true; mode = pending.mode; selected = Set(pending.wordIds ?? []) }
         } catch { self.error = error.localizedDescription }
     }
 

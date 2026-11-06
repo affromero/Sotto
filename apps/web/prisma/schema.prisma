@@ -1212,6 +1212,7 @@ model Course {
   grammar           LearnerGrammar[]
   vocabEdges        VocabEdge[]
   practiceSessions  PracticeSession[]
+  vocabularyRefill  VocabularyRefill?
   practiceRequests  PracticeRequestReceipt[]
   note              CourseNote?
   materials         CourseMaterial[]
@@ -1931,10 +1932,52 @@ model PracticeSession {
   writingPrompts   WritingPrompt[]
   writingResponses WritingResponse[]
   reviewEvents     LearnerReviewEvent[]
+  flashcardRatings FlashcardRating[]
+  flashcardExamples FlashcardExample[]
 
   @@unique([id, courseId])
   @@index([courseId, kind])
   @@index([courseId, status])
+}
+
+// Self-reported flashcard ratings remain even if the dictionary word is removed.
+model FlashcardRating {
+  practiceSessionId String
+  courseId          String
+  cardId            String
+  rating            String
+  ratedAt           DateTime @default(now())
+
+  practice PracticeSession @relation(fields: [practiceSessionId, courseId], references: [id, courseId], onDelete: Cascade)
+
+  @@id([practiceSessionId, cardId])
+}
+
+// Generated examples belong to a specific frozen practice card.
+model FlashcardExample {
+  practiceSessionId String
+  courseId          String
+  cardId            String
+  sourceHash        String
+  operationId       String
+  status            String
+  examples          Json?
+  practice PracticeSession @relation(fields: [practiceSessionId, courseId], references: [id, courseId], onDelete: Cascade)
+
+  @@id([practiceSessionId, cardId])
+}
+
+// One durable replenishment operation per course prevents duplicate generation.
+model VocabularyRefill {
+  courseId       String @id
+  generation     Int
+  operationId    String @unique
+  triggerSessionId String?
+  sourceHash     String
+  status         String
+  added          Int?
+  wordIds        String[] @default([])
+  course         Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
 }
 
 // Learner-marked difficult words, phrases, and full sentences. These are

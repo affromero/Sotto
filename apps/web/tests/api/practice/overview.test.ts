@@ -236,7 +236,16 @@ describe('Practice HTTP contract', () => {
     mocks.course.mockResolvedValue({ id: 'c1', currentLevel: 'A1', targetLang: 'es' });
     mocks.vocab.mockResolvedValueOnce(7).mockResolvedValueOnce(20);
     mocks.grammar.mockResolvedValue(3);
-    mocks.sessions.mockResolvedValue([{ id: 'ps1', kind: 'FULL', status: 'FAILED', score: null }]);
+    mocks.sessions.mockResolvedValue([
+      {
+        id: 'ps1',
+        courseId: 'c1',
+        kind: 'FULL',
+        status: 'FAILED',
+        score: null,
+        vocabularyStudy: null,
+      },
+    ]);
     const response = await overviewGet(
       new NextRequest('http://localhost/api/v1/practice'),
       courseParams
@@ -247,6 +256,135 @@ describe('Practice HTTP contract', () => {
       totalVocab: 20,
       recent: [{ status: 'FAILED' }],
     });
+  });
+  it('identifies saved vocabulary formats without exposing private cards', async () => {
+    mocks.course.mockResolvedValue({ id: 'c1', currentLevel: 'A1', targetLang: 'es' });
+    mocks.vocab.mockResolvedValue(0);
+    mocks.grammar.mockResolvedValue(0);
+    const modes = ['FLASHCARDS', 'MEANING_RECALL', 'WORD_RECALL', 'LISTENING_RECALL'];
+    mocks.sessions.mockResolvedValue([
+      {
+        id: 'legacy',
+        courseId: 'c1',
+        kind: 'VOCAB',
+        status: 'ACTIVE',
+        score: null,
+        vocabularyStudy: null,
+      },
+      ...modes.map((mode) => {
+        const id = randomUUID();
+        return {
+          id,
+          courseId: 'c1',
+          kind: 'VOCAB',
+          status: 'ACTIVE',
+          score: null,
+          vocabularyStudy: {
+            version: 1,
+            normalization: 'unicode-v1',
+            requestId: id,
+            courseId: 'c1',
+            userId: 'u1',
+            mode,
+            support: null,
+            nativeLang: 'en',
+            targetLang: 'es',
+            requestedWordIds: [],
+            cards: [
+              {
+                id: randomUUID(),
+                wordId: 'private-word',
+                lemma: 'secret-lemma',
+                meaning: 'secret-answer',
+                acceptedMeanings: [],
+                listeningPresentedAt: null,
+                response: null,
+              },
+            ],
+          },
+        };
+      }),
+    ]);
+    const response = await overviewGet(
+      new NextRequest('http://localhost/api/v1/practice'),
+      courseParams
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(
+      body.recent.map((session: { vocabularyFormat: string }) => session.vocabularyFormat)
+    ).toEqual(['GENERATED', ...modes]);
+    expect(JSON.stringify(body)).not.toContain('secret-answer');
+    expect(JSON.stringify(body)).not.toContain('secret-lemma');
+    expect(JSON.stringify(body)).not.toContain('private-word');
+    expect(JSON.stringify(body)).not.toContain('vocabularyStudy');
+  });
+
+  it('does not publish a malformed or foreign vocabulary study', async () => {
+    mocks.course.mockResolvedValue({ id: 'c1', currentLevel: 'A1', targetLang: 'es' });
+    mocks.vocab.mockResolvedValue(0);
+    mocks.grammar.mockResolvedValue(0);
+    mocks.sessions.mockResolvedValue([
+      {
+        id: randomUUID(),
+        courseId: 'c1',
+        kind: 'VOCAB',
+        status: 'ACTIVE',
+        score: null,
+        vocabularyStudy: { userId: 'another-user' },
+      },
+    ]);
+    const response = await overviewGet(
+      new NextRequest('http://localhost/api/v1/practice'),
+      courseParams
+    );
+    expect(response.status).toBe(500);
+    expect(JSON.stringify(await response.json())).not.toContain('another-user');
+  });
+
+  it('does not reveal a valid study owned by another learner', async () => {
+    const id = randomUUID();
+    mocks.course.mockResolvedValue({ id: 'c1', currentLevel: 'A1', targetLang: 'es' });
+    mocks.vocab.mockResolvedValue(0);
+    mocks.grammar.mockResolvedValue(0);
+    mocks.sessions.mockResolvedValue([
+      {
+        id,
+        courseId: 'c1',
+        kind: 'VOCAB',
+        status: 'ACTIVE',
+        score: null,
+        vocabularyStudy: {
+          version: 1,
+          normalization: 'unicode-v1',
+          requestId: id,
+          courseId: 'c1',
+          userId: 'other-user',
+          mode: 'FLASHCARDS',
+          support: null,
+          nativeLang: 'en',
+          targetLang: 'es',
+          requestedWordIds: [],
+          cards: [
+            {
+              id: randomUUID(),
+              wordId: 'private-word',
+              lemma: 'secret-lemma',
+              meaning: 'secret-answer',
+              acceptedMeanings: [],
+              listeningPresentedAt: null,
+              response: null,
+            },
+          ],
+        },
+      },
+    ]);
+    const response = await overviewGet(
+      new NextRequest('http://localhost/api/v1/practice'),
+      courseParams
+    );
+    expect(response.status).toBe(500);
+    expect(JSON.stringify(await response.json())).not.toContain('secret-answer');
   });
   it('reports qualified current-band channel reviews separately while preserving broad legacy grammar', async () => {
     const { entry, binding, states } = reviewFixture();

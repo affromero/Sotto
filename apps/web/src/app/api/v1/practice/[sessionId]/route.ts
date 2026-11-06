@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/api-keys';
 import { errorResponse } from '@/lib/api-response';
 import { logger } from '@/lib/logger';
-import { prisma } from '@/lib/prisma';
+import { prisma, prismaUnfiltered } from '@/lib/prisma';
 import { PracticeSessionNotFoundError } from '@/lib/practice-service';
 import { resumePractice } from '@/lib/practice/resume';
 import { patchLearningProgress } from '@/lib/learning/progress-route';
@@ -10,6 +10,7 @@ import { readingVocabularySchema } from '@sotto/shared';
 import { cancelPracticePreparation } from '@/lib/practice/preparation';
 import { sottoRequestExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import { PreparationConflictError } from '@/lib/classes/preparation-state';
+import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 
 type RouteParams = { params: Promise<{ sessionId: string }> };
 
@@ -135,7 +136,47 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
         );
     }
 
-    await prisma.practiceSession.delete({ where: { id: session.id } });
+    if (session.vocabularyStudy) {
+      await sottoTransaction(
+        prismaUnfiltered,
+        async (database) => {
+          await sottoRequestExecution(request, authed).authorize(database);
+          await database.$queryRaw`SELECT id FROM "PracticeSession" WHERE id = ${sessionId} FOR UPDATE`;
+          const owned = await database.practiceSession.findFirst({
+            where: { id: sessionId, course: { userId: authed.userId } },
+            select: { id: true, courseId: true },
+          });
+          if (!owned) throw new PracticeSessionNotFoundError('Practice session not found');
+          const pending = await database.flashcardExample.findFirst({
+            where: {
+              practiceSessionId: sessionId,
+              status: { in: ['PENDING', 'PUBLISHING', 'UNRESOLVED'] },
+            },
+            select: { cardId: true },
+          });
+          if (pending)
+            throw new PreparationConflictError(
+              'Example generation must settle before deleting this practice.'
+            );
+          const refill = await database.vocabularyRefill.findFirst({
+            where: {
+              courseId: owned.courseId,
+              triggerSessionId: sessionId,
+              status: { in: ['PENDING', 'PUBLISHING', 'UNRESOLVED'] },
+            },
+            select: { courseId: true },
+          });
+          if (refill)
+            throw new PreparationConflictError(
+              'Vocabulary generation must settle before deleting this practice.'
+            );
+          await database.practiceSession.delete({ where: { id: sessionId } });
+        },
+        { signal: request.signal }
+      );
+    } else {
+      await prisma.practiceSession.delete({ where: { id: session.id } });
+    }
 
     const pruned = session.vocabularyStudy
       ? { vocab: 0, grammar: 0 }
@@ -161,6 +202,8 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json({ deleted: true, pruned });
   } catch (error: unknown) {
+    if (error instanceof PracticeSessionNotFoundError)
+      return errorResponse('Practice session not found', 404);
     if (error instanceof PreparationConflictError) return errorResponse(error.message, 409);
     const message = error instanceof Error ? error.message : 'Failed to delete practice';
     logger.error('Failed to delete practice session', { error: message });

@@ -300,7 +300,11 @@ function logWorkerJobFailure(queueName: string, job: Job<unknown> | undefined, e
 }
 
 function genericContractVersion(queueName: string, jobName?: string): number | null {
-  if (queueName === 'interactions' && jobName === 'interactions.v2') return null;
+  if (
+    queueName === 'interactions' &&
+    ['interactions.v2', 'interactions.v3', 'interactions.v4'].includes(jobName ?? '')
+  )
+    return null;
   return new Set([
     'vocabulary-audio',
     'vocabulary-index',

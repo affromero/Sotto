@@ -6,6 +6,7 @@ import type { SottoProviderExecution } from '../sidedoor/credentials/runtime/pro
 import {
   assertVocabularyStudyOwner,
   publicVocabularyStudy,
+  readFlashcardRatings,
   vocabularyAnswerMatches,
   vocabularyStudyStateSchema,
   VocabularyStudyConflict,
@@ -35,7 +36,8 @@ export async function actOnVocabularyStudy(
       const state = vocabularyStudyStateSchema.parse(session.vocabularyStudy);
       assertVocabularyStudyOwner(state, session, actor.userId);
       await database.$queryRaw`SELECT id FROM "Course" WHERE id = ${session.courseId} FOR UPDATE`;
-      const current = () => publicVocabularyStudy(state, session);
+      const ratings = await readFlashcardRatings(database, state, sessionId);
+      const current = () => publicVocabularyStudy(state, session, ratings);
       if (action.action === 'COMPLETE' && session.status === 'COMPLETED') return current();
       if (!['ACTIVE', 'COMPLETED'].includes(session.status))
         throw new VocabularyStudyConflict('This study no longer accepts responses.');
@@ -49,7 +51,8 @@ export async function actOnVocabularyStudy(
             card.response.outcome === 'ANSWERED' &&
             card.response.answer === action.answer;
           const repeatedReveal = action.action === 'REVEAL' && card.response.outcome !== 'ANSWERED';
-          if (repeatedAnswer || repeatedReveal) return current();
+          const repeatedRating = action.action === 'RATE' && ratings.get(card.id) === action.rating;
+          if (repeatedAnswer || repeatedReveal || repeatedRating) return current();
           throw new VocabularyStudyConflict(
             'This card already has feedback. Continue with the next card.'
           );
@@ -85,10 +88,12 @@ export async function actOnVocabularyStudy(
             progressRevision: { increment: 1 },
           },
         });
-        return publicVocabularyStudy(state, completed);
+        return publicVocabularyStudy(state, completed, ratings);
       }
 
       const card = state.cards.find((item) => item.id === action.itemId)!;
+      if (action.action === 'RATE' && state.mode !== 'FLASHCARDS')
+        throw new VocabularyStudyConflict('Self-ratings are only available for flashcards.');
       if (action.action === 'ANSWER' && state.mode === 'FLASHCARDS')
         throw new VocabularyStudyConflict(
           'Flashcards are study. Start a separate recall check to assess mastery.'
@@ -105,9 +110,11 @@ export async function actOnVocabularyStudy(
         throw new VocabularyStudyUnavailable('This dictionary word changed or was removed.');
       const now = new Date();
       const correct =
-        action.action === 'ANSWER' && state.mode !== 'FLASHCARDS'
-          ? vocabularyAnswerMatches(card, state.mode, action.answer, state.nativeLang)
-          : false;
+        action.action === 'RATE'
+          ? action.rating === 'KNOWN'
+          : action.action === 'ANSWER' && state.mode !== 'FLASHCARDS'
+            ? vocabularyAnswerMatches(card, state.mode, action.answer, state.nativeLang)
+            : false;
       card.response = {
         outcome:
           state.mode === 'FLASHCARDS'
@@ -123,7 +130,18 @@ export async function actOnVocabularyStudy(
         where: { id: card.wordId, courseId: session.courseId, introducedAt: null },
         data: { introducedAt: now },
       });
-      if (state.mode !== 'FLASHCARDS')
+      if (action.action === 'RATE') {
+        await database.flashcardRating.create({
+          data: {
+            practiceSessionId: sessionId,
+            courseId: session.courseId,
+            cardId: card.id,
+            rating: action.rating,
+            ratedAt: now,
+          },
+        });
+      }
+      if (state.mode !== 'FLASHCARDS' || action.action === 'RATE')
         await applyReviewOutcome(
           session.courseId,
           [card.lemma],
@@ -134,7 +152,7 @@ export async function actOnVocabularyStudy(
           database,
           {
             source: { practiceSessionId: sessionId, attempt: 1 },
-            assessment: state.mode,
+            assessment: state.mode === 'FLASHCARDS' ? 'FLASHCARD_SELF_ASSESSMENT' : state.mode,
             questionIdsByTarget: new Map([[`vocab:${card.lemma}`, [card.id]]]),
           }
         );
@@ -142,7 +160,11 @@ export async function actOnVocabularyStudy(
         where: { id: sessionId },
         data: { vocabularyStudy: state, progressRevision: { increment: 1 } },
       });
-      return publicVocabularyStudy(state, saved);
+      return publicVocabularyStudy(
+        state,
+        saved,
+        await readFlashcardRatings(database, state, sessionId)
+      );
     },
     { signal: execution.signal }
   );

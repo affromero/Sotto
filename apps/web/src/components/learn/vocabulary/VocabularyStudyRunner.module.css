@@ -45,6 +45,49 @@
   min-height: 21rem;
   align-content: center;
 }
+.swipeCard {
+  touch-action: pan-y;
+}
+.ratingActions {
+  display: grid;
+  gap: 0.75rem;
+}
+.ratingButtons {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+  gap: 0.75rem;
+}
+.ratingActions small {
+  color: var(--color-text-secondary);
+}
+.examples {
+  display: grid;
+  gap: 0.5rem;
+  border-top: 1px solid var(--color-border);
+  padding-top: 1rem;
+}
+.refill {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1.25rem;
+  border: 1px solid var(--color-border);
+  border-radius: 1rem;
+  background: var(--color-surface);
+}
+.refill h3,
+.refill p {
+  margin: 0;
+}
+.examples h3,
+.examples p {
+  margin: 0;
+}
+.examples ol {
+  margin: 0;
+  padding-left: 1.5rem;
+  display: grid;
+  gap: 1rem;
+}
 .word,
 .title {
   font-family: var(--font-heading);

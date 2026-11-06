@@ -17,7 +17,7 @@ struct PracticeDuePanel: View {
         } else {
             VStack(alignment: .leading, spacing: 12) {
                 if overview.totalDue > 0 || !overview.unfinished.isEmpty {
-                    Label("Waiting for you", systemImage: "tray.full")
+                    Label("Practice sessions", systemImage: "tray.full")
                         .font(.headline)
                         .foregroundStyle(SottoTheme.ink)
                 }
@@ -69,7 +69,9 @@ struct PracticeDuePanel: View {
                     pendingDeletion = nil
                 }
             } message: {
-                Text("Its answers and recordings go with it.")
+                if let session = pendingDeletion {
+                    Text("\(sessionTitle(session)) · \(startedLabel(session)). Its answers and recordings go with it.")
+                }
             }
         }
     }
@@ -77,7 +79,7 @@ struct PracticeDuePanel: View {
     private func sessionRow(_ session: SottoPracticeSessionSummary) -> some View {
         SottoAdaptiveStack(verticalAlignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(kindLabel(session.kind))
+                Text(sessionTitle(session))
                     .font(.callout.bold())
                     .foregroundStyle(SottoTheme.ink)
                 Text(session.statusLabel)
@@ -92,6 +94,7 @@ struct PracticeDuePanel: View {
 
             Button(session.actionLabel) { onResume(session.id) }
                 .buttonStyle(SottoSecondaryButtonStyle())
+                .accessibilityLabel("\(session.actionLabel) \(sessionTitle(session)), \(startedLabel(session))")
 
             Button(role: .destructive) {
                 pendingDeletion = session
@@ -100,7 +103,7 @@ struct PracticeDuePanel: View {
                     .frame(minWidth: 44, minHeight: 44)
             }
             .buttonStyle(.borderless)
-            .accessibilityLabel("Delete this \(kindLabel(session.kind)) session")
+            .accessibilityLabel("Delete \(sessionTitle(session)), \(startedLabel(session))")
         }
         .environment(\.sottoLayout, .regular)
     }
@@ -109,20 +112,30 @@ struct PracticeDuePanel: View {
         overview.dueSummary
     }
 
-    private func kindLabel(_ kind: String) -> String {
-        practiceOptions.first { $0.kind == kind }?.label ?? kind.capitalized
+    private func sessionTitle(_ session: SottoPracticeSessionSummary) -> String {
+        if session.kind == "VOCAB" { return session.displayTitle }
+        return practiceOptions.first { $0.kind == session.kind }?.label ?? session.displayTitle
     }
 
     private func startedLabel(_ session: SottoPracticeSessionSummary) -> String {
-        guard
-            let startedAt = session.startedAt,
-            let date = ISO8601DateFormatter.sottoInternet.date(from: startedAt)
-        else {
-            return "Started earlier"
-        }
-
-        return "Started \(date.formatted(.relative(presentation: .named)))"
+        practiceStartedLabel(session, among: overview.recent)
     }
+}
+
+func practiceStartedLabel(_ session: SottoPracticeSessionSummary, among sessions: [SottoPracticeSessionSummary]) -> String {
+    func timeLabel(_ value: String?) -> String {
+        guard let value, let date = ISO8601DateFormatter.sottoInternet.date(from: value)
+            ?? ISO8601DateFormatter().date(from: value) else { return "Started earlier" }
+        return "Started \(date.formatted(date: .abbreviated, time: .standard))"
+    }
+    let started = timeLabel(session.startedAt)
+    let matches = sessions.filter {
+        (($0.status == "ACTIVE" && $0.completedAt == nil)
+            || ["GENERATING", "FAILED", "CANCELLED"].contains($0.status))
+            && $0.displayTitle == session.displayTitle && timeLabel($0.startedAt) == started
+    }
+    guard matches.count > 1, let index = matches.firstIndex(where: { $0.id == session.id }) else { return started }
+    return "\(started) · \(index + 1) of \(matches.count)"
 }
 
 extension ISO8601DateFormatter {

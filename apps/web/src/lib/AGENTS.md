@@ -11,7 +11,8 @@ terminal removal; changed, uncertain and published operations remain fenced.
 material-index admission, and local pronunciation. Keep answer keys in private
 study state. Public cards reveal answers only after an immutable response.
 Apply assessed outcomes through the canonical review journal in the same
-transaction as the saved response. Flashcards only record exposure.
+transaction as the saved response. Legacy flashcard reveals record exposure;
+explicit flashcard self-ratings update review scheduling with distinct evidence.
 
 Material indexing extends canonical reading vocabulary extraction and metadata
 review. Exact source offsets, independent coverage review, and bounded recursive

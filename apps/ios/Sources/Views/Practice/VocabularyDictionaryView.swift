@@ -7,6 +7,7 @@ struct VocabularyDictionaryView: View {
     @Binding var mode: SottoVocabularyMode
     @Binding var modeChosen: Bool
     let disabled: Bool
+    let onAdmitted: (SottoPracticeStart) -> Void
     @State private var dictionary: SottoDictionary?
     @State private var search = ""
     @State private var filter = "all"
@@ -21,6 +22,10 @@ struct VocabularyDictionaryView: View {
 
     var body: some View {
         Group {
+            if let dictionary, dictionary.total == 0, search.isEmpty, filter == "all",
+               !dictionary.materials.contains(where: { ["PENDING", "ACTIVE"].contains($0.status) }) {
+                Section { VocabularyRefillView(courseId: courseId, sessionId: nil, onContinue: onAdmitted) }
+            }
             Section("Your dictionary") {
                 if let dictionary {
                     Text("\(dictionary.total) words · \(dictionary.counts.due) due · \(dictionary.counts.unseen) unseen")

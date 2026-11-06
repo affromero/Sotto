@@ -53,7 +53,7 @@ struct PracticeStartView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
-                    header
+                    if !currentStart.isVocabularyStudy { header }
                     if let level = currentStart.practiceLevel {
                         Text("Practice difficulty: \(level.rawValue). This does not change your course level.")
                             .font(.callout).foregroundStyle(SottoTheme.muted)

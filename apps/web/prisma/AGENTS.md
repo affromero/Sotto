@@ -12,7 +12,8 @@ Vocabulary imports use `MaterialVocabularyIndex`, `VocabularyIndexChunk`, and
 Imported words start unassessed. `introducedAt` records exposure separately
 from review evidence; `acceptedMeanings` contains explicit answer aliases.
 `PracticeSession.vocabularyStudy` stores private immutable study keys and
-receipts. Flashcard exposure never creates a mastery review event.
+receipts. Legacy flashcard exposure creates no mastery review event; explicit
+flashcard self-ratings retain distinct review evidence and update scheduling.
 `VocabularyPronunciation` owns cached local audio by course and fingerprint;
 register its storage references in migration and erasure inventories.
 

@@ -30,45 +30,117 @@ struct VocabularyStudyView: View {
                 Text("This vocabulary mode is not supported by this version of the app.")
             } else if let receipt = session.receipt {
                 Text("Session complete").font(.title2.bold())
-                Text(mode == .flashcards ? "\(receipt.studied) words studied." : "\(receipt.correct) of \(receipt.total) recalled.")
+                if mode == .flashcards, let summary = session.ratingSummary {
+                    Text("\(summary.known) known · \(summary.unknown) still learning")
+                    if summary.studied > 0 { Text("\(summary.studied) previously studied without a rating.") }
+                } else {
+                    Text(mode == .flashcards ? "\(receipt.studied) words studied." : "\(receipt.correct) of \(receipt.total) recalled.")
+                }
+                if mode == .flashcards, let courseId = session.courseId {
+                    VocabularyRefillView(courseId: courseId, sessionId: session.sessionId) { next in
+                        model.presentVocabularyStudy(next, courseId: courseId)
+                    }
+                }
             } else if cards.indices.contains(index) {
                 let card = cards[index]
-                Text("\(mode?.title ?? "Vocabulary") · \(index + 1) / \(cards.count)").font(.headline)
+                HStack {
+                    Label(mode?.title ?? "Vocabulary", systemImage: "rectangle.stack")
+                        .font(.headline).foregroundStyle(SottoTheme.primary)
+                    Spacer()
+                    Text("\(index + 1) / \(cards.count)").font(.subheadline.weight(.semibold))
+                        .foregroundStyle(SottoTheme.muted)
+                }
                 ProgressView(value: Double(cards.filter { $0.feedback != nil }.count), total: Double(cards.count))
-                Text(card.prompt).font(.title.bold()).textSelection(.enabled)
-                if mode != .word || card.feedback != nil {
-                    VocabularyPronunciation(path: "/api/v1/practice/\(start.sessionId)/vocabulary/\(card.id)/audio").id(card.id)
-                }
-                if let feedback = card.feedback {
-                    Text(mode == .flashcards ? "Study card" : feedback.correct == true ? "Recalled" : "Keep practicing").font(.headline)
-                    if mode != .meaning && mode != .flashcards { Text(feedback.lemma).font(.title3) }
-                    Text(feedback.meaning)
-                    if feedback.outcome == "REVEALED" && mode != .flashcards {
-                        Text("Revealing an answer schedules more practice.").font(.caption)
+                    .tint(SottoTheme.primary)
+                    .accessibilityLabel("Words reviewed")
+                    .accessibilityValue("\(cards.filter { $0.feedback != nil }.count) of \(cards.count)")
+                VStack(alignment: .leading, spacing: 20) {
+                    Text(mode == .word ? "MEANING" : mode == .flashcards ? "MEET THIS WORD" : "WHAT DOES THIS MEAN?")
+                        .font(.caption.weight(.semibold)).tracking(1.2).foregroundStyle(SottoTheme.primary)
+                    Text(card.prompt).font(.system(.largeTitle, design: .serif, weight: .bold))
+                        .foregroundStyle(SottoTheme.ink).textSelection(.enabled)
+                        .accessibilityAddTraits(.isHeader)
+                    if mode != .word || card.feedback != nil {
+                        VocabularyPronunciation(path: "/api/v1/practice/\(start.sessionId)/vocabulary/\(card.id)/audio").id(card.id)
                     }
-                    Button(index + 1 < cards.count ? "Next word" : "Finish session") {
-                        if index + 1 < cards.count { index += 1 }
-                        else { Task { await act("COMPLETE", card: card) } }
-                    }.buttonStyle(.borderedProminent).disabled(busy || pending != nil || recoveredDrafts || draftStorageFailed)
-                } else {
-                    if mode != .flashcards {
-                        TextField(mode == .word ? "The word" : "Its meaning", text: Binding(
-                            get: { drafts[card.id] ?? "" },
-                            set: { drafts[card.id] = String($0.prefix(1000)); saveDrafts() }
-                        )).textFieldStyle(.roundedBorder).disabled(busy || pending != nil || recoveredDrafts || draftStorageFailed)
-                        Button("Check answer") { Task { await act("ANSWER", card: card) } }
-                            .buttonStyle(.borderedProminent)
-                            .disabled(busy || pending != nil || recoveredDrafts || draftStorageFailed || (drafts[card.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    if mode == .flashcards {
+                        VocabularyExamplesView(sessionId: start.sessionId, cardId: card.id, revealed: card.feedback != nil).id(card.id)
                     }
-                    Button(mode == .flashcards ? "Reveal meaning" : "I can’t recall it") {
-                        Task { await act("REVEAL", card: card) }
-                    }.disabled(busy || pending != nil || recoveredDrafts || draftStorageFailed)
+                    if let feedback = card.feedback {
+                        Divider()
+                        Text(mode == .flashcards ? (feedback.selfRating == "KNOWN" ? "Known" : feedback.selfRating == "UNKNOWN" ? "Still learning" : "Meaning") : feedback.correct == true ? "Recalled" : "Keep practicing")
+                            .font(.headline).foregroundStyle(SottoTheme.primary)
+                        if mode != .meaning && mode != .flashcards { Text(feedback.lemma).font(.title3) }
+                        Text(feedback.meaning).font(.title3).foregroundStyle(SottoTheme.ink)
+                        if feedback.outcome == "REVEALED" && mode != .flashcards {
+                            Text("Revealing an answer schedules more practice.").font(.caption)
+                        }
+                        Button {
+                            if index + 1 < cards.count { index += 1 }
+                            else { Task { await act("COMPLETE", card: card) } }
+                        } label: {
+                            Text(index + 1 < cards.count ? "Next word" : "Finish session").frame(maxWidth: .infinity)
+                        }.buttonStyle(.borderedProminent).tint(SottoTheme.primary).controlSize(.large)
+                            .disabled(busy || pending != nil || recoveredDrafts || draftStorageFailed)
+                    } else {
+                        if mode != .flashcards {
+                            TextField(mode == .word ? "The word" : "Its meaning", text: Binding(
+                                get: { drafts[card.id] ?? "" },
+                                set: { drafts[card.id] = String($0.prefix(1000)); saveDrafts() }
+                            )).textFieldStyle(.roundedBorder).disabled(busy || pending != nil || recoveredDrafts || draftStorageFailed)
+                            Button("Check answer") { Task { await act("ANSWER", card: card) } }
+                                .buttonStyle(.borderedProminent).tint(SottoTheme.primary).controlSize(.large)
+                                .disabled(busy || pending != nil || recoveredDrafts || draftStorageFailed || (drafts[card.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        }
+                        if mode == .flashcards {
+                            Text("Swipe here: left to keep learning, right if you know it.")
+                                .font(.callout).foregroundStyle(SottoTheme.muted)
+                                .frame(maxWidth: .infinity, minHeight: 56)
+                                .background(SottoTheme.primary.opacity(0.06))
+                                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                .contentShape(Rectangle())
+                                .simultaneousGesture(DragGesture(minimumDistance: 35).onEnded { gesture in
+                                    guard session.selfRatingSupported == true, !busy, pending == nil,
+                                          !recoveredDrafts, !draftStorageFailed,
+                                          abs(gesture.translation.width) >= 80,
+                                          abs(gesture.translation.width) > abs(gesture.translation.height) * 1.5 else { return }
+                                    Task { await act("RATE", card: card, rating: gesture.translation.width > 0 ? "KNOWN" : "UNKNOWN") }
+                                })
+                            SottoAdaptiveStack(spacing: 8) {
+                                Button("Still learning") { Task { await act("RATE", card: card, rating: "UNKNOWN") } }
+                                    .buttonStyle(.bordered).tint(SottoTheme.primary).controlSize(.large)
+                                Button("Know it") { Task { await act("RATE", card: card, rating: "KNOWN") } }
+                                    .buttonStyle(.borderedProminent).tint(SottoTheme.primary).controlSize(.large)
+                            }
+                            .disabled(busy || pending != nil || recoveredDrafts || draftStorageFailed || session.selfRatingSupported != true)
+                            Button { Task { await act("RATE", card: card, rating: "UNKNOWN") } } label: {
+                                Text("Reveal meaning").frame(maxWidth: .infinity)
+                            }
+                                .buttonStyle(.bordered).tint(SottoTheme.primary).controlSize(.large)
+                                .disabled(busy || pending != nil || recoveredDrafts || draftStorageFailed || session.selfRatingSupported != true)
+                            Text("Revealing the meaning counts as still learning.")
+                                .font(.caption).foregroundStyle(SottoTheme.muted)
+                            if session.selfRatingSupported != true {
+                                Text("Update your Sotto server to use flashcard ratings.")
+                                    .font(.callout).foregroundStyle(SottoTheme.rose)
+                            }
+                        } else {
+                            Button("I can’t recall it") { Task { await act("REVEAL", card: card) } }
+                                .buttonStyle(.bordered).tint(SottoTheme.primary).controlSize(.large)
+                                .disabled(busy || pending != nil || recoveredDrafts || draftStorageFailed)
+                        }
+                    }
                 }
+                .frame(maxWidth: .infinity, minHeight: 280, alignment: .leading)
+                .padding(24)
+                .background(SottoTheme.surface)
+                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(SottoTheme.line))
             } else {
                 Text("This vocabulary session could not be read. Reopen it to try again.")
             }
             if let pending, cards.indices.contains(index) {
-                Button("Retry saved response") { Task { await act(pending.action, card: cards[index]) } }
+                Button("Retry saved response") { Task { await act(pending.action, card: cards[index], rating: pending.rating) } }
                     .disabled(busy || conflict || recoveredDrafts || draftStorageFailed)
             }
             if conflict {
@@ -153,7 +225,7 @@ struct VocabularyStudyView: View {
         } catch { self.error = error.localizedDescription }
     }
 
-    private func act(_ action: String, card: SottoVocabularyCard) async {
+    private func act(_ action: String, card: SottoVocabularyCard, rating: String? = nil) async {
         guard !recoveredDrafts, !draftStorageFailed else { return }
         guard let client = model.makeClient() else { error = "Pair this device to continue."; return }
         busy = true
@@ -162,7 +234,8 @@ struct VocabularyStudyView: View {
             let revision = try await progress.flushRevision()
             let input = pending ?? SottoVocabularyAction(action: action, expectedRevision: revision,
                 itemId: action == "COMPLETE" ? nil : card.id,
-                answer: action == "ANSWER" ? (drafts[card.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines) : nil)
+                answer: action == "ANSWER" ? (drafts[card.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines) : nil,
+                rating: action == "RATE" ? rating : nil)
             let store = VocabularyPendingStore(client: client, scope: actionScope)
             try store.save(input)
             pending = input
@@ -175,6 +248,7 @@ struct VocabularyStudyView: View {
             }
             let feedback = response.cards?.first(where: { $0.id == input.itemId })?.feedback
             let confirmed = input.action == "COMPLETE" ? response.receipt != nil
+                : input.action == "RATE" ? feedback?.outcome == "STUDIED" && feedback?.selfRating == input.rating
                 : input.action == "ANSWER" ? feedback?.outcome == "ANSWERED" && feedback?.answer == input.answer
                 : ["STUDIED", "REVEALED"].contains(feedback?.outcome ?? "")
             guard confirmed else { throw SottoAPIError.message("The server did not confirm this response. Retry the same response.") }
@@ -183,6 +257,9 @@ struct VocabularyStudyView: View {
             progress.acceptRevision(response.progressRevision ?? revision)
             savedServerDrafts = response.writingDrafts ?? drafts
             model.practiceStart = response
+            if input.action == "RATE", input.rating == "KNOWN", index + 1 < (response.cards?.count ?? 0) {
+                index += 1
+            }
             pending = nil
             error = nil
         } catch let failure as SottoAPIError {

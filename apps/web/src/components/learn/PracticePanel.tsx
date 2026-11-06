@@ -33,6 +33,7 @@ interface Overview {
   recent: Array<{
     id: string;
     kind: string;
+    vocabularyFormat?: string;
     status: string;
     score: number | null;
     startedAt?: string;
@@ -505,16 +506,35 @@ export function PracticePanel({
       {overview && overview.recent.length > 0 && (
         <section className={styles.recent} aria-labelledby="recent-practice-heading">
           <h3 id="recent-practice-heading" className={styles.recentHeading}>
-            Recent sessions
+            Practice sessions
           </h3>
           <ul className={styles.recentList} role="list">
             {overview.recent.map((session) => {
               const state = sessionState(session);
-              const label = kindLabel(session.kind);
+              const label = sessionLabel(session);
+              const started = sessionStart(session.startedAt) || 'Started earlier';
+              const matching = overview.recent.filter(
+                (other) =>
+                  sessionLabel(other) === label &&
+                  (sessionStart(other.startedAt) || 'Started earlier') === started
+              );
+              const ordinal =
+                matching.length > 1
+                  ? ` · ${matching.findIndex((other) => other.id === session.id) + 1} of ${matching.length}`
+                  : '';
+              const description = `${label}, ${started}${ordinal}`;
               const completed = session.status === 'COMPLETED';
               return (
                 <li key={session.id} className={styles.recentRow}>
                   <span className={styles.recentKind}>{label}</span>
+                  <time
+                    className={styles.recentTime}
+                    dateTime={session.startedAt}
+                    suppressHydrationWarning
+                  >
+                    {started}
+                    {ordinal}
+                  </time>
                   <span className={`${styles.badge} ${styles[state.tone]}`}>{state.label}</span>
                   {session.score !== null && (
                     <span className={styles.recentScore}>{Math.round(session.score * 100)}%</span>
@@ -525,7 +545,7 @@ export function PracticePanel({
                       className={styles.resumeButton}
                       onClick={() => void resumeSession(session.id)}
                       disabled={phase === 'starting' || deletingId === session.id}
-                      aria-label={`${completed ? 'View results for' : 'Resume'} ${label} practice`}
+                      aria-label={`${completed ? 'View results for' : 'Resume'} ${description} practice`}
                     >
                       {completed ? 'View results' : 'Resume'}
                     </button>
@@ -533,9 +553,9 @@ export function PracticePanel({
                   <button
                     type="button"
                     className={styles.deleteButton}
-                    onClick={() => void deleteSession(session.id, label)}
+                    onClick={() => void deleteSession(session.id, description)}
                     disabled={deletingId === session.id}
-                    aria-label={`Delete ${label} session`}
+                    aria-label={`Delete ${description} session`}
                   >
                     {deletingId === session.id ? 'Deleting…' : 'Delete'}
                   </button>
@@ -551,6 +571,25 @@ export function PracticePanel({
 
 function kindLabel(kind: string | null): string {
   return KINDS.find((item) => item.kind === kind)?.label ?? 'your';
+}
+
+function sessionLabel(session: Overview['recent'][number]): string {
+  if (session.kind !== 'VOCAB') return kindLabel(session.kind);
+  const labels: Record<string, string> = {
+    GENERATED: 'Vocabulary · Exercises',
+    FLASHCARDS: 'Vocabulary · Flashcards',
+    MEANING_RECALL: 'Vocabulary · Remember the meaning',
+    WORD_RECALL: 'Vocabulary · Find the word',
+    LISTENING_RECALL: 'Vocabulary · Listen and remember',
+  };
+  return labels[session.vocabularyFormat ?? ''] ?? 'Vocabulary';
+}
+
+function sessionStart(value?: string): string {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return `Started ${date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'medium' })}`;
 }
 
 function readPracticeError(data: unknown): string {

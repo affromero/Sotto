@@ -1,7 +1,10 @@
 // Zod contracts mirror canonical API routes, validators and practice services.
 // They are also used by the terminal client.
 import { z } from 'zod';
-import { vocabularyStudySessionSchema } from '../learning/vocabulary-study';
+import {
+  vocabularyStudyModeSchema,
+  vocabularyStudySessionSchema,
+} from '../learning/vocabulary-study';
 import { readingVocabularySchema } from '../reading-vocabulary';
 import { skillRequirementsSchema } from '../learning-requirements';
 import { learningObjectiveMemorySchema } from '../learning-map/contracts';
@@ -118,6 +121,7 @@ export const coursesListResponseSchema = z.object({
 
 export const practiceRecentSessionSchema = z.object({
   practiceLevel: cefrLevelSchema.nullable().optional(),
+  vocabularyFormat: z.union([vocabularyStudyModeSchema, z.literal('GENERATED')]).optional(),
   id: z.string(),
   kind: practiceKindSchema,
   status: practiceStatusSchema,

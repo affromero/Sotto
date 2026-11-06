@@ -33,6 +33,7 @@ import { sottoTransaction } from '../sidedoor/access/state/transaction';
 import {
   assertVocabularyStudyOwner,
   publicVocabularyStudy,
+  readFlashcardRatings,
   vocabularyStudyStateSchema,
 } from '../vocabulary/study-state';
 import {
@@ -87,7 +88,20 @@ export async function resumePractice(
     assertVocabularyStudyOwner(state, session, userId);
     if (!['ACTIVE', 'COMPLETED'].includes(session.status))
       throw new PracticeSessionNotFoundError('Vocabulary study is unavailable');
-    return publicVocabularyStudy(state, session);
+    return sottoTransaction(prismaUnfiltered, async (database) => {
+      const latest = await database.practiceSession.findFirst({
+        where: { id: sessionId, course: { userId } },
+      });
+      if (!latest?.vocabularyStudy || !['ACTIVE', 'COMPLETED'].includes(latest.status))
+        throw new PracticeSessionNotFoundError('Vocabulary study is unavailable');
+      const latestState = vocabularyStudyStateSchema.parse(latest.vocabularyStudy);
+      assertVocabularyStudyOwner(latestState, latest, userId);
+      return publicVocabularyStudy(
+        latestState,
+        latest,
+        await readFlashcardRatings(database, latestState, sessionId)
+      );
+    });
   }
   if (session.generationState) {
     const stored = practicePreparationSchema.parse(session.generationState);

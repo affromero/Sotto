@@ -13,6 +13,10 @@ import {
   vocabularyStudySessionSchema,
   vocabularyStudyRequestSchema,
   vocabularyStudyActionSchema,
+  vocabularyExamplesRequestSchema,
+  vocabularyExamplesResponseSchema,
+  vocabularyRefillRequestSchema,
+  vocabularyRefillResponseSchema,
 } from '../src/learning/vocabulary-study';
 import {
   dictionaryResponseSchema,
@@ -202,6 +206,10 @@ const namedSchemas: Record<string, z.ZodType> = {
   VocabularyAudioResponse: vocabularyAudioResponseSchema,
   VocabularyStudyRequest: vocabularyStudyRequestSchema,
   VocabularyStudyAction: vocabularyStudyActionSchema,
+  VocabularyExamplesRequest: vocabularyExamplesRequestSchema,
+  VocabularyExamplesResponse: vocabularyExamplesResponseSchema,
+  VocabularyRefillRequest: vocabularyRefillRequestSchema,
+  VocabularyRefillResponse: vocabularyRefillResponseSchema,
   PencilHomeworkRequest: pencilHomeworkRequestSchema,
   PencilHomeworkResponse: pencilHomeworkResponseSchema,
   ClassLessonHelpRequest: classLessonHelpRequestSchema,

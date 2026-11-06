@@ -221,6 +221,24 @@ final class APITransportPrivacyTests: XCTestCase {
             action: SottoVocabularyAction(action: "REVEAL", expectedRevision: 2, itemId: "card"))
     }
 
+    func testVocabularyExamplesUseTheOwnedSessionAndRetainRequestIdentity() async throws {
+        let body = #"{"status":"PENDING","request":{"operationId":"00000000-0000-4000-8000-000000000001","retryOf":null,"sourceHash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"canRetry":false}"#
+        let server = try LocalHTTPServer { _ in .init(status: 200, headers: [:], body: body) }
+        try await server.start()
+        defer { server.stop() }
+        let client = SottoAPIClient(serverURL: server.url, apiKey: "practice-secret", profileId: "learner", session: URLSession(configuration: .ephemeral))
+        let path = "/api/v1/practice/study/vocabulary/card/examples"
+        let status = try await client.vocabularyExamples(path: path)
+        _ = try await client.prepareVocabularyExamples(path: path, request: status.request)
+        XCTAssertEqual(status.request.operationId, "00000000-0000-4000-8000-000000000001")
+        XCTAssertEqual(server.requests.count, 2)
+        for request in server.requests {
+            XCTAssertTrue(request.contains(path))
+            XCTAssertTrue(request.lowercased().contains("x-sotto-profile-id: learner"))
+        }
+        XCTAssertTrue(server.requests[1].contains(status.request.sourceHash))
+    }
+
     func testDictionarySearchAndMeaningEditsUseTheOwnedCourse() async throws {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [VocabularyDictionaryProtocol.self]

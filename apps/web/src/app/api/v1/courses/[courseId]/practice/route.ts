@@ -24,6 +24,10 @@ import {
   speechCreditsMessage,
 } from '@/lib/providers/shared/speech-availability';
 import { introducedVocabularyWhere } from '@/lib/learning/vocabulary/memory';
+import {
+  assertVocabularyStudyOwner,
+  vocabularyStudyStateSchema,
+} from '@/lib/vocabulary/study-state';
 
 type RouteParams = { params: Promise<{ courseId: string }> };
 
@@ -115,7 +119,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         take: 10,
         select: {
           id: true,
+          courseId: true,
           kind: true,
+          vocabularyStudy: true,
           practiceLevel: true,
           status: true,
           score: true,
@@ -128,7 +134,14 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({
       due: { vocab: vocabDue, grammar: grammarDue, ...objectiveDue },
       totalVocab,
-      recent,
+      recent: recent.map(({ vocabularyStudy, courseId: sessionCourseId, ...session }) => {
+        if (vocabularyStudy === null) {
+          return session.kind === 'VOCAB' ? { ...session, vocabularyFormat: 'GENERATED' } : session;
+        }
+        const state = vocabularyStudyStateSchema.parse(vocabularyStudy);
+        assertVocabularyStudyOwner(state, { ...session, courseId: sessionCourseId }, authed.userId);
+        return { ...session, vocabularyFormat: state.mode };
+      }),
     });
   } catch (error: unknown) {
     logger.error('Failed to load practice overview', {

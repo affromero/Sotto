@@ -13,6 +13,7 @@ import { STUDY_MODES, VocabularyStudyRunner } from './VocabularyStudyRunner';
 import { VocabularySupportSettings } from './VocabularySupportSettings';
 import { LocalPronunciation } from './LocalPronunciation';
 import { VocabularyImports, type VocabularyImport } from './VocabularyImports';
+import { VocabularyRefill } from './VocabularyRefill';
 import styles from './VocabularyStudio.module.css';
 
 interface Dictionary {
@@ -44,11 +45,13 @@ export function VocabularyStudio({
   courseName,
   support,
   sessionId,
+  profileId,
 }: {
   courseId: string;
   courseName: string;
   support: VocabularySupport | null;
   sessionId?: string;
+  profileId?: string;
 }) {
   const router = useRouter();
   const [dictionary, setDictionary] = useState<Dictionary | null>(null);
@@ -201,7 +204,17 @@ export function VocabularyStudio({
   if (study)
     return (
       <div className={styles.root} role="region" aria-label="Vocabulary">
-        <VocabularyStudyRunner key={study.sessionId} start={study} onDone={leave} />
+        <VocabularyStudyRunner
+          key={study.sessionId}
+          start={study}
+          onDone={leave}
+          onSessionChange={(next) => {
+            setStudy(next);
+            router.replace(
+              `/learn/vocabulary?course=${encodeURIComponent(courseId)}&session=${encodeURIComponent(next.sessionId)}`
+            );
+          }}
+        />
       </div>
     );
   return (
@@ -229,19 +242,21 @@ export function VocabularyStudio({
           </p>
         </div>
         <div className={styles.startControls}>
-          <label htmlFor="vocabulary-mode">Practice mode</label>
-          <select
-            id="vocabulary-mode"
-            value={mode}
-            disabled={busy || pendingAdmission !== null}
-            onChange={(event) => setMode(event.target.value as VocabularyStudyMode)}
-          >
+          <fieldset className={styles.modes} disabled={busy || pendingAdmission !== null}>
+            <legend>Practice mode</legend>
             {Object.entries(STUDY_MODES).map(([key, value]) => (
-              <option key={key} value={key}>
+              <label className={styles.mode} key={key}>
+                <input
+                  type="radio"
+                  name="vocabulary-mode"
+                  value={key}
+                  checked={mode === key}
+                  onChange={() => setMode(key as VocabularyStudyMode)}
+                />
                 {value.title}
-              </option>
+              </label>
             ))}
-          </select>
+          </fieldset>
           <button
             className={styles.primary}
             disabled={busy || dictionary?.total === 0}
@@ -318,6 +333,23 @@ export function VocabularyStudio({
           <p role="status">Loading your dictionary…</p>
         ) : dictionary.words.length === 0 ? (
           <div className={styles.empty}>
+            {!search &&
+              state === 'all' &&
+              dictionary.total === 0 &&
+              !dictionary.materials.some((material) =>
+                ['PENDING', 'ACTIVE'].includes(material.status)
+              ) && (
+                <VocabularyRefill
+                  courseId={courseId}
+                  profileId={profileId}
+                  onContinue={(next) => {
+                    setStudy(next);
+                    router.replace(
+                      `/learn/vocabulary?course=${encodeURIComponent(courseId)}&session=${encodeURIComponent(next.sessionId)}`
+                    );
+                  }}
+                />
+              )}
             <h2>
               {search || state !== 'all'
                 ? 'No words match this view.'
@@ -326,7 +358,7 @@ export function VocabularyStudio({
             <p>
               {search || state !== 'all'
                 ? 'Try another search or show all words.'
-                : 'Add course materials or take a class to build your vocabulary.'}
+                : 'New words can be prepared for you, or you can add course materials.'}
             </p>
           </div>
         ) : (
