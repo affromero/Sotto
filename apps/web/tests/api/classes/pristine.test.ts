@@ -6,10 +6,28 @@ const mockRequestPreparation = vi.fn();
 vi.mock('@/lib/classes/preparation', () => ({
   requestClassPreparation: (...args: unknown[]) => mockRequestPreparation(...args),
 }));
-vi.mock('@/lib/prisma', () => ({
-  prisma: {
+vi.mock('@/lib/prisma', () => {
+  const database = {
     courseClass: { findFirst: async () => ({ courseId: 'course-1', status: 'AVAILABLE' }) },
-  },
+  };
+  return { prisma: database, prismaUnfiltered: database };
+});
+vi.mock('@/lib/sidedoor/access/state/transaction', () => ({
+  sottoTransaction: async (database: unknown, operation: (database: unknown) => Promise<unknown>) =>
+    operation(database),
+}));
+vi.mock('@/lib/sidedoor/credentials/runtime/provider-execution', () => ({
+  sottoRequestExecution: (...args: [unknown, { userId: string }]) => ({
+    userId: args[1].userId,
+    authorize: async () => ({ userId: args[1].userId }),
+  }),
+}));
+vi.mock('@/lib/classes/lesson/initial-a1-provenance', () => ({
+  classTaskMaterialHash: async () => 'material',
+  readInitialA1PracticeAuthorization: async () => null,
+}));
+vi.mock('@/lib/classes/help/content/prerequisite-token', () => ({
+  createPrerequisiteTokenizer: () => ({ material: () => 'revision', dispose: () => {} }),
 }));
 const mockGetClass = vi.fn();
 const mockSnapshot = vi.fn();

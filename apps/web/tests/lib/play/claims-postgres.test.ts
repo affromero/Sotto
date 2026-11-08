@@ -114,35 +114,39 @@ suite('atomic guest credentials and exact delivery recovery', () => {
   }
 
   // Fault injection stays at the database boundary and rolls the real first transaction back.
-  function retryingDatabase(onRetry: () => void): PrismaClient {
+  function retryingDatabase(onRetry: () => void) {
     let interrupt = true;
-    return new Proxy(instance.database, {
-      get(target, property) {
-        if (property !== '$transaction') {
-          const value = target[property as keyof PrismaClient];
-          return typeof value === 'function' ? value.bind(target) : value;
-        }
-        return <Result>(
-          operation: (database: Prisma.TransactionClient) => Promise<Result>,
-          options?: {
-            isolationLevel?: Prisma.TransactionIsolationLevel;
-            timeout?: number;
-            maxWait?: number;
+    return new Proxy(
+      {},
+      {
+        get(_target, property): unknown {
+          const target = instance.database;
+          if (property !== '$transaction') {
+            const value = target[property as keyof PrismaClient];
+            return typeof value === 'function' ? value.bind(target) : value;
           }
-        ) =>
-          instance.database.$transaction(async (database) => {
-            const result = await operation(database);
-            if (interrupt) {
-              interrupt = false;
-              onRetry();
-              await database.$executeRawUnsafe(
-                "DO $$ BEGIN RAISE EXCEPTION 'fixture serialization conflict' USING ERRCODE = '40001'; END $$"
-              );
+          return <Result>(
+            operation: (database: Prisma.TransactionClient) => Promise<Result>,
+            options?: {
+              isolationLevel?: Prisma.TransactionIsolationLevel;
+              timeout?: number;
+              maxWait?: number;
             }
-            return result;
-          }, options);
-      },
-    });
+          ) =>
+            instance.database.$transaction(async (database) => {
+              const result = await operation(database);
+              if (interrupt) {
+                interrupt = false;
+                onRetry();
+                await database.$executeRawUnsafe(
+                  "DO $$ BEGIN RAISE EXCEPTION 'fixture serialization conflict' USING ERRCODE = '40001'; END $$"
+                );
+              }
+              return result;
+            }, options);
+        },
+      }
+    ) as unknown as PrismaClient;
   }
 
   it('requires the live host again after owner approval changes canonical access', async () => {

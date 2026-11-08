@@ -8,6 +8,18 @@ impl App {
             Event::Tick => self.action_tx.send(Action::Tick)?,
             Event::Resize(w, h) => self.action_tx.send(Action::Resize(w, h))?,
             Event::Key(key) => {
+                if self.retained_class_recording.is_some() {
+                    if matches!(key.code, KeyCode::Char('r')) {
+                        self.retry_retained_class_audio();
+                    } else {
+                        self.status_bar.set_error(
+                            "Recording is still in memory. Press r to save it before leaving."
+                                .into(),
+                        );
+                        self.render();
+                    }
+                    return Ok(());
+                }
                 if let Some(action) = self.map_key(key) {
                     self.action_tx.send(action)?;
                 }
@@ -60,6 +72,25 @@ impl App {
             };
         }
 
+        if let View::Class {
+            history_open: true, ..
+        }
+        | View::ClassRepair {
+            history_open: true, ..
+        } = &self.view
+        {
+            return match key.code {
+                KeyCode::Esc | KeyCode::Char('q') | KeyCode::F(2) => {
+                    Some(Action::ClassHistoryToggle)
+                }
+                KeyCode::Up | KeyCode::PageUp => Some(Action::ClassHistoryScroll(false)),
+                KeyCode::Down | KeyCode::PageDown => Some(Action::ClassHistoryScroll(true)),
+                KeyCode::Char('[') => Some(Action::ClassHistoryAudioMove(false)),
+                KeyCode::Char(']') => Some(Action::ClassHistoryAudioMove(true)),
+                KeyCode::Char(' ') => Some(Action::ClassHistoryAudioPlay),
+                _ => None,
+            };
+        }
         // Manual placement (`l` from the language picker) is MODAL: ↑/↓ pick a
         // level, Enter confirms, Esc/`l`/`q` close; everything else is swallowed.
         if self.manual.open {
@@ -130,9 +161,30 @@ impl App {
                 _ => None,
             };
         }
+        if matches!(&self.view, View::Class { previous_work, .. } | View::ClassRepair { previous_work, .. } if !previous_work.is_empty())
+            && key.code == KeyCode::F(2)
+        {
+            return Some(Action::ClassHistoryToggle);
+        }
         // Listening (standalone or class/exam section): `a` opens the Q&A overlay.
         if self.audio_screen() && matches!(key.code, KeyCode::Char('a')) {
             return Some(Action::ToggleAsk);
+        }
+
+        if key.modifiers.contains(KeyModifiers::CONTROL)
+            && matches!(
+                self.view,
+                View::Class {
+                    directions: Some(_),
+                    ..
+                }
+            )
+        {
+            match key.code {
+                KeyCode::Up => return Some(Action::ClassDirectionScroll(false)),
+                KeyCode::Down => return Some(Action::ClassDirectionScroll(true)),
+                _ => {}
+            }
         }
 
         // Writing editor: capture text input. Ctrl-D submits; Esc backs out.
@@ -209,6 +261,19 @@ impl App {
         }
         // Screen-specific keys take priority over the generic mapping below.
         match &self.view {
+            View::Class {
+                directions: Some(_),
+                ..
+            } if key.code == KeyCode::Char('[') => {
+                return Some(Action::ClassDirectionScroll(false));
+            }
+            View::Class {
+                directions: Some(_),
+                ..
+            } if key.code == KeyCode::Char(']') => return Some(Action::ClassDirectionScroll(true)),
+            View::ClassPrelude { .. } if key.code == KeyCode::Char('r') => {
+                return Some(Action::Retry);
+            }
             View::PracticePreparing { .. } => match key.code {
                 KeyCode::Char('r') => return Some(Action::Retry),
                 KeyCode::Char('x') => return Some(Action::PracticeCancel),
@@ -521,6 +586,14 @@ impl App {
             return;
         }
         match &mut self.view {
+            View::ClassPrelude { scroll, .. } | View::ExamRecovery { scroll, .. } => {
+                *scroll = if down {
+                    scroll.saturating_add(1)
+                } else {
+                    scroll.saturating_sub(1)
+                };
+                self.render();
+            }
             View::ItemReview { prompt_scroll, .. } => {
                 *prompt_scroll = if down {
                     prompt_scroll.saturating_add(1)
@@ -533,144 +606,6 @@ impl App {
             View::Memory { .. } => self.memory_scroll(down),
             _ => {}
         }
-    }
-
-    // --- Theme & polish (P7) -----------------------------------------------
-
-    /// Toggle the theme picker overlay (`t`). Closing it persists the choice.
-    pub(super) fn on_toggle_theme_picker(&mut self) {
-        if self.theme_picker.open {
-            self.theme_picker = ThemePicker::closed();
-            self.persist_theme();
-        } else {
-            // Opening the picker dismisses the other modals (one at a time).
-            self.help_open = false;
-            self.accounts = AccountsOverlay::closed();
-            self.theme_picker = ThemePicker::opened();
-        }
-        self.render();
-    }
-
-    /// Toggle the key-help overlay (`?`).
-    pub(super) fn on_toggle_help(&mut self) {
-        self.help_open = !self.help_open;
-        if self.help_open {
-            self.theme_picker = ThemePicker::closed();
-            self.accounts = AccountsOverlay::closed();
-        }
-        self.render();
-    }
-
-    /// Cycle the value of the picker's focused row and apply it live. The choice
-    /// is persisted when the picker closes (not on every keystroke).
-    pub(super) fn on_cycle_theme_value(&mut self) {
-        if self.theme_picker.open {
-            overlay::cycle_focused(&mut self.theme, self.theme_picker.row);
-            self.render();
-        }
-    }
-
-    /// Persist `config` to its configured path. A no-op when `config_path` is
-    /// `None` (tests), so the suite never writes the developer's real config.
-    pub(super) fn persist_config(&self) -> Result<()> {
-        match &self.config_path {
-            Some(path) => self.config.save_to(path),
-            None => Ok(()),
-        }
-    }
-
-    /// Write the active theme into `config` and persist it. A save failure is
-    /// surfaced in the status bar rather than crashing the UI loop.
-    pub(super) fn persist_theme(&mut self) {
-        self.config.theme = self.theme.to_choice();
-        if let Err(e) = self.persist_config() {
-            self.status_bar
-                .set_error(format!("could not save theme: {e}"));
-        }
-    }
-
-    // --- Account management (P9) -------------------------------------------
-
-    /// Toggle the account switcher overlay (`A`). Opens with the cursor on the
-    /// active profile so Enter on it is a no-op switch.
-    pub(super) fn on_toggle_accounts(&mut self) {
-        if self.accounts.open {
-            self.accounts = AccountsOverlay::closed();
-        } else {
-            self.theme_picker = ThemePicker::closed();
-            self.help_open = false;
-            let active_idx = self
-                .config
-                .profile_names()
-                .iter()
-                .position(|n| n == &self.config.active)
-                .unwrap_or(0);
-            self.accounts = AccountsOverlay::opened(active_idx);
-        }
-        self.render();
-    }
-
-    /// Switch to the profile under the switcher cursor.
-    ///
-    /// A successful client build is the GATE for the rest of the switch: we build
-    /// the new profile's client FIRST, and only then swap it in, set the profile
-    /// active, persist, and reload. If the build fails we change nothing — the
-    /// previously-active profile and its client stay in place — so a fetch is
-    /// never dispatched through a client that does not belong to the now-active
-    /// profile (which would otherwise load the old account's data under the new
-    /// one). The error surfaces in the status bar.
-    pub(super) fn on_switch_account(&mut self) {
-        let names = self.config.profile_names();
-        let Some(name) = names.get(self.accounts.cursor).cloned() else {
-            self.accounts = AccountsOverlay::closed();
-            return;
-        };
-        self.accounts = AccountsOverlay::closed();
-
-        // No-op when already active (still close the overlay).
-        if name == self.config.active {
-            self.render();
-            return;
-        }
-
-        // Build the target profile's client BEFORE mutating any state.
-        let Some(profile) = self.config.profiles.get(&name).cloned() else {
-            self.status_bar
-                .set_error(format!("no profile named '{name}'"));
-            self.render();
-            return;
-        };
-        let client = match (self.client_factory)(&profile) {
-            Ok(client) => client,
-            Err(e) => {
-                // Build failed: keep the previously-active profile + client. Do
-                // NOT set active, persist, or fetch through the stale client.
-                self.status_bar
-                    .set_error(format!("could not connect with '{name}': {e}"));
-                self.render();
-                return;
-            }
-        };
-
-        // The client is good — commit the switch.
-        self.cache_practice();
-        self.client = client;
-        self.pending_admissions.clear();
-        self.pending_selections.clear();
-        self.placement_transport = Default::default();
-        self.practice_cache.clear();
-        let user = profile
-            .name
-            .clone()
-            .unwrap_or_else(|| "(owner)".to_string());
-        self.status_bar.set_session(profile.server_url, user);
-        // `set_active` cannot fail here: `name` came from `profile_names()`.
-        let _ = self.config.set_active(&name);
-        if let Err(e) = self.persist_config() {
-            self.status_bar.set_error(format!("could not save: {e}"));
-        }
-        // Reload courses against the NEW client (bumps gen, sets Loading).
-        self.fetch_courses();
     }
 
     pub(super) fn on_select(&mut self) {
@@ -746,6 +681,7 @@ impl App {
             }
             View::Result { .. } => self.dismiss_result(),
             // Class and exam share the section-walk Select handler.
+            View::ClassPrelude { .. } => self.class_prelude_select(),
             View::Class { .. } | View::Exam { .. } | View::Practice { .. } => {
                 self.class_on_select()
             }
@@ -771,7 +707,7 @@ impl App {
             }
             View::PlacementResult { .. } => self.placement_result_continue(),
             // Memory and settings are read-only; Enter does nothing.
-            View::Memory { .. } | View::Settings { .. } => {}
+            View::Memory { .. } | View::Settings { .. } | View::ExamRecovery { .. } => {}
             View::Loading | View::Error { .. } => {}
         }
     }
@@ -827,6 +763,34 @@ impl App {
     }
 
     pub(super) fn on_back(&mut self) {
+        let recording = matches!(
+            &self.view,
+            View::SpeakingReview {
+                phase: SpeakingPhase::Recording,
+                ..
+            }
+        ) || self.current_section().is_some_and(|section| {
+            matches!(
+                &section.progress,
+                SectionProgress::Speaking {
+                    phase: SpeakingPhase::Recording,
+                    ..
+                }
+            )
+        });
+        if recording || self.recorder.is_recording() {
+            self.status_bar
+                .set_error("Press r to stop recording before leaving.".into());
+            self.render();
+            return;
+        }
+        if self.retained_class_recording.is_some() {
+            self.status_bar.set_error(
+                "Recording is still in memory. Press r to save it before leaving.".into(),
+            );
+            self.render();
+            return;
+        }
         self.cache_practice();
         match &self.view {
             View::LearningMap { .. } => self.learning_map_intent(crate::action::LearningMapIntent::Back),
@@ -841,6 +805,7 @@ impl App {
             | View::ListeningReview { course, .. }
             | View::SpeakingReview { course, .. }
             | View::Result { course, .. }
+            | View::ClassPrelude { course, .. }
             | View::Class { course, .. }
             | View::Practice { course, .. }
             | View::PracticePreparing { course, .. }
@@ -848,12 +813,14 @@ impl App {
             | View::ClassOutcome { course, .. }
             | View::ClassDone { course, .. }
             | View::Exam { course, .. }
+            | View::ExamRecovery { course, .. }
             | View::ExamOutcome { course, .. }
             // Memory belongs to a course -> back to its home.
             | View::Memory { course, .. } => {
                 let course = course.clone();
                 // Stop any audio/recording before leaving a review screen.
                 self.stop_audio();
+                if self.retained_class_recording.is_some() { self.render(); return; }
                 self.enter_course_home(course);
             }
             // Placement and settings have no owning course -> back to the list.
@@ -874,11 +841,22 @@ impl App {
             player.stop();
         }
         if self.recorder.is_recording() {
-            let _ = self.recorder.stop();
+            let was_class = self.class_recording_binding.take().is_some();
+            if let Ok(wav) = self.recorder.stop()
+                && was_class
+                && let Some(path) = self.retain_class_audio(wav)
+            {
+                self.status_bar
+                    .set_error(format!("Recording saved at {}", path.display()));
+            }
         }
     }
 
     pub(super) fn on_retry(&mut self) {
+        if matches!(self.view, View::ClassPrelude { .. }) {
+            self.class_prelude_read();
+            return;
+        }
         if let Some(progress) = self.view.learning_progress_mut() {
             progress.conflict = false;
             progress.dirty = true;

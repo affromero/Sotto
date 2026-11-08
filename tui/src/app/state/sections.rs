@@ -49,6 +49,15 @@ pub(crate) struct ClassSection {
 }
 
 impl ClassSection {
+    pub(crate) fn current_task_key(&self) -> Option<(String, String, String)> {
+        let (kind, id) = match &self.progress {
+            SectionProgress::Mc { questions, index, .. } | SectionProgress::Listening { questions, index, .. } => ("question", questions.get(*index)?.id.as_str()),
+            SectionProgress::Speaking { prompts, index, .. } => ("speaking", prompts.get(*index)?.id.as_str()),
+            SectionProgress::Writing { prompts, index, .. } => ("writing", prompts.get(*index)?.id.as_str()),
+        };
+        Some((self.id.clone(), kind.into(), id.into()))
+    }
+
     /// Build a section's progress from the generated section by its skill. MC
     /// sections (grammar/reading) and listening comprehension use `questions`;
     /// speaking uses `prompts`; writing uses `writing_prompts`.
@@ -153,6 +162,8 @@ pub(crate) fn class_sections(cls: &types::ClassDetailResponse) -> Option<Vec<Cla
                                 transcript: recording["transcript"].as_str().map(str::to_string),
                                 feedback: recording["feedback"].as_str().map(str::to_string) },
                         Some("FAILED") => SpeakingPhase::Failed { message: "This recording could not be graded. Record another attempt.".into() },
+                        Some("UNRESOLVED") if recording["recoveryAcknowledged"].as_bool() == Some(true) => SpeakingPhase::Failed { message: "The earlier outcome is unknown. You acknowledged possible charges; record a new attempt when ready.".into() },
+                        Some("UNRESOLVED") => SpeakingPhase::Unresolved { message: "Grading outcome is unknown. Your recording is saved. Review recovery in the Sotto web app.".into() },
                         Some(_) => SpeakingPhase::Polling { recording_id: recording["id"].as_str()?.to_string() },
                         None => SpeakingPhase::Idle,
                     };

@@ -40,6 +40,48 @@ function renderSection(
 }
 
 describe('fresh grammar and reading practice', () => {
+  it.each(['GRAMMAR', 'READING'] as const)(
+    'places %s directions only on their matching question',
+    (skill) => {
+      render(
+        <GrammarSection
+          courseId="course"
+          sourceId="demo-section"
+          skill={skill}
+          questions={questions}
+          gate={70}
+          nextName={null}
+          onAnswer={vi.fn()}
+          onScore={vi.fn()}
+          onContinue={vi.fn()}
+          prerequisiteDirections={{
+            classId: 'class',
+            sourceHash: 'a'.repeat(64),
+            nativeLang: 'es',
+            directions: {
+              guided: 'Inténtalo.',
+              tasks: [
+                {
+                  sectionId: 'demo-section',
+                  taskId: 'question-1',
+                  kind: 'question',
+                  instruction: 'Formula una pregunta.',
+                },
+              ],
+            },
+          }}
+        />
+      );
+      const second = screen.getByRole('region', { name: 'Question 2' });
+      expect(within(second).getByText('Formula una pregunta.')).toHaveAttribute('lang', 'es');
+      expect(second).toHaveAccessibleDescription('Formula una pregunta.');
+      expect(
+        within(screen.getByRole('region', { name: 'Question 1' })).queryByText(
+          'Formula una pregunta.'
+        )
+      ).toBeNull();
+    }
+  );
   it('shows every exercise immediately and lets the learner start with the last question', () => {
     renderSection('GRAMMAR');
     for (const question of questions) expect(screen.getByText(question.question)).toBeVisible();

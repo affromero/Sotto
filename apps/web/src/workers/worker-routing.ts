@@ -19,6 +19,7 @@ const PIPELINE_WORKERS = new Set([
   'material-analysis',
   'placement-generation',
   'class-preparation',
+  'learning-writing',
   'practice-preparation',
   'vocabulary-audio',
   'vocabulary-index',

@@ -83,7 +83,8 @@ export interface ClassSpeakingAlignmentToken {
 
 export interface ClassSpeakingRecording {
   id: string;
-  status: 'PENDING' | 'GRADING' | 'SCORED' | 'FAILED';
+  status: 'PENDING' | 'GRADING' | 'SCORED' | 'FAILED' | 'UNRESOLVED';
+  recoveryAcknowledged?: boolean;
   transcript?: string | null;
   overallScore?: number | null;
   rubricScores?: {
@@ -177,10 +178,21 @@ export interface ClassFeedbackNote {
 
 export interface ClassData {
   teaching?: ClassTeaching;
+  prerequisiteSourceHash?: string | null;
+  lessonHelpRevision?: string | null;
+  taskMaterialRevision?: string | null;
   attempt?: number;
   progressRevision?: number;
   learnerAnswers?: Record<string, number> | null;
   writingDrafts?: Record<string, string> | null;
+  writingHistory?: ClassWritingHistory[];
+  speakingHistory?: ClassSpeakingHistory[];
+  speakingHistoryUnlinked?: ClassHistoricalRecording[];
+  orphanWritingDrafts?: Array<{ id: string; text: string }>;
+  quizHistory?: ClassQuizHistory[];
+  orphanQuizAnswers?: ClassOrphanQuizAnswer[];
+  quizHistoryUnreadable?: boolean;
+  quizSubmissionReceipts?: ClassQuizReceipt[];
   skillRequirements?: SkillRequirements | null;
   id: string;
   courseId: string;
@@ -195,8 +207,99 @@ export interface ClassData {
   intro: ClassIntroData;
   vocabulary: ClassVocabularyItem[];
   submitted: boolean;
-  submission: { passed: boolean; overallScore: number } | null;
+  submission: { passed: boolean; overallScore: number; receipt?: ClassSubmitResult } | null;
   sections: ClassSection[];
+}
+
+export interface ClassQuizSubmission {
+  attempt: number | null;
+  submittedAt: string | null;
+  selectedIndex: number | null;
+  isCorrect: boolean | null;
+}
+
+export interface ClassQuizHistory {
+  sectionId: string;
+  skill: 'GRAMMAR' | 'READING' | 'LISTENING';
+  attempt: number;
+  questions: Array<{
+    id: string;
+    order: number;
+    question: string;
+    passageText: string | null;
+    options: string[] | null;
+    savedChoice: number | null;
+    submissions: ClassQuizSubmission[];
+  }>;
+}
+
+export interface ClassOrphanQuizAnswer {
+  sectionId: string | null;
+  questionId: string | null;
+  savedChoice: number | null;
+  submissions: ClassQuizSubmission[];
+}
+
+export interface ClassQuizReceipt {
+  attempt: number | null;
+  submittedAt: string | null;
+  passed: boolean | null;
+  overallScore: number | null;
+  answersUnavailable: boolean;
+  passedSections: number | null;
+  totalSections: number | null;
+  sections: Array<{
+    id: string | null;
+    skill: string | null;
+    score: number | null;
+    passed: boolean | null;
+  }>;
+  summaryIncomplete: boolean;
+}
+
+export interface ClassHistoricalRecording {
+  id: string;
+  attempt: number;
+  status: string;
+  transcript: string | null;
+  overallScore: number | null;
+  rubricScores: unknown;
+  phonemeScores: unknown;
+  feedback: string | null;
+  createdAt: string;
+}
+
+export interface ClassSpeakingHistory {
+  sectionId: string;
+  attempt: number;
+  prompts: Array<{
+    id: string;
+    order: number;
+    targetPhrase: string;
+    translation: string;
+    recordings: Array<ClassHistoricalRecording & { attemptMatches: boolean }>;
+  }>;
+}
+
+export interface ClassWritingHistory {
+  sectionId: string;
+  attempt: number;
+  prompts: Array<{
+    id: string;
+    order: number;
+    task: string;
+    savedDraft: string | null;
+    responses: Array<{
+      id: string;
+      attempt: number;
+      attemptMatches: boolean;
+      text: string;
+      overallScore: number | null;
+      corrections: unknown;
+      feedback: string | null;
+      createdAt: string;
+    }>;
+  }>;
 }
 
 interface ClassSectionResult {
@@ -207,6 +310,7 @@ interface ClassSectionResult {
 }
 
 export interface ClassSubmitResult {
+  source?: 'ASSESSMENT';
   passed: boolean;
   overallScore: number;
   passedSections: number;
@@ -297,7 +401,9 @@ export function classPresentationIssues(cls: ClassData): string[] {
     }
     if (
       cls.skillRequirements.referenceAudioRequired &&
-      speaking?.prompts.some((prompt) => !prompt.referenceTtsUrl)
+      speaking?.prompts.some(
+        (prompt) => prompt.taskMode !== 'COMMUNICATIVE' && !prompt.referenceTtsUrl
+      )
     )
       issues.push('Speaking reference audio is incomplete.');
   }

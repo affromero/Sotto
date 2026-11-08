@@ -5,7 +5,6 @@ pub(crate) enum ProductiveWork {
     Speaking(SpeakingPhase),
     Writing { text: String, phase: WritingPhase },
 }
-
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(crate) struct ProgressSave {
     pub revision: i64,
@@ -74,6 +73,8 @@ fn practice_view(course: Course, response: &types::StartPracticeResponse) -> Res
                 Some(recording) => match recording.status {
                     types::PracticeSpeakingPromptLatestRecordingStatus::Scored if recording.overall_score.is_some() => SpeakingPhase::Graded { score: recording.overall_score.map(pct), transcript: recording.transcript.clone(), feedback: recording.feedback.clone() },
                     types::PracticeSpeakingPromptLatestRecordingStatus::Failed => SpeakingPhase::Failed { message: "This recording could not be graded. Record another attempt.".into() },
+                    types::PracticeSpeakingPromptLatestRecordingStatus::Unresolved if recording.recovery_acknowledged == Some(true) => SpeakingPhase::Failed { message: "The earlier outcome is unknown. You acknowledged possible charges; record a new attempt when ready.".into() },
+                    types::PracticeSpeakingPromptLatestRecordingStatus::Unresolved => SpeakingPhase::Unresolved { message: "Grading outcome is unknown. Your recording is saved. Review recovery in the Sotto web app.".into() },
                     _ => SpeakingPhase::Polling { recording_id: recording.recording_id.clone() },
                 },
                 None => SpeakingPhase::Idle,
@@ -126,6 +127,12 @@ impl ClassSection {
 }
 
 pub(crate) fn refresh_cached_practice(cached: &mut View, fresh: &View) {
+    if let (View::Class { previous_work: cached_history, history_open, history_scroll, history_audio: cached_audio, .. }, View::Class { previous_work, history_audio, .. }) = (&mut *cached, fresh) {
+        *cached_history = previous_work.clone();
+        if cached_history.is_empty() { *history_open = false; }
+        *history_scroll = 0;
+        *cached_audio = history_audio.clone();
+    }
     let cached_sections = match cached { View::Practice { sections: Some(sections), .. } | View::Class { sections: Some(sections), .. } => sections, _ => return };
     let fresh_sections = match fresh { View::Practice { sections: Some(sections), .. } | View::Class { sections: Some(sections), .. } => sections, _ => return };
     for section in cached_sections {
@@ -133,22 +140,12 @@ pub(crate) fn refresh_cached_practice(cached: &mut View, fresh: &View) {
         let Some(latest) = fresh_sections.iter().find(|latest| latest.id == section.id) else { continue; };
         for (id, work) in &latest.work {
             if matches!(section.work.get(id), Some(ProductiveWork::Speaking(SpeakingPhase::UnknownUpload { .. } | SpeakingPhase::Uploading))) {
-                let recorded_id = |progress: &SectionProgress| match progress {
-                    SectionProgress::Speaking { prompts, .. } => prompts.iter().find(|prompt| &prompt.id == id).and_then(|prompt| prompt.recording_id.clone()),
-                    _ => None,
-                };
-                let fresh_id = recorded_id(&latest.progress);
-                if fresh_id.is_none() || fresh_id == recorded_id(&section.progress) { continue; }
-                if let (SectionProgress::Speaking { prompts, .. }, Some(fresh_id)) = (&mut section.progress, fresh_id)
-                    && let Some(prompt) = prompts.iter_mut().find(|prompt| &prompt.id == id) {
-                    prompt.recording_id = Some(fresh_id);
-                }
+                continue;
             }
             match (section.work.get(id), work) {
                 (Some(ProductiveWork::Writing { text, .. }), ProductiveWork::Writing { text: graded_text, phase }) if text.trim() == graded_text.trim() => {
                     section.work.insert(id.clone(), ProductiveWork::Writing { text: text.clone(), phase: phase.clone() });
                 },
-                (Some(ProductiveWork::Speaking(SpeakingPhase::UnknownUpload { .. } | SpeakingPhase::Uploading)), ProductiveWork::Speaking(SpeakingPhase::Idle)) => {},
                 (_, ProductiveWork::Speaking(phase)) => {
                     if let (SectionProgress::Speaking { prompts, .. }, SectionProgress::Speaking { prompts: fresh_prompts, .. }) = (&mut section.progress, &latest.progress)
                         && let Some(prompt) = prompts.iter_mut().find(|prompt| &prompt.id == id) {
@@ -172,9 +169,40 @@ pub(crate) fn refresh_cached_practice(cached: &mut View, fresh: &View) {
 }
 
 impl View {
+    pub(crate) fn has_upload_in_progress(&self) -> bool {
+        let sections = match self {
+            View::Class { sections: Some(sections), .. } | View::Practice { sections: Some(sections), .. }
+            | View::Exam { sections: Some(sections), .. } => sections,
+            _ => return false,
+        };
+        sections.iter().any(|section| matches!(&section.progress, SectionProgress::Speaking { phase: SpeakingPhase::Uploading, .. }) ||
+            section.work.values().any(|work| matches!(work, ProductiveWork::Speaking(SpeakingPhase::Uploading))))
+    }
+
+    pub(crate) fn mark_abandoned_uploads_unknown(&mut self, retained: Option<&std::path::Path>) {
+        let sections = match self {
+            View::Class { sections: Some(sections), .. } | View::Practice { sections: Some(sections), .. }
+            | View::Exam { sections: Some(sections), .. } => sections,
+            _ => return,
+        };
+        let unknown = || SpeakingPhase::UnknownUpload { message: retained.map_or_else(
+            || "The upload outcome is unknown. Keep your recording while it is investigated.".into(),
+            |path| format!("The upload outcome is unknown. Recording saved at {}", path.display()),
+        ) };
+        for section in sections {
+            if let SectionProgress::Speaking { phase, .. } = &mut section.progress
+                && matches!(phase, SpeakingPhase::Uploading) { *phase = unknown(); }
+            for work in section.work.values_mut() {
+                if let ProductiveWork::Speaking(phase) = work
+                    && matches!(phase, SpeakingPhase::Uploading) { *phase = unknown(); }
+            }
+        }
+    }
+
     pub(crate) fn has_uncertain_upload(&self) -> bool {
         let sections = match self {
-            View::Class { sections: Some(sections), .. } | View::Practice { sections: Some(sections), .. } => sections,
+            View::Class { sections: Some(sections), .. } | View::Practice { sections: Some(sections), .. }
+            | View::Exam { sections: Some(sections), .. } => sections,
             _ => return false,
         };
         sections.iter().any(|section| matches!(&section.progress, SectionProgress::Speaking { phase: SpeakingPhase::UnknownUpload { .. } | SpeakingPhase::Uploading, .. }) ||

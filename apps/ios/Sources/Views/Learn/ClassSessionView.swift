@@ -12,6 +12,7 @@ struct ClassSessionView: View {
     @State private var answers: [String: Int] = [:]
     @State private var submittedAnswers: [String: Int] = [:]
     @ObservedObject var drafts: WritingDraftStore
+    var activityOwner: SottoLearnerIdentity? = nil
     var initialSectionId: String? = nil
     @State private var selectedStage = "lesson"
     @State private var showingRemoveConfirmation = false
@@ -25,9 +26,23 @@ struct ClassSessionView: View {
     @State private var unreviewedPencilAnswers = Set<String>()
     @State private var pencilReviewError: String?
     @State private var pencilToolPicker = WorkbookTools.makeWorkbookToolPicker()
+    @State private var prerequisite: ScopedClassPrerequisite?
+    @State private var showingAssessment = false
 
     private var currentClass: SottoClassDetail {
         model.selectedClass ?? classDetail
+    }
+
+    private var prerequisiteScope: ClassPrerequisiteScope? {
+        guard let credentials = model.credentials, credentials.selectedProfile != nil,
+              model.selectedClass?.id == classDetail.id,
+              let sourceHash = currentClass.prerequisiteSourceHash else { return nil }
+        return ClassPrerequisiteScope(credentials: credentials, classId: currentClass.id, sourceHash: sourceHash)
+    }
+
+    private var currentPrerequisite: SottoClassPrerequisiteResponse? {
+        guard let scope = prerequisiteScope, prerequisite?.scope == scope else { return nil }
+        return prerequisite?.response
     }
 
     /// Only the choices that moved since the last submit.
@@ -54,6 +69,11 @@ struct ClassSessionView: View {
     private var sessionScroll: some View {
         ScrollViewReader { scroll in
             ScrollView {
+                if currentClass.taskMaterialRevision == nil && !currentClass.submitted {
+                    Text("Update your Sotto server before saving class edits. Your work stays on this screen until it can be verified.")
+                        .foregroundStyle(.red)
+                        .padding(.horizontal, 16)
+                }
                 classContent
                     .padding(layout == .compact ? 16 : 28)
                     .frame(maxWidth: 980, alignment: .leading)
@@ -68,6 +88,14 @@ struct ClassSessionView: View {
             .background(SottoTheme.paper)
             .navigationTitle(model.pencilWorkbook && layout.supportsHandwriting ? "Class \(currentClass.order) workbook" : "Class \(currentClass.order)")
             .navigationBarTitleDisplayMode(.inline)
+            .sheet(isPresented: $showingAssessment) {
+                ClassAssessmentView(classId: currentClass.id, attempt: currentClass.attempt ?? 1) { result in
+                    model.classResult = result
+                    showingAssessment = false
+                    selectedStage = "review"
+                }
+                .environmentObject(model)
+            }
             .toolbar {
                 sessionToolbar
             }
@@ -125,7 +153,8 @@ struct ClassSessionView: View {
             .task(id: currentClass.id) {
                 guard !hydrated else { return }
                 progress.configure(client: model.makeClient(), path: "/api/v1/classes/\(currentClass.id)",
-                    revision: currentClass.progressRevision ?? 0)
+                    revision: currentClass.progressRevision ?? 0, attempt: currentClass.attempt ?? 1,
+                    materialRevision: currentClass.taskMaterialRevision)
                 answers = progress.answers ?? currentClass.learnerAnswers ?? [:]
                 drafts.register(currentClass.sections.flatMap(\.writingPrompts), savedDrafts: currentClass.writingDrafts ?? [:])
                 hydrated = true
@@ -150,9 +179,16 @@ struct ClassSessionView: View {
                     .font(.callout).foregroundStyle(SottoTheme.muted)
             }
             pencilReviewStatus
+            if let scope = prerequisiteScope {
+                ClassPrerequisiteView(detail: currentClass, scope: scope, saved: $prerequisite)
+                    .id(scope)
+                    .frame(height: selectedStage == "lesson" ? nil : 0)
+                    .clipped()
+                    .accessibilityHidden(selectedStage != "lesson")
+            }
             if selectedStage == "lesson" {
                 if let teaching = currentClass.teaching {
-                    ClassTeachingView(classId: currentClass.id, teaching: teaching, intro: currentClass.intro, onSelectionHelp: openSelectionHelp)
+                    ClassTeachingView(classId: currentClass.id, teaching: teaching, intro: currentClass.intro, prerequisite: currentPrerequisite, lessonHelpRevision: currentClass.lessonHelpRevision, onSelectionHelp: openSelectionHelp)
                     if let intro = currentClass.intro {
                         DisclosureGroup("Class summary") {
                             ClassIntroBlock(intro: intro, onSelectionHelp: openSelectionHelp)
@@ -161,14 +197,34 @@ struct ClassSessionView: View {
                 } else if let intro = currentClass.intro {
                     ClassIntroBlock(intro: intro, onSelectionHelp: openSelectionHelp)
                 }
+                ClassSpeakingHistoryView(
+                    classId: currentClass.id,
+                    history: currentClass.speakingHistory ?? [],
+                    unlinked: currentClass.speakingHistoryUnlinked ?? []
+                )
+                ClassWritingHistoryView(
+                    history: currentClass.writingHistory ?? [],
+                    orphanDrafts: currentClass.orphanWritingDrafts ?? []
+                )
+                ClassQuizHistoryView(
+                    history: currentClass.quizHistory ?? [],
+                    orphanAnswers: currentClass.orphanQuizAnswers ?? [],
+                    receipts: currentClass.quizSubmissionReceipts ?? [],
+                    unreadable: currentClass.quizHistoryUnreadable ?? false
+                )
             } else if selectedStage == "review" {
-                if let result = model.classResult { ClassResultBanner(result: result) }
+                if let result = model.classResult {
+                    ClassResultBanner(result: result)
+                    if result.source == "ASSESSMENT" && !result.passed {
+                        Text("Your result is saved. Assessment retry is not available yet.")
+                    }
+                }
                 ClassFeedbackClinicBlock(classDetail: currentClass, result: model.classResult)
                 workbookSubmissionFooter
             } else if let section = orderedSections.first(where: { $0.id == selectedStage }) {
                 DisclosureGroup("Lesson notes") {
                     if let teaching = currentClass.teaching {
-                        ClassTeachingView(classId: currentClass.id, teaching: teaching, intro: currentClass.intro, onSelectionHelp: openSelectionHelp)
+                        ClassTeachingView(classId: currentClass.id, teaching: teaching, intro: currentClass.intro, prerequisite: currentPrerequisite, lessonHelpRevision: currentClass.lessonHelpRevision, onSelectionHelp: openSelectionHelp)
                     } else if let intro = currentClass.intro {
                         ClassIntroBlock(intro: intro, onSelectionHelp: openSelectionHelp)
                     }
@@ -237,7 +293,12 @@ struct ClassSessionView: View {
             drafts: drafts,
             pencilWorkbook: model.pencilWorkbook && layout.supportsHandwriting,
             classAttempt: currentClass.attempt ?? 1,
+            speakingBinding: currentClass.attempt.flatMap { attempt in
+                currentClass.taskMaterialRevision.map { SottoClassSpeakingBinding(attempt: attempt, materialRevision: $0) }
+            },
+            activityOwner: activityOwner,
             pencilToolPicker: pencilToolPicker,
+            prerequisite: currentPrerequisite,
             onPencilReviewRequired: updatePencilReview,
             onSelectionHelp: openSelectionHelp
         )
@@ -349,8 +410,25 @@ struct ClassSessionView: View {
                 guard graded else { return }
 
                 let payload = everyAnswer
-                await model.submitClassAnswers(payload)
-                submittedAnswers = answers
+                do {
+                    guard let client = model.makeClient() else { return }
+                    let prelude = try await client.fetchClassPrelude(classId: classId)
+                    guard model.isCurrentLearningClient(client), model.selectedClass?.id == classId else { return }
+                    if [.base, .addendum].contains(prelude.kind) {
+                        guard prelude.acknowledged == true else {
+                            throw SottoAPIError.message("Review the lesson before starting the assessment.")
+                        }
+                        _ = try await progress.flushRevision()
+                        guard model.isCurrentLearningClient(client), model.selectedClass?.id == classId else { return }
+                        showingAssessment = true
+                    } else if prelude.kind == .notRequired || prelude.kind == .replay {
+                        if await model.submitClassAnswers(payload) { submittedAnswers = answers }
+                    } else {
+                        throw SottoAPIError.message("The lesson is not ready. Check its saved status.")
+                    }
+                } catch {
+                    model.errorMessage = error.localizedDescription
+                }
             }
         } label: {
             Label("Submit", systemImage: "checkmark.circle.fill")

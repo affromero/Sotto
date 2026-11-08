@@ -125,6 +125,9 @@ export function EpisodePlayerView({
   const [liveFailedAtStatus, setLiveFailedAtStatus] = useState(episode.failedAtStatus);
   const [liveErrorId, setLiveErrorId] = useState(episode.errorId);
   const [retrying, setRetrying] = useState(false);
+  const [retryError, setRetryError] = useState<string | null>(null);
+  const [retryPending, setRetryPending] = useState(false);
+  const [retryUncertain, setRetryUncertain] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [scriptTurns, setScriptTurns] = useState<Array<{ speaker: string; text: string }> | null>(
@@ -164,13 +167,18 @@ export function EpisodePlayerView({
 
   // SSE-based status watching while episode is processing
   const isStillProcessing =
-    liveStatus !== 'READY' && liveStatus !== 'FAILED' && liveStatus !== 'SCRIPT_READY';
+    retryPending ||
+    (liveStatus !== 'READY' && liveStatus !== 'FAILED' && liveStatus !== 'SCRIPT_READY');
   useEpisodeStatus({
     episodeId: isStillProcessing ? episode.id : null,
-    initialStatus: liveStatus,
+    initialStatus: retryPending ? undefined : liveStatus,
     onStatusChange: useCallback(
       (event: { status: string; [key: string]: unknown }) => {
         setLiveStatus(event.status as typeof episode.status);
+        if (['FAILED', 'READY', 'SCRIPT_READY', 'DRAFT'].includes(event.status)) {
+          setRetryPending(false);
+          setRetryError(null);
+        }
         if (event.verificationProgress) {
           setVerificationProgress(event.verificationProgress as Record<string, unknown>);
         }
@@ -195,6 +203,7 @@ export function EpisodePlayerView({
 
   const handleRetry = useCallback(async () => {
     setRetrying(true);
+    setRetryError(null);
     try {
       const body: Record<string, unknown> = {};
       // Extract provider from first voice with an explicit provider (for retry)
@@ -212,11 +221,21 @@ export function EpisodePlayerView({
       });
       if (response.ok) {
         window.location.reload();
+        return;
+      }
+      const result = await response.json().catch(() => null);
+      setRetryError(typeof result?.error === 'string' ? result.error : 'Retry failed.');
+      if (result?.deliveryPending === true) {
+        setRetryPending(true);
+        router.refresh();
       }
     } catch {
+      setRetryError('The retry could not be confirmed. Reload the page to check its status.');
+      setRetryUncertain(true);
+    } finally {
       setRetrying(false);
     }
-  }, [episode.id, audioConfig]);
+  }, [episode.id, audioConfig, router]);
 
   const handleDelete = useCallback(async () => {
     setDeleting(true);
@@ -426,7 +445,12 @@ export function EpisodePlayerView({
               />
             )}
             <div className={styles.failedActions}>
-              <Button onClick={handleRetry} loading={retrying} disabled={retrying || deleting}>
+              {retryError && <p role="alert">{retryError}</p>}
+              <Button
+                onClick={handleRetry}
+                loading={retrying}
+                disabled={retrying || retryPending || retryUncertain || deleting}
+              >
                 {!retrying && <RefreshCw size={16} />}
                 {retrying ? 'Retrying...' : 'Retry Generation'}
               </Button>

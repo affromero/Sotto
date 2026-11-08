@@ -24,10 +24,14 @@ struct RootView: View {
                         } onPlay: {
                             model.openPlay()
                         }
+                    } else if let navigation = model.classPreludeNavigation {
+                        ClassPreludeView(navigation: navigation)
+                            .id(navigation.id)
+                            .environmentObject(model)
                     } else if let selectedClass = model.selectedClass {
                         let state = model.learningSessionState(path: "/api/v1/classes/\(selectedClass.id)",
                             attempt: selectedClass.attempt ?? 1, revision: selectedClass.progressRevision ?? 0)
-                        ClassSessionView(classDetail: selectedClass, progress: state.progress, drafts: state.drafts)
+                        ClassSessionView(classDetail: selectedClass, progress: state.progress, drafts: state.drafts, activityOwner: state.owner)
                             .id("\(selectedClass.id)/\(selectedClass.attempt ?? 1)")
                             .environmentObject(model)
                     } else {
@@ -78,7 +82,8 @@ struct RootView: View {
             if let practiceStart = model.practiceStart {
                 let state = model.learningSessionState(path: "/api/v1/practice/\(practiceStart.sessionId)",
                     attempt: 1, revision: practiceStart.progressRevision ?? 0)
-                PracticeStartView(start: practiceStart, progress: state.progress, drafts: state.drafts)
+                PracticeStartView(start: practiceStart, progress: state.progress, drafts: state.drafts, activityOwner: state.owner)
+                    .id(ObjectIdentifier(state))
                     .environmentObject(model)
                     .id(practiceStart.sessionId)
             }

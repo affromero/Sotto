@@ -47,6 +47,7 @@ describe('queue-metadata', () => {
   });
 
   it('covers exactly the same queues as ALL_QUEUE_NAMES', () => {
+    expect(QUEUE_METADATA['learning-writing']).toMatchObject({ stage: 'Interactions' });
     const metadataNames = Object.keys(QUEUE_METADATA).sort();
     const allNames = [...ALL_QUEUE_NAMES].sort();
     expect(metadataNames).toEqual(allNames);

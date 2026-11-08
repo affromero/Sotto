@@ -20,6 +20,9 @@ import { errorResponse } from '@/lib/api-response';
 import { THEME_PREFS_COOKIE, serializeThemePrefs, themePrefsFromUser } from '@/lib/theme-prefs';
 import { z } from 'zod';
 import { deleteOwnSottoProfile } from '@/lib/sidedoor/access/deletion/profile-deletion';
+import { PrerequisiteDeletionConflict } from '@/lib/classes/help/prerequisite-deletion';
+import { SpeakingDeletionConflict } from '@/lib/sidedoor/jobs/stitch/speaking-grading-deletion';
+import { AssessmentFenceConflict } from '@/lib/learning/classes/lifecycle/assessment-fence';
 import { accessOperation } from '@/lib/sidedoor/access/core/http';
 import { ACTIVE_PROFILE_COOKIE } from '@/lib/profiles/profile-cookie';
 import { SHARED_SESSION_COOKIE } from '@/lib/sidedoor/access/core/session-identity';
@@ -386,7 +389,23 @@ export async function DELETE(request: NextRequest) {
       return errorResponse('You must send { "confirm": "DELETE" } to delete your account', 400);
     }
 
-    const cleanup = await deleteOwnSottoProfile(prismaUnfiltered, request, authResult);
+    const cleanup = await deleteOwnSottoProfile(prismaUnfiltered, request, authResult).catch(
+      (error: unknown) => {
+        if (error instanceof PrerequisiteDeletionConflict) return 'prerequisite' as const;
+        if (error instanceof SpeakingDeletionConflict) return 'speaking' as const;
+        if (error instanceof AssessmentFenceConflict) return 'assessment' as const;
+        throw error;
+      }
+    );
+    if (cleanup === 'prerequisite')
+      return errorResponse(
+        'Prerequisite work is active or requires recovery before deletion.',
+        409
+      );
+    if (cleanup === 'speaking')
+      return errorResponse('Speaking work is active or requires recovery before deletion.', 409);
+    if (cleanup === 'assessment')
+      return errorResponse('An assessment request is already active or needs recovery.', 409);
     if (!cleanup) return errorResponse('User not found', 404);
     const response = NextResponse.json(
       { success: true, cleanup: { id: cleanup.id, phase: cleanup.phase } },

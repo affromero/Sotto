@@ -225,6 +225,106 @@ suite('request-admitted transcript exports', () => {
       expect((await handler(new NextRequest(request.url), params)).status).toBe(401);
     }
   });
+  it('denies assessment transcript exports and prevents attaching ordinary pending work', async () => {
+    const ordinary = await source('UNLISTED');
+    const pending = await admit(ordinary.id);
+    const curriculum = await instance.database.curriculum.upsert({
+      where: { nativeLang_targetLang: { nativeLang: 'es', targetLang: 'ru' } },
+      create: { nativeLang: 'es', targetLang: 'ru', title: 'Russian' },
+      update: {},
+    });
+    const lesson = await instance.database.lesson.create({
+      data: {
+        curriculumId: curriculum.id,
+        slug: 'export-assessment',
+        level: 'A1',
+        order: 1,
+        title: 'First lesson',
+        objective: 'Greet',
+        grammarPoints: [],
+        targetVocab: [],
+        vocabThemes: [],
+      },
+    });
+    const course = await instance.database.course.create({
+      data: {
+        userId: identity.ownerId,
+        curriculumId: curriculum.id,
+        nativeLang: 'es',
+        targetLang: 'ru',
+      },
+    });
+    const cls = await instance.database.courseClass.create({
+      data: { courseId: course.id, lessonId: lesson.id, order: 1 },
+    });
+    const assessment = await instance.database.classAssessment.create({
+      data: {
+        classId: cls.id,
+        courseId: course.id,
+        userId: identity.ownerId,
+        classAttempt: 1,
+        assessmentAttempt: 1,
+        requirements: {},
+        formativeRevision: 'revision',
+        generationOperationId: 'transcript-assessment-operation',
+      },
+    });
+    await expect(
+      instance.database.classAssessmentSection.create({
+        data: {
+          assessmentId: assessment.id,
+          skill: 'LISTENING',
+          passThreshold: 0.7,
+          episodeId: ordinary.id,
+        },
+      })
+    ).rejects.toThrow('Assessment audio must match its creation reservation');
+    const section = await instance.database.classAssessmentSection.create({
+      data: { assessmentId: assessment.id, skill: 'LISTENING', passThreshold: 0.7 },
+    });
+    const episode = await instance.database.$transaction(async (tx) => {
+      const created = await tx.episode.create({
+        data: {
+          userId: identity.ownerId,
+          title: 'Assessment',
+          topic: 'Assessment',
+          status: 'READY',
+          visibility: 'UNLISTED',
+          assessmentAudioAssessmentId: assessment.id,
+          assessmentAudioSectionId: section.id,
+          assessmentAudioOperationId: 'transcript-assessment-operation',
+        },
+      });
+      await tx.classAssessmentSection.update({
+        where: { id: section.id },
+        data: {
+          episodeId: created.id,
+          audioReservationEpisodeId: created.id,
+          audioReservationOperationId: 'transcript-assessment-operation',
+        },
+      });
+      return created;
+    });
+    const viewer = await identity.household('Viewer');
+    const params = { params: Promise.resolve({ episodeId: episode.id }) };
+    for (const pdfUrl of [null, '/existing/private-transcript.md']) {
+      await instance.database.episode.update({ where: { id: episode.id }, data: { pdfUrl } });
+      for (const token of [identity.ownerToken, viewer.token]) {
+        for (const handler of [GET, POST]) {
+          const request = new NextRequest('http://localhost/api/v1/episodes/export', {
+            headers: { cookie: `${SHARED_SESSION_COOKIE}=${token}` },
+          });
+          const response = await handler(request, params);
+          expect(response.status).toBe(404);
+          expect(JSON.stringify(await response.json())).not.toContain('private-transcript');
+        }
+      }
+    }
+    const work = await sottoTransaction(instance.database, (tx) =>
+      readTranscriptExport(tx, pending.queued)
+    );
+    expect(work.complete).toBe(false);
+  });
   it('lets overlapping export jobs complete with one published reference', async () => {
     const episode = await source();
     const first = await admit(episode.id);

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma, prismaUnfiltered } from '@/lib/prisma';
+import { prismaUnfiltered } from '@/lib/prisma';
 import { authenticateRequest } from '@/lib/api-keys';
 import { updateEpisodeSchema } from '@/lib/validations';
 import { EPISODE_PUBLIC_SELECT } from '@/lib/episode-select';
@@ -7,93 +7,136 @@ import { resolveAudioUrl } from '@/lib/r2';
 import { generateEpisodeSlug } from '@/lib/slugify';
 import { errorResponse } from '@/lib/api-response';
 import { cache, getEpisodeCacheTtl, invalidateEpisodeCache } from '@/lib/redis';
+import { isAccessError } from 'thesidedoor-core/access';
+import type { Prisma } from '@/generated/prisma/client';
+import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
+import { requireOriginalSottoAdmission } from '@/lib/sidedoor/access/core/request-identity';
+import {
+  InteractionEpisodeNotFoundError,
+  readInteractionEpisode,
+} from '@/lib/sidedoor/jobs/interaction-access';
 type RouteParams = { params: Promise<{ episodeId: string }> };
+
+const episodeDetailSelect = {
+  ...EPISODE_PUBLIC_SELECT,
+  verificationProgress: true,
+  user: { select: { id: true, name: true, image: true } },
+  tags: { include: { tag: true } },
+  segments: { orderBy: { order: 'asc' } },
+  interactions: {
+    orderBy: { createdAt: 'desc' },
+    include: { user: { select: { id: true, name: true, image: true } } },
+  },
+} as const satisfies Prisma.EpisodeSelect;
+type EpisodeDetail = Prisma.EpisodeGetPayload<{ select: typeof episodeDetailSelect }>;
 
 export async function GET(request: NextRequest, { params }: RouteParams) {
   const { episodeId } = await params;
   const authResult = await authenticateRequest(request);
-
-  // Try Redis cache first (shared, non-user-specific data)
   const cacheKey = `episode:public:${episodeId}`;
-  let episode: Record<string, any> | null = await cache.get(cacheKey);
-  if (episode?.visibility !== 'UNLISTED') {
-    episode = null;
-  }
-
-  if (!episode) {
-    episode = await prisma.episode.findUnique({
-      where: { id: episodeId },
-      select: {
-        ...EPISODE_PUBLIC_SELECT,
-        verificationProgress: true,
-        user: { select: { id: true, name: true, image: true } },
-        tags: { include: { tag: true } },
-        segments: { orderBy: { order: 'asc' } },
-        interactions: {
-          orderBy: { createdAt: 'desc' },
-          include: {
-            user: { select: { id: true, name: true, image: true } },
+  const cached = await cache.get<EpisodeDetail>(cacheKey);
+  const headers = { 'Cache-Control': 'private, no-store' };
+  let result:
+    | { episode: EpisodeDetail; isSaved: boolean; failureReason: string | null; cacheHit: boolean }
+    | { error: string };
+  try {
+    result = await sottoTransaction(
+      prismaUnfiltered,
+      async (database) => {
+        if (authResult) await requireOriginalSottoAdmission(database, request, authResult);
+        await database.$queryRaw`SELECT id FROM "Episode" WHERE id = ${episodeId} FOR UPDATE`;
+        const current = await database.episode.findUnique({
+          where: { id: episodeId },
+          select: {
+            id: true,
+            userId: true,
+            visibility: true,
+            deletedAt: true,
+            status: true,
+            updatedAt: true,
+            currentVersion: true,
+            failureReason: true,
+            assessmentSection: { select: { id: true } },
+            assessmentAudioAssessmentId: true,
           },
-        },
+        });
+        if (!current || current.deletedAt) return { error: 'Episode not found' };
+        if (current.assessmentSection || current.assessmentAudioAssessmentId)
+          return { error: 'Not found' };
+        if (
+          current.visibility === 'PRIVATE' &&
+          (!authResult || authResult.userId !== current.userId)
+        )
+          return { error: 'Not found' };
+        const cacheHit =
+          !!cached &&
+          current.visibility === 'UNLISTED' &&
+          cached.visibility === 'UNLISTED' &&
+          cached.id === current.id &&
+          cached.userId === current.userId &&
+          cached.status === current.status &&
+          cached.currentVersion === current.currentVersion &&
+          new Date(cached.updatedAt).getTime() === current.updatedAt.getTime() &&
+          Array.isArray(cached.segments);
+        const episode = cacheHit
+          ? cached
+          : await database.episode.findUnique({
+              where: { id: episodeId },
+              select: episodeDetailSelect,
+            });
+        if (!episode) return { error: 'Episode not found' };
+        const isSaved =
+          !!authResult &&
+          !!(await database.save.findUnique({
+            where: { userId_episodeId: { userId: authResult.userId, episodeId } },
+          }));
+        if (authResult) await requireOriginalSottoAdmission(database, request, authResult);
+        request.signal.throwIfAborted();
+        return {
+          episode,
+          isSaved,
+          cacheHit,
+          failureReason:
+            authResult?.userId === current.userId && current.status === 'FAILED'
+              ? current.failureReason
+              : null,
+        };
       },
-    });
-
-    if (episode?.visibility === 'UNLISTED') {
-      const ttl = getEpisodeCacheTtl(episode.status);
-      await cache.set(cacheKey, episode, ttl);
-    }
+      { signal: request.signal }
+    );
+  } catch (error) {
+    if (isAccessError(error))
+      return errorResponse(
+        error.message,
+        error.code === 'unauthorized' ? 401 : 409,
+        undefined,
+        headers
+      );
+    throw error;
   }
-
-  if (!episode) {
-    return errorResponse('Episode not found', 404);
-  }
-
-  // Private episodes require ownership
-  if (episode.visibility === 'PRIVATE') {
-    if (!authResult || authResult.userId !== episode.userId) {
-      return errorResponse('Not found', 404);
-    }
-  }
-
-  // Per-user fields fetched separately (cheap, not cached)
-  let isSaved = false;
-
-  if (authResult) {
-    const save = await prisma.save.findUnique({
-      where: { userId_episodeId: { userId: authResult.userId, episodeId } },
-    });
-    isSaved = !!save;
-  }
-
-  // Resolve audio URLs: presigned for PRIVATE/UNLISTED, public CDN for PUBLIC
+  if ('error' in result) return errorResponse(result.error, 404, undefined, headers);
+  const { episode, isSaved, failureReason, cacheHit } = result;
+  if (!cacheHit && episode.visibility === 'UNLISTED')
+    await cache.set(cacheKey, episode, getEpisodeCacheTtl(episode.status));
   const [resolvedAudioUrl, resolvedSegments] = await Promise.all([
     resolveAudioUrl(episode.audioUrl),
     Promise.all(
-      episode.segments.map(async (s: Record<string, unknown>) => ({
+      episode.segments.map(async (s) => ({
         ...s,
-        audioUrl: await resolveAudioUrl(s.audioUrl as string | null),
+        audioUrl: await resolveAudioUrl(s.audioUrl),
       }))
     ),
   ]);
-
-  // Owner-only fields: fetch separately (cheap, not cached) so the shared
-  // public cache never leaks failure details to non-owners.
-  let failureReason: string | null = null;
-  if (authResult && authResult.userId === episode.userId && episode.status === 'FAILED') {
-    const ownerFields = await prisma.episode.findUnique({
-      where: { id: episodeId },
-      select: { failureReason: true },
-    });
-    failureReason = ownerFields?.failureReason ?? null;
-  }
-
-  return NextResponse.json({
-    ...episode,
-    audioUrl: resolvedAudioUrl,
-    segments: resolvedSegments,
-    isSaved,
-    ...(failureReason ? { failureReason } : {}),
-  });
+  return NextResponse.json(
+    {
+      ...episode,
+      audioUrl: resolvedAudioUrl,
+      segments: resolvedSegments,
+      isSaved,
+      ...(failureReason ? { failureReason } : {}),
+    },
+    { headers }
+  );
 }
 
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
@@ -104,45 +147,44 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     return errorResponse('Unauthorized', 401);
   }
 
-  const episode = await prisma.episode.findUnique({
-    where: { id: episodeId },
-    select: { userId: true },
-  });
-
-  if (!episode) {
-    return errorResponse('Episode not found', 404);
+  let updated;
+  try {
+    const result = await sottoTransaction(
+      prismaUnfiltered,
+      async (database) => {
+        await requireOriginalSottoAdmission(database, request, authResult);
+        const episode = await readInteractionEpisode(database, episodeId);
+        if (episode.userId !== authResult.userId)
+          return { error: 'Forbidden', status: 403 } as const;
+        const parsed = updateEpisodeSchema.safeParse(await request.clone().json());
+        if (!parsed.success) return { error: parsed.error.flatten(), status: 400 } as const;
+        const slugData = parsed.data.title
+          ? { slug: await generateEpisodeSlug(parsed.data.title, authResult.userId, database) }
+          : {};
+        const updated = await database.episode.update({
+          where: { id: episodeId },
+          data: { ...parsed.data, ...slugData },
+          select: {
+            ...EPISODE_PUBLIC_SELECT,
+            user: { select: { id: true, name: true, image: true } },
+            tags: { include: { tag: true } },
+          },
+        });
+        await requireOriginalSottoAdmission(database, request, authResult);
+        request.signal.throwIfAborted();
+        return { updated };
+      },
+      { signal: request.signal }
+    );
+    if (result.error !== undefined) return errorResponse(result.error, result.status);
+    updated = result.updated;
+  } catch (error) {
+    if (error instanceof InteractionEpisodeNotFoundError)
+      return errorResponse('Episode not found', 404);
+    if (isAccessError(error))
+      return errorResponse(error.message, error.code === 'unauthorized' ? 401 : 409);
+    throw error;
   }
-
-  if (episode.userId !== authResult.userId) {
-    return errorResponse('Forbidden', 403);
-  }
-
-  const body = await request.json();
-  const parsed = updateEpisodeSchema.safeParse(body);
-
-  if (!parsed.success) {
-    return errorResponse(parsed.error.flatten(), 400);
-  }
-
-  const updateData = parsed.data;
-
-  // Regenerate slug when title changes
-  const slugData = updateData.title
-    ? { slug: await generateEpisodeSlug(updateData.title, authResult.userId, prisma) }
-    : {};
-
-  const updated = await prisma.episode.update({
-    where: { id: episodeId },
-    data: {
-      ...updateData,
-      ...slugData,
-    },
-    select: {
-      ...EPISODE_PUBLIC_SELECT,
-      user: { select: { id: true, name: true, image: true } },
-      tags: { include: { tag: true } },
-    },
-  });
   await invalidateEpisodeCache(episodeId);
 
   return NextResponse.json(updated);
@@ -156,23 +198,31 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     return errorResponse('Unauthorized', 401);
   }
 
-  const episode = await prisma.episode.findUnique({
-    where: { id: episodeId },
-    select: { userId: true },
-  });
-
-  if (!episode) {
-    return errorResponse('Episode not found', 404);
+  try {
+    const result = await sottoTransaction(
+      prismaUnfiltered,
+      async (database) => {
+        await requireOriginalSottoAdmission(database, request, authResult);
+        const episode = await readInteractionEpisode(database, episodeId);
+        if (episode.userId !== authResult.userId) return false;
+        await database.episode.update({
+          where: { id: episodeId },
+          data: { deletedAt: new Date() },
+        });
+        await requireOriginalSottoAdmission(database, request, authResult);
+        request.signal.throwIfAborted();
+        return true;
+      },
+      { signal: request.signal }
+    );
+    if (!result) return errorResponse('Forbidden', 403);
+  } catch (error) {
+    if (error instanceof InteractionEpisodeNotFoundError)
+      return errorResponse('Episode not found', 404);
+    if (isAccessError(error))
+      return errorResponse(error.message, error.code === 'unauthorized' ? 401 : 409);
+    throw error;
   }
-
-  if (episode.userId !== authResult.userId) {
-    return errorResponse('Forbidden', 403);
-  }
-
-  await prismaUnfiltered.episode.update({
-    where: { id: episodeId },
-    data: { deletedAt: new Date() },
-  });
   await invalidateEpisodeCache(episodeId);
 
   return new NextResponse(null, { status: 204 });

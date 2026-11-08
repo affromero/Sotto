@@ -10,7 +10,10 @@ vi.mock('@/lib/providers/ai', () => ({
 }));
 vi.mock('@/lib/usage-logger', () => ({ logUsage: vi.fn() }));
 import { reviewObjectiveTasks } from '@/lib/learning-map/evidence/review';
-import { gradeProductiveObjective } from '@/lib/learning-map/evidence/productive';
+import {
+  buildProductiveTaskRequest,
+  gradeProductiveObjective,
+} from '@/lib/learning-map/evidence/productive';
 import { composeCommunicativeSpeakingPrompts } from '@/lib/learning-map/evidence/communicative-speaking';
 import { objectiveEvidenceHash } from '@/lib/learning-map/evidence/protocol';
 import { assessmentFixture } from './evidence-fixtures';
@@ -152,6 +155,17 @@ describe('criterion-specific productive grading', () => {
     expect(
       await gradeProductiveObjective({ userId: 'user-1', execution, assessment: assessed, text })
     ).toMatchObject({ finding: { quality: 0.6, responseSha256: objectiveEvidenceHash({ text }) } });
+    const request = buildProductiveTaskRequest({
+      task: assessed.task,
+      rubric: assessed.criterion,
+      taskFingerprint: assessed.taskFingerprint,
+      text,
+    });
+    expect(boundary.respond.mock.calls[0]).toEqual([
+      request.system,
+      request.messages,
+      request.options,
+    ]);
   });
   it('rejects hallucinated response quotes despite a positive reported score', async () => {
     const assessed = assessmentFixture('WRITING');

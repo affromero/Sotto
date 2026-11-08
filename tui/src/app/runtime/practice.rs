@@ -212,9 +212,12 @@ impl App {
                 self.render();
             }
             SpeakingPhase::Recording => self.stop_and_upload(),
-            // Upload/poll already in flight: ignore further toggles.
+            SpeakingPhase::Polling { recording_id } => {
+                self.poll_grade(recording_id, self.request_gen);
+            }
+            // An unresolved upload must not start another recording.
             SpeakingPhase::Uploading
-            | SpeakingPhase::Polling { .. }
+            | SpeakingPhase::Unresolved { .. }
             | SpeakingPhase::UnknownUpload { .. } => {}
         }
     }
@@ -634,12 +637,9 @@ impl App {
                 }
             }
             Err(message) => {
-                if let View::SpeakingReview { phase, .. } = &mut self.view {
-                    *phase = SpeakingPhase::Failed {
-                        message: message.clone(),
-                    };
-                }
-                self.status_bar.set_error(message.clone());
+                self.status_bar.set_error(format!(
+                    "Could not check this recording. Press r to check again. {message}"
+                ));
             }
         }
         self.render();

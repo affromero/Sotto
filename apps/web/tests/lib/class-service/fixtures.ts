@@ -121,6 +121,7 @@ const mockCourseClassCreate = vi.fn();
 const mockCourseClassUpdate = vi.fn();
 const mockCourseClassDelete = vi.fn();
 const mockClassSectionCreate = vi.fn();
+const mockClassSectionFindMany = vi.fn().mockResolvedValue([]);
 const mockClassSectionUpdate = vi.fn();
 const mockClassSectionDeleteMany = vi.fn();
 const mockLessonQuestionCreate = vi.fn();
@@ -141,6 +142,8 @@ export const mockLearnerVocabFindMany = vi
 
 vi.mock('@/lib/prisma', () => {
   const database = {
+    classAssessment: { findFirst: async () => null },
+    $queryRawUnsafe: async () => [],
     episode: { updateMany: (...args: unknown[]) => mockEpisodeUpdateMany(...args) },
     $queryRaw: async (query: TemplateStringsArray, ...values: unknown[]) => {
       const materials = (await mockCourseMaterialRows()) as Array<{
@@ -228,6 +231,7 @@ vi.mock('@/lib/prisma', () => {
               skill,
               status: 'READY',
               attempt: 1,
+              withdrawn: false,
               spec:
                 skill === 'LISTENING'
                   ? { scriptHash: learningScriptHash([{ speaker: 'Ana', text: 'Hola.' }]) }
@@ -283,6 +287,7 @@ vi.mock('@/lib/prisma', () => {
       delete: (...args: unknown[]) => mockCourseClassDelete(...args),
     },
     classSection: {
+      findMany: (...args: unknown[]) => mockClassSectionFindMany(...args),
       create: (...args: unknown[]) => mockClassSectionCreate(...args),
       update: (...args: unknown[]) => mockClassSectionUpdate(...args),
       deleteMany: (...args: unknown[]) => mockClassSectionDeleteMany(...args),
@@ -363,6 +368,10 @@ const mockEnsureCurriculumHasLevelLessons = vi.fn();
 
 vi.mock('@/lib/class-generation', () => ({
   generateSectionQuestions: (...args: unknown[]) => mockGenerateSectionQuestions(...args),
+  requireInitialA1SectionReview: () => undefined,
+  bindInitialA1SectionReview: () => ({}),
+  sealInitialA1SectionReviews: () => undefined,
+  materializeInitialA1SectionReviews: () => [],
 }));
 
 vi.mock('@/lib/classes/class-intro', () => ({
@@ -392,14 +401,17 @@ vi.mock('@/lib/class-listening-generator', async (importOriginal) => ({
     content: { episodeId: 'episode-listening', turns: [], comprehensionQuestions: [] },
   }),
   queueListeningAudio: (...args: unknown[]) => mockQueueListeningAudio(...args),
+  sealInitialA1ListeningReview: vi.fn(),
 }));
 
 vi.mock('@/lib/class-speaking-generator', () => ({
   generateClassSpeaking: (...args: unknown[]) => mockGenerateClassSpeaking(...args),
+  sealInitialA1SpeakingReview: vi.fn(),
 }));
 
 vi.mock('@/lib/class-writing-generator', () => ({
   generateClassWriting: (...args: unknown[]) => mockGenerateClassWriting(...args),
+  sealInitialA1WritingReview: vi.fn(),
 }));
 
 vi.mock('@/lib/course-notes', async (importOriginal) => ({
@@ -501,6 +513,7 @@ export {
   mockCourseClassUpdate,
   mockCourseClassDelete,
   mockClassSectionCreate,
+  mockClassSectionFindMany,
   mockClassSectionUpdate,
   mockClassSectionDeleteMany,
   mockLessonQuestionCreate,

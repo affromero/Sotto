@@ -1,7 +1,7 @@
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { StorageReadCleanupError } from 'thesidedoor-core/storage';
+import { isJobExecutionCleanupFailure } from 'thesidedoor-core/runtime/outbox';
 import { prismaUnfiltered as prisma } from '../../prisma';
 import { sottoTransaction } from '../../sidedoor/access/state/transaction';
 import { captureCourseStorage } from '../../sidedoor/storage/core/course-storage';
@@ -89,7 +89,7 @@ export async function readVocabularyAudio(
     });
     return { bytes, mime: detectAudioFormat(bytes).mime };
   } catch (error) {
-    cleanupUnconfirmed = error instanceof StorageReadCleanupError;
+    cleanupUnconfirmed = isJobExecutionCleanupFailure(error);
     throw error;
   } finally {
     if (!cleanupUnconfirmed) await rm(directory, { recursive: true, force: true });

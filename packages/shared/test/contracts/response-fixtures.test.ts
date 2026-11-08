@@ -188,11 +188,12 @@ describe('response schemas accept representative payloads', () => {
     expect(
       speakingPollResponseSchema.parse({
         status: 'SCORED',
+        recordingId: 'recording-1',
         overallScore: 0.87,
         transcript: 'Hola, ¿qué tal?',
         feedback: 'Great rhythm; soften the final vowel.',
       })
-    ).toBeTruthy();
+    ).toMatchObject({ recordingId: 'recording-1' });
   });
 
   it('episode/segment schemas accept the route superset (loose)', () => {
@@ -599,5 +600,19 @@ describe('response schemas accept representative payloads', () => {
         createdAt: '2026-06-13T00:00:00.000Z',
       })
     ).toBeTruthy();
+  });
+
+  it('rejects unknown interaction states', () => {
+    expect(() =>
+      interactionResponseSchema.parse({
+        id: 'int-1',
+        question: 'What does casa mean?',
+        timestamp: 0,
+        status: 'UNKNOWN',
+        answer: null,
+        helpful: null,
+        segmentOrder: null,
+      })
+    ).toThrow();
   });
 });

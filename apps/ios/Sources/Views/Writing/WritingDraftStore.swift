@@ -28,6 +28,7 @@ final class WritingDraftStore: ObservableObject {
     @Published private(set) var drafts: [String: Draft] = [:]
     @Published private(set) var isSubmitting = false
     @Published private(set) var errorMessage: String?
+    private(set) var operationGeneration = 0
 
     /// Seeds a prompt's draft from whatever the server already graded. Called
     /// as cards appear; an existing draft is left alone so re-rendering never
@@ -132,6 +133,7 @@ final class WritingDraftStore: ObservableObject {
             : changedPromptIds
         guard !ids.isEmpty else { return true }
 
+        operationGeneration += 1
         isSubmitting = true
         errorMessage = nil
         defer { isSubmitting = false }

@@ -14,8 +14,10 @@ struct PracticeStartView: View {
     @State private var vocabularyBlocksDismissal = false
     @State private var vocabularyCloseError: String?
     @State private var vocabularyDraftDurable = true
+    @State private var recoveryInProgress = false
     @State private var submittedAnswers: [String: Int] = [:]
     @ObservedObject var drafts: WritingDraftStore
+    var activityOwner: SottoLearnerIdentity? = nil
 
     private var currentStart: SottoPracticeStart {
         model.practiceStart?.sessionId == start.sessionId ? (model.practiceStart ?? start) : start
@@ -140,13 +142,18 @@ struct PracticeStartView: View {
             }
             .interactiveDismissDisabled(currentStart.isVocabularyStudy)
         }
+        .disabled(recoveryInProgress)
     }
 
     /// The one place this sheet submits from. It sends the multiple-choice
     /// answers that moved and the writing drafts that were edited, nothing else.
     private var submitBar: some View {
         VStack(alignment: .leading, spacing: 10) {
-            LearningSaveFailureView(progress: progress)
+            LearningSaveFailureView(progress: progress, discardAndReload: {
+                recoveryInProgress = true
+                defer { recoveryInProgress = false }
+                try await model.reloadPracticeDiscardingLocalEdits(sessionId: start.sessionId, progress: progress)
+            })
             if let message = drafts.errorMessage {
                 Text(message)
                     .font(.caption)
@@ -308,7 +315,8 @@ struct PracticeStartView: View {
             if let speakingPrompts = currentStart.speakingPrompts, !speakingPrompts.isEmpty {
                 ClassSpeakingPracticeView(
                     source: .practice(sessionId: start.sessionId),
-                    prompts: speakingPrompts
+                    prompts: speakingPrompts,
+                    activityOwner: activityOwner
                 )
             }
 

@@ -9,7 +9,7 @@ import {
   preparationProgress,
   readPreparationActivity,
 } from '@/lib/classes/preparation';
-import { currentClassSections } from '@/lib/learning/classes/current-sections';
+import { currentClassSections } from '@/lib/learning/classes/progress/current-sections';
 import { readSkillRequirements } from '@/lib/learning/skill-requirements';
 import { sottoRequestExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import { PreparationConflictError } from '@/lib/classes/preparation-state';
@@ -192,6 +192,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
             select: {
               skill: true,
               attempt: true,
+              withdrawn: true,
               status: true,
               updatedAt: true,
               episode: { select: { status: true, audioUrl: true, updatedAt: true } },

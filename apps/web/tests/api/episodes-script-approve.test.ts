@@ -150,6 +150,19 @@ describe('POST /api/v1/episodes/[episodeId]/script/approve', () => {
     expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
+  it('does not start ordinary audio generation for an assessment episode', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockEpisodeFindUnique.mockResolvedValue({
+      userId: 'user-1',
+      status: 'SCRIPT_READY',
+      assessmentSection: { id: 'assessment-section' },
+    });
+    const response = await POST(createRequest(), await createParams('pod-1'));
+    expect(response.status).toBe(404);
+    expect(mockEpisodeUpdateMany).not.toHaveBeenCalled();
+    expect(mockCreateSegmentsAndQueueAudio).not.toHaveBeenCalled();
+  });
+
   it('returns 401 when session has no user id', async () => {
     mockAuthenticateRequest.mockResolvedValue(null);
 

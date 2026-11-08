@@ -1,19 +1,29 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { LearningSaveRecovery } from './progress/LearningSaveRecovery';
+import { classFocusSnapshotSchema } from '@sotto/shared';
+import { LearningSaveRecovery, RetainedClassWork } from './progress/LearningSaveRecovery';
 import {
+  classProgressBlocked,
   flushLearningProgress,
+  pauseClassLearningProgress,
   retainedLearningProgress,
   useLearningProgress,
 } from './progress/useLearningProgress';
 import { useRouter } from 'next/navigation';
 import { SottoSpinner } from '@/components/ui/SottoSpinner';
-import { ClassGlyph } from './ClassGlyph';
+import { HubRail, TimelineRail } from './navigation/ClassRails';
+import { ClassLoadingState, ClassErrorState, ClassRecoveryState } from './recovery/ClassShellState';
 import { ClassHub } from './ClassHub';
 import { ClassNavigation } from './navigation/ClassNavigation';
 import { ClassTeachingNotes } from './lesson/ClassTeachingNotes';
+import { ClassTeachingPrelude } from './lesson/ClassTeachingPrelude';
+import { useClassPrelude } from './lesson/ClassPreludeContext';
+import { classFocusAuthorizationMatches } from './lesson/classFocusAuthorization';
+import type { ClassPrerequisiteDirections } from './lesson/prerequisiteTypes';
 import { ClassSummary, FeedbackClinic } from './ClassSummary';
+import { ClassAssessment } from './assessment/ClassAssessment';
+import { clearConfirmedAssessmentWork } from './assessment/assessment-retention';
 import { GrammarSection } from './GrammarSection';
 import { ListeningSection } from './ListeningSection';
 import { SpeakingSection } from './SpeakingSection';
@@ -24,7 +34,6 @@ import {
   type ClassRefreshOptions,
 } from './recovery/classRefresh';
 import {
-  SKILL_GLYPH,
   skillLabel,
   classRefToReferenceData,
   classPresentationIssues,
@@ -38,12 +47,14 @@ import {
 } from './classTypes';
 import styles from './ClassShell.module.css';
 
-type View = 'loading' | 'error' | 'hub' | 'hour' | 'submitting' | 'summary';
+type View = 'loading' | 'error' | 'hub' | 'hour' | 'submitting' | 'assessment' | 'summary';
 
 interface ClassShellProps {
   classId: string;
   initialSectionId?: string;
 }
+
+class ClassLoadSuperseded extends Error {}
 
 /** Order the sections so the hour runs grammar → reading → listening → speaking → writing. */
 const SKILL_ORDER: Record<string, number> = {
@@ -58,14 +69,6 @@ function orderSections(sections: ClassSection[]): ClassSection[] {
   return [...sections].sort((a, b) => (SKILL_ORDER[a.skill] ?? 99) - (SKILL_ORDER[b.skill] ?? 99));
 }
 
-function shouldReturnToLearn(errorMessage: string): boolean {
-  return errorMessage.includes('required material was ready');
-}
-
-function canExplicitlyRegenerate(errorMessage: string): boolean {
-  return errorMessage.includes('missing required presentation material');
-}
-
 function isClassPresentationStillRendering(cls: ClassData): boolean {
   const listening = cls.sections.find((section) => section.skill === 'LISTENING');
   const episode = listening?.episode;
@@ -75,10 +78,37 @@ function isClassPresentationStillRendering(cls: ClassData): boolean {
 }
 
 export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
+  return (
+    <ClassTeachingPrelude key={classId} classId={classId} quarantineOnEntry>
+      <ClassShellContent classId={classId} initialSectionId={initialSectionId} />
+    </ClassTeachingPrelude>
+  );
+}
+
+function ClassShellContent({ classId, initialSectionId }: ClassShellProps) {
   const router = useRouter();
+  const prelude = useClassPrelude();
   const [view, setView] = useState<View>('loading');
   const [cls, setCls] = useState<ClassData | null>(null);
+  useEffect(() => {
+    if (!cls?.submitted || !cls.attempt || cls.submission?.receipt?.source !== 'ASSESSMENT') return;
+    const controller = new AbortController();
+    void clearConfirmedAssessmentWork({
+      classId,
+      attempt: cls.attempt,
+      receipt: cls.submission.receipt,
+      signal: controller.signal,
+    });
+    return () => controller.abort();
+  }, [classId, cls?.attempt, cls?.submitted, cls?.submission?.receipt]);
+  const initialClassLoaded = useRef(false);
+  const classLoadGeneration = useRef(0);
+  const cancelClassLoad = useRef<(() => void) | null>(null);
+  const classLifetime = useRef<AbortController | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
+  const [, setRecoveryVersion] = useState(0);
+  const [prerequisiteDirections, setPrerequisiteDirections] =
+    useState<ClassPrerequisiteDirections | null>(null);
 
   const [segIdx, setSegIdx] = useState(0);
   // running 0..100 score for the active segment (drives the rail + gate)
@@ -97,7 +127,20 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
     { answers },
     Boolean(cls && !cls.submitted),
     cls?.progressRevision ?? 0,
-    String(cls?.attempt ?? 1)
+    String(cls?.attempt ?? 1),
+    cls?.attempt && cls.taskMaterialRevision
+      ? { expectedAttempt: cls.attempt, taskMaterialRevision: cls.taskMaterialRevision }
+      : null,
+    Object.fromEntries(
+      (cls?.sections ?? []).flatMap((section) =>
+        section.questions.flatMap((question) => {
+          const option = question.options[answers[question.id]];
+          return option === undefined
+            ? []
+            : [[question.id, { question: question.question, option }]];
+        })
+      )
+    )
   );
   const [feedbackNotes, setFeedbackNotes] = useState<ClassFeedbackNote[]>([]);
   const [liveSpeakingRecordings, setLiveSpeakingRecordings] = useState<
@@ -161,15 +204,80 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
   }, []);
 
   const fetchClassData = useCallback(async (): Promise<ClassData> => {
-    const res = await fetch(`/api/v1/classes/${classId}`);
-    if (res.status === 404) {
-      throw new Error('Class not found.');
+    const endpoint = `/api/v1/classes/${classId}`;
+    cancelClassLoad.current?.();
+    const generation = ++classLoadGeneration.current;
+    const controller = new AbortController();
+    const signal = controller.signal;
+    const timeout = setTimeout(
+      () => controller.abort(new Error('Class status check timed out.')),
+      30_000
+    );
+    const checkCurrent = () => {
+      if (classLoadGeneration.current !== generation) throw new ClassLoadSuperseded();
+      signal.throwIfAborted();
+    };
+    const hold =
+      prelude && !initialClassLoaded.current ? pauseClassLearningProgress(endpoint) : null;
+    let finished = false;
+    const cancel = () => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timeout);
+      controller.abort();
+      hold?.();
+      if (cancelClassLoad.current === cancel) cancelClassLoad.current = null;
+    };
+    cancelClassLoad.current = cancel;
+    try {
+      const res = await fetch(endpoint, { cache: 'no-store', signal });
+      checkCurrent();
+      if (res.status === 404) throw new Error('Class not found.');
+      if (!res.ok) throw new Error('Failed to load class. Please refresh.');
+      const data = (await res.json()) as ClassData;
+      checkCurrent();
+      if (data.id !== classId)
+        throw new Error('Class status could not be verified. Your local work is retained.');
+      if (!hold || !prelude || data.status === 'GENERATING') return data;
+      const response = await fetch(`${endpoint}/focus-snapshot`, {
+        cache: 'no-store',
+        signal,
+      });
+      checkCurrent();
+      if (!response.ok)
+        throw new Error('Class status could not be checked. Your local work is retained.');
+      const snapshot = classFocusSnapshotSchema.parse(await response.json());
+      checkCurrent();
+      const binding = {
+        classId: data.id,
+        attempt: data.attempt,
+        taskMaterialRevision: data.taskMaterialRevision,
+        replay: prelude.kind === 'REPLAY',
+      };
+      if (
+        !classFocusAuthorizationMatches({
+          binding,
+          originalPrelude: prelude,
+          currentPrelude: snapshot.prelude,
+          currentProgress: snapshot.progress,
+        })
+      )
+        throw new Error(
+          'The class changed. Copy any retained work, then return to Learn and reopen the class.'
+        );
+      if (prelude.kind !== 'REPLAY' && data.attempt && data.taskMaterialRevision)
+        hold.verify({
+          expectedAttempt: data.attempt,
+          taskMaterialRevision: data.taskMaterialRevision,
+        });
+      return data;
+    } catch (error) {
+      if (classLoadGeneration.current !== generation) throw new ClassLoadSuperseded();
+      throw error;
+    } finally {
+      cancel();
     }
-    if (!res.ok) {
-      throw new Error('Failed to load class. Please refresh.');
-    }
-    return (await res.json()) as ClassData;
-  }, [classId]);
+  }, [classId, prelude]);
 
   const regenerateWholeClass = useCallback(async () => {
     const res = await fetch(`/api/v1/classes/${classId}?background=1`, {
@@ -185,30 +293,36 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
 
   const applyLoadedClass = useCallback(
     (data: ClassData) => {
+      initialClassLoaded.current = true;
       setCls(data);
       setAnswers(
         retainedLearningProgress(
           `/api/v1/classes/${classId}`,
           { answers: data.learnerAnswers ?? {} },
           data.progressRevision ?? 0,
-          String(data.attempt ?? 1)
+          String(data.attempt ?? 1),
+          data.attempt && data.taskMaterialRevision
+            ? { expectedAttempt: data.attempt, taskMaterialRevision: data.taskMaterialRevision }
+            : null
         ).answers ?? {}
       );
       const ordered = orderSections(data.sections);
 
       if (data.submitted && data.submission) {
-        setResult({
-          passed: data.submission.passed,
-          overallScore: data.submission.overallScore,
-          passedSections: ordered.filter((s) => s.passed).length,
-          totalSections: ordered.length,
-          sections: ordered.map((s) => ({
-            id: s.id,
-            skill: s.skill,
-            score: s.score ?? 0,
-            passed: s.passed ?? false,
-          })),
-        });
+        setResult(
+          data.submission.receipt ?? {
+            passed: data.submission.passed,
+            overallScore: data.submission.overallScore,
+            passedSections: ordered.filter((s) => s.passed).length,
+            totalSections: ordered.length,
+            sections: ordered.map((s) => ({
+              id: s.id,
+              skill: s.skill,
+              score: s.score ?? 0,
+              passed: s.passed ?? false,
+            })),
+          }
+        );
         setView('summary');
         return;
       }
@@ -232,42 +346,56 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
     [fetchClassData]
   );
 
-  const loadClass = useCallback(async () => {
-    try {
-      let data = await fetchClassData();
+  const loadClass = useCallback(
+    async (signal = classLifetime.current?.signal) => {
+      try {
+        let data = await fetchClassData();
+        signal?.throwIfAborted();
 
-      if (
-        !data.submitted &&
-        (data.status === 'GENERATING' || isClassPresentationStillRendering(data))
-      ) {
-        setAutoRefreshing(true);
-        setView('loading');
-        resetClassProgress();
-        data = await waitForClassRefresh();
-      }
+        if (
+          !data.submitted &&
+          (data.status === 'GENERATING' || isClassPresentationStillRendering(data))
+        ) {
+          setAutoRefreshing(true);
+          setView('loading');
+          resetClassProgress();
+          data = await waitForClassRefresh({ signal });
+        }
+        signal?.throwIfAborted();
 
-      const remainingIssues = !data.submitted ? classPresentationIssues(data) : [];
-      if (remainingIssues.length > 0) {
-        setErrorMessage(
-          `This class is missing required presentation material: ${remainingIssues.join(' ')}`
-        );
+        const remainingIssues = !data.submitted ? classPresentationIssues(data) : [];
+        if (remainingIssues.length > 0) {
+          setErrorMessage(
+            `This class is missing required presentation material: ${remainingIssues.join(' ')}`
+          );
+          setView('error');
+          return;
+        }
+
+        applyLoadedClass(data);
+      } catch (error) {
+        if (error instanceof ClassLoadSuperseded || signal?.aborted) return;
+        setErrorMessage(error instanceof Error ? error.message : 'Network error. Please refresh.');
         setView('error');
-        return;
+      } finally {
+        setAutoRefreshing(false);
       }
-
-      applyLoadedClass(data);
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Network error. Please refresh.');
-      setView('error');
-    } finally {
-      setAutoRefreshing(false);
-    }
-  }, [applyLoadedClass, fetchClassData, resetClassProgress, waitForClassRefresh]);
+    },
+    [applyLoadedClass, fetchClassData, resetClassProgress, waitForClassRefresh]
+  );
 
   useEffect(() => {
+    const lifetime = new AbortController();
+    classLifetime.current = lifetime;
     void (async () => {
-      await loadClass();
+      await loadClass(lifetime.signal);
     })();
+    return () => {
+      lifetime.abort();
+      if (classLifetime.current === lifetime) classLifetime.current = null;
+      classLoadGeneration.current += 1;
+      cancelClassLoad.current?.();
+    };
   }, [loadClass]);
 
   function commit(sectionId: string, value: number) {
@@ -343,6 +471,15 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
     }));
 
     try {
+      if (prelude?.kind === 'BASE' || prelude?.kind === 'ADDENDUM') {
+        await flushLearningProgress(
+          `/api/v1/classes/${classId}`,
+          String(cls.attempt ?? 1),
+          cls.progressRevision ?? 0
+        );
+        setView('assessment');
+        return;
+      }
       const res = await fetch(`/api/v1/classes/${classId}/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -405,6 +542,7 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
   }
 
   async function handleRetrySection() {
+    const lifetime = classLifetime.current?.signal;
     const section = sections[segIdx];
     if (!cls || !section || retryInFlight.current) return;
     retryInFlight.current = true;
@@ -464,6 +602,7 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
             item.attempt > section.attempt
         );
       const data = await waitForClassRefresh({
+        signal: lifetime,
         isExpectedMaterial: (candidate) =>
           (candidate.attempt ?? 1) > (cls.attempt ?? 1) && Boolean(replacementIn(candidate)),
         operation: { id: accepted.operationId, courseId: cls.courseId, onStopped: applyMaterial },
@@ -490,13 +629,14 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
   }
 
   async function handleRegenerateClass() {
+    const lifetime = classLifetime.current?.signal;
     setRegenerating(true);
     setErrorMessage('');
     try {
       await regenerateWholeClass();
       resetClassProgress();
       setView('loading');
-      const data = await waitForClassRefresh();
+      const data = await waitForClassRefresh({ signal: lifetime });
       applyLoadedClass(data);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Network error. Please try again.');
@@ -518,64 +658,38 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
         ? Math.round(((committedCount + activeSectionProgress) / sections.length) * 100)
         : 0;
 
-  // ---- loading / error ----
-  if (view === 'loading') {
+  if (view === 'loading') return <ClassLoadingState autoRefreshing={autoRefreshing} />;
+  if (view === 'error' || !cls) {
     return (
-      <div className={styles.stateShell}>
-        <ClassNavigation currentSection="Loading class" />
-        <div className={styles.fullState} role="status" aria-label="Loading class">
-          <SottoSpinner
-            size="large"
-            label={autoRefreshing ? 'Preparing this class' : 'Loading your class'}
-            orientation="stack"
-          />
-        </div>
-      </div>
+      <ClassErrorState
+        classId={classId}
+        errorMessage={errorMessage}
+        regenerating={regenerating}
+        onRegenerate={() => void handleRegenerateClass()}
+        onBack={() => router.push('/learn')}
+        onRetry={() => {
+          setView('loading');
+          setErrorMessage('');
+          void loadClass();
+        }}
+      />
     );
   }
 
-  if (view === 'error' || !cls) {
-    const returnToLearn = shouldReturnToLearn(errorMessage);
-    const canRegenerate = canExplicitlyRegenerate(errorMessage);
-    const backToLearn = returnToLearn || canRegenerate;
-
+  const classEndpoint = `/api/v1/classes/${classId}`;
+  const classAttempt = String(cls.attempt ?? 1);
+  if (classProgressBlocked(classEndpoint, classAttempt)) {
     return (
-      <div className={styles.stateShell}>
-        <ClassNavigation currentSection="Class unavailable" />
-        <div className={styles.fullState} role="alert">
-          <p>{errorMessage || 'An unexpected error occurred.'}</p>
-          {canRegenerate ? (
-            <button
-              type="button"
-              className={styles.retryBtn}
-              onClick={() => void handleRegenerateClass()}
-              disabled={regenerating}
-              aria-busy={regenerating}
-            >
-              {regenerating ? 'Regenerating...' : 'Regenerate class'}
-            </button>
-          ) : null}
-          <button
-            type="button"
-            className={styles.retryBtn}
-            onClick={() => {
-              if (backToLearn) {
-                router.push('/learn');
-                return;
-              }
-              setView('loading');
-              setErrorMessage('');
-              void loadClass();
-            }}
-          >
-            {returnToLearn
-              ? 'View progress in Learn'
-              : canRegenerate
-                ? 'Back to Learn'
-                : 'Try again'}
-          </button>
-        </div>
-      </div>
+      <ClassRecoveryState
+        endpoint={classEndpoint}
+        attempt={classAttempt}
+        saveError={saveError}
+        onArchived={() => setRecoveryVersion((value) => value + 1)}
+        onRetry={() => {
+          setView('loading');
+          void loadClass();
+        }}
+      />
     );
   }
 
@@ -604,6 +718,12 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
         sourceTitle={cls.sourceTitle}
       />
     ) : null;
+  const currentDirections =
+    prerequisiteDirections?.classId === classId &&
+    prerequisiteDirections.classId === cls.id &&
+    prerequisiteDirections.sourceHash === cls.prerequisiteSourceHash
+      ? prerequisiteDirections
+      : null;
 
   if (view === 'hub') {
     stage = (
@@ -614,8 +734,20 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
           lesson={cls.lesson}
           intro={cls.intro}
           teaching={cls.teaching}
+          prerequisiteSourceHash={cls.prerequisiteSourceHash}
+          lessonHelpRevision={cls.lessonHelpRevision}
+          prerequisiteDirections={currentDirections}
+          onDirectionsChange={setPrerequisiteDirections}
           order={cls.order}
           sections={sections}
+          writingHistory={cls.writingHistory}
+          speakingHistory={cls.speakingHistory}
+          speakingHistoryUnlinked={cls.speakingHistoryUnlinked}
+          orphanWritingDrafts={cls.orphanWritingDrafts}
+          quizHistory={cls.quizHistory}
+          orphanQuizAnswers={cls.orphanQuizAnswers}
+          quizHistoryUnreadable={cls.quizHistoryUnreadable}
+          quizSubmissionReceipts={cls.quizSubmissionReceipts}
           scores={scores}
           started={startedHour}
           regenerating={regenerating}
@@ -641,6 +773,32 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
         {sourcesPanel}
       </>
     );
+  } else if (view === 'assessment') {
+    stage = (
+      <ClassAssessment
+        classId={classId}
+        classAttempt={cls.attempt ?? 1}
+        onBack={() => setView('hour')}
+        onComplete={(receipt) => {
+          setResult(receipt);
+          setCls((previous) =>
+            previous
+              ? {
+                  ...previous,
+                  submitted: true,
+                  status: receipt.passed ? 'PASSED' : 'FAILED',
+                  submission: {
+                    passed: receipt.passed,
+                    overallScore: receipt.overallScore,
+                    receipt,
+                  },
+                }
+              : previous
+          );
+          setView('summary');
+        }}
+      />
+    );
   } else if (view === 'submitting') {
     stage = (
       <div className={styles.stageState} role="status" aria-label="Submitting answers">
@@ -658,6 +816,7 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
             sourceId={seg.id}
             skill={seg.skill}
             questions={seg.questions}
+            prerequisiteDirections={currentDirections}
             savedAnswers={answers}
             gate={gate}
             nextName={nextName}
@@ -680,6 +839,7 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
             sourceId={seg.id}
             episode={seg.episode}
             questions={seg.questions}
+            prerequisiteDirections={currentDirections}
             savedAnswers={answers}
             gate={gate}
             nextName={nextName}
@@ -698,7 +858,14 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
           <SpeakingSection
             key={seg.id}
             endpointBase={`/api/v1/classes/${classId}/speaking`}
+            classBinding={
+              cls.attempt && cls.taskMaterialRevision
+                ? { expectedAttempt: cls.attempt, taskMaterialRevision: cls.taskMaterialRevision }
+                : null
+            }
             prompts={seg.prompts}
+            sectionId={seg.id}
+            prerequisiteDirections={currentDirections}
             gate={gate}
             nextName={nextName}
             onScore={setCurScore}
@@ -714,7 +881,10 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
             classId={classId}
             progressRevision={cls?.progressRevision ?? 0}
             attempt={cls?.attempt ?? 1}
+            taskMaterialRevision={cls?.taskMaterialRevision ?? null}
             prompts={seg.writingPrompts}
+            sectionId={seg.id}
+            prerequisiteDirections={currentDirections}
             gate={gate}
             nextName={nextName}
             onScore={setCurScore}
@@ -735,11 +905,13 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
         currentSection={
           view === 'hour' && activeSection
             ? skillLabel(activeSection.skill)
-            : view === 'summary'
-              ? 'Class results'
-              : view === 'submitting'
-                ? 'Grading class'
-                : 'Lesson overview'
+            : view === 'assessment'
+              ? 'Independent assessment'
+              : view === 'summary'
+                ? 'Class results'
+                : view === 'submitting'
+                  ? 'Grading class'
+                  : 'Lesson overview'
         }
         onOverview={view === 'hour' ? () => setView('hub') : undefined}
         busy={regenerating}
@@ -776,6 +948,7 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
 
       <main className={styles.cstage}>
         <div className={styles.cstageInner}>
+          <RetainedClassWork endpoint={classEndpoint} attempt={classAttempt} />
           {saveError && (
             <LearningSaveRecovery
               endpoint={`/api/v1/classes/${classId}`}
@@ -796,6 +969,10 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
                 courseId={cls.courseId}
                 intro={cls.intro}
                 teaching={cls.teaching}
+                prerequisiteSourceHash={cls.prerequisiteSourceHash}
+                lessonHelpRevision={cls.lessonHelpRevision}
+                prerequisiteDirections={currentDirections}
+                onDirectionsChange={setPrerequisiteDirections}
                 collapsible
               />
             )}
@@ -819,166 +996,5 @@ export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
         </div>
       </main>
     </div>
-  );
-}
-
-// ---- rail: hub mode (level + progress) ----
-
-interface HubRailProps {
-  level: string;
-  sections: ClassSection[];
-  scores: Record<string, number>;
-  completionPct: number;
-}
-
-function HubRail({ level, sections, scores, completionPct }: HubRailProps) {
-  return (
-    <>
-      <nav className={styles.cnav} aria-label="Class sections">
-        <p className={styles.cnavItem} aria-current="step">
-          Lesson overview
-        </p>
-        {sections.map((s) => {
-          const done = (scores[s.id] ?? 0) > 0;
-          return (
-            <div className={styles.cnavItem} key={s.id}>
-              <span className={styles.cnavIco}>
-                <ClassGlyph name={done ? 'check' : (SKILL_GLYPH[s.skill] ?? 'gate')} size={18} />
-              </span>
-              {skillLabel(s.skill)}
-            </div>
-          );
-        })}
-      </nav>
-
-      <div className={styles.crailFoot}>
-        <div className={styles.crailDiv} />
-        <div className={styles.lvlStrip}>
-          <div className={styles.lvlTop}>
-            <span>Class completion</span>
-            <span>
-              <b>{completionPct}%</b>
-            </span>
-          </div>
-          <div
-            className={styles.lvlBar}
-            role="progressbar"
-            aria-label="Class completion"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={completionPct}
-          >
-            <i style={{ width: `${completionPct}%` }} />
-          </div>
-          <div className={styles.lvlNote}>{level} · one rung above your reach</div>
-        </div>
-      </div>
-    </>
-  );
-}
-
-// ---- rail: hour / summary mode (timeline) ----
-
-interface TimelineRailProps {
-  sections: ClassSection[];
-  segIdx: number;
-  scores: Record<string, number>;
-  curScore: number;
-  completionPct: number;
-  gate: number;
-  isSummary: boolean;
-  busy: boolean;
-  onJump: (index: number) => void;
-}
-
-function TimelineRail({
-  sections,
-  segIdx,
-  scores,
-  curScore,
-  completionPct,
-  gate,
-  isSummary,
-  busy,
-  onJump,
-}: TimelineRailProps) {
-  return (
-    <>
-      <div className={styles.classProgress}>
-        <div className={styles.lvlTop}>
-          <span>Class completion</span>
-          <span>
-            <b>{completionPct}%</b>
-          </span>
-        </div>
-        <div
-          className={styles.lvlBar}
-          role="progressbar"
-          aria-label="Class completion"
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={completionPct}
-        >
-          <i style={{ width: `${completionPct}%` }} />
-        </div>
-      </div>
-
-      <div className={styles.ctl}>
-        {sections.map((s, i) => {
-          const sectionGate = s.passThreshold === undefined ? gate : s.passThreshold * 100;
-          let state: 'done' | 'active' | 'locked';
-          if (isSummary) state = 'done';
-          else if (i < segIdx) state = 'done';
-          else if (i === segIdx) state = 'active';
-          else state = 'locked';
-
-          const clickable = !busy && !isSummary && state === 'done';
-          const committed = scores[s.id] ?? 0;
-          const mini = state === 'done' ? committed || 100 : state === 'active' ? curScore : 0;
-
-          const segClass = [
-            styles.ctlSeg,
-            state === 'done' ? styles.ctlSegDone : '',
-            state === 'active' ? styles.ctlSegActive : '',
-            state === 'locked' ? styles.ctlSegLocked : '',
-            clickable ? styles.ctlSegClickable : '',
-          ]
-            .filter(Boolean)
-            .join(' ');
-
-          const glyph =
-            state === 'done'
-              ? 'check'
-              : state === 'locked'
-                ? 'lock'
-                : (SKILL_GLYPH[s.skill] ?? 'gate');
-
-          return (
-            <button
-              key={s.id}
-              type="button"
-              className={segClass}
-              disabled={!clickable}
-              aria-current={state === 'active' ? 'step' : undefined}
-              onClick={() => clickable && onJump(i)}
-            >
-              <span className={styles.ctlIco}>
-                <ClassGlyph name={glyph} size={15} />
-              </span>
-              <span className={styles.ctlBody}>
-                <span className={styles.ctlName}>{skillLabel(s.skill)}</span>
-                <span className={styles.ctlMeta}>gate {sectionGate}%</span>
-                <span className={styles.ctlMini}>
-                  <i style={{ width: `${Math.min(100, mini)}%` }} />
-                </span>
-                {state === 'done' && committed > 0 && (
-                  <span className={styles.ctlScore}>{committed}% cleared</span>
-                )}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-    </>
   );
 }

@@ -2,10 +2,29 @@ import { describe, expect, it } from 'vitest';
 import {
   classRegenerationRequestSchema,
   classRegenerationAcceptedSchema,
+  learningProgressRequestSchema,
 } from '../../src/learning-evidence';
 import { classSectionSchema } from '../../src/contracts/schemas';
 
 describe('class regeneration contract', () => {
+  it('requires class progress attempt and material revision together', () => {
+    const progress = { expectedRevision: 3, answers: { q: 1 } };
+    expect(learningProgressRequestSchema.safeParse(progress).success).toBe(true);
+    expect(
+      learningProgressRequestSchema.safeParse({ ...progress, expectedAttempt: 1 }).success
+    ).toBe(false);
+    expect(
+      learningProgressRequestSchema.safeParse({ ...progress, taskMaterialRevision: 'a'.repeat(64) })
+        .success
+    ).toBe(false);
+    expect(
+      learningProgressRequestSchema.safeParse({
+        ...progress,
+        expectedAttempt: 1,
+        taskMaterialRevision: 'a'.repeat(64),
+      }).success
+    ).toBe(true);
+  });
   it('retains an optional stored section mastery threshold for clients', () => {
     const section = {
       id: 'section-1',

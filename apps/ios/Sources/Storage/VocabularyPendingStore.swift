@@ -50,6 +50,11 @@ struct VocabularyPendingStore {
         return Array(Set(sessions)).sorted()
     }
 
+    func ownedScopes(prefix: String) throws -> [String] {
+        try read().entries.values.filter { $0.owner == owner && $0.scope.hasPrefix(prefix) }
+            .map(\.scope).sorted()
+    }
+
     static func clearAll() throws { try CredentialStore(account: account).delete() }
 
     private func read() throws -> State {

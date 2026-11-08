@@ -21,6 +21,7 @@ import { SIDEDOOR_STATE_ID } from '@/lib/sidedoor/access/state/store';
 import { interactionQueue } from '@/lib/queue';
 import { ClassLessonHelpError } from '@/lib/classes/help/lesson-source';
 import { readLessonHelpStatus } from '@/lib/classes/help/lesson-status';
+import { createPrerequisiteTokenizer } from '@/lib/classes/help/content/prerequisite-token';
 
 type Params = { params: Promise<{ classId: string }> };
 
@@ -45,7 +46,13 @@ export function GET(request: NextRequest, params: Params) {
         prisma,
         async (database) => {
           await execution.authorize(database);
-          return (await readLessonHelpStatus(database, classId, identity.userId)).response;
+          const value = await readLessonHelpStatus(database, classId, identity.userId);
+          const tokenizer = createPrerequisiteTokenizer(classId, identity.userId);
+          try {
+            return tokenizer.help(value.response);
+          } finally {
+            tokenizer.dispose();
+          }
         },
         { signal: request.signal }
       );
@@ -67,125 +74,137 @@ export function POST(request: NextRequest, params: Params) {
       );
       const { classId } = await params.params;
       const execution = sottoRequestExecution(request, identity);
-      const inspect = (database: Parameters<typeof readLessonHelpStatus>[0]) =>
-        readLessonHelpStatus(database, classId, identity.userId);
-      const initial = await sottoTransaction(
-        prisma,
-        async (database) => {
-          await execution.authorize(database);
-          const value = await inspect(database);
-          if (!isDeepStrictEqual(value.response.request, input))
-            throw new ClassLessonHelpError(
-              'The lesson-help request changed. Reopen the lesson.',
-              409
-            );
-          return value;
-        },
-        { signal: request.signal }
-      );
-      if (initial.response.status === 'READY') return NextResponse.json(initial.response);
-      if (initial.response.status === 'FAILED' && !initial.response.canRetry)
-        throw new ClassLessonHelpError(
-          initial.response.error ?? 'The previous request needs recovery.',
-          409
+      const tokenizer = createPrerequisiteTokenizer(classId, identity.userId);
+      try {
+        const inspect = (database: Parameters<typeof readLessonHelpStatus>[0]) =>
+          readLessonHelpStatus(database, classId, identity.userId);
+        const initial = await sottoTransaction(
+          prisma,
+          async (database) => {
+            await execution.authorize(database);
+            const value = await inspect(database);
+            if (!isDeepStrictEqual(tokenizer.help(value.response).request, input))
+              throw new ClassLessonHelpError(
+                'The lesson-help request changed. Reopen the lesson.',
+                409
+              );
+            return value;
+          },
+          { signal: request.signal }
         );
-      const creating = initial.response.status === 'AVAILABLE' || initial.response.canRetry;
-      const ai = creating ? await resolveCapturedLearningAi(identity.userId, execution) : null;
-      const moderation = creating ? await captureLearningModerationCredential(execution) : null;
-      const complete = await sottoTransaction(
-        prisma,
-        async (database) => {
-          await execution.authorize(database);
-          const value = await inspect(database);
-          const existing = await sottoJobOutbox(database).read(input.operationId);
-          if (existing) {
+        if (initial.response.status === 'READY')
+          return NextResponse.json(tokenizer.help(initial.response));
+        if (initial.response.status === 'FAILED' && !initial.response.canRetry)
+          throw new ClassLessonHelpError(
+            initial.response.error ?? 'The previous request needs recovery.',
+            409
+          );
+        const creating = initial.response.status === 'AVAILABLE' || initial.response.canRetry;
+        const ai = creating ? await resolveCapturedLearningAi(identity.userId, execution) : null;
+        const moderation = creating ? await captureLearningModerationCredential(execution) : null;
+        const internalRequest = initial.response.request;
+        const complete = await sottoTransaction(
+          prisma,
+          async (database) => {
+            await execution.authorize(database);
+            const value = await inspect(database);
+            const existing = await sottoJobOutbox(database).read(internalRequest.operationId);
+            if (existing) {
+              if (
+                value.current.operationId !== internalRequest.operationId ||
+                !isDeepStrictEqual(tokenizer.help(value.response).request, input) ||
+                existing.job.handler !== 'interactions' ||
+                existing.job.version !== 2
+              )
+                throw new ClassLessonHelpError('The saved lesson-help request differs.', 409);
+              return existing.complete;
+            }
             if (
-              value.current.operationId !== input.operationId ||
-              existing.job.handler !== 'interactions' ||
-              existing.job.version !== 2
+              !ai ||
+              !isDeepStrictEqual(tokenizer.help(value.response).request, input) ||
+              (value.response.status !== 'AVAILABLE' && !value.response.canRetry)
             )
-              throw new ClassLessonHelpError('The saved lesson-help request differs.', 409);
-            return existing.complete;
-          }
-          if (
-            !ai ||
-            !isDeepStrictEqual(value.response.request, input) ||
-            (value.response.status !== 'AVAILABLE' && !value.response.canRetry)
-          )
-            throw new ClassLessonHelpError(
-              'The lesson-help request changed. Reopen the lesson.',
-              409
+              throw new ClassLessonHelpError(
+                'The lesson-help request changed. Reopen the lesson.',
+                409
+              );
+            const { ownership, context } = value.source;
+            const subject = ownership.scopes.find(
+              (scope) => scope.subjectId === `profile:${identity.userId}`
             );
-          const { ownership, context } = value.source;
-          const subject = ownership.scopes.find(
-            (scope) => scope.subjectId === `profile:${identity.userId}`
-          );
-          const resource = ownership.scopes.find(
-            (scope) => scope.subjectId === `course:${context.courseId}`
-          );
-          if (!subject || !resource)
-            throw new ClassLessonHelpError('Lesson ownership changed.', 409);
-          const grantSpec = {
-            id: input.operationId,
-            revision: randomUUID(),
-            instanceId: ownership.instanceId,
-            subject: { id: subject.subjectId, generation: subject.generation },
-            resource: { id: resource.subjectId, generation: resource.generation },
-            operationId: input.operationId,
-            action: 'lesson-help-parent-provider-request',
-            expiresAt: Date.now() + 15 * 60_000,
-            maxRequests: 8,
-          };
-          await sottoJobOutbox(database).enqueue(
-            prepareJob({
-              id: input.operationId,
-              namespace: SIDEDOOR_STATE_ID,
-              handler: 'interactions',
-              version: 2,
-              payload: {
-                kind: 'CLASS_LESSON_HELP',
-                context,
-                previousOperationId: input.retryOf,
-                grant: delegationGrantBinding(grantSpec),
-                selection: {
-                  provider: ai.provider,
-                  model: ai.model,
-                  ...(ai.endpoint ? { endpoint: ai.endpoint } : {}),
-                  ...(ai.isolatedImage ? { isolatedImage: ai.isolatedImage } : {}),
-                  credentialFingerprint: learningCredentialFingerprint(ai.execution.credential),
-                  moderationCredentialFingerprint: learningCredentialFingerprint(moderation),
+            const resource = ownership.scopes.find(
+              (scope) => scope.subjectId === `course:${context.courseId}`
+            );
+            if (!subject || !resource)
+              throw new ClassLessonHelpError('Lesson ownership changed.', 409);
+            const grantSpec = {
+              id: internalRequest.operationId,
+              revision: randomUUID(),
+              instanceId: ownership.instanceId,
+              subject: { id: subject.subjectId, generation: subject.generation },
+              resource: { id: resource.subjectId, generation: resource.generation },
+              operationId: internalRequest.operationId,
+              action: 'lesson-help-parent-provider-request',
+              expiresAt: Date.now() + 15 * 60_000,
+              maxRequests: 8,
+            };
+            await sottoJobOutbox(database).enqueue(
+              prepareJob({
+                id: internalRequest.operationId,
+                namespace: SIDEDOOR_STATE_ID,
+                handler: 'interactions',
+                version: 2,
+                payload: {
+                  kind: 'CLASS_LESSON_HELP',
+                  context,
+                  previousOperationId: internalRequest.retryOf,
+                  grant: delegationGrantBinding(grantSpec),
+                  selection: {
+                    provider: ai.provider,
+                    model: ai.model,
+                    ...(ai.endpoint ? { endpoint: ai.endpoint } : {}),
+                    ...(ai.isolatedImage ? { isolatedImage: ai.isolatedImage } : {}),
+                    credentialFingerprint: learningCredentialFingerprint(ai.execution.credential),
+                    moderationCredentialFingerprint: learningCredentialFingerprint(moderation),
+                  },
                 },
+                scopes: ownership.scopes,
+                delivery: { attempts: 1, priority: 0, availableAt: 0 },
+              })
+            );
+            await learningPreparationGrant(
+              database,
+              {
+                id: internalRequest.operationId,
+                courseId: context.courseId,
+                userId: identity.userId,
               },
-              scopes: ownership.scopes,
-              delivery: { attempts: 1, priority: 0, availableAt: 0 },
-            })
-          );
-          await learningPreparationGrant(
-            database,
-            { id: input.operationId, courseId: context.courseId, userId: identity.userId },
-            'lesson-help'
-          ).create(grantSpec);
-          return false;
-        },
-        { signal: request.signal }
-      );
-      if (!complete)
-        await deliverSottoJob({
-          database: prisma,
-          queue: interactionQueue,
-          operationId: input.operationId,
-          version: 2,
-        });
-      return NextResponse.json(
-        {
-          status: 'PENDING',
-          request: input,
-          nativeLang: initial.source.context.nativeLang,
-          targetLang: initial.source.context.targetLang,
-          canRetry: false,
-        },
-        { status: 202 }
-      );
+              'lesson-help'
+            ).create(grantSpec);
+            return false;
+          },
+          { signal: request.signal }
+        );
+        if (!complete)
+          await deliverSottoJob({
+            database: prisma,
+            queue: interactionQueue,
+            operationId: internalRequest.operationId,
+            version: 2,
+          });
+        return NextResponse.json(
+          {
+            status: 'PENDING',
+            request: input,
+            nativeLang: initial.source.context.nativeLang,
+            targetLang: initial.source.context.targetLang,
+            canRetry: false,
+          },
+          { status: 202 }
+        );
+      } finally {
+        tokenizer.dispose();
+      }
     } catch (error) {
       return failure(error);
     }

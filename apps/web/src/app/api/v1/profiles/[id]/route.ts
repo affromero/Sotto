@@ -10,6 +10,9 @@ import { updateProfileSchema } from '@/lib/validations';
 import { errorResponse } from '@/lib/api-response';
 import { deleteSottoProfile } from '@/lib/sidedoor/access/deletion/profile-deletion';
 import { THEME_PREFS_COOKIE } from '@/lib/theme-prefs';
+import { PrerequisiteDeletionConflict } from '@/lib/classes/help/prerequisite-deletion';
+import { SpeakingDeletionConflict } from '@/lib/sidedoor/jobs/stitch/speaking-grading-deletion';
+import { AssessmentFenceConflict } from '@/lib/learning/classes/lifecycle/assessment-fence';
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -34,6 +37,9 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     const cleanup = await deleteSottoProfile(prismaUnfiltered, request, id).catch(
       (error: unknown) => {
         if (isStorageManifestLimitError(error)) return 'oversized' as const;
+        if (error instanceof PrerequisiteDeletionConflict) return 'prerequisite' as const;
+        if (error instanceof SpeakingDeletionConflict) return 'speaking' as const;
+        if (error instanceof AssessmentFenceConflict) return 'assessment' as const;
         throw error;
       }
     );
@@ -42,6 +48,15 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
         'A stored file reference is too large to snapshot. The profile was not deleted.',
         413
       );
+    if (cleanup === 'prerequisite')
+      return errorResponse(
+        'Prerequisite work is active or requires recovery before deletion.',
+        409
+      );
+    if (cleanup === 'speaking')
+      return errorResponse('Speaking work is active or requires recovery before deletion.', 409);
+    if (cleanup === 'assessment')
+      return errorResponse('An assessment request is already active or needs recovery.', 409);
     if (!cleanup) return errorResponse('Profile not found', 404);
     const response = NextResponse.json(
       { success: true, cleanup: { id: cleanup.id, phase: cleanup.phase } },

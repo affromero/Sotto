@@ -1,4 +1,4 @@
-import type { Queue, Job } from 'bullmq';
+import { Job, type Queue } from 'bullmq';
 import { z } from 'zod';
 import { JobOutbox, JobSnapshot, type OutboxJob } from 'thesidedoor-core/runtime/outbox';
 import { AccessError } from 'thesidedoor-core/access';
@@ -28,7 +28,10 @@ export class SottoTerminalDeliveryError extends Error {
   }
 }
 
-function validateQueueJob(record: OutboxJob, existing: Job) {
+function validateQueueJob(
+  record: OutboxJob,
+  existing: Pick<Job, 'id' | 'queueName' | 'name' | 'data' | 'opts' | 'timestamp'>
+) {
   const parsed = referenceSchema.safeParse(existing.data);
   if (
     existing.id !== record.job.id ||
@@ -42,6 +45,63 @@ function validateQueueJob(record: OutboxJob, existing: Job) {
     (existing.opts.delay ?? 0) !== Math.max(0, record.job.delivery.availableAt - existing.timestamp)
   )
     throw new Error('Existing queue job conflicts with immutable durable work');
+}
+
+/**
+ * Capture a point-in-time failed delivery. This does not claim the job or prove
+ * that a provider has stopped. Callers must hold the execution and observation
+ * fences and revalidate durable work before acting on the result.
+ */
+export async function snapshotFailedSottoDelivery(queue: Queue, record: OutboxJob) {
+  if (record.complete || record.job.handler !== queue.name)
+    throw new AccessError('conflict', 'The failed queue job does not match pending work');
+  const client = await queue.getBackend().client;
+  client.defineCommand('sottoFailedDeliverySnapshotV1', {
+    numberOfKeys: 2,
+    lua: `local score = redis.call('ZSCORE', KEYS[1], ARGV[1])
+     if not score then return {} end
+     return redis.call('HGETALL', KEYS[2])`,
+  });
+  const raw: unknown = await client.runCommand('sottoFailedDeliverySnapshotV1', [
+    queue.toKey('failed'),
+    queue.toKey(record.job.id),
+    record.job.id,
+  ]);
+  const fields = z.array(z.string()).parse(raw);
+  if (!fields.length || fields.length % 2 !== 0)
+    throw new AccessError('conflict', 'The failed queue job is missing or incomplete');
+  const values = Object.fromEntries(
+    Array.from({ length: fields.length / 2 }, (_, index) => [
+      fields[index * 2]!,
+      fields[index * 2 + 1]!,
+    ])
+  );
+  const positiveInteger = z
+    .string()
+    .regex(/^[1-9][0-9]*$/)
+    .transform(Number)
+    .pipe(z.number().int().positive().safe());
+  const timestamp = positiveInteger.parse(values.timestamp);
+  const deliveryAttempts = positiveInteger.parse(values.attemptsMade ?? values.atm);
+  const failedAt = positiveInteger.parse(values.finishedOn);
+  const processedAt = positiveInteger.parse(values.processedOn);
+  if (processedAt > failedAt)
+    throw new AccessError('conflict', 'The failed queue job has inconsistent timestamps');
+  validateQueueJob(record, {
+    id: record.job.id,
+    queueName: queue.name,
+    name: z.string().min(1).parse(values.name),
+    data: JSON.parse(z.string().parse(values.data)),
+    opts: Job.optsFromJSON(z.string().parse(values.opts)),
+    timestamp,
+  });
+  return Object.freeze({
+    operationId: record.job.id,
+    fingerprint: record.fingerprint,
+    deliveryAttempts,
+    failedAt,
+    processedAt,
+  });
 }
 
 /** Read-only evidence for an explicit retry. The failed Redis job remains untouched. */

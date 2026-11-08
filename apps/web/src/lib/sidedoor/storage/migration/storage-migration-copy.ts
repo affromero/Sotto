@@ -28,6 +28,8 @@ import { requireOriginalSottoAdmission } from '@/lib/sidedoor/access/core/reques
 import { SIDEDOOR_STATE_ID, sottoStorageInstance } from '@/lib/sidedoor/access/state/store';
 import { sottoJobOutbox, sottoJobSnapshot } from '@/lib/sidedoor/jobs/core/job-delivery';
 import { withSottoJobExecution } from '@/lib/sidedoor/jobs/core/job-execution-lifetime';
+import { sottoJobExecutions } from '@/lib/sidedoor/jobs/core/job-execution-lifetime';
+import { hasSettledSottoExecution } from '@/lib/sidedoor/jobs/core/job-settlement-proof';
 import {
   inspectStorageMigrationConsumer,
   type readStorageMigrationAssetPage,
@@ -222,6 +224,37 @@ async function completedCopy(
   }
   signal.throwIfAborted();
   return outcome;
+}
+
+/** Verify a completed copy and every consumer before its owning data is removed. */
+export async function verifyStorageCopyForDeletion(
+  database: Prisma.TransactionClient,
+  input: {
+    id: string;
+    fingerprint: string;
+    scope: { subjectId: string; generation: number };
+    consumers: ReadonlySet<string>;
+  }
+) {
+  const parent = await sottoJobOutbox(database).read(input.id);
+  if (
+    !parent ||
+    !parent.complete ||
+    parent.fingerprint !== input.fingerprint ||
+    parent.job.id !== input.id ||
+    parent.job.namespace !== SIDEDOOR_STATE_ID ||
+    parent.job.handler !== 'storage-migration-copy' ||
+    parent.job.version !== 1 ||
+    !parent.job.scopes.some((scope) => isDeepStrictEqual(scope, input.scope))
+  )
+    throw new Error('Storage copy cannot be retired');
+  const payload = payloadSchema.parse(parent.job.payload);
+  if (payload.claims.some((claim) => !input.consumers.has(claim.consumer)))
+    throw new Error('Storage copy has consumers outside the deletion scope');
+  if (!(await hasSettledSottoExecution(database, { id: input.id, fingerprint: input.fingerprint })))
+    throw new Error('Storage copy execution is not settled');
+  await sottoJobExecutions(database).requireParentDrained(input.id, input.fingerprint);
+  await completedCopy(database, parent, payload, new AbortController().signal);
 }
 
 /** Execute an admitted one-asset copy. Configuration activation belongs to the migration coordinator. */

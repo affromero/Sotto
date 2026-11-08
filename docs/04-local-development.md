@@ -50,7 +50,7 @@ Open `http://localhost:3000`.
 2. start PostgreSQL and Redis
 3. create `.env.local` from `.env.oss.example`
 4. generate local secrets when missing
-5. push the Prisma schema
+5. apply the Prisma migrations
 6. generate the Prisma client
 7. keep storage local by default
 
@@ -70,6 +70,8 @@ npm run dev
 ```
 
 Use `.env.oss.example` for local onboarding. `.env.example` may include hosted deployment references; the OSS template is the local source of truth.
+
+Use migrations to initialize the database. `prisma db push` does not install the database triggers required by learning workflows.
 
 ---
 

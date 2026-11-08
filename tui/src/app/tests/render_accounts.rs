@@ -134,6 +134,226 @@
     }
 
     #[test]
+    fn switching_accounts_preserves_a_recording_that_could_not_be_saved() {
+        let (mut app, _) = two_profile_app();
+        app.view = View::courses(&[course_summary("c0")]);
+        app.retained_class_recording = Some(b"unsaved audio".to_vec());
+        app.on_toggle_accounts();
+        app.on_down();
+        app.on_switch_account();
+
+        assert_eq!(app.config.active, "home");
+        assert_eq!(app.retained_class_recording.as_deref(), Some(b"unsaved audio".as_slice()));
+        assert!(matches!(app.view, View::Courses { .. }));
+    }
+
+    #[tokio::test]
+    async fn switching_accounts_preserves_each_learners_uncertain_class_upload() {
+        let (mut app, _) = two_profile_app();
+        let sections = serde_json::json!([{
+            "id": "speaking", "skill": "SPEAKING", "status": "READY",
+            "episode": null, "questions": [], "writingPrompts": [],
+            "prompts": [{ "id": "s0", "targetPhrase": "Hola", "translation": "Hello", "order": 0 }]
+        }]);
+        app.view = class_with_sections(sections.clone());
+        let key = app.view.learning_key().unwrap();
+        app.on_class_speaking_uploaded(app.request_gen, Arc::new(Err("home upload unknown".into())));
+        app.on_toggle_accounts();
+        app.on_down();
+        app.on_switch_account();
+        assert_eq!(app.config.active, "work");
+        assert!(!app.practice_cache.contains_key(&key));
+
+        app.view = class_with_sections(sections);
+        app.on_class_speaking_uploaded(app.request_gen, Arc::new(Err("work upload unknown".into())));
+        app.on_toggle_accounts();
+        app.on_up();
+        app.on_switch_account();
+        assert_eq!(app.config.active, "home");
+        let home = app.practice_cache.get(&key).expect("home's class is retained");
+        assert!(home.has_uncertain_upload());
+        assert!(matches!(home, View::Class { sections: Some(sections), .. }
+            if matches!(&sections[0].progress, SectionProgress::Speaking { phase: SpeakingPhase::UnknownUpload { message }, .. } if message.contains("home upload unknown"))));
+
+        app.on_toggle_accounts();
+        app.on_down();
+        app.on_switch_account();
+        let work = app.practice_cache.get(&key).expect("work's class is retained");
+        assert!(work.has_uncertain_upload());
+        assert!(matches!(work, View::Class { sections: Some(sections), .. }
+            if matches!(&sections[0].progress, SectionProgress::Speaking { phase: SpeakingPhase::UnknownUpload { message }, .. } if message.contains("work upload unknown"))));
+    }
+
+    #[tokio::test]
+    async fn account_aliases_share_the_same_uncertain_upload_fence() {
+        let (mut app, _) = two_profile_app();
+        let mut home = app.config.profiles.get("home").unwrap().clone();
+        home.server_url.push('/');
+        app.config.upsert_profile("alias", home);
+        app.view = class_with_sections(serde_json::json!([{
+            "id": "speaking", "skill": "SPEAKING", "status": "READY",
+            "episode": null, "questions": [], "writingPrompts": [],
+            "prompts": [{ "id": "s0", "targetPhrase": "Hola", "translation": "Hello", "order": 0 }]
+        }]));
+        let key = app.view.learning_key().unwrap();
+        app.on_class_speaking_uploaded(app.request_gen, Arc::new(Err("unknown upload".into())));
+        app.on_toggle_accounts();
+        app.on_up();
+        app.on_switch_account();
+        assert_eq!(app.config.active, "alias");
+        assert!(app.practice_cache.get(&key).is_some_and(View::has_uncertain_upload));
+    }
+
+    #[test]
+    fn switching_accounts_waits_for_an_upload_in_progress() {
+        let (mut app, _) = two_profile_app();
+        app.view = class_with_sections(serde_json::json!([{
+            "id": "speaking", "skill": "SPEAKING", "status": "READY",
+            "episode": null, "questions": [], "writingPrompts": [],
+            "prompts": [{ "id": "s0", "targetPhrase": "Hola", "translation": "Hello", "order": 0 }]
+        }]));
+        if let Some(section) = app.current_section_mut()
+            && let SectionProgress::Speaking { phase, .. } = &mut section.progress {
+            *phase = SpeakingPhase::Uploading;
+        }
+        app.on_toggle_accounts();
+        app.on_down();
+        app.on_switch_account();
+        assert_eq!(app.config.active, "home");
+        assert!(app.view.has_upload_in_progress());
+    }
+
+    #[tokio::test]
+    async fn switching_accounts_requires_reconciliation_for_a_pending_progress_save() {
+        let (mut app, _) = two_profile_app();
+        app.view = class_with_sections(serde_json::json!([{
+            "id": "grammar", "skill": "GRAMMAR", "status": "READY",
+            "episode": null, "prompts": [], "writingPrompts": [],
+            "questions": [{ "id": "g0", "order": 0, "question": "?", "options": ["a", "b"] }]
+        }]));
+        let key = app.view.learning_key().unwrap();
+        if let View::Class { progress, .. } = &mut app.view {
+            progress.revision = 4;
+            progress.in_flight = Some(12);
+        }
+        app.on_toggle_accounts();
+        app.on_down();
+        app.on_switch_account();
+        app.on_toggle_accounts();
+        app.on_up();
+        app.on_switch_account();
+        let View::Class { progress, .. } = app.practice_cache.get(&key).unwrap() else { panic!("saved class") };
+        assert!(progress.dirty && progress.conflict);
+        assert!(progress.in_flight.is_none());
+        assert_eq!(progress.revision, 4);
+        app.on_practice_progress_saved(key.clone(), 12, ok(serde_json::from_value(serde_json::json!({
+            "saved": true, "progressRevision": 5
+        })).unwrap()));
+        let View::Class { progress, .. } = app.practice_cache.get(&key).unwrap() else { panic!("saved class") };
+        assert_eq!(progress.revision, 4);
+        assert!(progress.conflict);
+    }
+
+    #[tokio::test]
+    async fn a_late_upload_receipt_after_switch_keeps_the_original_audio_and_fence() {
+        let (mut app, _) = two_profile_app();
+        app.view = class_with_sections(serde_json::json!([{
+            "id": "speaking", "skill": "SPEAKING", "status": "READY",
+            "episode": null, "questions": [], "writingPrompts": [],
+            "prompts": [{ "id": "s0", "targetPhrase": "Hola", "translation": "Hello", "order": 0 }]
+        }]));
+        let key = app.view.learning_key().unwrap();
+        let original_generation = app.request_gen;
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("recording.wav");
+        std::fs::write(&path, b"audio").unwrap();
+        if let View::Class { material_source, .. } = &mut app.view { *material_source = Some("a".repeat(64)); }
+        let target = app.current_class_recording_binding().unwrap();
+        let profile = app.config.active_profile().unwrap();
+        let owner = (profile.server_url.trim_end_matches('/').to_string(), profile.api_key.clone());
+        app.pending_class_audio.insert(original_generation, PendingClassAudio { path: path.clone(), owner, target, origin: app.view.clone() });
+        if let Some(section) = app.current_section_mut()
+            && let SectionProgress::Speaking { phase, .. } = &mut section.progress {
+            *phase = SpeakingPhase::Uploading;
+        }
+        app.on_back();
+        app.on_toggle_accounts();
+        app.on_down();
+        app.on_switch_account();
+        app.on_class_speaking_uploaded(original_generation, ok(SpeakingUploadResponse {
+            recording_id: "saved".into(), status: "PENDING".into(),
+        }));
+        assert_eq!(std::fs::read(&path).unwrap(), b"audio");
+        assert!(!app.practice_cache.contains_key(&key));
+        app.on_toggle_accounts();
+        app.on_up();
+        app.on_switch_account();
+        let cached = app.practice_cache.get(&key).expect("original class is retained");
+        assert!(matches!(cached, View::Class { sections: Some(sections), .. }
+            if matches!(&sections[0].progress, SectionProgress::Speaking { phase: SpeakingPhase::UnknownUpload { message }, .. } if message.contains(&path.display().to_string()))));
+    }
+
+    #[tokio::test]
+    async fn a_removed_prompt_preserves_its_recording_in_recovery() {
+        let (mut app, _) = two_profile_app();
+        app.view = class_with_sections(serde_json::json!([{
+            "id": "speaking", "skill": "SPEAKING", "status": "READY",
+            "episode": null, "questions": [], "writingPrompts": [],
+            "prompts": [{ "id": "s0", "targetPhrase": "Hola", "translation": "Hello", "order": 0 }]
+        }]));
+        if let View::Class { material_source, .. } = &mut app.view { *material_source = Some("a".repeat(64)); }
+        let target = app.current_class_recording_binding().unwrap();
+        let profile = app.config.active_profile().unwrap();
+        let owner = (profile.server_url.trim_end_matches('/').to_string(), profile.api_key.clone());
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("recording.wav");
+        std::fs::write(&path, b"audio").unwrap();
+        if let Some(section) = app.current_section_mut()
+            && let SectionProgress::Speaking { phase, .. } = &mut section.progress { *phase = SpeakingPhase::Uploading; }
+        let mut origin = app.view.clone();
+        origin.mark_abandoned_uploads_unknown(Some(&path));
+        app.pending_class_audio.insert(app.request_gen, PendingClassAudio { path: path.clone(), owner, target, origin });
+        if let Some(section) = app.current_section_mut()
+            && let SectionProgress::Speaking { prompts, .. } = &mut section.progress { prompts.clear(); }
+        app.on_class_speaking_uploaded(app.request_gen, ok(SpeakingUploadResponse {
+            recording_id: "saved".into(), status: "PENDING".into(),
+        }));
+        assert_eq!(std::fs::read(&path).unwrap(), b"audio");
+        assert!(matches!(&app.view, View::ClassPrelude { retained_work, .. }
+            if retained_work.iter().any(|line| line.contains(&path.display().to_string()))));
+        assert!(!app.view.has_upload_in_progress());
+    }
+
+    #[tokio::test]
+    async fn a_receipt_for_another_owner_is_quarantined_without_exposing_its_path() {
+        let (mut app, _) = two_profile_app();
+        app.view = class_with_sections(serde_json::json!([{
+            "id": "speaking", "skill": "SPEAKING", "status": "READY",
+            "episode": null, "questions": [], "writingPrompts": [],
+            "prompts": [{ "id": "s0", "targetPhrase": "Hola", "translation": "Hello", "order": 0 }]
+        }]));
+        if let View::Class { material_source, .. } = &mut app.view { *material_source = Some("a".repeat(64)); }
+        let target = app.current_class_recording_binding().unwrap();
+        let profile = app.config.active_profile().unwrap();
+        let owner = (profile.server_url.trim_end_matches('/').to_string(), profile.api_key.clone());
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("recording.wav");
+        std::fs::write(&path, b"audio").unwrap();
+        if let Some(section) = app.current_section_mut()
+            && let SectionProgress::Speaking { phase, .. } = &mut section.progress { *phase = SpeakingPhase::Uploading; }
+        let mut origin = app.view.clone();
+        origin.mark_abandoned_uploads_unknown(Some(&path));
+        app.pending_class_audio.insert(app.request_gen, PendingClassAudio { path: path.clone(), owner: owner.clone(), target, origin });
+        app.config.set_active("work").unwrap();
+        app.on_class_speaking_uploaded(app.request_gen, ok(SpeakingUploadResponse {
+            recording_id: "saved".into(), status: "PENDING".into(),
+        }));
+        assert_eq!(std::fs::read(&path).unwrap(), b"audio");
+        assert!(matches!(&app.view, View::Error { message, .. } if !message.contains(&path.display().to_string())));
+        assert!(app.account_practice_cache.get(&owner).unwrap().values().any(View::has_uncertain_upload));
+    }
+
+    #[test]
     fn a_opens_the_account_switcher_and_a_closes_it() {
         let mut app = test_app();
         app.view = View::courses(&[]);

@@ -26,12 +26,16 @@ import type { WritingCorrection, WritingPromptData, WritingResponse } from './cl
 import { LearningSaveRecovery } from './progress/LearningSaveRecovery';
 import { useWritingDrafts, type WritingDrafts } from './writing/useWritingDrafts';
 import styles from './WritingSection.module.css';
+import type { ClassPrerequisiteDirections } from './lesson/prerequisiteTypes';
+import { TaskDirection, taskDirection } from './lesson/TaskDirection';
 
 interface WritingSectionProps {
   /** The screen's drafts. Grading belongs to the screen's single submit, so
    *  this section only edits and shows the grade a prompt already has. */
   drafts: WritingDrafts;
   prompts: WritingPromptData[];
+  sectionId?: string;
+  prerequisiteDirections?: ClassPrerequisiteDirections | null;
   /** Reports the running average 0..100 score upward (class gate / rail). */
   onScore?: (score: number) => void;
   feedbackHref?: string;
@@ -56,8 +60,11 @@ const MAX_CHARS = 4000;
 /** Own the class drafts and grade them before opening the next activity. */
 export function ClassWritingStage({
   classId,
+  sectionId,
+  prerequisiteDirections,
   progressRevision,
   attempt,
+  taskMaterialRevision,
   prompts,
   gate,
   nextName,
@@ -66,8 +73,11 @@ export function ClassWritingStage({
   onContinue,
 }: {
   classId: string;
+  sectionId?: string;
+  prerequisiteDirections?: ClassPrerequisiteDirections | null;
   progressRevision: number;
   attempt: number;
+  taskMaterialRevision: string | null;
   prompts: WritingPromptData[];
   gate: number;
   nextName: string | null;
@@ -80,12 +90,15 @@ export function ClassWritingStage({
     `/api/v1/classes/${classId}/writing`,
     onFeedback,
     progressRevision,
-    String(attempt)
+    String(attempt),
+    taskMaterialRevision ? { expectedAttempt: attempt, taskMaterialRevision } : null
   );
   return (
     <WritingSection
       drafts={drafts}
       prompts={prompts}
+      sectionId={sectionId}
+      prerequisiteDirections={prerequisiteDirections}
       gate={gate}
       nextName={nextName}
       onScore={onScore}
@@ -187,9 +200,10 @@ interface PromptCardProps {
   index: number;
   total: number;
   feedbackHref: string;
+  direction?: { id: string; text: string; language: string };
 }
 
-function PromptCard({ drafts, prompt, index, total, feedbackHref }: PromptCardProps) {
+function PromptCard({ drafts, prompt, index, total, feedbackHref, direction }: PromptCardProps) {
   const draft = drafts.drafts[prompt.id];
   const text = draft?.text ?? '';
   const result = draft?.result ?? null;
@@ -206,6 +220,7 @@ function PromptCard({ drafts, prompt, index, total, feedbackHref }: PromptCardPr
       className={styles.card}
       id={`writing-prompt-${prompt.id}`}
       aria-label={`Writing prompt ${index + 1} of ${total}`}
+      aria-describedby={direction?.id}
     >
       <div className={styles.writePrompt}>
         <div className={styles.writeFrom}>Prompt {index + 1}</div>
@@ -215,6 +230,9 @@ function PromptCard({ drafts, prompt, index, total, feedbackHref }: PromptCardPr
         >
           {prompt.task}
         </div>
+        {direction && (
+          <TaskDirection id={direction.id} text={direction.text} language={direction.language} />
+        )}
         {prompt.guidance && (
           <div
             className={`${styles.writeTask} ${guardStyles.guarded}`}
@@ -287,6 +305,8 @@ function PromptCard({ drafts, prompt, index, total, feedbackHref }: PromptCardPr
 export function WritingSection({
   drafts,
   prompts,
+  sectionId,
+  prerequisiteDirections,
   onScore,
   feedbackHref = '#feedback-clinic',
   gate,
@@ -345,17 +365,31 @@ export function WritingSection({
       </div>
 
       <ol className={styles.promptList}>
-        {prompts.map((prompt, idx) => (
-          <li key={prompt.id} className={styles.promptItem}>
-            <PromptCard
-              drafts={drafts}
-              prompt={prompt}
-              index={idx}
-              total={prompts.length}
-              feedbackHref={feedbackHref}
-            />
-          </li>
-        ))}
+        {prompts.map((prompt, idx) => {
+          const direction = sectionId
+            ? taskDirection(prerequisiteDirections, sectionId, prompt.id, 'writing')
+            : undefined;
+          return (
+            <li key={prompt.id} className={styles.promptItem}>
+              <PromptCard
+                drafts={drafts}
+                prompt={prompt}
+                index={idx}
+                total={prompts.length}
+                feedbackHref={feedbackHref}
+                direction={
+                  direction && prerequisiteDirections && sectionId
+                    ? {
+                        id: `direction-${sectionId}-${prompt.id}`,
+                        text: direction.instruction,
+                        language: prerequisiteDirections.nativeLang,
+                      }
+                    : undefined
+                }
+              />
+            </li>
+          );
+        })}
       </ol>
 
       {submitAction && (

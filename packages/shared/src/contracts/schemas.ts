@@ -7,9 +7,9 @@ import {
 } from '../learning/vocabulary-study';
 import { readingVocabularySchema } from '../reading-vocabulary';
 import { skillRequirementsSchema } from '../learning-requirements';
-import { learningObjectiveMemorySchema } from '../learning-map/contracts';
+export * from './learner-views';
 import { learningSkillSchema } from '../learning-map/catalog';
-import { classTeachingSchema } from './class-teaching';
+import { classPreludeResponseSchema, classTeachingSchema } from './class-teaching';
 import {
   placementSessionPublicSchema,
   placementSubmitRequestSchema,
@@ -26,6 +26,7 @@ import {
   practiceReceiptSchema,
   speakingEvidenceSchema,
   writingFeedbackSchema,
+  classReceiptSchema,
 } from '../learning-evidence';
 
 // ---------------------------------------------------------------------------
@@ -376,7 +377,20 @@ export const episodeDetailResponseSchema = z
 // and phonemeScores (Json); the terminal client only uses these scalar fields.
 // ---------------------------------------------------------------------------
 
-export const speakingGradeStatusSchema = z.enum(['PENDING', 'GRADING', 'SCORED', 'FAILED']);
+export const speakingGradeStatusSchema = z.enum([
+  'PENDING',
+  'GRADING',
+  'SCORED',
+  'FAILED',
+  'UNRESOLVED',
+]);
+export const speakingRecoveryRequestSchema = z
+  .object({
+    recordingId: z.string().min(1),
+    acknowledgePossibleCharges: z.literal(true),
+  })
+  .strict();
+export const speakingRecoveryResponseSchema = z.object({ acknowledged: z.literal(true) }).strict();
 
 // `.loose()`: the GET route also returns rubricScores and phonemeScores (Json).
 // We model only the scalar fields the client uses and keep the object OPEN so
@@ -384,6 +398,8 @@ export const speakingGradeStatusSchema = z.enum(['PENDING', 'GRADING', 'SCORED',
 export const speakingPollResponseSchema = z
   .object({
     status: speakingGradeStatusSchema,
+    recordingId: z.string().min(1).optional(),
+    recoveryAcknowledged: z.boolean().optional(),
     // 0..1 combined pronunciation score; null until SCORED.
     overallScore: z.number().nullable(),
     transcript: z.string().nullable(),
@@ -420,6 +436,20 @@ export const classStatusSchema = z.enum([
   'PASSED',
   'FAILED',
 ]);
+
+export const classProgressRecoverySchema = z
+  .object({
+    classId: z.string().min(1),
+    status: classStatusSchema,
+    attempt: z.number().int().positive(),
+    progressRevision: z.number().int().nonnegative(),
+    taskMaterialRevision: z.string().regex(/^[a-f0-9]{64}$/),
+  })
+  .strict();
+
+export const classFocusSnapshotSchema = z
+  .object({ prelude: classPreludeResponseSchema, progress: classProgressRecoverySchema })
+  .strict();
 
 // Mirrors the Prisma `SectionStatus` enum.
 export const sectionStatusSchema = z.enum([
@@ -503,13 +533,156 @@ export const classSectionSchema = z
 
 // `.loose()`: the class carries `lesson` + `submission` (Json) and sourced-class
 // attribution the client does not need; only the modeled fields are read.
+const historicalSpeakingRecordingSchema = z.object({
+  id: z.string(),
+  attempt: z.number().int(),
+  status: z.string(),
+  transcript: z.string().nullable(),
+  overallScore: z.number().nullable(),
+  rubricScores: z.unknown(),
+  phonemeScores: z.unknown(),
+  feedback: z.string().nullable(),
+  createdAt: z.string(),
+});
+
 export const classDetailResponseSchema = z
   .object({
     teaching: classTeachingSchema.optional(),
+    prerequisiteSourceHash: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/)
+      .nullable()
+      .optional(),
+    taskMaterialRevision: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/)
+      .nullable()
+      .optional(),
+    lessonHelpRevision: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/)
+      .nullable()
+      .optional(),
     skillRequirements: skillRequirementsSchema.nullable().optional(),
     readingVocabulary: readingVocabularySchema.nullable().optional(),
     learnerAnswers: z.record(z.string(), z.number().int().min(0).max(3)).nullable().optional(),
     writingDrafts: z.record(z.string(), z.string()).nullable().optional(),
+    writingHistory: z
+      .array(
+        z.object({
+          sectionId: z.string(),
+          attempt: z.number().int().positive(),
+          prompts: z.array(
+            z.object({
+              id: z.string(),
+              order: z.number().int(),
+              task: z.string(),
+              savedDraft: z.string().nullable(),
+              responses: z.array(
+                z.object({
+                  id: z.string(),
+                  attempt: z.number().int().positive(),
+                  attemptMatches: z.boolean(),
+                  text: z.string(),
+                  overallScore: z.number().nullable(),
+                  corrections: z.unknown(),
+                  feedback: z.string().nullable(),
+                  createdAt: z.string(),
+                })
+              ),
+            })
+          ),
+        })
+      )
+      .optional(),
+    orphanWritingDrafts: z.array(z.object({ id: z.string(), text: z.string() })).optional(),
+    speakingHistory: z
+      .array(
+        z.object({
+          sectionId: z.string(),
+          attempt: z.number().int(),
+          prompts: z.array(
+            z.object({
+              id: z.string(),
+              order: z.number().int(),
+              targetPhrase: z.string(),
+              translation: z.string(),
+              recordings: z.array(
+                historicalSpeakingRecordingSchema.extend({ attemptMatches: z.boolean() })
+              ),
+            })
+          ),
+        })
+      )
+      .optional(),
+    speakingHistoryUnlinked: z.array(historicalSpeakingRecordingSchema).optional(),
+    quizHistory: z
+      .array(
+        z.object({
+          sectionId: z.string(),
+          skill: z.enum(['GRAMMAR', 'READING', 'LISTENING']),
+          attempt: z.number().int(),
+          questions: z.array(
+            z.object({
+              id: z.string(),
+              order: z.number().int(),
+              question: z.string(),
+              passageText: z.string().nullable(),
+              options: z.array(z.string()).nullable(),
+              savedChoice: z.number().int().nullable(),
+              submissions: z.array(
+                z.object({
+                  attempt: z.number().int().nullable(),
+                  submittedAt: z.string().nullable(),
+                  selectedIndex: z.number().int().nullable(),
+                  isCorrect: z.boolean().nullable(),
+                })
+              ),
+            })
+          ),
+        })
+      )
+      .optional(),
+    orphanQuizAnswers: z
+      .array(
+        z.object({
+          sectionId: z.string().nullable(),
+          questionId: z.string().nullable(),
+          savedChoice: z.number().int().nullable(),
+          submissions: z.array(
+            z.object({
+              attempt: z.number().int().nullable(),
+              submittedAt: z.string().nullable(),
+              selectedIndex: z.number().int().nullable(),
+              isCorrect: z.boolean().nullable(),
+            })
+          ),
+        })
+      )
+      .optional(),
+    quizHistoryUnreadable: z.boolean().optional(),
+    quizSubmissionReceipts: z
+      .array(
+        z.object({
+          attempt: z.number().int().nullable(),
+          submittedAt: z.string().nullable(),
+          passed: z.boolean().nullable(),
+          overallScore: z.number().nullable(),
+          answersUnavailable: z.boolean(),
+          passedSections: z.number().int().nullable(),
+          totalSections: z.number().int().nullable(),
+          sections: z.array(
+            z.object({
+              id: z.string().nullable(),
+              skill: z.enum(['GRAMMAR', 'READING', 'LISTENING', 'SPEAKING', 'WRITING']).nullable(),
+              score: z.number().nullable(),
+              passed: z.boolean().nullable(),
+            })
+          ),
+          summaryIncomplete: z.boolean(),
+        })
+      )
+      .optional(),
     progressRevision: z.number().int().nonnegative().optional(),
     attempt: z.number().int().positive().optional(),
     id: z.string(),
@@ -518,6 +691,15 @@ export const classDetailResponseSchema = z
     order: z.number().int(),
     passThreshold: z.number(),
     submitted: z.boolean(),
+    submission: z
+      .object({
+        passed: z.boolean().nullable(),
+        overallScore: z.number().finite().nullable(),
+        submittedAt: z.string().optional(),
+        receipt: classReceiptSchema.optional(),
+      })
+      .nullable()
+      .optional(),
     sections: z.array(classSectionSchema),
   })
   .loose();
@@ -790,185 +972,6 @@ export const deleteCourseResponseSchema = z.object({
   filesDeleted: z.number(),
   filesFailed: z.number(),
 });
-
-// ---------------------------------------------------------------------------
-// GET /api/v1/courses/{courseId}/graph — the vocabulary/grammar memory graph.
-// Mirrors apps/web/src/lib/knowledge-graph.ts (getMemoryGraph). The route
-// returns legacy nodes/edges plus separate pinned objective projections.
-// `.loose()` on a legacy node tolerates additional display metadata.
-// ---------------------------------------------------------------------------
-
-export const memoryNodeSchema = z
-  .object({
-    id: z.string(),
-    kind: z.enum(['vocab', 'grammar']),
-    label: z.string(),
-    // Vocab nodes carry a translation; grammar nodes do not.
-    translation: z.string().optional(),
-    // 0..1 mastery strength.
-    strength: z.number(),
-    due: z.boolean(),
-  })
-  .loose();
-
-export const memoryEdgeSchema = z
-  .object({
-    source: z.string(),
-    target: z.string(),
-    type: z.string(),
-    weight: z.number(),
-  })
-  .loose();
-
-export const memoryGraphResponseSchema = z
-  .object({
-    objectives: z.array(learningObjectiveMemorySchema),
-    nodes: z.array(memoryNodeSchema),
-    edges: z.array(memoryEdgeSchema),
-  })
-  .loose();
-
-// ---------------------------------------------------------------------------
-// GET /api/v1/courses/{courseId}/exams — the exam this course can sit plus the
-// learner's past attempts. Mirrors listCourseExams in
-// apps/web/src/lib/mock-exam-service.ts.
-// ---------------------------------------------------------------------------
-
-export const courseExamsResponseSchema = z
-  .object({
-    available: z
-      .object({
-        institution: z.string(),
-        institutionLabel: z.string(),
-        examName: z.string(),
-        level: z.string(),
-        sectionCount: z.number(),
-      })
-      .loose(),
-    history: z.array(
-      z
-        .object({
-          id: z.string(),
-          examName: z.string(),
-          level: z.string(),
-          status: z.string(),
-          band: z.string().nullable(),
-          overallScore: z.number().nullable(),
-          createdAt: z.string(),
-        })
-        .loose()
-    ),
-  })
-  .loose();
-
-// ---------------------------------------------------------------------------
-// GET /api/v1/learn/activity — daily study activity + streaks, bucketed in the
-// learner's timezone. `days` is an ISO-day-keyed object; quiet days are absent.
-// ---------------------------------------------------------------------------
-
-export const activityResponseSchema = z
-  .object({
-    timeZone: z.string(),
-    todayIso: z.string(),
-    days: z.record(z.string(), z.record(z.string(), z.number())),
-    currentStreak: z.number(),
-    longestStreak: z.number(),
-  })
-  .loose();
-
-// ---------------------------------------------------------------------------
-// GET /api/v1/onboarding/config — instance + owner config for the wizard. No
-// secrets. Mirrors apps/web/src/app/api/v1/onboarding/config/route.ts:
-// { selfHosted, isOwner, infra: {...non-secret provider/storage fields} | null }
-// (`infra` is null unless self-hosted AND the user is the owner).
-// ---------------------------------------------------------------------------
-
-// `.loose()`: the non-secret infra projection. Every field is an optional/
-// nullable display string; open to tolerate any provider fields added later.
-export const onboardingInfraSchema = z
-  .object({
-    aiProvider: z.string().nullable().optional(),
-    aiModel: z.string().nullable().optional(),
-    aiBaseUrl: z.string().nullable().optional(),
-    sttProvider: z.string().nullable().optional(),
-    sttBaseUrl: z.string().nullable().optional(),
-    sttModel: z.string().nullable().optional(),
-    ttsProvider: z.string().nullable().optional(),
-    ttsBaseUrl: z.string().nullable().optional(),
-    storageProvider: z.string().nullable().optional(),
-    s3Bucket: z.string().nullable().optional(),
-    s3Region: z.string().nullable().optional(),
-  })
-  .loose();
-
-export const onboardingConfigResponseSchema = z.object({
-  selfHosted: z.boolean(),
-  isOwner: z.boolean(),
-  infra: onboardingInfraSchema.nullable(),
-});
-
-// ---------------------------------------------------------------------------
-// GET /api/v1/users/me  (auth: bearer) — the authenticated learner's identity.
-// `.loose()`: the route returns a richer row (episodeCount, voicePreferences,
-// preferred*, createdAt, ...); the CLI reads only the identity subset and
-// tolerates the extra fields. `id` is always present; the rest are nullable.
-// Used by `sotto whoami` and the account switcher to show who a profile is.
-// ---------------------------------------------------------------------------
-export const meResponseSchema = z
-  .object({
-    id: z.string(),
-    name: z.string().nullable().optional(),
-    email: z.string().nullable().optional(),
-    image: z.string().nullable().optional(),
-  })
-  .loose();
-
-// ---------------------------------------------------------------------------
-// ADAPTIVE-LISTENING Q&A — ask a contextual question during a listening lesson.
-//   POST /api/v1/episodes/{episodeId}/interact                  -> 201 Interaction
-//   GET  /api/v1/episodes/{episodeId}/interact/{interactionId}  -> 200 Interaction
-// Mirrors apps/web/src/app/api/v1/episodes/[episodeId]/interact + the Interaction
-// model. The worker answers asynchronously; the client polls until the status is
-// ANSWERED with a non-null `answer`. The answer is TEXT only — the Interaction
-// model has no answer-audio field, so none is modeled (the loose response would
-// tolerate one if the route ever adds it).
-// ---------------------------------------------------------------------------
-
-// Mirrors the Prisma `InteractionStatus` enum. There is no FAILED state — a
-// worker failure leaves the interaction PENDING/ANSWERING (the client times out
-// and surfaces an error); a content-policy block resolves to ANSWERED with a
-// fallback answer text.
-export const interactionStatusSchema = z.enum([
-  'PENDING',
-  'ANSWERING',
-  'ANSWERED',
-  'RESOLVED',
-  'INCORPORATING',
-  'INCORPORATED',
-]);
-
-// POST body: a contextual question + the playback position (seconds) it was
-// asked at. `interactionSchema` on the route: question 1..2000, timestamp >= 0.
-export const askInteractionRequestSchema = z.object({
-  question: z.string().min(1).max(2000),
-  timestamp: z.number().min(0),
-});
-
-// `.loose()`: the POST returns the full Interaction row (plus `user`); the GET
-// returns the safe projection. One open schema covers both — the client reads
-// the shared subset and tolerates the POST's extra fields.
-export const interactionResponseSchema = z
-  .object({
-    id: z.string(),
-    question: z.string(),
-    timestamp: z.number(),
-    status: interactionStatusSchema,
-    // Populated once the worker finishes (ANSWERED); null while pending.
-    answer: z.string().nullable(),
-    helpful: z.boolean().nullable(),
-    segmentOrder: z.number().nullable(),
-  })
-  .loose();
 
 // ---------------------------------------------------------------------------
 // POST /api/v1/auth/pair/redeem  (auth: none — the pairing token is the credential)

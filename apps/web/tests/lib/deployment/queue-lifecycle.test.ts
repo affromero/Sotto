@@ -607,21 +607,34 @@ suite('deployment queue and execution settlement', () => {
     }
   });
 
-  it('allows only authenticated synchronous writing while worker journals remain blocking', async () => {
-    await execution('learning-writing');
-    const worker = await execution('audio-stitching', 2);
+  it.each([1, 2])(
+    'allows synchronous writing v%s while worker journals remain blocking',
+    async (version) => {
+      await execution('learning-writing', version);
+      const worker = await execution('audio-stitching', 2);
+      const manifest = await run({ command: 'snapshot' }, runtime);
+      await run({ command: 'pause', manifest }, runtime);
+      expect(await run({ command: 'drained', manifest }, runtime)).toMatchObject({
+        drained: false,
+        executions: { synchronousActive: 1, workerActive: 1 },
+      });
+      await sottoTransaction(instance.database, (transaction) =>
+        sottoJobExecutions(transaction).settle(worker)
+      );
+      expect(await run({ command: 'drained', manifest }, runtime)).toMatchObject({
+        drained: true,
+        executions: { synchronousActive: 1, settled: 1 },
+      });
+    }
+  );
+
+  it('treats queued assessment writing as active worker work during deployment', async () => {
+    await execution('learning-writing', 3);
     const manifest = await run({ command: 'snapshot' }, runtime);
     await run({ command: 'pause', manifest }, runtime);
     expect(await run({ command: 'drained', manifest }, runtime)).toMatchObject({
       drained: false,
-      executions: { synchronousActive: 1, workerActive: 1 },
-    });
-    await sottoTransaction(instance.database, (transaction) =>
-      sottoJobExecutions(transaction).settle(worker)
-    );
-    expect(await run({ command: 'drained', manifest }, runtime)).toMatchObject({
-      drained: true,
-      executions: { synchronousActive: 1, settled: 1 },
+      executions: { synchronousActive: 0, workerActive: 1 },
     });
   });
 

@@ -1,9 +1,9 @@
-// @vitest-environment node
+// @vitest-environment private-redis
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { StorageWriteJournal } from 'thesidedoor-core/storage';
+import { StorageWriteJournal, copyOwnedBytesToFile } from 'thesidedoor-core/storage';
 import { NextRequest } from 'next/server';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -29,6 +29,7 @@ import { closeRedis } from '@/lib/redis';
 import { planMaterialUploadParts } from '@/lib/course-materials/uploads/protocol';
 import { settleFailedMaterialJob } from '@/lib/course-materials/jobs/failure';
 import { sottoJobOutbox } from '@/lib/sidedoor/jobs/core/job-delivery';
+import { sottoJobExecutions } from '@/lib/sidedoor/jobs/core/job-execution-lifetime';
 import { durableQueueOperationId } from '@/lib/sidedoor/jobs/core/durable-queue';
 import { SIDEDOOR_STATE_ID } from '@/lib/sidedoor/access/state/store';
 import {
@@ -41,11 +42,31 @@ const boundary = vi.hoisted(() => ({
   database: null as PrismaClient | null,
   unknownOriginal: false,
   beforePart: null as (() => Promise<void>) | null,
+  failDownload: false,
 }));
 vi.mock('@/lib/r2', async (original) => {
   const actual = await original<typeof import('@/lib/r2')>();
   return {
     ...actual,
+    restoreStorageBackend: async (...args: Parameters<typeof actual.restoreStorageBackend>) => {
+      const backend = await actual.restoreStorageBackend(...args);
+      if (!boundary.failDownload) return backend;
+      return {
+        ...backend,
+        downloadToFile: async (_key: string, destination: string) =>
+          copyOwnedBytesToFile({
+            destination,
+            openSource: async () => ({
+              read: async () => {
+                throw new Error('Synthetic storage read failed');
+              },
+              close: async () => {
+                throw new Error('Synthetic storage close failed');
+              },
+            }),
+          }),
+      };
+    },
     captureStorageBackend: async () => {
       const backend = await actual.captureStorageBackend();
       return {
@@ -65,7 +86,10 @@ vi.mock('@/lib/prisma', async () => {
   const database = prismaTestBoundary(boundary);
   return { prisma: database, prismaUnfiltered: database };
 });
-const suite = process.env.SIDEDOOR_TEST_DATABASE_URL ? describe : describe.skip;
+const suite =
+  process.env.SIDEDOOR_TEST_DATABASE_URL && process.env.SOTTO_TEST_PRIVATE_REDIS_URL
+    ? describe
+    : describe.skip;
 const sha256 = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
 suite('resumable owned material originals', () => {
   let instance: SharedTestInstance;
@@ -73,6 +97,15 @@ suite('resumable owned material originals', () => {
   let executionDirectory: string;
   const jobs = new Set<string>();
   beforeAll(async () => {
+    const privateUrl = new URL(process.env.SOTTO_TEST_PRIVATE_REDIS_URL!);
+    const redis = (await import('@/lib/redis')).getSharedQueueRedisClient();
+    if (
+      redis.options.host !== privateUrl.hostname ||
+      redis.options.port !== Number(privateUrl.port) ||
+      (redis.options.db ?? 0) !== Number(privateUrl.pathname.slice(1) || '0') ||
+      Boolean(redis.options.tls) !== (privateUrl.protocol === 'rediss:')
+    )
+      throw new Error('Material queues are not connected to private Redis');
     instance = await createSharedTestInstance('material_upload');
     boundary.database = instance.database;
     executionDirectory = await mkdtemp(join(tmpdir(), 'sotto-upload-executions-'));
@@ -85,6 +118,7 @@ suite('resumable owned material originals', () => {
     vi.stubEnv('SIDEDOOR_EXECUTION_DIR', join(executionDirectory, 'work'));
     boundary.unknownOriginal = false;
     boundary.beforePart = null;
+    boundary.failDownload = false;
     identity = await instance.reset();
   });
   afterEach(async () => {
@@ -499,6 +533,35 @@ suite('resumable owned material originals', () => {
     ).toBeNull();
     expect(await instance.database.materialUploadPart.count()).toBe(0);
   });
+  it('retains the finalizer execution when reading an uploaded part has unconfirmed cleanup', async () => {
+    const bytes = Buffer.from('owned original');
+    let upload = await create(bytes);
+    upload = materialUploadResumeSchema.parse(await (await part(upload, bytes, 0)).json());
+    expect((await finalize(upload)).status).toBe(202);
+    const row = await instance.database.materialUpload.findUniqueOrThrow({
+      where: { id: upload.uploadId },
+    });
+    const operationId = row.finalizationOperationId!;
+    const job = await materialFinalizationQueue.getJob(operationId);
+    if (!job) throw new Error('Missing finalizer.');
+    boundary.failDownload = true;
+    await expect(processMaterialFinalization(job)).rejects.toThrow();
+    const record = await instance.database.$transaction((tx) =>
+      sottoJobOutbox(tx).read(operationId)
+    );
+    if (!record) throw new Error('Finalization job missing');
+    expect(
+      await instance.database.$transaction((tx) =>
+        sottoJobExecutions(tx).blockingStatus(operationId, record.fingerprint)
+      )
+    ).toBe('cleanup-unconfirmed');
+    boundary.failDownload = false;
+    await expect(processMaterialFinalization(job)).rejects.toThrow();
+    expect(
+      await instance.database.materialUploadPart.count({ where: { uploadId: upload.uploadId } })
+    ).toBe(1);
+  });
+
   it('retains uncertain original writes and prevents another storage attempt on retry', async () => {
     const bytes = Buffer.from('uncertain original');
     let upload = await create(bytes);

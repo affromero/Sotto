@@ -6,6 +6,8 @@ struct ClassTeachingView: View {
     let classId: String
     let teaching: SottoClassTeaching
     var intro: SottoClassIntro? = nil
+    var prerequisite: SottoClassPrerequisiteResponse? = nil
+    var lessonHelpRevision: String? = nil
     let onSelectionHelp: (String, String) -> Void
     @State private var showingLanguageHelp = false
 
@@ -69,6 +71,9 @@ struct ClassTeachingView: View {
             }
             VStack(alignment: .leading, spacing: 14) {
                 Text("Try it first").font(.headline).foregroundStyle(SottoTheme.primary)
+                if let prerequisite, let guided = prerequisite.content?.directions.guided {
+                    ClassPrerequisiteDirection(instruction: guided, language: prerequisite.nativeLang)
+                }
                 learnerText(teaching.guidedPractice.prompt)
                 DisclosureGroup("Hint") {
                     learnerText(teaching.guidedPractice.hint).padding(.vertical, 8)
@@ -87,7 +92,7 @@ struct ClassTeachingView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .tint(SottoTheme.primary)
         .sheet(isPresented: $showingLanguageHelp) {
-            ClassLanguageHelpSheet(classId: classId, teaching: teaching)
+            ClassLanguageHelpSheet(classId: classId, teaching: teaching, revision: lessonHelpRevision)
         }
     }
 

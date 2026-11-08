@@ -54,11 +54,14 @@ vi.mock('@aws-sdk/s3-request-presigner', () => ({
 
 import {
   deleteFile,
+  captureStorageBackend,
   extractR2Key,
   getPresignedUrl,
   readLocalObject,
+  readAttributedStorageRange,
   resolveAudioUrl,
   uploadFile,
+  STORAGE_RANGE_MAX_BYTES,
 } from '@/lib/r2';
 
 describe('shared storage runtime', () => {
@@ -96,8 +99,34 @@ describe('shared storage runtime', () => {
     const url = await uploadFile('episodes/one/audio.mp3', Buffer.from('audio'), 'audio/mpeg');
     expect(url).toBe('/api/v1/storage/episodes/one/audio.mp3');
     expect(await readFile(join(directory, 'episodes/one/audio.mp3'), 'utf8')).toBe('audio');
-    expect(await readLocalObject('episodes/one/audio.mp3', 'learner')).toBeNull();
+    expect(
+      await readLocalObject('episodes/one/audio.mp3', {
+        userId: 'learner',
+        authorize: async () => ({ userId: 'learner' }),
+      })
+    ).toBeNull();
     expect(await resolveAudioUrl(url)).toBe(url);
+  });
+
+  it('rejects oversized audio range reads before contacting storage', async () => {
+    const backend = await captureStorageBackend();
+    await expect(
+      readAttributedStorageRange({
+        input: {
+          consumer: 'recording:id:audio',
+          reference: 'audio.mp3',
+          assetId: 'a'.repeat(64),
+          backendId: 'b'.repeat(64),
+          binding: 'c'.repeat(64),
+          key: 'audio.mp3',
+        },
+        descriptor: backend.descriptor,
+        execution: { userId: 'learner', authorize: async () => ({ userId: 'learner' }) },
+        start: 0,
+        end: STORAGE_RANGE_MAX_BYTES,
+      })
+    ).rejects.toThrow('Invalid storage byte range');
+    expect(boundary.send).not.toHaveBeenCalled();
   });
 
   it('presigns private object references from shared configuration', async () => {

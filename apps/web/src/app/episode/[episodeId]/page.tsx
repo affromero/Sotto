@@ -11,12 +11,14 @@ import styles from './page.module.css';
 interface EpisodePageProps {
   params: Promise<{ episodeId: string }>;
 }
+export const dynamic = 'force-dynamic';
 
 export async function generateMetadata({ params }: EpisodePageProps): Promise<Metadata> {
   const { episodeId } = await params;
-  const episode = await getEpisodeForDetailPage(episodeId);
+  const [session, episode] = await Promise.all([auth(), getEpisodeForDetailPage(episodeId)]);
 
-  if (!episode) return { title: 'Lesson Not Found' };
+  if (!episode || (episode.visibility === 'PRIVATE' && episode.userId !== session?.user?.id))
+    return { title: 'Lesson Not Found' };
 
   const appUrl = getAppBaseUrl();
   const episodeUrl = absoluteEpisodeUrl({ id: episode.id }, appUrl);

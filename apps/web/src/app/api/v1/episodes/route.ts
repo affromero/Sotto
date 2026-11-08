@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { prisma, prismaUnfiltered } from '@/lib/prisma';
+import { isAccessError } from 'thesidedoor-core/access';
+import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 import { authenticateRequest } from '@/lib/api-keys';
 import { createEpisodeSchema } from '@/lib/validations';
 import { checkRateLimit } from '@/lib/redis';
@@ -24,15 +26,45 @@ export async function GET(request: NextRequest) {
     return errorResponse('Unauthorized', 401);
   }
 
-  const episodes = await prisma.episode.findMany({
-    where: { userId: authResult.userId },
-    orderBy: { createdAt: 'desc' },
-    include: {
-      tags: { include: { tag: true } },
-    },
-  });
-
-  return NextResponse.json(episodes);
+  const headers = { 'Cache-Control': 'private, no-store' };
+  try {
+    const episodes = await sottoTransaction(
+      prismaUnfiltered,
+      async (database) => {
+        await requireOriginalSottoAdmission(database, request, authResult);
+        const result = await database.episode.findMany({
+          where: {
+            userId: authResult.userId,
+            deletedAt: null,
+            assessmentAudioAssessmentId: null,
+            assessmentSection: { is: null },
+          },
+          orderBy: { createdAt: 'desc' },
+          omit: {
+            learningAudioIdentity: true,
+            assessmentAudioAssessmentId: true,
+            assessmentAudioSectionId: true,
+            assessmentAudioOperationId: true,
+          },
+          include: { tags: { include: { tag: true } } },
+        });
+        await requireOriginalSottoAdmission(database, request, authResult);
+        request.signal.throwIfAborted();
+        return result;
+      },
+      { signal: request.signal }
+    );
+    return NextResponse.json(episodes, { headers });
+  } catch (error) {
+    if (isAccessError(error))
+      return errorResponse(
+        error.message,
+        error.code === 'unauthorized' ? 401 : 409,
+        undefined,
+        headers
+      );
+    throw error;
+  }
 }
 
 export async function POST(request: NextRequest) {

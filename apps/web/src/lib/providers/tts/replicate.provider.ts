@@ -8,6 +8,7 @@
  */
 import { logger } from '../../logger';
 import { setTimeout as delay } from 'node:timers/promises';
+import { z } from 'zod';
 import type { TtsProvider, SpeechParams } from '../tts';
 import { getProviderMeta, type TtsProviderId } from '../tts-registry';
 import { FAL_VOICE_POOL, INWORLD_VOICE_POOL, selectVoicePairFromPool } from '../tts-voices';
@@ -47,12 +48,16 @@ const QWEN3_LANGUAGE_MAP: Record<string, string> = {
   ru: 'Russian',
 };
 
-interface ReplicatePrediction {
-  id: string;
-  status: 'starting' | 'processing' | 'succeeded' | 'failed' | 'canceled';
-  output: string | null;
-  error: string | null;
-}
+const predictionSchema = z.object({
+  id: z
+    .string()
+    .min(1)
+    .refine((id) => id.trim().length > 0),
+  status: z.enum(['starting', 'processing', 'succeeded', 'failed', 'canceled']),
+  output: z.string().nullable().optional(),
+  error: z.string().nullable().optional(),
+});
+type ReplicatePrediction = z.infer<typeof predictionSchema>;
 
 function retryDelay(bodyText: string): number {
   try {
@@ -139,9 +144,9 @@ export class ReplicateProvider implements TtsProvider {
       throw new Error(`Replicate API error (${response.status}): ${errorText}`);
     }
 
-    let prediction: ReplicatePrediction = await response.json();
+    let prediction = predictionSchema.parse(await response.json());
 
-    if (prediction.status !== 'succeeded') {
+    if (!['succeeded', 'failed', 'canceled'].includes(prediction.status)) {
       prediction = await this.pollPrediction(prediction.id, params);
     }
     params.onSettled?.();
@@ -183,7 +188,8 @@ export class ReplicateProvider implements TtsProvider {
         throw new Error(`Replicate API error (${response.status}): ${body}`);
       }
 
-      const prediction: ReplicatePrediction = await response.json();
+      const prediction = predictionSchema.parse(await response.json());
+      if (prediction.id !== id) throw new Error('Replicate prediction identity changed');
       if (
         prediction.status === 'succeeded' ||
         prediction.status === 'failed' ||

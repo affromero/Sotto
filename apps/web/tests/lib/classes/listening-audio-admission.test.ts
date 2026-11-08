@@ -1,9 +1,11 @@
 // @vitest-environment node
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { randomUUID } from 'node:crypto';
 import type { PrismaClient } from '@/generated/prisma/client';
 import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import { linkPreparationAudio } from '../../helpers/runtime/preparation-audio';
 import { registerPreparationAudio } from '@/lib/classes/preparation-audio';
+import { learningScriptHash } from '@/lib/learning/script-hash';
 import {
   createSharedTestInstance,
   type SharedTestInstance,
@@ -46,6 +48,190 @@ suite('listening audio ownership at durable admission', () => {
     boundary.database = null;
     await instance?.close();
     vi.unstubAllEnvs();
+  });
+
+  it('retains the admitted replacement audio when delivery acknowledgment is lost', async () => {
+    const { restartExistingSegmentAudio } = await import('@/lib/segment-creator');
+    const { durableQueueOperationId, DurableDeliveryPendingError } =
+      await import('@/lib/sidedoor/jobs/core/durable-queue');
+    const { sottoTransaction } = await import('@/lib/sidedoor/access/state/transaction');
+    const { sottoJobOutbox, deliverSottoJob } =
+      await import('@/lib/sidedoor/jobs/core/job-delivery');
+    const generationKey = randomUUID();
+    const episode = await instance.database.episode.create({
+      data: {
+        userId: identity.ownerId,
+        title: 'Fixture',
+        topic: 'Greetings',
+        status: 'GENERATING_AUDIO',
+        audioGenerationKey: generationKey,
+      },
+    });
+    const segment = await instance.database.segment.create({
+      data: { episodeId: episode.id, order: 0, speaker: 'HOST', text: 'Привет' },
+    });
+    const actualQueue = queue.createQueue('audio-generation');
+    const add = actualQueue.add.bind(actualQueue);
+    const lost = vi.spyOn(actualQueue, 'add').mockImplementationOnce(async (...args) => {
+      await add(...args);
+      throw new Error('Lost delivery acknowledgment');
+    });
+    try {
+      const failure = await restartExistingSegmentAudio(episode.id, generationKey, {
+        authorize: async () => ({ userId: identity.ownerId }),
+      }).catch((error: unknown) => error);
+      expect(failure).toBeInstanceOf(DurableDeliveryPendingError);
+      const updated = await instance.database.segment.findUniqueOrThrow({
+        where: { id: segment.id },
+      });
+      expect(updated.version).toBe(segment.version + 1);
+      const operationId = durableQueueOperationId(
+        queue.audioGenerationQueue.name,
+        `audio-${episode.id}-${segment.id}-v${updated.version}-${generationKey}`
+      );
+      jobs.push(operationId);
+      expect((failure as InstanceType<typeof DurableDeliveryPendingError>).operationId).toBe(
+        operationId
+      );
+      const record = await sottoTransaction(instance.database, (database) =>
+        sottoJobOutbox(database).read(operationId)
+      );
+      expect(record).not.toBeNull();
+      await expect(
+        deliverSottoJob({
+          database: instance.database,
+          queue: actualQueue,
+          operationId,
+          fingerprint: record!.fingerprint,
+          version: 1,
+        })
+      ).resolves.toBe('delivered');
+      expect(
+        await instance.database.episode.findUniqueOrThrow({ where: { id: episode.id } })
+      ).toMatchObject({
+        status: 'GENERATING_AUDIO',
+        audioGenerationKey: generationKey,
+      });
+    } finally {
+      lost.mockRestore();
+    }
+  });
+
+  it('replays a reserved generation without resetting segments or creating new children', async () => {
+    const { createSegmentsAndQueueAudio } = await import('@/lib/segment-creator');
+    const { durableQueueOperationId } = await import('@/lib/sidedoor/jobs/core/durable-queue');
+    const episode = await instance.database.episode.create({
+      data: {
+        userId: identity.ownerId,
+        title: 'Reserved audio',
+        topic: 'Greetings',
+        status: 'SCRIPT_READY',
+      },
+    });
+    const generationKey = randomUUID();
+    const turns = [
+      { speaker: 'HOST', text: 'Привет' },
+      { speaker: 'EXPERT', text: 'Здравствуйте' },
+    ];
+    const admission = {
+      authorize: async () => ({ userId: identity.ownerId }),
+      reservation: {
+        generationKey,
+        reconcile: async (
+          database: import('@/generated/prisma/client').Prisma.TransactionClient,
+          key: string
+        ) => {
+          await database.$queryRaw`SELECT id FROM "Episode" WHERE id = ${episode.id} FOR UPDATE`;
+          const current = await database.episode.findUniqueOrThrow({ where: { id: episode.id } });
+          if (current.status === 'SCRIPT_READY' && !current.audioGenerationKey)
+            return 'CREATE' as const;
+          if (current.audioGenerationKey === key) return 'REPLAY' as const;
+          throw new Error('Audio reservation changed');
+        },
+      },
+    };
+    const actualQueue = queue.createQueue('audio-generation');
+    const add = actualQueue.add.bind(actualQueue);
+    const lostAcknowledgment = vi
+      .spyOn(actualQueue, 'add')
+      .mockImplementationOnce(async (...args) => {
+        await add(...args);
+        throw new Error('Lost delivery acknowledgment');
+      });
+    try {
+      await expect(createSegmentsAndQueueAudio(episode.id, turns, admission)).rejects.toThrow(
+        'Lost delivery acknowledgment'
+      );
+    } finally {
+      lostAcknowledgment.mockRestore();
+    }
+    await Promise.all([
+      createSegmentsAndQueueAudio(episode.id, turns, admission),
+      createSegmentsAndQueueAudio(episode.id, turns, admission),
+    ]);
+    const before = await instance.database.segment.findMany({
+      where: { episodeId: episode.id },
+      orderBy: { order: 'asc' },
+    });
+    expect(before).toHaveLength(2);
+    for (const segment of before)
+      jobs.push(
+        durableQueueOperationId(
+          queue.audioGenerationQueue.name,
+          `audio-${episode.id}-${segment.id}-v${segment.version}-${generationKey}`
+        )
+      );
+    await instance.database.segment.update({
+      where: { id: before[0]!.id },
+      data: { audioUrl: '/completed.wav' },
+    });
+    await createSegmentsAndQueueAudio(episode.id, turns, admission);
+    const after = await instance.database.segment.findMany({
+      where: { episodeId: episode.id },
+      orderBy: { order: 'asc' },
+    });
+    expect(after.map((item) => ({ id: item.id, version: item.version }))).toEqual(
+      before.map((item) => ({ id: item.id, version: item.version }))
+    );
+    expect(after[0]!.audioUrl).toBe('/completed.wav');
+    let resume!: () => void;
+    let entered!: () => void;
+    const waiting = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    const barrier = new Promise<void>((resolve) => {
+      resume = resolve;
+    });
+    const mutableTurns = structuredClone(turns);
+    const pausedAdmission = {
+      ...admission,
+      reservation: {
+        ...admission.reservation,
+        reconcile: async (
+          database: import('@/generated/prisma/client').Prisma.TransactionClient,
+          key: string
+        ) => {
+          entered();
+          await barrier;
+          return admission.reservation.reconcile(database, key);
+        },
+      },
+    };
+    const paused = createSegmentsAndQueueAudio(episode.id, mutableTurns, pausedAdmission);
+    await waiting;
+    mutableTurns[0]!.text = 'Mutated after admission';
+    resume();
+    await paused;
+    expect(
+      (await instance.database.segment.findUniqueOrThrow({ where: { id: before[0]!.id } })).text
+    ).toBe('Привет');
+    await expect(
+      createSegmentsAndQueueAudio(
+        episode.id,
+        [{ ...turns[0]!, text: 'Changed' }, turns[1]!],
+        admission
+      )
+    ).rejects.toThrow('The reserved audio generation changed');
   });
 
   it.each(['unqueued', 'admitted', 'unknown', 'other-owner'] as const)(
@@ -101,6 +287,7 @@ suite('listening audio ownership at durable admission', () => {
         },
       });
       let associationId: string;
+      let audioParent: Parameters<typeof listening.queueListeningAudio>[2];
       const execution: SottoProviderExecution = {
         userId: identity.ownerId,
         authorize: async (database) => {
@@ -147,6 +334,7 @@ suite('listening audio ownership at durable admission', () => {
           await import('@/lib/practice/preparation');
         const operation = await requestPracticePreparation(course.id, 'FULL', execution);
         associationId = operation.sessionId;
+        audioParent = { practiceSessionId: associationId };
         await db.practiceSession.update({
           where: { id: associationId },
           data: { episodeId: episode.id },
@@ -172,13 +360,15 @@ suite('listening audio ownership at durable admission', () => {
           },
         });
         const cls = await db.courseClass.create({
-          data: { courseId: course.id, lessonId: lesson.id, order: 1 },
+          data: { courseId: course.id, lessonId: lesson.id, order: 1, status: 'GENERATING' },
         });
+        audioParent = { classId: cls.id, attempt: cls.attempt };
         associationId = (
           await db.classSection.create({
             data: {
               classId: cls.id,
               skill: 'LISTENING',
+              status: 'READY',
               seed: 'fixture',
               spec: {},
               episodeId: episode.id,
@@ -213,6 +403,7 @@ suite('listening audio ownership at durable admission', () => {
             },
           })
         ).id;
+        audioParent = { examId: exam.id, examSectionId: associationId };
       }
       const turns = [];
       for (let index = 0; index < 22; index++)
@@ -220,13 +411,20 @@ suite('listening audio ownership at durable admission', () => {
           speaker: index % 2 === 0 ? 'HOST' : 'GUEST',
           text: `Guten Morgen. Satz ${index + 1}.`,
         });
+      await db.script.create({ data: { episodeId: episode.id, turns, markdown: 'Fixture' } });
+      if ('practiceSessionId' in audioParent)
+        await db.practiceSession.update({
+          where: { id: audioParent.practiceSessionId },
+          data: { listeningScriptHash: learningScriptHash(turns) },
+        });
       await listening.queueListeningAudio(
         {
           episodeId: episode.id,
           comprehensionQuestions: [],
           turns,
         },
-        execution
+        execution,
+        audioParent
       );
       const { sottoJobOutbox } = await import('@/lib/sidedoor/jobs/core/job-delivery');
       const { validateDurableAuthority } = await import('@/lib/sidedoor/jobs/core/durable-queue');

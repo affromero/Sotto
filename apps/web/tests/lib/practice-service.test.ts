@@ -10,7 +10,11 @@ import { reviewFixture } from './learning-map/adaptation/fixtures';
 
 const mockReadingProviderInput = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/learning-ai', () => ({
-  resolveCapturedLearningAi: async () => ({ provider: 'anthropic', model: 'fixture' }),
+  resolveCapturedLearningAi: async (userId: string, execution: object) => ({
+    provider: 'anthropic',
+    model: 'fixture',
+    execution: { ...execution, userId },
+  }),
   capturedLearningAiOptions: async () => ({}),
 }));
 vi.mock('@/lib/providers/ai', () => ({

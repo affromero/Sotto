@@ -79,6 +79,10 @@
               "questions": [{ "id": "q0", "order": 0, "question": "?", "options": ["a","b"], "passageRef": null, "passageText": null }] }
         ]));
 
+        if let View::Class { previous_work, .. } = &mut app.view {
+            previous_work.push("Saved draft".into());
+        }
+
         // Open the overlay over the listening section and put it in flight (Polling).
         app.on_toggle_ask();
         for c in "explain?".chars() {
@@ -97,6 +101,7 @@
             current_ask_phase_section(&app),
             state::AskPhase::Polling { .. }
         ));
+        assert!(app.map_key(key(KeyCode::F(2))).is_none());
 
         let gen_before = app.request_gen;
         let cursor_before = match &app.view {

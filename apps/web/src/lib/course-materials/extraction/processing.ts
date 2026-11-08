@@ -3,7 +3,7 @@ import { statfs } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Job } from 'bullmq';
 import { materialVisualCoverageSchema } from '@sotto/shared';
-import { StorageReadCleanupError } from 'thesidedoor-core/storage';
+import { isJobExecutionCleanupFailure } from 'thesidedoor-core/runtime/outbox';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { restoreStorageBackend } from '@/lib/r2';
 import { isMediaCleanupFailure } from '@/lib/audio/media-process';
@@ -138,7 +138,7 @@ export async function processMaterialExtraction(
         const backend = await restoreStorageBackend(captured.source.backend.descriptor);
         await backend.downloadToFile(captured.source.input.key, originalPath, signal);
       } catch (error) {
-        if (error instanceof StorageReadCleanupError) markCleanupUnconfirmed();
+        if (isJobExecutionCleanupFailure(error)) markCleanupUnconfirmed();
         throw error;
       }
       if (textSource) {

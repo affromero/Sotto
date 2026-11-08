@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useAudioRecorder } from '@/lib/hooks/useAudioRecorder';
+import { createElement, StrictMode, type ReactNode } from 'react';
 
 const mockStop = vi.fn();
 const mockStart = vi.fn();
@@ -8,27 +9,28 @@ const mockPlay = vi.fn();
 const mockPause = vi.fn();
 
 let mockRecorderState = 'inactive';
-let onstopCallback: (() => void) | null = null;
+let instances: MockMediaRecorder[] = [];
+let deferStop = false;
 
 class MockMediaRecorder {
   mimeType: string;
-  ondataavailable: ((e: { data: { size: number } }) => void) | null = null;
+  ondataavailable: ((e: { data: Blob }) => void) | null = null;
   onstop: (() => void) | null = null;
 
   constructor(_stream: MediaStream, opts: { mimeType: string }) {
     this.mimeType = opts.mimeType;
+    instances.push(this);
   }
 
   start() {
     mockStart();
     mockRecorderState = 'recording';
-    onstopCallback = this.onstop;
   }
 
   stop() {
     mockStop();
     mockRecorderState = 'inactive';
-    if (onstopCallback) onstopCallback();
+    if (!deferStop) this.onstop?.();
   }
 
   get state() {
@@ -50,7 +52,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.useFakeTimers();
   mockRecorderState = 'inactive';
-  onstopCallback = null;
+  instances = [];
+  deferStop = false;
 
   vi.stubGlobal('MediaRecorder', MockMediaRecorder);
   vi.stubGlobal('Audio', MockAudio);
@@ -105,6 +108,154 @@ describe('useAudioRecorder', () => {
   });
 
   describe('startRecording', () => {
+    it('does not leave the prior timer running when stop completes after a new start', async () => {
+      const hook = renderHook(() => useAudioRecorder());
+      await act(async () => {
+        await hook.result.current.startRecording();
+      });
+      const previous = instances[0];
+      deferStop = true;
+      act(() => hook.result.current.stopRecording());
+      await act(async () => {
+        await hook.result.current.startRecording();
+      });
+      act(() => {
+        previous.onstop?.();
+        vi.advanceTimersByTime(3000);
+      });
+      expect(hook.result.current.duration).toBe(3);
+      expect(mockStop).toHaveBeenCalledTimes(1);
+      expect(vi.getTimerCount()).toBe(1);
+    });
+    it('keeps late audio from an older recorder out of a new recording', async () => {
+      const hook = renderHook(() => useAudioRecorder());
+      await act(async () => {
+        await hook.result.current.startRecording();
+      });
+      const previous = instances[0];
+      act(() => hook.result.current.reset());
+      await act(async () => {
+        await hook.result.current.startRecording();
+      });
+      const current = instances[1];
+      act(() => {
+        previous.ondataavailable?.({ data: new Blob(['old']) });
+        current.ondataavailable?.({ data: new Blob(['fresh']) });
+        hook.result.current.stopRecording();
+      });
+      expect(hook.result.current.recordedBlob?.size).toBe(5);
+    });
+
+    it('does not start a second recorder while one is active', async () => {
+      const hook = renderHook(() => useAudioRecorder());
+      await act(async () => {
+        await hook.result.current.startRecording();
+      });
+      await act(async () => {
+        await hook.result.current.startRecording();
+      });
+      expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledTimes(1);
+      expect(mockStart).toHaveBeenCalledTimes(1);
+    });
+
+    it('stops the older stream when overlapping permission requests resolve out of order', async () => {
+      const stopOld = vi.fn();
+      const stopNew = vi.fn();
+      let old: (stream: MediaStream) => void = () => {};
+      let current: (stream: MediaStream) => void = () => {};
+      vi.mocked(navigator.mediaDevices.getUserMedia)
+        .mockImplementationOnce(
+          () =>
+            new Promise<MediaStream>((resolve) => {
+              old = resolve;
+            })
+        )
+        .mockImplementationOnce(
+          () =>
+            new Promise<MediaStream>((resolve) => {
+              current = resolve;
+            })
+        );
+      const hook = renderHook(() => useAudioRecorder());
+      let first: Promise<void>;
+      let second: Promise<void>;
+      act(() => {
+        first = hook.result.current.startRecording();
+        second = hook.result.current.startRecording();
+      });
+      await act(async () => {
+        current({ getTracks: () => [{ stop: stopNew }] } as unknown as MediaStream);
+        await second;
+        old({ getTracks: () => [{ stop: stopOld }] } as unknown as MediaStream);
+        await first;
+      });
+      expect(stopOld).toHaveBeenCalled();
+      expect(stopNew).not.toHaveBeenCalled();
+      expect(mockStart).toHaveBeenCalledTimes(1);
+      hook.unmount();
+      expect(stopNew).toHaveBeenCalled();
+    });
+    it('stops a late microphone stream instead of recording after unmount', async () => {
+      const stopTrack = vi.fn();
+      let complete: (stream: MediaStream) => void = () => {};
+      vi.mocked(navigator.mediaDevices.getUserMedia).mockImplementationOnce(
+        () =>
+          new Promise<MediaStream>((resolve) => {
+            complete = resolve;
+          })
+      );
+      const hook = renderHook(() => useAudioRecorder());
+      let pending: Promise<void>;
+      act(() => {
+        pending = hook.result.current.startRecording();
+      });
+      hook.unmount();
+      await act(async () => {
+        complete({ getTracks: () => [{ stop: stopTrack }] } as unknown as MediaStream);
+        await pending;
+      });
+      expect(stopTrack).toHaveBeenCalled();
+      expect(mockStart).not.toHaveBeenCalled();
+    });
+
+    it('stops a late microphone stream when its class authorization changed', async () => {
+      const stopTrack = vi.fn();
+      let complete: (stream: MediaStream) => void = () => {};
+      let authorized = true;
+      vi.mocked(navigator.mediaDevices.getUserMedia).mockImplementationOnce(
+        () =>
+          new Promise<MediaStream>((resolve) => {
+            complete = resolve;
+          })
+      );
+      const hook = renderHook(() => useAudioRecorder());
+      let pending: Promise<void>;
+      act(() => {
+        pending = hook.result.current.startRecording(() => authorized);
+      });
+      authorized = false;
+      await act(async () => {
+        complete({ getTracks: () => [{ stop: stopTrack }] } as unknown as MediaStream);
+        await pending;
+      });
+      expect(stopTrack).toHaveBeenCalled();
+      expect(mockStart).not.toHaveBeenCalled();
+      expect(hook.result.current.isRecording).toBe(false);
+    });
+
+    it('stops the active microphone when its view is unmounted', async () => {
+      const stopTrack = vi.fn();
+      vi.mocked(navigator.mediaDevices.getUserMedia).mockResolvedValueOnce({
+        getTracks: () => [{ stop: stopTrack }],
+      } as unknown as MediaStream);
+      const hook = renderHook(() => useAudioRecorder());
+      await act(async () => {
+        await hook.result.current.startRecording();
+      });
+      hook.unmount();
+      expect(mockStop).toHaveBeenCalled();
+      expect(stopTrack).toHaveBeenCalled();
+    });
     it('sets isRecording to true after starting', async () => {
       const { result } = renderHook(() => useAudioRecorder());
       await act(async () => {
@@ -181,6 +332,38 @@ describe('useAudioRecorder', () => {
   });
 
   describe('duration timer', () => {
+    it('stops once at the limit under StrictMode', async () => {
+      const hook = renderHook(() => useAudioRecorder({ maxSeconds: 2 }), {
+        wrapper: ({ children }: { children: ReactNode }) =>
+          createElement(StrictMode, null, children),
+      });
+      await act(async () => {
+        await hook.result.current.startRecording();
+      });
+      act(() => vi.advanceTimersByTime(3000));
+      expect(hook.result.current.duration).toBe(2);
+      expect(mockStop).toHaveBeenCalledTimes(1);
+    });
+
+    it('ignores an old timer tick after resetting and starting a new recorder', async () => {
+      const interval = vi.spyOn(globalThis, 'setInterval');
+      const hook = renderHook(() => useAudioRecorder());
+      await act(async () => {
+        await hook.result.current.startRecording();
+      });
+      const oldTick = interval.mock.calls[0][0];
+      expect(typeof oldTick).toBe('function');
+      act(() => hook.result.current.reset());
+      await act(async () => {
+        await hook.result.current.startRecording();
+      });
+      act(() => {
+        if (typeof oldTick === 'function') oldTick();
+      });
+      expect(hook.result.current.duration).toBe(0);
+      expect(mockStop).toHaveBeenCalledTimes(1);
+      interval.mockRestore();
+    });
     it('increments duration each second', async () => {
       const { result } = renderHook(() => useAudioRecorder());
       await act(async () => {
@@ -193,9 +376,7 @@ describe('useAudioRecorder', () => {
     });
 
     it('auto-stops at maxSeconds', async () => {
-      const { result } = renderHook(() =>
-        useAudioRecorder({ maxSeconds: 10 })
-      );
+      const { result } = renderHook(() => useAudioRecorder({ maxSeconds: 10 }));
       await act(async () => {
         await result.current.startRecording();
       });
@@ -221,9 +402,7 @@ describe('useAudioRecorder', () => {
 
   describe('minSeconds', () => {
     it('uses custom minSeconds value', () => {
-      const { result } = renderHook(() =>
-        useAudioRecorder({ minSeconds: 10 })
-      );
+      const { result } = renderHook(() => useAudioRecorder({ minSeconds: 10 }));
       expect(result.current.minSeconds).toBe(10);
     });
   });
@@ -272,9 +451,7 @@ describe('useAudioRecorder', () => {
     });
 
     it('clears error', async () => {
-      vi.mocked(navigator.mediaDevices.getUserMedia).mockRejectedValueOnce(
-        new Error('denied')
-      );
+      vi.mocked(navigator.mediaDevices.getUserMedia).mockRejectedValueOnce(new Error('denied'));
       const { result } = renderHook(() => useAudioRecorder());
       await act(async () => {
         await result.current.startRecording();

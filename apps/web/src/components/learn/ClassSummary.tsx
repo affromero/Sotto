@@ -121,7 +121,7 @@ export function ClassSummary({
                 <ClassGlyph name="graph" size={13} /> Overall
               </div>
               <div className={styles.wstVal}>{overall}%</div>
-              <div className={styles.wstSub}>across all four skills</div>
+              <div className={styles.wstSub}>across required skills</div>
             </div>
           </div>
         </div>
@@ -131,6 +131,7 @@ export function ClassSummary({
           sections={sections}
           vocabulary={vocabulary}
           feedbackNotes={feedbackNotes}
+          practiceFeedback={result.source === 'ASSESSMENT'}
         />
 
         <CefrDisclaimer variant="compact" />
@@ -157,16 +158,20 @@ export function ClassSummary({
                 <ClassGlyph name="back" size={15} /> Courses
               </button>
               <span className={styles.grow} />
-              <button
-                type="button"
-                className={`${styles.btn} ${styles.btnPrimary}`}
-                onClick={onRetryFailed}
-                disabled={regenerating}
-                aria-disabled={regenerating}
-              >
-                {regenerating ? 'Preparing…' : 'Retry the missed sections'}{' '}
-                <ClassGlyph name="retry" size={15} />
-              </button>
+              {result.source === 'ASSESSMENT' ? (
+                <p>Your result is saved. Assessment retry is not available yet.</p>
+              ) : (
+                <button
+                  type="button"
+                  className={`${styles.btn} ${styles.btnPrimary}`}
+                  onClick={onRetryFailed}
+                  disabled={regenerating}
+                  aria-disabled={regenerating}
+                >
+                  {regenerating ? 'Preparing…' : 'Retry the missed sections'}{' '}
+                  <ClassGlyph name="retry" size={15} />
+                </button>
+              )}
             </>
           )}
         </div>
@@ -185,6 +190,7 @@ export function FeedbackClinic({
   liveSection,
   onRetrySection,
   retrying = false,
+  practiceFeedback = false,
 }: {
   result?: ClassSubmitResult | null;
   sections: ClassSection[];
@@ -201,6 +207,7 @@ export function FeedbackClinic({
   } | null;
   onRetrySection?: () => void;
   retrying?: boolean;
+  practiceFeedback?: boolean;
 }) {
   const weakSections = (result?.sections ?? (liveSection?.complete ? [liveSection] : []))
     .filter((section) => !section.passed || section.score < 0.82)
@@ -236,7 +243,7 @@ export function FeedbackClinic({
       <div className={styles.clinicGrid}>
         {feedbackNotes.length > 0 && (
           <article className={styles.clinicCard}>
-            <h3>Live notes</h3>
+            <h3>{practiceFeedback ? 'Practice notes' : 'Live notes'}</h3>
             <div className={styles.feedbackNoteList}>
               {[...feedbackNotes]
                 .sort((left, right) => Number(left.tone === 'good') - Number(right.tone === 'good'))
@@ -296,7 +303,7 @@ export function FeedbackClinic({
         </article>
 
         <article className={styles.clinicCard}>
-          <h3>Pronunciation</h3>
+          <h3>{practiceFeedback ? 'Pronunciation practice' : 'Pronunciation'}</h3>
           {speakingFeedback.length > 0 ? (
             <div className={styles.speechList}>
               {speakingFeedback.map((prompt) => {
@@ -379,7 +386,7 @@ export function FeedbackClinic({
         </article>
 
         <article className={styles.clinicCard}>
-          <h3>Writing</h3>
+          <h3>{practiceFeedback ? 'Writing practice' : 'Writing'}</h3>
           {writingFeedback.length > 0 ? (
             <div className={styles.writingList}>
               {writingFeedback.map((prompt) => (

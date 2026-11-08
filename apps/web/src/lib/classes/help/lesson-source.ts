@@ -23,6 +23,10 @@ const lessonHelpSourceSchema = classTeachingSchema.omit({ guidedPractice: true }
   }),
 });
 
+export function lessonHelpTeachingHash(teaching: z.infer<typeof classTeachingSchema>) {
+  return createHash('sha256').update(JSON.stringify(teaching)).digest('hex');
+}
+
 export const lessonHelpContextSchema = z
   .object({
     classId: z.string().min(1),
@@ -67,7 +71,7 @@ export async function readLessonHelpSource(
     courseId: cls.courseId,
     userId,
     attempt: cls.attempt,
-    sourceHash: createHash('sha256').update(JSON.stringify(teaching)).digest('hex'),
+    sourceHash: lessonHelpTeachingHash(teaching),
     ...cls.course,
     level: cls.lesson.level,
     source: {

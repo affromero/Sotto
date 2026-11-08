@@ -1,4 +1,19 @@
 fn draw_class(frame: &mut Frame, area: Rect, view: &View, p: &Palette) {
+    if let View::Class { history_open: true, previous_work, history_scroll, history_audio, .. }
+        | View::ClassRepair { history_open: true, previous_work, history_scroll, history_audio, .. } = view {
+        let inner = panel(frame, area, "Previous work · F2/Esc back · ↑/↓ scroll", p);
+        let body = if let Some(recording) = history_audio.items.get(history_audio.cursor) {
+            let chunks = Layout::vertical([Constraint::Length(1), Constraint::Length(1),
+                Constraint::Length(1), Constraint::Fill(1)]).split(inner);
+            frame.render_widget(Paragraph::new(format!("Audio {}/{} · [/] choose · Space play",
+                history_audio.cursor + 1, history_audio.items.len())), chunks[0]);
+            frame.render_widget(Paragraph::new(recording.label.as_str()), chunks[1]);
+            frame.render_widget(Paragraph::new(history_audio.note.as_deref().unwrap_or("")), chunks[2]);
+            chunks[3]
+        } else { inner };
+        frame.render_widget(Paragraph::new(previous_work.join("\n\n")).wrap(Wrap { trim: false }).scroll((*history_scroll, 0)), body);
+        return;
+    }
     let (course, sections, cursor, submitting, flow) = match view {
         View::Class { course, sections, cursor, submitting, .. } => (course, sections, cursor, submitting, "class"),
         View::Practice { course, sections, cursor, submitting, .. } => (course, sections, cursor, submitting, "practice"),
@@ -47,7 +62,11 @@ fn draw_class(frame: &mut Frame, area: Rect, view: &View, p: &Palette) {
 
     let details = match view {
         View::Practice { requirements, progress, .. } => Some((requirements.clone(), progress)),
-        View::Class { progress, .. } => Some((vec!["N repair missing or failed sections".into()], progress)),
+        View::Class { progress, previous_work, .. } => {
+            let mut notices = vec!["N repair missing or failed sections".into()];
+            if !previous_work.is_empty() { notices.push("F2 previous work".into()); }
+            Some((notices, progress))
+        },
         _ => None,
     };
     let body = if let Some((mut notices, progress)) = details {
@@ -58,7 +77,20 @@ fn draw_class(frame: &mut Frame, area: Rect, view: &View, p: &Palette) {
             chunks[1]
         }
     } else { inner };
-    draw_section(frame, body, section, p);
+    let instruction = match view {
+        View::Class { directions: Some(directions), direction_scroll, .. } =>
+            section.current_task_key().and_then(|key| directions.tasks.get(&key).map(|text| (text, direction_scroll.get(&key).copied().unwrap_or(0)))),
+        _ => None,
+    };
+    if let Some((instruction, offset)) = instruction.filter(|_| body.height >= 5) {
+        let rows = body.height.saturating_sub(3).min(4);
+        let chunks = Layout::vertical([Constraint::Length(1), Constraint::Length(rows), Constraint::Fill(1)]).split(body);
+        frame.render_widget(Paragraph::new("Instruction · Ctrl-↑/↓ scroll"), chunks[0]);
+        frame.render_widget(Paragraph::new(instruction.as_str()).wrap(Wrap { trim: true }).scroll((offset, 0)), chunks[1]);
+        draw_section(frame, chunks[2], section, p);
+    } else {
+        draw_section(frame, body, section, p);
+    }
 }
 
 fn draw_section(frame: &mut Frame, area: Rect, section: &ClassSection, p: &Palette) {
@@ -198,8 +230,8 @@ fn draw_section(frame: &mut Frame, area: Rect, section: &ClassSection, p: &Palet
             let hints: &[&str] = match phase {
                 SpeakingPhase::Idle => &["r record", "p reference audio", "q back"],
                 SpeakingPhase::Recording => &["r stop", "q back"],
-                SpeakingPhase::UnknownUpload { .. } => &["r check saved work", "q back"],
-                SpeakingPhase::Uploading | SpeakingPhase::Polling { .. } => &["q back"],
+                SpeakingPhase::UnknownUpload { .. } => &["q back"],
+                SpeakingPhase::Uploading | SpeakingPhase::Polling { .. } | SpeakingPhase::Unresolved { .. } => &["q back"],
                 SpeakingPhase::Graded { .. } | SpeakingPhase::Failed { .. } => {
                     &["enter next", "r retry", "q back"]
                 }
@@ -373,7 +405,7 @@ fn speaking_phase_line(phase: &SpeakingPhase, p: &Palette) -> Line<'static> {
             ),
             Style::default().fg(p.pink).add_modifier(Modifier::BOLD),
         )),
-        SpeakingPhase::UnknownUpload { message } | SpeakingPhase::Failed { message } => {
+        SpeakingPhase::UnknownUpload { message } | SpeakingPhase::Failed { message } | SpeakingPhase::Unresolved { message } => {
             Line::from(Span::styled(message.clone(), Style::default().fg(p.pink)))
         }
     }

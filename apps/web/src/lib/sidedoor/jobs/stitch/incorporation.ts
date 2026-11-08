@@ -16,6 +16,10 @@ import {
 } from '@/lib/sidedoor/access/core/request-identity';
 import { sottoJobOutbox } from '@/lib/sidedoor/jobs/core/job-delivery';
 import { SIDEDOOR_STATE_ID } from '@/lib/sidedoor/access/state/store';
+import {
+  InteractionEpisodeNotFoundError,
+  readInteractionEpisode,
+} from '@/lib/sidedoor/jobs/interaction-access';
 
 const attemptSchema = z
   .object({
@@ -63,6 +67,19 @@ export class IncorporationAdmissionError extends Error {
   ) {
     super(message);
     this.name = 'IncorporationAdmissionError';
+  }
+}
+
+export async function requireIncorporableEpisode(
+  database: Prisma.TransactionClient,
+  episodeId: string
+) {
+  try {
+    await readInteractionEpisode(database, episodeId);
+  } catch (error) {
+    if (error instanceof InteractionEpisodeNotFoundError)
+      throw new IncorporationAdmissionError('Interaction not found', 404);
+    throw error;
   }
 }
 
@@ -171,6 +188,7 @@ export async function captureIncorporation(
 ) {
   const identity = await resolveSottoRequest(database, request);
   if (!identity || identity.kind !== 'content') throw new AccessError('unauthorized');
+  await requireIncorporableEpisode(database, episodeId);
   const inputs = await readIncorporationInputs(database, episodeId, interactionId);
   if (inputs.episode.userId !== identity.userId) throw new AccessError('forbidden');
   if (inputs.visibility === 'PRIVATE' && inputs.userId !== identity.userId)
@@ -228,6 +246,7 @@ export async function commitIncorporation(
   job: PreparedJob
 ) {
   await requireOriginalSottoAdmission(database, request, admission.identity);
+  await requireIncorporableEpisode(database, admission.inputs.episodeId);
   const inputs = await readIncorporationInputs(
     database,
     admission.inputs.episodeId,

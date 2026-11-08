@@ -28,6 +28,8 @@ import {
 } from '@/lib/sidedoor/jobs/initial/initial-stitch-outcome';
 import { readStitchingArtifact } from '@/lib/sidedoor/jobs/stitch/stitching-artifact';
 import { readStitchingParent } from '@/lib/sidedoor/jobs/stitch/stitching-parent';
+import { prepareStitchFailureEffects } from '@/lib/sidedoor/jobs/stitch/stitch-failure-effects';
+import { readAccessibleTranscriptEpisode } from '@/lib/sidedoor/storage/publication/transcript-export';
 import { randomUUID } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -108,6 +110,77 @@ suite('initial stitching admission with PostgreSQL and attributed storage', () =
     };
     return { episodeId: episode.id, authorize };
   }
+
+  it.each(['READY', 'DURATION_FAILED', 'PROCESSING_FAILED'] as const)(
+    'allows no public effects only for assessment-owned %s outcomes',
+    async (kind) => {
+      const input = await source();
+      const captured = await sottoTransaction(instance.database, (tx) =>
+        captureInitialStitchInputs(tx, input.authorize, input.episodeId, 'generation-one')
+      );
+      const assessmentInputs = structuredClone(captured);
+      assessmentInputs.storage.associations.assessmentSection = {
+        id: 'assessment-section',
+        assessmentId: 'assessment',
+        classId: 'class',
+        classAttempt: 1,
+        currentClassAttempt: 1,
+        assessmentAttempt: 1,
+      };
+      const ordinary = prepareInitialStitch(captured, 'none');
+      const assessment = prepareInitialStitch(assessmentInputs, 'none');
+      await sottoTransaction(instance.database, async (tx) => {
+        const outbox = sottoJobOutbox(tx);
+        const regular = await outbox.enqueue(ordinary);
+        const privateJob = await outbox.enqueue(assessment);
+        await outbox.complete(regular.job.id, regular.fingerprint);
+        await outbox.complete(privateJob.job.id, privateJob.fingerprint);
+        const result = (parent: OutboxJob) => {
+          const { outputs } = initialStitchPayloadSchema.parse(parent.job.payload);
+          const common = { stitchKey: createInitialStitchKey(parent.fingerprint), effects: [] };
+          if (kind === 'READY')
+            return {
+              ...common,
+              kind,
+              versionId: outputs.versionId,
+              version: 1,
+              audioUrl: '/audio',
+            };
+          if (kind === 'DURATION_FAILED')
+            return { ...common, kind, durationSeconds: 5000, limitSeconds: 3000 };
+          return { ...common, kind, failureCode: 'audio_stitching_failed' as const };
+        };
+        await expect(
+          writeInitialStitchOutcome(
+            tx,
+            { id: regular.job.id, fingerprint: regular.fingerprint },
+            result(regular)
+          )
+        ).rejects.toThrow('does not match its admitted effects');
+        await writeInitialStitchOutcome(
+          tx,
+          { id: privateJob.job.id, fingerprint: privateJob.fingerprint },
+          result(privateJob)
+        );
+        const completed = await outbox.read(privateJob.job.id);
+        if (!completed) throw new Error('Completed assessment stitch missing');
+        expect(await readInitialStitchOutcome(tx, completed)).toEqual(result(privateJob));
+        const outputs = initialStitchPayloadSchema.parse(privateJob.job.payload).outputs;
+        expect(
+          prepareStitchFailureEffects({
+            operationId: privateJob.job.id,
+            fingerprint: privateJob.fingerprint,
+            episodeId: input.episodeId,
+            userId: identity.ownerId,
+            contributorId: identity.ownerId,
+            storage: assessmentInputs.storage,
+            outputs,
+            message: 'Failed',
+          })
+        ).toEqual([]);
+      });
+    }
+  );
 
   it('rejects stitching publication authority after the linked preparation is revoked', async () => {
     const { episodeId, authorize } = await source();
@@ -603,6 +676,83 @@ suite('initial stitching admission with PostgreSQL and attributed storage', () =
       });
     }
   );
+
+  it('does not generate an automatic transcript for an assessment episode', async () => {
+    const curriculum = await instance.database.curriculum.upsert({
+      where: { nativeLang_targetLang: { nativeLang: 'es', targetLang: 'ru' } },
+      create: { nativeLang: 'es', targetLang: 'ru', title: 'Russian' },
+      update: {},
+    });
+    const lesson = await instance.database.lesson.create({
+      data: {
+        curriculumId: curriculum.id,
+        slug: 'assessment-pdf',
+        level: 'A1',
+        order: 1,
+        title: 'Lesson',
+        objective: 'Greet',
+        grammarPoints: [],
+        targetVocab: [],
+        vocabThemes: [],
+      },
+    });
+    const course = await instance.database.course.create({
+      data: {
+        userId: identity.ownerId,
+        curriculumId: curriculum.id,
+        nativeLang: 'es',
+        targetLang: 'ru',
+      },
+    });
+    const cls = await instance.database.courseClass.create({
+      data: { courseId: course.id, lessonId: lesson.id, order: 1 },
+    });
+    const operationId = randomUUID();
+    const assessment = await instance.database.classAssessment.create({
+      data: {
+        classId: cls.id,
+        courseId: course.id,
+        userId: identity.ownerId,
+        classAttempt: 1,
+        assessmentAttempt: 1,
+        generationOperationId: operationId,
+        requirements: {},
+        formativeRevision: 'revision',
+      },
+    });
+    const episode = await sottoTransaction(instance.database, async (tx) => {
+      const section = await tx.classAssessmentSection.create({
+        data: { assessmentId: assessment.id, skill: 'LISTENING', passThreshold: 0.7 },
+      });
+      const episode = await tx.episode.create({
+        data: {
+          userId: identity.ownerId,
+          title: 'Assessment',
+          topic: 'Assessment',
+          assessmentAudioAssessmentId: assessment.id,
+          assessmentAudioSectionId: section.id,
+          assessmentAudioOperationId: operationId,
+        },
+      });
+      await tx.classAssessmentSection.update({
+        where: { id: section.id },
+        data: {
+          episodeId: episode.id,
+          audioReservationEpisodeId: episode.id,
+          audioReservationOperationId: operationId,
+        },
+      });
+      return episode;
+    });
+    await expect(
+      sottoTransaction(instance.database, (tx) =>
+        readAccessibleTranscriptEpisode(tx, episode.id, identity.ownerId)
+      )
+    ).rejects.toThrow('Episode not found');
+    expect(
+      (await instance.database.episode.findUniqueOrThrow({ where: { id: episode.id } })).pdfUrl
+    ).toBeNull();
+  });
 
   it('does not accept cancellation-only completion as a successful initial stitch', async () => {
     const input = await source();

@@ -19,6 +19,8 @@ import { issueSottoPairing, redeemSottoPairing } from '@/lib/sidedoor/access/cor
 import { sottoDeviceService } from '@/lib/sidedoor/access/state/device-identity';
 import { SIDEDOOR_STATE_ID } from '@/lib/sidedoor/access/state/store';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
+import * as profileDeletion from '@/lib/sidedoor/access/deletion/profile-deletion';
+import { AssessmentFenceConflict } from '@/lib/learning/classes/lifecycle/assessment-fence';
 import {
   createSharedTestInstance,
   type SharedTestIdentity,
@@ -351,6 +353,39 @@ suite('self profile deletion with canonical PostgreSQL authority', () => {
         (await deleteManagedProfile(request(learner), { params: Promise.resolve({ id }) })).status
       ).toBe(403);
       await assertIntact(id);
+    }
+  });
+
+  it('reports active assessments as conflicts for self and managed profile deletion', async () => {
+    const learner = await household('BROWSER');
+    const self = vi
+      .spyOn(profileDeletion, 'deleteOwnSottoProfile')
+      .mockRejectedValue(new AssessmentFenceConflict());
+    const managed = vi
+      .spyOn(profileDeletion, 'deleteSottoProfile')
+      .mockRejectedValue(new AssessmentFenceConflict());
+    try {
+      const selfResponse = await DELETE(request(learner));
+      expect(selfResponse.status).toBe(409);
+      expect(await selfResponse.json()).toMatchObject({
+        error: expect.stringContaining('assessment'),
+      });
+      const owner: Learner = {
+        id: identity.ownerId,
+        token: identity.ownerToken,
+        client: 'BROWSER',
+      };
+      const managedResponse = await deleteManagedProfile(request(owner), {
+        params: Promise.resolve({ id: learner.id }),
+      });
+      expect(managedResponse.status).toBe(409);
+      expect(await managedResponse.json()).toMatchObject({
+        error: expect.stringContaining('assessment'),
+      });
+      await assertIntact(learner.id);
+    } finally {
+      self.mockRestore();
+      managed.mockRestore();
     }
   });
 

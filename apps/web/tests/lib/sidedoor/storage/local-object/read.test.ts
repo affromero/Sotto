@@ -21,6 +21,7 @@ vi.mock('node:fs/promises', async (importOriginal) => {
 import {
   contentTypeForStorageKey,
   readLocalStorageFile,
+  readLocalStorageRange,
 } from '@/lib/storage/sidedoor/local-object-read';
 
 describe('canonical local object reads', () => {
@@ -46,6 +47,13 @@ describe('canonical local object reads', () => {
     });
   });
 
+  it('detects replacement of a stored file even when the size is unchanged', async () => {
+    const before = await readLocalStorageRange(file, 'recordings/audio.mp3', 'bytes=0-1');
+    await writeFile(file, 'abcdefghij');
+    const after = await readLocalStorageRange(file, 'recordings/audio.mp3', 'bytes=0-1');
+    expect(after?.identity).not.toEqual(before?.identity);
+  });
+
   it.each([
     ['bytes=2-5', '2345', 2, 5],
     ['bytes=7-', '789', 7, 9],
@@ -60,7 +68,7 @@ describe('canonical local object reads', () => {
     });
   });
 
-  it.each(['bytes=99-200', 'items=0-1', 'bytes=-0'])(
+  it.each(['bytes=99-200', 'items=0-1', 'bytes=-0', 'bytes=9007199254740992-', 'bytes=0-1,4-5'])(
     'rejects invalid or unsatisfied range %s',
     async (range) => {
       expect(await readLocalStorageFile(file, 'recordings/audio.mp3', range)).toBeNull();
@@ -84,6 +92,8 @@ describe('canonical local object reads', () => {
 
   it('maps supported extensions and defaults unknown content', () => {
     expect(contentTypeForStorageKey('notes.pdf')).toBe('application/pdf');
+    expect(contentTypeForStorageKey('recording.ogg')).toBe('audio/ogg');
+    expect(contentTypeForStorageKey('recording.flac')).toBe('audio/flac');
     expect(contentTypeForStorageKey('payload.bin')).toBe('application/octet-stream');
   });
 });

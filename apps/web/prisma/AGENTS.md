@@ -2,6 +2,52 @@
 
 ## Schema Overview
 
+ClassAssessment records are separate from formative ClassSection rows. Their
+review and provider operation IDs require durable, owned receipt validation
+before publication. Assessment audio, speaking, and writing resources must be
+added to fenced deletion and provider cleanup before the records are used.
+The active teaching kind and receipt are bound before sealing; a version-one
+formative digest cannot be treated as the current active-teaching revision.
+Formative section, question and prompt statements touch affected class rows in
+sorted order. Assessment material writes and deletes touch their assessment row.
+After held-out audio admission, the reserved episode freezes assessment task and
+provenance fields until the assessment and episode are removed together. Audio
+publication and provider journals remain writable. While that assessment is
+unsealed, class teaching and formative section, question, and prompt writes are
+also fenced, along with the course and lesson fields used for teaching; learner
+answers and drafts remain writable. Formative media and retained prior-history
+writes still require their own dispatch fence.
+`AssessmentAudioSourceFreeze` preserves the exact class, assessment and episode
+binding through cascades. Its marker can only be removed after all three are gone;
+audio deletion still requires the existing tombstone and execution-drain checks.
+Multi-parent transactions must acquire locks in sorted order or retry the whole
+transaction on deadlock. Script and media writers still need fences before
+assessment publication can use a captured snapshot.
+Selected audio identity snapshots are private and must be verified against the
+owned episode, script, storage registry and trusted audio writer before sealing.
+Assessment audio episodes carry immutable creation markers. Their matching
+section must remain attached until the episode is deleted in the same transaction.
+Held-out speaking prompts bind an explicit task mode to their assessment review;
+they must not claim formative objective evidence to identify their mode.
+Assessment provider-call records retain bounded private response bytes and the
+settled attempt identity for replay. Unknown attempts remain fenced and records
+cascade with their assessment; worker and deletion authority must be reconciled
+before these records can be used for publication.
+The partial active-attempt index, assessment-parent checks, and ownership and
+skill triggers are in migration SQL and must be preserved. SQL foreign keys do
+not establish semantic review or cross-table audio ownership.
+Productive evidence foreign keys are deferred so complete profile cascades can
+remove both evidence and source records in either order.
+Sealing is permanent. Material writes and receipt writes serialize on the
+assessment row; take the class lock first in application transactions and retry
+whole transactions on deadlocks. Deferred delete guards allow class cascades
+only after fenced provider and storage cleanup. Productive evidence uses owned
+record references and immutable snapshots, but assessment-scoped provider
+grants and operation/input verification remain necessary before activation.
+Recompute the reviewed material digest under those locks immediately before
+sealing. A submission, its answers and the COMMITTED transition must share one
+transaction; the SQL guard does not prove answer or evidence completeness.
+
 `MaterialExtractionRun` and its page/text children retain complete source
 provenance independently of legacy text previews. Text chunks use bytea so UTF-8
 BOM and NUL remain intact. Recognition operations and bounded response receipts
@@ -71,7 +117,7 @@ The schema is organized into logical sections:
 From repo root (monorepo):
 
 ```bash
-npx prisma db push --schema=apps/web/prisma/schema.prisma     # Push schema changes (dev)
+npx prisma migrate deploy --config=prisma.config.ts             # Apply committed migrations
 npx prisma generate --schema=apps/web/prisma/schema.prisma     # Regenerate client
 npx prisma studio --schema=apps/web/prisma/schema.prisma       # Visual database browser
 ```
@@ -79,7 +125,7 @@ npx prisma studio --schema=apps/web/prisma/schema.prisma       # Visual database
 From `apps/web/` directory:
 
 ```bash
-npx prisma db push     # Push schema changes (dev)
+npx prisma migrate deploy --config=../../prisma.config.ts  # Apply committed migrations
 npx prisma generate    # Regenerate client
 npx prisma studio      # Visual database browser
 ```
@@ -87,7 +133,7 @@ npx prisma studio      # Visual database browser
 ## Modifying the Schema
 
 1. Edit `schema.prisma`
-2. Use `npx prisma db push` or `npx prisma migrate dev` for development. Production uses `npx prisma migrate deploy` through the reviewed fenced schema-transition procedure in `docs/03-self-host-deployment.md`.
+2. Create and apply a migration with `npx prisma migrate dev --config=prisma.config.ts` from the repo root. Existing databases use `npx prisma migrate deploy --config=prisma.config.ts`. Do not use `prisma db push` to initialize the app: it does not install migration-managed database triggers. Production uses the reviewed fenced schema-transition procedure in `docs/03-self-host-deployment.md`.
 3. Run `npx prisma generate`
 4. Update this AGENTS.md if models/enums changed
 5. Update `src/types/` if API response shapes changed
@@ -148,6 +194,16 @@ stage files before creating a course. Note edits leave these records untouched.
 Pending uploads have a null original reference and remain discoverable by
 erasure before storage I/O. Publication fills the reference atomically; learner
 APIs expose published documents.
+
+`ClassReadingStage` holds private, unpublished reading-repair material for one
+withdrawn section and one preparation operation. Publication removes it in the
+same transaction that activates the section. Section deletion cascades to it.
+`ClassWritingStage` binds unpublished writing prompts to their preparation and
+source hashes under the same activation rule. `WritingPrompt` and
+`WritingResponse` incarnation IDs distinguish replaced records during repair.
+`ClassGrammarStage` binds unpublished grammar questions to the admitted source
+and operation. `ClassSubmission` and `SectionAnswer` incarnation IDs and
+statement triggers fence changes to historical graded evidence.
 
 `Episode.transcriptPublication` binds a canonical transcript reference to its source
 fingerprint and producing operation. It belongs to the episode, so requester-job

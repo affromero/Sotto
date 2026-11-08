@@ -3,6 +3,7 @@ import XCTest
 
 @MainActor
 final class ClassLessonHelpLoaderTests: XCTestCase {
+    private let revision = String(repeating: "c", count: 64)
     private let teaching = SottoClassTeaching(
         version: 1,
         title: "Meinung",
@@ -31,7 +32,7 @@ final class ClassLessonHelpLoaderTests: XCTestCase {
             "status": status.rawValue,
             "request": [
                 "operationId": "2c157df4-a35d-4e3f-bbd6-670d9b200e2f",
-                "attempt": 2, "sourceHash": hash ?? teaching.sourceHash, "retryOf": NSNull()
+                "attempt": 2, "sourceHash": hash ?? revision, "retryOf": NSNull()
             ],
             "nativeLang": "en", "targetLang": "de", "canRetry": canRetry
         ]
@@ -48,6 +49,7 @@ final class ClassLessonHelpLoaderTests: XCTestCase {
         var updates: [SottoClassLessonHelpStatus] = []
         let loader = ClassLessonHelpLoader(
             teaching: teaching,
+            revision: revision,
             read: { reads.removeFirst() },
             start: { request in
                 XCTAssertEqual(request, available.request)
@@ -62,7 +64,7 @@ final class ClassLessonHelpLoaderTests: XCTestCase {
 
     func testExistingHelpOpensWithoutStartingAnotherRequest() async throws {
         let ready = try response(.ready)
-        let loader = ClassLessonHelpLoader(teaching: teaching, read: { ready }, start: { _ in
+        let loader = ClassLessonHelpLoader(teaching: teaching, revision: revision, read: { ready }, start: { _ in
             XCTFail("Already prepared help must not be regenerated")
             return ready
         })
@@ -73,14 +75,14 @@ final class ClassLessonHelpLoaderTests: XCTestCase {
     func testFailedHelpRequiresExplicitRetryAndRetryableStatus() async throws {
         let failed = try response(.failed, canRetry: true)
         let ready = try response(.ready)
-        let inspect = ClassLessonHelpLoader(teaching: teaching, read: { failed }, start: { _ in
+        let inspect = ClassLessonHelpLoader(teaching: teaching, revision: revision, read: { failed }, start: { _ in
             XCTFail("Checking a failure must not start a retry")
             return ready
         })
         let inspected = try await inspect.load(retry: false) { _ in }
         XCTAssertTrue(inspected.error?.contains("failed") == true)
 
-        let retry = ClassLessonHelpLoader(teaching: teaching, read: { failed }, start: { request in
+        let retry = ClassLessonHelpLoader(teaching: teaching, revision: revision, read: { failed }, start: { request in
             XCTAssertEqual(request, failed.request)
             return ready
         })
@@ -88,7 +90,7 @@ final class ClassLessonHelpLoaderTests: XCTestCase {
         XCTAssertEqual(recovered.help?.title, "English help")
 
         let blocked = try response(.failed, canRetry: false)
-        let noRetry = ClassLessonHelpLoader(teaching: teaching, read: { blocked }, start: { _ in
+        let noRetry = ClassLessonHelpLoader(teaching: teaching, revision: revision, read: { blocked }, start: { _ in
             XCTFail("A non-retryable failure must remain unchanged")
             return ready
         })
@@ -99,7 +101,7 @@ final class ClassLessonHelpLoaderTests: XCTestCase {
     func testStaleLessonAndMismatchedExamplesNeverReachTheView() async throws {
         for invalid in try [response(.available, hash: String(repeating: "a", count: 64)), response(.ready, examples: 3)] {
             var updates: [SottoClassLessonHelpStatus] = []
-            let loader = ClassLessonHelpLoader(teaching: teaching, read: { invalid }, start: { _ in
+            let loader = ClassLessonHelpLoader(teaching: teaching, revision: revision, read: { invalid }, start: { _ in
                 XCTFail("Invalid help must not be admitted")
                 return invalid
             })
@@ -116,7 +118,7 @@ final class ClassLessonHelpLoaderTests: XCTestCase {
     func testCancellationDuringPollingStopsFurtherReadsAndUpdates() async throws {
         let pending = try response(.pending)
         var updates: [SottoClassLessonHelpStatus] = []
-        let loader = ClassLessonHelpLoader(teaching: teaching, read: { pending }, start: { _ in pending }, pause: {
+        let loader = ClassLessonHelpLoader(teaching: teaching, revision: revision, read: { pending }, start: { _ in pending }, pause: {
             withUnsafeCurrentTask { $0?.cancel() }
             try Task.checkCancellation()
         })
@@ -131,10 +133,37 @@ final class ClassLessonHelpLoaderTests: XCTestCase {
         }
     }
 
+    func testReopeningAfterCancelledPreparationReadsSavedHelpWithoutStartingAgain() async throws {
+        let available = try response(.available)
+        let pending = try response(.pending)
+        let ready = try response(.ready)
+        var reads = [available, ready]
+        var starts = 0
+        let loader = ClassLessonHelpLoader(teaching: teaching, revision: revision, read: {
+            reads.removeFirst()
+        }, start: { request in
+            XCTAssertEqual(request, available.request)
+            starts += 1
+            return pending
+        }, pause: {
+            withUnsafeCurrentTask { $0?.cancel() }
+            try Task.checkCancellation()
+        })
+        let first = Task { try await loader.load(retry: false) { _ in } }
+        do {
+            _ = try await first.value
+            XCTFail("Closing help should cancel pending polling")
+        } catch is CancellationError {}
+
+        let reopened = try await loader.load(retry: false) { _ in }
+        XCTAssertEqual(reopened.help?.title, "English help")
+        XCTAssertEqual(starts, 1)
+    }
+
     func testAdmissionFailurePropagatesAndRetainsLastConfirmedState() async throws {
         let available = try response(.available)
         var updates: [SottoClassLessonHelpStatus] = []
-        let loader = ClassLessonHelpLoader(teaching: teaching, read: { available }, start: { _ in
+        let loader = ClassLessonHelpLoader(teaching: teaching, revision: revision, read: { available }, start: { _ in
             throw SottoAPIError.message("Server unavailable")
         })
         do {
@@ -148,7 +177,7 @@ final class ClassLessonHelpLoaderTests: XCTestCase {
 
     func testPendingHelpTimesOutWithoutPollingAgain() async throws {
         let pending = try response(.pending)
-        let loader = ClassLessonHelpLoader(teaching: teaching, read: { pending }, start: { _ in pending }, pause: {
+        let loader = ClassLessonHelpLoader(teaching: teaching, revision: revision, read: { pending }, start: { _ in pending }, pause: {
             XCTFail("Expired help should not poll")
         }, timeout: .zero)
         do {

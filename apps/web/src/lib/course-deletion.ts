@@ -10,9 +10,12 @@ import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 
 export interface CourseDeletionResult {
   episodesDeleted: number;
+  /** Targets discovered so far; pending cleanup may discover more. */
   filesAttempted: number;
   filesDeleted: number;
+  /** Discovered targets still awaiting cleanup. */
   filesFailed: number;
+  /** Nonzero when cleanup is incomplete, including undiscovered targets. */
   cleanupPendingJobs: number;
 }
 
@@ -26,8 +29,12 @@ function cleanup(database: Prisma.TransactionClient) {
   );
 }
 
-async function courseEpisodeIds(database: Prisma.TransactionClient, courseId: string) {
-  const [classSections, examSections, practiceSessions] = await Promise.all([
+async function courseEpisodeIds(
+  database: Prisma.TransactionClient,
+  courseId: string,
+  userId: string
+) {
+  const [classSections, examSections, practiceSessions, assessmentSections] = await Promise.all([
     database.classSection.findMany({
       where: { class: { courseId }, episodeId: { not: null } },
       select: { episodeId: true },
@@ -40,14 +47,66 @@ async function courseEpisodeIds(database: Prisma.TransactionClient, courseId: st
       where: { courseId, episodeId: { not: null } },
       select: { episodeId: true },
     }),
+    database.classAssessmentSection.findMany({
+      where: { assessment: { courseId }, episodeId: { not: null } },
+      select: {
+        episodeId: true,
+        episode: {
+          select: {
+            userId: true,
+            classSection: { select: { class: { select: { courseId: true } } } },
+            examSection: { select: { exam: { select: { courseId: true } } } },
+            practiceSession: { select: { courseId: true } },
+          },
+        },
+        assessment: { select: { userId: true, course: { select: { userId: true } } } },
+      },
+    }),
   ]);
-  return [
+  for (const section of assessmentSections) {
+    if (
+      !section.episode ||
+      section.episode.userId !== section.assessment.userId ||
+      section.assessment.userId !== section.assessment.course.userId ||
+      (section.episode.classSection && section.episode.classSection.class.courseId !== courseId) ||
+      (section.episode.examSection && section.episode.examSection.exam.courseId !== courseId) ||
+      (section.episode.practiceSession && section.episode.practiceSession.courseId !== courseId)
+    )
+      throw new Error('Assessment episode ownership changed during deletion');
+  }
+  const episodeIds = [
     ...new Set([
       ...classSections.flatMap((section) => (section.episodeId ? [section.episodeId] : [])),
       ...examSections.flatMap((section) => (section.episodeId ? [section.episodeId] : [])),
       ...practiceSessions.flatMap((session) => (session.episodeId ? [session.episodeId] : [])),
+      ...assessmentSections.flatMap((section) => (section.episodeId ? [section.episodeId] : [])),
     ]),
   ];
+  if (episodeIds.length) {
+    const episodes = await database.episode.findMany({
+      where: { id: { in: episodeIds } },
+      select: {
+        userId: true,
+        classSection: { select: { class: { select: { courseId: true } } } },
+        examSection: { select: { exam: { select: { courseId: true } } } },
+        practiceSession: { select: { courseId: true } },
+        assessmentSection: { select: { assessment: { select: { courseId: true } } } },
+      },
+    });
+    if (
+      episodes.length !== episodeIds.length ||
+      episodes.some(
+        (episode) =>
+          episode.userId !== userId ||
+          (episode.classSection && episode.classSection.class.courseId !== courseId) ||
+          (episode.examSection && episode.examSection.exam.courseId !== courseId) ||
+          (episode.practiceSession && episode.practiceSession.courseId !== courseId) ||
+          (episode.assessmentSection && episode.assessmentSection.assessment.courseId !== courseId)
+      )
+    )
+      throw new Error('Course episode ownership changed during deletion');
+  }
+  return episodeIds;
 }
 
 /** Revoke storage authority and remove one course with its generated episodes atomically. */
@@ -58,9 +117,9 @@ export async function deleteCourseCompletely(courseId: string): Promise<CourseDe
     async (database) => {
       const course = await database.course.findUniqueOrThrow({
         where: { id: courseId },
-        select: { createdAt: true },
+        select: { createdAt: true, userId: true },
       });
-      const episodeIds = await courseEpisodeIds(database, courseId);
+      const episodeIds = await courseEpisodeIds(database, courseId, course.userId);
       const materials = await database.courseMaterial.findMany({
         where: { courseId },
         select: { id: true, createdAt: true },
@@ -94,7 +153,7 @@ export async function deleteCourseCompletely(courseId: string): Promise<CourseDe
         await database.episode.deleteMany({ where: { id: { in: episodeIds } } });
       return {
         episodeIds,
-        jobs: jobs.map((job) => ({ id: job.id, files: job.pending })),
+        jobs: jobs.map((job) => ({ id: job.id })),
       };
     },
     { timeoutMs: 60_000 }
@@ -114,14 +173,15 @@ export async function deleteCourseCompletely(courseId: string): Promise<CourseDe
   const statuses = await sottoTransaction(prismaUnfiltered, async (database) =>
     Promise.all(admitted.jobs.map((job) => cleanup(database).get(job.id)))
   );
-  const filesAttempted = admitted.jobs.reduce((total, job) => total + job.files, 0);
+  const filesAttempted = statuses.reduce((total, job) => total + job.pending + job.deleted, 0);
   const filesDeleted = statuses.reduce((total, job) => total + job.deleted, 0);
+  const filesFailed = statuses.reduce((total, job) => total + job.pending, 0);
   const cleanupPendingJobs = statuses.filter((job) => job.phase !== 'complete').length;
   const result = {
     episodesDeleted: admitted.episodeIds.length,
     filesAttempted,
     filesDeleted,
-    filesFailed: filesAttempted - filesDeleted,
+    filesFailed,
     cleanupPendingJobs,
   };
   logger.warn('Course deleted completely', {

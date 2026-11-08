@@ -98,8 +98,20 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     });
     if (!exam) return errorResponse('Exam not found', 404);
 
+    const prompt = await prisma.speakingPrompt.findFirst({
+      where: { id: promptId, examSection: { examId } },
+      select: { examSectionId: true },
+    });
+    if (!prompt?.examSectionId) return errorResponse('Recording not found', 404);
+
     const recording = await prisma.speakingRecording.findFirst({
-      where: { id: parsed.data.recordingId, promptId, userId },
+      where: {
+        id: parsed.data.recordingId,
+        promptId,
+        userId,
+        examSectionId: prompt.examSectionId,
+        prompt: { examSectionId: prompt.examSectionId, examSection: { examId, exam: { userId } } },
+      },
       select: {
         status: true,
         overallScore: true,

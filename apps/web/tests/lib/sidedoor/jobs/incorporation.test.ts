@@ -8,6 +8,7 @@ import {
 } from '@/lib/sidedoor/jobs/stitch/incorporation';
 import { sottoJobOutbox } from '@/lib/sidedoor/jobs/core/job-delivery';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
+import { readIncorporationWork } from '@/lib/sidedoor/jobs/stitch/incorporation-work';
 import {
   createSharedTestInstance,
   type SharedTestInstance,
@@ -81,6 +82,93 @@ suite('incorporation admission and durable enqueue', () => {
       await sottoTransaction(instance.database, (tx) => sottoJobOutbox(tx).listIncomplete())
     ).toMatchObject({ jobs: [] });
   }
+  async function attachAssessment(episodeId: string) {
+    const curriculum = await instance.database.curriculum.upsert({
+      where: { nativeLang_targetLang: { nativeLang: 'es', targetLang: 'ru' } },
+      create: { nativeLang: 'es', targetLang: 'ru', title: 'Russian' },
+      update: {},
+    });
+    const lesson = await instance.database.lesson.upsert({
+      where: {
+        curriculumId_slug: { curriculumId: curriculum.id, slug: 'incorporation-assessment' },
+      },
+      create: {
+        curriculumId: curriculum.id,
+        slug: 'incorporation-assessment',
+        level: 'A1',
+        order: 1,
+        title: 'Lesson',
+        objective: 'Greet',
+        grammarPoints: [],
+        targetVocab: [],
+        vocabThemes: [],
+      },
+      update: {},
+    });
+    const course = await instance.database.course.create({
+      data: {
+        userId: identity.ownerId,
+        curriculumId: curriculum.id,
+        nativeLang: 'es',
+        targetLang: 'ru',
+      },
+    });
+    const cls = await instance.database.courseClass.create({
+      data: { courseId: course.id, lessonId: lesson.id, order: 1 },
+    });
+    const assessment = await instance.database.classAssessment.create({
+      data: {
+        classId: cls.id,
+        courseId: course.id,
+        userId: identity.ownerId,
+        classAttempt: 1,
+        assessmentAttempt: 1,
+        requirements: {},
+        formativeRevision: 'revision',
+      },
+    });
+    await instance.database.classAssessmentSection.create({
+      data: { assessmentId: assessment.id, skill: 'LISTENING', passThreshold: 0.7, episodeId },
+    });
+  }
+
+  it('rejects attaching a previously captured episode to an assessment', async () => {
+    const item = await fixture();
+    await expect(attachAssessment(item.episode.id)).rejects.toThrow(
+      'Assessment audio must match its creation reservation'
+    );
+    await expect(
+      sottoTransaction(instance.database, (tx) =>
+        captureIncorporation(tx, item.request, item.episode.id, item.interaction.id)
+      )
+    ).resolves.toBeDefined();
+    await expectUnchanged(item);
+    await expect(item.commit()).resolves.toBeDefined();
+  });
+
+  it('keeps queued incorporation work valid when an invalid assessment attachment is rejected', async () => {
+    const item = await fixture();
+    const record = await item.commit();
+    await expect(attachAssessment(item.episode.id)).rejects.toThrow(
+      'Assessment audio must match its creation reservation'
+    );
+    await expect(
+      sottoTransaction(instance.database, (tx) =>
+        readIncorporationWork(tx, {
+          id: record.job.id,
+          name: 'segment-regeneration.v1',
+          data: { operationId: record.job.id, fingerprint: record.fingerprint },
+        })
+      )
+    ).resolves.toBeDefined();
+    expect(
+      (
+        await instance.database.interaction.findUniqueOrThrow({
+          where: { id: item.interaction.id },
+        })
+      ).incorporated
+    ).toBe(false);
+  });
   it('leaves source status unchanged during generation and commits both transitions with recoverable work', async () => {
     const item = await fixture();
     await expectUnchanged(item);

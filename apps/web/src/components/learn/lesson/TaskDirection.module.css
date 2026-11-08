@@ -1,0 +1,6 @@
+.direction {
+  color: var(--color-text-secondary);
+  font-size: 0.95rem;
+  line-height: 1.55;
+  margin: 0.5rem 0 0;
+}

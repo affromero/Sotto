@@ -7,7 +7,6 @@ import {
   mockResolveSkillRequirements,
   mockCourseClassFindUnique,
   mockCourseClassUpdate,
-  mockCourseClassDelete,
   mockClassSectionCreate,
   mockClassSectionUpdate,
   mockClassSectionDeleteMany,
@@ -30,7 +29,12 @@ import {
   mockTeachingProviderInput,
 } from './fixtures';
 import { authorizedLearnerExecution } from '../../helpers/runtime/provider-execution';
-import { getClassForUser, regenerateCurrentClass, deleteClassForUser } from '@/lib/class-service';
+import { getClassForUser, regenerateCurrentClass } from '@/lib/class-service';
+import type { Prisma } from '@/generated/prisma/client';
+
+vi.mock('@/lib/classes/repair/grammar-repair-source', () => ({
+  grammarRepairSourceHash: async () => 'a'.repeat(64),
+}));
 
 describe('regenerateCurrentClass', () => {
   beforeEach(() => {
@@ -169,7 +173,15 @@ describe('regenerateCurrentClass', () => {
       const result = await regenerateCurrentClass(
         'class-1',
         'u1',
-        authorizedLearnerExecution('u1'),
+        {
+          ...authorizedLearnerExecution('u1'),
+          ...(skill === 'GRAMMAR'
+            ? {
+                grammarRepairSourceHash: 'a'.repeat(64),
+                stageClassGrammar: async () => {},
+              }
+            : {}),
+        },
         undefined,
         {
           repair: true,
@@ -330,43 +342,6 @@ describe('regenerateCurrentClass', () => {
   });
 });
 
-// ---- deleteClassForUser ----
-
-describe('deleteClassForUser', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockTransaction.mockImplementation((ops: Promise<unknown>[]) => Promise.all(ops));
-    mockCourseClassDelete.mockResolvedValue({});
-    mockCourseUpdate.mockResolvedValue({});
-  });
-
-  it('returns false when the class is not owned by the user', async () => {
-    mockCourseClassFindFirst.mockResolvedValue(null);
-
-    const result = await deleteClassForUser('class-1', 'u1');
-
-    expect(result).toBe(false);
-    expect(mockCourseClassDelete).not.toHaveBeenCalled();
-  });
-
-  it('deletes the class and clears activeClassId when needed', async () => {
-    mockCourseClassFindFirst.mockResolvedValue({
-      id: 'class-1',
-      courseId: 'course-1',
-      course: { activeClassId: 'class-1' },
-    });
-
-    const result = await deleteClassForUser('class-1', 'u1');
-
-    expect(result).toBe(true);
-    expect(mockCourseClassDelete).toHaveBeenCalledWith({ where: { id: 'class-1' } });
-    expect(mockCourseUpdate).toHaveBeenCalledWith({
-      where: { id: 'course-1' },
-      data: { activeClassId: null },
-    });
-  });
-});
-
 // Failed and incomplete repair admission is covered with real PostgreSQL in
 // classes/preparation-postgres.test.ts; selective material is covered in learning/class-repair.test.ts.
 
@@ -387,6 +362,19 @@ describe('getClassForUser', () => {
         where: { id: 'class-1', course: { userId: 'u1' } },
       })
     );
+  });
+
+  it('reads the owned class through a supplied transaction', async () => {
+    const findFirst = vi.fn().mockResolvedValue(null);
+    const database = { courseClass: { findFirst } } as unknown as Pick<
+      Prisma.TransactionClient,
+      'courseClass' | 'speakingRecording'
+    >;
+    expect(await getClassForUser('class-1', 'u1', database)).toBeNull();
+    expect(findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'class-1', course: { userId: 'u1' } } })
+    );
+    expect(mockCourseClassFindFirst).not.toHaveBeenCalled();
   });
 
   it('returns accepted class teaching and rejects present malformed teaching instead of hiding it', async () => {

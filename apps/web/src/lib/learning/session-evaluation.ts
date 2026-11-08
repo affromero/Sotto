@@ -110,6 +110,14 @@ export function evaluateLearningWork(
   sections: readonly LearningSectionWork[]
 ): { complete: boolean; mastered: boolean; sections: LearningSectionResult[] } {
   assertLearningMaterial(requirements, sections, true);
+  return scorePreviouslyValidatedLearningWork(requirements, sections);
+}
+
+/** Score material whose complete admission and media readiness were already verified. */
+export function scorePreviouslyValidatedLearningWork(
+  requirements: SkillRequirements,
+  sections: readonly LearningSectionWork[]
+): { complete: boolean; mastered: boolean; sections: LearningSectionResult[] } {
   const results = learningSkills.map((skill): LearningSectionResult => {
     const requirement = requirements.skills[skill];
     if (requirement.state !== 'REQUIRED')

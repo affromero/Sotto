@@ -2,7 +2,8 @@
 // (no TTS, unlike speaking). composeWritingPrompts is the content-only core
 // (reused by practice); generateClassWriting adds the ClassSection + WritingPrompt
 // persistence.
-import { withClassGeneration } from './learning/classes/class-generation-state';
+import { withClassGeneration } from './learning/classes/formative/class-generation-state';
+import { writingRepairSourceHash } from './classes/repair/writing-repair-source';
 import {
   captureClassAssessmentScope,
   reviewWritingAssessments,
@@ -24,6 +25,10 @@ import {
 } from './classes/quality/teaching-quality';
 import { combineTeachingFailures } from './classes/quality/teaching-failure';
 import {
+  createWritingReviewAuthority,
+  type InitialA1WritingReceipt,
+} from './classes/quality/section-review/writing-review-proof';
+import {
   parseWritingAuthoringProof,
   parseWritingIdeas,
   parseWritingStarter,
@@ -43,6 +48,9 @@ import {
 } from './classes/quality/generation-structure';
 
 const WRITING_PROMPT_COUNT = 3;
+const writingReviewAuthority = createWritingReviewAuthority();
+export const sealInitialA1WritingReview = writingReviewAuthority.sealSeed;
+export const materializeInitialA1WritingReview = writingReviewAuthority.materializeSeed;
 const WRITING_REPAIR_SCHEMA_INSTRUCTION =
   'Conform to the supplied JSON Schema, including the private modelAnswer and task-appropriate correctionReason. Supply ideas or a starter only when the schema permits them; any permitted opening must be an exact proper prefix of modelAnswer. Do not add other properties.';
 const writingPromptProviderSchema = z
@@ -98,6 +106,7 @@ export interface WritingPromptsParams {
   objective: string;
   targetVocab: Array<{ lemma: string; gloss: string }>;
   note?: string;
+  reviewScope?: { classId: string; courseId: string; attempt: number };
 }
 
 export interface ComposedWritingPrompt {
@@ -355,7 +364,11 @@ export async function composeWritingPrompts(
     );
     generated.prompts = publicWritingPrompts(generated.reviewItems);
     try {
+      const proof = p.reviewScope
+        ? writingReviewAuthority.capture(generated.prompts, generated.reviewItems, p, ai)
+        : undefined;
       await review(generated.reviewItems);
+      if (proof) writingReviewAuthority.accept(generated.prompts, p, proof);
       return generated.prompts;
     } catch (error) {
       const failure =
@@ -414,15 +427,27 @@ export interface ClassWritingParams {
   objective: string;
   targetVocab: Array<{ lemma: string; gloss: string }>;
   note?: string;
+  reviewScope?: { courseId: string };
+  stagedRepair?: boolean;
 }
 
 export interface ClassWritingResult {
   sectionId: string;
+  reviewReceipt?: InitialA1WritingReceipt;
 }
 
 export async function generateClassWriting(p: ClassWritingParams): Promise<ClassWritingResult> {
   const attempt = p.attempt ?? 1;
-  const composedPrompts = await composeWritingPrompts({
+  if (p.stagedRepair && (!p.execution.stageClassWriting || !p.execution.writingRepairSourceHash))
+    throw new Error('Writing repair requires a durable staging operation.');
+  const sourceHash = p.stagedRepair
+    ? await withClassGeneration(p.execution, p.classId, attempt, (database) =>
+        writingRepairSourceHash(database, p.classId, attempt)
+      )
+    : null;
+  if (sourceHash && sourceHash !== p.execution.writingRepairSourceHash)
+    throw new Error('The saved writing material changed before repair.');
+  const composeParams: WritingPromptsParams = {
     taskMode: 'translation',
     teaching: p.teaching,
     userId: p.userId,
@@ -433,7 +458,12 @@ export async function generateClassWriting(p: ClassWritingParams): Promise<Class
     objective: p.objective,
     targetVocab: p.targetVocab,
     note: p.note,
-  });
+    ...(p.reviewScope
+      ? { reviewScope: { classId: p.classId, courseId: p.reviewScope.courseId, attempt } }
+      : {}),
+  };
+  const composedPrompts = await composeWritingPrompts(composeParams);
+  if (p.reviewScope) writingReviewAuthority.require(composedPrompts, composeParams);
   const scope = await captureClassAssessmentScope({
     classId: p.classId,
     userId: p.userId,
@@ -443,8 +473,10 @@ export async function generateClassWriting(p: ClassWritingParams): Promise<Class
     userId: p.userId,
     execution: p.execution,
     scope,
-    prompts: composedPrompts,
+    prompts: p.reviewScope ? structuredClone(composedPrompts) : composedPrompts,
   });
+  if (p.reviewScope) writingReviewAuthority.require(composedPrompts, composeParams, prompts);
+  const persistedPrompts = p.reviewScope ? structuredClone(prompts) : prompts;
 
   const section = await withClassGeneration(p.execution, p.classId, attempt, async (database) => {
     const section = await database.classSection.create({
@@ -455,32 +487,58 @@ export async function generateClassWriting(p: ClassWritingParams): Promise<Class
         seed: `${p.classId}-WRITING-${attempt}`,
         spec: { objective: p.objective },
         status: 'READY',
+        withdrawn: p.stagedRepair === true,
         generatedAt: new Date(),
       },
     });
 
-    await database.writingPrompt.createMany({
-      data: prompts.map((c, i) => ({
-        sectionId: section.id,
-        order: i + 1,
-        task: c.task,
-        guidance: c.guidance,
-        ideas: c.ideas,
-        ...(c.learningObjectives
-          ? {
-              learningObjectives:
-                c.learningObjectives as unknown as import('@/generated/prisma/client').Prisma.InputJsonValue,
-            }
-          : {}),
-      })),
-    });
-    return section;
+    const data = persistedPrompts.map((c, i) => ({
+      sectionId: section.id,
+      order: i + 1,
+      task: c.task,
+      guidance: c.guidance,
+      ideas: c.ideas,
+      ...(c.learningObjectives
+        ? {
+            learningObjectives:
+              c.learningObjectives as unknown as import('@/generated/prisma/client').Prisma.InputJsonValue,
+          }
+        : {}),
+    }));
+    if (!p.reviewScope) {
+      await database.writingPrompt.createMany({ data });
+      if (sourceHash && p.execution.stageClassWriting)
+        await p.execution.stageClassWriting(database, {
+          classId: p.classId,
+          attempt,
+          sectionId: section.id,
+          sourceHash,
+        });
+      return { section, ids: [] as string[] };
+    }
+    const ids: string[] = [];
+    for (const prompt of data) {
+      const saved = await database.writingPrompt.create({ data: prompt, select: { id: true } });
+      ids.push(saved.id);
+    }
+    return { section, ids };
   });
+
+  const reviewReceipt = p.reviewScope
+    ? writingReviewAuthority.bind(
+        composedPrompts,
+        composeParams,
+        persistedPrompts,
+        section.section.id,
+        `${p.classId}-WRITING-${attempt}`,
+        section.ids
+      )
+    : undefined;
 
   logger.info('Writing section generated', {
     classId: p.classId,
-    sectionId: section.id,
+    sectionId: section.section.id,
     promptCount: String(prompts.length),
   });
-  return { sectionId: section.id };
+  return { sectionId: section.section.id, ...(reviewReceipt ? { reviewReceipt } : {}) };
 }

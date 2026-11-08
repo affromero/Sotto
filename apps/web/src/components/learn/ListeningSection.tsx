@@ -9,12 +9,15 @@ import { LearningSelectionMenu } from './LearningSelectionMenu';
 import { LessonAudioPlayer } from './audio/LessonAudioPlayer';
 import { type ClassFeedbackNote, type ClassQuestion, type ClassSectionEpisode } from './classTypes';
 import styles from './ListeningSection.module.css';
+import type { ClassPrerequisiteDirections } from './lesson/prerequisiteTypes';
+import { TaskDirection, taskDirection } from './lesson/TaskDirection';
 
 interface ListeningSectionProps {
   courseId: string;
   sourceId: string;
   episode: ClassSectionEpisode | null;
   questions: ClassQuestion[];
+  prerequisiteDirections?: ClassPrerequisiteDirections | null;
   savedAnswers?: Record<string, number>;
   gate: number; // 0..100
   nextName: string | null;
@@ -33,6 +36,7 @@ export function ListeningSection({
   sourceId,
   episode,
   questions,
+  prerequisiteDirections,
   savedAnswers = {},
   gate,
   nextName,
@@ -112,9 +116,16 @@ export function ListeningSection({
 
         <div className={styles.listenQs}>
           {questions.map((q) => {
+            const direction = taskDirection(prerequisiteDirections, sourceId, q.id, 'question');
+            const directionId = `direction-${sourceId}-${q.id}`;
             const sel = picked[q.id];
             return (
-              <div className={styles.lq} id={`question-${q.id}`} key={q.id}>
+              <div
+                className={styles.lq}
+                id={`question-${q.id}`}
+                key={q.id}
+                aria-describedby={direction ? directionId : undefined}
+              >
                 <LearningSelectionMenu
                   courseId={courseId}
                   sourceType="CLASS"
@@ -128,6 +139,13 @@ export function ListeningSection({
                     {q.question}
                   </div>
                 </LearningSelectionMenu>
+                {direction && prerequisiteDirections && (
+                  <TaskDirection
+                    id={directionId}
+                    text={direction.instruction}
+                    language={prerequisiteDirections.nativeLang}
+                  />
+                )}
                 <div
                   className={styles.lqOpts}
                   role="group"

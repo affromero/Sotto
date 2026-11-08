@@ -354,6 +354,8 @@ pub(crate) enum SpeakingPhase {
     Uploading,
     /// The upload acknowledgement was lost. Check saved work before recording again.
     UnknownUpload { message: String },
+    /// The server retained an uncertain provider attempt for operator recovery.
+    Unresolved { message: String },
     /// Grading poll loop in flight for `recording_id`.
     Polling { recording_id: String },
     /// Grading finished.

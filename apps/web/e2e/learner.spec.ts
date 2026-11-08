@@ -1,7 +1,15 @@
 import { test, expect } from '@playwright/test';
 import { join } from 'node:path';
-import { readingVocabularySchema } from '@sotto/shared';
+import { stat } from 'node:fs/promises';
+import { createHash, randomUUID } from 'node:crypto';
+import { classReceiptSchema, readingVocabularySchema } from '@sotto/shared';
 import { prismaUnfiltered as database } from '@/lib/prisma';
+import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
+import { sottoJobOutbox } from '@/lib/sidedoor/jobs/core/job-delivery';
+import { initialStitchAttemptId } from '@/lib/sidedoor/jobs/initial/initial-stitch-admission';
+import { verifyInitialStitchPublication } from '@/lib/sidedoor/jobs/initial/initial-stitch-outcome';
+import { SIDEDOOR_STATE_ID } from '@/lib/sidedoor/access/state/store';
+import { listAssessmentAudioAttempts } from '@/lib/learning/classes/audio/assessment-audio-attempt';
 import { seedClass } from './class-fixture';
 
 test.afterAll(async () => database.$disconnect());
@@ -144,6 +152,7 @@ test('compatible connections keep credentials bound through consent, model check
 });
 
 test('a learner plays audio and completes all five skills on a narrow screen', async ({ page }) => {
+  test.setTimeout(420_000);
   await page.setViewportSize({ width: 375, height: 812 });
   const fixture = await seedClass();
   const preparedClass = await database.courseClass.findUniqueOrThrow({
@@ -174,7 +183,25 @@ test('a learner plays audio and completes all five skills on a narrow screen', a
     '/learn'
   );
   await expect(header.getByRole('navigation', { name: 'Class location' })).toContainText(
+    'Before you practise'
+  );
+  await page.getByRole('button', { name: 'Explain the basics' }).click();
+  await expect(page.getByRole('heading', { name: 'A German greeting' })).toBeVisible({
+    timeout: 90_000,
+  });
+  await expect(
+    page.getByText('Hallo is a greeting. Place the greeting before the person’s name.')
+  ).toBeVisible();
+  await expect(page.getByText('Hallo, Mia!', { exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Mark basics as read' }).click();
+  await expect(header.getByRole('navigation', { name: 'Class location' })).toContainText(
     'Lesson overview'
+  );
+  const afterPrelude = await database.courseClass.findUniqueOrThrow({
+    where: { id: fixture.classId },
+  });
+  expect(afterPrelude.adaptiveSeed).toMatchObject(
+    preparedClass.adaptiveSeed as Record<string, unknown>
   );
   const illustration = page.locator('img[src*="class-conversation"]');
   await expect(illustration).toBeVisible();
@@ -225,7 +252,7 @@ test('a learner plays audio and completes all five skills on a narrow screen', a
   await expect(helpButton).toBeFocused();
   expect(
     (await database.courseClass.findUniqueOrThrow({ where: { id: fixture.classId } })).adaptiveSeed
-  ).toEqual(preparedClass.adaptiveSeed);
+  ).toEqual(afterPrelude.adaptiveSeed);
   for (const width of [375, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     for (const theme of ['light', 'dark']) {
@@ -297,12 +324,106 @@ test('a learner plays audio and completes all five skills on a narrow screen', a
   await page.getByRole('button', { name: 'Check writing', exact: true }).click();
   await expect(page.getByText('Your greeting is clear.').first()).toBeVisible();
   await page.getByRole('button', { name: 'Finish class', exact: true }).click();
+  const assessment = page.getByRole('region', { name: 'Show what you have learned' });
+  await expect(assessment).toBeVisible();
+  await assessment.getByRole('button', { name: 'Prepare assessment' }).click();
+  const questions = assessment.locator('fieldset');
+  await expect(questions.first()).toBeVisible({ timeout: 180_000 });
+  const statusResponse = await page.request.get(
+    `/api/v1/classes/${fixture.classId}/assessment/status`
+  );
+  const status = await statusResponse.json();
+  expect(status.status).toBe('READY');
+  const materialResponse = await page.request.get(
+    `/api/v1/classes/${fixture.classId}/assessment/${status.assessmentId}`
+  );
+  const material = await materialResponse.json();
+  expect(JSON.stringify(material)).not.toMatch(/correctIndex|rubric|privateTranscript/);
+  for (const question of await questions.all()) {
+    const legend = await question.locator('legend').innerText();
+    const name = /greeting for (\w+) in/.exec(legend)?.[1];
+    expect(name).toBeTruthy();
+    await question.getByRole('radio', { name: `Guten Tag, ${name}!` }).check();
+  }
+  const listeningAudio = assessment.getByLabel('Assessment listening audio');
+  await listeningAudio.evaluate((element: HTMLAudioElement) => element.load());
+  await expect
+    .poll(() => listeningAudio.evaluate((element: HTMLAudioElement) => element.readyState))
+    .toBeGreaterThanOrEqual(1);
+  const references = assessment.getByLabel('Speaking assessment reference audio');
+  await expect(references).toHaveCount(fixture.counts.SPEAKING);
+  const referenceUrl = await references.first().getAttribute('src');
+  expect(referenceUrl).toBeTruthy();
+  const referenceResponse = await page.request.get(referenceUrl!);
+  expect(referenceResponse.ok()).toBe(true);
+  expect(referenceResponse.headers()['content-type']).toContain('audio/wav');
+  await references.first().evaluate((element: HTMLAudioElement) => element.load());
+  await expect
+    .poll(() => references.first().evaluate((element: HTMLAudioElement) => element.readyState))
+    .toBeGreaterThanOrEqual(1);
+  const speakingTasks = assessment.locator('p').filter({ hasText: /^Guten Tag, [A-Za-z]+!$/ });
+  await expect(speakingTasks).toHaveCount(fixture.counts.SPEAKING);
+  for (const task of await speakingTasks.all()) {
+    const text = await task.innerText();
+    expect(
+      (
+        await page.request.post(`${process.env.SOTTO_BROWSER_PROVIDER}/fixture/transcription`, {
+          data: { text },
+        })
+      ).ok()
+    ).toBe(true);
+    const card = task.locator('..');
+    await card.getByRole('button', { name: 'Record', exact: true }).click();
+    await expect(card.getByRole('button', { name: 'Stop recording' })).toBeVisible();
+    await page.waitForTimeout(2200);
+    await card.getByRole('button', { name: 'Stop recording' }).click();
+    await card.getByRole('button', { name: 'Save recording' }).click();
+    await expect(card.getByText('Recording saved.')).toBeVisible({ timeout: 30_000 });
+  }
+  const writingTasks = assessment.getByRole('textbox');
+  await expect(writingTasks).toHaveCount(fixture.counts.WRITING);
+  for (const task of await writingTasks.all()) {
+    const label = await task.getAttribute('id');
+    const prompt = await assessment.locator(`label[for="${label}"]`).innerText();
+    const name = /^Greet (\w+) in German\.$/.exec(prompt)?.[1];
+    expect(name).toBeTruthy();
+    await task.fill(`Guten Tag, ${name}!`);
+    const card = task.locator('..');
+    await card.getByRole('button', { name: 'Save response' }).click();
+    let lastStatusCheck = 0;
+    await expect
+      .poll(
+        async () => {
+          if (await card.getByText('Response saved.').isVisible()) return true;
+          if (
+            Date.now() - lastStatusCheck >= 3000 &&
+            (await card.getByText('Your response needs recovery before continuing.').isVisible())
+          ) {
+            lastStatusCheck = Date.now();
+            await assessment.getByRole('button', { name: 'Check saved status' }).click();
+          }
+          return false;
+        },
+        { timeout: 60_000 }
+      )
+      .toBe(true);
+  }
+  const submissionResponse = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response
+        .url()
+        .endsWith(`/api/v1/classes/${fixture.classId}/assessment/${status.assessmentId}`)
+  );
+  await assessment.getByRole('button', { name: 'Submit assessment' }).click();
+  expect((await submissionResponse).status()).toBe(200);
   await expect
     .poll(
       async () =>
         (await database.courseClass.findUniqueOrThrow({ where: { id: fixture.classId } })).status
     )
     .toBe('PASSED');
+  await expect(page.getByRole('heading', { name: 'An hour, well spent.' })).toBeVisible();
   await page.reload();
   await expect(page.getByRole('heading', { name: 'An hour, well spent.' })).toBeVisible();
   const saved = await database.courseClass.findUniqueOrThrow({
@@ -313,7 +434,11 @@ test('a learner plays audio and completes all five skills on a narrow screen', a
     },
   });
   expect(saved.submission).toMatchObject({ passed: true });
-  expect(saved.sections.every((section) => section.passed)).toBe(true);
+  if (!saved.submission) throw new Error('Assessment submission missing');
+  const receipt = classReceiptSchema.parse(saved.submission?.receipt);
+  expect(receipt.source).toBe('ASSESSMENT');
+  expect(receipt.sections).toHaveLength(5);
+  expect(receipt.sections.every((section) => section.passed)).toBe(true);
   const recordings = saved.sections.flatMap((section) =>
     section.prompts.flatMap((prompt) => prompt.recordings)
   );
@@ -321,6 +446,165 @@ test('a learner plays audio and completes all five skills on a narrow screen', a
   for (const recording of recordings) {
     expect(recording).toMatchObject({ status: 'SCORED', transcript: 'Guten Morgen.' });
   }
+  const assessmentAudio = await database.classAssessmentSection.findFirstOrThrow({
+    where: { assessment: { classId: fixture.classId }, skill: 'LISTENING' },
+    select: {
+      assessmentId: true,
+      episodeId: true,
+      episode: { select: { audioUrl: true, segments: { select: { audioUrl: true } } } },
+    },
+  });
+  expect(assessmentAudio.episodeId).toBeTruthy();
+  await expect(
+    sottoTransaction(
+      database,
+      async (tx) => {
+        await tx.courseClass.update({
+          where: { id: fixture.classId },
+          data: { attempt: { increment: 1 } },
+        });
+        const savedAttempt = await tx.sidedoorState.findUniqueOrThrow({
+          where: { id: initialStitchAttemptId(assessmentAudio.episodeId!) },
+        });
+        const state = savedAttempt.state;
+        if (
+          !state ||
+          typeof state !== 'object' ||
+          Array.isArray(state) ||
+          typeof state.operationId !== 'string'
+        )
+          throw new Error('Stitch attempt missing');
+        const stitch = await sottoJobOutbox(tx).read(state.operationId);
+        if (!stitch) throw new Error('Stitch operation missing');
+        await expect(verifyInitialStitchPublication(tx, stitch)).rejects.toThrow();
+        await expect(
+          verifyInitialStitchPublication(tx, stitch, undefined, { allowHistoricalAssessment: true })
+        ).resolves.toMatchObject({ kind: 'READY' });
+        throw new Error('Rollback historical audio check');
+      },
+      { timeoutMs: 30_000 }
+    )
+  ).rejects.toThrow('Rollback historical audio check');
+  await database.courseClass.update({
+    where: { id: fixture.classId },
+    data: { attempt: { increment: 1 } },
+  });
+  const attempts = await sottoTransaction(database, (tx) =>
+    listAssessmentAudioAttempts(tx, {
+      classId: fixture.classId,
+      courseId: fixture.courseId,
+      userId: saved.submission!.userId,
+    })
+  );
+  expect(attempts).toHaveLength(1);
+  const attempt = attempts[0]!;
+  const executions = await database.$queryRaw<Array<{ state: unknown }>>`
+    SELECT state FROM "SidedoorState"
+    WHERE state->>'kind' = 'job_execution'
+      AND state->>'parentId' = ${attempt.operationId}
+      AND state->>'status' = 'settled'`;
+  const settled = executions.find((row) => {
+    const value = row.state;
+    return (
+      value &&
+      typeof value === 'object' &&
+      !Array.isArray(value) &&
+      'id' in value &&
+      typeof value.id === 'string' &&
+      'executorId' in value &&
+      typeof value.executorId === 'string' &&
+      'fingerprint' in value &&
+      value.fingerprint === attempt.fingerprint
+    );
+  });
+  if (
+    !settled ||
+    !settled.state ||
+    typeof settled.state !== 'object' ||
+    Array.isArray(settled.state) ||
+    !('id' in settled.state) ||
+    !('executorId' in settled.state) ||
+    typeof settled.state.id !== 'string' ||
+    typeof settled.state.executorId !== 'string'
+  )
+    throw new Error('Settled audio execution missing');
+  const claimPrefix = createHash('sha256')
+    .update(JSON.stringify([fixture.classId, saved.createdAt.getTime()]))
+    .digest('hex');
+  const claimId = `${SIDEDOOR_STATE_ID}:assessment-audio-claim:${claimPrefix}:${attempt.operationId}`;
+  await database.sidedoorState.create({
+    data: {
+      id: claimId,
+      revision: randomUUID(),
+      state: {
+        classId: fixture.classId,
+        classGeneration: saved.createdAt.getTime(),
+        assessmentId: assessmentAudio.assessmentId,
+        operationId: attempt.operationId,
+        fingerprint: attempt.fingerprint,
+        nonce: randomUUID(),
+        status: 'RELEASED',
+        execution: {
+          id: settled.state.id,
+          parentId: attempt.operationId,
+          fingerprint: attempt.fingerprint,
+          executorId: settled.state.executorId,
+        },
+      },
+    },
+  });
+  const referencePrompts = await database.speakingPrompt.findMany({
+    where: { assessmentSection: { assessment: { classId: fixture.classId } } },
+    select: { assessmentReference: { select: { currentUrl: true } } },
+  });
+  const audioUrls = [
+    assessmentAudio.episode?.audioUrl,
+    ...(assessmentAudio.episode?.segments.map((segment) => segment.audioUrl) ?? []),
+    ...referencePrompts.map((prompt) => prompt.assessmentReference?.currentUrl),
+  ];
+  expect(audioUrls).toHaveLength(2 + fixture.counts.SPEAKING);
+  const audioPaths = audioUrls.map((url) => {
+    expect(url).toMatch(/^\/api\/v1\/storage\//);
+    return join(
+      process.env.SOTTO_BROWSER_DIRECTORY!,
+      'storage',
+      url!.slice('/api/v1/storage/'.length)
+    );
+  });
+  for (const path of audioPaths) expect((await stat(path)).size).toBeGreaterThan(0);
+  const classListening = await database.classSection.findFirstOrThrow({
+    where: { classId: fixture.classId, skill: 'LISTENING' },
+    include: { episode: true },
+  });
+  expect(classListening.episode?.audioUrl).toMatch(/^\/api\/v1\/storage\//);
+  const classListeningPath = join(
+    process.env.SOTTO_BROWSER_DIRECTORY!,
+    'storage',
+    classListening.episode!.audioUrl!.slice('/api/v1/storage/'.length)
+  );
+  expect((await stat(classListeningPath)).size).toBeGreaterThan(0);
+  const deletedClass = await page.request.delete(`/api/v1/classes/${fixture.classId}`);
+  const classDeletion = await deletedClass.json();
+  expect(deletedClass.status(), JSON.stringify(classDeletion)).toBe(200);
+  expect(classDeletion).toMatchObject({ deleted: true });
+  expect(await database.courseClass.findUnique({ where: { id: fixture.classId } })).toBeNull();
+  expect(
+    await database.episode.findUnique({ where: { id: classListening.episodeId! } })
+  ).toBeNull();
+  await expect(stat(classListeningPath)).rejects.toMatchObject({ code: 'ENOENT' });
+  for (const path of audioPaths) await expect(stat(path)).rejects.toMatchObject({ code: 'ENOENT' });
+  const deleted = await page.request.delete(`/api/v1/courses/${fixture.courseId}`, {
+    data: { confirm: 'de' },
+  });
+  const deletion = await deleted.json();
+  expect(deleted.status(), JSON.stringify(deletion)).toBe(200);
+  expect(deletion).toMatchObject({ deleted: true, filesFailed: 0, cleanupPendingJobs: 0 });
+  expect(await database.course.findUnique({ where: { id: fixture.courseId } })).toBeNull();
+  expect(await database.sidedoorState.findUnique({ where: { id: claimId } })).toBeNull();
+  expect(
+    await database.episode.findUnique({ where: { id: assessmentAudio.episodeId! } })
+  ).toBeNull();
+  for (const path of audioPaths) await expect(stat(path)).rejects.toMatchObject({ code: 'ENOENT' });
 });
 
 test('full practice keeps skill sections usable on desktop and a 375px screen', async ({

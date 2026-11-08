@@ -44,21 +44,41 @@ export function transcriptSource(episode: Awaited<ReturnType<typeof readEpisodeT
   return z.json().parse(JSON.parse(JSON.stringify(source)));
 }
 
+export async function readAccessibleTranscriptEpisode(
+  database: Prisma.TransactionClient,
+  episodeId: string,
+  requesterId: string
+) {
+  await database.$queryRaw`SELECT id FROM "Episode" WHERE id = ${episodeId} FOR UPDATE`;
+  const episode = await database.episode.findUnique({
+    where: { id: episodeId },
+    select: {
+      userId: true,
+      visibility: true,
+      status: true,
+      deletedAt: true,
+      assessmentAudioAssessmentId: true,
+      pdfUrl: true,
+      assessmentSection: { select: { id: true } },
+    },
+  });
+  if (
+    !episode ||
+    episode.deletedAt ||
+    episode.assessmentSection ||
+    episode.assessmentAudioAssessmentId ||
+    (episode.visibility === 'PRIVATE' && episode.userId !== requesterId)
+  )
+    throw new TranscriptExportNotFoundError();
+  return episode;
+}
+
 async function requireExportAccess(
   database: Prisma.TransactionClient,
   episodeId: string,
   requesterId: string
 ) {
-  const episode = await database.episode.findUnique({
-    where: { id: episodeId },
-    select: { userId: true, visibility: true, status: true, deletedAt: true },
-  });
-  if (
-    !episode ||
-    episode.deletedAt ||
-    (episode.visibility === 'PRIVATE' && episode.userId !== requesterId)
-  )
-    throw new TranscriptExportNotFoundError();
+  const episode = await readAccessibleTranscriptEpisode(database, episodeId, requesterId);
   if (episode.status !== 'READY')
     throw new AccessError('invalid', 'Episode must be in READY status to export');
 }

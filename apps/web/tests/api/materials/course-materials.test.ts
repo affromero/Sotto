@@ -1,5 +1,8 @@
-// @vitest-environment node
+// @vitest-environment private-redis
 import { createHash, randomUUID } from 'node:crypto';
+import { registerAssessmentDeletionCase } from './course-material-cases/assessment-deletion';
+import { dirname } from 'node:path';
+import { rm, stat } from 'node:fs/promises';
 import { NextRequest } from 'next/server';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PrismaClient } from '@/generated/prisma/client';
@@ -20,10 +23,18 @@ import { attachCourseMaterials, persistPlacementMaterials } from '@/lib/course-m
 import { factoryReset } from '@/lib/admin/factory-reset';
 import { resolveSottoRequest } from '@/lib/sidedoor/access/core/request-identity';
 import { deleteCourseCompletely } from '@/lib/course-deletion';
+import { sottoJobOutbox } from '@/lib/sidedoor/jobs/core/job-delivery';
+import { prepareJob } from 'thesidedoor-core/runtime/outbox';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 import { resolveStorageInput } from '@/lib/sidedoor/storage/core/storage-inputs';
 import { inspectStorageMigrationConsumer } from '@/lib/sidedoor/storage/migration/storage-migration-plan';
-import { StorageReferenceRegistry, StorageCleanupJournal } from 'thesidedoor-core/storage';
+import {
+  StorageReferenceRegistry,
+  StorageCleanupJournal,
+  prepareStorageCleanup,
+  copyOwnedBytesToFile,
+} from 'thesidedoor-core/storage';
+import { captureStorageBackend } from '@/lib/r2';
 import { runSottoStorageCleanup } from '@/lib/sidedoor/storage/migration/storage-cleanup-runtime';
 import { SIDEDOOR_STATE_ID } from '@/lib/sidedoor/access/state/store';
 import { visitStorageDeletionReferences } from '@/lib/storage/sidedoor/deletion-targets';
@@ -36,7 +47,10 @@ import {
 const boundary = vi.hoisted(() => ({
   database: null as PrismaClient | null,
   beforeWrite: null as (() => Promise<void>) | null,
+  beforeCourseDeletion: null as (() => Promise<void>) | null,
   generate: vi.fn(),
+  failDownload: false,
+  downloadDirectory: '',
 }));
 vi.mock('@/lib/learning-ai', () => ({
   resolveCapturedLearningAi: async (_userId: string, execution: SottoProviderExecution) => ({
@@ -56,6 +70,27 @@ vi.mock('@/lib/r2', async (original) => {
   const actual = await original<typeof import('@/lib/r2')>();
   return {
     ...actual,
+    restoreStorageBackend: async (...args: Parameters<typeof actual.restoreStorageBackend>) => {
+      const backend = await actual.restoreStorageBackend(...args);
+      if (!boundary.failDownload) return backend;
+      return {
+        ...backend,
+        downloadToFile: async (_key: string, destination: string) => {
+          boundary.downloadDirectory = dirname(destination);
+          return copyOwnedBytesToFile({
+            destination,
+            openSource: async () => ({
+              read: async () => {
+                throw new Error('Synthetic storage read failed');
+              },
+              close: async () => {
+                throw new Error('Synthetic storage close failed');
+              },
+            }),
+          });
+        },
+      };
+    },
     captureStorageBackend: async () => {
       const backend = await actual.captureStorageBackend();
       return {
@@ -74,18 +109,46 @@ vi.mock('@/lib/prisma', async () => {
   return { prisma: database, prismaUnfiltered: database };
 });
 vi.mock('@/lib/live-vocab', () => ({ extractAndStoreNoteVocab: vi.fn().mockResolvedValue(0) }));
+vi.mock('@/lib/sidedoor/access/deletion/learning-deletion', async (original) => {
+  const actual =
+    await original<typeof import('@/lib/sidedoor/access/deletion/learning-deletion')>();
+  return {
+    ...actual,
+    admitLearningStorageDeletion: async (
+      ...args: Parameters<typeof actual.admitLearningStorageDeletion>
+    ) => {
+      if (args[0].scope.kind === 'course') await boundary.beforeCourseDeletion?.();
+      return actual.admitLearningStorageDeletion(...args);
+    },
+  };
+});
 
-const suite = process.env.SIDEDOOR_TEST_DATABASE_URL ? describe : describe.skip;
+const suite =
+  process.env.SIDEDOOR_TEST_DATABASE_URL && process.env.SOTTO_TEST_PRIVATE_REDIS_URL
+    ? describe
+    : describe.skip;
 suite('owned original course materials', () => {
   let instance: SharedTestInstance;
   let identity: SharedTestIdentity;
   let courseId: string;
   beforeAll(async () => {
+    const privateUrl = new URL(process.env.SOTTO_TEST_PRIVATE_REDIS_URL!);
+    const redis = (await import('@/lib/redis')).getSharedQueueRedisClient();
+    if (
+      redis.options.host !== privateUrl.hostname ||
+      redis.options.port !== Number(privateUrl.port) ||
+      (redis.options.db ?? 0) !== Number(privateUrl.pathname.slice(1) || '0') ||
+      Boolean(redis.options.tls) !== (privateUrl.protocol === 'rediss:')
+    )
+      throw new Error('Material queues are not connected to private Redis');
     instance = await createSharedTestInstance('course_materials');
     boundary.database = instance.database;
   });
   beforeEach(async () => {
     boundary.beforeWrite = null;
+    boundary.beforeCourseDeletion = null;
+    boundary.failDownload = false;
+    boundary.downloadDirectory = '';
     boundary.generate.mockReset();
     boundary.generate.mockResolvedValue({
       content: JSON.stringify({
@@ -375,6 +438,23 @@ suite('owned original course materials', () => {
     expect(response.status).toBe(400);
     expect(await instance.database.courseMaterial.count()).toBe(0);
   });
+  it('retains download staging when a read and its cleanup both fail', async () => {
+    const material = await retained();
+    boundary.failDownload = true;
+    try {
+      const response = await download(request(`materials/${material.id}/file`), {
+        params: Promise.resolve({ materialId: material.id }),
+      });
+      expect(response.status).toBe(502);
+      expect(boundary.downloadDirectory).not.toBe('');
+      expect((await stat(boundary.downloadDirectory)).isDirectory()).toBe(true);
+    } finally {
+      boundary.failDownload = false;
+      if (boundary.downloadDirectory)
+        await rm(boundary.downloadDirectory, { recursive: true, force: true });
+    }
+  });
+
   it('returns exact original bytes through the owning profile and rejects another learner', async () => {
     const material = await retained();
     const params = { params: Promise.resolve({ materialId: material.id }) };
@@ -475,7 +555,9 @@ suite('owned original course materials', () => {
       attachCourseMaterials(database, identity.ownerId, courseId, [material.id])
     );
     const result = await deleteCourseCompletely(courseId);
+    expect(result.filesAttempted).toBe(1);
     expect(result.filesDeleted).toBe(1);
+    expect(result.filesFailed).toBe(0);
     expect(result.cleanupPendingJobs).toBe(0);
     expect(
       await instance.database.courseMaterial.findUnique({ where: { id: material.id } })
@@ -487,6 +569,136 @@ suite('owned original course materials', () => {
         })
       ).status
     ).toBe(404);
+  });
+  it('reports pending cleanup and preserves files until an interrupted deletion is resumed', async () => {
+    const material = await retained();
+    await sottoTransaction(instance.database, (database) =>
+      attachCourseMaterials(database, identity.ownerId, courseId, [material.id])
+    );
+    const stored = await instance.database.courseMaterial.findUniqueOrThrow({
+      where: { id: material.id },
+    });
+    if (!stored.originalUrl) throw new Error('Material original missing');
+    const input = await sottoTransaction(instance.database, (database) =>
+      resolveStorageInput(database, {
+        consumer: `material:${material.id}:original`,
+        reference: stored.originalUrl!,
+      })
+    );
+    const backend = await captureStorageBackend();
+    expect(await backend.has(input.input.key)).toBe(true);
+    const runtime = await import('@/lib/sidedoor/storage/migration/storage-cleanup-runtime');
+    const interrupted = vi
+      .spyOn(runtime, 'runSottoStorageCleanup')
+      .mockRejectedValue(new Error('Synthetic cleanup interruption'));
+    let result: Awaited<ReturnType<typeof deleteCourseCompletely>>;
+    try {
+      result = await deleteCourseCompletely(courseId);
+    } finally {
+      interrupted.mockRestore();
+    }
+    expect(result.cleanupPendingJobs).toBeGreaterThan(0);
+    expect(result.filesAttempted).toBeGreaterThanOrEqual(result.filesDeleted);
+    expect(result.filesFailed).toBeGreaterThanOrEqual(0);
+    expect(await backend.has(input.input.key)).toBe(true);
+    const journal = new StorageCleanupJournal(
+      {
+        query: (sql, values) =>
+          instance.database.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...values),
+      },
+      'postgres',
+      SIDEDOOR_STATE_ID
+    );
+    const jobs = await journal.listJobs();
+    const job = jobs.jobs.find((item) => item.subjectId === `material:${material.id}`);
+    if (!job) throw new Error('Material cleanup job missing');
+    await runSottoStorageCleanup(instance.database, job.id);
+    expect((await journal.get(job.id)).phase).toBe('complete');
+    expect(await backend.has(input.input.key)).toBe(false);
+  });
+  it('deletes a course after an already erased class storage copy', async () => {
+    const course = await instance.database.course.findUniqueOrThrow({ where: { id: courseId } });
+    const classScope = { subjectId: `class:${randomUUID()}`, generation: 1 };
+    const courseScope = { subjectId: `course:${courseId}`, generation: course.createdAt.getTime() };
+    const copy = await sottoTransaction(instance.database, async (database) => {
+      const outbox = sottoJobOutbox(database);
+      return outbox.enqueue(
+        prepareJob({
+          namespace: SIDEDOOR_STATE_ID,
+          handler: 'storage-migration-copy',
+          version: 1,
+          payload: {},
+          scopes: [classScope, courseScope],
+          delivery: { attempts: 1, priority: 0, availableAt: 0 },
+        })
+      );
+    });
+    await expect(deleteCourseCompletely(courseId)).rejects.toThrow(
+      'Storage copy cannot be retired'
+    );
+    expect(await instance.database.course.findUnique({ where: { id: courseId } })).not.toBeNull();
+    await sottoTransaction(instance.database, async (database) => {
+      const outbox = sottoJobOutbox(database);
+      await outbox.complete(copy.job.id, copy.fingerprint);
+      const cleanup = new StorageCleanupJournal(
+        {
+          query: (sql, values) =>
+            database.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...values),
+        },
+        'postgres',
+        SIDEDOOR_STATE_ID
+      );
+      await cleanup.createJob(
+        prepareStorageCleanup({ namespace: SIDEDOOR_STATE_ID, ...classScope })
+      );
+      await outbox.erase(copy.job.id, copy.fingerprint, classScope);
+    });
+    await deleteCourseCompletely(courseId);
+    expect(await instance.database.course.findUnique({ where: { id: courseId } })).toBeNull();
+  });
+
+  registerAssessmentDeletionCase(() => ({ instance, identity, courseId, boundary }));
+
+  it('retries course deletion when another episode is linked after inventory', async () => {
+    const first = await instance.database.episode.create({
+      data: { userId: identity.ownerId, title: 'First', topic: 'Test' },
+    });
+    const late = await instance.database.episode.create({
+      data: { userId: identity.ownerId, title: 'Late', topic: 'Test' },
+    });
+    await instance.database.practiceSession.create({
+      data: { courseId, kind: 'LISTENING', items: [], seed: 'first', episodeId: first.id },
+    });
+    let started!: () => void;
+    let release!: () => void;
+    const startedPromise = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const releasePromise = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    boundary.beforeCourseDeletion = async () => {
+      boundary.beforeCourseDeletion = null;
+      started();
+      await releasePromise;
+    };
+    const deletion = deleteCourseCompletely(courseId);
+    await Promise.race([
+      startedPromise,
+      deletion.then(() => {
+        throw new Error('Deletion completed before the test barrier');
+      }),
+    ]);
+    await instance.database.practiceSession
+      .create({
+        data: { courseId, kind: 'LISTENING', items: [], seed: 'late', episodeId: late.id },
+      })
+      .finally(release);
+    const result = await deletion;
+    expect(result.episodesDeleted).toBe(2);
+    expect(
+      await instance.database.episode.count({ where: { id: { in: [first.id, late.id] } } })
+    ).toBe(0);
   });
   it('placement keeps pasted notes editable and attaches the original documents', async () => {
     const material = await retained();

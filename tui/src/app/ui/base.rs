@@ -54,20 +54,66 @@ pub(super) fn draw_view(frame: &mut Frame, area: Rect, view: &View, config: &Con
         View::ListeningReview { .. } => draw_listening_review(frame, area, view, p),
         View::SpeakingReview { .. } => draw_speaking_review(frame, area, view, p),
         View::Result { course, result } => draw_result(frame, area, course, result, p),
-        View::Class { .. } | View::Practice { .. } => draw_class(frame, area, view, p),
+        View::ClassPrelude { value, in_flight, error, scroll, retained_work, .. } => {
+            let inner = panel(frame, area, "Before you practise", p);
+            let mut text = String::new();
+            if let Some(error) = error { text.push_str(&format!("{error}\n\n")); }
+            if let Some(value) = value {
+                let material = if value["kind"] == "BASE" { &value["teaching"] } else { &value["content"] };
+                for key in ["title", "explanation"] {
+                    if let Some(item) = material[key].as_str() { text.push_str(&format!("{item}\n\n")); }
+                }
+                if let Some(examples) = material["workedExamples"].as_array().or_else(|| material["examples"].as_array()) {
+                    text.push_str("Examples\n");
+                    for example in examples {
+                        for key in ["prompt", "answer", "target", "meaning", "explanation"] {
+                            if let Some(item) = example[key].as_str() { text.push_str(&format!("{item}\n")); }
+                        }
+                        text.push('\n');
+                    }
+                }
+                if let Some(mistake) = material["commonMistake"].as_object() {
+                    text.push_str("Notice the difference\n");
+                    for key in ["incorrect", "correction", "explanation"] {
+                        if let Some(item) = mistake.get(key).and_then(|v| v.as_str()) { text.push_str(&format!("{item}\n")); }
+                    }
+                }
+                let status = value["status"].as_str().or_else(|| value["kind"].as_str()).unwrap_or_default();
+                text.push_str(&format!("\nStatus: {status}\n"));
+                if status == "AVAILABLE" || ["FAILED", "STALE"].contains(&status) && value["canRetry"] == true {
+                    text.push_str("Preparing an explanation uses your configured AI provider. Press Enter to prepare.\n");
+                } else if value["acknowledged"] == false { text.push_str("Press Enter after reading to continue.\n"); }
+            }
+            if *in_flight { text.push_str("Checking saved status…\n"); }
+            if !retained_work.is_empty() {
+                text.push_str("\nYour retained work\n\n");
+                for item in retained_work { text.push_str(item); text.push_str("\n\n"); }
+            }
+            text.push_str("\nr check saved status · PageUp/PageDown scroll · q back");
+            frame.render_widget(Paragraph::new(text).wrap(Wrap { trim: false }).scroll((*scroll, 0)), inner);
+        },
+        View::Class { .. } | View::Practice { .. } | View::ClassRepair { history_open: true, .. } => draw_class(frame, area, view, p),
         View::PracticePreparing { message, status, can_recover, recovery_confirmation, .. } => {
             let inner = panel(frame, area, &format!("Practice preparation · {status}"), p);
             let detail = if *recovery_confirmation { "An interrupted provider request may have incurred charges. Press R again to acknowledge and request recovery." } else { message };
             let hints = if *can_recover { "r check status · x cancel · R recover · q back" } else { "r check status or retry admission · x cancel · q back" };
             frame.render_widget(Paragraph::new(format!("{detail}\n\n{hints}")).wrap(Wrap { trim: true }), inner);
         },
-        View::ClassRepair { course, message, .. } => {
+        View::ClassRepair { course, message, previous_work, .. } => {
             let inner = panel(frame, area, &format!("{} · repair class", course.title), p);
-            frame.render_widget(Paragraph::new(format!("{message}\\n\\nn repair saved class · q back")).wrap(Wrap { trim: true }), inner);
+            let history_hint = if previous_work.is_empty() { "" } else { " · F2 previous work" };
+            frame.render_widget(Paragraph::new(format!("{message}\\n\\nn repair saved class · q back{history_hint}")).wrap(Wrap { trim: true }), inner);
         },
         View::ClassOutcome { course, result, .. } => draw_class_result(frame, area, course, result, p),
         View::ClassDone { course } => draw_class_done(frame, area, course, p),
         View::Exam { .. } => draw_exam(frame, area, view, p),
+        View::ExamRecovery { course, exam_id, retained_work, scroll } => {
+            let inner = panel(frame, area, &format!("{} · saved exam", course.title), p);
+            let mut text = format!("Saved exam {exam_id}. Read-only local recovery. The upload outcome is unknown; a restart may lose this view.\n\n");
+            for item in retained_work { text.push_str(item); text.push_str("\n\n"); }
+            text.push_str("PageUp/PageDown scroll · q back");
+            frame.render_widget(Paragraph::new(text).wrap(Wrap { trim: false }).scroll((*scroll, 0)), inner);
+        },
         View::ExamOutcome { course, result } => draw_exam_result(frame, area, course, result, p),
         View::PlacementLang { .. } => draw_placement_lang(frame, area, view, p),
         View::PlacementReview { .. } => draw_placement_review(frame, area, view, p),
@@ -670,7 +716,7 @@ fn draw_speaking_review(frame: &mut Frame, area: Rect, view: &View, p: &Palette)
                 )));
             }
         }
-        SpeakingPhase::UnknownUpload { message } | SpeakingPhase::Failed { message } => lines.push(Line::from(Span::styled(
+        SpeakingPhase::UnknownUpload { message } | SpeakingPhase::Failed { message } | SpeakingPhase::Unresolved { message } => lines.push(Line::from(Span::styled(
             message.clone(),
             Style::default().fg(p.pink),
         ))),
@@ -684,7 +730,7 @@ fn draw_speaking_review(frame: &mut Frame, area: Rect, view: &View, p: &Palette)
     let hints: &[&str] = match phase {
         SpeakingPhase::Idle => &["r record", "q back"],
         SpeakingPhase::Recording => &["r stop", "q back"],
-        SpeakingPhase::Uploading | SpeakingPhase::Polling { .. } | SpeakingPhase::UnknownUpload { .. } => &["q back"],
+        SpeakingPhase::Uploading | SpeakingPhase::Polling { .. } | SpeakingPhase::UnknownUpload { .. } | SpeakingPhase::Unresolved { .. } => &["q back"],
         SpeakingPhase::Graded { .. } | SpeakingPhase::Failed { .. } => {
             &["enter next", "r retry", "q back"]
         }

@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
-use crate::api::{NextClassOutcome, SpeakingUploadResponse, WritingGradeResponse, types};
+use crate::api::{
+    ClassPreludeMaterial, NextClassOutcome, SpeakingUploadResponse, WritingGradeResponse, types,
+};
 
 #[derive(Clone, Debug)]
 pub(crate) enum LearningMapIntent {
@@ -62,6 +64,11 @@ pub(crate) enum Action {
     ScrollUp,
     /// Scroll the current item's prompt down (PageDown).
     ScrollDown,
+    ClassDirectionScroll(bool),
+    ClassHistoryToggle,
+    ClassHistoryScroll(bool),
+    ClassHistoryAudioMove(bool),
+    ClassHistoryAudioPlay,
     /// A typed character for the writing editor.
     Input(char),
     /// Newline in the writing editor (Enter).
@@ -126,6 +133,8 @@ pub(crate) enum Action {
     // --- Classes (the gated CEFR curriculum flow) ---
     /// `POST /courses/{id}/next-class` returned (or failed).
     NextClassResolved(u64, ApiResult<NextClassOutcome>),
+    ClassPreludeLoaded(u64, ApiResult<types::ClassPreludeResponse>),
+    ClassPreludeMaterialLoaded(u64, ApiResult<ClassPreludeMaterial>),
     /// `GET /classes/{id}` returned (or failed).
     ClassLoaded(u64, ApiResult<types::ClassDetailResponse>),
     /// `POST /classes/{id}/submit` returned (or failed).
@@ -134,6 +143,7 @@ pub(crate) enum Action {
     ClassEpisodeLoaded(u64, ApiResult<types::EpisodeDetailResponse>),
     /// Class listening audio bytes were downloaded (or failed).
     ClassAudioDownloaded(u64, ApiResult<Vec<u8>>),
+    ClassHistoryAudioDownloaded(u64, uuid::Uuid, String, String, String, ApiResult<Vec<u8>>),
     /// A class speaking attempt upload returned (or failed).
     ClassSpeakingUploaded(u64, ApiResult<SpeakingUploadResponse>),
     /// A class speaking grading poll returned (or failed).

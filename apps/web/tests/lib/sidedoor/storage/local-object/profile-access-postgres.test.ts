@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { randomUUID } from 'node:crypto';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { registerReferenceAudioCase } from './profile-cases/reference-audio';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { NextRequest } from 'next/server';
@@ -12,7 +13,9 @@ import {
   StorageReferenceRegistry,
 } from 'thesidedoor-core/storage';
 import type { PrismaClient } from '@/generated/prisma/client';
-import { captureStorageBackend } from '@/lib/r2';
+import { captureStorageBackend, readAttributedStorageRange } from '@/lib/r2';
+import * as storageRuntime from '@/lib/r2';
+import { captureSpeakingHistoryAudio } from '@/lib/classes/speaking/speaking-history-audio';
 import { SIDEDOOR_STATE_ID } from '@/lib/sidedoor/access/state/store';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 import { canReadLocalObjectConsumer } from '@/lib/storage/sidedoor/local-object-access';
@@ -29,6 +32,9 @@ const boundary = vi.hoisted(() => ({
 }));
 vi.mock('@/lib/api-keys', () => ({
   authenticateRequest: async () => (boundary.userId ? { userId: boundary.userId } : null),
+}));
+vi.mock('@/lib/sidedoor/access/core/request-identity', () => ({
+  requireOriginalSottoAdmission: async () => {},
 }));
 vi.mock('@/lib/prisma', () => {
   const database = new Proxy(
@@ -49,6 +55,10 @@ vi.mock('@/lib/prisma', () => {
 });
 
 const { GET } = await import('@/app/api/v1/storage/[...key]/route');
+const { GET: getSpeakingAudio } =
+  await import('@/app/api/v1/classes/[classId]/speaking/[promptId]/recordings/[recordingId]/audio/route');
+const { GET: getReferenceAudio } =
+  await import('@/app/api/v1/classes/[classId]/speaking/[promptId]/reference/audio/route');
 const suite = process.env.SIDEDOOR_TEST_DATABASE_URL ? describe : describe.skip;
 const PDF = Buffer.from('%PDF-1.7\nPrivate learner worksheet\n');
 
@@ -229,6 +239,176 @@ suite('local worksheet profile access', () => {
       canReadLocalObjectConsumer(database, userId, reference, consumer)
     );
 
+  it('denies assessment episode assets while preserving an independently owned shared reference', async () => {
+    const previousReference = reference;
+    const backend = await captureStorageBackend();
+    key = `shared/${randomUUID()}.pdf`;
+    reference = await backend.writeBuffer(key, PDF, 'application/pdf');
+    const assessment = await instance.database.classAssessment.create({
+      data: {
+        classId,
+        courseId,
+        userId: learnerId,
+        classAttempt: 1,
+        assessmentAttempt: 1,
+        requirements: {},
+        formativeRevision: 'revision',
+        generationOperationId: 'shared-audio-operation',
+      },
+    });
+    const section = await instance.database.classAssessmentSection.create({
+      data: { assessmentId: assessment.id, skill: 'LISTENING', passThreshold: 0.7 },
+    });
+    const episode = await instance.database.$transaction(async (tx) => {
+      const created = await tx.episode.create({
+        data: {
+          userId: learnerId,
+          title: 'Listening',
+          topic: 'Test',
+          visibility: 'UNLISTED',
+          audioUrl: reference,
+          pdfUrl: reference,
+          assessmentAudioAssessmentId: assessment.id,
+          assessmentAudioSectionId: section.id,
+          assessmentAudioOperationId: 'shared-audio-operation',
+        },
+      });
+      await tx.classAssessmentSection.update({
+        where: { id: section.id },
+        data: {
+          episodeId: created.id,
+          audioReservationEpisodeId: created.id,
+          audioReservationOperationId: 'shared-audio-operation',
+        },
+      });
+      return created;
+    });
+    const segment = await instance.database.segment.create({
+      data: {
+        episodeId: episode.id,
+        order: 0,
+        speaker: 'HOST',
+        text: 'Private',
+        audioUrl: reference,
+      },
+    });
+    const version = await instance.database.episodeVersion.create({
+      data: { episodeId: episode.id, version: 1, audioUrl: reference, changeType: 'initial' },
+    });
+    const consumers = [
+      `episode:${episode.id}:audio`,
+      `episode:${episode.id}:transcript`,
+      `segment:${segment.id}:audio`,
+      `episode-version:${version.id}:audio`,
+    ];
+    await sottoTransaction(instance.database, async (database) => {
+      const registry = new StorageReferenceRegistry(
+        {
+          query: (sql, values) =>
+            database.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...values),
+        },
+        'postgres',
+        SIDEDOOR_STATE_ID
+      );
+      const existing = await registry.resolve({
+        consumer: `class:${classId}:worksheet`,
+        reference: previousReference,
+      });
+      if (!existing) throw new Error('Missing worksheet registry reference');
+      await registry.replaceMany({
+        consumers: [
+          { consumer: `class:${classId}:worksheet`, previousReference },
+          ...consumers.map((consumer) => ({ consumer, previousReference: null })),
+        ],
+        next: prepareStorageReference({
+          namespace: SIDEDOOR_STATE_ID,
+          operationId: randomUUID(),
+          reference,
+          localRoutePrefix: '/api/v1/storage',
+          target: { ...existing.prepared.target, key },
+          scopes: existing.prepared.scopes,
+        }),
+      });
+      await database.courseClass.update({
+        where: { id: classId },
+        data: { worksheetPdfUrl: reference },
+      });
+    });
+    for (const consumer of consumers) {
+      expect(await readable(consumer, learnerId)).toBe(false);
+      expect(await readable(consumer, otherId)).toBe(false);
+    }
+    expect((await download(otherId)).status).toBe(404);
+    expect((await download(learnerId)).status).toBe(200);
+    await sottoTransaction(instance.database, async (database) => {
+      const registry = new StorageReferenceRegistry(
+        {
+          query: (sql, values) =>
+            database.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...values),
+        },
+        'postgres',
+        SIDEDOOR_STATE_ID
+      );
+      await registry.retire({
+        operationId: randomUUID(),
+        consumer: `class:${classId}:worksheet`,
+        previousReference: reference,
+      });
+    });
+    expect((await download(learnerId)).status).toBe(404);
+  });
+
+  it('does not attach an episode whose local bytes are already served', async () => {
+    const backend = await captureStorageBackend();
+    key = `assessment/${randomUUID()}.pdf`;
+    reference = await backend.writeBuffer(key, PDF, 'application/pdf');
+    const episode = await instance.database.episode.create({
+      data: { userId: learnerId, title: 'Listening', topic: 'Test', audioUrl: reference },
+    });
+    await sottoTransaction(instance.database, async (database) => {
+      const executor = {
+        query: (sql: string, values: readonly unknown[]) =>
+          database.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...values),
+      };
+      const stored = prepareStorageBackend(SIDEDOOR_STATE_ID, backend.descriptor);
+      await new StorageBackendRegistry(executor, 'postgres', SIDEDOOR_STATE_ID).register(stored);
+      await new StorageReferenceRegistry(executor, 'postgres', SIDEDOOR_STATE_ID).replaceMany({
+        consumers: [{ consumer: `episode:${episode.id}:audio`, previousReference: null }],
+        next: prepareStorageReference({
+          namespace: SIDEDOOR_STATE_ID,
+          operationId: randomUUID(),
+          reference,
+          localRoutePrefix: '/api/v1/storage',
+          target: { backendId: stored.id, binding: stored.binding, key },
+          scopes: [{ subjectId: `episode:${episode.id}`, generation: episode.createdAt.getTime() }],
+        }),
+      });
+    });
+    expect((await download(learnerId)).status).toBe(200);
+    const assessment = await instance.database.classAssessment.create({
+      data: {
+        classId,
+        courseId,
+        userId: learnerId,
+        classAttempt: 1,
+        assessmentAttempt: 1,
+        requirements: {},
+        formativeRevision: 'revision',
+      },
+    });
+    await expect(
+      instance.database.classAssessmentSection.create({
+        data: {
+          assessmentId: assessment.id,
+          skill: 'LISTENING',
+          passThreshold: 0.7,
+          episodeId: episode.id,
+        },
+      })
+    ).rejects.toThrow('Assessment audio must match its creation reservation');
+    expect((await download(learnerId)).status).toBe(200);
+  }, 15000);
+
   async function speakingSection() {
     return instance.database.classSection.create({
       data: { classId, skill: 'SPEAKING', seed: 'owned', spec: {} },
@@ -253,6 +433,176 @@ suite('local worksheet profile access', () => {
     expect(await readable(consumer)).toBe(true);
     expect(await readable(consumer, otherId)).toBe(false);
     expect(await readable(consumer, identity.ownerId)).toBe(false);
+  });
+
+  registerReferenceAudioCase(() => ({
+    instance,
+    identity,
+    directory,
+    learnerId,
+    otherId,
+    courseId,
+    classId,
+    boundary,
+    getReferenceAudio,
+    speakingSection,
+  }));
+
+  it('plays an owned published recording with exact attribution and byte ranges', async () => {
+    const section = await speakingSection();
+    const prompt = await instance.database.speakingPrompt.create({
+      data: {
+        sectionId: section.id,
+        order: 1,
+        targetPhrase: 'Hola',
+        translation: 'Hello',
+      },
+    });
+    const backend = await captureStorageBackend();
+    const audioKey = `recordings/${randomUUID()}.ogg`;
+    const bytes = Buffer.concat([
+      Buffer.from('OggS-'),
+      Buffer.alloc(storageRuntime.STORAGE_RANGE_MAX_BYTES + 8, 97),
+    ]);
+    const audioReference = await backend.writeBuffer(audioKey, bytes, 'audio/ogg');
+    const recording = await instance.database.speakingRecording.create({
+      data: {
+        promptId: prompt.id,
+        sectionId: section.id,
+        userId: learnerId,
+        audioUrl: audioReference,
+      },
+    });
+    const course = await instance.database.course.findUniqueOrThrow({ where: { id: courseId } });
+    await sottoTransaction(instance.database, async (database) => {
+      const executor = {
+        query: (sql: string, values: readonly unknown[]) =>
+          database.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...values),
+      };
+      const stored = prepareStorageBackend(SIDEDOOR_STATE_ID, backend.descriptor);
+      await new StorageBackendRegistry(executor, 'postgres', SIDEDOOR_STATE_ID).register(stored);
+      await new StorageReferenceRegistry(executor, 'postgres', SIDEDOOR_STATE_ID).replaceMany({
+        consumers: [{ consumer: `recording:${recording.id}:audio`, previousReference: null }],
+        next: prepareStorageReference({
+          namespace: SIDEDOOR_STATE_ID,
+          operationId: randomUUID(),
+          reference: audioReference,
+          localRoutePrefix: '/api/v1/storage',
+          target: { backendId: stored.id, binding: stored.binding, key: audioKey },
+          scopes: [{ subjectId: `course:${courseId}`, generation: course.createdAt.getTime() }],
+        }),
+      });
+    });
+    const downloadRecording = (userId: string, range?: string, requestedPromptId = prompt.id) => {
+      boundary.userId = userId;
+      return getSpeakingAudio(
+        new NextRequest('http://localhost/audio', { headers: range ? { range } : undefined }),
+        {
+          params: Promise.resolve({
+            classId,
+            promptId: requestedPromptId,
+            recordingId: recording.id,
+          }),
+        }
+      );
+    };
+    const full = await downloadRecording(learnerId);
+    expect(full.status).toBe(200);
+    expect(full.headers.get('content-type')).toBe('audio/ogg');
+    expect(full.headers.get('cache-control')).toBe('private, no-store');
+    expect(Buffer.from(await full.arrayBuffer())).toEqual(bytes);
+    const partial = await downloadRecording(learnerId, 'bytes=5-9');
+    expect(partial.status).toBe(206);
+    expect(partial.headers.get('content-range')).toBe(`bytes 5-9/${bytes.length}`);
+    expect(await partial.text()).toBe('aaaaa');
+    const invalid = await downloadRecording(learnerId, `bytes=${bytes.length}-`);
+    expect(invalid.status).toBe(416);
+    expect(invalid.headers.get('content-range')).toBe(`bytes */${bytes.length}`);
+    expect((await downloadRecording(otherId)).status).toBe(404);
+    expect((await downloadRecording(identity.ownerId)).status).toBe(404);
+    expect((await downloadRecording(learnerId, undefined, 'other-prompt')).status).toBe(404);
+    let release!: () => void;
+    let entered!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const waiting = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    const readRange = storageRuntime.readAttributedStorageRange;
+    const spy = vi
+      .spyOn(storageRuntime, 'readAttributedStorageRange')
+      .mockImplementation(async (options) => {
+        if (options.start === storageRuntime.STORAGE_RANGE_MAX_BYTES) {
+          entered();
+          await gate;
+        }
+        return readRange(options);
+      });
+    try {
+      const interrupted = await downloadRecording(learnerId);
+      const reader = interrupted.body!.getReader();
+      expect((await reader.read()).value?.length).toBe(storageRuntime.STORAGE_RANGE_MAX_BYTES);
+      await Promise.race([
+        waiting,
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Second audio range did not start')), 2000)
+        ),
+      ]);
+      await instance.database.classSection.update({
+        where: { id: section.id },
+        data: { withdrawn: true },
+      });
+      release();
+      await expect(reader.read()).rejects.toThrow('Recording authorization changed');
+    } finally {
+      release();
+      spy.mockRestore();
+      await instance.database.classSection.update({
+        where: { id: section.id },
+        data: { withdrawn: false },
+      });
+    }
+    const unattributed = await instance.database.speakingRecording.create({
+      data: {
+        promptId: prompt.id,
+        sectionId: section.id,
+        userId: learnerId,
+        audioUrl: audioReference,
+      },
+    });
+    const missing = await getSpeakingAudio(new NextRequest('http://localhost/audio'), {
+      params: Promise.resolve({ classId, promptId: prompt.id, recordingId: unattributed.id }),
+    });
+    expect(missing.status).toBe(502);
+    expect(await missing.json()).toMatchObject({ error: 'Recording unavailable' });
+    const captured = await sottoTransaction(instance.database, (database) =>
+      captureSpeakingHistoryAudio(database, {
+        classId,
+        promptId: prompt.id,
+        recordingId: recording.id,
+        userId: learnerId,
+      })
+    );
+    if (!captured) throw new Error('Expected authorized audio');
+    const rangeInput = {
+      input: captured.storage.input,
+      descriptor: captured.storage.backend.descriptor,
+      execution: { userId: learnerId, authorize: async () => ({ userId: learnerId }) },
+      start: 0,
+      end: 0,
+    };
+    const before = await readAttributedStorageRange(rangeInput);
+    if (!before) throw new Error('Expected first audio range');
+    await writeFile(join(directory, audioKey), Buffer.alloc(bytes.length, 65));
+    await expect(
+      readAttributedStorageRange({ ...rangeInput, expectedIdentity: before.identity })
+    ).rejects.toThrow('Stored object identity changed');
+    await instance.database.classSection.update({
+      where: { id: section.id },
+      data: { withdrawn: true },
+    });
+    expect((await downloadRecording(learnerId)).status).toBe(404);
   });
 
   it.each(['class', 'practice', 'exam'] as const)(
@@ -299,6 +649,110 @@ suite('local worksheet profile access', () => {
       expect(await readable(consumer, kind === 'exam' ? learnerId : otherId)).toBe(false);
     }
   );
+
+  it('hides a withdrawn class reference until publication and retains access to published history', async () => {
+    const section = await speakingSection();
+    await instance.database.classSection.update({
+      where: { id: section.id },
+      data: { withdrawn: true },
+    });
+    const prompt = await instance.database.speakingPrompt.create({
+      data: {
+        sectionId: section.id,
+        order: 1,
+        targetPhrase: 'Hola',
+        translation: 'Hello',
+        referenceTtsUrl: reference,
+      },
+    });
+    const consumer = `speaking-prompt:${prompt.id}:reference`;
+    expect(await readable(consumer, learnerId)).toBe(false);
+    await instance.database.classSection.update({
+      where: { id: section.id },
+      data: { withdrawn: false },
+    });
+    expect(await readable(consumer, learnerId)).toBe(true);
+    await instance.database.classSection.create({
+      data: {
+        classId: section.classId,
+        skill: 'SPEAKING',
+        attempt: section.attempt + 1,
+        seed: 'newer',
+        spec: {},
+        status: 'READY',
+      },
+    });
+    expect(await readable(consumer, learnerId)).toBe(true);
+    expect(await readable(consumer, otherId)).toBe(false);
+  });
+
+  it('serves staged speaking bytes only through an independently authorized consumer or after publication', async () => {
+    const section = await speakingSection();
+    const previousReference = reference;
+    await instance.database.classSection.update({
+      where: { id: section.id },
+      data: { withdrawn: true },
+    });
+    const backend = await captureStorageBackend();
+    key = `speaking-reference/${randomUUID()}.mp3`;
+    reference = await backend.writeBuffer(
+      key,
+      Buffer.from('Private speaking reference'),
+      'audio/mpeg'
+    );
+    const prompt = await instance.database.speakingPrompt.create({
+      data: {
+        sectionId: section.id,
+        order: 1,
+        targetPhrase: 'Hola',
+        translation: 'Hello',
+        referenceTtsUrl: reference,
+      },
+    });
+    const course = await instance.database.course.findUniqueOrThrow({ where: { id: courseId } });
+    const consumer = `speaking-prompt:${prompt.id}:reference`;
+    await sottoTransaction(instance.database, async (database) => {
+      const executor = {
+        query: (sql: string, values: readonly unknown[]) =>
+          database.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...values),
+      };
+      const stored = prepareStorageBackend(SIDEDOOR_STATE_ID, backend.descriptor);
+      await new StorageBackendRegistry(executor, 'postgres', SIDEDOOR_STATE_ID).register(stored);
+      await new StorageReferenceRegistry(executor, 'postgres', SIDEDOOR_STATE_ID).replaceMany({
+        consumers: [
+          { consumer, previousReference: null },
+          { consumer: `class:${classId}:worksheet`, previousReference },
+        ],
+        next: prepareStorageReference({
+          namespace: SIDEDOOR_STATE_ID,
+          operationId: randomUUID(),
+          reference,
+          localRoutePrefix: '/api/v1/storage',
+          target: { backendId: stored.id, binding: stored.binding, key },
+          scopes: [{ subjectId: `course:${course.id}`, generation: course.createdAt.getTime() }],
+        }),
+      });
+    });
+    expect((await download(learnerId)).status).toBe(404);
+    await instance.database.courseClass.update({
+      where: { id: classId },
+      data: { worksheetPdfUrl: reference },
+    });
+    expect((await download(learnerId)).status).toBe(200);
+    await instance.database.courseClass.update({
+      where: { id: classId },
+      data: { worksheetPdfUrl: null },
+    });
+    expect((await download(learnerId)).status).toBe(404);
+    await instance.database.classSection.update({
+      where: { id: section.id },
+      data: { withdrawn: false },
+    });
+    const allowed = await download(learnerId);
+    expect(allowed.status).toBe(200);
+    expect(await allowed.text()).toBe('Private speaking reference');
+    expect((await download(otherId)).status).toBe(404);
+  });
 
   it.each(['none', 'multiple'] as const)('rejects prompts with %s parents', async (kind) => {
     const prompt = await instance.database.speakingPrompt.create({

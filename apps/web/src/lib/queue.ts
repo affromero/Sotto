@@ -1,10 +1,12 @@
 import { ConnectionOptions, Queue, Worker, Job } from 'bullmq';
+import { z } from 'zod';
 import { validateSottoQueueContract } from '@/lib/sidedoor/jobs/core/job-contracts';
 import { executeSottoJob } from '@/lib/sidedoor/jobs/core/job-execution';
 import {
   admitDurableQueueJob,
   bindDurableQueueJob,
   bindDurableQueueCleanup,
+  bindDurableQueueExecution,
   completeDurableQueueJob,
   loadDurableQueueJob,
   isDurableQueueCleanupFailure,
@@ -13,13 +15,22 @@ import {
 import { deliverSottoJob } from '@/lib/sidedoor/jobs/core/job-delivery';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 import { sottoStateWriteTransaction } from '@/lib/sidedoor/access/state/write-transaction';
-import { withSottoJobExecution } from '@/lib/sidedoor/jobs/core/job-execution-lifetime';
+import {
+  finishSottoExecutionOperations,
+  withSottoJobExecution,
+} from '@/lib/sidedoor/jobs/core/job-execution-lifetime';
 import { settleFailedMaterialJob } from '@/lib/course-materials/jobs/failure';
 import { settleFailedAnalysisJob } from '@/lib/course-materials/jobs/analysis-failure';
 import { createRedisConnection, getSharedQueueRedisClient } from './redis';
 import { logger } from './logger';
 import { prismaUnfiltered as prisma } from './prisma';
 import type { Prisma } from '@/generated/prisma/client';
+
+const assessmentAudioCompletionSchema = z.object({
+  episodeId: z.string().min(1),
+  segmentId: z.string().min(1),
+  audioGenerationKey: z.string().min(1),
+});
 
 /**
  * Job types for the Sotto queue system
@@ -174,6 +185,7 @@ const DEFAULT_QUEUE_OPTIONS: QueueConfig = {
 
 const QUEUE_DEFINITIONS: Record<string, QueueDefinition> = {
   'class-preparation': { attempts: 1 },
+  'learning-writing': { attempts: 1 },
   'practice-preparation': { attempts: 1 },
   'vocabulary-audio': { attempts: 1, skipEvents: true },
   'vocabulary-index': { attempts: 1, skipEvents: true },
@@ -302,7 +314,13 @@ function logWorkerJobFailure(queueName: string, job: Job<unknown> | undefined, e
 function genericContractVersion(queueName: string, jobName?: string): number | null {
   if (
     queueName === 'interactions' &&
-    ['interactions.v2', 'interactions.v3', 'interactions.v4'].includes(jobName ?? '')
+    [
+      'interactions.v2',
+      'interactions.v3',
+      'interactions.v4',
+      'interactions.v5',
+      'interactions.v6',
+    ].includes(jobName ?? '')
   )
     return null;
   return new Set([
@@ -394,9 +412,31 @@ export function createWorker<T>(
       validateSottoQueueContract(queueName, job);
       const genericVersion = genericContractVersion(queueName, job.name);
       if (genericVersion === null) return executeSottoJob(job, processor, token, signal);
-      const work = await sottoTransaction(prisma, (database) =>
-        loadDurableQueueJob<T>(database, job as Job<unknown>, queueName, genericVersion)
-      );
+      const { work, capabilityScope } = await sottoTransaction(prisma, async (database) => {
+        const work = await loadDurableQueueJob<T>(
+          database,
+          job as Job<unknown>,
+          queueName,
+          genericVersion
+        );
+        if (
+          work.complete ||
+          queueName !== 'audio-generation' ||
+          work.payload.authority.kind !== 'episode'
+        )
+          return { work, capabilityScope: undefined };
+        const episodeId = work.payload.authority.episodeId;
+        const episode = await database.episode.findUnique({
+          where: { id: episodeId },
+          select: { assessmentAudioAssessmentId: true },
+        });
+        if (!episode?.assessmentAudioAssessmentId) return { work, capabilityScope: undefined };
+        const capabilityScope = work.scopes.find(
+          (scope) => scope.subjectId === `episode:${episodeId}`
+        );
+        if (!capabilityScope) throw new Error('Assessment audio execution scope is missing');
+        return { work, capabilityScope };
+      });
       if (work.complete) return;
       const bound = bindDurableQueueJob(job as Job<unknown>, work.payload.payload, work);
       const executionSignal = signal ?? new AbortController().signal;
@@ -408,6 +448,7 @@ export function createWorker<T>(
             parentId: work.operationId,
             fingerprint: work.fingerprint,
             signal: executionSignal,
+            capabilityScope,
             isCleanupFailure: isDurableQueueCleanupFailure,
             validate: async (database) => {
               const current = await loadDurableQueueJob<T>(
@@ -418,12 +459,29 @@ export function createWorker<T>(
               );
               return !current.complete;
             },
-            run: async ({ markCleanupUnconfirmed }) => {
+            run: async ({ markCleanupUnconfirmed, capability, directory }) => {
               bindDurableQueueCleanup(bound, markCleanupUnconfirmed);
+              if (capability) bindDurableQueueExecution(bound, capability, directory);
               const result = await processor(bound, executionSignal, token);
+              if (capability) await finishSottoExecutionOperations(capability);
+              const assessmentAudio = capabilityScope
+                ? assessmentAudioCompletionSchema.parse(work.payload.payload)
+                : null;
+              const assessmentAttempt = assessmentAudio
+                ? await import('@/lib/learning/classes/audio/assessment-audio-attempt')
+                : null;
               await sottoStateWriteTransaction(
                 prisma,
-                (database) => completeDurableQueueJob(database, bound),
+                async (database) => {
+                  if (assessmentAudio && assessmentAttempt)
+                    await assessmentAttempt.readCompletedAssessmentAudioAttempt(database, {
+                      episodeId: assessmentAudio.episodeId,
+                      segmentId: assessmentAudio.segmentId,
+                      generationKey: assessmentAudio.audioGenerationKey,
+                      operationId: work.operationId,
+                    });
+                  await completeDurableQueueJob(database, bound);
+                },
                 executionSignal
               );
               return result;
@@ -516,6 +574,7 @@ export const compileScriptQueue = createQueueReference('compile-script');
 export const audioGenerationQueue = createQueueReference('audio-generation');
 export const audioStitchingQueue = createQueueReference('audio-stitching');
 export const interactionQueue = createQueueReference('interactions');
+export const learningWritingQueue = createQueueReference('learning-writing');
 export const segmentRegenerationQueue = createQueueReference('segment-regeneration');
 export const notificationQueue = createQueueReference('notifications');
 export const pdfGenerationQueue = createQueueReference('pdf-generation');

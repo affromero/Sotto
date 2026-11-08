@@ -12,6 +12,8 @@ import {
   StorageCleanupJournal,
   StorageReferenceRegistry,
   StorageWriteJournal,
+  CleanupExecutionJournal,
+  storageBackendBinding,
   prepareStorageWrite,
 } from 'thesidedoor-core/storage';
 import type { PrismaClient } from '@/generated/prisma/client';
@@ -62,6 +64,355 @@ suite('durable local storage cleanup', () => {
     boundary.database = null;
     await instance?.close();
     await Promise.all(roots.map((root) => rm(root, { recursive: true, force: true })));
+  });
+
+  it('does not settle an earlier unresolved cleanup execution', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'sotto-cleanup-prior-execution-'));
+    roots.push(root);
+    await setSiteConfig({ storageProvider: 'local', localStorageRoot: root }, identity.ownerId);
+    const backend = await captureStorageBackend();
+    const prepared = prepareStorageBackend(SIDEDOOR_STATE_ID, backend.descriptor);
+    const job = prepareStorageCleanup({
+      namespace: SIDEDOOR_STATE_ID,
+      subjectId: `profile:${identity.ownerId}`,
+      generation: Date.now(),
+    });
+    const prior = {
+      executionId: randomUUID(),
+      executorId: randomUUID(),
+      jobId: job.id,
+      backendBinding: prepared.binding,
+    };
+    await sottoTransaction(instance.database, async (database) => {
+      const executor = {
+        query: (sql: string, values: readonly unknown[]) =>
+          database.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...values),
+      };
+      await new StorageBackendRegistry(executor, 'postgres', SIDEDOOR_STATE_ID).register(prepared);
+      const cleanup = new StorageCleanupJournal(executor, 'postgres', SIDEDOOR_STATE_ID);
+      await cleanup.createJob(job);
+      await cleanup.registerCollectors(job.id, job.epoch, [
+        {
+          id: 'empty',
+          kind: 'inventory',
+          backendIds: [prepared.id],
+          scope: '__test/empty',
+          match: 'key',
+        },
+      ]);
+      const executions = new CleanupExecutionJournal(executor, 'postgres', SIDEDOOR_STATE_ID);
+      await executions.begin(prior);
+      await executions.markUnconfirmed(prior);
+    });
+    await expect(
+      runSottoStorageCleanup(instance.database, job.id, {
+        openConnection: () => openSottoStorageConnection(databaseUrl, instance.schema),
+      })
+    ).rejects.toThrow('Backend has an unresolved cleanup execution');
+    const current = await sottoTransaction(instance.database, (database) =>
+      new CleanupExecutionJournal(
+        {
+          query: (sql, values) =>
+            database.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...values),
+        },
+        'postgres',
+        SIDEDOOR_STATE_ID
+      ).current(prepared.binding)
+    );
+    expect(current).toMatchObject({ ...prior, status: 'unconfirmed' });
+  });
+
+  it('leaves a failed object-storage execution unresolved', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'sotto-cleanup-object-gate-'));
+    roots.push(root);
+    await setSiteConfig({ storageProvider: 'local', localStorageRoot: root }, identity.ownerId);
+    const local = await captureStorageBackend();
+    const location = {
+      kind: 'object' as const,
+      endpoint: 'https://storage.example',
+      bucket: 'fixture',
+    };
+    const prepared = prepareStorageBackend(SIDEDOOR_STATE_ID, {
+      kind: 'object',
+      location,
+      binding: storageBackendBinding(location),
+      publicUrl: null,
+    });
+    const job = prepareStorageCleanup({
+      namespace: SIDEDOOR_STATE_ID,
+      subjectId: `profile:${identity.ownerId}`,
+      generation: Date.now(),
+    });
+    await sottoTransaction(instance.database, async (database) => {
+      const executor = {
+        query: (sql: string, values: readonly unknown[]) =>
+          database.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...values),
+      };
+      await new StorageBackendRegistry(executor, 'postgres', SIDEDOOR_STATE_ID).register(prepared);
+      const cleanup = new StorageCleanupJournal(executor, 'postgres', SIDEDOOR_STATE_ID);
+      await cleanup.createJob(job);
+      await cleanup.registerCollectors(job.id, job.epoch, [
+        {
+          id: 'object',
+          kind: 'inventory',
+          backendIds: [prepared.id],
+          scope: 'fixture/item',
+          match: 'key',
+        },
+      ]);
+    });
+    const storage = await import('@/lib/r2');
+    const capture = vi.spyOn(storage, 'captureStorageCleanup').mockResolvedValue({
+      descriptor: prepared.descriptor,
+      normalize: local.normalize,
+      list: local.list,
+      has: async () => {
+        throw new Error('Object request outcome unknown');
+      },
+      delete: local.delete,
+    });
+    try {
+      await expect(
+        runSottoStorageCleanup(instance.database, job.id, {
+          openConnection: () => openSottoStorageConnection(databaseUrl, instance.schema),
+        })
+      ).rejects.toThrow('Object request outcome unknown');
+    } finally {
+      capture.mockRestore();
+    }
+    const current = await sottoTransaction(instance.database, (database) =>
+      new CleanupExecutionJournal(
+        {
+          query: (sql, values) =>
+            database.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...values),
+        },
+        'postgres',
+        SIDEDOOR_STATE_ID
+      ).current(prepared.binding)
+    );
+    expect(current).toMatchObject({ jobId: job.id, status: 'unconfirmed' });
+  });
+
+  it('keeps both gates unresolved when a mixed-backend cleanup fails', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'sotto-cleanup-mixed-gate-'));
+    roots.push(root);
+    await setSiteConfig({ storageProvider: 'local', localStorageRoot: root }, identity.ownerId);
+    const local = await captureStorageBackend();
+    const localBackend = prepareStorageBackend(SIDEDOOR_STATE_ID, local.descriptor);
+    const location = {
+      kind: 'object' as const,
+      endpoint: 'https://storage.example',
+      bucket: 'fixture',
+    };
+    const objectBackend = prepareStorageBackend(SIDEDOOR_STATE_ID, {
+      kind: 'object',
+      location,
+      binding: storageBackendBinding(location),
+      publicUrl: null,
+    });
+    const job = prepareStorageCleanup({
+      namespace: SIDEDOOR_STATE_ID,
+      subjectId: `profile:${identity.ownerId}`,
+      generation: Date.now(),
+    });
+    await sottoTransaction(instance.database, async (database) => {
+      const executor = {
+        query: (sql: string, values: readonly unknown[]) =>
+          database.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...values),
+      };
+      const registry = new StorageBackendRegistry(executor, 'postgres', SIDEDOOR_STATE_ID);
+      await registry.register(localBackend);
+      await registry.register(objectBackend);
+      const cleanup = new StorageCleanupJournal(executor, 'postgres', SIDEDOOR_STATE_ID);
+      await cleanup.createJob(job);
+      await cleanup.registerCollectors(job.id, job.epoch, [
+        {
+          id: 'a-local',
+          kind: 'inventory',
+          backendIds: [localBackend.id],
+          scope: 'fixture/local',
+          match: 'key',
+        },
+        {
+          id: 'b-object',
+          kind: 'inventory',
+          backendIds: [objectBackend.id],
+          scope: 'fixture/object',
+          match: 'key',
+        },
+      ]);
+    });
+    const storage = await import('@/lib/r2');
+    const capture = vi
+      .spyOn(storage, 'captureStorageCleanup')
+      .mockImplementation(async (descriptor) => ({
+        descriptor: descriptor!,
+        normalize: local.normalize,
+        list: local.list,
+        has: async () => {
+          throw new Error('Mixed cleanup failed');
+        },
+        delete: local.delete,
+      }));
+    try {
+      await expect(
+        runSottoStorageCleanup(instance.database, job.id, {
+          openConnection: () => openSottoStorageConnection(databaseUrl, instance.schema),
+        })
+      ).rejects.toThrow('Mixed cleanup failed');
+    } finally {
+      capture.mockRestore();
+    }
+    const statuses = await sottoTransaction(instance.database, async (database) => {
+      const executions = new CleanupExecutionJournal(
+        {
+          query: (sql, values) =>
+            database.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...values),
+        },
+        'postgres',
+        SIDEDOOR_STATE_ID
+      );
+      return Promise.all([
+        executions.current(localBackend.binding),
+        executions.current(objectBackend.binding),
+      ]);
+    });
+    expect(statuses).toEqual([
+      expect.objectContaining({ jobId: job.id, status: 'unconfirmed' }),
+      expect.objectContaining({ jobId: job.id, status: 'unconfirmed' }),
+    ]);
+  });
+
+  it('preserves profile avatars when resetting learning data', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'sotto-reset-avatar-'));
+    roots.push(root);
+    await setSiteConfig({ storageProvider: 'local', localStorageRoot: root }, identity.ownerId);
+    const curriculum = await instance.database.curriculum.create({
+      data: { nativeLang: 'es', targetLang: 'ru', title: 'Russian' },
+    });
+    const course = await instance.database.course.create({
+      data: {
+        userId: identity.ownerId,
+        curriculumId: curriculum.id,
+        nativeLang: 'es',
+        targetLang: 'ru',
+      },
+    });
+    const profile = await instance.database.user.findUniqueOrThrow({
+      where: { id: identity.ownerId },
+    });
+    const backend = await captureStorageBackend();
+    const key = `avatars/${identity.ownerId}/${randomUUID()}.png`;
+    const reference = await backend.writeBuffer(key, Buffer.from('avatar'), 'image/png');
+    const [job] = await sottoTransaction(instance.database, async (database) => {
+      const executor = {
+        query: (sql: string, values: readonly unknown[]) =>
+          database.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...values),
+      };
+      const registered = prepareStorageBackend(SIDEDOOR_STATE_ID, backend.descriptor);
+      await new StorageBackendRegistry(executor, 'postgres', SIDEDOOR_STATE_ID).register(
+        registered
+      );
+      await new StorageReferenceRegistry(executor, 'postgres', SIDEDOOR_STATE_ID).replaceMany({
+        consumers: [{ consumer: `profile:${identity.ownerId}:avatar`, previousReference: null }],
+        next: prepareStorageReference({
+          namespace: SIDEDOOR_STATE_ID,
+          operationId: randomUUID(),
+          reference,
+          localRoutePrefix: '/api/v1/storage',
+          target: { backendId: registered.id, binding: registered.binding, key },
+          scopes: [
+            { subjectId: `profile:${identity.ownerId}`, generation: profile.createdAt.getTime() },
+          ],
+        }),
+      });
+      await database.user.update({ where: { id: identity.ownerId }, data: { image: reference } });
+      const jobs = await admitLearningStorageDeletion({
+        database,
+        scope: { kind: 'instance' },
+        subjects: [{ subjectId: `course:${course.id}`, generation: course.createdAt.getTime() }],
+        currentBackend: backend,
+      });
+      await database.course.delete({ where: { id: course.id } });
+      return jobs;
+    });
+    if (!job) throw new Error('Missing cleanup job');
+    await runSottoStorageCleanup(instance.database, job.id, {
+      openConnection: () => openSottoStorageConnection(databaseUrl, instance.schema),
+    });
+    expect(await readFile(join(root, key), 'utf8')).toBe('avatar');
+    expect(
+      await instance.database.user.findUniqueOrThrow({ where: { id: identity.ownerId } })
+    ).toMatchObject({ image: reference });
+  });
+
+  it('preserves a course when its saved asset has no matching deletion scope', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'sotto-cleanup-unattributed-'));
+    roots.push(root);
+    await setSiteConfig({ storageProvider: 'local', localStorageRoot: root }, identity.ownerId);
+    const curriculum = await instance.database.curriculum.upsert({
+      where: { nativeLang_targetLang: { nativeLang: 'es', targetLang: 'ru' } },
+      create: { nativeLang: 'es', targetLang: 'ru', title: 'Russian' },
+      update: {},
+    });
+    const course = await instance.database.course.create({
+      data: {
+        userId: identity.ownerId,
+        curriculumId: curriculum.id,
+        nativeLang: 'es',
+        targetLang: 'ru',
+      },
+    });
+    const focus = await instance.database.learnerFocusTarget.create({
+      data: { courseId: course.id, kind: 'WORD', text: 'чай', normalizedText: 'чай' },
+    });
+    const profile = await instance.database.user.findUniqueOrThrow({
+      where: { id: identity.ownerId },
+    });
+    const backend = await captureStorageBackend();
+    const key = `visual-cues/${randomUUID()}.png`;
+    const reference = await backend.writeBuffer(key, new TextEncoder().encode('kept'), 'image/png');
+    const consumer = `focus-target:${focus.id}:visual`;
+    await sottoTransaction(instance.database, async (database) => {
+      const executor = {
+        query: (sql: string, values: readonly unknown[]) =>
+          database.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...values),
+      };
+      const registered = prepareStorageBackend(SIDEDOOR_STATE_ID, backend.descriptor);
+      await new StorageBackendRegistry(executor, 'postgres', SIDEDOOR_STATE_ID).register(
+        registered
+      );
+      await new StorageReferenceRegistry(executor, 'postgres', SIDEDOOR_STATE_ID).replaceMany({
+        consumers: [{ consumer, previousReference: null }],
+        next: prepareStorageReference({
+          namespace: SIDEDOOR_STATE_ID,
+          operationId: randomUUID(),
+          reference,
+          localRoutePrefix: '/api/v1/storage',
+          target: { backendId: registered.id, binding: registered.binding, key },
+          scopes: [
+            { subjectId: `profile:${identity.ownerId}`, generation: profile.createdAt.getTime() },
+          ],
+        }),
+      });
+      await database.learnerFocusTarget.update({
+        where: { id: focus.id },
+        data: { visualCueUrl: reference },
+      });
+    });
+    await expect(
+      sottoTransaction(instance.database, async (database) => {
+        await admitLearningStorageDeletion({
+          database,
+          scope: { kind: 'course', id: course.id, episodeIds: [] },
+          subjects: [{ subjectId: `course:${course.id}`, generation: course.createdAt.getTime() }],
+          currentBackend: backend,
+        });
+        await database.course.delete({ where: { id: course.id } });
+      })
+    ).rejects.toThrow(`Storage reference ${consumer} has no matching deletion scope`);
+    expect(await instance.database.course.findUnique({ where: { id: course.id } })).not.toBeNull();
+    expect(await readFile(join(root, key), 'utf8')).toBe('kept');
   });
 
   it('deletes published files and retained unreferenced writes after application rows commit', async () => {
@@ -249,5 +600,168 @@ suite('durable local storage cleanup', () => {
       ).get(job.id)
     );
     expect(status).toMatchObject({ phase: 'complete', deleted: 0, pending: 0 });
+  });
+
+  it('refuses a persisted exact cleanup target while an asset still has a live consumer', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'sotto-cleanup-old-target-'));
+    roots.push(root);
+    await setSiteConfig({ storageProvider: 'local', localStorageRoot: root }, identity.ownerId);
+    const backend = await captureStorageBackend();
+    const key = `profile-assets/${randomUUID()}.png`;
+    const reference = await backend.writeBuffer(
+      key,
+      new TextEncoder().encode('retained'),
+      'image/png'
+    );
+    const scope = `profile:${identity.ownerId}`;
+    const job = prepareStorageCleanup({
+      namespace: SIDEDOOR_STATE_ID,
+      subjectId: scope,
+      generation: Date.now(),
+    });
+    await sottoTransaction(instance.database, async (database) => {
+      const executor = {
+        query: (sql: string, values: readonly unknown[]) =>
+          database.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...values),
+      };
+      const registered = prepareStorageBackend(SIDEDOOR_STATE_ID, backend.descriptor);
+      await new StorageBackendRegistry(executor, 'postgres', SIDEDOOR_STATE_ID).register(
+        registered
+      );
+      await new StorageReferenceRegistry(executor, 'postgres', SIDEDOOR_STATE_ID).replaceMany({
+        consumers: [{ consumer: `profile:${identity.ownerId}:avatar`, previousReference: null }],
+        next: prepareStorageReference({
+          namespace: SIDEDOOR_STATE_ID,
+          operationId: randomUUID(),
+          reference,
+          localRoutePrefix: '/api/v1/storage',
+          target: { backendId: registered.id, binding: registered.binding, key },
+          scopes: [{ subjectId: scope, generation: job.generation }],
+        }),
+      });
+      const journal = new StorageCleanupJournal(executor, 'postgres', SIDEDOOR_STATE_ID);
+      await journal.createJob(job);
+      await journal.registerCollectors(job.id, job.epoch, [
+        {
+          id: 'old-target',
+          kind: 'inventory',
+          backendIds: [registered.id],
+          scope: key,
+          match: 'key',
+        },
+      ]);
+    });
+    await expect(
+      runSottoStorageCleanup(instance.database, job.id, {
+        openConnection: () => openSottoStorageConnection(databaseUrl, instance.schema),
+      })
+    ).rejects.toThrow('Storage cleanup target still has live consumers');
+    expect(await readFile(join(root, key), 'utf8')).toBe('retained');
+  });
+
+  it('preserves a shared asset even when the deleted course retains a write intent for it', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'sotto-cleanup-shared-write-'));
+    roots.push(root);
+    await setSiteConfig({ storageProvider: 'local', localStorageRoot: root }, identity.ownerId);
+    const curriculum = await instance.database.curriculum.upsert({
+      where: { nativeLang_targetLang: { nativeLang: 'fr', targetLang: 'de' } },
+      create: { nativeLang: 'fr', targetLang: 'de', title: 'German' },
+      update: {},
+    });
+    const secondCurriculum = await instance.database.curriculum.upsert({
+      where: { nativeLang_targetLang: { nativeLang: 'fr', targetLang: 'es' } },
+      create: { nativeLang: 'fr', targetLang: 'es', title: 'Spanish' },
+      update: {},
+    });
+    const makeCourse = (selected: typeof curriculum) =>
+      instance.database.course.create({
+        data: {
+          userId: identity.ownerId,
+          curriculumId: selected.id,
+          nativeLang: 'fr',
+          targetLang: selected.targetLang,
+        },
+      });
+    const [removedCourse, retainedCourse] = await Promise.all([
+      makeCourse(curriculum),
+      makeCourse(secondCurriculum),
+    ]);
+    const makeFocus = (courseId: string) =>
+      instance.database.learnerFocusTarget.create({
+        data: { courseId, kind: 'WORD', text: 'Tee', normalizedText: 'tee' },
+      });
+    const [removedFocus, retainedFocus] = await Promise.all([
+      makeFocus(removedCourse.id),
+      makeFocus(retainedCourse.id),
+    ]);
+    const backend = await captureStorageBackend();
+    const key = `visual-cues/${randomUUID()}.png`;
+    const reference = await backend.writeBuffer(
+      key,
+      new TextEncoder().encode('shared'),
+      'image/png'
+    );
+    await sottoTransaction(instance.database, async (database) => {
+      const executor = {
+        query: (sql: string, values: readonly unknown[]) =>
+          database.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...values),
+      };
+      const registered = prepareStorageBackend(SIDEDOOR_STATE_ID, backend.descriptor);
+      await new StorageBackendRegistry(executor, 'postgres', SIDEDOOR_STATE_ID).register(
+        registered
+      );
+      const target = { backendId: registered.id, binding: registered.binding, key };
+      const scopes = [removedCourse, retainedCourse].map((course) => ({
+        subjectId: `course:${course.id}`,
+        generation: course.createdAt.getTime(),
+      }));
+      const intent = prepareStorageWrite({ namespace: SIDEDOOR_STATE_ID, ...scopes[0]!, target });
+      const writes = new StorageWriteJournal(executor, 'postgres', SIDEDOOR_STATE_ID);
+      await writes.begin(intent, scopes[0]!.generation);
+      await new StorageReferenceRegistry(executor, 'postgres', SIDEDOOR_STATE_ID).replaceMany({
+        consumers: [removedFocus, retainedFocus].map((focus) => ({
+          consumer: `focus-target:${focus.id}:visual`,
+          previousReference: null,
+        })),
+        next: prepareStorageReference({
+          namespace: SIDEDOOR_STATE_ID,
+          operationId: randomUUID(),
+          reference,
+          localRoutePrefix: '/api/v1/storage',
+          target,
+          scopes,
+        }),
+      });
+      await writes.finish(intent, { kind: 'unreferenced' });
+      await database.learnerFocusTarget.updateMany({
+        where: { id: { in: [removedFocus.id, retainedFocus.id] } },
+        data: { visualCueUrl: reference },
+      });
+    });
+    await expect(
+      sottoTransaction(instance.database, async (database) => {
+        await admitLearningStorageDeletion({
+          database,
+          scope: { kind: 'course', id: removedCourse.id, episodeIds: [] },
+          subjects: [
+            {
+              subjectId: `course:${removedCourse.id}`,
+              generation: removedCourse.createdAt.getTime(),
+            },
+          ],
+          currentBackend: backend,
+        });
+        await database.course.delete({ where: { id: removedCourse.id } });
+      })
+    ).rejects.toThrow('Storage write intent targets an asset with surviving consumers');
+    expect(await readFile(join(root, key), 'utf8')).toBe('shared');
+    expect(
+      await instance.database.course.findUnique({ where: { id: removedCourse.id } })
+    ).not.toBeNull();
+    expect(
+      await instance.database.learnerFocusTarget.findUniqueOrThrow({
+        where: { id: retainedFocus.id },
+      })
+    ).toMatchObject({ visualCueUrl: reference });
   });
 });

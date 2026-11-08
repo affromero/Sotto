@@ -20,6 +20,9 @@ Never use npm here. This crate is not a workspace member; `npm run ci` does not 
 - `app/mod.rs` — the `App`: owns `Arc<dyn Api>`, dispatches async work on a tokio mpsc channel, and applies results back on the main loop. Each result is tagged with a monotonic `request_gen`; a stale generation is dropped so a late/cancelled response never mutates current state.
 - `app/state.rs` — **pure** state machine (no I/O). This is where logic lives and where most tests are. Keep it side-effect-free so it stays unit-testable.
 - `app/state/learning_map.rs`, `app/runtime/learning_map.rs` and `app/ui/learning_map.rs` keep map state, canonical HTTP dispatch and rendering separate. Band selection is read-only; exact objective previews and server completion receipts own practice and advancement. Preserve frozen selection and request UUID after a lost response, and discard stale navigation results through `request_gen`.
+- Class entry reads the teaching prelude before loading practice. Saved
+  addendum directions must match the acknowledged receipt, scoped source and
+  every current task. Keep local work when the task material changes.
 - `app/ui.rs` — ratatui rendering only. `app/class.rs`, `app/exam.rs`, `app/onboard.rs`, `app/ask.rs`, `app/overlay.rs` — per-flow state + view. `class.rs`/`exam.rs` share a `FlowKind` seam.
 - `api.rs` — the `Api` trait (the async seam) and `SottoClient`, its progenitor-backed impl. `action.rs` / `event.rs` / `tui.rs` — action enum, crossterm event stream, terminal setup/teardown.
 - `audio/playback.rs` (rodio) and `audio/record.rs` (cpal capture → `hound` WAV). `config.rs`, `auth.rs`, `theme.rs`, `components/`.

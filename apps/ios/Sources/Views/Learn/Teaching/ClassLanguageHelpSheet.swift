@@ -5,6 +5,7 @@ struct ClassLanguageHelpSheet: View {
     @Environment(\.dismiss) private var dismiss
     let classId: String
     let teaching: SottoClassTeaching
+    let revision: String?
 
     @State private var result: SottoClassLessonHelpResponse?
     @State private var failure: String?
@@ -49,6 +50,7 @@ struct ClassLanguageHelpSheet: View {
         do {
             let loader = ClassLessonHelpLoader(
                 teaching: teaching,
+                revision: revision,
                 read: { try await model.fetchClassLessonHelp(classId: classId) },
                 start: { try await model.startClassLessonHelp(classId: classId, request: $0) }
             )

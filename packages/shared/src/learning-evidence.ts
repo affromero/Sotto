@@ -11,7 +11,8 @@ export const writingFeedbackSchema = z.object({
 
 export const speakingEvidenceSchema = z.object({
   recordingId: z.string(),
-  status: z.enum(['PENDING', 'GRADING', 'SCORED', 'FAILED']),
+  status: z.enum(['PENDING', 'GRADING', 'SCORED', 'FAILED', 'UNRESOLVED']),
+  recoveryAcknowledged: z.boolean().optional(),
   transcript: z.string().nullable().optional(),
   overallScore: z.number().finite().min(0).max(1).nullable().optional(),
   rubricScores: z
@@ -61,6 +62,7 @@ export type SpeakingEvidence = z.infer<typeof speakingEvidenceSchema>;
 export type PracticeReceipt = z.infer<typeof practiceReceiptSchema>;
 
 export const classReceiptSchema = z.object({
+  source: z.literal('ASSESSMENT').optional(),
   passed: z.boolean(),
   overallScore: z.number().finite().min(0).max(1),
   passedSections: z.number().int().nonnegative(),
@@ -96,11 +98,19 @@ export type PracticePreparing = z.infer<typeof practicePreparingSchema>;
 export const learningProgressRequestSchema = z
   .object({
     expectedRevision: z.number().int().nonnegative(),
+    expectedAttempt: z.number().int().positive().optional(),
+    taskMaterialRevision: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/)
+      .optional(),
     answers: z.record(z.string().min(1), z.number().int().min(0).max(3)).optional(),
     writingDrafts: z.record(z.string().min(1), z.string().max(4000)).optional(),
   })
   .strict()
-  .refine((value) => value.answers !== undefined || value.writingDrafts !== undefined);
+  .refine((value) => value.answers !== undefined || value.writingDrafts !== undefined)
+  .refine(
+    (value) => (value.expectedAttempt === undefined) === (value.taskMaterialRevision === undefined)
+  );
 export const learningProgressResponseSchema = z.object({
   saved: z.literal(true),
   progressRevision: z.number().int().positive(),

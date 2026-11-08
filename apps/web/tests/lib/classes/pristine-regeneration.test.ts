@@ -1,7 +1,7 @@
 // @vitest-environment node
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { beforeAll, beforeEach, afterAll, describe, expect, it, vi } from 'vitest';
-import type { PrismaClient } from '@/generated/prisma/client';
+import { Prisma, type PrismaClient } from '@/generated/prisma/client';
 import {
   createSharedTestInstance,
   type SharedTestInstance,
@@ -9,14 +9,16 @@ import {
 import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import {
   claimPristineRegeneration,
+  readPristine,
   readPristineRegenerationSnapshot,
+  validatePristineRegeneration,
 } from '@/lib/classes/regeneration/pristine';
 import { regenerateCurrentClass } from '@/lib/class-service';
 import {
   claimClassRegeneration,
   settleClassGenerationFailure,
   withClassGeneration,
-} from '@/lib/learning/classes/class-generation-state';
+} from '@/lib/learning/classes/formative/class-generation-state';
 import { createSkillRequirements } from '@sotto/shared';
 import { prepareJob } from 'thesidedoor-core/runtime/outbox';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
@@ -124,6 +126,114 @@ suite.each(['AVAILABLE', 'FAILED'] as const)(
       if (instance) await instance.close();
     });
 
+    it('retains the original pristine snapshot format after row identities are added', async () => {
+      const speaking = await instance.database.classSection.create({
+        data: {
+          classId,
+          skill: 'SPEAKING',
+          status: 'READY',
+          seed: 'speaking',
+          spec: {},
+          prompts: {
+            create: {
+              order: 1,
+              targetPhrase: 'Hallo',
+              translation: 'Hello',
+              referenceTtsUrl: 'old-audio',
+            },
+          },
+        },
+        include: { prompts: true },
+      });
+      await instance.database.classSection.create({
+        data: {
+          classId,
+          skill: 'WRITING',
+          status: 'READY',
+          seed: 'writing',
+          spec: {},
+          writingPrompts: { create: { order: 1, task: 'Write a greeting.' } },
+        },
+      });
+      const { cls, snapshot } = await sottoTransaction(instance.database, (database) =>
+        readPristine(database, classId, execution.userId)
+      );
+      const legacy = JSON.parse(JSON.stringify(cls)) as {
+        prerequisiteGate?: unknown;
+        sections: Array<{
+          incarnationId?: string;
+          withdrawn?: boolean;
+          questions: Array<{ incarnationId?: string }>;
+          prompts: Array<Record<string, unknown>>;
+          writingPrompts: Array<Record<string, unknown>>;
+        }>;
+      };
+      delete legacy.prerequisiteGate;
+      for (const section of legacy.sections) {
+        delete section.incarnationId;
+        delete section.withdrawn;
+        for (const question of section.questions) delete question.incarnationId;
+        section.prompts = section.prompts.map((prompt) => ({
+          learningObjectives: prompt.learningObjectives,
+          id: prompt.id,
+          sectionId: prompt.sectionId,
+          practiceSessionId: prompt.practiceSessionId,
+          examSectionId: prompt.examSectionId,
+          order: prompt.order,
+          targetPhrase: prompt.targetPhrase,
+          translation: prompt.translation,
+          ipa: prompt.ipa,
+          referenceTtsUrl: prompt.referenceTtsUrl,
+          createdAt: prompt.createdAt,
+          recordings: prompt.recordings,
+        }));
+        section.writingPrompts = section.writingPrompts.map((prompt) => ({
+          learningObjectives: prompt.learningObjectives,
+          id: prompt.id,
+          sectionId: prompt.sectionId,
+          practiceSessionId: prompt.practiceSessionId,
+          examSectionId: prompt.examSectionId,
+          order: prompt.order,
+          task: prompt.task,
+          guidance: prompt.guidance,
+          ideas: prompt.ideas,
+          createdAt: prompt.createdAt,
+          responses: prompt.responses,
+        }));
+      }
+      expect(snapshot).toBe(createHash('sha256').update(JSON.stringify(legacy)).digest('hex'));
+      await instance.database.courseClass.update({
+        where: { id: classId },
+        data: { prerequisiteGate: { version: 1 } },
+      });
+      await expect(validatePristineRegeneration(classId, execution, snapshot)).rejects.toThrow();
+      await instance.database.courseClass.update({
+        where: { id: classId },
+        data: { prerequisiteGate: Prisma.DbNull },
+      });
+      await instance.database.speakingPrompt.update({
+        where: { id: speaking.prompts[0]!.id },
+        data: { assessmentRubric: 'changed' },
+      });
+      await expect(validatePristineRegeneration(classId, execution, snapshot)).rejects.toThrow();
+      await instance.database.speakingPrompt.update({
+        where: { id: speaking.prompts[0]!.id },
+        data: { assessmentRubric: null, referenceEncryption: { version: 1 } },
+      });
+      await expect(validatePristineRegeneration(classId, execution, snapshot)).rejects.toThrow();
+    });
+
+    it('rejects a legacy pristine snapshot after a section is withdrawn', async () => {
+      const { snapshot } = await sottoTransaction(instance.database, (database) =>
+        readPristine(database, classId, execution.userId)
+      );
+      await instance.database.classSection.update({
+        where: { id: sectionId },
+        data: { withdrawn: true },
+      });
+      await expect(validatePristineRegeneration(classId, execution, snapshot)).rejects.toThrow();
+    });
+
     it('recovers failed generation with pending, ready, failed, or absent sections', async () => {
       await instance.database.courseClass.update({
         where: { id: classId },
@@ -158,6 +268,47 @@ suite.each(['AVAILABLE', 'FAILED'] as const)(
         await instance.database.courseClass.findUnique({ where: { id: classId } })
       ).toMatchObject({ status: 'GENERATING', attempt: 2, failedAt: null });
       expect(await instance.database.classSection.count({ where: { classId } })).toBe(0);
+    });
+
+    it('invalidates an earlier prerequisite receipt when pristine regeneration is claimed', async () => {
+      await instance.database.courseClass.update({
+        where: { id: classId },
+        data: { prerequisiteGate: { prior: true } },
+      });
+      const snapshot = await readPristineRegenerationSnapshot(classId, execution);
+      await claimPristineRegeneration(classId, execution, snapshot);
+      expect(
+        (await instance.database.courseClass.findUniqueOrThrow({ where: { id: classId } }))
+          .prerequisiteGate
+      ).toBeNull();
+    });
+
+    it('invalidates an earlier prerequisite receipt when preserving learner work during repair', async () => {
+      await instance.database.courseClass.update({
+        where: { id: classId },
+        data: {
+          prerequisiteGate: { prior: true },
+          learnerAnswers: { saved: 1 },
+          writingDrafts: { draft: 'keep' },
+        },
+      });
+      const cls = await instance.database.courseClass.findUniqueOrThrow({ where: { id: classId } });
+      const requirements = createSkillRequirements({
+        scope: 'CLASS',
+        nativeLang: 'en',
+        targetLang: 'de',
+        level: 'A2',
+        ttsProvider: null,
+        sttProvider: null,
+      });
+      await claimClassRegeneration(execution, classId, cls, requirements);
+      expect(
+        await instance.database.courseClass.findUniqueOrThrow({ where: { id: classId } })
+      ).toMatchObject({
+        prerequisiteGate: null,
+        learnerAnswers: { saved: 1 },
+        writingDrafts: { draft: 'keep' },
+      });
     });
 
     it.each([

@@ -20,6 +20,7 @@ import {
   reviewTeachingContent,
   requestTeachingReview,
   buildTeachingAdjudicatorJsonSchema,
+  classIntroAuditAddressCount,
 } from '@/lib/classes/quality/teaching-quality';
 import { captureGenerationFailure } from '@/lib/classes/quality/generation-failure';
 
@@ -130,6 +131,13 @@ async function rejectedExamples(reviewOptions = options): Promise<TeachingQualit
 }
 
 describe('intro audit addresses', () => {
+  it('counts the optional visual as a separately reviewed address', () => {
+    const { visuals, ...withoutVisuals } = candidate;
+    expect(classIntroAuditAddressCount(candidate)).toBe(
+      classIntroAuditAddressCount(withoutVisuals) + 1
+    );
+    expect(visuals).toBeDefined();
+  });
   beforeEach(() => {
     boundary.generate
       .mockReset()

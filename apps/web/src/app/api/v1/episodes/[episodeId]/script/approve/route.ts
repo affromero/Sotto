@@ -11,6 +11,7 @@ import type { ScriptTurn } from '@/lib/script-generator';
 
 import { errorResponse } from '@/lib/api-response';
 import { requireOriginalSottoAdmission } from '@/lib/sidedoor/access/core/request-identity';
+import { readInteractionEpisode } from '@/lib/sidedoor/jobs/interaction-access';
 import {
   assertProviderActivated,
   ProviderActivationPendingError,
@@ -28,10 +29,23 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
   const episode = await prisma.episode.findUnique({
     where: { id: episodeId },
-    select: { userId: true, status: true, ttsProvider: true, ttsModel: true },
+    select: {
+      userId: true,
+      status: true,
+      ttsProvider: true,
+      ttsModel: true,
+      deletedAt: true,
+      assessmentAudioAssessmentId: true,
+      assessmentSection: { select: { id: true } },
+    },
   });
 
-  if (!episode) {
+  if (
+    !episode ||
+    episode.deletedAt ||
+    episode.assessmentSection ||
+    episode.assessmentAudioAssessmentId
+  ) {
     return errorResponse('Episode not found', 404);
   }
   if (episode.userId !== userId) {
@@ -83,7 +97,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   // Claim the episode before making any configuration, voice, segment, or
   // queue mutations. Concurrent approvals therefore have one clear winner.
   const claimed = await prisma.episode.updateMany({
-    where: { id: episodeId, status: 'SCRIPT_READY' },
+    where: {
+      id: episodeId,
+      status: 'SCRIPT_READY',
+      deletedAt: null,
+      assessmentAudioAssessmentId: null,
+      assessmentSection: null,
+    },
     data: { status: 'GENERATING_AUDIO' },
   });
   if (claimed.count === 0) {
@@ -155,12 +175,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     await createSegmentsAndQueueAudio(episodeId, convertedTurns, {
       authorize: async (database) => {
         await requireOriginalSottoAdmission(database, request, authResult);
-        const current = await database.episode.findUnique({
-          where: { id: episodeId },
-          select: { userId: true },
-        });
-        if (!current || current.userId !== userId)
-          throw new Error('Episode ownership changed during approval');
+        const current = await readInteractionEpisode(database, episodeId);
+        if (current.userId !== userId) throw new Error('Episode ownership changed during approval');
         return { userId };
       },
     });

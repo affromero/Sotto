@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import { createHash, randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import type { Job } from 'bullmq';
@@ -20,10 +21,18 @@ import {
 } from '@/lib/sidedoor/storage/core/storage-inputs';
 import { restoreStorageBackend } from '@/lib/r2';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
-import { withSottoJobExecution } from '@/lib/sidedoor/jobs/core/job-execution-lifetime';
+import {
+  sottoJobExecutions,
+  withSottoJobExecution,
+} from '@/lib/sidedoor/jobs/core/job-execution-lifetime';
 import { isMediaCleanupFailure } from '@/lib/audio/media-process';
 import { readSottoWorkerJob, sottoJobOutbox } from '@/lib/sidedoor/jobs/core/job-delivery';
-import { speakingGradingPayloadSchema } from '@/lib/sidedoor/jobs/stitch/speaking-grading-work';
+import {
+  classSpeakingGradingPayloadSchema,
+  speakingGradingPayloadSchema,
+} from '@/lib/sidedoor/jobs/stitch/speaking-grading-work';
+import { learningPreparationGrant } from '@/lib/learning/preparation/preparation-grant';
+import { learningPreparationProviderRequest } from '@/lib/learning/preparation/preparation-provider';
 import { captureSpeakingRecordingStorage } from '@/lib/sidedoor/storage/core/speaking-storage';
 import { readSkillRequirements } from '@/lib/learning/skill-requirements';
 import { sttSelectionSchema } from '@/lib/learning/speech-selection';
@@ -38,6 +47,11 @@ import {
   isPrivateSpeakingAssessment,
 } from '@/lib/learning-map/evidence/private-speaking/protocol';
 import { gradePrivateSourceSpeaking } from '@/lib/learning-map/evidence/private-speaking/grade';
+import {
+  InitialA1PracticeBlocked,
+  readInitialA1PracticeAuthorization,
+} from '@/lib/classes/lesson/initial-a1-provenance';
+import { capturePrerequisiteOwnership } from '@/lib/classes/help/lifecycle/prerequisite-ownership';
 
 async function readSpeakingWork(database: Prisma.TransactionClient, recordingId: string) {
   const recording = await database.speakingRecording.findUnique({
@@ -48,10 +62,12 @@ async function readSpeakingWork(database: Prisma.TransactionClient, recordingId:
     },
   });
   if (!recording) throw new Error(`SpeakingRecording not found: ${recordingId}`);
+  if (recording.status === 'UNRESOLVED') throw new Error('Speaking grading requires recovery');
   if (recording.status === 'SCORED' || recording.status === 'FAILED')
     return { complete: true as const, status: recording.status };
 
   let targetLang: string;
+  let classId: string | null = null;
   let criterionCourseId: string | undefined;
   let criterionLevel: string | undefined;
   let privateSelection: unknown;
@@ -59,6 +75,7 @@ async function readSpeakingWork(database: Prisma.TransactionClient, recordingId:
     const section = await database.classSection.findUnique({
       where: { id: recording.sectionId },
       select: {
+        classId: true,
         attempt: true,
         class: {
           select: {
@@ -70,6 +87,7 @@ async function readSpeakingWork(database: Prisma.TransactionClient, recordingId:
       },
     });
     if (!section) throw new Error(`ClassSection not found for sectionId: ${recording.sectionId}`);
+    classId = section.classId;
     if (section.attempt != null && section.attempt !== recording.attempt)
       throw new Error('The speaking exercise attempt changed');
     targetLang =
@@ -153,7 +171,10 @@ async function readSpeakingWork(database: Prisma.TransactionClient, recordingId:
   const inputs = {
     id: recording.id,
     createdAt: recording.createdAt.getTime(),
+    gradingOperationId: recording.gradingOperationId,
+    attempt: recording.attempt,
     sectionId: recording.sectionId,
+    classId,
     practiceSessionId: recording.practiceSessionId,
     examSectionId: recording.examSectionId,
     promptId: recording.promptId,
@@ -173,9 +194,82 @@ async function readSpeakingWork(database: Prisma.TransactionClient, recordingId:
 }
 
 type SpeakingWork = Exclude<Awaited<ReturnType<typeof readSpeakingWork>>, { complete: true }>;
-type DurableSpeakingWork = SpeakingWork & { operationId: string; fingerprint: string };
+type ClassAuthorization = NonNullable<
+  import('zod').infer<typeof speakingGradingPayloadSchema>['classAuthorization']
+>;
+type DurableSpeakingWork = SpeakingWork & {
+  operationId: string;
+  fingerprint: string;
+  classAuthorization?: ClassAuthorization;
+  grant?: import('zod').infer<typeof classSpeakingGradingPayloadSchema>['grant'];
+  classScope?: { subjectId: string; generation: number };
+};
 
-async function requireCurrentWork(database: Prisma.TransactionClient, captured: SpeakingWork) {
+class SpeakingAuthorizationChanged extends Error {
+  constructor() {
+    super('Speaking grading prerequisite authorization changed');
+  }
+}
+
+function speakingGrant(database: Prisma.TransactionClient, work: DurableSpeakingWork) {
+  if (!work.grant || work.grant.id !== work.operationId || !work.inputs.classId)
+    throw new Error('Speaking grading grant does not match its class');
+  const parent = work.inputs.ownership.associations.parents.find(
+    (candidate) => candidate.kind === 'class' && candidate.parentId === work.inputs.classId
+  );
+  if (!parent) throw new Error('Speaking grading course ownership changed');
+  return learningPreparationGrant(
+    database,
+    {
+      id: work.operationId,
+      userId: work.inputs.userId,
+      courseId: parent.courseId,
+    },
+    'speaking'
+  );
+}
+
+async function requireClassScope(database: Prisma.TransactionClient, work: DurableSpeakingWork) {
+  if (!work.grant) return;
+  if (!work.classScope || !work.inputs.classId)
+    throw new Error('Speaking grading class scope is missing');
+  const parent = work.inputs.ownership.associations.parents.find(
+    (candidate) => candidate.kind === 'class' && candidate.parentId === work.inputs.classId
+  );
+  if (!parent) throw new Error('Speaking grading class ownership changed');
+  const ownership = await capturePrerequisiteOwnership(
+    database,
+    work.inputs.classId,
+    parent.courseId,
+    work.inputs.userId
+  );
+  if (!ownership.scopes.some((scope) => isDeepStrictEqual(scope, work.classScope)))
+    throw new Error('Speaking grading class scope changed');
+}
+
+async function requireClassAuthorization(
+  database: Prisma.TransactionClient,
+  work: SpeakingWork,
+  captured?: ClassAuthorization
+) {
+  if (!work.inputs.sectionId) {
+    if (captured)
+      throw new Error('Speaking grading class authorization does not match its recording');
+    return;
+  }
+  const classId = work.inputs.classId;
+  if (!classId || (captured && classId !== captured.classId))
+    throw new Error('Speaking grading class authorization does not match its recording');
+  await database.$queryRaw`SELECT id FROM "CourseClass" WHERE id = ${classId} FOR UPDATE`;
+  const current = await readInitialA1PracticeAuthorization(database, classId, work.inputs.userId);
+  if (!isDeepStrictEqual(current, captured?.authorization ?? null))
+    throw new SpeakingAuthorizationChanged();
+}
+
+async function requireCurrentWork(
+  database: Prisma.TransactionClient,
+  captured: DurableSpeakingWork
+) {
   const current = await readSpeakingWork(database, captured.inputs.id);
   if (
     current.complete ||
@@ -186,6 +280,98 @@ async function requireCurrentWork(database: Prisma.TransactionClient, captured: 
     })
   )
     throw new Error('Speaking grading inputs changed during execution');
+  await requireClassAuthorization(database, current, captured.classAuthorization);
+  await requireClassScope(database, captured);
+  if (
+    captured.grant &&
+    (await database.speakingRecording.findFirst({
+      where: {
+        id: { not: captured.inputs.id },
+        promptId: captured.inputs.promptId,
+        userId: captured.inputs.userId,
+        sectionId: captured.inputs.sectionId,
+        attempt: captured.inputs.attempt,
+        status: 'UNRESOLVED',
+        gradingAcknowledgedAt: null,
+      },
+      select: { id: true },
+    }))
+  )
+    throw new Error('An earlier speaking recording requires recovery');
+}
+
+/** Retire only a changed class job that provably never admitted provider work. */
+async function failUnstartedChangedClassWork(
+  database: Prisma.TransactionClient,
+  work: DurableSpeakingWork
+): Promise<boolean> {
+  if (!work.grant) return false;
+  const current = await readSpeakingWork(database, work.inputs.id);
+  if (
+    current.complete ||
+    current.inputs.createdAt !== work.inputs.createdAt ||
+    current.inputs.userId !== work.inputs.userId ||
+    current.inputs.sectionId !== work.inputs.sectionId ||
+    !isDeepStrictEqual(current.inputs.storage, work.inputs.storage) ||
+    !isDeepStrictEqual(current.inputs.ownership, work.inputs.ownership)
+  )
+    return false;
+  await requireClassScope(database, work);
+  try {
+    await requireClassAuthorization(database, current, work.classAuthorization);
+    return false;
+  } catch (error) {
+    if (!(
+      error instanceof SpeakingAuthorizationChanged || error instanceof InitialA1PracticeBlocked
+    ))
+      throw error;
+  }
+  const authority = speakingGrant(database, work);
+  const state = await authority.read(work.grant);
+  if (state.status !== 'active' || state.attempts.length !== 0) return false;
+  await sottoJobExecutions(database).requireParentDrained(work.operationId, work.fingerprint);
+  await authority.revoke(work.grant);
+  await database.speakingRecording.update({
+    where: { id: current.inputs.id },
+    data: { status: 'FAILED', feedback: 'Teaching changed. Review it before recording again.' },
+  });
+  if (!(await sottoJobOutbox(database).complete(work.operationId, work.fingerprint)))
+    throw new Error('Speaking grading work was already completed');
+  return true;
+}
+
+/** Preserve an uncertain paid attempt and permanently stop this job's redispatch. */
+async function markSpeakingUnresolved(
+  database: Prisma.TransactionClient,
+  work: DurableSpeakingWork
+): Promise<boolean> {
+  if (!work.grant || !work.inputs.classId) return false;
+  await database.$queryRaw`SELECT id FROM "CourseClass" WHERE id = ${work.inputs.classId} FOR UPDATE`;
+  const recording = await database.speakingRecording.findUnique({ where: { id: work.inputs.id } });
+  if (
+    !recording ||
+    recording.gradingOperationId !== work.operationId ||
+    recording.userId !== work.inputs.userId ||
+    recording.sectionId !== work.inputs.sectionId ||
+    recording.createdAt.getTime() !== work.inputs.createdAt ||
+    recording.status === 'SCORED' ||
+    recording.status === 'FAILED'
+  )
+    return false;
+  const authority = speakingGrant(database, work);
+  const state = await authority.read(work.grant);
+  if (state.attempts.length === 0 || state.status === 'completed') return false;
+  await authority.revoke(work.grant);
+  await database.speakingRecording.update({
+    where: { id: recording.id },
+    data: {
+      status: 'UNRESOLVED',
+      feedback: 'The grading outcome is unknown. Your recording is saved.',
+    },
+  });
+  if (!(await sottoJobOutbox(database).complete(work.operationId, work.fingerprint)))
+    throw new Error('Speaking grading work was already completed');
+  return true;
 }
 
 export async function processSpeakingGrading(
@@ -193,17 +379,58 @@ export async function processSpeakingGrading(
   signal: AbortSignal = AbortSignal.timeout(600_000)
 ): Promise<void> {
   signal.throwIfAborted();
+  if (job.name === 'speaking-grading.v3') {
+    const { processAssessmentSpeaking } = await import('./classes/assessment-speaking.worker');
+    return processAssessmentSpeaking(job, signal);
+  }
+  const version = job.name === 'speaking-grading.v2' ? 2 : 1;
   const work = await sottoTransaction(
     prisma,
     async (database) => {
       const durable = await readSottoWorkerJob(database, job, {
         handler: 'speaking-grading',
-        version: 1,
-        payload: speakingGradingPayloadSchema,
+        version,
+        payload: version === 2 ? classSpeakingGradingPayloadSchema : speakingGradingPayloadSchema,
       });
       if (durable.complete) return durable;
       const current = await readSpeakingWork(database, durable.payload.recordingId);
       if (current.complete) {
+        if (version === 2) {
+          const payload = classSpeakingGradingPayloadSchema.parse(durable.payload);
+          const parent = payload.ownership.associations.parents.find(
+            (candidate) =>
+              candidate.kind === 'class' &&
+              candidate.parentId === payload.classAuthorization.classId
+          );
+          if (!parent || payload.grant.id !== durable.operationId)
+            throw new Error('Terminal speaking grading ownership changed');
+          await sottoJobExecutions(database).requireParentDrained(
+            durable.operationId,
+            durable.fingerprint
+          );
+          const authority = learningPreparationGrant(
+            database,
+            {
+              id: durable.operationId,
+              userId: payload.ownership.associations.userId,
+              courseId: parent.courseId,
+            },
+            'speaking'
+          );
+          const grant = await authority.read(payload.grant);
+          if (
+            current.status === 'FAILED' &&
+            grant.status === 'active' &&
+            grant.attempts.length === 0
+          )
+            await authority.revoke(payload.grant);
+          else if (
+            (current.status === 'SCORED' && grant.status !== 'completed') ||
+            (current.status === 'FAILED' &&
+              !(grant.status === 'revoked' && grant.attempts.length === 0))
+          )
+            throw new Error('Terminal speaking grading provider work requires recovery');
+        }
         await sottoJobOutbox(database).complete(durable.operationId, durable.fingerprint);
         return { complete: true as const };
       }
@@ -213,7 +440,89 @@ export async function processSpeakingGrading(
         !isDeepStrictEqual(current.inputs.ownership, durable.payload.ownership)
       )
         throw new Error('Speaking grading payload does not match its recording');
-      return { ...durable, ...current };
+      if (version === 1 && current.inputs.gradingOperationId != null)
+        throw new Error('Legacy speaking grading no longer owns this recording');
+      if (version === 1 && current.inputs.sectionId) {
+        const legacy = await database.speakingRecording.findUniqueOrThrow({
+          where: { id: current.inputs.id },
+          select: { status: true },
+        });
+        if (legacy.status === 'GRADING' || (job.attemptsMade ?? 0) > 0) {
+          if (!current.inputs.classId) throw new Error('Legacy speaking class is missing');
+          await database.$queryRaw`SELECT id FROM "CourseClass" WHERE id = ${current.inputs.classId} FOR UPDATE`;
+          await sottoJobExecutions(database).requireParentDrained(
+            durable.operationId,
+            durable.fingerprint
+          );
+          await database.speakingRecording.update({
+            where: { id: current.inputs.id },
+            data: {
+              status: 'UNRESOLVED',
+              gradingOperationId: durable.operationId,
+              feedback: 'The grading outcome is unknown. Your recording is saved.',
+            },
+          });
+          if (!(await sottoJobOutbox(database).complete(durable.operationId, durable.fingerprint)))
+            throw new Error('Legacy speaking work was already completed');
+          return { complete: true as const };
+        }
+      }
+      const grant =
+        version === 2 ? classSpeakingGradingPayloadSchema.parse(durable.payload).grant : undefined;
+      if (grant && current.inputs.gradingOperationId !== durable.operationId)
+        throw new Error('Speaking grading operation no longer owns this recording');
+      const classScope = grant
+        ? durable.scopes.find((scope) => scope.subjectId === `class:${current.inputs.classId}`)
+        : undefined;
+      if (grant && !classScope) throw new Error('Speaking grading class scope is missing');
+      const captured = {
+        ...durable,
+        ...current,
+        grant,
+        classScope,
+        classAuthorization: durable.payload.classAuthorization,
+      };
+      if (grant) {
+        const state = await speakingGrant(database, captured).read(grant);
+        if (state.attempts.length > 0) {
+          const blocked = await sottoJobExecutions(database).blockingStatus(
+            durable.operationId,
+            durable.fingerprint
+          );
+          if (blocked === 'active') throw new Error('Speaking grading execution is still active');
+          if (await markSpeakingUnresolved(database, captured)) return { complete: true as const };
+        }
+      }
+      try {
+        await requireClassAuthorization(database, current, durable.payload.classAuthorization);
+        await requireClassScope(database, captured);
+      } catch (error) {
+        if (!(
+          error instanceof SpeakingAuthorizationChanged || error instanceof InitialA1PracticeBlocked
+        ))
+          throw error;
+        if (!grant && version === 1 && current.inputs.sectionId) {
+          await sottoJobExecutions(database).requireParentDrained(
+            durable.operationId,
+            durable.fingerprint
+          );
+          await database.speakingRecording.update({
+            where: { id: current.inputs.id },
+            data: {
+              status: 'UNRESOLVED',
+              gradingOperationId: durable.operationId,
+              feedback: 'The grading outcome is unknown. Your recording is saved.',
+            },
+          });
+          if (!(await sottoJobOutbox(database).complete(durable.operationId, durable.fingerprint)))
+            throw new Error('Speaking grading work was already completed');
+          return { complete: true as const };
+        }
+        if (!grant) throw error;
+        if (!(await failUnstartedChangedClassWork(database, captured))) throw error;
+        return { complete: true as const };
+      }
+      return { ...durable, ...current, grant, classScope };
     },
     { signal }
   );
@@ -221,29 +530,57 @@ export async function processSpeakingGrading(
     await job.updateProgress(100);
     return;
   }
-  await withSottoJobExecution({
-    database: prisma,
-    parentId: work.operationId,
-    fingerprint: work.fingerprint,
-    signal,
-    isCleanupFailure: isMediaCleanupFailure,
-    validate: async (database) => {
-      const current = await readSpeakingWork(database, work.inputs.id);
-      signal.throwIfAborted();
-      if (current.complete) return false;
-      if (
-        !isDeepStrictEqual(current, {
-          complete: false,
-          inputs: work.inputs,
-          backend: work.backend,
-        })
-      )
-        throw new Error('Speaking grading inputs changed before execution');
-      return true;
-    },
-    run: ({ directory, markCleanupUnconfirmed }) =>
-      executeSpeakingGrading(job, work, signal, directory, markCleanupUnconfirmed),
-  });
+  try {
+    await withSottoJobExecution({
+      database: prisma,
+      parentId: work.operationId,
+      fingerprint: work.fingerprint,
+      signal,
+      isCleanupFailure: isMediaCleanupFailure,
+      validate: async (database) => {
+        const current = await readSpeakingWork(database, work.inputs.id);
+        signal.throwIfAborted();
+        if (current.complete) return false;
+        if (
+          !isDeepStrictEqual(current, {
+            complete: false,
+            inputs: work.inputs,
+            backend: work.backend,
+          })
+        )
+          throw new Error('Speaking grading inputs changed before execution');
+        await requireClassAuthorization(database, current, work.payload.classAuthorization);
+        await requireClassScope(database, work);
+        if (work.grant) {
+          const grant = await speakingGrant(database, work).read(work.grant);
+          if (grant.status !== 'active' || grant.attempts.length !== 0)
+            throw new Error('Speaking grading has previous provider attempts requiring recovery');
+        }
+        return true;
+      },
+      run: ({ directory, markCleanupUnconfirmed }) =>
+        executeSpeakingGrading(
+          job,
+          { ...work, classAuthorization: work.payload.classAuthorization },
+          signal,
+          directory,
+          markCleanupUnconfirmed
+        ),
+    });
+  } catch (error) {
+    const retired = await sottoTransaction(prisma, async (database) => {
+      const captured = {
+        ...work,
+        classAuthorization: work.payload.classAuthorization,
+      };
+      return (
+        (await failUnstartedChangedClassWork(database, captured)) ||
+        (await markSpeakingUnresolved(database, captured))
+      );
+    });
+    if (!retired) throw error;
+    await job.updateProgress(100);
+  }
 }
 
 async function executeSpeakingGrading(
@@ -281,6 +618,23 @@ async function executeSpeakingGrading(
       await requireCurrentWork(database, work);
       return { userId: inputs.userId };
     },
+    ...(work.grant
+      ? {
+          providerRequest: learningPreparationProviderRequest(
+            {
+              selection: { recordingId: inputs.id, operationId: work.operationId },
+              admit: async (database, attempt) => {
+                await requireCurrentWork(database, work);
+                return speakingGrant(database, work).admit(work.grant!, attempt);
+              },
+              settle: async (database, attempt, outcome) =>
+                speakingGrant(database, work).settle(work.grant!, attempt, outcome),
+            },
+            signal,
+            markCleanupUnconfirmed
+          ),
+        }
+      : {}),
   };
 
   try {
@@ -318,6 +672,36 @@ async function executeSpeakingGrading(
     const aiTransport = rules.length
       ? await createSottoProviderTransport(ai.execution, rules)
       : undefined;
+    const cliAttempt =
+      !aiTransport && work.grant
+        ? {
+            id: randomUUID(),
+            fingerprint: createHash('sha256')
+              .update(
+                JSON.stringify({
+                  operationId: work.operationId,
+                  recordingId: inputs.id,
+                  transcript: sttResult.text,
+                  targetPhrase: inputs.targetPhrase,
+                  learningObjectives: inputs.learningObjectives,
+                })
+              )
+              .digest('hex'),
+          }
+        : undefined;
+    if (cliAttempt && work.grant) {
+      await sottoTransaction(
+        prisma,
+        async (database) => {
+          await requireCurrentWork(database, work);
+          const admission = await speakingGrant(database, work).admit(work.grant!, cliAttempt);
+          if (!admission.dispatch)
+            throw new Error('Speaking grading provider attempt already exists');
+        },
+        { signal }
+      );
+    }
+    if (!aiTransport) onDispatch();
     const observedFetch: typeof fetch | undefined = aiTransport
       ? (request, init) =>
           aiTransport.authenticatedFetch(request, init, {
@@ -332,8 +716,6 @@ async function executeSpeakingGrading(
     const score =
       speakingTaskMode(inputs.learningObjectives) === 'COMMUNICATIVE'
         ? await (async () => {
-            const cli = !observedFetch;
-            if (cli) onDispatch();
             const privateAssessment = isPrivateSpeakingAssessment(inputs.learningObjectives);
             const grading = {
               userId: inputs.userId,
@@ -351,7 +733,6 @@ async function executeSpeakingGrading(
                   ...grading,
                   assessment: reviewedObjectiveAssessmentSchema.parse(inputs.learningObjectives),
                 });
-            if (cli) onSettled();
             if (!privateAssessment) objectiveEvidence = qualified.finding;
             return {
               transcript: sttResult.text,
@@ -383,6 +764,11 @@ async function executeSpeakingGrading(
                   })
               : undefined,
           });
+    if (!aiTransport) onSettled();
+    if (cliAttempt && work.grant)
+      await sottoTransaction(prisma, (database) =>
+        speakingGrant(database, work).settle(work.grant!, cliAttempt, 'succeeded')
+      );
     if (dispatches !== settlements) {
       markCleanupUnconfirmed();
       throw new Error('Speaking provider request has no terminal response proof');
@@ -394,6 +780,7 @@ async function executeSpeakingGrading(
       async (database) => {
         await requireCurrentWork(database, work);
         await validateStorageInputs(database, [inputs.storage]);
+        if (work.grant) await speakingGrant(database, work).complete(work.grant);
         await database.speakingRecording.update({
           where: { id: inputs.id },
           data: {
@@ -417,7 +804,7 @@ async function executeSpeakingGrading(
       overallScore: score.overallScore,
     });
   } catch (error) {
-    if (dispatches !== settlements) {
+    if (dispatches > 0) {
       markCleanupUnconfirmed();
     }
     logger.error('Speaking grading failed', {

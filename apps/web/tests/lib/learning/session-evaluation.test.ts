@@ -4,6 +4,7 @@ import { createSkillRequirements } from '@sotto/shared';
 import {
   assertLearningMaterial,
   evaluateLearningWork,
+  scorePreviouslyValidatedLearningWork,
   type LearningSectionWork,
 } from '@/lib/learning/session-evaluation';
 
@@ -74,6 +75,7 @@ describe('complete learning evidence', () => {
   });
   it('permits complete text learning only with captured provider exemptions', () => {
     const result = evaluateLearningWork(requirements, sections);
+    expect(scorePreviouslyValidatedLearningWork(requirements, sections)).toEqual(result);
     expect(result.complete).toBe(true);
     expect(result.mastered).toBe(true);
     expect(result.sections.find((section) => section.skill === 'LISTENING')).toMatchObject({

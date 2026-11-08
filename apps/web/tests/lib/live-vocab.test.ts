@@ -209,6 +209,20 @@ describe('keyed reading extraction requests', () => {
     mockLoadAndRender.mockImplementation(loadAndRender);
     mockGenerateResponse.mockResolvedValue({ content: READING_SAMPLE, model: 'captured' });
   });
+  it('requires explicit saved-question mode for shorter reading choices', async () => {
+    const short = { ...question, options: ['Coffee', 'Tea'] };
+    await expect(
+      requestVocabularyExtraction({ ...reading, readingQuestions: [short] })
+    ).rejects.toThrow('private question keys');
+    expect(mockGenerateResponse).not.toHaveBeenCalled();
+    await expect(
+      requestVocabularyExtraction({
+        ...reading,
+        readingQuestions: [short],
+        readingQuestionMode: 'saved',
+      })
+    ).resolves.toBe(READING_SAMPLE);
+  });
   it('sends private answer keys and bounded correction data using the captured selection', async () => {
     const correction = {
       words: [{ lemma: 'bestellen', sourceForm: 'bestellt' }],

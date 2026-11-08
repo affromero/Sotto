@@ -6,6 +6,9 @@ import { cache } from '@/lib/redis';
 import { errorResponse } from '@/lib/api-response';
 import { logger } from '@/lib/logger';
 import { deleteCourseCompletely } from '@/lib/course-deletion';
+import { PrerequisiteDeletionConflict } from '@/lib/classes/help/prerequisite-deletion';
+import { SpeakingDeletionConflict } from '@/lib/sidedoor/jobs/stitch/speaking-grading-deletion';
+import { AssessmentFenceConflict } from '@/lib/learning/classes/lifecycle/assessment-fence';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -55,6 +58,12 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json({ deleted: true, ...result });
   } catch (error: unknown) {
+    if (
+      error instanceof PrerequisiteDeletionConflict ||
+      error instanceof SpeakingDeletionConflict ||
+      error instanceof AssessmentFenceConflict
+    )
+      return errorResponse(error.message, 409);
     logger.error('Course deletion failed', {
       error: error instanceof Error ? error.message : String(error),
     });

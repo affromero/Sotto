@@ -89,6 +89,9 @@ their UDIDs to `xcodebuild`. Test **both** families: the layout differs by size 
 ## App Store
 
 - Native classes open with the saved `teaching` lesson before skill practice.
+  First-A1 class and workbook navigation reads the scoped teaching prelude
+  before fetching class material. Explicit preparation and receipt
+  acknowledgment retain their original identities through recovery.
   Keep answers and writing drafts in the parent while navigating sections.
   Ordinary practice presents one question; Workbook retains its exercise pages.
   Explanations appear after a choice, and guided answers require disclosure.

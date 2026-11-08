@@ -246,7 +246,7 @@ async function inspectExecutions(runtime, forbidden = []) {
       assert(!forbidden.includes(receipt.handler), 'Added queue has an active execution');
       if (runtime.isSottoSynchronousJob(receipt.handler, receipt.version)) {
         assert.equal(receipt.handler, 'learning-writing');
-        assert.equal(receipt.version, 1);
+        assert([1, 2].includes(receipt.version), 'Unsupported synchronous writing version');
         if (receipt.status === 'pending') summary.synchronousActive++;
         else summary.workerActive++;
       } else {

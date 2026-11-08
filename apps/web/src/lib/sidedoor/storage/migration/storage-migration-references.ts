@@ -22,9 +22,20 @@ const cursorSchema = z
 export type StorageMigrationReferenceCursor = z.infer<typeof cursorSchema>;
 const rowSchema = cursorSchema.extend({ reference: z.string(), consumer: z.string() });
 const union = storageConsumerFields
-  .map(
-    ([model, field, kind, slot]) =>
-      `SELECT '${model}'::text AS model, id, '${field}'::text AS field, "${field}" AS reference,
+  .map(([model, field, kind, slot]) =>
+    model === 'SpeakingRecording'
+      ? `SELECT 'SpeakingRecording'::text AS model, id, 'audioUrl'::text AS field,
+    CASE WHEN "assessmentSectionId" IS NULL THEN "audioUrl"
+      ELSE COALESCE("assessmentAudioUrl", '') END AS reference,
+    'recording:' || id || ':audio' AS consumer FROM "SpeakingRecording"`
+      : model === 'SpeakingPrompt'
+        ? `SELECT 'SpeakingPrompt'::text AS model, p.id, 'referenceTtsUrl'::text AS field,
+    CASE WHEN p."assessmentSectionId" IS NULL THEN p."referenceTtsUrl"
+      ELSE COALESCE(r."currentUrl", '') END AS reference,
+    'speaking-prompt:' || p.id || ':reference' AS consumer
+    FROM "SpeakingPrompt" p LEFT JOIN "AssessmentSpeakingReference" r ON r."promptId" = p.id
+    WHERE p."referenceTtsUrl" IS NOT NULL OR r."promptId" IS NOT NULL`
+        : `SELECT '${model}'::text AS model, id, '${field}'::text AS field, "${field}" AS reference,
     '${kind}:' || id || ':${slot}' AS consumer FROM "${model}" WHERE "${field}" IS NOT NULL`
   )
   .join(' UNION ALL ');

@@ -1,7 +1,8 @@
 import { ImageResponse } from 'next/og';
-import { prisma } from '@/lib/prisma';
+import { getShareableEpisodeMetadata } from '@/lib/episode-data';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 export const alt = 'Sotto Lesson';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
@@ -14,15 +15,7 @@ function formatDuration(seconds: number | null): string {
 
 export default async function OgImage({ params }: { params: Promise<{ episodeId: string }> }) {
   const { episodeId } = await params;
-  const episode = await prisma.episode.findUnique({
-    where: { id: episodeId },
-    select: {
-      title: true,
-      topic: true,
-      duration: true,
-      user: { select: { name: true } },
-    },
-  });
+  const episode = await getShareableEpisodeMetadata(episodeId);
 
   if (!episode) {
     return new ImageResponse(
@@ -39,7 +32,7 @@ export default async function OgImage({ params }: { params: Promise<{ episodeId:
       >
         <span style={{ fontSize: 48, color: '#1E2128' }}>Lesson Not Found</span>
       </div>,
-      { ...size }
+      { ...size, headers: { 'Cache-Control': 'private, no-store' } }
     );
   }
 
@@ -133,6 +126,6 @@ export default async function OgImage({ params }: { params: Promise<{ episodeId:
         )}
       </div>
     </div>,
-    { ...size }
+    { ...size, headers: { 'Cache-Control': 'private, no-store' } }
   );
 }

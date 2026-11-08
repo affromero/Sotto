@@ -62,6 +62,9 @@ vi.mock('@/lib/redis', () => ({
 vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
+vi.mock('@/lib/learning/classes/progress/listening-attachment-fence', () => ({
+  requireListeningAttachmentFence: async () => {},
+}));
 
 import { POST } from '@/app/api/v1/episodes/[episodeId]/script/regenerate/route';
 
@@ -151,6 +154,23 @@ describe('POST /api/v1/episodes/[episodeId]/script/regenerate', () => {
     expect(response.status).toBe(400);
     expect(body.error).toContain('SCRIPT_READY');
   });
+
+  it.each(['classSection', 'practiceSession', 'examSection'] as const)(
+    'does not regenerate a script attached to a %s',
+    async (association) => {
+      mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+      mockEpisodeFindUnique.mockResolvedValue({
+        userId: 'user-1',
+        status: 'SCRIPT_READY',
+        [association]: { id: 'learning' },
+      });
+      const response = await POST(createRequest(), await createParams('pod-1'));
+      expect(response.status).toBe(409);
+      expect(await response.json()).toMatchObject({
+        error: 'This script belongs to a learning exercise.',
+      });
+    }
+  );
 
   it('returns 404 when discovery not found', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });

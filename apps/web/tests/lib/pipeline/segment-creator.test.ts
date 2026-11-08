@@ -151,4 +151,18 @@ describe('createSegmentsAndQueueAudio', () => {
       )
     ).toEqual(['replacement-attempt', 'replacement-attempt']);
   });
+
+  it('does not settle the old failure when no replacement audio can be admitted', async () => {
+    const settled: string[] = [];
+    await expect(
+      restartExistingSegmentAudio('episode-1', 'replacement-attempt', {
+        authorize: vi.fn(),
+        onPrepared: async (_database, key) => {
+          settled.push(key);
+        },
+      })
+    ).rejects.toThrow('has no segments to regenerate');
+    expect(settled).toEqual([]);
+    expect(mocks.admittedChildren).toEqual([]);
+  });
 });

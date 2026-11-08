@@ -57,8 +57,18 @@ extension LocalHTTPServer.Response {
 }
 
 @MainActor
-func waitForPlay(_ description: String, until predicate: () -> Bool) async throws {
+func playDiagnostics(_ coordinator: PlayCoordinator, _ server: LocalHTTPServer) -> String {
+    let requests = server.requests.compactMap { $0.components(separatedBy: "\r\n").first }
+    return "active=\(coordinator.active), error=\(coordinator.error ?? "none"), server=\(server.url), configured=\(String(describing: coordinator.boundConnection?.serverURL)), requests=\(requests)"
+}
+
+@MainActor
+func waitForPlay(_ description: String, diagnostics: () -> String = { "" }, until predicate: () -> Bool) async throws {
     let deadline = ContinuousClock.now.advanced(by: .seconds(5))
     while !predicate(), ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(10)) }
-    XCTAssertTrue(predicate(), description)
+    guard predicate() else {
+        let detail = diagnostics()
+        XCTFail(detail.isEmpty ? description : "\(description): \(detail)")
+        throw NSError(domain: "Play fixture wait timed out", code: 1)
+    }
 }

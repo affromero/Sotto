@@ -11,6 +11,7 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { formatUserFeedback } from '@/lib/feedback-formatter';
 import { readRequestBytes, RequestBodyTooLargeError } from 'thesidedoor-core/runtime/request';
+import { requireListeningAttachmentFence } from '@/lib/learning/classes/progress/listening-attachment-fence';
 class ScriptRevisionConflict extends Error {}
 type RouteParams = { params: Promise<{ episodeId: string }> };
 
@@ -53,15 +54,25 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
   const episode = await prisma.episode.findUnique({
     where: { id: episodeId },
-    select: { userId: true, status: true },
+    select: {
+      userId: true,
+      status: true,
+      deletedAt: true,
+      assessmentAudioAssessmentId: true,
+      classSection: { select: { id: true } },
+      practiceSession: { select: { id: true } },
+      examSection: { select: { id: true } },
+    },
   });
 
-  if (!episode) {
+  if (!episode || episode.deletedAt || episode.assessmentAudioAssessmentId) {
     return errorResponse('Episode not found', 404);
   }
   if (episode.userId !== userId) {
     return errorResponse('Forbidden', 403);
   }
+  if (episode.classSection || episode.practiceSession || episode.examSection)
+    return errorResponse('This script belongs to a learning exercise.', 409);
   if (episode.status !== 'SCRIPT_READY') {
     return errorResponse('Script can only be regenerated when status is SCRIPT_READY', 400);
   }
@@ -127,8 +138,19 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           return { userId };
         },
         mutate: async (database, operationId) => {
+          await requireListeningAttachmentFence(database);
           const claimed = await database.episode.updateMany({
-            where: { id: episodeId, userId, status: 'SCRIPT_READY' },
+            where: {
+              id: episodeId,
+              userId,
+              status: 'SCRIPT_READY',
+              deletedAt: null,
+              assessmentAudioAssessmentId: null,
+              assessmentSection: { is: null },
+              classSection: { is: null },
+              practiceSession: { is: null },
+              examSection: { is: null },
+            },
             data: {
               status: 'RESEARCHING',
               lowReferences: false,
@@ -174,8 +196,19 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           return { userId };
         },
         mutate: async (database, operationId) => {
+          await requireListeningAttachmentFence(database);
           const claimed = await database.episode.updateMany({
-            where: { id: episodeId, userId, status: 'SCRIPT_READY' },
+            where: {
+              id: episodeId,
+              userId,
+              status: 'SCRIPT_READY',
+              deletedAt: null,
+              assessmentAudioAssessmentId: null,
+              assessmentSection: { is: null },
+              classSection: { is: null },
+              practiceSession: { is: null },
+              examSection: { is: null },
+            },
             data: {
               status: 'SCRIPTING',
               lowReferences: false,

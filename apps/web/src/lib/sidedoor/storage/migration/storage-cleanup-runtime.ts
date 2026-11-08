@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import {
   acquirePostgresBackendLock,
+  CleanupExecutionJournal,
   runStorageCleanup,
   StorageBackendRegistry,
   StorageReferenceRegistry,
@@ -116,6 +117,31 @@ async function inventoryPage(
   return { targets, next: more ? `offset:${offset + targets.length}` : null };
 }
 
+/** Recheck old as well as newly admitted cleanup tickets before touching bytes. */
+async function requireNoLiveTarget(database: PrismaClient, binding: string, key: string) {
+  await sottoTransaction(database, async (transaction) => {
+    const registry = new StorageReferenceRegistry(
+      executor(transaction),
+      'postgres',
+      SIDEDOOR_STATE_ID
+    );
+    let cursor: string | null = null;
+    do {
+      const page = await registry.listAssets(cursor);
+      if (
+        page.assets.some(
+          (asset) =>
+            asset.prepared.target.binding === binding &&
+            asset.prepared.target.key === key &&
+            asset.consumers.length > 0
+        )
+      )
+        throw new Error('Storage cleanup target still has live consumers');
+      cursor = page.cursor;
+    } while (cursor !== null);
+  });
+}
+
 /** Resume one cleanup while retaining database and physical backend ownership. */
 export async function runSottoStorageCleanup(
   database: PrismaClient,
@@ -129,7 +155,17 @@ export async function runSottoStorageCleanup(
   const backends = await registeredBackends(database, jobId);
   if (!backends.length) throw new Error('Storage cleanup has no registered backends');
   const locks = new Map<string, BackendLock>();
+  const executorId = randomUUID();
+  let inFlight = 0;
   let operationFailure: unknown;
+  const tracked = async <T>(operation: () => Promise<T>): Promise<T> => {
+    inFlight += 1;
+    try {
+      return await operation();
+    } finally {
+      inFlight -= 1;
+    }
+  };
   try {
     for (const binding of new Set(backends.map((backend) => backend.binding))) {
       locks.set(
@@ -153,17 +189,25 @@ export async function runSottoStorageCleanup(
         backendId: backend.id,
         binding: backend.binding,
         collect: (collector, active) =>
-          collector.kind === 'references'
-            ? referencePage(database, backend, collector)
-            : inventoryPage(cleanup, backend, collector, active),
-        delete: (key, active) => cleanup.delete(key, { force: true, signal: active }),
+          tracked(() =>
+            collector.kind === 'references'
+              ? referencePage(database, backend, collector)
+              : inventoryPage(cleanup, backend, collector, active)
+          ),
+        delete: async (key, active) => {
+          await tracked(async () => {
+            await requireNoLiveTarget(database, backend.binding, key);
+            active.throwIfAborted();
+            await cleanup.delete(key, { force: true, signal: active });
+          });
+        },
       });
     }
     await runStorageCleanup({
       namespace: SIDEDOOR_STATE_ID,
       dialect: 'postgres',
       jobId,
-      executorId: randomUUID(),
+      executorId,
       signal: lifetime,
       transaction: <Result>(
         run: (transaction: Parameters<typeof executor>[0]) => Promise<Result>
@@ -173,6 +217,48 @@ export async function runSottoStorageCleanup(
     });
   } catch (error) {
     operationFailure = error;
+    if (
+      backends.every((backend) => backend.descriptor.kind === 'local') &&
+      inFlight === 0 &&
+      locks.size > 0 &&
+      !signal?.aborted &&
+      [...locks.values()].every((lock) => !lock.signal.aborted)
+    ) {
+      try {
+        for (const lock of locks.values()) lock.assertHeld();
+        await sottoTransaction(database, async (transaction) => {
+          for (const lock of locks.values()) lock.assertHeld();
+          const journal = new CleanupExecutionJournal(
+            executor(transaction),
+            'postgres',
+            SIDEDOOR_STATE_ID
+          );
+          for (const [binding, lock] of locks) {
+            const current = await journal.current(binding);
+            if (
+              current?.status === 'unconfirmed' &&
+              current.executorId === executorId &&
+              current.jobId === jobId &&
+              current.backendBinding === binding
+            )
+              await journal.settle({
+                executionId: current.executionId,
+                executorId: current.executorId,
+                jobId: current.jobId,
+                backendBinding: current.backendBinding,
+              });
+            lock.assertHeld();
+          }
+          if (signal?.aborted) signal.throwIfAborted();
+          for (const lock of locks.values()) lock.assertHeld();
+        });
+      } catch (settlementError) {
+        operationFailure = new AggregateError(
+          [error, settlementError],
+          'Storage cleanup failed and local settlement could not be confirmed'
+        );
+      }
+    }
   }
   const releases = await Promise.allSettled(
     [...locks.values()].reverse().map((lock) => lock.release())

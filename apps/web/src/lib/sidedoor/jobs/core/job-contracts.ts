@@ -24,6 +24,7 @@ export function sottoJobFailureCode(error: unknown): string {
 
 const SOTTO_DURABLE_JOB_VERSIONS: ReadonlyMap<string, readonly number[]> = new Map([
   ['class-preparation', [1]],
+  ['learning-writing', [3]],
   ['practice-preparation', [1]],
   ['vocabulary-audio', [1]],
   ['vocabulary-index', [1]],
@@ -33,7 +34,7 @@ const SOTTO_DURABLE_JOB_VERSIONS: ReadonlyMap<string, readonly number[]> = new M
   ['script-writing', [1]],
   ['compile-script', [1]],
   ['audio-generation', [1]],
-  ['interactions', [1, 2, 3, 4]],
+  ['interactions', [1, 2, 3, 4, 5, 6]],
   ['segment-regeneration', [1]],
   ['audio-stitching', [1, 2]],
   ['notifications', [1, 2, 3, 4]],
@@ -41,8 +42,8 @@ const SOTTO_DURABLE_JOB_VERSIONS: ReadonlyMap<string, readonly number[]> = new M
   ['pdf-generation', [1, 2]],
   ['waveform-generation', [1]],
   ['episode-status', [1]],
-  ['speaking-grading', [1]],
-  ['worksheet-pdf', [1]],
+  ['speaking-grading', [1, 2, 3]],
+  ['worksheet-pdf', [1, 2]],
   ['pencil-homework', [1]],
   ['pricing-fetch', [1]],
   ['material-finalization', [1]],
@@ -84,5 +85,5 @@ export function validateSottoQueueContract(
 
 /** Synchronous request executors retain durable receipts without Redis delivery. */
 export function isSottoSynchronousJob(handler: string, version: number): boolean {
-  return handler === 'learning-writing' && version === 1;
+  return handler === 'learning-writing' && (version === 1 || version === 2);
 }

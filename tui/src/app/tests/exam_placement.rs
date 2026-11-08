@@ -173,6 +173,7 @@ async fn malformed_exam_backs_out_to_course_home() {
     let mut app = test_app();
     app.enter_course_home(course("A"));
     app.view = View::exam_view(course("A"));
+    if let View::Exam { exam_id, .. } = &mut app.view { *exam_id = Some("exam1".into()); }
     let req_gen = app.request_gen;
 
     // Empty sections -> malformed -> back to CourseHome.
@@ -185,6 +186,52 @@ async fn malformed_exam_backs_out_to_course_home() {
         })),
     );
     assert!(matches!(app.view, View::CourseHome { .. }));
+}
+
+#[tokio::test]
+async fn reopening_an_exam_exposes_unconfirmed_work_without_enabling_another_upload() {
+    let mut app = test_app();
+    let section = serde_json::json!({
+        "id": "ex-s", "skill": "SPEAKING", "part": "P1", "order": 0,
+        "format": "speaking", "weight": 1.0, "status": "READY", "score": null,
+        "episode": null, "questions": [], "writingPrompts": [],
+        "speakingPrompts": [{ "id": "s0", "targetPhrase": "Hola", "translation": "Hello", "order": 0 }]
+    });
+    app.view = exam_with_sections(serde_json::json!([section.clone()]));
+    app.on_class_speaking_uploaded(app.request_gen, Arc::new(Err("Lost acknowledgement".into())));
+    assert!(app.view.has_uncertain_upload());
+    app.on_back();
+    assert!(app.practice_cache.get("EXAM/exam1").is_some_and(View::has_uncertain_upload));
+    app.on_start_exam();
+    assert!(matches!(&app.view, View::ExamRecovery { exam_id, retained_work, .. }
+        if exam_id == "exam1" && retained_work.iter().any(|line| line.contains("Lost acknowledgement"))));
+    assert!(app.map_key(key(KeyCode::Char('r'))).is_none());
+    app.on_select();
+    assert!(matches!(app.view, View::ExamRecovery { .. }));
+    app.on_back();
+    app.on_start_exam();
+    assert!(matches!(app.view, View::ExamRecovery { .. }));
+    assert!(app.practice_cache.get("EXAM/exam1").is_some_and(View::has_uncertain_upload));
+}
+
+#[test]
+fn exam_recovery_scrolls_to_a_retained_recording_in_a_narrow_terminal() {
+    let mut app = test_app();
+    let mut work = (0..14).map(|i| format!("Saved answer {i}")).collect::<Vec<_>>();
+    work.push("Recording saved at /tmp/copy.wav".into());
+    app.view = View::ExamRecovery { course: course("A"), exam_id: "exam1".into(), retained_work: work, scroll: 0 };
+    let mut terminal = ratatui::Terminal::new(ratatui::backend::TestBackend::new(40, 10)).unwrap();
+    let mut visible = false;
+    for _ in 0..50 {
+        terminal.draw(|frame| { app.draw(frame).unwrap(); }).unwrap();
+        let rendered: String = terminal.backend().buffer().content().iter().map(|cell| cell.symbol()).collect();
+        if rendered.contains("copy.wav") { visible = true; break; }
+        app.on_scroll(true);
+    }
+    assert!(visible, "the recording path can be reached by scrolling");
+    app.on_select();
+    app.on_retry();
+    assert!(matches!(app.view, View::ExamRecovery { .. }));
 }
 
 // --- P6d: placement / memory / settings (hermetic, StubApi) -----------

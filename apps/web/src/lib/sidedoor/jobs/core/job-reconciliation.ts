@@ -19,6 +19,10 @@ import {
 import { sidedoorStateStore, sottoStorageInstance } from '@/lib/sidedoor/access/state/store';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 import { reconcileDurableQueueFailure } from './durable-queue';
+import {
+  settleFailedClassSpeaking,
+  settleFailedLegacyClassSpeaking,
+} from '../stitch/speaking-grading-failure';
 
 interface ReconciliationOptions {
   database: PrismaClient;
@@ -98,6 +102,140 @@ export async function reconcileSottoJobs(options: ReconciliationOptions) {
           ? options.withQueue(receipt.handler, signal, deliver)
           : deliver(queue));
       } catch (error) {
+        if (
+          error instanceof SottoTerminalDeliveryError &&
+          error.observation.state === 'failed' &&
+          error.observation.handler === 'learning-writing' &&
+          error.observation.version === 3
+        ) {
+          const { settleQueuedAssessmentWritingReceipt } =
+            await import('@/lib/learning/classes/writing/assessment-writing-run');
+          const settled = await sottoTransaction(
+            database,
+            (tx) =>
+              settleQueuedAssessmentWritingReceipt(
+                tx,
+                { operationId: reference.id, fingerprint: reference.fingerprint },
+                signal
+              ),
+            { signal }
+          );
+          if (settled) return 'complete';
+          throw error;
+        }
+        if (
+          error instanceof SottoTerminalDeliveryError &&
+          error.observation.state === 'failed' &&
+          error.observation.handler === 'interactions' &&
+          error.observation.version === 6
+        ) {
+          const { reconcileFailedAssessmentDelivery } =
+            await import('@/lib/learning/classes/lifecycle/assessment-unresolved');
+          const reconcile = (target: Queue) =>
+            reconcileFailedAssessmentDelivery({
+              database,
+              queue: target,
+              identity: { id: reference.id, fingerprint: reference.fingerprint },
+              signal,
+            });
+          await (options.withQueue
+            ? options.withQueue(receipt.handler, signal, reconcile)
+            : reconcile(queue));
+          throw error;
+        }
+        if (
+          error instanceof SottoTerminalDeliveryError &&
+          error.observation.state === 'failed' &&
+          error.observation.handler === 'audio-generation' &&
+          error.observation.version === 1
+        ) {
+          const { reconcileFailedAssessmentAudio } =
+            await import('@/lib/learning/classes/audio/assessment-audio-reconciliation');
+          const reconcile = (target: Queue) =>
+            reconcileFailedAssessmentAudio({
+              database,
+              queue: target,
+              operationId: reference.id,
+              fingerprint: reference.fingerprint,
+              signal,
+            });
+          const outcome = await (options.withQueue
+            ? options.withQueue(receipt.handler, signal, reconcile)
+            : reconcile(queue));
+          if (outcome === 'PUBLISHED') return 'complete';
+          throw error;
+        }
+        if (
+          error instanceof SottoTerminalDeliveryError &&
+          error.observation.state === 'failed' &&
+          error.observation.handler === 'speaking-grading' &&
+          error.observation.version === 3
+        ) {
+          const { assessmentSpeakingGradingPayloadSchema } =
+            await import('../stitch/speaking-grading-work');
+          const { settleCompletedAssessmentSpeaking } =
+            await import('@/lib/learning/classes/speaking/lifecycle/assessment-speaking-recovery');
+          const settled = await sottoTransaction(
+            database,
+            async (tx) => {
+              const record = await sottoJobOutbox(tx).read(reference.id);
+              if (!record || record.fingerprint !== reference.fingerprint) throw error;
+              const payload = assessmentSpeakingGradingPayloadSchema.parse(record.job.payload);
+              const recording = await tx.speakingRecording.findUnique({
+                where: { id: payload.recordingId },
+                select: { status: true },
+              });
+              if (recording?.status !== 'SCORED') return false;
+              return settleCompletedAssessmentSpeaking(
+                tx,
+                { operationId: reference.id, fingerprint: reference.fingerprint },
+                signal
+              );
+            },
+            { signal }
+          );
+          if (settled) return 'complete';
+          const { reconcileFailedAssessmentSpeakingPrelaunch } =
+            await import('@/lib/learning/classes/speaking/lifecycle/assessment-speaking-prelaunch');
+          const reconcile = (target: Queue) =>
+            reconcileFailedAssessmentSpeakingPrelaunch({
+              database,
+              queue: target,
+              identity: { id: reference.id, fingerprint: reference.fingerprint },
+              signal,
+            });
+          const recovered = await (options.withQueue
+            ? options.withQueue(receipt.handler, signal, reconcile)
+            : reconcile(queue));
+          if (recovered) return 'complete';
+          throw error;
+        }
+        if (
+          error instanceof SottoTerminalDeliveryError &&
+          error.observation.state === 'failed' &&
+          error.observation.handler === 'speaking-grading' &&
+          error.observation.version === 2
+        ) {
+          await sottoTransaction(
+            database,
+            (tx) => settleFailedClassSpeaking(tx, error.observation),
+            { signal }
+          );
+          return 'complete';
+        }
+        if (
+          error instanceof SottoTerminalDeliveryError &&
+          error.observation.state === 'failed' &&
+          error.observation.handler === 'speaking-grading' &&
+          error.observation.version === 1
+        ) {
+          const settled = await sottoTransaction(
+            database,
+            (tx) => settleFailedLegacyClassSpeaking(tx, error.observation),
+            { signal }
+          );
+          if (settled) return 'complete';
+        }
         if (
           error instanceof SottoTerminalDeliveryError &&
           error.observation.state === 'failed' &&

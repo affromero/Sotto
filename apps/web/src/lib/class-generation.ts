@@ -4,6 +4,12 @@ import { createAIProvider } from './providers/ai';
 import { loadAndRender } from './prompt-loader';
 import { formatNotesForPrompt } from './course-notes';
 import { orderQuizChoices } from './classes/quiz/choice-order';
+import {
+  parseGeneratedQuestions,
+  sanitizeLlmJson,
+  type ParsedGeneratedQuestions,
+  type RawGeneratedQuestion,
+} from './classes/quiz/generated-json';
 import type { ClassTeaching, SkillType } from '@sotto/shared';
 import {
   assertFreshQuizQuestions,
@@ -33,6 +39,12 @@ import {
   type VocabularyCoverageFeedback,
 } from './classes/quality/vocabulary-repair/coverage';
 import { classLanguagePolicy } from './classes/class-language-policy';
+import { createSectionReviewAuthority } from './classes/quality/section-review/section-review-proof';
+import {
+  isInitialA1ExerciseReview,
+  prerequisiteReviewTeaching,
+  PRE_DISCLOSURE_REVIEW_CONTEXT,
+} from './classes/lesson/prerequisite-review-context';
 import {
   assessSectionReview,
   sectionReviewInput,
@@ -158,101 +170,16 @@ export interface SectionGenParams {
   retry?: QuizRetryContext;
   /** Supplied reading passages remain exact; unsourced reading generates a new passage. */
   sourceContent?: string;
+  reviewScope?: { classId: string; courseId: string; sectionId: string; attempt: number };
 }
 
-interface RawGeneratedQuestion {
-  targetIndex?: unknown;
-  distractors?: unknown;
-  taskContext?: unknown;
-  question?: unknown;
-  options?: unknown;
-  correctIndex?: unknown;
-  explanation?: unknown;
-  passageRef?: unknown;
-}
+const sectionReviewAuthority = createSectionReviewAuthority();
 
-interface WrappedGeneratedQuestions {
-  questions?: unknown;
-  passage?: unknown;
-}
-
-interface ParsedGeneratedQuestions {
-  questions: RawGeneratedQuestion[];
-  passage?: string;
-}
-
-function sanitizeLlmJson(text: string): string {
-  return text
-    .trim()
-    .replace(/^```(?:json)?\s*\n?/i, '')
-    .replace(/\n?```\s*$/i, '')
-    .trim();
-}
-
-function extractFirstJsonValue(text: string): string {
-  const objectStart = text.indexOf('{');
-  const arrayStart = text.indexOf('[');
-  const starts = [objectStart, arrayStart].filter((index) => index >= 0);
-  if (starts.length === 0) throw new Error('No JSON object or array found in response');
-
-  const start = Math.min(...starts);
-  const stack: string[] = [];
-  let inString = false;
-  let escape = false;
-  for (let i = start; i < text.length; i += 1) {
-    const ch = text[i];
-    if (escape) {
-      escape = false;
-      continue;
-    }
-    if (ch === '\\' && inString) {
-      escape = true;
-      continue;
-    }
-    if (ch === '"') {
-      inString = !inString;
-      continue;
-    }
-    if (inString) continue;
-    if (ch === '{') {
-      stack.push('}');
-      continue;
-    }
-    if (ch === '[') {
-      stack.push(']');
-      continue;
-    }
-    if (stack.length > 0 && ch === stack[stack.length - 1]) {
-      stack.pop();
-      if (stack.length === 0) return text.slice(start, i + 1);
-    }
-  }
-
-  throw new Error('Unbalanced JSON response');
-}
-
-function parseGeneratedQuestions(content: string): ParsedGeneratedQuestions {
-  const cleaned = sanitizeLlmJson(content);
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(cleaned);
-  } catch {
-    parsed = JSON.parse(extractFirstJsonValue(cleaned));
-  }
-
-  if (Array.isArray(parsed)) return { questions: parsed as RawGeneratedQuestion[] };
-  if (parsed && typeof parsed === 'object') {
-    const wrapped = parsed as WrappedGeneratedQuestions;
-    if (Array.isArray(wrapped.questions)) {
-      return {
-        questions: wrapped.questions as RawGeneratedQuestion[],
-        passage: typeof wrapped.passage === 'string' ? wrapped.passage : undefined,
-      };
-    }
-  }
-
-  throw new Error('Class generation returned no question array.');
-}
+/** Read only a receipt issued by the accepted class-section review. */
+export const requireInitialA1SectionReview = sectionReviewAuthority.require;
+export const bindInitialA1SectionReview = sectionReviewAuthority.bind;
+export const sealInitialA1SectionReviews = sectionReviewAuthority.sealSeed;
+export const materializeInitialA1SectionReviews = sectionReviewAuthority.materializeSeed;
 
 function buildUserPrompt(
   skill: string,
@@ -573,7 +500,11 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
     if (coverage.issues.length) return coverage.issues;
     stage = 'blind_review';
     const response = await provider.generateResponse(
-      reviewPrompt(questions),
+      reviewPrompt(questions) +
+        (p.teaching &&
+        isInitialA1ExerciseReview(p.level, p.execution.initialA1Class, 'explanations')
+          ? `\n${PRE_DISCLOSURE_REVIEW_CONTEXT}`
+          : ''),
       [
         {
           role: 'user',
@@ -583,7 +514,14 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
               objective: p.objective,
               grammarPoints: p.grammarPoints,
               targetVocab: p.targetVocab,
-              ...(p.teaching ? { teaching: p.teaching } : {}),
+              ...(p.teaching
+                ? {
+                    teaching: prerequisiteReviewTeaching(
+                      p.teaching,
+                      isInitialA1ExerciseReview(p.level, p.execution.initialA1Class, 'explanations')
+                    ),
+                  }
+                : {}),
             },
           }),
         },
@@ -802,9 +740,11 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
       }
 
       if (candidate) {
+        const proof = p.reviewScope ? sectionReviewAuthority.capture(candidate, p, ai) : undefined;
         const issues = await review(candidate, duplicateTargets.length > 0);
         stage = 'validation';
-        if (issues.length === 0 && !duplicateTargets.length) return candidate;
+        if (issues.length === 0 && !duplicateTargets.length)
+          return proof ? sectionReviewAuthority.accept(candidate, p, proof) : candidate;
         if (sectionSkill === 'GRAMMAR' && teachingRejection && attempt < MAX_GENERATION_ATTEMPTS) {
           const failure = authenticTeachingFailure(teachingRejection, 'explanations', candidate);
           const verdict = failure?.reviews.length === 1 ? failure.reviews[0].verdict : undefined;
@@ -947,9 +887,11 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
         lastError = err instanceof Error ? err.message : String(err);
       }
       if (candidate) {
+        const proof = p.reviewScope ? sectionReviewAuthority.capture(candidate, p, ai) : undefined;
         const issues = await review(candidate);
         stage = 'validation';
-        if (issues.length === 0) return candidate;
+        if (issues.length === 0)
+          return proof ? sectionReviewAuthority.accept(candidate, p, proof) : candidate;
         qualityFailed = true;
         lastError = `educational quality: ${issues.join(', ')}`;
       }

@@ -121,6 +121,16 @@ export async function validatePreparationAudio(
   episodeId: string,
   audioGenerationKey: string
 ) {
+  const episode = await database.episode.findUnique({
+    where: { id: episodeId },
+    select: { assessmentAudioAssessmentId: true },
+  });
+  if (episode?.assessmentAudioAssessmentId) {
+    const { validateAssessmentAudioLineage } =
+      await import('../learning/classes/audio/assessment-audio-lineage');
+    await validateAssessmentAudioLineage(database, episodeId, audioGenerationKey);
+    return;
+  }
   const lineage = await readPreparationAudioBinding(database, episodeId);
   if (!lineage || lineage.audioGenerationKey !== audioGenerationKey) return;
   const grant = await learningPreparationGrant(

@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Ajv from 'ajv';
-import type { ClassTeaching } from '@sotto/shared';
+import { createSkillRequirements, type ClassTeaching } from '@sotto/shared';
 import type { SourceDocuments } from '@/lib/providers/ai';
+import type { Prisma } from '@/generated/prisma/client';
 import { sampleTeaching } from '../../../helpers/learning/class-teaching';
 import { blockedProviderExecution } from '../../../helpers/runtime/provider-execution';
 import {
@@ -26,6 +27,12 @@ vi.mock('@/lib/learning-ai', () => ({
   }),
 }));
 vi.mock('@/lib/usage-logger', () => ({ logUsage: vi.fn() }));
+vi.mock('@/lib/learning/classes/formative/class-memory', () => ({
+  seedPublishedClassMemory: vi.fn(),
+}));
+vi.mock('@/lib/learning/classes/formative/class-material', () => ({
+  assertStoredClassMaterial: vi.fn(),
+}));
 vi.mock('@/lib/providers/ai', () => ({
   createAIProvider: () => ({
     generateResponse: async (
@@ -50,10 +57,17 @@ vi.mock('@/lib/providers/ai', () => ({
   }),
 }));
 
-import { generateClassTeaching, teachingFromSeed } from '@/lib/classes/lesson/teaching';
+import {
+  generateClassTeaching,
+  requireInitialA1TeachingReview,
+  sealInitialA1TeachingSeed,
+  materializeInitialA1TeachingSeed,
+  teachingFromSeed,
+} from '@/lib/classes/lesson/teaching';
 import { classLanguagePolicy } from '@/lib/classes/class-language-policy';
 import { TeachingQualityRejectionError } from '@/lib/classes/quality/teaching-quality';
 import { SectionQualityError } from '@/lib/classes/section-quality';
+import { publishClassGeneration } from '@/lib/learning/classes/formative/class-generation-state';
 import { countWords } from '@/lib/duration';
 import {
   captureGenerationFailure,
@@ -72,6 +86,14 @@ const params = {
   targetVocab: [{ lemma: 'museo', gloss: 'museum' }],
   note: 'Use familiar museum and reading situations.',
 };
+const initialRequirements = createSkillRequirements({
+  scope: 'CLASS',
+  nativeLang: 'es',
+  targetLang: 'ru',
+  level: 'A1',
+  ttsProvider: null,
+  sttProvider: null,
+});
 const approved = {
   content: JSON.stringify({ items: [{ index: 0, acceptable: true, issues: [], feedback: [] }] }),
   model: 'captured-model',
@@ -118,6 +140,213 @@ beforeEach(() => {
 });
 
 describe('class teaching', () => {
+  it('binds an initial A1 teaching review to the unchanged unit and captured scope', async () => {
+    const scope = {
+      ...params,
+      execution: { ...params.execution, initialA1Class: true },
+      level: 'A1',
+      nativeLang: 'es',
+      targetLang: 'ru',
+    };
+    const unit = await generateClassTeaching(scope);
+    expect(() => requireInitialA1TeachingReview(unit, scope)).not.toThrow();
+    expect(() => requireInitialA1TeachingReview(structuredClone(unit), scope)).toThrow(
+      'review is no longer valid'
+    );
+    expect(() =>
+      requireInitialA1TeachingReview(unit, { ...scope, objective: 'Another goal' })
+    ).toThrow();
+    expect(() =>
+      requireInitialA1TeachingReview(unit, { ...scope, execution: { ...scope.execution } })
+    ).toThrow();
+    const original = unit.guidedPractice.answer;
+    unit.guidedPractice.answer = 'Changed answer';
+    expect(() => requireInitialA1TeachingReview(unit, scope)).toThrow('review is no longer valid');
+    unit.guidedPractice.answer = original;
+    expect(() => requireInitialA1TeachingReview(unit, scope)).not.toThrow();
+    const authorize = scope.execution.authorize;
+    scope.execution.authorize = async () => ({ userId: 'u1' });
+    expect(() => requireInitialA1TeachingReview(unit, scope)).toThrow('review is no longer valid');
+    scope.execution.authorize = authorize;
+    scope.execution.initialA1Class = false;
+    expect(() => requireInitialA1TeachingReview(unit, scope)).toThrow('review is no longer valid');
+  });
+
+  it('materializes only the exact reviewed initial-A1 seed for publication', async () => {
+    const scope = {
+      ...params,
+      execution: { ...params.execution, initialA1Class: true },
+      level: 'A1',
+      nativeLang: 'es',
+      targetLang: 'ru',
+      reviewScope: {
+        classId: 'class-1',
+        courseId: 'course-1',
+        attempt: 1,
+        requirements: initialRequirements,
+        course: { nativeLang: 'es', targetLang: 'ru' },
+        lesson: { id: 'lesson-1', title: params.title, objective: params.objective },
+        sourceBefore: { title: null, url: null },
+        sourceAfter: { title: null, url: null },
+      },
+    };
+    const unit = await generateClassTeaching(scope);
+    const seed = { teaching: unit, vocabIds: ['a'] };
+    sealInitialA1TeachingSeed(seed, unit, scope);
+    const expected = { classId: 'class-1', userId: 'u1', attempt: 1 };
+    const materialized = materializeInitialA1TeachingSeed(seed, expected);
+    expect(materialized).toEqual({ seed, scope: scope.reviewScope });
+    expect(materialized.seed).not.toBe(seed);
+    expect(materialized.seed.teaching).not.toBe(unit);
+    expect(() =>
+      materializeInitialA1TeachingSeed(seed, { ...expected, classId: 'another' })
+    ).toThrow('scope changed');
+    expect(() => materializeInitialA1TeachingSeed(seed, { ...expected, attempt: 2 })).toThrow(
+      'scope changed'
+    );
+    expect(() =>
+      materializeInitialA1TeachingSeed(seed, { ...expected, userId: 'another' })
+    ).toThrow('scope changed');
+    expect(() => materializeInitialA1TeachingSeed(structuredClone(seed), expected)).toThrow(
+      'proof is unavailable'
+    );
+    seed.vocabIds.push('changed');
+    expect(() => materializeInitialA1TeachingSeed(seed, expected)).toThrow(
+      'review is no longer valid'
+    );
+    seed.vocabIds.pop();
+    unit.explanation = 'Altered after review';
+    expect(() => materializeInitialA1TeachingSeed(seed, expected)).toThrow(
+      'review is no longer valid'
+    );
+  });
+
+  it('publishes a private reviewed copy even if the original changes during a database wait', async () => {
+    const scope = {
+      ...params,
+      execution: { ...params.execution, initialA1Class: true },
+      level: 'A1',
+      nativeLang: 'es',
+      targetLang: 'ru',
+      reviewScope: {
+        classId: 'class-1',
+        courseId: 'course-1',
+        attempt: 1,
+        requirements: initialRequirements,
+        course: { nativeLang: 'es', targetLang: 'ru' },
+        lesson: { id: 'lesson-1', title: params.title, objective: params.objective },
+        sourceBefore: { title: null, url: null },
+        sourceAfter: { title: null, url: null },
+      },
+    };
+    const unit = await generateClassTeaching(scope);
+    const seed = { teaching: unit };
+    const original = unit.explanation;
+    sealInitialA1TeachingSeed(seed, unit, scope);
+    let release!: () => void;
+    const wait = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const update = vi.fn().mockResolvedValue({});
+    const database = {
+      $queryRaw: vi.fn(async () => {
+        await wait;
+      }),
+      courseClass: {
+        findUnique: vi
+          .fn()
+          .mockResolvedValue({ status: 'GENERATING', attempt: 1, course: { userId: 'u1' } }),
+        findUniqueOrThrow: vi.fn().mockResolvedValue({
+          courseId: 'course-1',
+          lessonId: 'lesson-1',
+          sourceTitle: null,
+          sourceUrl: null,
+          skillRequirements: initialRequirements,
+          course: { nativeLang: 'es', targetLang: 'ru' },
+          lesson: { title: params.title, objective: params.objective },
+        }),
+        update,
+      },
+      course: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+    } as unknown as Prisma.TransactionClient;
+    const publication = publishClassGeneration(database, {
+      classId: 'class-1',
+      attempt: 1,
+      userId: 'u1',
+      data: { adaptiveSeed: seed },
+      requireInitialA1TeachingProof: true,
+    });
+    unit.explanation = 'Changed while publication waited.';
+    release();
+    await publication;
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          adaptiveSeed: expect.objectContaining({
+            teaching: expect.objectContaining({ explanation: original }),
+          }),
+        }),
+      })
+    );
+  });
+  it('allows a reviewed regeneration to publish its newly prepared source', async () => {
+    const scope = {
+      ...params,
+      objective: 'New source',
+      execution: { ...params.execution, initialA1Class: true },
+      level: 'A1',
+      nativeLang: 'es',
+      targetLang: 'ru',
+      reviewScope: {
+        classId: 'class-1',
+        courseId: 'course-1',
+        attempt: 2,
+        requirements: initialRequirements,
+        course: { nativeLang: 'es', targetLang: 'ru' },
+        lesson: { id: 'lesson-1', title: params.title, objective: params.objective },
+        sourceBefore: { title: 'Old source', url: 'https://example.com/old' },
+        sourceAfter: { title: 'New source', url: 'https://example.com/new' },
+      },
+    };
+    const unit = await generateClassTeaching(scope);
+    const seed = { teaching: unit };
+    sealInitialA1TeachingSeed(seed, unit, scope);
+    const update = vi.fn().mockResolvedValue({});
+    const database = {
+      $queryRaw: vi.fn(),
+      courseClass: {
+        findUnique: vi
+          .fn()
+          .mockResolvedValue({ status: 'GENERATING', attempt: 2, course: { userId: 'u1' } }),
+        findUniqueOrThrow: vi.fn().mockResolvedValue({
+          courseId: 'course-1',
+          lessonId: 'lesson-1',
+          sourceTitle: 'Old source',
+          sourceUrl: 'https://example.com/old',
+          skillRequirements: initialRequirements,
+          course: scope.reviewScope.course,
+          lesson: { title: params.title, objective: params.objective },
+        }),
+        update,
+      },
+      course: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+    } as unknown as Prisma.TransactionClient;
+    await publishClassGeneration(database, {
+      classId: 'class-1',
+      attempt: 2,
+      userId: 'u1',
+      requireInitialA1TeachingProof: true,
+      data: { adaptiveSeed: seed, sourceTitle: 'New source', sourceUrl: 'https://example.com/new' },
+    });
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          sourceTitle: 'New source',
+          sourceUrl: 'https://example.com/new',
+        }),
+      })
+    );
+  });
   it('provides beginner directions in the learner language and keeps higher levels immersive', () => {
     const beginner = classLanguagePolicy({ level: 'A1', nativeLang: 'es', targetLang: 'ru' });
     const intermediate = classLanguagePolicy({ level: 'A2', nativeLang: 'es', targetLang: 'ru' });

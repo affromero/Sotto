@@ -10,12 +10,15 @@ import { ContinueBar, DotRail, MasteryMeter, type DotState } from './ClassWidget
 import { LearningSelectionMenu } from './LearningSelectionMenu';
 import type { ClassFeedbackNote, ClassQuestion } from './classTypes';
 import styles from './GrammarSection.module.css';
+import type { ClassPrerequisiteDirections } from './lesson/prerequisiteTypes';
+import { TaskDirection, taskDirection } from './lesson/TaskDirection';
 
 interface GrammarSectionProps {
   courseId: string;
   sourceId: string;
   skill: 'GRAMMAR' | 'READING';
   questions: ClassQuestion[];
+  prerequisiteDirections?: ClassPrerequisiteDirections | null;
   savedAnswers?: Record<string, number>;
   gate: number;
   nextName: string | null;
@@ -35,6 +38,7 @@ export function GrammarSection({
   sourceId,
   skill,
   questions,
+  prerequisiteDirections,
   savedAnswers = {},
   gate,
   nextName,
@@ -120,6 +124,13 @@ export function GrammarSection({
         />
         <ol className={styles.questionList} aria-label={label + ' exercises'}>
           {questions.map((question, index) => {
+            const direction = taskDirection(
+              prerequisiteDirections,
+              sourceId,
+              question.id,
+              'question'
+            );
+            const directionId = `direction-${sourceId}-${question.id}`;
             const selected = picked[question.id];
             const correct =
               question.correctIndex !== undefined && selected === question.correctIndex;
@@ -147,6 +158,7 @@ export function GrammarSection({
                   className={styles.drillCard}
                   id={'question-' + question.id}
                   aria-label={'Question ' + (index + 1)}
+                  aria-describedby={direction ? directionId : undefined}
                 >
                   <div className={styles.drillMeta}>
                     <span className={styles.questionNumber}>
@@ -182,6 +194,13 @@ export function GrammarSection({
                       {question.question}
                     </h2>
                   </LearningSelectionMenu>
+                  {direction && prerequisiteDirections && (
+                    <TaskDirection
+                      id={directionId}
+                      text={direction.instruction}
+                      language={prerequisiteDirections.nativeLang}
+                    />
+                  )}
                   <div
                     className={styles.optRow}
                     role="group"

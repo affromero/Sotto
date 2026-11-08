@@ -35,10 +35,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   signal.throwIfAborted();
   const episode = await prisma.episode.findUnique({
     where: { id: episodeId },
-    select: { userId: true },
+    select: { userId: true, deletedAt: true, assessmentAudioAssessmentId: true },
   });
   signal.throwIfAborted();
-  if (!episode) {
+  if (!episode || episode.deletedAt || episode.assessmentAudioAssessmentId) {
     return new Response('Not found', { status: 404 });
   }
   if (episode.userId !== authenticated.userId) {

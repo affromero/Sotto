@@ -87,3 +87,17 @@ Provider attempts and charges remain unknown. The learner must acknowledge that
 uncertainty through preparation recovery before the task can be cancelled and
 replaced. This also checks descendant audio cleanup. Never run operator recovery
 against an active supervisor.
+
+For an unresolved class speaking execution, stop its original supervisor and all
+local I/O first. Copy the exact `id`, `parentId`, `executorId` and `fingerprint`
+from its `JobExecutionJournal` record into `execution-binding.json`. From
+`apps/web`, using the original database and `SIDEDOOR_EXECUTION_DIR`, run:
+
+```bash
+npx tsx scripts/reconcile-speaking-grading.ts execution-binding.json --supervisor-stopped
+```
+
+The command verifies the class, recording, job and workspace identities before
+settling local cleanup. It preserves the recording and the unknown provider
+outcome. The learner can then review possible prior charges before choosing a
+new attempt. A missing or replaced attached workspace requires investigation.

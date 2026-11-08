@@ -29,10 +29,51 @@ import {
 import { deliverSottoJob } from '@/lib/sidedoor/jobs/core/job-delivery';
 import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import { validatePreparationAudio } from '@/lib/classes/preparation-audio';
+import {
+  durableJobProviderExecution,
+  durableQueueExecution,
+  durableQueueExecutionDirectory,
+  durableQueueJobIdentity,
+} from '@/lib/sidedoor/jobs/core/durable-queue';
+import {
+  runSottoExecutionOperation,
+  type SottoJobExecutionOperation,
+} from '@/lib/sidedoor/jobs/core/job-execution-lifetime';
+import {
+  beginAssessmentAudioAttempt,
+  publishAssessmentAudioAttempt,
+  readAssessmentAudioAttemptStatus,
+} from '@/lib/learning/classes/audio/assessment-audio-attempt';
+import { AssessmentFenceConflict } from '@/lib/learning/classes/lifecycle/assessment-fence';
 
 export async function processAudioGeneration(
   job: Job<GenerateAudioPayload>,
   signal = new AbortController().signal
+): Promise<void> {
+  const episode = await prisma.episode.findUnique({
+    where: { id: job.data.episodeId },
+    select: { assessmentAudioAssessmentId: true },
+  });
+  if (!episode?.assessmentAudioAssessmentId) return processAudioGenerationWork(job, signal);
+  const identity = durableQueueJobIdentity(job);
+  return runSottoExecutionOperation(
+    durableQueueExecution(job),
+    { parentId: identity.operationId, fingerprint: identity.fingerprint },
+    (operation, executionSignal) =>
+      processAudioGenerationWork(
+        job,
+        executionSignal,
+        operation,
+        durableQueueExecutionDirectory(job)
+      )
+  );
+}
+
+async function processAudioGenerationWork(
+  job: Job<GenerateAudioPayload>,
+  signal: AbortSignal,
+  operation?: SottoJobExecutionOperation,
+  executionDirectory?: string
 ): Promise<void> {
   signal.throwIfAborted();
   const stitchIdentities = prepareInitialStitchIdentities();
@@ -54,7 +95,7 @@ export async function processAudioGeneration(
   // Fail-fast: skip if episode already failed (another segment errored first)
   const episodeStatus = await prisma.episode.findUnique({
     where: { id: episodeId },
-    select: { status: true, audioGenerationKey: true },
+    select: { status: true, audioGenerationKey: true, assessmentAudioAssessmentId: true },
   });
 
   if (
@@ -62,6 +103,7 @@ export async function processAudioGeneration(
     !['GENERATING_AUDIO', 'STITCHING', 'READY'].includes(episodeStatus.status) ||
     episodeStatus.audioGenerationKey !== audioGenerationKey
   ) {
+    if (episodeStatus?.assessmentAudioAssessmentId) throw new AssessmentFenceConflict();
     logger.info('Skipping invalidated audio generation job', { episodeId, segmentId });
     await job.updateProgress(100);
     return;
@@ -88,6 +130,7 @@ export async function processAudioGeneration(
     existingSegment.text !== text ||
     existingSegment.speaker !== speaker
   ) {
+    if (episodeStatus.assessmentAudioAssessmentId) throw new AssessmentFenceConflict();
     logger.info('Skipping stale audio generation job', { episodeId, segmentId, segmentVersion });
     await job.updateProgress(100);
     return;
@@ -98,6 +141,19 @@ export async function processAudioGeneration(
     (database) => captureEpisodeStorage(database, episodeId),
     { signal }
   );
+  if (
+    Boolean(episodeStatus.assessmentAudioAssessmentId) !==
+    Boolean(executionOwnership.associations.assessmentSection)
+  )
+    throw new AssessmentFenceConflict();
+  const assessmentAttempt = episodeStatus.assessmentAudioAssessmentId
+    ? {
+        episodeId,
+        segmentId,
+        generationKey: audioGenerationKey,
+        ...durableQueueJobIdentity(job),
+      }
+    : null;
   async function authorizeGeneration(database: Prisma.TransactionClient) {
     signal.throwIfAborted();
     await validatePreparationAudio(database, episodeId, audioGenerationKey);
@@ -145,7 +201,19 @@ export async function processAudioGeneration(
     await invalidateEpisodeCache(episodeId);
     await publishEpisodeStatus(episodeId, { operationId: admission.record.job.id });
   }
-  if (existingSegment.audioUrl) {
+  if (assessmentAttempt) {
+    const status = await sottoTransaction(
+      prisma,
+      (database) => readAssessmentAudioAttemptStatus(database, assessmentAttempt),
+      { signal }
+    );
+    if (status === 'ACTIVE') throw new AssessmentFenceConflict();
+    if (status === 'COMPLETE') {
+      await deliver(await sottoTransaction(prisma, admit, { signal }));
+      await job.updateProgress(100);
+      return;
+    }
+  } else if (existingSegment.audioUrl) {
     logger.info('Segment already has audio, skipping TTS', { episodeId, segmentId });
 
     await deliver(await sottoTransaction(prisma, admit, { signal }));
@@ -223,6 +291,10 @@ export async function processAudioGeneration(
   };
   const execution: SottoProviderExecution = {
     userId: episode.userId,
+    signal,
+    ...(assessmentAttempt
+      ? { onCleanupError: durableJobProviderExecution(job, episode.userId, signal).onCleanupError }
+      : {}),
     authorize: async (database) => {
       await validatePreparationAudio(database, episodeId, audioGenerationKey);
       await validateEpisodeStorage(database, episodeId, executionOwnership);
@@ -423,6 +495,7 @@ export async function processAudioGeneration(
     captured = await capture();
   } catch (error) {
     if (!(error instanceof EpisodeStorageChangedError)) throw error;
+    if (assessmentAttempt) throw error;
     await job.updateProgress(100);
     return;
   }
@@ -438,31 +511,64 @@ export async function processAudioGeneration(
   }
 
   // ---- Shared TTS generation core ----
-  const result = await generateTtsAudio({
-    text,
-    voiceId,
-    speaker,
-    previousText,
-    nextText,
-    direction,
-    language: episode.language,
-    provider,
-    providerId,
-    source,
-    userId: episode.userId,
-    episodeId,
-    requestedModel: episode.ttsModel,
-    usageCategory: 'audio_generation',
-    isAborted: async () => {
-      const check = await prisma.episode.findUnique({
-        where: { id: episodeId },
-        select: { status: true },
-      });
-      return check?.status === 'FAILED';
-    },
-  });
+  const observation = assessmentAttempt
+    ? await beginAssessmentAudioAttempt(prisma, assessmentAttempt, operation)
+    : undefined;
+  let assessmentDispatched = false;
+  let reportedUncertain = false;
+  const markProviderUncertain = () => {
+    if (assessmentDispatched && !reportedUncertain) {
+      reportedUncertain = true;
+      execution.onCleanupError?.(new Error('Assessment audio provider cleanup is unconfirmed'));
+    }
+  };
+  const onAbort = () => markProviderUncertain();
+  signal.addEventListener('abort', onAbort, { once: true });
+  if (signal.aborted) onAbort();
+  let result: Awaited<ReturnType<typeof generateTtsAudio>>;
+  try {
+    result = await generateTtsAudio({
+      signal,
+      executionDirectory,
+      onDispatch: observation
+        ? () => {
+            observation.onDispatch();
+            assessmentDispatched = true;
+          }
+        : undefined,
+      onSettled: observation?.onSettled,
+      text,
+      voiceId,
+      speaker,
+      previousText,
+      nextText,
+      direction,
+      language: episode.language,
+      provider,
+      providerId,
+      source,
+      userId: episode.userId,
+      episodeId,
+      requestedModel: episode.ttsModel,
+      usageCategory: 'audio_generation',
+      isAborted: async () => {
+        const check = await prisma.episode.findUnique({
+          where: { id: episodeId },
+          select: { status: true },
+        });
+        return check?.status === 'FAILED';
+      },
+    });
+    if (!result) markProviderUncertain();
+  } catch (error) {
+    markProviderUncertain();
+    throw error;
+  } finally {
+    signal.removeEventListener('abort', onAbort);
+  }
 
   if (!result) {
+    if (observation) throw new AssessmentFenceConflict();
     logger.info('Episode failed while waiting for semaphore, skipping', { episodeId, segmentId });
     await job.updateProgress(100);
     return;
@@ -471,50 +577,61 @@ export async function processAudioGeneration(
   await job.updateProgress(60);
 
   try {
-    await writeStorageReference({
-      database: prisma,
-      signal,
-      prefix: `episodes/${episodeId}/segments`,
-      extension: 'mp3',
-      contentType: 'audio/mpeg',
-      body: result.audioBuffer,
-      writer: storageWriter,
-      captureAdmission: async (tx) => {
-        await validateStorage(tx);
-        return { ...captured.ownership, consumer: `segment:${segmentId}:audio`, snapshot: null };
-      },
-      validateAdmission: (tx, admission, committedReference) => {
-        if (admission.consumer !== `segment:${segmentId}:audio`)
-          throw new EpisodeStorageChangedError();
-        return validateStorage(tx, committedReference);
-      },
-      previousReference: () => null,
-      commit: async (tx, audioUrl) => {
-        const persisted = await tx.segment.updateMany({
-          where: {
-            id: segmentId,
-            episodeId,
-            version: segmentVersion,
-            text,
-            audioUrl: null,
-            episode: {
-              status: 'GENERATING_AUDIO',
-              audioGenerationKey,
+    if (observation) {
+      await publishAssessmentAudioAttempt({
+        database: prisma,
+        signal,
+        observation,
+        audio: result.audioBuffer,
+        duration: result.segmentDuration,
+        wordTimings: result.wordTimings,
+      });
+    } else
+      await writeStorageReference({
+        database: prisma,
+        signal,
+        prefix: `episodes/${episodeId}/segments`,
+        extension: 'mp3',
+        contentType: 'audio/mpeg',
+        body: result.audioBuffer,
+        writer: storageWriter,
+        captureAdmission: async (tx) => {
+          await validateStorage(tx);
+          return { ...captured.ownership, consumer: `segment:${segmentId}:audio`, snapshot: null };
+        },
+        validateAdmission: (tx, admission, committedReference) => {
+          if (admission.consumer !== `segment:${segmentId}:audio`)
+            throw new EpisodeStorageChangedError();
+          return validateStorage(tx, committedReference);
+        },
+        previousReference: () => null,
+        commit: async (tx, audioUrl) => {
+          const persisted = await tx.segment.updateMany({
+            where: {
+              id: segmentId,
+              episodeId,
+              version: segmentVersion,
+              text,
+              audioUrl: null,
+              episode: {
+                status: 'GENERATING_AUDIO',
+                audioGenerationKey,
+              },
             },
-          },
-          data: {
-            audioUrl,
-            duration: result.segmentDuration,
-            ...(result.wordTimings
-              ? { wordTimings: JSON.parse(JSON.stringify(result.wordTimings)) }
-              : {}),
-          },
-        });
-        if (persisted.count !== 1) throw new EpisodeStorageChangedError();
-      },
-    });
+            data: {
+              audioUrl,
+              duration: result.segmentDuration,
+              ...(result.wordTimings
+                ? { wordTimings: JSON.parse(JSON.stringify(result.wordTimings)) }
+                : {}),
+            },
+          });
+          if (persisted.count !== 1) throw new EpisodeStorageChangedError();
+        },
+      });
   } catch (error) {
     if (!(error instanceof EpisodeStorageChangedError)) throw error;
+    if (assessmentAttempt) throw error;
     logger.info('Discarding audio generated for stale segment content', {
       episodeId,
       segmentId,

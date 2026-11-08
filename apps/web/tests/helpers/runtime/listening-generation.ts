@@ -11,6 +11,7 @@ import {
 
 const {
   mockEpisodeCreate,
+  mockEpisodeFindFirst,
   mockEpisodeUpdate,
   mockEpisodeUpdateMany,
   mockScriptCreate,
@@ -20,6 +21,7 @@ const {
   mockLessonQuestionCreateMany,
   mockUserFindUnique,
   mockTransaction,
+  mockClassAssessmentFind,
 } = vi.hoisted(() => {
   const episodeCreate = vi.fn();
   const episodeUpdate = vi.fn();
@@ -33,6 +35,7 @@ const {
 
   return {
     mockEpisodeCreate: episodeCreate,
+    mockEpisodeFindFirst: vi.fn(),
     mockEpisodeUpdate: episodeUpdate,
     mockEpisodeUpdateMany: vi.fn().mockResolvedValue({ count: 1 }),
     mockScriptCreate: scriptCreate,
@@ -42,6 +45,7 @@ const {
     mockLessonQuestionCreateMany: lessonQuestionCreateMany,
     mockUserFindUnique: userFindUnique,
     mockTransaction: transaction,
+    mockClassAssessmentFind: vi.fn(),
   };
 });
 
@@ -140,13 +144,21 @@ const { mockLogUsage } = vi.hoisted(() => ({ mockLogUsage: vi.fn() }));
 
 vi.mock('@/lib/prisma', () => {
   const database = {
-    $queryRaw: async () => [],
+    $queryRaw: async (query: TemplateStringsArray) =>
+      query.join('').includes('pg_trigger') ? [{ valid: 3 }] : [],
+    $executeRaw: async () => 0,
     courseClass: {
-      findFirst: async () => ({ id: 'class-1', skillRequirements: null }),
+      findFirst: (...args: unknown[]) => {
+        const query = args[0] as { where?: { courseId?: string } };
+        if (query.where?.courseId) return Promise.resolve({ id: 'class-1' });
+        return mockClassAssessmentFind(...args);
+      },
       findUnique: async () => ({ status: 'GENERATING', attempt: 1, course: { userId: 'u1' } }),
     },
+    course: { findFirst: async () => ({ id: 'course-1' }) },
     episode: {
       create: (...args: unknown[]) => mockEpisodeCreate(...args),
+      findFirst: (...args: unknown[]) => mockEpisodeFindFirst(...args),
       update: (...args: unknown[]) => mockEpisodeUpdate(...args),
       updateMany: (...args: unknown[]) => mockEpisodeUpdateMany(...args),
     },
@@ -322,6 +334,7 @@ const PARAMS: ClassListeningParams = {
 
 /** Wire all happy-path mocks. */
 function setupHappyPath() {
+  mockClassAssessmentFind.mockReset().mockResolvedValue({ id: 'class-1', skillRequirements: null });
   mockGetServerInfra.mockResolvedValue({});
   mockTeachingCriticResponse.mockImplementation((_system, messages) =>
     emptyTeachingCriticFixture(messages)
@@ -358,7 +371,11 @@ function setupHappyPath() {
   mockGetAiKey.mockResolvedValue({ provider: 'anthropic', apiKey: 'k' });
   mockGetAiProviderMeta.mockReturnValue({ defaultModel: 'm' });
   mockUserFindUnique.mockResolvedValue({ preferredTtsModel: null });
-  mockEpisodeCreate.mockResolvedValue({ id: 'episode-1' });
+  mockEpisodeCreate.mockResolvedValue({
+    id: 'episode-1',
+    createdAt: new Date('2026-01-01T00:00:00Z'),
+  });
+  mockEpisodeFindFirst.mockResolvedValue({ id: 'episode-1' });
   mockEpisodeUpdate.mockResolvedValue({});
   mockGenerateScript.mockResolvedValue(SAMPLE_SCRIPT_RESULT);
 
@@ -392,6 +409,7 @@ function setupHappyPath() {
 
 export {
   mockEpisodeCreate,
+  mockEpisodeFindFirst,
   mockEpisodeUpdate,
   mockEpisodeUpdateMany,
   mockScriptCreate,
@@ -401,6 +419,7 @@ export {
   mockLessonQuestionCreateMany,
   mockUserFindUnique,
   mockTransaction,
+  mockClassAssessmentFind,
   mockGenerateScript,
   mockGetAiKey,
   mockGetAiProviderMeta,

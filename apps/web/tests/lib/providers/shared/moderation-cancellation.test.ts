@@ -50,6 +50,37 @@ describe('moderation cancellation', () => {
     expect(boundary.fetch).not.toHaveBeenCalled();
   });
 
+  it('checks moderation on each durable replay even when a cached verdict exists', async () => {
+    boundary.get.mockResolvedValue({
+      flagged: false,
+      categories: {},
+      scores: {},
+      blockedCategories: [],
+    });
+    boundary.fetch.mockResolvedValue(
+      Response.json({ results: [{ categories: {}, category_scores: {}, flagged: false }] })
+    );
+    const { moderateOrThrow } = await import('@/lib/moderation');
+    await moderateOrThrow('Prompt', { ...moderation, bypassCache: true });
+    expect(boundary.fetch).toHaveBeenCalledOnce();
+    expect(boundary.get).not.toHaveBeenCalled();
+    expect(boundary.set).not.toHaveBeenCalled();
+  });
+
+  it('uses the same thresholds for retained responses and rejects malformed scores', async () => {
+    const { interpretModerationResponse } = await import('@/lib/moderation');
+    expect(
+      interpretModerationResponse({
+        results: [{ categories: { violence: true }, category_scores: { violence: 0.8 } }],
+      })
+    ).toMatchObject({ flagged: true, blockedCategories: ['violence'] });
+    expect(() =>
+      interpretModerationResponse({
+        results: [{ categories: {}, category_scores: { violence: '0.8' } }],
+      })
+    ).toThrow('Moderation provider returned no result');
+  });
+
   it('cancels the moderation request without treating cancellation as approval', async () => {
     let started!: () => void;
     const opened = new Promise<void>((resolve) => {

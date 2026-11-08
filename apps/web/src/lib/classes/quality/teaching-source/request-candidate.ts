@@ -2,15 +2,28 @@ import { buildListeningSourceUnits } from '../listening-audit/passage-witness';
 import { literalQuestionCompletions } from '../../section-quality';
 import { teachingFindingSource } from '../teaching-review-protocol';
 import type { requestTeachingReview } from '../teaching-quality';
+import {
+  isInitialA1ExerciseReview,
+  prerequisiteReviewTeaching,
+} from '../../lesson/prerequisite-review-context';
 
 /** Keep source evidence and proposed operands visible without exposing approval labels. */
 export function teachingReviewCandidate(options: Parameters<typeof requestTeachingReview>[0]) {
+  const context = options.lessonContext;
+  const project = isInitialA1ExerciseReview(
+    options.variables.LEVEL,
+    options.ai.execution.initialA1Class,
+    options.variables.KIND
+  );
+  const lessonContext = context?.teaching
+    ? { ...context, teaching: prerequisiteReviewTeaching(context.teaching, project) }
+    : context;
   const listeningUnits = options.listeningTurns
     ? buildListeningSourceUnits(options.items[0], options.listeningTurns, options.variables.TARGET)
     : undefined;
   return {
     ...(options.exerciseMode ? { exerciseMode: options.exerciseMode } : {}),
-    ...(options.lessonContext ? { lessonContext: options.lessonContext } : {}),
+    ...(lessonContext ? { lessonContext } : {}),
     ...(options.introContext ? { introContext: options.introContext } : {}),
     ...(options.novelFindingProposals
       ? { novelFindingProposals: options.novelFindingProposals }

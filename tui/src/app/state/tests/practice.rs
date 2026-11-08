@@ -516,6 +516,47 @@
     }
 
     #[test]
+    fn reopening_speaking_practice_restores_pending_recording() {
+        let resp = start_response(serde_json::json!({
+            "status": "ready_speaking",
+            "sessionId": "sess-speak",
+            "prompts": [{
+                "id": "p1", "targetPhrase": "Buenos días", "translation": "Good morning",
+                "referenceTtsUrl": null,
+                "latestRecording": { "recordingId": "saved-recording", "status": "GRADING" }
+            }]
+        }));
+        let next = reduce_start(course_home(), &resp);
+        let View::Practice { sections: Some(sections), .. } = next else {
+            panic!("expected resumable speaking practice");
+        };
+        assert!(matches!(&sections[0].progress, SectionProgress::Speaking {
+            phase: SpeakingPhase::Polling { recording_id }, ..
+        } if recording_id == "saved-recording"));
+    }
+
+    #[test]
+    fn reopening_speaking_practice_keeps_unknown_grading_blocked() {
+        let resp = start_response(serde_json::json!({
+            "status": "ready_speaking",
+            "sessionId": "sess-speak",
+            "prompts": [{
+                "id": "p1", "targetPhrase": "Buenos días", "translation": "Good morning",
+                "referenceTtsUrl": null,
+                "latestRecording": { "recordingId": "saved-recording", "status": "UNRESOLVED" }
+            }]
+        }));
+        let next = reduce_start(course_home(), &resp);
+        let View::Practice { sections: Some(sections), .. } = next else {
+            panic!("expected resumable speaking practice");
+        };
+        assert!(matches!(&sections[0].progress, SectionProgress::Speaking {
+            phase: SpeakingPhase::Unresolved { .. }, ..
+        }));
+        assert!(!section_complete(&sections[0]));
+    }
+
+    #[test]
     fn empty_speaking_ready_is_malformed() {
         let resp = start_response(serde_json::json!({
             "status": "ready_speaking",
@@ -570,6 +611,28 @@
             }
         );
         assert!(!poll_is_terminal(&phase));
+    }
+
+    #[test]
+    fn unresolved_speaking_stops_polling_and_preserves_the_recording() {
+        let resp = poll_response(serde_json::json!({
+            "status": "UNRESOLVED", "overallScore": null, "transcript": null,
+            "feedback": "The recording is saved."
+        }));
+        let phase = reduce_speaking_poll("rec-1", &resp);
+        assert!(matches!(&phase, SpeakingPhase::Unresolved { message } if message.contains("recording is saved")));
+        assert!(poll_is_terminal(&phase));
+    }
+
+    #[test]
+    fn acknowledged_unknown_speaking_allows_a_new_attempt() {
+        let resp = poll_response(serde_json::json!({
+            "status": "UNRESOLVED", "overallScore": null, "transcript": null,
+            "feedback": null, "recoveryAcknowledged": true
+        }));
+        let phase = reduce_speaking_poll("rec-1", &resp);
+        assert!(matches!(&phase, SpeakingPhase::Failed { message } if message.contains("acknowledged possible charges")));
+        assert!(poll_is_terminal(&phase));
     }
 
     #[test]

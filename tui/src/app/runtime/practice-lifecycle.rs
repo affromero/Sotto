@@ -149,6 +149,10 @@ impl App {
         }
         if let Some(progress) = self.view.learning_progress_mut() {
             progress.dirty = true;
+            if progress.conflict {
+                progress.reconcile_confirmation = false;
+                progress.in_flight = None;
+            }
         }
     }
 
@@ -158,6 +162,32 @@ impl App {
         }
         let Some(id) = self.view.learning_key() else {
             return;
+        };
+        let class_binding = match &self.view {
+            View::Class {
+                attempt,
+                material_source,
+                progress,
+                ..
+            } if progress.dirty && progress.in_flight.is_none() && !progress.conflict => {
+                match material_source
+                    .as_deref()
+                    .filter(|source| !source.is_empty())
+                {
+                    Some(source) if *attempt > 0 => Some((*attempt, source.to_owned())),
+                    _ => {
+                        if let Some(progress) = self.view.learning_progress_mut() {
+                            progress.conflict = true;
+                        }
+                        self.status_bar.set_error(
+                            "Class material identity is unavailable. Local work is preserved."
+                                .into(),
+                        );
+                        return;
+                    }
+                }
+            }
+            _ => None,
         };
         let (id, sequence, body) = match &mut self.view {
             View::Practice {
@@ -186,9 +216,14 @@ impl App {
                         _ => None,
                     })
                     .collect();
-                let body = match serde_json::from_value(serde_json::json!({
+                let mut payload = serde_json::json!({
                     "expectedRevision": progress.revision, "answers": answers, "writingDrafts": drafts
-                })) {
+                });
+                if let Some((attempt, source)) = &class_binding {
+                    payload["expectedAttempt"] = serde_json::json!(attempt);
+                    payload["taskMaterialRevision"] = serde_json::json!(source);
+                }
+                let body = match serde_json::from_value(payload) {
                     Ok(body) => body,
                     Err(error) => {
                         progress.conflict = true;
@@ -263,7 +298,13 @@ impl App {
     pub(super) fn cache_practice(&mut self) {
         self.save_practice_progress();
         if let Some(id) = self.view.learning_key() {
-            self.practice_cache.insert(id, self.view.clone());
+            let mut snapshot = self.view.clone();
+            snapshot.mark_abandoned_uploads_unknown(
+                self.pending_class_audio
+                    .get(&self.request_gen)
+                    .map(|pending| pending.path.as_path()),
+            );
+            self.practice_cache.insert(id, snapshot);
         }
     }
 
@@ -291,7 +332,7 @@ impl App {
                 if let Some(target) = id.strip_prefix("CLASS/") {
                     serde_json::to_value(
                         client
-                            .class(target.split('/').next().unwrap_or_default())
+                            .class_progress_recovery(target.split('/').next().unwrap_or_default())
                             .await?,
                     )
                     .map_err(Into::into)
@@ -325,7 +366,16 @@ impl App {
         } else {
             self.practice_cache.get_mut(&id)
         };
-        let Some(progress) = target.and_then(View::learning_progress_mut) else {
+        let Some(target) = target else {
+            return;
+        };
+        let material_source = match &*target {
+            View::Class {
+                material_source, ..
+            } => material_source.clone(),
+            _ => None,
+        };
+        let Some(progress) = target.learning_progress_mut() else {
             return;
         };
         if progress.in_flight != Some(sequence) {
@@ -339,16 +389,26 @@ impl App {
         };
         match response {
             Ok(response)
-                if (response["sessionId"] == id && response["submissionResult"].is_null())
+                if ((response["sessionId"] == id && response["submissionResult"].is_null())
                     || (id.strip_prefix("CLASS/").is_some_and(|target| {
                         let mut parts = target.split('/');
-                        response["id"] == parts.next().unwrap_or_default()
+                        response["classId"] == parts.next().unwrap_or_default()
                             && response["attempt"].as_i64()
                                 == parts.next().and_then(|attempt| attempt.parse().ok())
+                            && material_source.as_deref().is_some_and(|source| {
+                                !source.is_empty()
+                                    && response["taskMaterialRevision"].as_str() == Some(source)
+                            })
                     }) && ["AVAILABLE", "IN_PROGRESS"]
-                        .contains(&response["status"].as_str().unwrap_or_default())) =>
+                        .contains(&response["status"].as_str().unwrap_or_default())))
+                    && response["progressRevision"]
+                        .as_i64()
+                        .is_some_and(|revision| revision >= 0) =>
             {
-                if let Some(revision) = response["progressRevision"].as_i64() {
+                if let Some(revision) = response["progressRevision"]
+                    .as_i64()
+                    .filter(|revision| *revision >= 0)
+                {
                     progress.revision = revision;
                     progress.conflict = false;
                     progress.dirty = true;

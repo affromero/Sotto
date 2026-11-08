@@ -1,0 +1,24 @@
+.root {
+  display: grid;
+  gap: 0.5rem;
+  color: inherit;
+}
+
+.root p {
+  margin: 0;
+}
+
+.root button {
+  min-height: 44px;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid currentColor;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.root button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}

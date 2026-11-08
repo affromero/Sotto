@@ -28,7 +28,11 @@ struct SottoAPIClient {
             if let mime = http.mimeType, mime == "text/html" || mime == "application/json" {
                 throw SottoAPIError.message("The server returned a page instead of listening audio.")
             }
-            let fileExtension = ["mp3", "m4a", "wav", "aac", "aiff", "caf", "ogg"].contains(url.pathExtension.lowercased()) ? url.pathExtension.lowercased() : "audio"
+            let mimeExtensions = ["audio/mpeg": "mp3", "audio/mp4": "m4a", "audio/wav": "wav",
+                                  "audio/ogg": "ogg", "audio/flac": "flac", "audio/webm": "webm"]
+            let pathExtension = url.pathExtension.lowercased()
+            let fileExtension = http.mimeType.flatMap { mimeExtensions[$0] } ??
+                (["mp3", "m4a", "wav", "aac", "aiff", "caf", "ogg", "flac", "webm"].contains(pathExtension) ? pathExtension : "audio")
             let local = FileManager.default.temporaryDirectory.appendingPathComponent("Sotto-audio-\(UUID().uuidString).\(fileExtension)")
             try FileManager.default.moveItem(at: temporary, to: local)
             return local
@@ -235,6 +239,13 @@ struct SottoAPIClient {
         try await get("/api/v1/classes/\(classId)")
     }
 
+    func fetchClassProgressRecovery(classId: String) async throws -> SottoClassProgressRecovery {
+        var request = try makeRequest(path: "/api/v1/classes/\(classId)/progress-recovery", method: "GET", authorized: true)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
+        return try await send(request, acceptedStatuses: [200])
+    }
+
     func regenerateClass(classId: String, expectedAttempt: Int) async throws {
         let _: NextClassBackgroundResponse = try await post(
             "/api/v1/classes/\(classId)",
@@ -273,9 +284,9 @@ struct SottoAPIClient {
             acceptedStatuses: [200, 202])
     }
 
-    func saveLearningProgress(path: String, expectedRevision: Int, answers: [String: Int], writingDrafts: [String: String]) async throws -> SottoLearningProgressResponse {
+    func saveLearningProgress(path: String, expectedRevision: Int, answers: [String: Int], writingDrafts: [String: String], expectedAttempt: Int? = nil, taskMaterialRevision: String? = nil) async throws -> SottoLearningProgressResponse {
         try await patch(path, body: LearningProgressRequest(expectedRevision: expectedRevision,
-            answers: answers, writingDrafts: writingDrafts))
+            answers: answers, writingDrafts: writingDrafts, expectedAttempt: expectedAttempt, taskMaterialRevision: taskMaterialRevision))
     }
 
     func fetchCourseTopics(courseId: String) async throws -> [SottoTopicSuggestion] {
@@ -368,11 +379,17 @@ struct SottoAPIClient {
     func uploadClassSpeakingRecording(
         classId: String,
         promptId: String,
-        audioURL: URL
+        audioURL: URL,
+        binding: SottoClassSpeakingBinding
     ) async throws -> SottoSpeakingUploadResponse {
-        try await uploadSpeakingRecording(
+        guard binding.attempt > 0, binding.materialRevision.utf8.count == 64,
+              binding.materialRevision.utf8.allSatisfy({ (48...57).contains($0) || (97...102).contains($0) }) else {
+            throw SottoAPIError.message("Reopen the class before recording.")
+        }
+        return try await uploadSpeakingRecording(
             path: "/api/v1/classes/\(classId)/speaking/\(promptId)",
-            audioURL: audioURL
+            audioURL: audioURL,
+            classBinding: binding
         )
     }
 
@@ -419,7 +436,8 @@ struct SottoAPIClient {
     /// poll the same path for the grade, so the transport lives here once.
     private func uploadSpeakingRecording(
         path: String,
-        audioURL: URL
+        audioURL: URL,
+        classBinding: SottoClassSpeakingBinding? = nil
     ) async throws -> SottoSpeakingUploadResponse {
         var request = try makeRequest(
             path: path,
@@ -434,7 +452,8 @@ struct SottoAPIClient {
             boundary: boundary,
             fieldName: "audio",
             fileName: "speaking.wav",
-            contentType: "audio/wav"
+            contentType: "audio/wav",
+            fields: classBinding.map { [("expectedAttempt", String($0.attempt)), ("taskMaterialRevision", $0.materialRevision)] } ?? []
         )
         return try await send(request, acceptedStatuses: [201])
     }
@@ -491,48 +510,6 @@ struct SottoAPIClient {
     func revokeApiKey(id: String) async throws {
         let request = try makeRequest(path: "/api/v1/keys/\(id)", method: "DELETE", authorized: true)
         try await sendIgnoringBody(request, acceptedStatuses: [200, 204])
-    }
-
-    // MARK: - Account settings
-
-    func fetchAccount() async throws -> SottoAccount {
-        try await get("/api/v1/users/me")
-    }
-
-    /// The route's schema is strict, so only changed fields may be sent; nil
-    /// properties are omitted by Swift's synthesized encoder.
-    func updateAccount(_ update: SottoAccountUpdate) async throws -> SottoAccount {
-        try await patch("/api/v1/users/me", body: update)
-    }
-
-    func fetchAiModels() async throws -> SottoAiModelList {
-        try await get("/api/v1/ai-models")
-    }
-
-    func uploadAvatar(imageData: Data, fileName: String, contentType: String) async throws -> SottoAvatarUploadResponse {
-        var request = try makeRequest(path: "/api/v1/users/me/avatar", method: "POST", authorized: true)
-        let boundary = "Boundary-\(UUID().uuidString)"
-        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-        request.httpBody = multipartBody(
-            data: imageData,
-            boundary: boundary,
-            fieldName: "avatar",
-            fileName: fileName,
-            contentType: contentType
-        )
-        return try await send(request, acceptedStatuses: [200, 201])
-    }
-
-    // MARK: - Activity
-
-    func fetchActivity() async throws -> SottoActivity {
-        try await get("/api/v1/learn/activity")
-    }
-
-    // MARK: - Memory graph
-
-    func fetchMemoryGraph(courseId: String) async throws -> SottoMemoryGraph {
-        try await get("/api/v1/courses/\(courseId)/graph")
     }
 
     // MARK: - Placement
@@ -766,6 +743,10 @@ struct SottoAPIClient {
                 throw failure
             }
             if let error = try? JSONDecoder().decode(SottoErrorResponse.self, from: data) {
+                if (http.statusCode == 409 && ["CLASS_MATERIAL_CHANGED", "PREREQUISITE_ACK_REQUIRED"].contains(error.code ?? "")) ||
+                    ([400, 401, 404, 409].contains(http.statusCode) && error.code == "CLASS_RECORDING_REJECTED") {
+                    throw SottoAPIError.classRecordingRejected(error.error.description)
+                }
                 throw SottoAPIError.http(http.statusCode, error.error.description)
             }
             throw SottoAPIError.http(http.statusCode, "Sotto returned HTTP \(http.statusCode).")
@@ -802,30 +783,33 @@ struct SottoAPIClient {
         return path.isEmpty ? "A required field was missing." : "Missing field: \(path)."
     }
 
-    private func multipartAudioBody(
+    func multipartAudioBody(
         audioURL: URL,
         boundary: String,
         fieldName: String,
         fileName: String,
-        contentType: String
+        contentType: String,
+        fields: [(String, String)] = []
     ) throws -> Data {
         multipartBody(
             data: try Data(contentsOf: audioURL),
             boundary: boundary,
             fieldName: fieldName,
             fileName: fileName,
-            contentType: contentType
+            contentType: contentType,
+            fields: fields
         )
     }
 
     /// One file part. Both routes that take an upload — speaking audio and the
     /// avatar — send exactly this shape.
-    private func multipartBody(
+    func multipartBody(
         data: Data,
         boundary: String,
         fieldName: String,
         fileName: String,
-        contentType: String
+        contentType: String,
+        fields: [(String, String)] = []
     ) -> Data {
         var body = Data()
         body.appendString("--\(boundary)\r\n")
@@ -834,6 +818,10 @@ struct SottoAPIClient {
         )
         body.appendString("Content-Type: \(contentType)\r\n\r\n")
         body.append(data)
+        for (name, value) in fields {
+            body.appendString("\r\n--\(boundary)\r\n")
+            body.appendString("Content-Disposition: form-data; name=\"\(name)\"\r\n\r\n\(value)")
+        }
         body.appendString("\r\n--\(boundary)--\r\n")
         return body
     }

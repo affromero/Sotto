@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
@@ -43,6 +44,7 @@ const mockCreateSpeakingRecording = vi.fn().mockResolvedValue({
 });
 
 vi.mock('@/lib/sidedoor/storage/publication/speaking-recording-upload', () => ({
+  ClassSpeakingBindingConflict: class ClassSpeakingBindingConflict extends Error {},
   createSpeakingRecording: (...args: unknown[]) => mockCreateSpeakingRecording(...args),
 }));
 
@@ -69,6 +71,8 @@ vi.mock('@/lib/logger', () => ({
 // ---- Imports under test ----
 
 import { POST, GET } from '@/app/api/v1/classes/[classId]/speaking/[promptId]/route';
+import { InitialA1PracticeBlocked } from '@/lib/classes/lesson/initial-a1-provenance';
+import { ClassSpeakingBindingConflict } from '@/lib/sidedoor/storage/publication/speaking-recording-upload';
 
 // ---- Helpers ----
 
@@ -80,20 +84,26 @@ function makeGetRequest(url: string): NextRequest {
   return new NextRequest(url, { method: 'GET' });
 }
 
-/**
- * Build a POST request that mocks formData() to avoid Node.js multipart parsing
- * issues in the test environment (same pattern used by tests/api/v1/voices.test.ts).
- */
 function makePostRequest(
-  _classId: string,
-  _promptId: string,
-  audioFile?: { arrayBuffer: () => Promise<ArrayBuffer>; type: string } | null
+  classId: string,
+  promptId: string,
+  audioFile?: Blob | null,
+  fields: Record<string, unknown[] | undefined> = {
+    expectedAttempt: ['1'],
+    taskMaterialRevision: ['a'.repeat(64)],
+  }
 ): NextRequest {
-  const fileEntry = audioFile ?? null;
-  return {
-    formData: async () =>
-      ({ get: (key: string) => (key === 'audio' ? fileEntry : null) }) as unknown as FormData,
-  } as unknown as NextRequest;
+  const form = new FormData();
+  if (audioFile) form.append('audio', audioFile, 'recording.webm');
+  for (const [key, values] of Object.entries(fields)) {
+    for (const value of values ?? []) {
+      if (typeof value === 'string' || value instanceof Blob) form.append(key, value);
+    }
+  }
+  return new NextRequest(`http://localhost/api/v1/classes/${classId}/speaking/${promptId}`, {
+    method: 'POST',
+    body: form,
+  });
 }
 
 function makeAudioFile(type = 'audio/webm') {
@@ -102,26 +112,17 @@ function makeAudioFile(type = 'audio/webm') {
   // R2 key extension + content-type from the bytes, not the declared MIME).
   const bytes = new Uint8Array(64);
   bytes.set([0x1a, 0x45, 0xdf, 0xa3], 0);
-  return {
-    arrayBuffer: async () => bytes.buffer,
-    type,
-  };
+  return new Blob([bytes], { type });
 }
 
 function makeEmptyAudioFile(type = 'audio/webm') {
-  return {
-    arrayBuffer: async () => new ArrayBuffer(0),
-    type,
-  };
+  return new Blob([], { type });
 }
 
 function makeGarbageAudioFile(type = 'audio/webm') {
   // Random bytes that match no known audio container magic.
   const bytes = new Uint8Array([0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0]);
-  return {
-    arrayBuffer: async () => bytes.buffer,
-    type,
-  };
+  return new Blob([bytes], { type });
 }
 
 // ---- Tests ----
@@ -161,12 +162,31 @@ describe('POST /api/v1/classes/[classId]/speaking/[promptId]', () => {
     const req = makePostRequest('class-001', 'prompt-999', makeAudioFile());
     const res = await POST(req, routeParams('class-001', 'prompt-999'));
     expect(res.status).toBe(404);
+    expect(await res.json()).toMatchObject({ code: 'CLASS_RECORDING_REJECTED' });
   });
 
   it('returns 400 when audio field is missing', async () => {
     const req = makePostRequest('class-001', 'prompt-001', null);
     const res = await POST(req, routeParams('class-001', 'prompt-001'));
     expect(res.status).toBe(400);
+  });
+
+  it.each([
+    {},
+    { expectedAttempt: ['1'] },
+    { expectedAttempt: ['0'], taskMaterialRevision: ['a'.repeat(64)] },
+    { expectedAttempt: ['1', '2'], taskMaterialRevision: ['a'.repeat(64)] },
+    { expectedAttempt: ['1'], taskMaterialRevision: ['bad'] },
+    { expectedAttempt: ['1'], taskMaterialRevision: ['a'.repeat(64), 'b'.repeat(64)] },
+    { expectedAttempt: [new Blob(['1'])], taskMaterialRevision: ['a'.repeat(64)] },
+  ])('rejects missing or malformed class bindings before recording admission', async (fields) => {
+    const response = await POST(
+      makePostRequest('class-001', 'prompt-001', makeAudioFile(), fields),
+      routeParams('class-001', 'prompt-001')
+    );
+    expect(response.status).toBe(400);
+    expect(mockCreateSpeakingRecording).not.toHaveBeenCalled();
+    expect(mockDeliverSottoJob).not.toHaveBeenCalled();
   });
 
   it('returns 400 for a zero-byte audio upload without storing or queuing', async () => {
@@ -176,6 +196,30 @@ describe('POST /api/v1/classes/[classId]/speaking/[promptId]', () => {
     expect(res.status).toBe(400);
     expect(mockCreateSpeakingRecording).not.toHaveBeenCalled();
     expect(mockSpeakingRecordingCreate).not.toHaveBeenCalled();
+    expect(mockDeliverSottoJob).not.toHaveBeenCalled();
+  });
+
+  it('rejects an oversized streamed upload before storing or queuing', async () => {
+    const chunk = new Uint8Array(1024 * 1024);
+    let remaining = 65;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (remaining-- > 0) controller.enqueue(chunk);
+        else controller.close();
+      },
+    });
+    const request = new NextRequest(
+      'http://localhost/api/v1/classes/class-001/speaking/prompt-001',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'multipart/form-data; boundary=test' },
+        body,
+        duplex: 'half',
+      } as ConstructorParameters<typeof NextRequest>[1] & { duplex: 'half' }
+    );
+    const response = await POST(request, routeParams('class-001', 'prompt-001'));
+    expect(response.status).toBe(413);
+    expect(mockCreateSpeakingRecording).not.toHaveBeenCalled();
     expect(mockDeliverSottoJob).not.toHaveBeenCalled();
   });
 
@@ -198,6 +242,28 @@ describe('POST /api/v1/classes/[classId]/speaking/[promptId]', () => {
     expect(body).toEqual({ recordingId: 'rec-001', status: 'PENDING' });
   });
 
+  it('returns a conflict before publishing a recording when teaching is not acknowledged', async () => {
+    mockCreateSpeakingRecording.mockRejectedValue(new InitialA1PracticeBlocked());
+    const res = await POST(
+      makePostRequest('class-001', 'prompt-001', makeAudioFile()),
+      routeParams('class-001', 'prompt-001')
+    );
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: 'PREREQUISITE_ACK_REQUIRED' });
+    expect(mockDeliverSottoJob).not.toHaveBeenCalled();
+  });
+
+  it('returns a definite material conflict without delivering a grading job', async () => {
+    mockCreateSpeakingRecording.mockRejectedValue(new ClassSpeakingBindingConflict());
+    const res = await POST(
+      makePostRequest('class-001', 'prompt-001', makeAudioFile()),
+      routeParams('class-001', 'prompt-001')
+    );
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: 'CLASS_MATERIAL_CHANGED' });
+    expect(mockDeliverSottoJob).not.toHaveBeenCalled();
+  });
+
   it('publishes audio with captured ownership and the class parent', async () => {
     const req = makePostRequest('class-001', 'prompt-001', makeAudioFile());
     await POST(req, routeParams('class-001', 'prompt-001'));
@@ -207,6 +273,11 @@ describe('POST /api/v1/classes/[classId]/speaking/[promptId]', () => {
         admission: { userId: 'user-001' },
         promptId: 'prompt-001',
         parent: { sectionId: 'sec-001' },
+        classBinding: {
+          classId: 'class-001',
+          expectedAttempt: 1,
+          taskMaterialRevision: 'a'.repeat(64),
+        },
         extension: 'webm',
         contentType: 'audio/webm',
       })
@@ -228,7 +299,7 @@ describe('POST /api/v1/classes/[classId]/speaking/[promptId]', () => {
       expect.objectContaining({
         operationId: '10000000-0000-4000-8000-000000000001',
         fingerprint: 'a'.repeat(64),
-        version: 1,
+        version: 2,
       })
     );
   });
@@ -250,6 +321,7 @@ describe('GET /api/v1/classes/[classId]/speaking/[promptId]', () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-001' });
     mockCourseClassFindFirst.mockResolvedValue({ id: 'class-001' });
     mockSpeakingRecordingFindFirst.mockResolvedValue(SCORED_RECORDING);
+    mockSpeakingPromptFindFirst.mockResolvedValue({ sectionId: 'sec-001' });
   });
 
   it('returns 401 when unauthenticated', async () => {
@@ -276,13 +348,22 @@ describe('GET /api/v1/classes/[classId]/speaking/[promptId]', () => {
     expect(res.status).toBe(404);
   });
 
-  it('returns 404 when recording not found or not owned by user', async () => {
+  it('returns 404 when the recording is no longer in the owned class', async () => {
     mockSpeakingRecordingFindFirst.mockResolvedValue(null);
     const req = makeGetRequest(
       'http://localhost/api/v1/classes/class-001/speaking/prompt-001?recordingId=rec-999'
     );
     const res = await GET(req, routeParams('class-001', 'prompt-001'));
     expect(res.status).toBe(404);
+  });
+
+  it('does not expose a recording when its prompt belongs to a different class', async () => {
+    mockSpeakingPromptFindFirst.mockResolvedValue(null);
+    const req = makeGetRequest(
+      'http://localhost/api/v1/classes/class-001/speaking/other?recordingId=rec-001'
+    );
+    expect((await GET(req, routeParams('class-001', 'other'))).status).toBe(404);
+    expect(mockSpeakingRecordingFindFirst).not.toHaveBeenCalled();
   });
 
   it('returns scored fields when grading is complete', async () => {
@@ -294,7 +375,9 @@ describe('GET /api/v1/classes/[classId]/speaking/[promptId]', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toEqual({
+      recordingId: 'rec-001',
       status: 'SCORED',
+      recoveryAcknowledged: false,
       overallScore: 0.82,
       transcript: 'Guten Morgen',
       rubricScores: { accuracy: 0.85, fluency: 0.78, completeness: 0.9 },
@@ -320,6 +403,7 @@ describe('GET /api/v1/classes/[classId]/speaking/[promptId]', () => {
 
     expect(res.status).toBe(200);
     const body = await res.json();
+    expect(body.recordingId).toBe('rec-001');
     expect(body.status).toBe('PENDING');
     expect(body.overallScore).toBeNull();
   });

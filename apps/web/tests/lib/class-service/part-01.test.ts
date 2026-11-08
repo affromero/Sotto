@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createSkillRequirements } from '@sotto/shared';
+import { createSkillRequirements, type ClassTeaching } from '@sotto/shared';
 import { reviewFixture } from '../learning-map/adaptation/fixtures';
 import { sampleTeaching } from '../../helpers/learning/class-teaching';
 import {
@@ -42,6 +42,8 @@ import {
   mockLearnerVocabFindMany,
 } from './fixtures';
 import { authorizedLearnerExecution } from '../../helpers/runtime/provider-execution';
+import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
+import { publishClassGeneration } from '@/lib/learning/classes/formative/class-generation-state';
 import {
   createNextClass,
   ClassGenerationCancelledError,
@@ -67,9 +69,13 @@ describe('createNextClass', () => {
     mockGenerateClassListening.mockResolvedValue({
       sectionId: 'section-listening',
       episodeId: 'episode-listening',
+      reviewReceipt: {},
     });
-    mockGenerateClassSpeaking.mockResolvedValue({ sectionId: 'section-speaking' });
-    mockGenerateClassWriting.mockResolvedValue({ sectionId: 'section-writing' });
+    mockGenerateClassSpeaking.mockResolvedValue({
+      sectionId: 'section-speaking',
+      reviewReceipt: {},
+    });
+    mockGenerateClassWriting.mockResolvedValue({ sectionId: 'section-writing', reviewReceipt: {} });
     mockGenerateClassIntro.mockResolvedValue({
       purpose: 'Purpose',
       about: 'About',
@@ -107,6 +113,77 @@ describe('createNextClass', () => {
     await expect(
       createNextClass('course-1', 'u1', authorizedLearnerExecution('u1'))
     ).rejects.toBeInstanceOf(CourseNotFoundError);
+  });
+  it('does not publish an initial A1 class if a later stage changes its reviewed teaching', async () => {
+    mockCourseFindFirst.mockResolvedValue(SAMPLE_COURSE);
+    mockCourseClassFindFirst.mockResolvedValue(null);
+    mockCourseClassFindMany.mockResolvedValue([]);
+    mockGenerateSectionQuestions.mockImplementation(async (input: { teaching: ClassTeaching }) => {
+      input.teaching.explanation = 'Changed after review.';
+      return SAMPLE_QUESTIONS;
+    });
+    const publish = vi.fn();
+    await expect(
+      createNextClass(
+        'course-1',
+        'u1',
+        { ...authorizedLearnerExecution('u1'), initialA1Class: true },
+        undefined,
+        { create: async () => ({ id: 'class-new' }), publish }
+      )
+    ).rejects.toThrow('initial A1 teaching review is no longer valid');
+    expect(publish).not.toHaveBeenCalled();
+  });
+  it('does not skip the first A1 review when a later stage changes its policy', async () => {
+    mockCourseFindFirst.mockResolvedValue(SAMPLE_COURSE);
+    mockCourseClassFindFirst.mockResolvedValue(null);
+    mockCourseClassFindMany.mockResolvedValue([]);
+    mockGenerateSectionQuestions.mockImplementation(
+      async (input: { execution: SottoProviderExecution }) => {
+        input.execution.initialA1Class = false;
+        return SAMPLE_QUESTIONS;
+      }
+    );
+    const publish = vi.fn();
+    await expect(
+      createNextClass(
+        'course-1',
+        'u1',
+        { ...authorizedLearnerExecution('u1'), initialA1Class: true },
+        undefined,
+        { create: async () => ({ id: 'class-new' }), publish }
+      )
+    ).rejects.toThrow('initial A1 teaching policy changed');
+    expect(publish).not.toHaveBeenCalled();
+  });
+  it('rejects a reviewed seed changed after generation and before publication', async () => {
+    mockCourseFindFirst.mockResolvedValue(SAMPLE_COURSE);
+    mockCourseClassFindFirst.mockResolvedValue(null);
+    mockCourseClassFindMany.mockResolvedValue([]);
+    let attempted = false;
+    await expect(
+      createNextClass(
+        'course-1',
+        'u1',
+        { ...authorizedLearnerExecution('u1'), initialA1Class: true },
+        undefined,
+        {
+          create: async () => ({ id: 'class-new' }),
+          publish: async (classId, seed, requireTeachingProof) => {
+            attempted = true;
+            (seed.teaching as unknown as ClassTeaching).explanation = 'Changed after generation.';
+            await publishClassGeneration({} as never, {
+              classId,
+              userId: 'u1',
+              attempt: 1,
+              data: { adaptiveSeed: seed },
+              requireInitialA1TeachingProof: requireTeachingProof,
+            });
+          },
+        }
+      )
+    ).rejects.toThrow('review is no longer valid');
+    expect(attempted).toBe(true);
   });
   it('adds qualified objective criteria to the class context and snapshot without replacing its lesson scope', async () => {
     const { entry, binding, states } = reviewFixture();

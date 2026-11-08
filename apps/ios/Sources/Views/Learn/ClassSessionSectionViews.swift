@@ -2,6 +2,187 @@ import SwiftUI
 import UIKit
 import PencilKit
 
+struct ClassQuizHistoryView: View {
+    let history: [SottoQuizHistory]
+    let orphanAnswers: [SottoOrphanQuizAnswer]
+    let receipts: [SottoQuizReceipt]
+    let unreadable: Bool
+
+    var body: some View {
+        if !history.isEmpty || !orphanAnswers.isEmpty || !receipts.isEmpty || unreadable {
+            DisclosureGroup("Previous quiz work") {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Tasks and choices are the currently saved versions. Earlier wording may have changed.")
+                        .font(.callout).foregroundStyle(SottoTheme.muted)
+                    ForEach(Array(receipts.enumerated()), id: \.offset) { _, receipt in
+                        Text(receipt.attempt.map { "Saved submission · Attempt \($0)" } ?? "Saved submission").font(.headline)
+                        if let submittedAt = receipt.submittedAt { Text("Submitted at: \(submittedAt)") }
+                        Text(receipt.passed.map { $0 ? "Passed" : "Not passed" } ?? "Outcome unavailable")
+                        Text(scoreLabel(receipt.overallScore))
+                        if receipt.passedSections != nil || receipt.totalSections != nil {
+                            Text("Recorded: \(receipt.passedSections.map { String($0) } ?? "?") of \(receipt.totalSections.map { String($0) } ?? "?") skills passed")
+                        }
+                        ForEach(Array(receipt.sections.enumerated()), id: \.offset) { _, section in
+                            Text("\(section.skill.map(classSkillLabel) ?? "Skill unavailable") · \(scoreLabel(section.score)) · \(section.passed.map { $0 ? "Passed" : "Not passed" } ?? "Outcome unavailable")")
+                        }
+                        if receipt.summaryIncomplete { Text("Some result details are unavailable.") }
+                        if receipt.answersUnavailable { Text("Some individual answers are unavailable.") }
+                    }
+                    ForEach(history) { section in
+                        Text("\(classSkillLabel(section.skill)) · Attempt \(section.attempt)").font(.headline)
+                        ForEach(section.questions) { question in
+                            if let passage = question.passageText { Text(passage) }
+                            Text(question.question).font(.subheadline.bold())
+                            if let choice = question.savedChoice {
+                                Text("Saved choice: \(choiceLabel(question.options, choice))")
+                            }
+                            ForEach(Array(question.submissions.enumerated()), id: \.offset) { _, event in
+                                submission(event, options: question.options)
+                            }
+                        }
+                    }
+                    ForEach(Array(orphanAnswers.enumerated()), id: \.offset) { _, answer in
+                        Text("Answer without its original task").font(.subheadline.bold())
+                        if let choice = answer.savedChoice { Text("Saved choice: \(choiceLabel(nil, choice))") }
+                        ForEach(Array(answer.submissions.enumerated()), id: \.offset) { _, event in
+                            submission(event, options: nil)
+                        }
+                    }
+                    if unreadable { Text("Some previous quiz records could not be displayed.") }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+
+    private func choiceLabel(_ options: [String]?, _ selected: Int?) -> String {
+        guard let selected else { return "Choice unavailable" }
+        if let options, options.indices.contains(selected) { return "\(selected + 1). \(options[selected])" }
+        return "Choice index \(selected) (text unavailable)"
+    }
+
+    private func scoreLabel(_ score: Double?) -> String {
+        guard let score else { return "Score unavailable" }
+        if score < 0 || score > 1 { return "Recorded score: \(score) (outside expected range)" }
+        return "Score: \(score.formatted(.percent.precision(.fractionLength(0))))"
+    }
+
+    private func submission(_ event: SottoHistoricalQuizSubmission, options: [String]?) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(event.attempt.map { "Submitted · Attempt \($0)" } ?? "Submitted").font(.caption.bold())
+            if let submittedAt = event.submittedAt { Text("Submitted at: \(submittedAt)").font(.caption) }
+            Text("\(choiceLabel(options, event.selectedIndex)) · \(event.isCorrect.map { $0 ? "Correct" : "Incorrect" } ?? "Outcome unavailable")")
+        }
+    }
+}
+
+struct ClassSpeakingHistoryView: View {
+    let classId: String
+    let history: [SottoSpeakingHistory]
+    let unlinked: [SottoHistoricalSpeakingRecording]
+
+    var body: some View {
+        if !history.isEmpty || !unlinked.isEmpty {
+            DisclosureGroup("Previous speaking work") {
+                VStack(alignment: .leading, spacing: 16) {
+                    ForEach(history) { section in
+                        Text("Attempt \(section.attempt)").font(.headline)
+                        ForEach(section.prompts) { prompt in
+                            Text(prompt.targetPhrase).font(.subheadline.bold())
+                            Text(prompt.translation)
+                            ForEach(prompt.recordings) { recording in
+                                if let reference = speakingHistoryAudioPath(classId: classId, promptId: prompt.id, recordingId: recording.id) {
+                                    LearnerAudioPlayer(reference: reference)
+                                } else { Text("Recording unavailable.") }
+                                recordingView(recording)
+                            }
+                        }
+                    }
+                    ForEach(unlinked) { recording in
+                        Text("Recording without its original task").font(.headline)
+                        recordingView(recording)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+
+    private func recordingView(_ recording: SottoHistoricalSpeakingRecording) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Recording: \(recording.status)")
+            if recording.attemptMatches == false { Text("Saved with a different attempt number.") }
+            if let transcript = recording.transcript { Text("Transcript: \(transcript)").textSelection(.enabled) }
+            if let score = recording.overallScore { Text("Score: \(score.formatted(.percent.precision(.fractionLength(0))))") }
+            if let feedback = recording.feedback { Text("Feedback: \(feedback)").textSelection(.enabled) }
+            ForEach(recording.rubricScores.keys.sorted(), id: \.self) { key in
+                if let score = recording.rubricScores[key] {
+                    Text("\(key): \(score.formatted(.percent.precision(.fractionLength(0))))")
+                }
+            }
+            ForEach(Array(recording.phonemeScores.enumerated()), id: \.offset) { _, token in
+                Text("\(token.op): \(token.expected ?? "unavailable") → \(token.actual ?? "unavailable")")
+            }
+            if recording.detailsUnavailable { Text("Some speaking feedback could not be displayed.") }
+        }
+    }
+}
+
+func speakingHistoryAudioPath(classId: String, promptId: String, recordingId: String) -> String? {
+    let allowed = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-")
+    guard [classId, promptId, recordingId].allSatisfy({ !$0.isEmpty && $0.count <= 200 && $0.unicodeScalars.allSatisfy { allowed.contains($0) } }) else { return nil }
+    return "/api/v1/classes/\(classId)/speaking/\(promptId)/recordings/\(recordingId)/audio"
+}
+
+struct ClassWritingHistoryView: View {
+    let history: [SottoWritingHistory]
+    let orphanDrafts: [SottoOrphanWritingDraft]
+
+    var body: some View {
+        if !history.isEmpty || !orphanDrafts.isEmpty {
+            DisclosureGroup("Previous writing") {
+                VStack(alignment: .leading, spacing: 16) {
+                    ForEach(history) { section in
+                        Text("Attempt \(section.attempt)").font(.headline)
+                        ForEach(section.prompts) { prompt in
+                            Text(prompt.task).font(.subheadline.bold())
+                            if let draft = prompt.savedDraft {
+                                Text("Saved draft").font(.caption.bold())
+                                Text(draft.isEmpty ? "(Empty draft)" : draft)
+                                    .textSelection(.enabled)
+                            }
+                            ForEach(prompt.responses) { response in
+                                Text(response.overallScore == nil ? "Submitted response" : "Graded response")
+                                    .font(.caption.bold())
+                                Text(response.text).textSelection(.enabled)
+                                if !response.attemptMatches {
+                                    Text("Saved with a different attempt number.")
+                                }
+                                if let score = response.overallScore {
+                                    Text("Score: \(score.formatted(.percent.precision(.fractionLength(0))))")
+                                }
+                                if let feedback = response.feedback { Text(feedback) }
+                                ForEach(response.corrections ?? []) { correction in
+                                    Text("\(correction.old) → \(correction.new): \(correction.why)")
+                                }
+                                if response.correctionsUnavailable {
+                                    Text("Some corrections could not be displayed.")
+                                }
+                            }
+                        }
+                    }
+                    ForEach(orphanDrafts) { draft in
+                        Text("Saved draft without its original task").font(.caption.bold())
+                        Text(draft.text.isEmpty ? "(Empty draft)" : draft.text)
+                            .textSelection(.enabled)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+}
+
 struct ClassSectionView: View {
     let classId: String
     let section: SottoClassSection
@@ -9,7 +190,10 @@ struct ClassSectionView: View {
     @ObservedObject var drafts: WritingDraftStore
     let pencilWorkbook: Bool
     let classAttempt: Int
+    var speakingBinding: SottoClassSpeakingBinding? = nil
+    var activityOwner: SottoLearnerIdentity? = nil
     let pencilToolPicker: PKToolPicker
+    var prerequisite: SottoClassPrerequisiteResponse? = nil
     let onPencilReviewRequired: (String, Bool) -> Void
     let onSelectionHelp: (String, String) -> Void
     @State private var questionIndex = 0
@@ -64,6 +248,11 @@ struct ClassSectionView: View {
             }
 
             ForEach(pencilWorkbook ? sortedQuestions : Array(sortedQuestions.dropFirst(questionIndex).prefix(1))) { question in
+                if let prerequisite, let instruction = prerequisite.content?.directions.instruction(
+                    sectionId: section.id, taskId: question.id, kind: .question
+                ) {
+                    ClassPrerequisiteDirection(instruction: instruction, language: prerequisite.nativeLang)
+                }
                 if pencilWorkbook {
                     PencilHomeworkCard(classId: classId, attempt: classAttempt, exercise: .question(question),
                         toolPicker: pencilToolPicker,
@@ -95,6 +284,10 @@ struct ClassSectionView: View {
                 ClassSpeakingPracticeView(
                     source: .classSession(classId: classId),
                     prompts: section.prompts,
+                    classBinding: speakingBinding,
+                    activityOwner: activityOwner,
+                    prerequisite: prerequisite,
+                    sectionId: section.id,
                     onSelectionHelp: onSelectionHelp
                 )
             }
@@ -102,6 +295,11 @@ struct ClassSectionView: View {
             if !section.writingPrompts.isEmpty {
                 if pencilWorkbook {
                     ForEach(section.writingPrompts) { prompt in
+                        if let prerequisite, let instruction = prerequisite.content?.directions.instruction(
+                            sectionId: section.id, taskId: prompt.id, kind: .writing
+                        ) {
+                            ClassPrerequisiteDirection(instruction: instruction, language: prerequisite.nativeLang)
+                        }
                         PencilHomeworkCard(classId: classId, attempt: classAttempt, exercise: .writing(prompt),
                             toolPicker: pencilToolPicker,
                             confirmedAnswer: drafts.draft(for: prompt.id).map { .writing($0.text) }, onUseAnswer: { answer in
@@ -113,6 +311,8 @@ struct ClassSectionView: View {
                     drafts: drafts,
                     prompts: section.writingPrompts,
                     offersHandwriting: !pencilWorkbook,
+                    prerequisite: prerequisite,
+                    sectionId: section.id,
                     onSelectionHelp: onSelectionHelp
                 )
             }
@@ -426,11 +626,8 @@ struct PronunciationFeedbackRow: View {
                     .foregroundStyle(SottoTheme.muted)
             }
 
-            if let urlString = prompt.referenceTtsUrl, let url = URL(string: urlString) {
-                Link(destination: url) {
-                    Label("Reference voice", systemImage: "speaker.wave.2")
-                }
-                .font(.callout.bold())
+            if let reference = prompt.referenceTtsUrl {
+                LearnerAudioPlayer(reference: reference)
             }
         }
         .padding(12)

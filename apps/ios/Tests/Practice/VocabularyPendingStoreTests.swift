@@ -36,6 +36,8 @@ final class VocabularyPendingStoreTests: XCTestCase {
         defer { try? first.clear(); try? anotherCourse.clear(); try? anotherLearner.clear() }
         let request = SottoVocabularyAdmission(requestId: UUID().uuidString, mode: .word, wordIds: ["word"])
         try first.save(request)
+        XCTAssertEqual(try first.ownedScopes(prefix: "admission/"), ["admission/course-a"])
+        XCTAssertTrue(try anotherLearner.ownedScopes(prefix: "admission/").isEmpty)
         XCTAssertEqual(try first.load(SottoVocabularyAdmission.self), request)
         XCTAssertNil(try anotherCourse.load(SottoVocabularyAdmission.self))
         XCTAssertNil(try anotherLearner.load(SottoVocabularyAdmission.self))

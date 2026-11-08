@@ -301,6 +301,9 @@ suite('durable worker queue boundaries', () => {
       const worker = runtime.createWorker<GenerateAudioPayload>(
         'audio-generation',
         async (job) => {
+          expect(() => durable.durableQueueExecution(job)).toThrow(
+            'Durable execution capability is missing'
+          );
           const current = await instance.database.segment.findUniqueOrThrow({
             where: { id: job.data.segmentId },
           });

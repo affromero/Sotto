@@ -27,6 +27,43 @@ impl App {
             View::CourseHome { course, .. } => course.clone(),
             _ => return,
         };
+        let pending: Vec<String> = self
+            .practice_cache
+            .values()
+            .filter_map(|view| match view {
+                View::Exam {
+                    course: original,
+                    exam_id: Some(id),
+                    ..
+                } if original.id == course.id && view.has_uncertain_upload() => Some(id.clone()),
+                _ => None,
+            })
+            .collect();
+        if pending.len() > 1 {
+            self.status_bar.set_error("More than one exam has an unresolved recording. Keep your recordings and check the exams in the web app.".into());
+            self.render();
+            return;
+        }
+        if let Some(exam_id) = pending.into_iter().next() {
+            let key = format!("EXAM/{exam_id}");
+            let retained_work = match self.practice_cache.get(&key) {
+                Some(View::Exam {
+                    sections: Some(sections),
+                    ..
+                }) => super::class::retained_class_work(sections),
+                _ => return,
+            };
+            self.bump_gen();
+            self.stop_audio();
+            self.view = View::ExamRecovery {
+                course,
+                exam_id,
+                retained_work,
+                scroll: 0,
+            };
+            self.render();
+            return;
+        }
         let req_gen = self.bump_gen();
         self.stop_audio();
         self.view = View::exam_view(course.clone());
@@ -87,22 +124,36 @@ impl App {
             return;
         }
         match result.as_ref() {
-            Ok(resp) => match exam_sections(resp) {
-                Some(built) => {
-                    if let View::Exam { sections, .. } = &mut self.view {
-                        *sections = Some(built);
-                    }
-                    // If the first section is listening, kick off its episode.
-                    self.class_fetch_current_episode();
-                }
-                None => {
+            Ok(resp) => {
+                let expected = match &self.view {
+                    View::Exam {
+                        exam_id: Some(id), ..
+                    } => id.clone(),
+                    _ => return,
+                };
+                if resp.id != expected {
                     self.status_bar
-                        .set_error("This exam came back empty or malformed.".to_string());
-                    if let Some(course) = self.exam_course() {
-                        self.enter_course_home(course);
+                        .set_error("The returned exam does not match the saved exam.".into());
+                    self.render();
+                    return;
+                }
+                match exam_sections(resp) {
+                    Some(built) => {
+                        if let View::Exam { sections, .. } = &mut self.view {
+                            *sections = Some(built);
+                        }
+                        // If the first section is listening, kick off its episode.
+                        self.class_fetch_current_episode();
+                    }
+                    None => {
+                        self.status_bar
+                            .set_error("This exam came back empty or malformed.".to_string());
+                        if let Some(course) = self.exam_course() {
+                            self.enter_course_home(course);
+                        }
                     }
                 }
-            },
+            }
             Err(message) => self.status_bar.set_error(message.clone()),
         }
         self.render();

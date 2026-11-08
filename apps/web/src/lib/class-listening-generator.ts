@@ -2,11 +2,13 @@
 // script, vocabulary, and learner graph material. Verified references gate
 // readiness; audio waits for the final learning association and questions.
 import { learningScriptHash, learningScriptTranscript } from './learning/script-hash';
+import { isDeepStrictEqual } from 'node:util';
 import {
   captureClassAssessmentScope,
   reviewMultipleChoiceAssessments,
 } from './learning-map/evidence/producers';
-import { prisma } from './prisma';
+import { prisma, prismaUnfiltered } from './prisma';
+import { sottoTransaction } from './sidedoor/access/state/transaction';
 import { capturedLearningAiOptions, resolveCapturedLearningAi } from './learning-ai';
 import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import { createAIProvider } from './providers/ai';
@@ -20,8 +22,12 @@ import {
 } from './classes/quiz/retry';
 import { formatSourceBlock, generateScript } from './script-generator';
 import { scriptOutputProtocolFailure } from './learning/script/output-protocol';
-import { createSegmentsAndQueueAudio } from './segment-creator';
 import { normalizeListeningTurns } from './classes/quality/listening-audit/projection';
+import {
+  isInitialA1ExerciseReview,
+  prerequisiteReviewTeaching,
+  PRE_DISCLOSURE_REVIEW_CONTEXT,
+} from './classes/lesson/prerequisite-review-context';
 import { persistGeneratedReferences } from './references';
 import {
   getConfiguredTtsProviderId,
@@ -46,6 +52,25 @@ import {
   TeachingQualityRejectionError,
 } from './classes/quality/teaching-quality';
 import { combineTeachingFailures, type TeachingFailure } from './classes/quality/teaching-failure';
+import type { InitialA1ListeningReceipt } from './classes/quality/section-review/listening-review-proof';
+import { listeningReviewAuthority } from './classes/listening/review-authority';
+import {
+  authorizeListeningMaterial,
+  requireUnqueuedListeningEpisode,
+  ListeningEpisodeChangedError,
+  queueListeningAudio,
+  failUnqueuedClassListening,
+  minimumVerifiedReferences,
+  type ListeningContentParams,
+  type ListeningContent,
+} from './classes/listening/admission';
+export {
+  queueListeningAudio,
+  failUnqueuedClassListening,
+  minimumVerifiedReferences,
+  type ListeningContentParams,
+  type ListeningContent,
+} from './classes/listening/admission';
 import { listeningRepairPlan } from './classes/quality/listening-repair';
 import {
   captureStructureAttempt,
@@ -54,10 +79,9 @@ import {
   type GenerationAttemptFailure,
   type GenerationStructureIssue,
 } from './classes/quality/generation-structure';
-import {
-  assertClassGeneration,
-  withClassGeneration,
-} from './learning/classes/class-generation-state';
+import { withClassGeneration } from './learning/classes/formative/class-generation-state';
+import { assertRepairQuizPreserved } from './learning/classes/formative/class-repair';
+import { requireListeningAttachmentFence } from './learning/classes/progress/listening-attachment-fence';
 import {
   sectionReviewSchema,
   sectionReviewInput,
@@ -72,6 +96,8 @@ import {
 } from './classes/quality/private-protocol-evidence';
 
 const LISTENING_QUIZ_COUNT = 4;
+export const sealInitialA1ListeningReview = listeningReviewAuthority.sealSeed;
+export const materializeInitialA1ListeningReview = listeningReviewAuthority.materializeSeed;
 const listeningQuizSchema = z
   .array(
     z
@@ -107,101 +133,25 @@ export interface ClassListeningParams {
   note?: string;
   teaching?: ClassTeaching;
   retry?: QuizRetryContext;
+  repairQuiz?: { retry?: { sectionId: string; skill: import('@sotto/shared').SkillType } };
   /** Optional sourced-class content + provenance (see ListeningContentParams). */
   sourceContent?: string;
   sourceMetadata?: { title?: string; author?: string; publishedDate?: string; siteName?: string };
   sourceUrl?: string;
+  requireInitialA1Proof?: boolean;
 }
 
 export interface ClassListeningResult {
   sectionId: string;
   episodeId: string;
-}
-
-interface ListeningComprehensionQuestion {
-  question: string;
-  options: string[];
-  correctIndex: number;
-  explanation: string;
-}
-
-// Content-only listening generation: builds the CLASS episode and script
-// and the comprehension questions, feeds generated vocab into the memory graph,
-// and returns both. The caller decides where to persist the questions (a class
-// section, or a practice session). No ClassSection/LessonQuestion rows here.
-export interface ListeningContentParams {
-  ttsProvider?: import('./providers/tts-registry').TtsProviderId | null;
-  deferAudio?: boolean;
-  userId: string;
-  execution: SottoProviderExecution;
-  courseId: string;
-  level: string;
-  nativeLang: string;
-  targetLang: string;
-  objective: string;
-  mustIncludeVocab: Array<{ word: string; translation: string }>;
-  /** Provenance for graph vocab (a class id). Undefined for practice sessions. */
-  firstSeenClassId?: string;
-  note?: string;
-  teaching?: ClassTeaching;
-  retry?: QuizRetryContext;
-  /**
-   * Optional sourced-class content: a CEFR-leveled passage in the target
-   * language (from `prepareClassSource`). When present, the listening episode
-   * derives from it with `[N]` citations and real, verified references.
-   */
-  sourceContent?: string;
-  sourceMetadata?: { title?: string; author?: string; publishedDate?: string; siteName?: string };
-  sourceUrl?: string;
-}
-
-export interface ListeningContent {
-  episodeId: string;
-  comprehensionQuestions: ListeningComprehensionQuestion[];
-  turns: Array<{ speaker: string; text: string; direction?: string }>;
-}
-
-/** Admit audio only after the caller has persisted the final learning association. */
-export async function queueListeningAudio(
-  content: ListeningContent,
-  execution: SottoProviderExecution,
-  classAttempt?: { classId: string; attempt: number }
-) {
-  const registerAudioEpisode = execution.registerAudioEpisode;
-  await createSegmentsAndQueueAudio(content.episodeId, content.turns, {
-    authorize: execution.authorize,
-    onPrepared: async (database, audioGenerationKey) => {
-      if (classAttempt)
-        await assertClassGeneration(
-          database,
-          classAttempt.classId,
-          classAttempt.attempt,
-          execution.userId
-        );
-      await registerAudioEpisode?.(database, content.episodeId, audioGenerationKey);
-    },
-  });
-}
-
-/**
- * How many of a class's references must verify for the class to ship.
- *
- * A simple majority, and never fewer than one. The reasoning: a class whose
- * sources are mostly sound is still worth listening to — the failed entries are
- * shown as failed — while one where half or more of the citations cannot be
- * stood up is not something to teach from, however much was spent generating
- * it. Deliberately not reusing `getMinReferenceCount`: that governs how many
- * references a script must *contain*, which is a question about depth and
- * duration, not about how many of them survived checking.
- */
-export function minimumVerifiedReferences(total: number): number {
-  if (total <= 0) return 0;
-  return Math.max(1, Math.ceil(total / 2));
+  reviewReceipt?: InitialA1ListeningReceipt;
 }
 
 export async function composeListeningContent(
   p: ListeningContentParams
 ): Promise<ListeningContent> {
+  if (p.firstSeenClassId !== p.generationClass?.classId)
+    throw new Error('Listening class generation binding is missing or changed.');
   const sourceContent = p.sourceContent;
   const sourceMetadata = structuredClone(p.sourceMetadata);
   const lessonContext = {
@@ -254,19 +204,28 @@ export async function composeListeningContent(
   // Step 2: create a CLASS episode. When the instance pins a TTS provider,
   // such as the keyless local Kokoro sidecar, seed it on
   // the episode so the audio-generation worker renders listening audio with it.
-  const episode = await prisma.episode.create({
-    data: {
-      userId: p.userId,
-      title: `Listening: ${p.objective}`,
-      topic: p.objective,
-      source: 'CLASS',
-      visibility: 'PRIVATE',
-      language: p.targetLang,
-      status: 'PENDING',
-      ttsProvider: resolvedTts?.providerId ?? configuredTtsProvider ?? undefined,
-      ttsModel: resolvedTts?.provider.getModelId() ?? requestedTtsModel,
+  const episode = await sottoTransaction(
+    prismaUnfiltered,
+    async (database) => {
+      await authorizeListeningMaterial(database, p);
+      const created = await database.episode.create({
+        data: {
+          userId: p.userId,
+          title: `Listening: ${p.objective}`,
+          topic: p.objective,
+          source: 'CLASS',
+          visibility: 'PRIVATE',
+          language: p.targetLang,
+          status: 'PENDING',
+          ttsProvider: resolvedTts?.providerId ?? configuredTtsProvider ?? undefined,
+          ttsModel: resolvedTts?.provider.getModelId() ?? requestedTtsModel,
+        },
+      });
+      p.execution.signal?.throwIfAborted();
+      return created;
     },
-  });
+    { signal: p.execution.signal }
+  );
   const episodeId = episode.id;
 
   const failures: GenerationAttemptFailure[] = [];
@@ -290,6 +249,7 @@ export async function composeListeningContent(
       | {
           result: Awaited<ReturnType<typeof generateScript>>;
           questions: z.infer<typeof listeningQuizSchema>;
+          proof?: ReturnType<typeof listeningReviewAuthority.capture>;
         }
       | undefined;
     for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -517,6 +477,20 @@ export async function composeListeningContent(
         ...question,
         passageText: transcript,
       }));
+      const proof = p.reviewScope
+        ? listeningReviewAuthority.capture(
+            {
+              turns: result.turns,
+              soundCues: result.soundCues.length ? result.soundCues : null,
+              markdown: result.markdown,
+            },
+            questions,
+            reviewedQuestions,
+            p,
+            ai,
+            episodeId
+          )
+        : undefined;
       const blindSchema = sectionReviewSchema(reviewedQuestions);
       const blindReview = await provider.generateResponse(
         loadAndRender('class/review-section-quiz.md', {
@@ -529,13 +503,24 @@ export async function composeListeningContent(
             ...p,
             initialA1Class: p.execution.initialA1Class,
           }),
-        }),
+        }) +
+          (p.teaching && isInitialA1ExerciseReview(p.level, p.execution.initialA1Class, 'listening')
+            ? `\n${PRE_DISCLOSURE_REVIEW_CONTEXT}`
+            : ''),
         [
           {
             role: 'user',
             content: JSON.stringify({
               ...JSON.parse(sectionReviewInput(reviewedQuestions)),
-              lessonContext,
+              lessonContext: p.teaching
+                ? {
+                    ...lessonContext,
+                    teaching: prerequisiteReviewTeaching(
+                      p.teaching,
+                      isInitialA1ExerciseReview(p.level, p.execution.initialA1Class, 'listening')
+                    ),
+                  }
+                : lessonContext,
             }),
           },
         ],
@@ -546,6 +531,7 @@ export async function composeListeningContent(
           jsonSchema: blindSchema,
         }
       );
+      if (proof) listeningReviewAuthority.check(p, proof);
       logUsage({
         service: ai.provider,
         model: blindReview.model,
@@ -622,6 +608,7 @@ export async function composeListeningContent(
           listeningSource,
           listeningTurns,
         });
+        if (proof) listeningReviewAuthority.check(p, proof);
       } catch (error) {
         if (!(error instanceof TeachingQualityRejectionError)) throw error;
         if (!error.teachingFailure || error.feedback.length === 0) throw error;
@@ -670,38 +657,57 @@ export async function composeListeningContent(
         continue;
       }
 
-      accepted = { result, questions };
+      accepted = { result, questions, proof };
       break;
     }
     if (!accepted) throw new SectionQualityError();
-    const { result, questions } = accepted;
+    const { result, questions, proof } = accepted;
+    if (proof) listeningReviewAuthority.check(p, proof);
+    const script = proof
+      ? structuredClone(proof.script)
+      : {
+          turns: result.turns,
+          soundCues: result.soundCues.length ? result.soundCues : null,
+          markdown: result.markdown,
+        };
 
     // Step 4: persist Script and VocabularyEntry
-    await prisma.$transaction(async (tx) => {
-      await tx.script.create({
-        data: {
-          episodeId,
-          turns: result.turns,
-          soundCues: result.soundCues.length > 0 ? result.soundCues : undefined,
-          markdown: result.markdown,
-        },
-      });
-
-      if (result.vocabulary && result.vocabulary.length > 0) {
-        await tx.vocabularyEntry.createMany({
-          data: result.vocabulary.map((v) => ({
+    const scriptId = await sottoTransaction(
+      prismaUnfiltered,
+      async (tx) => {
+        await authorizeListeningMaterial(tx, p);
+        await requireUnqueuedListeningEpisode(tx, p, episode);
+        const saved = await tx.script.create({
+          data: {
             episodeId,
-            number: v.number,
-            word: v.word,
-            translation: v.translation,
-            partOfSpeech: v.partOfSpeech,
-            pronunciation: v.pronunciation,
-            exampleSentence: v.exampleSentence,
-            difficulty: v.difficulty,
-          })),
+            turns: script.turns,
+            soundCues:
+              script.soundCues === null
+                ? undefined
+                : (script.soundCues as import('@/generated/prisma/client').Prisma.InputJsonValue),
+            markdown: script.markdown,
+          },
         });
-      }
-    });
+
+        if (result.vocabulary && result.vocabulary.length > 0) {
+          await tx.vocabularyEntry.createMany({
+            data: result.vocabulary.map((v) => ({
+              episodeId,
+              number: v.number,
+              word: v.word,
+              translation: v.translation,
+              partOfSpeech: v.partOfSpeech,
+              pronunciation: v.pronunciation,
+              exampleSentence: v.exampleSentence,
+              difficulty: v.difficulty,
+            })),
+          });
+        }
+        p.execution.signal?.throwIfAborted();
+        return saved.id;
+      },
+      { signal: p.execution.signal }
+    );
 
     // Step 4b: fail closed before spending money on audio — but only when the
     // sourcing is broadly unsound, not when a single citation is. Requiring
@@ -731,71 +737,84 @@ export async function composeListeningContent(
     }
 
     // The caller attaches the class, practice, or exam before admitting audio.
-    await prisma.episode.update({
-      where: { id: episodeId },
-      data: { status: 'SCRIPT_READY' },
-    });
+    await sottoTransaction(
+      prismaUnfiltered,
+      async (database) => {
+        await authorizeListeningMaterial(database, p);
+        await requireUnqueuedListeningEpisode(database, p, episode);
+        await database.episode.update({
+          where: { id: episodeId },
+          data: { status: 'SCRIPT_READY' },
+        });
+        for (const v of p.firstSeenClassId ? [] : (result.vocabulary ?? [])) {
+          if (!v.word) continue;
+          await database.learnerVocab.upsert({
+            where: { courseId_lemma: { courseId: p.courseId, lemma: v.word } },
+            create: {
+              courseId: p.courseId,
+              lemma: v.word,
+              translation: v.translation,
+              partOfSpeech: v.partOfSpeech ?? null,
+              pronunciation: v.pronunciation ?? null,
+              firstSeenClassId: p.firstSeenClassId ?? null,
+            },
+            update: {},
+          });
+        }
+        p.execution.signal?.throwIfAborted();
+      },
+      { signal: p.execution.signal }
+    );
 
-    // Step 7: upsert generated vocab into the learner's knowledge graph
-    for (const v of p.firstSeenClassId ? [] : (result.vocabulary ?? [])) {
-      if (!v.word) continue;
-      await prisma.learnerVocab.upsert({
-        where: { courseId_lemma: { courseId: p.courseId, lemma: v.word } },
-        create: {
-          courseId: p.courseId,
-          lemma: v.word,
-          translation: v.translation,
-          partOfSpeech: v.partOfSpeech ?? null,
-          pronunciation: v.pronunciation ?? null,
-          firstSeenClassId: p.firstSeenClassId ?? null,
-        },
-        update: {},
-      });
-    }
-
-    return { episodeId, comprehensionQuestions: questions, turns: result.turns };
+    const content = proof
+      ? {
+          episodeId,
+          comprehensionQuestions: structuredClone(questions),
+          turns: structuredClone(script.turns),
+        }
+      : { episodeId, comprehensionQuestions: questions, turns: result.turns };
+    if (proof) listeningReviewAuthority.accept(content, p, proof, scriptId);
+    return content;
   } catch (err) {
     // Best-effort cleanup: mark the episode failed so it doesn't linger as PENDING.
     if (failures.length && ((typeof err === 'object' && err !== null) || typeof err === 'function'))
       recordGenerationAttemptFailures(err, failures);
-    await prisma.episode
-      .update({ where: { id: episodeId }, data: { status: 'FAILED' } })
-      .catch(() => {});
+    if (!(err instanceof ListeningEpisodeChangedError))
+      await sottoTransaction(prismaUnfiltered, async (database) => {
+        await requireListeningAttachmentFence(database);
+        await database.$queryRaw`SELECT id FROM "Episode" WHERE id = ${episodeId} AND "userId" = ${p.userId} FOR UPDATE`;
+        return database.episode.updateMany({
+          where: {
+            id: episodeId,
+            userId: p.userId,
+            createdAt: episode.createdAt,
+            source: 'CLASS',
+            status: { in: ['PENDING', 'SCRIPT_READY'] },
+            deletedAt: null,
+            audioGenerationKey: null,
+            classSection: { is: null },
+            practiceSession: { is: null },
+            examSection: { is: null },
+            assessmentSection: { is: null },
+            assessmentAudioAssessmentId: null,
+          },
+          data: { status: 'FAILED' },
+        });
+      }).catch((error: unknown) => {
+        p.execution.onCleanupError?.(error);
+        logger.error('Failed to mark unqueued listening as failed', { episodeId });
+      });
     throw err;
   }
 }
 
 // Generate the LISTENING section of a class: compose the content, then persist
 // the gated ClassSection + LessonQuestion rows.
-/** Retire only unqueued class audio; admitted or uncertain audio retains its own lifecycle. */
-export async function failUnqueuedClassListening(episodeId: string, userId: string): Promise<void> {
-  await prisma.episode
-    .updateMany({
-      where: {
-        id: episodeId,
-        userId,
-        source: 'CLASS',
-        status: 'SCRIPT_READY',
-        audioGenerationKey: null,
-      },
-      data: {
-        status: 'FAILED',
-        failureReason: 'Audio generation did not start because preparation did not finish.',
-      },
-    })
-    .catch((error: unknown) => {
-      logger.error('Failed to retire unqueued class listening', {
-        episodeId,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    });
-}
-
 export async function prepareClassListening(
   p: ClassListeningParams
 ): Promise<ClassListeningResult & { content: ListeningContent }> {
   const attempt = p.attempt ?? 1;
-  const content = await composeListeningContent({
+  const composeParams: ListeningContentParams = {
     ttsProvider: p.ttsProvider,
     userId: p.userId,
     execution: p.execution,
@@ -806,6 +825,7 @@ export async function prepareClassListening(
     objective: p.objective,
     mustIncludeVocab: p.mustIncludeVocab,
     firstSeenClassId: p.classId,
+    generationClass: { classId: p.classId, attempt },
     deferAudio: p.deferAudio,
     note: p.note,
     teaching: p.teaching,
@@ -813,25 +833,69 @@ export async function prepareClassListening(
     sourceContent: p.sourceContent,
     sourceMetadata: p.sourceMetadata,
     sourceUrl: p.sourceUrl,
-  });
+    ...(p.requireInitialA1Proof ? { reviewScope: { classId: p.classId, attempt } } : {}),
+  };
+  const content = await composeListeningContent(composeParams);
   const { episodeId, comprehensionQuestions } = content;
-  const scope = await captureClassAssessmentScope({
-    classId: p.classId,
-    userId: p.userId,
-    execution: p.execution,
-  });
-  const assessedQuestions = await reviewMultipleChoiceAssessments({
-    userId: p.userId,
-    execution: p.execution,
-    scope,
-    skill: 'LISTENING',
-    questions: comprehensionQuestions,
-    transcript: learningScriptTranscript(content.turns),
-    pendingListeningScriptSha256: learningScriptHash(content.turns),
-  });
-
   try {
+    const initialProof = p.requireInitialA1Proof
+      ? listeningReviewAuthority.require(content, composeParams)
+      : undefined;
+    const verifyScript = async (
+      database: Parameters<Parameters<typeof withClassGeneration>[3]>[0]
+    ) => {
+      if (!initialProof) return;
+      const episode = await database.episode.findFirst({
+        where: { id: episodeId, userId: p.userId, source: 'CLASS', deletedAt: null },
+        select: {
+          script: {
+            select: { id: true, turns: true, soundCues: true, markdown: true, version: true },
+          },
+        },
+      });
+      const expected = initialProof.snapshot.script;
+      if (
+        !episode?.script ||
+        episode.script.id !== initialProof.scriptId ||
+        episode.script.version !== 1 ||
+        !isDeepStrictEqual(episode.script.turns, expected.turns) ||
+        !isDeepStrictEqual(episode.script.soundCues, expected.soundCues) ||
+        episode.script.markdown !== expected.markdown
+      )
+        throw new SectionQualityError('The reviewed listening script changed before publication.');
+    };
+    if (initialProof) await withClassGeneration(p.execution, p.classId, attempt, verifyScript);
+    const scope = await captureClassAssessmentScope({
+      classId: p.classId,
+      userId: p.userId,
+      execution: p.execution,
+    });
+    const assessedQuestions = await reviewMultipleChoiceAssessments({
+      userId: p.userId,
+      execution: p.execution,
+      scope,
+      skill: 'LISTENING',
+      questions: p.requireInitialA1Proof
+        ? structuredClone(comprehensionQuestions)
+        : comprehensionQuestions,
+      transcript: learningScriptTranscript(content.turns),
+      pendingListeningScriptSha256: learningScriptHash(content.turns),
+    });
+    if (p.requireInitialA1Proof)
+      listeningReviewAuthority.require(content, composeParams, assessedQuestions);
+    const persistedQuestions = p.requireInitialA1Proof
+      ? structuredClone(assessedQuestions)
+      : assessedQuestions;
     const section = await withClassGeneration(p.execution, p.classId, attempt, async (database) => {
+      await verifyScript(database);
+      if (p.repairQuiz)
+        await assertRepairQuizPreserved(
+          database,
+          p.classId,
+          attempt,
+          ['LISTENING'],
+          p.repairQuiz.retry
+        );
       const section = await database.classSection.create({
         data: {
           classId: p.classId,
@@ -845,39 +909,60 @@ export async function prepareClassListening(
         },
       });
 
-      await database.lessonQuestion.createMany({
-        data: assessedQuestions.map((q, i) => ({
-          sectionId: section.id,
-          order: i + 1,
-          skill: 'LISTENING' as const,
-          question: q.question,
-          options: q.options,
-          correctIndex: q.correctIndex,
-          explanation: q.explanation,
-          ...(q.learningAssessment
-            ? {
-                learningAssessment:
-                  q.learningAssessment as unknown as import('@/generated/prisma/client').Prisma.InputJsonValue,
-              }
-            : {}),
-        })),
-      });
-      return section;
+      const data = persistedQuestions.map((q, i) => ({
+        sectionId: section.id,
+        order: i + 1,
+        skill: 'LISTENING' as const,
+        question: q.question,
+        options: q.options,
+        correctIndex: q.correctIndex,
+        explanation: q.explanation,
+        ...(q.learningAssessment
+          ? {
+              learningAssessment:
+                q.learningAssessment as unknown as import('@/generated/prisma/client').Prisma.InputJsonValue,
+            }
+          : {}),
+      }));
+      const ids: string[] = [];
+      if (p.requireInitialA1Proof) {
+        for (const question of data) {
+          const saved = await database.lessonQuestion.create({
+            data: question,
+            select: { id: true },
+          });
+          ids.push(saved.id);
+        }
+      } else await database.lessonQuestion.createMany({ data });
+      return { section, ids };
     });
+
+    const reviewReceipt = p.requireInitialA1Proof
+      ? listeningReviewAuthority.bind(
+          content,
+          composeParams,
+          persistedQuestions,
+          section.section.id,
+          `${p.classId}-LISTENING-${attempt}`,
+          section.ids
+        )
+      : undefined;
 
     logger.info('Listening section generated', {
       classId: p.classId,
       episodeId,
-      sectionId: section.id,
+      sectionId: section.section.id,
       questionCount: String(comprehensionQuestions.length),
     });
 
-    return { sectionId: section.id, episodeId, content };
+    return {
+      sectionId: section.section.id,
+      episodeId,
+      content,
+      ...(reviewReceipt ? { reviewReceipt } : {}),
+    };
   } catch (err) {
-    // Best-effort cleanup: mark the episode failed so it doesn't linger as PENDING.
-    await prisma.episode
-      .update({ where: { id: episodeId }, data: { status: 'FAILED' } })
-      .catch(() => {});
+    await failUnqueuedClassListening(episodeId, p.userId);
     throw err;
   }
 }
@@ -891,10 +976,15 @@ export async function generateClassListening(
       await queueListeningAudio(prepared.content, p.execution, {
         classId: p.classId,
         attempt: p.attempt ?? 1,
+        requireInitialA1Proof: p.requireInitialA1Proof,
       });
   } catch (error) {
     await failUnqueuedClassListening(prepared.episodeId, p.userId);
     throw error;
   }
-  return { sectionId: prepared.sectionId, episodeId: prepared.episodeId };
+  return {
+    sectionId: prepared.sectionId,
+    episodeId: prepared.episodeId,
+    ...(prepared.reviewReceipt ? { reviewReceipt: prepared.reviewReceipt } : {}),
+  };
 }

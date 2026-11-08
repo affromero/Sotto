@@ -1,4 +1,4 @@
-// @vitest-environment node
+// @vitest-environment private-redis
 import { createHash } from 'node:crypto';
 import type { ReadStream } from 'node:fs';
 import { lstat, mkdtemp, rm } from 'node:fs/promises';
@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { NextRequest } from 'next/server';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { StorageWriteJournal } from 'thesidedoor-core/storage';
+import { StorageWriteJournal, copyOwnedBytesToFile } from 'thesidedoor-core/storage';
 import type { PrismaClient } from '@/generated/prisma/client';
 import { POST as optimize } from '@/app/api/v1/materials/[materialId]/optimize/route';
 import { GET as download } from '@/app/api/v1/materials/[materialId]/file/route';
@@ -18,6 +18,7 @@ import { writeStorageReference } from '@/lib/sidedoor/storage/core/storage-write
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 import { SIDEDOOR_STATE_ID } from '@/lib/sidedoor/access/state/store';
 import { deliverSottoJob, sottoJobOutbox } from '@/lib/sidedoor/jobs/core/job-delivery';
+import { sottoJobExecutions } from '@/lib/sidedoor/jobs/core/job-execution-lifetime';
 import { materialOptimizationQueue } from '@/lib/queue';
 import { closeRedis } from '@/lib/redis';
 import { syntheticMaterialPdf } from '../../helpers/materials/pdf';
@@ -31,6 +32,7 @@ const boundary = vi.hoisted(() => ({
   database: null as PrismaClient | null,
   uncertainOptimizedWrite: false,
   downloadReader: null as ReadStream | null,
+  failDownload: false,
 }));
 // Observe the real filesystem reader only to arrange an already queued response
 // chunk. Its bytes, cancellation, close and staging cleanup remain real.
@@ -56,6 +58,25 @@ vi.mock('@/lib/r2', async (original) => {
   const actual = await original<typeof import('@/lib/r2')>();
   return {
     ...actual,
+    restoreStorageBackend: async (...args: Parameters<typeof actual.restoreStorageBackend>) => {
+      const backend = await actual.restoreStorageBackend(...args);
+      if (!boundary.failDownload) return backend;
+      return {
+        ...backend,
+        downloadToFile: async (_key: string, destination: string) =>
+          copyOwnedBytesToFile({
+            destination,
+            openSource: async () => ({
+              read: async () => {
+                throw new Error('Synthetic storage read failed');
+              },
+              close: async () => {
+                throw new Error('Synthetic storage close failed');
+              },
+            }),
+          }),
+      };
+    },
     captureStorageBackend: async () => {
       const backend = await actual.captureStorageBackend();
       return {
@@ -70,7 +91,10 @@ vi.mock('@/lib/r2', async (original) => {
   };
 });
 
-const suite = process.env.SIDEDOOR_TEST_DATABASE_URL ? describe : describe.skip;
+const suite =
+  process.env.SIDEDOOR_TEST_DATABASE_URL && process.env.SOTTO_TEST_PRIVATE_REDIS_URL
+    ? describe
+    : describe.skip;
 const sha256 = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
 suite('optional owned PDF optimization publication', () => {
   let instance: SharedTestInstance;
@@ -78,6 +102,15 @@ suite('optional owned PDF optimization publication', () => {
   let directory: string;
   const jobs = new Set<string>();
   beforeAll(async () => {
+    const privateUrl = new URL(process.env.SOTTO_TEST_PRIVATE_REDIS_URL!);
+    const redis = (await import('@/lib/redis')).getSharedQueueRedisClient();
+    if (
+      redis.options.host !== privateUrl.hostname ||
+      redis.options.port !== Number(privateUrl.port) ||
+      (redis.options.db ?? 0) !== Number(privateUrl.pathname.slice(1) || '0') ||
+      Boolean(redis.options.tls) !== (privateUrl.protocol === 'rediss:')
+    )
+      throw new Error('Optimization queue is not connected to private Redis');
     instance = await createSharedTestInstance('material_optimize_http');
     boundary.database = instance.database;
     directory = await mkdtemp(join(tmpdir(), 'sotto-optimization-http-'));
@@ -90,6 +123,7 @@ suite('optional owned PDF optimization publication', () => {
     vi.stubEnv('SIDEDOOR_EXECUTION_DIR', join(directory, 'executions'));
     boundary.uncertainOptimizedWrite = false;
     boundary.downloadReader = null;
+    boundary.failDownload = false;
     identity = await instance.reset();
   });
   afterEach(async () => {
@@ -374,6 +408,25 @@ suite('optional owned PDF optimization publication', () => {
     expect(row.optimizationReceipt).toBeNull();
     expect(row.optimizedUrl).toBeNull();
     expect(Buffer.from(await (await file(value.material.id)).arrayBuffer())).toEqual(value.bytes);
+  });
+
+  it('retains the optimization execution when storage read cleanup is unconfirmed', async () => {
+    const value = await fixture();
+    const admitted = await receipt(value.material.id);
+    const job = await delivered(admitted.operationId);
+    boundary.failDownload = true;
+    await expect(processMaterialOptimization(job)).rejects.toThrow();
+    const record = await sottoTransaction(instance.database, (tx) =>
+      sottoJobOutbox(tx).read(admitted.operationId)
+    );
+    if (!record) throw new Error('Optimization job missing');
+    expect(
+      await sottoTransaction(instance.database, (tx) =>
+        sottoJobExecutions(tx).blockingStatus(admitted.operationId, record.fingerprint)
+      )
+    ).toBe('cleanup-unconfirmed');
+    boundary.failDownload = false;
+    await expect(processMaterialOptimization(job)).rejects.toThrow();
   });
 
   it('records unavailable qpdf explicitly and never substitutes the original as an optimized variant', async () => {

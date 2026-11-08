@@ -1,4 +1,4 @@
-// @vitest-environment node
+// @vitest-environment private-redis
 import { randomUUID } from 'node:crypto';
 import { Queue, Worker } from 'bullmq';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -21,7 +21,7 @@ import {
 } from '../../../helpers/setup/shared-instance';
 
 const suite =
-  process.env.SIDEDOOR_TEST_DATABASE_URL && process.env.SIDEDOOR_TEST_REDIS_URL
+  process.env.SIDEDOOR_TEST_DATABASE_URL && process.env.SOTTO_TEST_PRIVATE_REDIS_URL
     ? describe
     : describe.skip;
 suite('durable reconciliation with PostgreSQL and Redis', () => {
@@ -29,10 +29,10 @@ suite('durable reconciliation with PostgreSQL and Redis', () => {
   let queue: Queue;
   let connection: { host: string; port: number; db: number; maxRetriesPerRequest: null };
   beforeAll(async () => {
-    const url = new URL(process.env.SIDEDOOR_TEST_REDIS_URL!);
-    if (!['localhost', '127.0.0.1'].includes(url.hostname) || url.pathname !== '/15')
-      throw new Error('Use disposable local Redis database 15');
-    connection = { host: url.hostname, port: Number(url.port), db: 15, maxRetriesPerRequest: null };
+    const url = new URL(process.env.SOTTO_TEST_PRIVATE_REDIS_URL!);
+    if (url.hostname !== '127.0.0.1' || url.pathname !== '/0')
+      throw new Error('Use the private Redis test instance');
+    connection = { host: url.hostname, port: Number(url.port), db: 0, maxRetriesPerRequest: null };
     instance = await createSharedTestInstance('job_reconciliation');
   });
   beforeEach(async () => {
@@ -91,28 +91,64 @@ suite('durable reconciliation with PostgreSQL and Redis', () => {
     });
   });
 
-  it('preserves synchronous writing receipts without dispatching them to Redis', async () => {
-    const record = await sottoTransaction(instance.database, (database) =>
-      sottoJobOutbox(database).enqueue(
-        prepareJob({
-          namespace: SIDEDOOR_STATE_ID,
-          handler: 'learning-writing',
-          version: 1,
-          payload: { responseId: 'writing-response' },
-          scopes: [{ subjectId: 'profile:test', generation: 1 }],
-          delivery: { attempts: 1, priority: 0, availableAt: 0 },
-        })
-      )
-    );
-    expect((await reconcileSottoJobs(options())).results).toMatchObject([
-      { id: record.job.id, status: 'delivered' },
-    ]);
-    expect(await queue.getJob(record.job.id)).toBeUndefined();
-    expect(
-      await sottoTransaction(instance.database, (database) =>
-        sottoJobOutbox(database).receipt(record.job.id)
-      )
-    ).toMatchObject({ status: 'pending' });
+  it.each([1, 2])(
+    'preserves synchronous writing v%s receipts without dispatching them to Redis',
+    async (version) => {
+      const record = await sottoTransaction(instance.database, (database) =>
+        sottoJobOutbox(database).enqueue(
+          prepareJob({
+            namespace: SIDEDOOR_STATE_ID,
+            handler: 'learning-writing',
+            version,
+            payload: { responseId: 'writing-response' },
+            scopes: [{ subjectId: 'profile:test', generation: 1 }],
+            delivery: { attempts: 1, priority: 0, availableAt: 0 },
+          })
+        )
+      );
+      expect((await reconcileSottoJobs(options())).results).toMatchObject([
+        { id: record.job.id, status: 'delivered' },
+      ]);
+      expect(await queue.getJob(record.job.id)).toBeUndefined();
+      expect(
+        await sottoTransaction(instance.database, (database) =>
+          sottoJobOutbox(database).receipt(record.job.id)
+        )
+      ).toMatchObject({ status: 'pending' });
+    }
+  );
+
+  it('delivers queued assessment writing by reference without exposing its response', async () => {
+    const writingQueue = new Queue('learning-writing', {
+      connection,
+      prefix: `writing-reconcile-${randomUUID()}`,
+    });
+    try {
+      const record = await sottoTransaction(instance.database, (database) =>
+        sottoJobOutbox(database).enqueue(
+          prepareJob({
+            namespace: SIDEDOOR_STATE_ID,
+            handler: 'learning-writing',
+            version: 3,
+            payload: { text: 'private writing response' },
+            scopes: [{ subjectId: 'profile:test', generation: 1 }],
+            delivery: { attempts: 1, priority: 0, availableAt: 0 },
+          })
+        )
+      );
+      const result = await reconcileSottoJobs({
+        ...options(),
+        queues: new Map([[writingQueue.name, writingQueue]]),
+      });
+      expect(result.results).toMatchObject([{ id: record.job.id, status: 'delivered' }]);
+      expect((await writingQueue.getJob(record.job.id))?.data).toEqual({
+        operationId: record.job.id,
+        fingerprint: record.fingerprint,
+      });
+    } finally {
+      await writingQueue.obliterate({ force: true });
+      await writingQueue.close();
+    }
   });
 
   it('keeps unsupported work visible and still dispatches supported work', async () => {
@@ -167,6 +203,57 @@ suite('durable reconciliation with PostgreSQL and Redis', () => {
         await sottoTransaction(instance.database, (tx) => sottoJobOutbox(tx).receipt(record.job.id))
       ).toMatchObject({ status: 'pending', fingerprint: record.fingerprint });
       expect((await queue.getJob(record.job.id))?.name).toBe('notifications.v4');
+    } finally {
+      await worker.close();
+    }
+  });
+
+  it('keeps malformed failed audio work pending for investigation', async () => {
+    await queue.close();
+    queue = new Queue('audio-generation', { connection, prefix: `reconcile-${randomUUID()}` });
+    const record = await sottoTransaction(instance.database, (database) =>
+      sottoJobOutbox(database).enqueue(
+        prepareJob({
+          namespace: SIDEDOOR_STATE_ID,
+          handler: queue.name,
+          version: 1,
+          payload: { invalid: true },
+          scopes: [{ subjectId: 'profile:test', generation: 1 }],
+          delivery: { attempts: 1, priority: 2, availableAt: 0 },
+        })
+      )
+    );
+    await deliverSottoJob({
+      database: instance.database,
+      queue,
+      operationId: record.job.id,
+      version: 1,
+    });
+    const worker = new Worker(
+      queue.name,
+      async () => {
+        throw new Error('Synthetic audio failure');
+      },
+      { connection, prefix: queue.opts.prefix, autorun: false }
+    );
+    try {
+      const failed = new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('Audio job did not fail')), 5000);
+        worker.on('failed', async (job) => {
+          if (job?.id !== record.job.id || (await job.getState()) !== 'failed') return;
+          clearTimeout(timer);
+          resolve();
+        });
+      });
+      void worker.run();
+      await failed;
+      const page = await reconcileSottoJobs(options());
+      expect(page.results.find((item) => item.id === record.job.id)).toMatchObject({
+        status: 'failed',
+      });
+      expect(
+        await sottoTransaction(instance.database, (tx) => sottoJobOutbox(tx).receipt(record.job.id))
+      ).toMatchObject({ status: 'pending', fingerprint: record.fingerprint });
     } finally {
       await worker.close();
     }
@@ -397,12 +484,44 @@ suite('durable reconciliation with PostgreSQL and Redis', () => {
 });
 
 describe('durable queue contract isolation', () => {
-  it('accepts episode interactions, lesson help and vocabulary examples while rejecting unknown versions', () => {
+  it('accepts legacy and class-scoped worksheet jobs but rejects unknown versions', () => {
+    for (const version of [1, 2]) {
+      expect(() =>
+        validateSottoQueueContract('worksheet-pdf', {
+          name: `worksheet-pdf.v${version}`,
+          data: { operationId: 'operation', fingerprint: 'fingerprint' },
+        })
+      ).not.toThrow();
+    }
+    expect(() =>
+      validateSottoQueueContract('worksheet-pdf', {
+        name: 'worksheet-pdf.v3',
+        data: { operationId: 'operation', fingerprint: 'fingerprint' },
+      })
+    ).toThrow();
+  });
+  it('accepts assessment speaking jobs without accepting unknown versions', () => {
     const data = { operationId: randomUUID(), fingerprint: 'a'.repeat(64) };
-    for (const name of ['interactions.v1', 'interactions.v2', 'interactions.v3', 'interactions.v4'])
+    expect(() =>
+      validateSottoQueueContract('speaking-grading', { name: 'speaking-grading.v3', data })
+    ).not.toThrow();
+    expect(() =>
+      validateSottoQueueContract('speaking-grading', { name: 'speaking-grading.v4', data })
+    ).toThrow();
+  });
+  it('accepts supported interaction jobs while rejecting unknown versions', () => {
+    const data = { operationId: randomUUID(), fingerprint: 'a'.repeat(64) };
+    for (const name of [
+      'interactions.v1',
+      'interactions.v2',
+      'interactions.v3',
+      'interactions.v4',
+      'interactions.v5',
+      'interactions.v6',
+    ])
       expect(() => validateSottoQueueContract('interactions', { name, data })).not.toThrow();
     expect(() =>
-      validateSottoQueueContract('interactions', { name: 'interactions.v5', data })
+      validateSottoQueueContract('interactions', { name: 'interactions.v7', data })
     ).toThrow();
   });
   it.each([

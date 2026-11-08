@@ -11,6 +11,7 @@ const boundary = vi.hoisted(() => ({
   review: vi.fn(),
   grade: vi.fn(),
   persist: vi.fn(),
+  persistOne: vi.fn(),
 }));
 vi.mock('@/lib/prisma', () => {
   const database = {
@@ -20,7 +21,7 @@ vi.mock('@/lib/prisma', () => {
       findUnique: async () => ({ status: 'GENERATING', attempt: 1, course: { userId: 'u1' } }),
     },
     classSection: { create: async () => ({ id: 'writing-1' }) },
-    writingPrompt: { createMany: boundary.persist },
+    writingPrompt: { createMany: boundary.persist, create: boundary.persistOne },
   };
   return {
     prisma: database,
@@ -56,7 +57,7 @@ vi.mock('@/lib/providers/ai', () => ({
           options,
           await boundary.review(system, messages, options)
         );
-      if (messages[0]?.content === 'Grade the response.')
+      if (messages[0]?.content.startsWith('{"task":'))
         return boundary.grade(system, messages, options);
       return boundary.generate(system, messages, options);
     },
@@ -65,9 +66,15 @@ vi.mock('@/lib/providers/ai', () => ({
 vi.mock('@/lib/usage-logger', () => ({ logUsage: vi.fn() }));
 vi.mock('@/lib/logger', () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 
-import { composeWritingPrompts, generateClassWriting } from '@/lib/class-writing-generator';
+import {
+  composeWritingPrompts,
+  generateClassWriting,
+  sealInitialA1WritingReview,
+  materializeInitialA1WritingReview,
+} from '@/lib/class-writing-generator';
 import { gradeWriting } from '@/lib/writing-grader';
 import { authorizedLearnerExecution } from '../../../helpers/runtime/provider-execution';
+import { sampleTeaching } from '../../../helpers/learning/class-teaching';
 
 const params = {
   userId: 'u1',
@@ -100,6 +107,9 @@ const response = (prompts = translations) => ({
 beforeEach(() => {
   vi.clearAllMocks();
   boundary.generate.mockReset().mockResolvedValue(response());
+  boundary.persistOne
+    .mockReset()
+    .mockImplementation(async ({ data }) => ({ id: `prompt-${data.order}` }));
   boundary.review.mockReset().mockImplementation(async (_system, messages) => ({
     content: JSON.stringify({
       items: JSON.parse(messages[0].content).items.map((item: { index: number }) => ({
@@ -114,6 +124,38 @@ beforeEach(() => {
 });
 
 describe('class translation practice', () => {
+  it('binds reviewed beginner writing to saved prompt identities without exposing worked answers', async () => {
+    const teaching = structuredClone(sampleTeaching);
+    const execution = { ...params.execution, initialA1Class: true };
+    const result = await generateClassWriting({
+      ...params,
+      execution,
+      teaching,
+      level: 'A1',
+      classId: 'class-1',
+      reviewScope: { courseId: 'course-1' },
+    });
+    expect(result.reviewReceipt).toBeDefined();
+    const seed = { teaching };
+    const scope = { classId: 'class-1', courseId: 'course-1', userId: 'u1', attempt: 1 };
+    const reviewedContext = { ...scope, ...params, level: 'A1' };
+    expect(() =>
+      sealInitialA1WritingReview(seed, teaching, result.reviewReceipt!, {
+        ...reviewedContext,
+        objective: 'Changed objective',
+      })
+    ).toThrow();
+    sealInitialA1WritingReview(seed, teaching, result.reviewReceipt!, reviewedContext);
+    const saved = materializeInitialA1WritingReview(seed, scope);
+    expect(saved.prompts.map((prompt) => prompt.id)).toEqual(['prompt-1', 'prompt-2', 'prompt-3']);
+    for (const item of translations) {
+      expect(JSON.stringify(saved)).not.toContain(item.modelAnswer);
+      expect(JSON.stringify(boundary.persistOne.mock.calls)).not.toContain(item.modelAnswer);
+    }
+    expect(() => materializeInitialA1WritingReview({ teaching }, scope)).toThrow();
+    teaching.explanation = 'Changed after review';
+    expect(() => materializeInitialA1WritingReview(seed, scope)).toThrow();
+  });
   it('publishes native source sentences without exposing the private translation or openings', async () => {
     await generateClassWriting({ ...params, classId: 'class-1' });
     const stored = boundary.persist.mock.calls[0][0].data;
@@ -212,8 +254,10 @@ describe('class translation practice', () => {
     const grade = await gradeWriting({ ...params, task, text });
     expect(grade).toMatchObject({ overallScore: 0.3, feedback: 'The journey is missing.' });
     const instructions = boundary.grade.mock.calls[0][0];
-    expect(instructions).toContain(task);
-    expect(instructions).toContain(text);
+    expect(JSON.parse(boundary.grade.mock.calls[0][1][0].content)).toEqual({
+      task,
+      response: text,
+    });
     expect(instructions).toContain('negation, modality');
     expect(instructions).toContain('Accept natural paraphrases');
     expect(instructions).toContain('Do not reward an unrelated simpler sentence');

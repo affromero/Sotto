@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => {
     enqueue,
     authenticateRequest: vi.fn(),
     requireAdmission: vi.fn(),
-    captureCourseStorage: vi.fn(),
+    captureClassOwnership: vi.fn(),
     deliver: vi.fn(),
   };
 });
@@ -27,8 +27,8 @@ vi.mock('@/lib/sidedoor/access/state/transaction', () => ({
 vi.mock('@/lib/sidedoor/access/core/request-identity', () => ({
   requireOriginalSottoAdmission: (...args: unknown[]) => mocks.requireAdmission(...args),
 }));
-vi.mock('@/lib/sidedoor/storage/core/course-storage', () => ({
-  captureCourseStorage: (...args: unknown[]) => mocks.captureCourseStorage(...args),
+vi.mock('@/lib/classes/help/lifecycle/prerequisite-ownership', () => ({
+  capturePrerequisiteOwnership: (...args: unknown[]) => mocks.captureClassOwnership(...args),
 }));
 vi.mock('@/lib/sidedoor/jobs/core/job-delivery', () => ({
   sottoJobOutbox: () => ({ enqueue: mocks.enqueue }),
@@ -61,8 +61,11 @@ describe('POST /api/v1/classes/[classId]/worksheet', () => {
       courseId: 'course-1',
       updatedAt: new Date('2026-01-01T00:00:00.000Z'),
     });
-    mocks.captureCourseStorage.mockResolvedValue({
-      scopes: [{ subjectId: 'course:course-1', generation: 3 }],
+    mocks.captureClassOwnership.mockResolvedValue({
+      scopes: [
+        { subjectId: 'class:class-1', generation: 2 },
+        { subjectId: 'course:course-1', generation: 3 },
+      ],
     });
     mocks.enqueue.mockImplementation(async (job) => ({
       job,
@@ -80,17 +83,20 @@ describe('POST /api/v1/classes/[classId]/worksheet', () => {
     expect(mocks.enqueue).toHaveBeenCalledWith(
       expect.objectContaining({
         handler: 'worksheet-pdf',
-        version: 1,
+        version: 2,
         payload: {
           classId: 'class-1',
           classUpdatedAt: new Date('2026-01-01T00:00:00.000Z').getTime(),
           appBaseUrl: 'https://selfhost.example.com',
         },
-        scopes: [{ subjectId: 'course:course-1', generation: 3 }],
+        scopes: [
+          { subjectId: 'class:class-1', generation: 2 },
+          { subjectId: 'course:course-1', generation: 3 },
+        ],
       })
     );
     expect(mocks.deliver).toHaveBeenCalledWith(
-      expect.objectContaining({ operationId: body.operationId, version: 1 })
+      expect.objectContaining({ operationId: body.operationId, version: 2 })
     );
   });
 

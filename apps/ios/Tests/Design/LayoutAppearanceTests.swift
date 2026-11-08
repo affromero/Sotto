@@ -6,6 +6,27 @@ import XCTest
 
 @MainActor
 final class LayoutAppearanceTests: XCTestCase {
+    func testSpeakingActivityHidesTheOriginalLearnersPromptAfterProfileSwitch() async throws {
+        let model = LayoutFixtures.model()
+        let owner = SottoLearnerIdentity(try XCTUnwrap(model.makeClient()))
+        let detail = try LayoutFixtures.classDetail()
+        let prompt = try XCTUnwrap(detail.sections.flatMap(\.prompts).first)
+        let content = ClassSpeakingPracticeView(source: .practice(sessionId: "saved"), prompts: [prompt],
+            activityOwner: owner).environmentObject(model)
+        let host = try mount(content, viewport: viewports[0], style: .light)
+        defer { host.close() }
+        await settle()
+        var text = descendants(of: host.content.view).compactMap { ($0 as? UITextView)?.text }
+        XCTAssertTrue(text.contains(prompt.targetPhrase))
+
+        var credentials = try XCTUnwrap(model.credentials)
+        credentials.selectedProfile = PlayTestIdentity.profile("another-learner")
+        try model.persistCredentials(credentials)
+        await settle()
+        text = descendants(of: host.content.view).compactMap { ($0 as? UITextView)?.text }
+        XCTAssertFalse(text.contains(prompt.targetPhrase))
+    }
+
     func testCoursePracticeAndVocabularyActionsFitPhoneTabletAndLargeText() async throws {
         let actions = CourseActionGrid(primaryTitle: "Resume class", primaryIcon: "play.fill",
             generating: false, onPrimary: {}, onPractice: { _ in }, due: nil,
@@ -130,6 +151,47 @@ final class LayoutAppearanceTests: XCTestCase {
                            name: "skills-\(viewport.name)-\(style.rawValue)")
                     skills.close()
                 }
+            }
+        }
+    }
+
+    func testPrerequisiteDirectionsFitTheTeachingAndPracticeLayouts() async throws {
+        let detail = try LayoutFixtures.classDetail()
+        let teaching = try XCTUnwrap(detail.teaching)
+        let tasks: [[String: String]] = detail.sections.flatMap { section in
+            section.questions.map { ["sectionId": section.id, "taskId": $0.id, "kind": "question", "instruction": "Lee la frase y elige una respuesta usando lo aprendido."] } +
+            section.prompts.map { ["sectionId": section.id, "taskId": $0.id, "kind": "speaking", "instruction": "Lee en voz alta la frase que aparece en ruso."] } +
+            section.writingPrompts.map { ["sectionId": section.id, "taskId": $0.id, "kind": "writing", "instruction": "Escribe una frase que exprese el mismo significado."] }
+        }
+        let body: [String: Any] = [
+            "status": "READY", "receiptId": "00000000-0000-4000-a000-000000000001", "acknowledged": false,
+            "request": ["sourceHash": String(repeating: "a", count: 64), "snapshotHash": String(repeating: "b", count: 64)],
+            "nativeLang": "es", "targetLang": "ru",
+            "content": ["title": "Antes de practicar", "explanation": "Primero aprende las ideas básicas.",
+                        "examples": [["target": "Вода", "meaning": "Agua", "explanation": "Una palabra."]],
+                        "directions": ["guided": "Usa el ejemplo para intentar una frase nueva.", "tasks": tasks]]
+        ]
+        let prerequisite = try JSONDecoder().decode(SottoClassPrerequisiteResponse.self,
+            from: JSONSerialization.data(withJSONObject: body))
+        for viewport in [viewports[0], viewports[3]] {
+            let lesson = ClassTeachingView(classId: detail.id, teaching: teaching,
+                prerequisite: prerequisite, onSelectionHelp: { _, _ in })
+                .padding(16).environmentObject(LayoutFixtures.model())
+            XCTAssertLessThanOrEqual(measuredSize(lesson, viewport: viewport).width, viewport.size.width + 1)
+            for section in detail.sections where !section.questions.isEmpty || !section.prompts.isEmpty || !section.writingPrompts.isEmpty {
+                let model = LayoutFixtures.model()
+                let owner = SottoLearnerIdentity(try XCTUnwrap(model.makeClient()))
+                let practice = ClassSectionView(classId: detail.id, section: section,
+                    answers: .constant([:]), drafts: WritingDraftStore(), pencilWorkbook: false,
+                    classAttempt: 1, activityOwner: owner, pencilToolPicker: WorkbookTools.makeWorkbookToolPicker(),
+                    prerequisite: prerequisite, onPencilReviewRequired: { _, _ in }, onSelectionHelp: { _, _ in })
+                    .environmentObject(model)
+                let host = try mount(ScrollView { practice }, viewport: viewport, style: .light)
+                await settle()
+                let scroll = try XCTUnwrap(verticalScrollView(in: host.content.view))
+                XCTAssertLessThanOrEqual(scroll.contentSize.width, scroll.bounds.width + 1)
+                attach(host.content.view, name: "prerequisite-\(section.skill)-\(viewport.name)")
+                host.close()
             }
         }
     }

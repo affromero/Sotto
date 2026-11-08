@@ -15,6 +15,14 @@ Word/card audio POST prepares cached local pronunciation; GET only serves owned
 bytes. Authenticate every route and keep study answer keys private until feedback.
 
 Class preparation is durably admitted through `courses/[courseId]/next-class`.
+The first-A1 assessment status endpoint verifies owned work and may recover a
+settled delivery. It never returns private prompts, answers, or provider state.
+The assessment material endpoint rechecks that status and practice in one
+transaction and returns only the reviewed learner projection.
+The assessment writing endpoint saves one response for queued grading and returns
+its recovery status without exposing grading feedback or private criteria.
+The assessment audio endpoint serves only verified owned audio and rechecks
+access while streaming. It supports single byte ranges and does not expose storage URLs.
 The `courses/[courseId]/preparation` route exposes explicit scheduling (POST),
 sanitized activity (GET), and acknowledged recovery after verified cleanup (PATCH).
 Generation status and cancellation include queued work before a class exists.
@@ -195,6 +203,13 @@ and clears its latch only after valid audio, without changing speech preferences
 native-language support through `interactions.v2`. Server-derived request IDs
 bind class ownership, attempt, languages and accepted teaching. Neither operation
 changes the class, grades answers or regenerates teaching.
+
+`classes/[classId]/prerequisite` reads owned repair status and admits reviewed
+prerequisite teaching through `interactions.v5`. Request hashes bind the saved
+class snapshot. Unknown provider outcomes remain fenced until recovery.
+
+`classes/[classId]/focus-snapshot` reads the owned teaching prelude and class
+progress identity in one serializable transaction. It returns no raw hashes.
 
 `welcome/welcome-snapshot.ts` and `welcome/resume-security.ts` discard browser-stored
 secrets and retain safe endpoint URLs. `welcome/credential-discovery.ts` projects

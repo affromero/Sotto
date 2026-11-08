@@ -1,9 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
+import { DurableDeliveryPendingError } from '@/lib/sidedoor/jobs/core/durable-queue';
 
 // ---- Mocks ----
 
 const mockAuthenticateRequest = vi.fn();
+const mockRequireOriginalAdmission = vi.fn();
 
 vi.mock('@/lib/api-keys', () => ({
   authenticateRequest: (...args: unknown[]) => mockAuthenticateRequest(...args),
@@ -28,6 +30,7 @@ const mockPrismaEpisodeVoiceDeleteMany = vi.fn().mockResolvedValue({ count: 0 })
 
 vi.mock('@/lib/prisma', () => {
   const _mockPrisma = {
+    $queryRaw: vi.fn().mockResolvedValue([]),
     episode: {
       findUnique: (...args: unknown[]) => mockPrismaEpisodeFindUnique(...args),
       update: (...args: unknown[]) => mockPrismaEpisodeUpdate(...args),
@@ -66,6 +69,13 @@ vi.mock('@/lib/prisma', () => {
   );
   return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
 });
+
+vi.mock('@/lib/sidedoor/access/core/request-identity', () => ({
+  requireOriginalSottoAdmission: (...args: unknown[]) => mockRequireOriginalAdmission(...args),
+}));
+vi.mock('@/lib/learning/classes/progress/listening-attachment-fence', () => ({
+  requireListeningAttachmentFence: async () => {},
+}));
 
 const mockEnqueueDurableJob = vi.fn();
 
@@ -153,6 +163,7 @@ async function createMockParams(episodeId: string) {
 describe('POST /api/v1/episodes/[episodeId]/generate', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockRequireOriginalAdmission.mockReset().mockResolvedValue(undefined);
     mockIsUserAdmin.mockResolvedValue(false); // non-admin by default
     mockPrismaEpisodeUpdate.mockResolvedValue({});
     mockPrismaEpisodeUpdateMany.mockResolvedValue({ count: 1 });
@@ -186,6 +197,55 @@ describe('POST /api/v1/episodes/[episodeId]/generate', () => {
 
     expect(response.status).toBe(404);
     expect(data).toMatchObject({ error: 'Episode not found' });
+  });
+
+  it.each(['PENDING', 'FAILED'])(
+    'does not generate assessment audio in %s state',
+    async (status) => {
+      mockAuthenticateRequest.mockResolvedValue({ userId: 'user-001' });
+      mockPrismaEpisodeFindUnique.mockResolvedValue({
+        id: 'episode-assessment',
+        userId: 'user-001',
+        status,
+        assessmentSection: { id: 'assessment-section' },
+        discovery: null,
+      });
+      const response = await POST(
+        createMockRequest({ forceRestart: 'true' }),
+        await createMockParams('episode-assessment')
+      );
+      expect(response.status).toBe(404);
+      expect(mockPrismaJobUpdateMany).not.toHaveBeenCalled();
+      expect(mockPrismaEpisodeUpdateMany).not.toHaveBeenCalled();
+      expect(mockEnqueueDurableJob).not.toHaveBeenCalled();
+    }
+  );
+
+  it('rejects a retry if the episode becomes assessment material before failed jobs are changed', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-001' });
+    const episode = { id: 'episode-race', userId: 'user-001', status: 'FAILED', discovery: null };
+    mockPrismaEpisodeFindUnique
+      .mockResolvedValueOnce(episode)
+      .mockResolvedValueOnce({ ...episode, assessmentSection: { id: 'assessment-section' } });
+    const response = await POST(createMockRequest(), await createMockParams(episode.id));
+    expect(response.status).toBe(409);
+    expect(mockPrismaJobUpdateMany).not.toHaveBeenCalled();
+    expect(mockDetermineResumePoint).not.toHaveBeenCalled();
+  });
+
+  it('does not generate audio carrying an assessment marker without a loaded section', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-001' });
+    mockPrismaEpisodeFindUnique.mockResolvedValue({
+      id: 'episode-assessment',
+      userId: 'user-001',
+      status: 'PENDING',
+      assessmentSection: null,
+      assessmentAudioAssessmentId: 'assessment',
+      discovery: null,
+    });
+    const response = await POST(createMockRequest(), await createMockParams('episode-assessment'));
+    expect(response.status).toBe(404);
+    expect(mockEnqueueDurableJob).not.toHaveBeenCalled();
   });
 
   it('returns 403 when user does not own episode', async () => {
@@ -326,6 +386,67 @@ describe('POST /api/v1/episodes/[episodeId]/generate', () => {
       );
     });
 
+    it('limits a failed audio queue cleanup to the attempt that failed', async () => {
+      mockAuthenticateRequest.mockResolvedValue({ userId: 'user-001' });
+      mockPrismaEpisodeFindUnique.mockResolvedValue({
+        id: 'episode-failed-queue',
+        userId: 'user-001',
+        status: 'FAILED',
+        discovery: null,
+      });
+      mockDetermineResumePoint.mockResolvedValue({
+        step: 'GENERATE_AUDIO',
+        pendingSegmentIds: ['seg'],
+      });
+      let admissionCount = 0;
+      mockRequireOriginalAdmission.mockImplementation(async () => {
+        admissionCount += 1;
+        if (admissionCount > 2) throw new Error('identity revoked');
+      });
+      mockRestartExistingSegmentAudio.mockRejectedValueOnce(new Error('queue unavailable'));
+      await expect(
+        POST(createMockRequest(), await createMockParams('episode-failed-queue'))
+      ).rejects.toThrow('queue unavailable');
+      expect(mockPrismaJobUpdateMany).not.toHaveBeenCalled();
+      const claim = mockPrismaEpisodeUpdateMany.mock.calls.find(
+        ([input]) => input.data.status === 'GENERATING_AUDIO'
+      )?.[0];
+      expect(claim.data.audioGenerationKey).toEqual(expect.any(String));
+      expect(mockPrismaEpisodeUpdateMany).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          where: {
+            id: 'episode-failed-queue',
+            status: 'GENERATING_AUDIO',
+            audioGenerationKey: claim.data.audioGenerationKey,
+          },
+          data: expect.objectContaining({ status: 'FAILED' }),
+        })
+      );
+    });
+
+    it('keeps an admitted audio generation active when delivery is pending', async () => {
+      mockAuthenticateRequest.mockResolvedValue({ userId: 'user-001' });
+      mockPrismaEpisodeFindUnique.mockResolvedValue({
+        id: 'episode-pending',
+        userId: 'user-001',
+        status: 'FAILED',
+        discovery: null,
+      });
+      mockDetermineResumePoint.mockResolvedValue({
+        step: 'GENERATE_AUDIO',
+        pendingSegmentIds: ['seg'],
+      });
+      mockRestartExistingSegmentAudio.mockRejectedValueOnce(
+        new DurableDeliveryPendingError('operation-1', new Error('Delivery interrupted'))
+      );
+      const response = await POST(createMockRequest(), await createMockParams('episode-pending'));
+      expect(response.status).toBe(409);
+      expect(await response.json()).toMatchObject({ success: false, deliveryPending: true });
+      expect(
+        mockPrismaEpisodeUpdateMany.mock.calls.some(([input]) => input.data.status === 'FAILED')
+      ).toBe(false);
+    });
+
     it('rejects stitching resume without its original generation identity', async () => {
       mockAuthenticateRequest.mockResolvedValue({ userId: 'user-001' });
       mockPrismaEpisodeFindUnique.mockResolvedValue({
@@ -399,6 +520,40 @@ describe('POST /api/v1/episodes/[episodeId]/generate', () => {
       expect(response.status).toBe(200);
       expect(data.message).toBe('Generation started');
     });
+
+    it('does not delete material if a learning association appears before the restart claim', async () => {
+      mockAuthenticateRequest.mockResolvedValue({ userId: 'user-001' });
+      mockPrismaEpisodeFindUnique.mockResolvedValue({
+        id: 'episode-fr',
+        userId: 'user-001',
+        status: 'FAILED',
+        source: 'WEB',
+        discovery: {
+          id: 'disc-fr',
+          sourceUrl: 'https://example.com',
+          sourceContent: null,
+          durationTarget: null,
+        },
+      });
+      await POST(createMockRequest({ forceRestart: 'true' }), await createMockParams('episode-fr'));
+      const admission = mockEnqueueDurableJob.mock.calls[0][3];
+      const removeScript = vi.fn();
+      const updateJobs = vi.fn();
+      const database = {
+        episode: {
+          updateMany: async ({ where }: { where: { classSection?: unknown } }) => ({
+            count: where.classSection ? 0 : 1,
+          }),
+        },
+        script: { deleteMany: removeScript },
+        job: { updateMany: updateJobs },
+      };
+      await expect(admission.mutate(database, 'operation')).rejects.toThrow(
+        'Episode is no longer in the expected pipeline state'
+      );
+      expect(removeScript).not.toHaveBeenCalled();
+      expect(updateJobs).not.toHaveBeenCalled();
+    });
   });
 
   describe('FAILED retry provider override', () => {
@@ -444,6 +599,17 @@ describe('POST /api/v1/episodes/[episodeId]/generate', () => {
     });
 
     it('writes provider override and deletes old voices when body has ttsProvider', async () => {
+      mockRestartExistingSegmentAudio.mockImplementationOnce(async (_episode, key, options) => {
+        await options.onPrepared(
+          {
+            episode: { update: mockPrismaEpisodeUpdate },
+            episodeVoice: { deleteMany: mockPrismaEpisodeVoiceDeleteMany },
+            job: { updateMany: mockPrismaJobUpdateMany },
+          },
+          key
+        );
+        return 2;
+      });
       const request = createMockRequest(undefined, { ttsProvider: 'openai', ttsModel: 'tts-1-hd' });
       const params = await createMockParams('episode-fail');
       const response = await POST(request, params);
@@ -458,6 +624,19 @@ describe('POST /api/v1/episodes/[episodeId]/generate', () => {
       expect(mockPrismaEpisodeVoiceDeleteMany).toHaveBeenCalledWith({
         where: { episodeId: 'episode-fail' },
       });
+    });
+
+    it('keeps the old provider and voices if replacement audio cannot be admitted', async () => {
+      mockRestartExistingSegmentAudio.mockRejectedValueOnce(new Error('No segments to queue'));
+      await expect(
+        POST(
+          createMockRequest(undefined, { ttsProvider: 'openai', ttsModel: 'tts-1-hd' }),
+          await createMockParams('episode-fail')
+        )
+      ).rejects.toThrow('No segments to queue');
+      expect(mockPrismaEpisodeUpdate).not.toHaveBeenCalled();
+      expect(mockPrismaEpisodeVoiceDeleteMany).not.toHaveBeenCalled();
+      expect(mockPrismaJobUpdateMany).not.toHaveBeenCalled();
     });
 
     it('preserves ttsProvider when no body is provided (bare retry)', async () => {

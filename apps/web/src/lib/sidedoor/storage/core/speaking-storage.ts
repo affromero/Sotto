@@ -11,6 +11,17 @@ type Parents = {
   sectionId: string | null;
   practiceSessionId: string | null;
   examSectionId: string | null;
+  assessmentSectionId: string | null;
+};
+type AssessmentAssociation = {
+  classId: string;
+  userId: string;
+  classAttempt: number;
+  currentClassAttempt: number;
+  assessmentAttempt: number;
+  status: string;
+  sealedAt: number | null;
+  reviewedMaterialDigest: string | null;
 };
 export class SpeakingStorageChangedError extends Error {
   constructor() {
@@ -27,7 +38,13 @@ async function profileScope(database: Prisma.TransactionClient, id: string): Pro
 
 async function parentScopes(database: Prisma.TransactionClient, parents: Parents) {
   const scopes: Scope[] = [];
-  const associations: Array<{ kind: string; id: string; courseId: string; parentId: string }> = [];
+  const associations: Array<{
+    kind: string;
+    id: string;
+    courseId: string;
+    parentId: string;
+    assessment?: AssessmentAssociation;
+  }> = [];
   if (parents.sectionId) {
     const section = await database.classSection.findUnique({
       where: { id: parents.sectionId },
@@ -81,6 +98,58 @@ async function parentScopes(database: Prisma.TransactionClient, parents: Parents
       courseId: section.exam.courseId,
     });
   }
+  if (parents.assessmentSectionId) {
+    const section = await database.classAssessmentSection.findUnique({
+      where: { id: parents.assessmentSectionId },
+      select: {
+        id: true,
+        skill: true,
+        assessmentId: true,
+        assessment: {
+          select: {
+            courseId: true,
+            userId: true,
+            classId: true,
+            classAttempt: true,
+            assessmentAttempt: true,
+            status: true,
+            sealedAt: true,
+            reviewedMaterialDigest: true,
+            class: { select: { id: true, courseId: true, attempt: true, createdAt: true } },
+          },
+        },
+      },
+    });
+    if (!section || section.skill !== 'SPEAKING') throw new SpeakingStorageChangedError();
+    const assessment = section.assessment;
+    const course = await captureCourseStorage(database, assessment.courseId);
+    if (
+      assessment.userId !== course.userId ||
+      assessment.classId !== assessment.class.id ||
+      assessment.courseId !== assessment.class.courseId
+    )
+      throw new SpeakingStorageChangedError();
+    scopes.push(...course.scopes, {
+      subjectId: `class:${assessment.class.id}`,
+      generation: assessment.class.createdAt.getTime(),
+    });
+    associations.push({
+      kind: 'assessment',
+      id: section.id,
+      parentId: section.assessmentId,
+      courseId: assessment.courseId,
+      assessment: {
+        classId: assessment.classId,
+        userId: assessment.userId,
+        classAttempt: assessment.classAttempt,
+        currentClassAttempt: assessment.class.attempt,
+        assessmentAttempt: assessment.assessmentAttempt,
+        status: assessment.status,
+        sealedAt: assessment.sealedAt?.getTime() ?? null,
+        reviewedMaterialDigest: assessment.reviewedMaterialDigest,
+      },
+    });
+  }
   return { scopes, associations };
 }
 
@@ -118,15 +187,24 @@ export async function captureSpeakingPromptStorage(database: Prisma.TransactionC
       sectionId: true,
       practiceSessionId: true,
       examSectionId: true,
+      assessmentSectionId: true,
+      assessmentReference: { select: { currentUrl: true } },
     },
   });
   if (!prompt) throw new SpeakingStorageChangedError();
+  if (
+    prompt.assessmentSectionId &&
+    Boolean(prompt.referenceTtsUrl) !== Boolean(prompt.assessmentReference)
+  )
+    throw new SpeakingStorageChangedError();
   try {
     const parents = await parentScopes(database, prompt);
     if (!parents.associations.length) throw new SpeakingStorageChangedError();
     return {
       ...(await captureScopes(database, parents.scopes)),
-      reference: prompt.referenceTtsUrl,
+      reference: prompt.assessmentSectionId
+        ? (prompt.assessmentReference?.currentUrl ?? null)
+        : prompt.referenceTtsUrl,
       associations: {
         promptId: prompt.id,
         createdAt: prompt.createdAt.getTime(),
@@ -150,24 +228,40 @@ export async function captureSpeakingRecordingStorage(
       id: true,
       createdAt: true,
       audioUrl: true,
+      assessmentAudioUrl: true,
       promptId: true,
       userId: true,
       sectionId: true,
       practiceSessionId: true,
       examSectionId: true,
+      assessmentSectionId: true,
     },
   });
   if (!recording) throw new SpeakingStorageChangedError();
+  const reference = recording.assessmentSectionId
+    ? recording.assessmentAudioUrl
+    : recording.audioUrl;
+  if (!reference) throw new SpeakingStorageChangedError();
   try {
     const prompt = await captureSpeakingPromptStorage(database, recording.promptId);
     const parents = await parentScopes(database, recording);
+    const promptAssessment = prompt.associations.parents.find((parent) => parent.assessment);
+    const recordingAssessment = parents.associations.find((parent) => parent.assessment);
+    if (
+      (promptAssessment || recordingAssessment) &&
+      (!promptAssessment ||
+        !recordingAssessment ||
+        promptAssessment.id !== recordingAssessment.id ||
+        recordingAssessment.assessment?.userId !== recording.userId)
+    )
+      throw new SpeakingStorageChangedError();
     return {
       ...(await captureScopes(database, [
         ...prompt.scopes,
         ...parents.scopes,
         await profileScope(database, recording.userId),
       ])),
-      reference: recording.audioUrl,
+      reference,
       associations: {
         recordingId: recording.id,
         createdAt: recording.createdAt.getTime(),

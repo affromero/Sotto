@@ -9,13 +9,14 @@ import { logger } from '@/lib/logger';
 import { readSottoWorkerJob, sottoJobOutbox } from '@/lib/sidedoor/jobs/core/job-delivery';
 import { worksheetPdfPayloadSchema } from '@/lib/sidedoor/jobs/stitch/worksheet-pdf-work';
 import { captureCourseStorage } from '@/lib/sidedoor/storage/core/course-storage';
+import { capturePrerequisiteOwnership } from '@/lib/classes/help/lifecycle/prerequisite-ownership';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 import { writeStorageReference } from '@/lib/sidedoor/storage/core/storage-write';
 
 async function readWork(database: Prisma.TransactionClient, job: Job<unknown>) {
   const durable = await readSottoWorkerJob(database, job, {
     handler: 'worksheet-pdf',
-    version: 1,
+    version: job.name === 'worksheet-pdf.v2' ? 2 : 1,
     payload: worksheetPdfPayloadSchema,
   });
   if (durable.complete) return durable;
@@ -44,7 +45,11 @@ async function readWork(database: Prisma.TransactionClient, job: Job<unknown>) {
   if (!cls) throw new Error(`CourseClass not found: ${durable.payload.classId}`);
   if (cls.updatedAt.getTime() !== durable.payload.classUpdatedAt)
     throw new Error('Worksheet class changed before generation');
-  const ownership = await captureCourseStorage(database, cls.courseId);
+  const courseOwnership = await captureCourseStorage(database, cls.courseId);
+  const ownership =
+    job.name === 'worksheet-pdf.v2'
+      ? await capturePrerequisiteOwnership(database, cls.id, cls.courseId, courseOwnership.userId)
+      : courseOwnership;
   if (!isDeepStrictEqual(ownership.scopes, durable.scopes))
     throw new Error('Worksheet ownership changed before generation');
   return { ...durable, cls, ownership };

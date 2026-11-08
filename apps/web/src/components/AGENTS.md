@@ -52,6 +52,17 @@ old invitation commands and proofs retain their original session recovery.
   reading pane. The original teaching stays primary and mounted. Target examples
   remain unchanged; concealed guided answers and their explanations stay excluded.
   Results bind to the exact class and accepted teaching and reset on source changes.
+- `ClassPrerequisite` offers and displays saved beginner scaffolding before the
+  lesson. It binds display to the class source revision, rechecks on focus and
+  resumes pending work without changing drafts or exposing answers. Guided and
+  exercise directions follow the same revision and exact section/task identity.
+- `ClassTeachingPrelude` loads the first-A1 teaching before the class runner.
+  Preparation is explicit, and acknowledgment binds the displayed receipt.
+  Recover uncertain work by checking saved status before another action.
+- `ClassAssessment` prepares reviewed first-A1 assessment work after practice.
+  Its local drafts bind to the active profile, class attempt, assessment and
+  revision. Submission retries keep the original choices; speaking remains
+  unavailable until its grading evidence is supported.
 - `learn/navigation/ClassNavigation` keeps the home link, return to Learn and
   class location visible throughout the class. Return to its overview retains
   answers and drafts in `ClassShell`; section gates still control advancement.

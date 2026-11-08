@@ -7,6 +7,9 @@ import { logger } from '@/lib/logger';
 import { invalidateServerInfra } from '@/lib/server-config';
 import { THEME_PREFS_COOKIE } from '@/lib/theme-prefs';
 import { factoryResetSchema } from '@/lib/validations';
+import { PrerequisiteDeletionConflict } from '@/lib/classes/help/prerequisite-deletion';
+import { SpeakingDeletionConflict } from '@/lib/sidedoor/jobs/stitch/speaking-grading-deletion';
+import { AssessmentFenceConflict } from '@/lib/learning/classes/lifecycle/assessment-fence';
 
 export async function POST(request: NextRequest) {
   const adminId = await requireAdmin();
@@ -33,6 +36,12 @@ export async function POST(request: NextRequest) {
     response.cookies.delete(THEME_PREFS_COOKIE);
     return response;
   } catch (error) {
+    if (
+      error instanceof PrerequisiteDeletionConflict ||
+      error instanceof SpeakingDeletionConflict ||
+      error instanceof AssessmentFenceConflict
+    )
+      return errorResponse(error.message, 409);
     logger.error('Factory reset failed', {
       adminId,
       error: error instanceof Error ? error.message : String(error),

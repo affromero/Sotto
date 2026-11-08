@@ -82,7 +82,7 @@ export async function linkPreparationAudio(
       select: { audioGenerationKey: true },
     });
     const generationKey = episode.audioGenerationKey ?? 'preparation-audio-fixture';
-    if (!episode.audioGenerationKey)
+    if (!episode.audioGenerationKey && !options.deferRegistration)
       await tx.episode.update({
         where: { id: episodeId },
         data: { audioGenerationKey: generationKey },

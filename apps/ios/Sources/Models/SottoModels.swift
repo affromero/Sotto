@@ -334,10 +334,257 @@ struct SottoClassDetail: Decodable, Identifiable, Equatable {
     let sections: [SottoClassSection]
     var learnerAnswers: [String: Int]? = nil
     var writingDrafts: [String: String]? = nil
+    var writingHistory: [SottoWritingHistory]? = nil
+    var speakingHistory: [SottoSpeakingHistory]? = nil
+    var speakingHistoryUnlinked: [SottoHistoricalSpeakingRecording]? = nil
+    var orphanWritingDrafts: [SottoOrphanWritingDraft]? = nil
+    var quizHistory: [SottoQuizHistory]? = nil
+    var orphanQuizAnswers: [SottoOrphanQuizAnswer]? = nil
+    var quizHistoryUnreadable: Bool? = nil
+    var quizSubmissionReceipts: [SottoQuizReceipt]? = nil
     var progressRevision: Int? = nil
     var attempt: Int? = nil
     var skillRequirements: SottoSkillRequirements? = nil
     var teaching: SottoClassTeaching? = nil
+    var prerequisiteSourceHash: String? = nil
+    var lessonHelpRevision: String? = nil
+    var taskMaterialRevision: String? = nil
+    var submission: SottoClassSavedSubmission? = nil
+}
+
+struct SottoClassSavedSubmission: Decodable, Equatable {
+    let passed: Bool?
+    let overallScore: Double?
+    let receipt: SottoClassSubmitResult?
+}
+
+struct SottoHistoricalSpeakingRecording: Decodable, Equatable, Identifiable {
+    let id: String
+    let attempt: Int
+    let attemptMatches: Bool?
+    let status: String
+    let transcript: String?
+    let overallScore: Double?
+    let rubricScores: [String: Double]
+    let phonemeScores: [SottoSpeakingAlignmentToken]
+    let detailsUnavailable: Bool
+    let feedback: String?
+    let createdAt: String
+
+    private enum CodingKeys: String, CodingKey {
+        case id, attempt, attemptMatches, status, transcript, overallScore, rubricScores, phonemeScores, feedback, createdAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        id = try values.decode(String.self, forKey: .id)
+        attempt = try values.decode(Int.self, forKey: .attempt)
+        attemptMatches = try values.decodeIfPresent(Bool.self, forKey: .attemptMatches)
+        status = try values.decode(String.self, forKey: .status)
+        transcript = try values.decodeIfPresent(String.self, forKey: .transcript)
+        overallScore = try values.decodeIfPresent(Double.self, forKey: .overallScore)
+        let scores = try? values.decodeIfPresent(PartialSpeakingScores.self, forKey: .rubricScores)
+        let tokens = try? values.decodeIfPresent(PartialSpeakingTokens.self, forKey: .phonemeScores)
+        rubricScores = scores?.items ?? [:]
+        phonemeScores = tokens?.items ?? []
+        let scoresPresent = try values.contains(.rubricScores) && !values.decodeNil(forKey: .rubricScores)
+        let tokensPresent = try values.contains(.phonemeScores) && !values.decodeNil(forKey: .phonemeScores)
+        detailsUnavailable = (scoresPresent && scores == nil) || (tokensPresent && tokens == nil) ||
+            (scores?.hasInvalid ?? false) || (tokens?.hasInvalid ?? false)
+        feedback = try values.decodeIfPresent(String.self, forKey: .feedback)
+        createdAt = try values.decode(String.self, forKey: .createdAt)
+    }
+}
+
+private struct SpeakingScoreKey: CodingKey {
+    let stringValue: String
+    let intValue: Int? = nil
+    init?(stringValue: String) { self.stringValue = stringValue }
+    init?(intValue: Int) { return nil }
+}
+
+private struct PartialSpeakingScores: Decodable {
+    let items: [String: Double]
+    let hasInvalid: Bool
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: SpeakingScoreKey.self)
+        var accepted: [String: Double] = [:]
+        var invalid = false
+        for key in container.allKeys {
+            if let score = try? container.decode(Double.self, forKey: key), score.isFinite {
+                accepted[key.stringValue] = score
+            } else { invalid = true }
+        }
+        items = accepted
+        hasInvalid = invalid
+    }
+}
+
+private struct PartialSpeakingTokens: Decodable {
+    let items: [SottoSpeakingAlignmentToken]
+    let hasInvalid: Bool
+    init(from decoder: Decoder) throws {
+        var container = try decoder.unkeyedContainer()
+        var accepted: [SottoSpeakingAlignmentToken] = []
+        var invalid = false
+        while !container.isAtEnd {
+            let item = try container.superDecoder()
+            if let token = try? SottoSpeakingAlignmentToken(from: item) { accepted.append(token) }
+            else { invalid = true }
+        }
+        items = accepted
+        hasInvalid = invalid
+    }
+}
+
+struct SottoHistoricalSpeakingPrompt: Decodable, Equatable, Identifiable {
+    let id: String
+    let order: Int
+    let targetPhrase: String
+    let translation: String
+    let recordings: [SottoHistoricalSpeakingRecording]
+}
+
+struct SottoSpeakingHistory: Decodable, Equatable, Identifiable {
+    let sectionId: String
+    let attempt: Int
+    let prompts: [SottoHistoricalSpeakingPrompt]
+    var id: String { sectionId }
+}
+
+struct SottoWritingHistory: Decodable, Equatable, Identifiable {
+    let sectionId: String
+    let attempt: Int
+    let prompts: [SottoHistoricalWritingPrompt]
+    var id: String { sectionId }
+}
+
+struct SottoHistoricalWritingPrompt: Decodable, Equatable, Identifiable {
+    let id: String
+    let order: Int
+    let task: String
+    let savedDraft: String?
+    let responses: [SottoHistoricalWritingResponse]
+}
+
+struct SottoHistoricalWritingResponse: Decodable, Equatable, Identifiable {
+    let id: String
+    let text: String
+    let attempt: Int
+    let attemptMatches: Bool
+    let overallScore: Double?
+    let corrections: [SottoWritingCorrection]?
+    let correctionsUnavailable: Bool
+    let feedback: String?
+    let createdAt: String
+
+    private enum CodingKeys: String, CodingKey {
+        case id, text, attempt, attemptMatches, overallScore, corrections, feedback, createdAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        id = try values.decode(String.self, forKey: .id)
+        text = try values.decode(String.self, forKey: .text)
+        attempt = try values.decode(Int.self, forKey: .attempt)
+        attemptMatches = try values.decode(Bool.self, forKey: .attemptMatches)
+        overallScore = try values.decodeIfPresent(Double.self, forKey: .overallScore)
+        do {
+            let decoded = try values.decodeIfPresent(PartialWritingCorrections.self, forKey: .corrections)
+            corrections = decoded?.items
+            correctionsUnavailable = decoded?.hasInvalid ?? false
+        } catch {
+            corrections = nil
+            correctionsUnavailable = true
+        }
+        feedback = try values.decodeIfPresent(String.self, forKey: .feedback)
+        createdAt = try values.decode(String.self, forKey: .createdAt)
+    }
+}
+
+private struct PartialWritingCorrections: Decodable {
+    let items: [SottoWritingCorrection]
+    let hasInvalid: Bool
+
+    init(from decoder: Decoder) throws {
+        var container = try decoder.unkeyedContainer()
+        var accepted: [SottoWritingCorrection] = []
+        var invalid = false
+        while !container.isAtEnd {
+            let item = try container.superDecoder()
+            if let correction = try? SottoWritingCorrection(from: item) {
+                accepted.append(correction)
+            } else {
+                invalid = true
+            }
+        }
+        items = accepted
+        hasInvalid = invalid
+    }
+}
+
+struct SottoOrphanWritingDraft: Decodable, Equatable, Identifiable {
+    let id: String
+    let text: String
+}
+
+struct SottoQuizHistory: Decodable, Equatable, Identifiable {
+    let sectionId: String
+    let skill: String
+    let attempt: Int
+    let questions: [SottoHistoricalQuizQuestion]
+    var id: String { sectionId }
+}
+
+struct SottoHistoricalQuizQuestion: Decodable, Equatable, Identifiable {
+    let id: String
+    let order: Int
+    let question: String
+    let passageText: String?
+    let options: [String]?
+    let savedChoice: Int?
+    let submissions: [SottoHistoricalQuizSubmission]
+}
+
+struct SottoHistoricalQuizSubmission: Decodable, Equatable {
+    let attempt: Int?
+    let submittedAt: String?
+    let selectedIndex: Int?
+    let isCorrect: Bool?
+}
+
+struct SottoQuizReceipt: Decodable, Equatable {
+    let attempt: Int?
+    let submittedAt: String?
+    let passed: Bool?
+    let overallScore: Double?
+    let answersUnavailable: Bool
+    let passedSections: Int?
+    let totalSections: Int?
+    let sections: [SottoQuizReceiptSection]
+    let summaryIncomplete: Bool
+}
+
+struct SottoQuizReceiptSection: Decodable, Equatable {
+    let id: String?
+    let skill: String?
+    let score: Double?
+    let passed: Bool?
+}
+
+struct SottoOrphanQuizAnswer: Decodable, Equatable {
+    let sectionId: String?
+    let questionId: String?
+    let savedChoice: Int?
+    let submissions: [SottoHistoricalQuizSubmission]
+}
+
+struct SottoClassProgressRecovery: Decodable {
+    let classId: String
+    let status: String
+    let attempt: Int
+    let progressRevision: Int
+    let taskMaterialRevision: String
 }
 
 struct SottoLesson: Decodable, Equatable {
@@ -462,6 +709,7 @@ struct SottoSpeakingRecording: Decodable, Equatable {
     let rubricScores: [String: Double]?
     let phonemeScores: [SottoSpeakingAlignmentToken]?
     let feedback: String?
+    var recoveryAcknowledged: Bool? = nil
 }
 
 struct SottoSpeakingUploadResponse: Decodable, Equatable {
@@ -476,6 +724,7 @@ struct SottoSpeakingPollResponse: Decodable, Equatable {
     let rubricScores: [String: Double]?
     let feedback: String?
     let phonemeScores: [SottoSpeakingAlignmentToken]?
+    var recoveryAcknowledged: Bool? = nil
 }
 
 struct SottoSpeakingAlignmentToken: Decodable, Equatable {
@@ -534,12 +783,13 @@ struct SottoSubmitAnswer: Encodable, Equatable {
     let selectedIndex: Int
 }
 
-struct SottoPracticeAnswer: Encodable, Equatable {
+struct SottoPracticeAnswer: Codable, Equatable {
     let itemId: String
     let selectedIndex: Int
 }
 
-struct SottoClassSubmitResult: Decodable, Equatable {
+struct SottoClassSubmitResult: Codable, Equatable {
+    var source: String? = nil
     let passed: Bool
     let overallScore: Double
     let passedSections: Int
@@ -557,7 +807,7 @@ struct SottoSelectionHelpExample: Decodable, Equatable {
     let note: String
 }
 
-struct SottoClassSectionResult: Decodable, Identifiable, Equatable {
+struct SottoClassSectionResult: Codable, Identifiable, Equatable {
     let id: String
     let skill: String
     let score: Double
@@ -704,230 +954,4 @@ struct SottoAvatarUploadResponse: Decodable, Equatable {
     let url: String?
 
     var resolvedImage: String? { image ?? url }
-}
-
-// MARK: - Activity
-
-/// `GET /api/v1/learn/activity`: one year of study days, bucketed in the learner's
-/// timezone by the server, plus streaks.
-struct SottoActivity: Decodable, Equatable {
-    let timeZone: String
-    let todayIso: String
-    /// ISO local day (YYYY-MM-DD) -> per-category counts. Quiet days are absent.
-    let days: [String: [String: Int]]
-    let currentStreak: Int
-    let longestStreak: Int
-
-    func total(on day: String) -> Int {
-        days[day]?.values.reduce(0, +) ?? 0
-    }
-
-    /// The category a day is coloured by: whichever the learner did most of,
-    /// ties broken by name so the colour does not flicker between loads.
-    func dominantCategory(on day: String) -> String? {
-        guard let counts = days[day], !counts.isEmpty else { return nil }
-        return counts.max { lhs, rhs in
-            lhs.value == rhs.value ? lhs.key > rhs.key : lhs.value < rhs.value
-        }?.key
-    }
-}
-
-// MARK: - Memory graph
-
-/// `GET /api/v1/courses/{id}/graph`: every word and grammar point the learner
-/// has met on this course, with its spaced-repetition state.
-struct SottoMemoryGraph: Decodable, Equatable {
-    let nodes: [SottoMemoryNode]
-
-    var dueNodes: [SottoMemoryNode] { nodes.filter(\.due) }
-
-    /// Weak-first, so the list opens on what needs work.
-    var byStrength: [SottoMemoryNode] {
-        nodes.sorted { $0.strength < $1.strength }
-    }
-}
-
-struct SottoMemoryNode: Decodable, Identifiable, Equatable {
-    let id: String
-    let kind: String
-    let label: String
-    let translation: String?
-    let strength: Double
-    let due: Bool
-    let cefrLevel: String?
-    let reviewCount: Int
-    let lapseCount: Int
-    let partOfSpeech: String?
-    let pronunciation: String?
-    let topicKey: String?
-
-    var isVocab: Bool { kind == "vocab" }
-}
-
-// MARK: - Placement
-
-struct SottoPlacementAnswer: Encodable, Equatable {
-    let id: String
-    /// 0-3 pick an option; 4 is the "I don't know" answer the scorer expects.
-    let selectedIndex: Int
-
-    static let dontKnowIndex = 4
-}
-
-struct SottoPlacementResult: Decodable, Equatable {
-    let courseId: String
-    let level: String
-    let assessedLevel: String
-    let confirmationReceiptId: UUID
-    let scoreBySkill: [String: Double]?
-}
-
-struct SottoManualPlacementResult: Decodable, Equatable {
-    let courseId: String
-    let level: String
-}
-
-// MARK: - Mock exams
-
-/// `GET /api/v1/courses/{id}/exams`: the exam this course can sit, plus the
-/// learner's past attempts.
-struct SottoCourseExams: Decodable, Equatable {
-    let available: SottoExamAvailable
-    let history: [SottoExamHistoryEntry]
-}
-
-struct SottoExamAvailable: Decodable, Equatable {
-    let institution: String
-    let institutionLabel: String
-    let examName: String
-    let level: String
-    let sectionCount: Int
-}
-
-struct SottoExamHistoryEntry: Decodable, Identifiable, Equatable {
-    let id: String
-    let examName: String
-    let level: String
-    let status: String
-    let band: String?
-    let overallScore: Double?
-    let createdAt: String
-}
-
-struct SottoExamDetail: Decodable, Identifiable, Equatable {
-    let id: String
-    let institution: String
-    let institutionLabel: String
-    let level: String
-    let status: String
-    let examName: String
-    let sections: [SottoExamSection]
-    let result: SottoExamResult?
-
-    var isScored: Bool { status == "SCORED" }
-
-    /// Sections are generated one per skill and each can fail on its own. When
-    /// every one failed the server still hands back a 201 and an exam id, so
-    /// the runner has to recognise the empty shell itself.
-    var allSectionsFailed: Bool {
-        !sections.isEmpty && sections.allSatisfy { $0.status == "FAILED" }
-    }
-}
-
-struct SottoExamSection: Decodable, Identifiable, Equatable {
-    let id: String
-    let skill: String
-    let part: String
-    let order: Int
-    let format: String
-    let weight: Double
-    let status: String
-    let score: Double?
-    let episode: SottoExamEpisode?
-    let questions: [SottoExamQuestion]
-    let speakingPrompts: [SottoSpeakingPrompt]
-    let writingPrompts: [SottoWritingPrompt]
-}
-
-struct SottoExamEpisode: Decodable, Equatable {
-    let id: String
-    let audioUrl: String?
-    let status: String
-}
-
-struct SottoExamQuestion: Decodable, Identifiable, Equatable {
-    let id: String
-    let order: Int
-    let question: String
-    let options: [String]
-    let passageRef: String?
-    let passageText: String?
-    /// Present only once the exam is scored.
-    let correctIndex: Int?
-    let explanation: String?
-}
-
-struct SottoExamResult: Decodable, Equatable {
-    let overallScore: Double?
-    let band: String?
-    let feedback: String?
-    let sectionResults: [SottoExamSectionResult]
-}
-
-struct SottoExamSectionResult: Decodable, Identifiable, Equatable {
-    let sectionId: String
-    let skill: String
-    let score: Double
-    let feedback: String?
-
-    var id: String { sectionId }
-}
-
-struct SottoExamStartResponse: Decodable {
-    let examId: String
-}
-
-/// `POST /api/v1/exams/{id}/submit` answers with the score, not the exam, so
-/// the runner refetches the exam afterwards for the answer key.
-struct SottoExamScoreResult: Decodable, Equatable {
-    let overallScore: Double
-    let band: String
-    let feedback: String
-    let sections: [SottoExamSectionScore]
-}
-
-struct SottoExamSectionScore: Decodable, Identifiable, Equatable {
-    let sectionId: String
-    let skill: String
-    let weight: Double
-    let score: Double
-
-    var id: String { sectionId }
-}
-
-struct SottoErrorResponse: Decodable {
-    let error: FlexibleError
-}
-
-enum FlexibleError: Decodable, CustomStringConvertible {
-    case text(String)
-    case object
-
-    var description: String {
-        switch self {
-        case let .text(value):
-            value
-        case .object:
-            "The Sotto server rejected this request."
-        }
-    }
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.singleValueContainer()
-        if let text = try? container.decode(String.self) {
-            self = .text(text)
-        } else {
-            self = .object
-        }
-    }
 }

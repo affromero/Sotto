@@ -7,6 +7,30 @@ import Vision
 
 @MainActor
 final class WorkbookTests: XCTestCase {
+    func testClassExportConcealsUnansweredExplanationsUntilSubmission() throws {
+        func detail(submitted: Bool) throws -> SottoClassDetail {
+            let payload = """
+            {"id":"class","courseId":"course","status":"IN_PROGRESS","order":1,
+             "passThreshold":0.7,"submitted":\(submitted),"sections":[{
+               "id":"section","skill":"GRAMMAR","status":"READY","attempt":1,
+               "questions":[
+                 {"id":"q1","order":1,"question":"Question one","options":["First","Second"],"explanation":"Explanation one"},
+                 {"id":"q2","order":2,"question":"Question two","options":["Third","Fourth"],"explanation":"Explanation two"}
+               ],"prompts":[],"writingPrompts":[]
+             }]}
+            """
+            return try JSONDecoder().decode(SottoClassDetail.self, from: Data(payload.utf8))
+        }
+        let draft = try ClassPDFExporter.export(classDetail: detail(submitted: false), answers: ["q1": 0, "q2": 99])
+        defer { try? FileManager.default.removeItem(at: draft) }
+        let draftText = try XCTUnwrap(PDFDocument(url: draft)?.string)
+        XCTAssertTrue(draftText.contains("Explanation one"))
+        XCTAssertFalse(draftText.contains("Explanation two"))
+        let submitted = try ClassPDFExporter.export(classDetail: detail(submitted: true), answers: [:])
+        defer { try? FileManager.default.removeItem(at: submitted) }
+        XCTAssertTrue(try XCTUnwrap(PDFDocument(url: submitted)?.string).contains("Explanation two"))
+    }
+
     func testExerciseSnapshotPreservesPrintedContextOutsideTheLearnersInk() throws {
         for style: UIUserInterfaceStyle in [.light, .dark] {
             try withAppearance(style) { try assertExerciseSnapshotPreservesPrintedContext() }
