@@ -300,12 +300,27 @@ suite('profile changes and durable deletion with PostgreSQL', () => {
         )?.asset.consumers
       ).toEqual([survivorConsumer]);
       const entries: unknown[] = [];
+      const unresolvedEntries: unknown[] = [];
       let cursor: string | null = null;
       do {
         const page = await journal().listManifests(body.cleanup.id, cursor);
         entries.push(...page.pages.flatMap((manifest) => manifest.entries));
+        unresolvedEntries.push(
+          ...page.pages
+            .filter((manifest) => !manifest.resolution)
+            .flatMap((manifest) => manifest.entries)
+        );
         cursor = page.cursor;
       } while (cursor !== null);
+      expect(unresolvedEntries).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            kind: 'storage_relocation_dependency',
+            role: 'destination',
+            prepared: endpoints.destination,
+          }),
+        ])
+      );
       expect(entries).toEqual(
         expect.arrayContaining([
           expect.objectContaining({

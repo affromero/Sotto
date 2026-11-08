@@ -58,6 +58,9 @@ suite('storage ownership collection with PostgreSQL', () => {
       'ALTER TABLE "SpeakingPrompt" ADD COLUMN "assessmentSectionId" TEXT'
     );
     await database.$executeRawUnsafe(
+      'ALTER TABLE "SpeakingRecording" ADD COLUMN "assessmentAudioUrl" TEXT, ADD COLUMN "assessmentSectionId" TEXT'
+    );
+    await database.$executeRawUnsafe(
       'CREATE TABLE "ClassAssessment" (id TEXT PRIMARY KEY, "classId" TEXT NOT NULL, "courseId" TEXT NOT NULL)'
     );
     await database.$executeRawUnsafe(

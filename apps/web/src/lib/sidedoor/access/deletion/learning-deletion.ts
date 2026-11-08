@@ -457,9 +457,12 @@ export async function admitLearningStorageDeletion(options: {
           generation: job.generation,
           pageId: manifest.id,
         });
-        const unresolved = inspected.entries.find((entry) => entry.status !== 'attributed');
+        const unresolved = inspected.entries.find(
+          (entry) => entry.status !== 'attributed' && entry.reason !== 'live_consumers'
+        );
         if (unresolved)
           throw new Error('Storage deletion attribution is unresolved: ' + unresolved.reason);
+        if (inspected.entries.some((entry) => entry.status !== 'attributed')) continue;
         await state.cleanup.resolveManifest(job.id, job.epoch, manifest.id, {
           resolver: 'sotto-learning-deletion-v1',
           entries: inspected.entries.map((entry) => {
