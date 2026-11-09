@@ -7,6 +7,7 @@
 // Returns { sectionId }.
 import { isDeepStrictEqual } from 'node:util';
 import { z } from 'zod';
+import type { Prisma } from '@/generated/prisma/client';
 import { prisma, prismaUnfiltered } from './prisma';
 import { capturedLearningAiOptions, resolveCapturedLearningAi } from './learning-ai';
 import { formatNotesForPrompt } from './course-notes';
@@ -25,12 +26,22 @@ import { getAutoModelConfig } from './auto-model-config';
 import { logUsage } from './usage-logger';
 import { logger } from './logger';
 import { classSpeakingMeaningPolicy } from './classes/class-language-policy';
+import { speakingRepairSourceHash } from './classes/repair/speaking-repair-source';
+import {
+  encryptSpeakingReference,
+  speakingReferenceWrappingKey,
+  type SpeakingReferenceEnvelope,
+} from './classes/speaking/speaking-reference-crypto';
 import {
   reviewTeachingContent,
   authenticTeachingFailure,
   TeachingQualityRejectionError,
 } from './classes/quality/teaching-quality';
 import { combineTeachingFailures } from './classes/quality/teaching-failure';
+import {
+  createSpeakingReviewAuthority,
+  type InitialA1SpeakingReceipt,
+} from './classes/quality/section-review/speaking-review-proof';
 import {
   captureStructureAttempt,
   captureTeachingAttempt,
@@ -42,12 +53,44 @@ import {
 import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import { writeStorageReference } from '@/lib/sidedoor/storage/core/storage-write';
 import { captureSpeakingPromptStorage } from '@/lib/sidedoor/storage/core/speaking-storage';
+import { capturePrerequisiteOwnership } from '@/lib/classes/help/lifecycle/prerequisite-ownership';
 import {
   assertClassGeneration,
   withClassGeneration,
-} from './learning/classes/class-generation-state';
+} from './learning/classes/formative/class-generation-state';
 
 const SPEAKING_PROMPT_COUNT = 4;
+const speakingReviewAuthority = createSpeakingReviewAuthority();
+
+async function referencePublicationScopes(
+  database: Prisma.TransactionClient,
+  snapshot: Awaited<ReturnType<typeof captureSpeakingPromptStorage>>,
+  userId: string
+) {
+  const scopes = new Map(snapshot.scopes.map((scope) => [scope.subjectId, scope.generation]));
+  for (const parent of snapshot.associations.parents) {
+    if (parent.kind !== 'class') continue;
+    const ownership = await capturePrerequisiteOwnership(
+      database,
+      parent.parentId,
+      parent.courseId,
+      userId
+    );
+    if (ownership.instanceId !== snapshot.instanceId)
+      throw new Error('Speaking reference ownership changed');
+    for (const scope of ownership.scopes) {
+      const existing = scopes.get(scope.subjectId);
+      if (existing !== undefined && existing !== scope.generation)
+        throw new Error('Speaking reference ownership changed');
+      scopes.set(scope.subjectId, scope.generation);
+    }
+  }
+  return [...scopes]
+    .map(([subjectId, generation]) => ({ subjectId, generation }))
+    .sort((a, b) => a.subjectId.localeCompare(b.subjectId));
+}
+export const sealInitialA1SpeakingReview = speakingReviewAuthority.sealSeed;
+export const materializeInitialA1SpeakingReview = speakingReviewAuthority.materializeSeed;
 const speakingPromptProviderSchema = z
   .object({
     prompts: z
@@ -85,10 +128,13 @@ export interface ClassSpeakingParams {
   targetVocab: Array<{ lemma: string; gloss: string }>;
   note?: string;
   teaching?: ClassTeaching;
+  reviewCourseId?: string;
+  repair?: boolean;
 }
 
 export interface ClassSpeakingResult {
   sectionId: string;
+  reviewReceipt?: InitialA1SpeakingReceipt;
 }
 
 // Content-only speaking generation: LLM phrases + reference TTS, with no parent
@@ -106,6 +152,7 @@ export interface SpeakingPromptsParams {
   refId: string;
   note?: string;
   teaching?: ClassTeaching;
+  reviewScope?: { classId: string; courseId: string; attempt: number };
 }
 
 export interface ComposedSpeakingPrompt {
@@ -290,6 +337,7 @@ export async function composeSpeakingPrompts(
     });
   };
   let accepted: RawSpeakingPrompt[] | undefined;
+  let acceptedProof: ReturnType<typeof speakingReviewAuthority.capture> | undefined;
   let correction: string | undefined;
   let priorTeachingFailure: ReturnType<typeof reviewedSpeakingFailure> = null;
   const retainedApprovedItems = new Map<number, RawSpeakingPrompt>();
@@ -306,8 +354,11 @@ export async function composeSpeakingPrompts(
       );
       if (retainedApprovedItems.size)
         candidate = candidate.map((phrase, index) => retainedApprovedItems.get(index) ?? phrase);
+      const proof = p.reviewScope ? speakingReviewAuthority.capture(candidate, p, ai) : undefined;
       await review(candidate);
+      if (proof) speakingReviewAuthority.check(p, proof);
       accepted = candidate;
+      acceptedProof = proof;
       break;
     } catch (error) {
       const structural = generationAttemptFailures(error);
@@ -354,7 +405,10 @@ export async function composeSpeakingPrompts(
     }
   }
   if (!accepted) throw new Error('Speaking generation did not produce a reviewed complete set.');
-  const phrases = accepted;
+  const phrases = acceptedProof ? structuredClone(accepted) : accepted;
+  const checkReview = () => {
+    if (acceptedProof) speakingReviewAuthority.check(p, acceptedProof);
+  };
 
   // Step 3: resolve TTS for reference audio under the required/optional policy.
   // Prefer the saved provider so a self-hoster using Kokoro renders reference
@@ -363,6 +417,7 @@ export async function composeSpeakingPrompts(
     where: { id: p.userId },
     select: { preferredTtsModel: true, preferredTtsProvider: true },
   });
+  checkReview();
   const ttsAvailable =
     p.ttsProvider === undefined
       ? !isSpeechDisabled(userSpeechPrefs) && (await canResolveTts(p.userId))
@@ -380,17 +435,20 @@ export async function composeSpeakingPrompts(
         const config = await getAutoModelConfig();
         requestedTtsProvider = config.model.ttsProvider;
       } catch {
+        p.execution.signal?.throwIfAborted();
         requestedTtsProvider = null;
       }
     }
   }
   const referenceTtsAudio: (Uint8Array | null)[] = [];
   for (let i = 0; i < phrases.length; i++) {
+    p.execution.signal?.throwIfAborted();
     if (!ttsAvailable || !requestedTtsProvider) {
       referenceTtsAudio.push(null);
       continue;
     }
     try {
+      checkReview();
       const { provider } = await resolveTtsProvider({
         userId: p.userId,
         execution: p.execution,
@@ -404,14 +462,19 @@ export async function composeSpeakingPrompts(
         ),
         language: p.targetLang,
       });
+      checkReview();
       const voiceId = provider.getVoiceId('HOST', p.refId, undefined, p.targetLang);
       const audioBuffer = await provider.generateSpeech({
         text: phrases[i].targetPhrase,
         voiceId,
         language: p.targetLang,
       });
-      referenceTtsAudio.push(audioBuffer);
+      p.execution.signal?.throwIfAborted();
+      checkReview();
+      referenceTtsAudio.push(acceptedProof ? Uint8Array.from(audioBuffer) : audioBuffer);
     } catch (err) {
+      p.execution.signal?.throwIfAborted();
+      checkReview();
       if (p.referenceAudioRequired) throw err;
       logger.warn('Reference TTS generation failed for speaking prompt', {
         refId: p.refId,
@@ -423,17 +486,22 @@ export async function composeSpeakingPrompts(
   }
 
   // Return the composed prompts; the caller persists them (class section or practice session).
-  return phrases.map((phrase, i) => ({
+  const result = phrases.map((phrase, i) => ({
     targetPhrase: phrase.targetPhrase,
     translation: phrase.translation,
     ipa: phrase.ipa ?? null,
     referenceTtsAudio: referenceTtsAudio[i] ?? null,
   }));
+  if (acceptedProof) speakingReviewAuthority.accept(result, p, acceptedProof);
+  return result;
 }
 
 export async function publishSpeakingPromptReferences(options: {
   classAttempt?: { classId: string; attempt: number };
+  stageSectionId?: string;
+  encryptions?: Map<string, SpeakingReferenceEnvelope>;
   required?: boolean;
+  failOnError?: boolean;
   prompts: ReadonlyArray<{ id: string; composed: ComposedSpeakingPrompt }>;
   userId: string;
   execution: SottoProviderExecution;
@@ -445,61 +513,130 @@ export async function publishSpeakingPromptReferences(options: {
       continue;
     }
     try {
+      let encryption: ReturnType<typeof encryptSpeakingReference> | null = null;
+      if (options.stageSectionId) {
+        if (
+          !options.classAttempt ||
+          !options.encryptions ||
+          !options.execution.verifySpeakingReferenceStage
+        )
+          throw new Error('Speaking repair staging authority is unavailable.');
+        const stageSectionId = options.stageSectionId;
+        const verifyStage = options.execution.verifySpeakingReferenceStage;
+        const binding = await withClassGeneration(
+          options.execution,
+          options.classAttempt.classId,
+          options.classAttempt.attempt,
+          (database) => verifyStage(database, { sectionId: stageSectionId, promptId: id })
+        );
+        const key = speakingReferenceWrappingKey();
+        try {
+          encryption = encryptSpeakingReference(composed.referenceTtsAudio, binding, key);
+        } finally {
+          key.fill(0);
+        }
+      }
       const reference = await writeStorageReference({
         database: prismaUnfiltered,
         signal: options.execution.signal ?? new AbortController().signal,
         prefix: `speaking-ref/${id}`,
-        extension: 'mp3',
-        body: composed.referenceTtsAudio,
-        contentType: 'audio/mpeg',
+        extension: encryption ? 'bin' : 'mp3',
+        body: encryption?.ciphertext ?? composed.referenceTtsAudio,
+        contentType: encryption ? 'application/octet-stream' : 'audio/mpeg',
         captureAdmission: async (database) => {
+          const recipient = await options.execution.authorize(database);
+          if (recipient.userId !== options.userId)
+            throw new Error('Speaking reference recipient changed');
           if (options.classAttempt)
             await assertClassGeneration(
               database,
               options.classAttempt.classId,
-              options.classAttempt.attempt
+              options.classAttempt.attempt,
+              recipient.userId
             );
-          const recipient = await options.execution.authorize(database);
-          if (recipient.userId !== options.userId)
-            throw new Error('Speaking reference recipient changed');
+          let stageBinding = null;
+          if (options.stageSectionId) {
+            if (!options.execution.verifySpeakingReferenceStage)
+              throw new Error('Speaking repair staging authority is unavailable.');
+            stageBinding = await options.execution.verifySpeakingReferenceStage(database, {
+              sectionId: options.stageSectionId,
+              promptId: id,
+            });
+          }
+          if (encryption && !isDeepStrictEqual(stageBinding, encryption.envelope.binding))
+            throw new Error('Speaking reference staging identity changed');
           const snapshot = await captureSpeakingPromptStorage(database, id);
+          const scopes = await referencePublicationScopes(database, snapshot, recipient.userId);
           return {
             instanceId: snapshot.instanceId,
-            scopes: snapshot.scopes,
+            scopes,
             consumer: `speaking-prompt:${id}:reference`,
-            snapshot,
+            snapshot: { storage: snapshot, stageBinding },
           };
         },
         validateAdmission: async (database, captured, committedReference) => {
+          const recipient = await options.execution.authorize(database);
+          if (recipient.userId !== options.userId)
+            throw new Error('Speaking reference recipient changed');
           if (options.classAttempt)
             await assertClassGeneration(
               database,
               options.classAttempt.classId,
-              options.classAttempt.attempt
+              options.classAttempt.attempt,
+              recipient.userId
             );
-          const recipient = await options.execution.authorize(database);
-          if (recipient.userId !== options.userId)
-            throw new Error('Speaking reference recipient changed');
+          let stageBinding = null;
+          if (options.stageSectionId) {
+            if (!options.execution.verifySpeakingReferenceStage)
+              throw new Error('Speaking repair staging authority is unavailable.');
+            stageBinding = await options.execution.verifySpeakingReferenceStage(database, {
+              sectionId: options.stageSectionId,
+              promptId: id,
+            });
+          }
+          if (!isDeepStrictEqual(stageBinding, captured.snapshot.stageBinding))
+            throw new Error('Speaking reference staging identity changed');
           const current = await captureSpeakingPromptStorage(database, id);
+          const scopes = await referencePublicationScopes(database, current, recipient.userId);
+          if (!isDeepStrictEqual(scopes, captured.scopes))
+            throw new Error('Speaking reference ownership changed');
           if (committedReference) {
             if (current.reference !== committedReference)
               throw new Error('Speaking reference publication changed');
-            return;
+            if (encryption) {
+              const prompt = await database.speakingPrompt.findUnique({
+                where: { id },
+                select: { referenceEncryption: true },
+              });
+              if (!isDeepStrictEqual(prompt?.referenceEncryption, encryption.envelope))
+                throw new Error('Speaking reference publication changed');
+            }
           }
-          if (!isDeepStrictEqual(current, captured.snapshot))
+          if (
+            !isDeepStrictEqual(current, {
+              ...captured.snapshot.storage,
+              reference: committedReference ?? captured.snapshot.storage.reference,
+            })
+          )
             throw new Error('Speaking reference ownership changed');
         },
-        previousReference: (snapshot) => snapshot.reference,
+        previousReference: (snapshot) => snapshot.storage.reference,
         commit: async (database, reference) => {
           await database.speakingPrompt.update({
             where: { id },
-            data: { referenceTtsUrl: reference },
+            data: {
+              referenceTtsUrl: reference,
+              ...(encryption ? { referenceEncryption: encryption.envelope } : {}),
+            },
           });
         },
       });
+      options.execution.signal?.throwIfAborted();
       references.set(id, reference);
+      if (encryption) options.encryptions!.set(id, encryption.envelope);
     } catch (error) {
-      if (options.required) throw error;
+      options.execution.signal?.throwIfAborted();
+      if (options.required || options.failOnError || options.stageSectionId) throw error;
       logger.warn('Reference TTS publication failed for speaking prompt', {
         promptId: id,
         error: error instanceof Error ? error.message : String(error),
@@ -513,7 +650,22 @@ export async function publishSpeakingPromptReferences(options: {
 // gated ClassSection + SpeakingPrompt rows.
 export async function generateClassSpeaking(p: ClassSpeakingParams): Promise<ClassSpeakingResult> {
   const attempt = p.attempt ?? 1;
-  const prompts = await composeSpeakingPrompts({
+  if (
+    p.repair &&
+    (!p.execution.speakingRepairSourceHash ||
+      !p.execution.stageClassSpeaking ||
+      !p.execution.verifySpeakingReferenceStage ||
+      !p.execution.sealClassSpeaking)
+  )
+    throw new Error('Speaking repair requires a durable staging operation.');
+  const sourceHash = p.repair
+    ? await withClassGeneration(p.execution, p.classId, attempt, (database) =>
+        speakingRepairSourceHash(database, p.classId, attempt)
+      )
+    : null;
+  if (sourceHash && sourceHash !== p.execution.speakingRepairSourceHash)
+    throw new Error('The saved speaking material changed before repair.');
+  const composeParams: SpeakingPromptsParams = {
     ttsProvider: p.ttsProvider,
     referenceAudioRequired: p.referenceAudioRequired,
     execution: p.execution,
@@ -526,13 +678,23 @@ export async function generateClassSpeaking(p: ClassSpeakingParams): Promise<Cla
     refId: `${p.classId}-${attempt}`,
     note: p.note,
     teaching: p.teaching,
-  });
+    ...(p.reviewCourseId
+      ? { reviewScope: { classId: p.classId, courseId: p.reviewCourseId, attempt } }
+      : {}),
+  };
+  const prompts = await composeSpeakingPrompts(composeParams);
+  if (p.reviewCourseId) speakingReviewAuthority.require(prompts, composeParams);
 
   const { section, savedPrompts } = await withClassGeneration(
     p.execution,
     p.classId,
     attempt,
     async (database) => {
+      if (
+        sourceHash &&
+        sourceHash !== (await speakingRepairSourceHash(database, p.classId, attempt))
+      )
+        throw new Error('The saved speaking material changed during repair.');
       const section = await database.classSection.create({
         data: {
           classId: p.classId,
@@ -541,35 +703,70 @@ export async function generateClassSpeaking(p: ClassSpeakingParams): Promise<Cla
           seed: `${p.classId}-SPEAKING-${attempt}`,
           spec: { objective: p.objective },
           status: 'READY',
+          withdrawn: p.repair === true,
           generatedAt: new Date(),
         },
       });
 
-      await database.speakingPrompt.createMany({
-        data: prompts.map((prompt, i) => ({
+      const data = prompts.map((prompt, i) => ({
+        sectionId: section.id,
+        order: i + 1,
+        targetPhrase: prompt.targetPhrase,
+        translation: prompt.translation,
+        ipa: prompt.ipa,
+        referenceTtsUrl: null,
+      }));
+      const savedPrompts: Array<{ id: string }> = [];
+      if (p.reviewCourseId) {
+        for (const prompt of data)
+          savedPrompts.push(
+            await database.speakingPrompt.create({ data: prompt, select: { id: true } })
+          );
+      } else {
+        await database.speakingPrompt.createMany({ data });
+        savedPrompts.push(
+          ...(await database.speakingPrompt.findMany({
+            where: { sectionId: section.id },
+            orderBy: { order: 'asc' },
+            select: { id: true },
+          }))
+        );
+      }
+      if (sourceHash && p.execution.stageClassSpeaking)
+        await p.execution.stageClassSpeaking(database, {
+          classId: p.classId,
+          attempt,
           sectionId: section.id,
-          order: i + 1,
-          targetPhrase: prompt.targetPhrase,
-          translation: prompt.translation,
-          ipa: prompt.ipa,
-          referenceTtsUrl: null,
-        })),
-      });
-      const savedPrompts = await database.speakingPrompt.findMany({
-        where: { sectionId: section.id },
-        orderBy: { order: 'asc' },
-        select: { id: true },
-      });
+          sourceHash,
+        });
       return { section, savedPrompts };
     }
   );
-  await publishSpeakingPromptReferences({
+  if (p.reviewCourseId) speakingReviewAuthority.require(prompts, composeParams);
+  const encryptions = new Map<string, SpeakingReferenceEnvelope>();
+  const references = await publishSpeakingPromptReferences({
     classAttempt: { classId: p.classId, attempt },
     required: p.referenceAudioRequired,
+    failOnError: Boolean(p.reviewCourseId) || p.repair === true,
+    ...(p.repair ? { stageSectionId: section.id, encryptions } : {}),
     prompts: savedPrompts.map((saved, index) => ({ id: saved.id, composed: prompts[index]! })),
     userId: p.userId,
     execution: p.execution,
   });
+  if (p.repair && p.execution.sealClassSpeaking)
+    await withClassGeneration(p.execution, p.classId, attempt, (database) =>
+      p.execution.sealClassSpeaking!(database, { sectionId: section.id, references, encryptions })
+    );
+  const reviewReceipt = p.reviewCourseId
+    ? speakingReviewAuthority.bind(
+        prompts,
+        composeParams,
+        section.id,
+        `${p.classId}-SPEAKING-${attempt}`,
+        savedPrompts.map((prompt) => prompt.id),
+        references
+      )
+    : undefined;
 
   logger.info('Speaking section generated', {
     classId: p.classId,
@@ -577,5 +774,5 @@ export async function generateClassSpeaking(p: ClassSpeakingParams): Promise<Cla
     promptCount: String(prompts.length),
   });
 
-  return { sectionId: section.id };
+  return { sectionId: section.id, ...(reviewReceipt ? { reviewReceipt } : {}) };
 }

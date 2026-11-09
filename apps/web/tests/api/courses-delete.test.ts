@@ -23,6 +23,9 @@ vi.mock('@/lib/logger', () => ({
 }));
 
 import { DELETE } from '@/app/api/v1/courses/[courseId]/route';
+import { PrerequisiteDeletionConflict } from '@/lib/classes/help/prerequisite-deletion';
+import { SpeakingDeletionConflict } from '@/lib/sidedoor/jobs/stitch/speaking-grading-deletion';
+import { AssessmentFenceConflict } from '@/lib/learning/classes/lifecycle/assessment-fence';
 
 function del(body?: unknown): NextRequest {
   return new NextRequest('http://localhost:3000/api/v1/courses/course-1', {
@@ -72,6 +75,29 @@ describe('DELETE /api/v1/courses/[courseId]', () => {
     const res = await DELETE(del({ confirm: 'es' }), params());
     expect(res.status).toBe(400);
     expect(mockDeleteCourseCompletely).not.toHaveBeenCalled();
+  });
+
+  it('reports recoverable prerequisite work without clearing the course caches', async () => {
+    mockDeleteCourseCompletely.mockRejectedValue(new PrerequisiteDeletionConflict());
+    const res = await DELETE(del({ confirm: 'de' }), params());
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ error: expect.stringContaining('requires recovery') });
+    expect(mockCacheDelete).not.toHaveBeenCalled();
+  });
+
+  it('reports unresolved speaking without clearing the course caches', async () => {
+    mockDeleteCourseCompletely.mockRejectedValue(new SpeakingDeletionConflict());
+    const res = await DELETE(del({ confirm: 'de' }), params());
+    expect(res.status).toBe(409);
+    expect(mockCacheDelete).not.toHaveBeenCalled();
+  });
+
+  it('reports active assessment work without clearing the course caches', async () => {
+    mockDeleteCourseCompletely.mockRejectedValue(new AssessmentFenceConflict());
+    const res = await DELETE(del({ confirm: 'de' }), params());
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ error: expect.stringContaining('assessment') });
+    expect(mockCacheDelete).not.toHaveBeenCalled();
   });
 
   it('deletes everything and clears both pair caches on a matching confirmation', async () => {

@@ -77,9 +77,11 @@ impl App {
 
     /// Historical classes without complete material remain gated and offer durable repair.
     fn show_class_repair(&mut self, message: &str) {
-        if let View::Class { course, class_id, attempt, .. } = &self.view {
+        if let View::Class { course, class_id, attempt, previous_work, history_audio, .. } = &self.view {
             self.view = View::ClassRepair {
                 course: course.clone(), class_id: class_id.clone(), attempt: *attempt, message: message.into(),
+                previous_work: previous_work.clone(), history_open: false, history_scroll: 0,
+                history_audio: state::HistoryAudioState { items: history_audio.items.clone(), ..Default::default() },
             };
             self.render();
         }
@@ -404,15 +406,85 @@ impl App {
 
     // --- Speaking section --------------------------------------------------
 
+    pub(super) fn current_class_recording_binding(&self) -> Option<(String, String, ClassSpeakingBinding)> {
+        let View::Class { class_id, attempt, material_source, .. } = &self.view else { return None };
+        let revision = material_source.as_deref()?;
+        if *attempt <= 0 || revision.len() != 64 ||
+            !revision.bytes().all(|value| value.is_ascii_digit() || (b'a'..=b'f').contains(&value)) {
+            return None;
+        }
+        Some((class_id.clone(), self.current_speaking_prompt_id()?, ClassSpeakingBinding {
+            attempt: *attempt, material_revision: revision.to_string(),
+        }))
+    }
+
+    pub(super) fn retain_class_audio(&mut self, wav: Vec<u8>) -> Option<std::path::PathBuf> {
+        use std::io::Write;
+        let path = std::env::temp_dir().join(format!("sotto-speaking-{}.wav", uuid::Uuid::new_v4()));
+        let saved = (|| -> std::io::Result<()> {
+            let mut options = std::fs::OpenOptions::new();
+            options.write(true).create_new(true);
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::OpenOptionsExt;
+                options.mode(0o600);
+            }
+            #[cfg(not(unix))]
+            return Err(std::io::Error::other("Private recording storage is unavailable on this platform"));
+            #[cfg(unix)]
+            {
+                let mut file = options.open(&path)?;
+                if let Err(error) = file.write_all(&wav).and_then(|()| file.sync_all()) {
+                    let _ = std::fs::remove_file(&path);
+                    return Err(error);
+                }
+                Ok(())
+            }
+        })();
+        match saved {
+            Ok(()) => Some(path),
+            Err(error) => {
+                self.retained_class_recording = Some(wav);
+                self.status_bar.set_error(format!("Recording remains in memory. Press r to retry saving it. {error}"));
+                None
+            }
+        }
+    }
+
+    pub(super) fn retry_retained_class_audio(&mut self) {
+        if let Some(wav) = self.retained_class_recording.take()
+            && let Some(path) = self.retain_class_audio(wav)
+        {
+            self.status_bar.set_error(format!("Recording saved at {}", path.display()));
+        }
+        self.render();
+    }
+
     pub(super) fn class_toggle_record(&mut self) {
+        if let Some(wav) = self.retained_class_recording.take() {
+            self.retained_class_recording = Some(wav);
+            self.retry_retained_class_audio();
+            return;
+        }
         let phase = match self.current_section().map(|s| &s.progress) {
             Some(SectionProgress::Speaking { phase, .. }) => phase.clone(),
             _ => return,
         };
         match phase {
             SpeakingPhase::Idle | SpeakingPhase::Graded { .. } | SpeakingPhase::Failed { .. } => {
+                let binding = if matches!(&self.view, View::Class { .. }) {
+                    match self.current_class_recording_binding() {
+                        Some(binding) => Some(binding),
+                        None => {
+                            self.status_bar.set_error("Reopen the class before recording.".into());
+                            self.render();
+                            return;
+                        }
+                    }
+                } else { None };
                 match self.recorder.start() {
                     Ok(()) => {
+                        self.class_recording_binding = binding;
                         if let Some(section) = self.current_section_mut()
                             && let SectionProgress::Speaking { phase, .. } = &mut section.progress
                         {
@@ -425,7 +497,7 @@ impl App {
             }
             SpeakingPhase::Recording => self.class_stop_and_upload(),
             SpeakingPhase::UnknownUpload { .. } => self.refresh_saved_speaking_upload(),
-            SpeakingPhase::Uploading | SpeakingPhase::Polling { .. } => {}
+            SpeakingPhase::Uploading | SpeakingPhase::Polling { .. } | SpeakingPhase::Unresolved { .. } => {}
         }
     }
 
@@ -433,6 +505,7 @@ impl App {
         let wav = match self.recorder.stop() {
             Ok(wav) => wav,
             Err(e) => {
+                self.class_recording_binding = None;
                 self.status_bar.set_error(e.to_string());
                 if let Some(section) = self.current_section_mut()
                     && let SectionProgress::Speaking { phase, .. } = &mut section.progress
@@ -443,26 +516,110 @@ impl App {
                 return;
             }
         };
+        let original = self.class_recording_binding.take();
+        let saved_target = original.clone();
         let req_gen = self.bump_gen();
         let (flow, id) = match self.current_flow() {
             Some((flow, Some(id))) => (flow, id),
-            _ => return,
+            _ => {
+                if original.is_some() && let Some(path) = self.retain_class_audio(wav) {
+                    self.status_bar.set_error(format!("Recording saved at {}", path.display()));
+                }
+                return;
+            }
         };
         let prompt_id = match self.current_speaking_prompt_id() {
             Some(id) => id,
-            None => return,
+            None => {
+                if original.is_some() && let Some(path) = self.retain_class_audio(wav) {
+                    self.status_bar.set_error(format!("Recording saved at {}", path.display()));
+                }
+                return;
+            }
         };
+        if original.is_some() && !matches!(flow, FlowKind::Class) {
+            if let Some(path) = self.retain_class_audio(wav) {
+                self.status_bar.set_error(format!("Recording saved at {}", path.display()));
+            }
+            return;
+        }
+        let (class_binding, retained_path) = if matches!(flow, FlowKind::Class) {
+            let current = self.current_class_recording_binding();
+            let path = match self.retain_class_audio(wav.clone()) {
+                Some(path) => path,
+                None => {
+                    if let Some(section) = self.current_section_mut()
+                        && let SectionProgress::Speaking { phase, .. } = &mut section.progress {
+                        *phase = SpeakingPhase::Failed { message: "Recording remains in memory. Press r to save it.".into() };
+                    }
+                    self.render();
+                    return;
+                }
+            };
+            if original.is_none() || original != current {
+                let message = format!("The class changed. Your recording was saved at {}", path.display());
+                if let Some(section) = self.current_section_mut()
+                    && let SectionProgress::Speaking { phase, .. } = &mut section.progress {
+                    *phase = SpeakingPhase::Failed { message: message.clone() };
+                }
+                self.status_bar.set_error(message);
+                self.render();
+                return;
+            }
+            self.status_bar.set_error(format!("Recording retained at {} until upload is confirmed.", path.display()));
+            (original.map(|(_, _, binding)| binding), Some(path))
+        } else { (None, None) };
+        let client = Arc::clone(&self.client);
+        let mut pending_identity = None;
+        if let Some(path) = &retained_path {
+            let Some(profile) = self.config.active_profile() else {
+                let message = format!("Recording saved at {}. Reopen the account before uploading.", path.display());
+                if let Some(section) = self.current_section_mut() && let SectionProgress::Speaking { phase, .. } = &mut section.progress {
+                    *phase = SpeakingPhase::Failed { message: message.clone() };
+                }
+                self.status_bar.set_error(message);
+                self.render();
+                return;
+            };
+            let Some(target) = saved_target else {
+                let message = format!("Recording saved at {}. Reopen the class before uploading.", path.display());
+                if let Some(section) = self.current_section_mut() && let SectionProgress::Speaking { phase, .. } = &mut section.progress {
+                    *phase = SpeakingPhase::Failed { message: message.clone() };
+                }
+                self.status_bar.set_error(message);
+                self.render();
+                return;
+            };
+            pending_identity = Some((path.clone(),
+                (profile.server_url.trim_end_matches('/').to_string(), profile.api_key.clone()), target));
+        }
         if let Some(section) = self.current_section_mut()
             && let SectionProgress::Speaking { phase, .. } = &mut section.progress
         {
             *phase = SpeakingPhase::Uploading;
         }
-        let client = Arc::clone(&self.client);
+        if let Some((path, owner, target)) = pending_identity {
+            let mut origin = self.view.clone();
+            origin.mark_abandoned_uploads_unknown(Some(path.as_path()));
+            self.pending_class_audio.insert(req_gen, PendingClassAudio { path, owner, target, origin });
+        }
         self.dispatch(
             req_gen,
             async move {
                 match flow {
-                    FlowKind::Class => client.upload_class_speaking(&id, &prompt_id, wav).await,
+                    FlowKind::Class => {
+                        let binding = class_binding.ok_or_else(|| color_eyre::eyre::eyre!("Class material identity is unavailable."))?;
+                        let path = retained_path.ok_or_else(|| color_eyre::eyre::eyre!("Recording copy is unavailable."))?;
+                        match client.upload_class_speaking(&id, &prompt_id, &binding, wav).await {
+                            Ok(receipt) => Ok(receipt),
+                            Err(error) => {
+                                let prefix = if error.downcast_ref::<ClassRecordingRejected>().is_some() {
+                                    "Recording was not submitted."
+                                } else { "Upload outcome is unknown." };
+                                Err(color_eyre::eyre::eyre!("{prefix} Recording saved at {}. {error}", path.display()))
+                            }
+                        }
+                    },
                     FlowKind::Exam => client.upload_exam_speaking(&id, &prompt_id, wav).await,
                     FlowKind::Practice => client.upload_speaking(&id, &prompt_id, wav).await,
                 }

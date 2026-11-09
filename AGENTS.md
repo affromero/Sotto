@@ -63,10 +63,10 @@ Root `package.json` proxies the main web commands to `@sotto/web`. Each major di
 ## Build Commands
 
 ```bash
-npm run setup                  # Install deps, start local services, write .env.local, push schema, generate Prisma
+npm run setup                  # Install deps, start local services, write .env.local, apply migrations, generate Prisma
 npm install                    # Install all workspaces only
 docker compose up -d postgres redis
-npx prisma db push --schema=apps/web/prisma/schema.prisma
+npx prisma migrate deploy --config=prisma.config.ts
 npx prisma generate --schema=apps/web/prisma/schema.prisma
 npm run dev                    # Local web + workers
 SKIP_DB_SYNC=1 npm run dev     # Faster start without DB sync

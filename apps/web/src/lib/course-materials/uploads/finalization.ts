@@ -6,7 +6,7 @@ import { Readable } from 'node:stream';
 import { isDeepStrictEqual } from 'node:util';
 import type { Job } from 'bullmq';
 import { z } from 'zod';
-import { StorageReadCleanupError } from 'thesidedoor-core/storage';
+import { isJobExecutionCleanupFailure } from 'thesidedoor-core/runtime/outbox';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { restoreStorageBackend } from '@/lib/r2';
 import { materialStorageScopes } from '@/lib/course-materials';
@@ -136,7 +136,7 @@ export async function processMaterialFinalization(
             try {
               await backend.downloadToFile(part.source.input.key, path, signal);
             } catch (error) {
-              if (error instanceof StorageReadCleanupError) markCleanupUnconfirmed();
+              if (isJobExecutionCleanupFailure(error)) markCleanupUnconfirmed();
               throw error;
             }
             const partHash = createHash('sha256');

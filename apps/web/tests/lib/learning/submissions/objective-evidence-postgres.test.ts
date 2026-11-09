@@ -1,7 +1,8 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest';
 import type { PrismaClient } from '@/generated/prisma/client';
-import { submitClass } from '@/lib/learning/classes/class-submission';
+import { submitClass as submitAuthorizedClass } from '@/lib/learning/classes/progress/class-submission';
+import { authorizedLearnerExecution } from '../../../helpers/runtime/provider-execution';
 import { submitPractice } from '@/lib/practice/submission';
 import type { Prisma } from '@/generated/prisma/client';
 import { createSubmissionFixture } from './fixtures';
@@ -12,6 +13,11 @@ vi.mock('@/lib/prisma', async () => {
   return { prisma: database, prismaUnfiltered: database };
 });
 const suite = process.env.SIDEDOOR_TEST_DATABASE_URL ? describe : describe.skip;
+const submitClass = (
+  classId: string,
+  userId: string,
+  answers: Array<{ questionId: string; selectedIndex: number }>
+) => submitAuthorizedClass(classId, userId, answers, authorizedLearnerExecution(userId));
 suite('Atomic objective evidence against PostgreSQL', () => {
   const fixture = createSubmissionFixture(binding, 'objective_submission');
   it('commits item evidence and the class receipt once under concurrent resubmission', async () => {

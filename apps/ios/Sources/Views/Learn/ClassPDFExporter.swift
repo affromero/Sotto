@@ -74,7 +74,9 @@ enum ClassPDFExporter {
                         let marker = answers[question.id] == index ? "☑" : "☐"
                         writer.writeLine("\(marker) \(option)", style: .small)
                     }
-                    if let explanation = question.explanation, !explanation.isEmpty {
+                    let selected = answers[question.id]
+                    let answered = selected.map { $0 >= 0 && $0 < question.options.count } ?? false
+                    if (classDetail.submitted || answered), let explanation = question.explanation, !explanation.isEmpty {
                         writer.writeLine(explanation, style: .smallMuted)
                     }
                 }

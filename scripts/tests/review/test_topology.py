@@ -110,6 +110,23 @@ class ReviewTopologyTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'topology changed'):
             verify_capture(original, self.observe())
 
+    def test_speaking_keyring_is_preserved_without_disclosure(self) -> None:
+        config = cast(dict[str, object], self.containers[0]['Config'])
+        entries = cast(list[str], config['Env'])
+        entries.append('SOTTO_SPEAKING_REFERENCE_KEYRING=PRIVATE-AUDIO-KEYRING')
+        original = self.observe()
+        self.assertNotIn('PRIVATE-AUDIO-KEYRING', json.dumps(original))
+        self.assertEqual(
+            classified_environment(
+                {**self.private, 'SOTTO_SPEAKING_REFERENCE_KEYRING': 'PRIVATE-AUDIO-KEYRING'},
+                {},
+            )['SOTTO_SPEAKING_REFERENCE_KEYRING'],
+            'PRIVATE-AUDIO-KEYRING',
+        )
+        entries[-1] = 'SOTTO_SPEAKING_REFERENCE_KEYRING=CHANGED-AUDIO-KEYRING'
+        with self.assertRaisesRegex(ValueError, 'topology changed'):
+            verify_capture(original, self.observe())
+
     def test_unknown_network_attachment_or_storage_writer_is_rejected(
         self,
     ) -> None:

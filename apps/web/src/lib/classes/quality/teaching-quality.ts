@@ -23,6 +23,7 @@ import {
   isImmersionLevel,
 } from '../class-language-policy';
 import { learningCredentialFingerprint } from '../preparation-selection';
+import { isInitialA1ExerciseReview } from '../lesson/prerequisite-review-context';
 import {
   captureTeachingFailure,
   introTeachingQualityVerdictSchema,
@@ -41,6 +42,13 @@ import {
   type TeachingAdjudicator as IntroAdjudicator,
   type TeachingReviewPacket as IntroReviewPacket,
 } from './teaching-review-protocol';
+import {
+  buildIntroAuditItems,
+  introAuditEvidence,
+  type IntroAuditAddress,
+  type IntroAuditItem,
+} from './teaching-source/intro-audit';
+export { classIntroAuditAddressCount, type IntroAuditAddress } from './teaching-source/intro-audit';
 export { ReviewerProtocolError } from './teaching-review-protocol';
 import {
   captureReviewerProtocolEvidence,
@@ -75,21 +83,6 @@ export class TeachingQualityRejectionError extends SectionQualityError {
     });
   }
 }
-
-export type IntroAuditAddress =
-  | { field: 'purpose' | 'about' | 'visuals' }
-  | { field: 'focus' | 'tips' | 'examples'; index: number };
-
-type IntroAuditItem = {
-  address: IntroAuditAddress;
-  fields: Record<string, unknown>;
-};
-
-type IntroAudit = {
-  introContext: Record<string, unknown>;
-  items: readonly IntroAuditItem[];
-  reviewPackets?: readonly IntroReviewPacket[];
-};
 
 type PriorIntroReview = {
   ai: CapturedLearningAi;
@@ -268,6 +261,80 @@ export async function reviewTeachingContent(options: {
   kind: 'intro' | 'teaching' | 'explanations' | 'writing' | 'listening' | 'speaking' | 'vocabulary';
   items: readonly unknown[];
 }): Promise<void> {
+  const initialExercise = isInitialA1ExerciseReview(
+    options.level,
+    options.ai.execution.initialA1Class,
+    options.kind
+  );
+  const execution = options.ai.execution;
+  const ai = options.ai;
+  const provider = options.provider;
+  const authority = initialExercise
+    ? {
+        provider: ai.provider,
+        model: ai.model,
+        endpoint: ai.endpoint,
+        isolatedImage: ai.isolatedImage,
+        apiKey: ai.apiKey,
+        userId: execution.userId,
+        authorize: execution.authorize,
+        signal: execution.signal,
+        providerRequest: execution.providerRequest,
+        sourceDocuments: execution.sourceDocuments,
+        onCleanupError: execution.onCleanupError,
+        registerAudioEpisode: execution.registerAudioEpisode,
+        workspaceDirectory: execution.isolatedWorkspace?.directory,
+        markCleanupUnconfirmed: execution.isolatedWorkspace?.markCleanupUnconfirmed,
+        credential: learningCredentialFingerprint(execution.credential),
+        selection: JSON.stringify(execution.learningSelection),
+        ttsModel: execution.ttsModel,
+      }
+    : undefined;
+  const reviewScope = () =>
+    JSON.stringify({
+      userId: options.userId,
+      level: options.level,
+      nativeLang: options.nativeLang,
+      targetLang: options.targetLang,
+      kind: options.kind,
+      lessonContext: options.lessonContext,
+      items: options.items,
+      readingPassageReview: options.readingPassageReview,
+      listeningPassageReview: options.listeningPassageReview,
+      listeningSource: options.listeningSource,
+      listeningTurns: options.listeningTurns,
+      sectionSkill: options.sectionSkill,
+      exerciseMode: options.exerciseMode,
+    });
+  const originalScope = initialExercise ? reviewScope() : undefined;
+  const requireUnchangedReview = () => {
+    if (!initialExercise || !authority) return;
+    if (
+      options.ai !== ai ||
+      options.provider !== provider ||
+      options.ai.execution !== execution ||
+      execution.initialA1Class !== true ||
+      ai.provider !== authority.provider ||
+      ai.model !== authority.model ||
+      ai.endpoint !== authority.endpoint ||
+      ai.isolatedImage !== authority.isolatedImage ||
+      ai.apiKey !== authority.apiKey ||
+      execution.userId !== authority.userId ||
+      execution.authorize !== authority.authorize ||
+      execution.signal !== authority.signal ||
+      execution.providerRequest !== authority.providerRequest ||
+      execution.sourceDocuments !== authority.sourceDocuments ||
+      execution.onCleanupError !== authority.onCleanupError ||
+      execution.registerAudioEpisode !== authority.registerAudioEpisode ||
+      execution.isolatedWorkspace?.directory !== authority.workspaceDirectory ||
+      execution.isolatedWorkspace?.markCleanupUnconfirmed !== authority.markCleanupUnconfirmed ||
+      learningCredentialFingerprint(execution.credential) !== authority.credential ||
+      JSON.stringify(execution.learningSelection) !== authority.selection ||
+      execution.ttsModel !== authority.ttsModel ||
+      reviewScope() !== originalScope
+    )
+      throw new ReviewerProtocolError();
+  };
   if (
     options.exerciseMode !== undefined &&
     (options.exerciseMode !== 'vocabulary_recall' ||
@@ -337,6 +404,7 @@ export async function reviewTeachingContent(options: {
     offset: number,
     capture?: (content: string, fixed: Parameters<typeof requestTeachingReview>[0]) => void
   ): Promise<T> {
+    requireUnchangedReview();
     const fixed = {
       ...request,
       items: structuredClone(request.items),
@@ -369,6 +437,7 @@ export async function reviewTeachingContent(options: {
     for (;;) {
       // Provider admission, cancellation and cleanup errors are never protocol corrections.
       const content = await requestTeachingReview(fixed);
+      requireUnchangedReview();
       try {
         const parsed = parse(content, fixed);
         capture?.(content, fixed);
@@ -782,74 +851,11 @@ export async function reviewTeachingContent(options: {
       }
       throw rejection;
     }
+    requireUnchangedReview();
   } catch (error) {
     retainReviewerProtocolEvidence(error, protocolEvidence);
     throw error;
   }
-}
-
-function buildIntroAuditItems(items: readonly unknown[], immersion = false): IntroAudit {
-  if (items.length !== 1 || !items[0] || typeof items[0] !== 'object' || Array.isArray(items[0]))
-    throw new ReviewerProtocolError();
-
-  const intro = items[0] as Record<string, unknown>;
-  const arrays = ['focus', 'tips', 'examples'] as const;
-  for (const field of arrays) {
-    if (!Array.isArray(intro[field])) throw new ReviewerProtocolError();
-  }
-  if (
-    (intro.focus as unknown[]).length < 1 ||
-    (intro.focus as unknown[]).length > 6 ||
-    (intro.tips as unknown[]).length < 1 ||
-    (intro.tips as unknown[]).length > 5 ||
-    (intro.examples as unknown[]).length < 1 ||
-    (intro.examples as unknown[]).length > 5
-  )
-    throw new ReviewerProtocolError();
-  const scopes: Array<{ address: IntroAuditAddress; fields: Record<string, unknown> }> = [
-    { address: { field: 'purpose' }, fields: { purpose: intro.purpose } },
-    { address: { field: 'about' }, fields: { about: intro.about } },
-  ];
-  for (const [index, focus] of (Array.isArray(intro.focus) ? intro.focus : []).entries())
-    scopes.push({ address: { field: 'focus', index }, fields: { focus } });
-  for (const [index, tip] of (Array.isArray(intro.tips) ? intro.tips : []).entries())
-    scopes.push({ address: { field: 'tips', index }, fields: { tips: tip } });
-  for (const [index, example] of (intro.examples as unknown[]).entries()) {
-    let reviewedExample: unknown = example;
-    if (
-      immersion &&
-      example &&
-      typeof example === 'object' &&
-      !Array.isArray(example) &&
-      'target' in example &&
-      typeof example.target === 'string' &&
-      'meaning' in example &&
-      example.meaning === example.target
-    ) {
-      const fields: Record<string, unknown> = { ...example };
-      delete fields.meaning;
-      reviewedExample = fields;
-    }
-    scopes.push({ address: { field: 'examples', index }, fields: { example: reviewedExample } });
-  }
-  if (intro.visuals !== undefined)
-    scopes.push({ address: { field: 'visuals' }, fields: { visuals: intro.visuals } });
-
-  return { introContext: intro, items: scopes };
-}
-
-export function classIntroAuditAddressCount(intro: unknown): number {
-  return buildIntroAuditItems([intro]).items.length;
-}
-
-function introAuditEvidence(audit: IntroAudit) {
-  return [
-    {
-      introContext: audit.introContext,
-      addresses: audit.items.map(({ address }) => address),
-      reviewPackets: audit.reviewPackets,
-    },
-  ];
 }
 
 function aggregateIntroFeedback(

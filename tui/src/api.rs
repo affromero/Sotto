@@ -33,6 +33,35 @@ mod generated {
 pub(crate) use generated::Client as GeneratedClient;
 pub(crate) use generated::types;
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct ClassDirections {
+    pub source_hash: String,
+    pub tasks: std::collections::BTreeMap<(String, String, String), String>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct ClassPreludeMaterial {
+    pub detail: types::ClassDetailResponse,
+    pub directions: Option<ClassDirections>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct ClassSpeakingBinding {
+    pub attempt: i64,
+    pub material_revision: String,
+}
+
+#[derive(Debug)]
+pub(crate) struct ClassRecordingRejected;
+
+impl std::fmt::Display for ClassRecordingRejected {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "The class no longer accepts this recording.")
+    }
+}
+
+impl std::error::Error for ClassRecordingRejected {}
+
 /// Response of the multipart speaking-attempt upload (POST). The upload itself
 /// is intentionally not in the OpenAPI contract — multipart binary does not
 /// codegen cleanly — so its small response is modeled here directly. Mirrors
@@ -161,14 +190,36 @@ pub(crate) trait Api: Send + Sync {
     ) -> Result<SpeakingUploadResponse>;
     /// Download raw bytes from an absolute (presigned) URL — segment audio.
     async fn download(&self, url: &str) -> Result<Vec<u8>>;
+    /// Fetch one owned class recording without forwarding credentials on redirects.
+    async fn class_history_audio(
+        &self,
+        class_id: &str,
+        prompt_id: &str,
+        recording_id: &str,
+    ) -> Result<Vec<u8>>;
 
     // --- Classes (the gated CEFR curriculum flow) ---
     /// Create/advance to the next gated class, or report the course done.
     async fn next_class(&self, course_id: &str) -> Result<NextClassOutcome>;
     async fn repair_class(&self, class_id: &str, expected_attempt: i64)
     -> Result<NextClassOutcome>;
+    async fn class_prelude(&self, class_id: &str) -> Result<types::ClassPreludeResponse>;
+    async fn class_prerequisite(&self, class_id: &str) -> Result<types::ClassPrerequisiteResponse>;
+    async fn prepare_class_prelude(
+        &self,
+        class_id: &str,
+        request: types::ClassPrerequisiteRequest,
+        recovery: bool,
+    ) -> Result<types::ClassPreludeResponse>;
+    async fn acknowledge_class_prelude(
+        &self,
+        class_id: &str,
+        request: types::ClassPreludeAcknowledgment,
+    ) -> Result<types::ClassPreludeAcknowledgmentResponse>;
     /// Fetch a class with its ordered, mixed-skill sections.
     async fn class(&self, class_id: &str) -> Result<types::ClassDetailResponse>;
+    async fn class_progress_recovery(&self, class_id: &str)
+    -> Result<types::ClassProgressRecovery>;
     /// Submit a class's MC answers and get the grade result.
     async fn submit_class(
         &self,
@@ -180,6 +231,7 @@ pub(crate) trait Api: Send + Sync {
         &self,
         class_id: &str,
         prompt_id: &str,
+        binding: &ClassSpeakingBinding,
         wav: Vec<u8>,
     ) -> Result<SpeakingUploadResponse>;
     /// Poll grading for a class speaking attempt.
@@ -326,6 +378,7 @@ pub(crate) trait Api: Send + Sync {
 pub(crate) struct SottoClient {
     inner: GeneratedClient,
     http: reqwest::Client,
+    history_http: reqwest::Client,
     download_http: reqwest::Client,
     base_url: String,
 }

@@ -17,10 +17,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
   const episode = await prisma.episode.findUnique({
     where: { id: episodeId },
-    select: { id: true },
+    select: { id: true, deletedAt: true, assessmentAudioAssessmentId: true },
   });
 
-  if (!episode) {
+  if (!episode || episode.deletedAt || episode.assessmentAudioAssessmentId) {
     return errorResponse('Episode not found', 404);
   }
 

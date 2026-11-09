@@ -15,6 +15,7 @@ import { logger } from '@/lib/logger';
 import { closeRedis } from '@/lib/redis';
 import { processContentExtraction } from '@/workers/content-extraction.worker';
 import { processClassPreparation } from '@/workers/classes/class-preparation.worker';
+import { runQueuedAssessmentWriting } from '@/lib/learning/classes/writing/assessment-writing-run';
 import { processPracticePreparation } from '@/workers/practice/practice-preparation.worker';
 import { processVocabularyAudio } from '@/workers/vocabulary/audio.worker';
 import { processVocabularyIndex } from '@/workers/vocabulary/index.worker';
@@ -90,6 +91,11 @@ logger.info('Starting Sotto workers...', {
 
 // Create workers filtered by WORKER_PROFILE
 const workers = [
+  shouldRun('learning-writing') &&
+    createWorker('learning-writing', runQueuedAssessmentWriting, {
+      concurrency: 2,
+      lockDuration: 300_000,
+    }),
   shouldRun('material-analysis') &&
     createWorker('material-analysis', processMaterialAnalysis, {
       concurrency: 1,

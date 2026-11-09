@@ -24,6 +24,13 @@ provider or cleanup outcomes stay fenced after Redis delivery records disappear.
 replenishes an exhausted vocabulary with reviewed words. Both capture ownership and
 provider authority, retain durable outcomes, and fence uncertain executions.
 
+`interactions.v5` owns saved-class prerequisite work. It captures source and
+provider authority before dispatch, publishes a reviewed addendum with its
+completion receipt, and retains uncertain provider outcomes for recovery. Its
+grant covers the parent, bounded model calls, input/output moderation and a
+small shared retry allowance. Admit and review every direction batch before
+publishing any of them.
+
 PDF generation accepts canonical v1 stitching children and v2 export requests.
 Raw `generate_pdf` payloads are rejected. Both contracts use the same transcript
 renderer and attributed publication transaction. Cancellation propagates through
@@ -57,6 +64,10 @@ model credentials, preserves unknown outcomes, and validates inherited audio aut
 Failures log the original operation and trusted canonical diagnostic codes before
 settlement. Provider messages, source content and private review payloads stay out of logs.
 See `docs/background-preparation.md` for scheduling and recovery semantics.
+
+`learning-writing.v3` executes queued assessment writing with its retained
+ownership, provider selection and one-shot launch. Versions 1 and 2 remain
+synchronous and must never be dispatched by the queue.
 
 | Worker                 | Queue Name             | Concurrency | Input                                                                                                                                                                                                                                                     | Output                                                                                                    |
 | ---------------------- | ---------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |

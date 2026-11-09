@@ -11,6 +11,7 @@
       ]
     },
     "apps/web": {
+      "ignoreDependencies": ["private-redis"],
       "entry": [
         "vitest*.config.ts",
         "scripts/**/*.{ts,mjs}!",

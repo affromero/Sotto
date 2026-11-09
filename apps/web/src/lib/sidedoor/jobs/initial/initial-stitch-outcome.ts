@@ -6,6 +6,7 @@ import { createInitialStitchKey } from '@/lib/audio/stitch-identity';
 import { sottoJobOutbox, sottoJobSnapshot } from '@/lib/sidedoor/jobs/core/job-delivery';
 import { initialStitchPayloadSchema } from '@/lib/sidedoor/jobs/initial/initial-stitch-contract';
 import { resolvePublishedStorageReference } from '@/lib/sidedoor/storage/migration/storage-publication';
+import { verifyAssessmentAudioRecovery } from '@/lib/learning/classes/audio/assessment-audio-recovery';
 
 const fingerprint = z.string().regex(/^[a-f0-9]{64}$/);
 const effect = z.object({ id: z.uuid(), fingerprint }).strict();
@@ -17,7 +18,7 @@ const outcomeSchema = z.discriminatedUnion('kind', [
       versionId: z.uuid(),
       version: z.number().int().nonnegative(),
       audioUrl: z.string().min(1),
-      effects: z.array(effect).length(4),
+      effects: z.array(effect).max(4),
     })
     .strict(),
   z
@@ -26,7 +27,7 @@ const outcomeSchema = z.discriminatedUnion('kind', [
       stitchKey: fingerprint,
       durationSeconds: z.number().nonnegative().finite(),
       limitSeconds: z.number().positive().finite(),
-      effects: z.array(effect).length(2),
+      effects: z.array(effect).max(2),
     })
     .strict(),
   z
@@ -34,7 +35,7 @@ const outcomeSchema = z.discriminatedUnion('kind', [
       kind: z.literal('PROCESSING_FAILED'),
       stitchKey: fingerprint,
       failureCode: z.literal('audio_stitching_failed'),
-      effects: z.array(effect).length(2),
+      effects: z.array(effect).max(2),
     })
     .strict(),
 ]);
@@ -45,12 +46,14 @@ function validateOutcome(parent: OutboxJob, value: unknown): InitialStitchOutcom
     throw new Error('Initial stitching outcome requires its completed parent');
   const { inputs, outputs } = initialStitchPayloadSchema.parse(parent.job.payload);
   const outcome = outcomeSchema.parse(value);
-  const expected =
-    outcome.kind === 'READY'
+  const expected = inputs.storage.associations.assessmentSection
+    ? []
+    : outcome.kind === 'READY'
       ? [outputs.readyNotification, outputs.readyStatus, outputs.pdf, outputs.waveform]
       : [outputs.failedNotification, outputs.failedStatus];
   if (
     outcome.stitchKey !== createInitialStitchKey(parent.fingerprint) ||
+    outcome.effects.length !== expected.length ||
     new Set(outcome.effects.map((item) => item.id)).size !== expected.length ||
     outcome.effects.some((item) => !expected.includes(item.id))
   )
@@ -155,7 +158,8 @@ export async function readInitialStitchOutcome(
 export async function verifyInitialStitchPublication(
   database: Prisma.TransactionClient,
   parent: OutboxJob,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  options: { allowHistoricalAssessment?: boolean } = {}
 ) {
   signal?.throwIfAborted();
   const outcome = await readInitialStitchOutcome(database, parent);
@@ -196,5 +200,18 @@ export async function verifyInitialStitchPublication(
     episodeSource.current.assetId !== versionSource.current.assetId
   )
     throw new Error('Initial stitching publication storage attribution changed');
+  const association = inputs.storage.associations.assessmentSection;
+  if (association)
+    await verifyAssessmentAudioRecovery(database, {
+      episodeId: inputs.episodeId,
+      userId: inputs.storage.userId,
+      generationKey: inputs.generationKey,
+      audioUrl: outcome.audioUrl,
+      version: outcome.version,
+      stitchKey: outcome.stitchKey,
+      association,
+      signal,
+      allowHistoricalAttempt: options.allowHistoricalAssessment,
+    });
   return outcome;
 }

@@ -260,4 +260,26 @@ suite('atomic episode child admission against PostgreSQL and Redis', () => {
     }
     expect((await jobs()).jobs).toHaveLength(2);
   });
+
+  it('refuses to recreate a missing child when replaying a prior batch', async () => {
+    const original = await episode();
+    const missing = { ...child({ episodeId: original.id }), existingOnly: true };
+    await expect(
+      admitDurableQueueBatch({
+        authorize,
+        prepare: async (tx) => {
+          await tx.episode.update({
+            where: { id: original.id },
+            data: { title: 'Must roll back' },
+          });
+          return [missing];
+        },
+      })
+    ).rejects.toThrow('The original durable child is unavailable for replay');
+    expect(
+      (await instance.database.episode.findUniqueOrThrow({ where: { id: original.id } })).title
+    ).toBe('Audio fixture');
+    expect((await jobs()).jobs).toEqual([]);
+    expect(await queue.getJobCounts('wait', 'delayed')).toEqual({ wait: 0, delayed: 0 });
+  });
 });

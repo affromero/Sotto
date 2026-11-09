@@ -9,6 +9,7 @@ import {
   IncorporationAdmissionError,
   readIncorporationInputs,
   requireIncorporationAttempt,
+  requireIncorporableEpisode,
 } from '@/lib/sidedoor/jobs/stitch/incorporation';
 
 const id = z.string().min(1).max(200);
@@ -33,6 +34,17 @@ export const incorporationPayloadSchema = z
             classSection: z.object({ id, classId: id }).strict().nullable(),
             examSection: z.object({ id, examId: id }).strict().nullable(),
             practiceSession: id.nullable(),
+            assessmentSection: z
+              .object({
+                id,
+                assessmentId: id,
+                classId: id,
+                classAttempt: z.number().int().positive(),
+                currentClassAttempt: z.number().int().positive(),
+                assessmentAttempt: z.number().int().positive(),
+              })
+              .strict()
+              .optional(),
           })
           .strict(),
       })
@@ -54,6 +66,7 @@ export async function readIncorporationWork(
   });
   if (work.complete) return work;
   const { payload } = work;
+  await requireIncorporableEpisode(database, payload.episodeId);
   await requireIncorporationAttempt(
     database,
     payload.interactionId,

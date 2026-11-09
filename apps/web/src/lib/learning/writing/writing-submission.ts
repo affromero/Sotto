@@ -14,8 +14,13 @@ import { validateSottoExecutionCredential } from '../../sidedoor/credentials/run
 import { gradeWriting } from '../../writing-grader';
 import type { SottoProviderExecution } from '../../sidedoor/credentials/runtime/provider-execution';
 import { readSkillRequirements } from '../skill-requirements';
-import { isCurrentClassSection } from '../classes/current-sections';
+import { isCurrentClassSection } from '../classes/progress/current-sections';
 import { sottoTransaction } from '../../sidedoor/access/state/transaction';
+import {
+  InitialA1PracticeBlocked,
+  readInitialA1PracticeAuthorization,
+  requireInitialA1PracticeAccess,
+} from '../../classes/lesson/initial-a1-provenance';
 
 export class LearningWritingError extends Error {
   constructor(
@@ -84,15 +89,27 @@ export async function submitLearningWriting(options: {
   execution: SottoProviderExecution;
 }) {
   const { kind, parentId, promptId, userId, text, execution } = options;
+  if (execution.userId !== userId) throw new LearningWritingError('Writing prompt not found', 404);
   const preflight = await sottoTransaction(
     prisma,
     async (database) => {
-      await execution.authorize(database);
+      const actor = await execution.authorize(database);
+      if (actor.userId !== userId) throw new LearningWritingError('Writing prompt not found', 404);
       const captured = await readOwnedWriting(database, kind, parentId, promptId, userId);
-      const latest = await database.writingResponse.findFirst({
+      let latest = await database.writingResponse.findFirst({
         where: { promptId, userId, attempt: captured.attempt },
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       });
+      if (latest && !writingFeedbackSchema.safeParse(latest).success) {
+        await reconcileWritingResponse(database, latest.id);
+        latest = await database.writingResponse.findUnique({ where: { id: latest.id } });
+      }
+      if (
+        latest &&
+        !writingFeedbackSchema.safeParse(latest).success &&
+        !(await writingFailureDrained(database, latest.gradingState))
+      )
+        return { captured, recoveryPending: true as const };
       if (latest?.text.trim() === text.trim()) {
         const saved = writingFeedbackSchema.safeParse(latest);
         if (saved.success)
@@ -105,10 +122,25 @@ export async function submitLearningWriting(options: {
             },
           };
       }
+      if (kind === 'CLASS') {
+        try {
+          await requireInitialA1PracticeAccess(database, parentId, userId);
+        } catch (error) {
+          if (error instanceof InitialA1PracticeBlocked)
+            return { captured, prerequisiteBlocked: true as const };
+          throw error;
+        }
+      }
       return { captured };
     },
     { signal: execution.signal }
   );
+  if ('recoveryPending' in preflight)
+    throw new LearningWritingError(
+      'The previous writing grade is pending or has an unknown outcome. Check the saved response before submitting again.',
+      409
+    );
+  if ('prerequisiteBlocked' in preflight) throw new InitialA1PracticeBlocked();
   if (preflight.cachedGrade) return preflight.cachedGrade;
   const ai = await resolveCapturedLearningAi(userId, execution);
   const moderation = await captureLearningModerationCredential(execution);
@@ -123,7 +155,8 @@ export async function submitLearningWriting(options: {
   const admission = await sottoTransaction(
     prisma,
     async (database) => {
-      await execution.authorize(database);
+      const actor = await execution.authorize(database);
+      if (actor.userId !== userId) throw new LearningWritingError('Writing prompt not found', 404);
       const captured = await readOwnedWriting(database, kind, parentId, promptId, userId);
       if (ai.execution.credential)
         await validateSottoExecutionCredential(
@@ -154,10 +187,7 @@ export async function submitLearningWriting(options: {
         !writingFeedbackSchema.safeParse(latest).success &&
         !(await writingFailureDrained(database, latest.gradingState))
       )
-        throw new LearningWritingError(
-          'The previous writing grade is pending or has an unknown outcome. Check the saved response before submitting again.',
-          409
-        );
+        return { captured, recoveryPending: true as const };
       if (latest?.text.trim() === text.trim()) {
         const saved = writingFeedbackSchema.safeParse(latest);
         if (saved.success) {
@@ -168,6 +198,17 @@ export async function submitLearningWriting(options: {
             cachedGrade: { overallScore, corrections, feedback },
           };
         }
+      }
+      let classAuthorization;
+      try {
+        classAuthorization =
+          kind === 'CLASS'
+            ? await readInitialA1PracticeAuthorization(database, parentId, userId)
+            : undefined;
+      } catch (error) {
+        if (error instanceof InitialA1PracticeBlocked)
+          return { captured, prerequisiteBlocked: true as const };
+        throw error;
       }
       const pending = await database.writingResponse.create({
         data: {
@@ -184,13 +225,25 @@ export async function submitLearningWriting(options: {
         courseId: captured.courseId,
         execution,
         selection,
+        classAuthorization,
       });
       return { captured, responseId: pending.id, operation };
     },
     { signal: execution.signal }
   );
+  if ('recoveryPending' in admission)
+    throw new LearningWritingError(
+      'The previous writing grade is pending or has an unknown outcome. Check the saved response before submitting again.',
+      409
+    );
+  if ('prerequisiteBlocked' in admission) throw new InitialA1PracticeBlocked();
   if ('cachedGrade' in admission) return admission.cachedGrade!;
   const validate = async (database: Prisma.TransactionClient) => {
+    if (kind === 'CLASS') {
+      const authorization = await readInitialA1PracticeAuthorization(database, parentId, userId);
+      if (!isDeepStrictEqual(authorization, admission.operation!.classAuthorization))
+        throw new InitialA1PracticeBlocked();
+    }
     const current = await readOwnedWriting(database, kind, parentId, promptId, userId);
     if (!isDeepStrictEqual(current, admission.captured))
       throw new LearningWritingError('Writing material changed while grading.', 409);

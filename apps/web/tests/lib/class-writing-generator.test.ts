@@ -1,5 +1,4 @@
 // @vitest-environment node
-// Writing content, bounded repair and class persistence through canonical processing.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { SourceDocuments } from '@/lib/providers/ai';
 import {
@@ -68,7 +67,8 @@ vi.mock('@/lib/providers/ai', () => ({
 }));
 
 const mockLoadAndRender = vi.fn();
-vi.mock('@/lib/prompt-loader', () => ({
+vi.mock('@/lib/prompt-loader', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/prompt-loader')>()),
   loadAndRender: (...a: unknown[]) => mockLoadAndRender(...a),
 }));
 vi.mock('@/lib/usage-logger', () => ({ logUsage: vi.fn() }));

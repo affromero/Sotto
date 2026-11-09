@@ -69,6 +69,8 @@ export async function executeLearningCliOnce(input: {
   operation: LearningCliOperation;
   signal: AbortSignal;
   unresolved: () => void;
+  beforeDispatch?: () => Promise<void>;
+  validateResponse?: (response: AIResponse) => Promise<void>;
 }): Promise<AIResponse> {
   const binding = structuredClone(input.binding);
   if (
@@ -119,6 +121,17 @@ export async function executeLearningCliOnce(input: {
     });
     await admission.validate(input.signal);
     if (getCodexSshHost()) throw new Error('The admitted local CLI backend changed.');
+    await input.beforeDispatch?.();
+    await admission.validate(input.signal);
+    await sottoTransaction(
+      prisma,
+      async (database) => {
+        await input.operation.validateBinding(database, binding);
+        await input.ai.execution.authorize(database);
+      },
+      { signal: input.signal }
+    );
+    if (getCodexSshHost()) throw new Error('The admitted local CLI backend changed.');
     input.signal.throwIfAborted();
     dispatched = true;
     const response = await createAIProvider(input.ai.provider).generateResponse(
@@ -132,6 +145,7 @@ export async function executeLearningCliOnce(input: {
     );
     if (Buffer.byteLength(JSON.stringify(response), 'utf8') > input.responseLimit)
       throw new Error('The invocation response exceeds its receipt byte budget.');
+    await input.validateResponse?.(response);
     await admission.validate(input.signal);
     if (getCodexSshHost()) throw new Error('The admitted local CLI backend changed.');
     const receipt = { inputDigest: input.inputDigest, attempt, binding, response };

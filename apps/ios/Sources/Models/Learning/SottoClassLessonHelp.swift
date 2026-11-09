@@ -64,8 +64,8 @@ struct SottoClassLessonHelpResponse: Decodable {
         case errorMessage = "error"
     }
 
-    func validate(for teaching: SottoClassTeaching) throws {
-        guard request.sourceHash == teaching.sourceHash else {
+    func validate(for teaching: SottoClassTeaching, revision: String?) throws {
+        guard let revision, request.sourceHash == revision else {
             throw SottoAPIError.message("The saved lesson changed. Reopen the class before requesting help.")
         }
         guard request.attempt > 0, UUID(uuidString: request.operationId) != nil,

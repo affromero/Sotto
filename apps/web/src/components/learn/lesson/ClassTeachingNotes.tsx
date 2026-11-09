@@ -5,12 +5,19 @@ import { LearningSelectionMenu } from '../LearningSelectionMenu';
 import type { ClassIntroData } from '../classTypes';
 import styles from './ClassTeachingNotes.module.css';
 import { ClassLanguageHelp } from './ClassLanguageHelp';
+import { ClassPrerequisite } from './ClassPrerequisite';
+import type { ClassPrerequisiteDirections } from './prerequisiteTypes';
+import { TaskDirection } from './TaskDirection';
 interface ClassTeachingNotesProps {
   classId: string;
   courseId: string;
   intro: ClassIntroData;
   teaching?: ClassTeaching;
   collapsible?: boolean;
+  prerequisiteSourceHash?: string | null;
+  lessonHelpRevision?: string | null;
+  prerequisiteDirections?: ClassPrerequisiteDirections | null;
+  onDirectionsChange?: (value: ClassPrerequisiteDirections | null) => void;
 }
 /** Keep accepted teaching available before and throughout the class activities. */
 export function ClassTeachingNotes({
@@ -19,6 +26,10 @@ export function ClassTeachingNotes({
   intro,
   teaching,
   collapsible = false,
+  prerequisiteSourceHash,
+  lessonHelpRevision,
+  prerequisiteDirections,
+  onDirectionsChange,
 }: ClassTeachingNotesProps) {
   const visuals = intro.visuals;
   const showAbout = !intro.examples.some(
@@ -125,7 +136,14 @@ export function ClassTeachingNotes({
   );
   const content = teaching ? (
     <div className={styles.root}>
-      <ClassLanguageHelp classId={classId} teaching={teaching} />
+      {prerequisiteSourceHash && (
+        <ClassPrerequisite
+          classId={classId}
+          sourceHash={prerequisiteSourceHash}
+          onDirectionsChange={onDirectionsChange}
+        />
+      )}
+      <ClassLanguageHelp classId={classId} teaching={teaching} revision={lessonHelpRevision} />
       <LearningSelectionMenu
         courseId={courseId}
         sourceType="CLASS"
@@ -201,6 +219,13 @@ export function ClassTeachingNotes({
           >
             <h3 className={styles.sectionTitle}>Try it first</h3>
             <p>{teaching.guidedPractice.prompt}</p>
+            {prerequisiteDirections && (
+              <TaskDirection
+                id="prerequisite-guided-direction"
+                text={prerequisiteDirections.directions.guided}
+                language={prerequisiteDirections.nativeLang}
+              />
+            )}
             <p className={styles.exampleNote}>
               <strong>Hint: </strong>
               {teaching.guidedPractice.hint}

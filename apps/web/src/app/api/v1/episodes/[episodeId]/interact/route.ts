@@ -9,6 +9,11 @@ import type { ProcessInteractionPayload } from '@/lib/queue';
 import { errorResponse } from '@/lib/api-response';
 import { requireOriginalSottoAdmission } from '@/lib/sidedoor/access/core/request-identity';
 import { randomUUID } from 'node:crypto';
+import { isAccessError } from 'thesidedoor-core/access';
+import {
+  InteractionEpisodeNotFoundError,
+  readInteractionEpisode,
+} from '@/lib/sidedoor/jobs/interaction-access';
 type RouteParams = { params: Promise<{ episodeId: string }> };
 
 export async function POST(request: NextRequest, { params }: RouteParams) {
@@ -18,6 +23,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   if (!authResult) {
     return errorResponse('Unauthorized', 401);
   }
+  const headers = { 'Cache-Control': 'private, no-store' };
 
   // Rate limit: 60/hour
   const hourly = await checkRateLimit(`interact:hour:${authResult.userId}`, 60, 3600);
@@ -27,11 +33,18 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
   const episode = await prisma.episode.findUnique({
     where: { id: episodeId },
-    select: { id: true, userId: true, title: true, visibility: true },
+    select: {
+      id: true,
+      userId: true,
+      title: true,
+      visibility: true,
+      assessmentAudioAssessmentId: true,
+      assessmentSection: { select: { id: true } },
+    },
   });
 
-  if (!episode) {
-    return errorResponse('Episode not found', 404);
+  if (!episode || episode.assessmentSection || episode.assessmentAudioAssessmentId) {
+    return errorResponse('Episode not found', 404, undefined, headers);
   }
 
   // Ownership/visibility guard mirrors the GET poll route: a non-owner may only
@@ -40,7 +53,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   const isEpisodeOwner = episode.userId === authResult.userId;
   const isShared = episode.visibility === 'UNLISTED';
   if (!isEpisodeOwner && !isShared) {
-    return errorResponse('Episode not found', 404);
+    return errorResponse('Episode not found', 404, undefined, headers);
   }
 
   const body = await request.json();
@@ -63,35 +76,45 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   };
 
   let interaction: Awaited<ReturnType<typeof prisma.interaction.create>> | null = null;
-  await admitDurableJob(interactionQueue, JobType.PROCESS_INTERACTION, payload, {
-    jobId: `interaction-${interactionId}`,
-    authorize: async (database) => {
-      await requireOriginalSottoAdmission(database, request, authResult);
-      const current = await database.episode.findUnique({
-        where: { id: episodeId },
-        select: { userId: true, visibility: true },
-      });
-      if (!current || (current.userId !== authResult.userId && current.visibility !== 'UNLISTED'))
-        throw new Error('Episode interaction authority changed');
-      return { userId: authResult.userId };
-    },
-    mutate: async (database) => {
-      interaction = await database.interaction.create({
-        data: {
-          id: interactionId,
-          episodeId,
-          userId: authResult.userId,
-          question,
-          timestamp,
-          status: 'PENDING',
-        },
-        include: {
-          user: { select: { id: true, name: true, image: true } },
-        },
-      });
-    },
-  });
+  try {
+    await admitDurableJob(interactionQueue, JobType.PROCESS_INTERACTION, payload, {
+      jobId: `interaction-${interactionId}`,
+      authorize: async (database) => {
+        await requireOriginalSottoAdmission(database, request, authResult);
+        const current = await readInteractionEpisode(database, episodeId);
+        if (current.userId !== authResult.userId && current.visibility !== 'UNLISTED')
+          throw new InteractionEpisodeNotFoundError();
+        return { userId: authResult.userId };
+      },
+      mutate: async (database) => {
+        interaction = await database.interaction.create({
+          data: {
+            id: interactionId,
+            episodeId,
+            userId: authResult.userId,
+            question,
+            timestamp,
+            status: 'PENDING',
+          },
+          include: {
+            user: { select: { id: true, name: true, image: true } },
+          },
+        });
+      },
+    });
+  } catch (error) {
+    if (error instanceof InteractionEpisodeNotFoundError)
+      return errorResponse('Episode not found', 404, undefined, headers);
+    if (isAccessError(error))
+      return errorResponse(
+        error.message,
+        error.code === 'unauthorized' ? 401 : 409,
+        undefined,
+        headers
+      );
+    throw error;
+  }
   if (!interaction) throw new Error('Interaction admission did not commit');
 
-  return NextResponse.json(interaction, { status: 201 });
+  return NextResponse.json(interaction, { status: 201, headers });
 }

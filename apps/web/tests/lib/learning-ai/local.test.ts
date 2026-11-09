@@ -176,6 +176,78 @@ suite('Local learning generation', () => {
     expect(ai.apiKey).toBe('private-ai-secret');
     expect(ai.endpoint).toBe(endpoint);
   });
+  it('applies the captured provider admission at the actual speech request boundary', async () => {
+    const speechEndpoint = 'http://localhost:8000/v1';
+    await instance.configureInfrastructure({
+      sttProvider: 'local',
+      sttBaseUrl: speechEndpoint,
+      sttModel: 'whisper-small',
+    });
+    await getServerInfra();
+    const sent: string[] = [];
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      sent.push(new Request(input, init).url);
+      return Response.json({ text: 'Hallo!', language: 'de', segments: [] });
+    });
+    let allowed = false;
+    const observed: string[] = [];
+    const stt = await resolveCapturedSttProvider({
+      userId: identity.ownerId,
+      execution: {
+        ...execution(),
+        providerRequest: async (request, dispatch) => {
+          observed.push(request.url);
+          if (!allowed) throw new Error('The reviewed lesson changed');
+          return dispatch();
+        },
+      },
+      requestedProvider: 'local',
+      language: 'de',
+    });
+    await expect(stt.provider.transcribe(Buffer.from('audio'))).rejects.toThrow();
+    expect(sent).toEqual([]);
+    allowed = true;
+    expect(await stt.provider.transcribe(Buffer.from('audio'))).toMatchObject({ text: 'Hallo!' });
+    expect(observed.length).toBeGreaterThanOrEqual(2);
+    expect(observed.every((url) => url === `${speechEndpoint}/audio/transcriptions`)).toBe(true);
+    expect(sent).toEqual([`${speechEndpoint}/audio/transcriptions`]);
+  });
+  it('applies provider admission to asynchronous speech upload, submission and polling', async () => {
+    await instance.seedProfileCredential(identity.ownerId, 'stt', 'assemblyai', {
+      apiKey: 'assembly-test-key',
+    });
+    await instance.configureInfrastructure({ sttProvider: 'assemblyai' });
+    await getServerInfra();
+    const observed: string[] = [];
+    const sent: string[] = [];
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      const request = new Request(input, init);
+      sent.push(`${request.method} ${request.url}`);
+      if (request.url.endsWith('/upload'))
+        return Response.json({ upload_url: 'https://audio.example/file' });
+      if (request.method === 'POST') return Response.json({ id: 'transcript-1', status: 'queued' });
+      return Response.json({ status: 'completed', text: 'Hallo!', utterances: [] });
+    });
+    const stt = await resolveCapturedSttProvider({
+      userId: identity.ownerId,
+      execution: {
+        ...execution(),
+        providerRequest: async (request, dispatch) => {
+          observed.push(`${request.method} ${request.url}`);
+          return dispatch();
+        },
+      },
+      requestedProvider: 'assemblyai',
+      language: 'de',
+    });
+    expect(await stt.provider.transcribe(Buffer.from('audio'))).toMatchObject({ text: 'Hallo!' });
+    expect(observed).toEqual([
+      'POST https://api.assemblyai.com/v2/upload',
+      'POST https://api.assemblyai.com/v2/transcript',
+      'GET https://api.assemblyai.com/v2/transcript/transcript-1',
+    ]);
+    expect(sent).toEqual(observed);
+  }, 15_000);
   it('uses the shared local endpoint without a personal preference', async () => {
     await instance.configureInfrastructure({
       aiProvider: 'local',

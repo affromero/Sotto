@@ -2,18 +2,22 @@ import Foundation
 
 extension SottoAppModel {
     func openWorkbook(for classId: String, pencil: Bool) async {
-        if !pencil { await openWorkbookPDF(for: classId); return }
-        await openClass(classId)
-        if selectedClass?.id == classId { pencilWorkbook = true }
+        beginClassPrelude(classId, destination: pencil ? .pencil : .pdf)
     }
 
-    func openWorkbookPDF(for classId: String) async {
+    func openWorkbookPDF(for classId: String, navigationId: UUID? = nil) async {
         guard let client = makeClient() else { return }
         isLoading = true
         errorMessage = nil
-        do { workbook = try await client.fetchWorksheet(classId: classId) }
-        catch { report(error) }
-        isLoading = false
+        do {
+            let result = try await client.fetchWorksheet(classId: classId)
+            guard !Task.isCancelled, isCurrentLearningClient(client), navigationId == nil || classPreludeNavigation?.id == navigationId else { return }
+            workbook = result
+        } catch {
+            guard !Task.isCancelled, isCurrentLearningClient(client), navigationId == nil || classPreludeNavigation?.id == navigationId else { return }
+            report(error)
+        }
+        if isCurrentLearningClient(client), navigationId == nil || classPreludeNavigation?.id == navigationId { isLoading = false }
     }
 
     func interpretPencilAnswer(classId: String, answer: SottoPencilRequest) async throws -> SottoPencilProposal {

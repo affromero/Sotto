@@ -373,6 +373,7 @@ export async function extractReadingVocabulary(options: {
   nativeLang: string;
   targetLang: string;
   level: string;
+  readingQuestionMode?: 'generated' | 'saved';
   questions: readonly {
     id: string;
     question: string;
@@ -381,7 +382,7 @@ export async function extractReadingVocabulary(options: {
     passageText?: string | null;
   }[];
 }): Promise<ReadingVocabulary> {
-  assertReadingQuestionKeys(options.questions);
+  assertReadingQuestionKeys(options.questions, options.readingQuestionMode);
   const passages = new Set(
     options.questions.map((question) => question.passageText).filter(Boolean)
   );

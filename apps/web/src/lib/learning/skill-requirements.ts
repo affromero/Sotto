@@ -2,6 +2,7 @@ import {
   createSkillRequirements,
   skillRequirementsSchema,
   type SkillRequirements,
+  type CefrLevel,
 } from '@sotto/shared';
 import { prismaUnfiltered } from '../prisma';
 import { getSiteConfig } from '../site-config';
@@ -159,4 +160,22 @@ export async function resolveSkillRequirementsInTransaction(
 export function readSkillRequirements(value: unknown): SkillRequirements | null {
   if (value === null || value === undefined) return null;
   return skillRequirementsSchema.parse(value);
+}
+
+/** Older saved classes retain the five skills they originally required. */
+export function classRequirementsOrLegacy(
+  value: unknown,
+  context: { nativeLang: string; targetLang: string; level: string }
+): SkillRequirements {
+  return (
+    readSkillRequirements(value) ??
+    createSkillRequirements({
+      scope: 'CLASS',
+      nativeLang: context.nativeLang,
+      targetLang: context.targetLang,
+      level: context.level as CefrLevel,
+      ttsProvider: 'legacy',
+      sttProvider: 'legacy',
+    })
+  );
 }

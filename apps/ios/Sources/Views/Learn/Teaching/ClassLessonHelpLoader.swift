@@ -3,6 +3,7 @@ import Foundation
 @MainActor
 struct ClassLessonHelpLoader {
     let teaching: SottoClassTeaching
+    let revision: String?
     let read: () async throws -> SottoClassLessonHelpResponse
     let start: (SottoClassLessonHelpRequest) async throws -> SottoClassLessonHelpResponse
     let pause: () async throws -> Void
@@ -10,12 +11,14 @@ struct ClassLessonHelpLoader {
 
     init(
         teaching: SottoClassTeaching,
+        revision: String?,
         read: @escaping () async throws -> SottoClassLessonHelpResponse,
         start: @escaping (SottoClassLessonHelpRequest) async throws -> SottoClassLessonHelpResponse,
         pause: @escaping () async throws -> Void = { try await Task.sleep(for: .seconds(2)) },
         timeout: Duration = .seconds(600)
     ) {
         self.teaching = teaching
+        self.revision = revision
         self.read = read
         self.start = start
         self.pause = pause
@@ -30,7 +33,7 @@ struct ClassLessonHelpLoader {
 
         func accept(_ value: SottoClassLessonHelpResponse) throws -> SottoClassLessonHelpResponse {
             try Task.checkCancellation()
-            try value.validate(for: teaching)
+            try value.validate(for: teaching, revision: revision)
             update(value)
             return value
         }

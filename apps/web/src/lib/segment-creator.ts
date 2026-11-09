@@ -13,6 +13,13 @@ export type AudioQueueAdmission = (
     }
 ) & {
   onPrepared?: (database: Prisma.TransactionClient, audioGenerationKey: string) => Promise<void>;
+  reservation?: {
+    generationKey: string;
+    reconcile: (
+      database: Prisma.TransactionClient,
+      generationKey: string
+    ) => Promise<'CREATE' | 'REPLAY'>;
+  };
 };
 
 function children(
@@ -45,19 +52,55 @@ export async function createSegmentsAndQueueAudio(
   turns: Array<{ speaker: string; text: string; direction?: string }>,
   admission: AudioQueueAdmission
 ): Promise<void> {
-  const audioGenerationKey = randomUUID();
-  const { onPrepared, ...authority } = admission;
+  const capturedTurns = structuredClone(turns);
+  const audioGenerationKey = admission.reservation?.generationKey ?? randomUUID();
+  const { onPrepared, reservation, ...authority } = admission;
+  const reconcile = reservation?.reconcile;
+  if (!audioGenerationKey.trim()) throw new Error('Audio generation key is required');
   await admitDurableQueueBatch({
     ...authority,
     prepare: async (database) => {
+      const mode = reconcile ? await reconcile(database, audioGenerationKey) : 'CREATE';
+      if (mode !== 'CREATE' && mode !== 'REPLAY')
+        throw new Error('Invalid audio reservation state');
+      if (mode === 'REPLAY') {
+        const episode = await database.episode.findUniqueOrThrow({
+          where: { id: episodeId },
+          select: { audioGenerationKey: true, status: true },
+        });
+        const segments = await database.segment.findMany({
+          where: { episodeId },
+          orderBy: { order: 'asc' },
+          select: { id: true, version: true, order: true, speaker: true, text: true },
+        });
+        if (
+          episode.audioGenerationKey !== audioGenerationKey ||
+          !['GENERATING_AUDIO', 'STITCHING', 'READY'].includes(episode.status) ||
+          segments.length !== capturedTurns.length ||
+          segments.some(
+            (segment, index) =>
+              segment.order !== index ||
+              segment.speaker !== capturedTurns[index]?.speaker ||
+              segment.text !== capturedTurns[index]?.text
+          )
+        )
+          throw new Error('The reserved audio generation changed');
+        await onPrepared?.(database, audioGenerationKey);
+        return children(
+          episodeId,
+          audioGenerationKey,
+          segments,
+          capturedTurns.map((turn) => turn.direction)
+        ).map((child) => ({ ...child, existingOnly: true }));
+      }
       await database.episode.update({
         where: { id: episodeId },
         data: { audioGenerationKey, status: 'GENERATING_AUDIO' },
       });
       await onPrepared?.(database, audioGenerationKey);
       const segments: AudioSegment[] = [];
-      for (let index = 0; index < turns.length; index++) {
-        const turn = turns[index]!;
+      for (let index = 0; index < capturedTurns.length; index++) {
+        const turn = capturedTurns[index]!;
         segments.push(
           await database.segment.upsert({
             where: { episodeId_order: { episodeId, order: index } },
@@ -76,13 +119,13 @@ export async function createSegmentsAndQueueAudio(
         );
       }
       await database.segment.deleteMany({
-        where: { episodeId, order: { gte: turns.length } },
+        where: { episodeId, order: { gte: capturedTurns.length } },
       });
       return children(
         episodeId,
         audioGenerationKey,
         segments,
-        turns.map((turn) => turn.direction)
+        capturedTurns.map((turn) => turn.direction)
       );
     },
   });
@@ -97,6 +140,7 @@ export async function restartExistingSegmentAudio(
   let count = 0;
   await admitDurableQueueBatch({
     ...admission,
+    distinguishDeliveryFailure: true,
     prepare: async (database) => {
       const existing = await database.segment.findMany({
         where: { episodeId },
@@ -120,6 +164,7 @@ export async function restartExistingSegmentAudio(
             select: { id: true, version: true, speaker: true, text: true },
           })
         );
+      await admission.onPrepared?.(database, audioGenerationKey);
       count = segments.length;
       return children(episodeId, audioGenerationKey, segments);
     },

@@ -35,6 +35,7 @@ const mockTransaction = vi.fn();
 
 vi.mock('@/lib/prisma', () => {
   const txProxy = {
+    $queryRaw: vi.fn().mockResolvedValue([]),
     episode: {
       findUnique: (...args: unknown[]) => mockEpisodeFindUnique(...args),
       update: (...args: unknown[]) => mockEpisodeUpdate(...args),
@@ -47,6 +48,14 @@ vi.mock('@/lib/prisma', () => {
   };
   return { prisma: txProxy, prismaUnfiltered: txProxy };
 });
+
+vi.mock('@/lib/sidedoor/access/state/transaction', () => ({
+  sottoTransaction: async (database: unknown, operation: (database: unknown) => Promise<unknown>) =>
+    operation(database),
+}));
+vi.mock('@/lib/sidedoor/access/core/request-identity', () => ({
+  requireOriginalSottoAdmission: vi.fn().mockResolvedValue(undefined),
+}));
 
 const mockAuthenticateRequest = vi.fn();
 vi.mock('@/lib/api-keys', () => ({
@@ -96,6 +105,8 @@ const baseEpisode = {
   id: 'pod-1',
   title: 'Test Episode',
   status: 'READY',
+  updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+  currentVersion: 1,
   audioUrl: 'https://r2.example.com/audio.mp3',
   visibility: 'UNLISTED',
   userId: 'user-1',
@@ -129,14 +140,15 @@ beforeEach(() => {
 
 describe('episode cache behavior', () => {
   describe('GET cache', () => {
-    it('returns cached data on cache hit without hitting Prisma', async () => {
+    it('rechecks episode access before returning cached data', async () => {
       mockCacheGet.mockResolvedValue(baseEpisode);
+      mockEpisodeFindUnique.mockResolvedValue(baseEpisode);
 
       const res = await getEpisode(makeRequest(), routeParams);
       const json = await res.json();
 
       expect(json.title).toBe('Test Episode');
-      expect(mockEpisodeFindUnique).not.toHaveBeenCalled();
+      expect(mockEpisodeFindUnique).toHaveBeenCalledOnce();
       expect(mockCacheGet).toHaveBeenCalledWith('episode:public:pod-1');
     });
 

@@ -8,6 +8,10 @@ export type StorageDeletionScope =
   | { kind: 'material'; id: string }
   | { kind: 'material-upload'; id: string };
 
+/** Class inventory is read-only. Callers must prove episode ownership, recording cascade and cleanup attribution. */
+export type StorageDeletionInventoryScope =
+  StorageDeletionScope | { kind: 'class'; id: string; episodeIds: readonly string[] };
+
 export function ownedStorageReferences(
   values: Array<string | null | undefined>,
   publicUrl?: string
@@ -42,6 +46,27 @@ export interface StorageDeletionReferencePage {
   rows: Array<{ id: string; references: Record<string, string>; episodePrefix?: string }>;
 }
 
+function speakingReference(row: {
+  assessmentSectionId: string | null;
+  referenceTtsUrl: string | null;
+  assessmentReference: { currentUrl: string } | null;
+}) {
+  if (!row.assessmentSectionId) return row.referenceTtsUrl;
+  if (Boolean(row.referenceTtsUrl) !== Boolean(row.assessmentReference))
+    throw new Error('Assessment speaking locator is inconsistent');
+  return row.assessmentReference?.currentUrl ?? null;
+}
+
+function recordingReference(row: {
+  assessmentSectionId: string | null;
+  assessmentAudioUrl: string | null;
+  audioUrl: string;
+}) {
+  if (!row.assessmentSectionId) return row.audioUrl;
+  if (!row.assessmentAudioUrl) throw new Error('Assessment recording locator is missing');
+  return row.assessmentAudioUrl;
+}
+
 /**
  * Persist each page before cascading source rows, using the caller's Serializable transaction.
  * Raw references retain field provenance and unknown historical URLs for explicit classification.
@@ -49,7 +74,7 @@ export interface StorageDeletionReferencePage {
  */
 export async function visitStorageDeletionReferences(
   database: Prisma.TransactionClient,
-  scope: StorageDeletionScope,
+  scope: StorageDeletionInventoryScope,
   visit: (page: StorageDeletionReferencePage) => Promise<void>
 ) {
   async function pages<Row extends { id: string }>(
@@ -90,6 +115,102 @@ export async function visitStorageDeletionReferences(
         }),
       ({ originalUrl }) => ({ originalUrl })
     );
+  }
+  if (scope.kind === 'class') {
+    const episodeWhere: Prisma.EpisodeWhereInput = { id: { in: [...scope.episodeIds] } };
+    const classSections = await database.classSection.findMany({
+      where: { classId: scope.id },
+      select: { id: true },
+    });
+    const promptWhere: Prisma.SpeakingPromptWhereInput = {
+      OR: [
+        { section: { classId: scope.id } },
+        { assessmentSection: { assessment: { classId: scope.id } } },
+      ],
+    };
+    await pages(
+      'episode',
+      (after) =>
+        database.episode.findMany({
+          ...page,
+          where: { AND: [episodeWhere, afterId(after)] },
+          select: {
+            id: true,
+            audioUrl: true,
+            pdfUrl: true,
+            waveformUrl: true,
+            spectrogramUrl: true,
+          },
+        }),
+      ({ audioUrl, pdfUrl, waveformUrl, spectrogramUrl }) => ({
+        audioUrl,
+        pdfUrl,
+        waveformUrl,
+        spectrogramUrl,
+      })
+    );
+    await pages(
+      'segment',
+      (after) =>
+        database.segment.findMany({
+          ...page,
+          where: { episode: episodeWhere, ...afterId(after) },
+          select: { id: true, audioUrl: true },
+        }),
+      ({ audioUrl }) => ({ audioUrl })
+    );
+    await pages(
+      'version',
+      (after) =>
+        database.episodeVersion.findMany({
+          ...page,
+          where: { episode: episodeWhere, ...afterId(after) },
+          select: { id: true, audioUrl: true },
+        }),
+      ({ audioUrl }) => ({ audioUrl })
+    );
+    await pages(
+      'class',
+      (after) =>
+        database.courseClass.findMany({
+          ...page,
+          where: { AND: [{ id: scope.id }, afterId(after)] },
+          select: { id: true, worksheetPdfUrl: true },
+        }),
+      ({ worksheetPdfUrl }) => ({ worksheetPdfUrl })
+    );
+    await pages(
+      'prompt',
+      (after) =>
+        database.speakingPrompt.findMany({
+          ...page,
+          where: { ...promptWhere, ...afterId(after) },
+          select: {
+            id: true,
+            assessmentSectionId: true,
+            referenceTtsUrl: true,
+            assessmentReference: { select: { currentUrl: true } },
+          },
+        }),
+      (prompt) => ({ referenceTtsUrl: speakingReference(prompt) })
+    );
+    await pages(
+      'recording',
+      (after) =>
+        database.speakingRecording.findMany({
+          ...page,
+          where: {
+            OR: [
+              { prompt: promptWhere },
+              { sectionId: { in: classSections.map((section) => section.id) } },
+            ],
+            ...afterId(after),
+          },
+          select: { id: true, audioUrl: true, assessmentAudioUrl: true, assessmentSectionId: true },
+        }),
+      (recording) => ({ audioUrl: recordingReference(recording) })
+    );
+    return;
   }
   // Completed-upload cleanup fences transfer work without touching the retained document.
   if (scope.kind === 'material-upload') {
@@ -139,6 +260,7 @@ export async function visitStorageDeletionReferences(
             { section: { class: courseWhere } },
             { practiceSession: courseWhere },
             { examSection: { exam: courseWhere } },
+            { assessmentSection: { assessment: { class: courseWhere } } },
             ...(scope.kind === 'profile' ? [{ examSection: { exam: { userId: scope.id } } }] : []),
           ],
         };
@@ -185,13 +307,13 @@ export async function visitStorageDeletionReferences(
       ({ audioUrl }) => ({ audioUrl })
     );
   }
-  if (scope.kind !== 'course') {
+  if (scope.kind === 'profile') {
     await pages(
       'user',
       (after) =>
         database.user.findMany({
           ...page,
-          where: { AND: [scope.kind === 'profile' ? { id: scope.id } : {}, afterId(after)] },
+          where: { AND: [{ id: scope.id }, afterId(after)] },
           select: { id: true, image: true },
         }),
       ({ image }) => ({ image })
@@ -213,9 +335,14 @@ export async function visitStorageDeletionReferences(
       database.speakingPrompt.findMany({
         ...page,
         where: { ...promptWhere, ...afterId(after) },
-        select: { id: true, referenceTtsUrl: true },
+        select: {
+          id: true,
+          assessmentSectionId: true,
+          referenceTtsUrl: true,
+          assessmentReference: { select: { currentUrl: true } },
+        },
       }),
-    ({ referenceTtsUrl }) => ({ referenceTtsUrl })
+    (prompt) => ({ referenceTtsUrl: speakingReference(prompt) })
   );
   const recordingWhere =
     scope.kind === 'instance'
@@ -229,9 +356,9 @@ export async function visitStorageDeletionReferences(
       database.speakingRecording.findMany({
         ...page,
         where: { ...recordingWhere, ...afterId(after) },
-        select: { id: true, audioUrl: true },
+        select: { id: true, audioUrl: true, assessmentAudioUrl: true, assessmentSectionId: true },
       }),
-    ({ audioUrl }) => ({ audioUrl })
+    (recording) => ({ audioUrl: recordingReference(recording) })
   );
   await pages(
     'focus',

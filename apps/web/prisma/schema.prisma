@@ -99,6 +99,7 @@ model User {
   courseMaterials    CourseMaterial[]
   materialUploadBatches MaterialUploadBatch[]
   classSubmissions   ClassSubmission[]
+  classAssessments   ClassAssessment[]
   speakingRecordings SpeakingRecording[]
   writingResponses   WritingResponse[]
   mockExams          MockExam[]
@@ -342,6 +343,9 @@ model PlaySafetyReceipt {
 
 model Episode {
   learningAudioIdentity Json? // immutable stitched audio and script identity
+  assessmentAudioAssessmentId String?
+  assessmentAudioSectionId    String?
+  assessmentAudioOperationId  String?
   id             String        @id @default(cuid())
   userId         String
   title          String
@@ -422,6 +426,7 @@ model Episode {
   creativeOutline   CreativeOutline?
   vocabularyEntries VocabularyEntry[]
   classSection      ClassSection?
+  assessmentSection ClassAssessmentSection?
   examSection       ExamSection?
   practiceSession   PracticeSession?
 
@@ -1208,6 +1213,7 @@ model Course {
   curriculum        Curriculum                @relation(fields: [curriculumId], references: [id])
   placement         PlacementResult?
   classes           CourseClass[]
+  assessments       ClassAssessment[]
   vocab             LearnerVocab[]
   grammar           LearnerGrammar[]
   vocabEdges        VocabEdge[]
@@ -1227,6 +1233,7 @@ model Course {
   observations     LearningObservation[]
 
   @@unique([userId, nativeLang, targetLang]) // one course per user per language pair
+  @@unique([id, userId])
   @@index([userId])
   @@index([curriculumId])
 }
@@ -1322,6 +1329,7 @@ model CourseClass {
   status            ClassStatus @default(LOCKED)
   attempt           Int         @default(1) // whole-class retry counter
   adaptiveSeed      Json? // { vocabIds, grammarKeys, dueCount } that seeded this class
+  prerequisiteGate  Json? // private, versioned review and acknowledgment receipt
   skillRequirements Json? // versioned required skills and genuine provider exemptions
   learnerAnswers    Json? // selections saved before final submission
   writingDrafts     Json? // learner drafts saved independently of grades
@@ -1339,6 +1347,7 @@ model CourseClass {
   course       Course               @relation(fields: [courseId], references: [id], onDelete: Cascade)
   lesson       Lesson               @relation(fields: [lessonId], references: [id])
   sections     ClassSection[]
+  assessments  ClassAssessment[]
   submission   ClassSubmission?
   reviewEvents LearnerReviewEvent[]
 
@@ -1348,10 +1357,189 @@ model CourseClass {
   @@index([lessonId])
 }
 
+enum ClassAssessmentStatus {
+  GENERATING
+  READY
+  COMMITTED
+  FAILED
+  UNRESOLVED
+  RETIRED
+}
+
+// Held-out material has its own identity and never participates in currentClassSections.
+model ClassAssessment {
+  id                     String @id @default(cuid())
+  classId                String
+  courseId               String
+  userId                 String
+  classAttempt           Int
+  assessmentAttempt      Int
+  materialVersion        Int @default(1)
+  status                 ClassAssessmentStatus @default(GENERATING)
+  requirements           Json
+  formativeRevision      String
+  teachingKind           String?
+  teachingReceiptId      String?
+  reviewedMaterialDigest String?
+  generationOperationId  String? @unique
+  reviewOperationId      String? @unique
+  reviewReceipt          Json?
+  sealedAt               DateTime?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  class      CourseClass @relation(fields: [classId, courseId], references: [id, courseId], onDelete: Cascade)
+  course     Course @relation(fields: [courseId, userId], references: [id, userId], onDelete: Cascade)
+  user       User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sections   ClassAssessmentSection[]
+  providerCalls ClassAssessmentProviderCall[]
+  submission ClassAssessmentSubmission?
+
+  @@unique([classId, classAttempt, assessmentAttempt])
+  @@index([userId, classId])
+}
+
+model ClassAssessmentProviderCall {
+  id                 String @id @default(cuid())
+  assessmentId       String
+  stage              String
+  ordinal            Int
+  role               String
+  inputDigest        String
+  status             String @default("READY")
+  attemptId          String? @unique(map: "ClassAssessmentProviderCall_attempt_key")
+  attemptFingerprint String?
+  responseMetadata   Json?
+  responseBytes      Bytes? @db.ByteA
+  responseSha256     String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  assessment ClassAssessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade, map: "ClassAssessmentProviderCall_assessment_fkey")
+
+  @@unique([assessmentId, stage, ordinal], map: "ClassAssessmentProviderCall_stage_key")
+}
+
+// Retained independently of its parents until assessment, class, and audio are gone.
+model AssessmentAudioSourceFreeze {
+  assessmentId String @id
+  classId      String
+  episodeId    String @unique
+
+  @@index([classId])
+}
+
+// Source media remains independently fenced until its assessment cleanup completes.
+model AssessmentAudioProtectedMedia {
+  assessmentId String
+  classId      String
+  episodeId    String
+
+  @@id([assessmentId, episodeId])
+  @@index([episodeId])
+}
+
+model ClassAssessmentSection {
+  id            String @id @default(cuid())
+  assessmentId  String
+  skill         SkillType
+  passThreshold Float
+  passageText   String? @db.Text
+  episodeId     String? @unique
+  audioReservationEpisodeId String? @unique
+  audioReservationOperationId String?
+  audioIdentity Json? // selected immutable listening content and storage identity
+  authoredDraft Json? // private draft, retained for idempotent section staging
+
+  assessment     ClassAssessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  episode        Episode? @relation(fields: [episodeId], references: [id], onDelete: SetNull)
+  questions      ClassAssessmentQuestion[]
+  speakingPrompts SpeakingPrompt[]
+  writingPrompts WritingPrompt[]
+  speakingRecordings SpeakingRecording[]
+  writingResponses WritingResponse[]
+  productiveEvidence ClassAssessmentProductiveEvidence[]
+
+  @@unique([assessmentId, skill])
+  @@unique([id, assessmentId])
+}
+
+model ClassAssessmentQuestion {
+  id           String @id @default(cuid())
+  assessmentId String
+  sectionId    String
+  order        Int
+  question     String @db.Text
+  options      Json
+  correctIndex Int
+  explanation  String @db.Text
+
+  section ClassAssessmentSection @relation(fields: [sectionId, assessmentId], references: [id, assessmentId], onDelete: Cascade)
+  answers ClassAssessmentAnswer[]
+
+  @@unique([sectionId, order])
+  @@unique([id, assessmentId])
+}
+
+model ClassAssessmentSubmission {
+  id              String @id @default(cuid())
+  assessmentId    String @unique
+  requestDigest   String
+  receipt         Json
+  submittedAt     DateTime @default(now())
+
+  assessment ClassAssessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  answers    ClassAssessmentAnswer[]
+  productiveEvidence ClassAssessmentProductiveEvidence[]
+
+  @@unique([id, assessmentId])
+}
+
+model ClassAssessmentProductiveEvidence {
+  id                   String @id @default(cuid())
+  submissionId         String
+  assessmentId         String
+  sectionId            String
+  promptId             String
+  speakingRecordingId  String? @unique
+  writingResponseId    String? @unique
+  operationId          String @unique
+  operationFingerprint String
+  materialDigest       String
+  inputDigest          String
+  score                Float
+  snapshot             Json
+
+  submission ClassAssessmentSubmission @relation(fields: [submissionId, assessmentId], references: [id, assessmentId], onDelete: Cascade)
+  section ClassAssessmentSection @relation(fields: [sectionId, assessmentId], references: [id, assessmentId], onDelete: Cascade)
+  speakingRecording SpeakingRecording? @relation(fields: [speakingRecordingId, sectionId, promptId], references: [id, assessmentSectionId, promptId], onDelete: NoAction)
+  writingResponse WritingResponse? @relation(fields: [writingResponseId, sectionId, promptId], references: [id, assessmentSectionId, promptId], onDelete: NoAction)
+
+  @@unique([submissionId, promptId])
+  @@unique([speakingRecordingId, sectionId, promptId])
+  @@unique([writingResponseId, sectionId, promptId])
+}
+
+model ClassAssessmentAnswer {
+  id            String @id @default(cuid())
+  submissionId  String
+  assessmentId  String
+  questionId    String
+  selectedIndex Int
+  isCorrect     Boolean
+
+  submission ClassAssessmentSubmission @relation(fields: [submissionId, assessmentId], references: [id, assessmentId], onDelete: Cascade)
+  question   ClassAssessmentQuestion @relation(fields: [questionId, assessmentId], references: [id, assessmentId], onDelete: NoAction)
+
+  @@unique([submissionId, questionId])
+}
+
 // One skill section per (re)attempt. Failed-section regeneration = a new row
 // with attempt+1 and a new seed; the latest attempt per (class, skill) is active.
 model ClassSection {
   id            String        @id @default(cuid())
+  incarnationId String        @unique @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  withdrawn     Boolean       @default(false)
   classId       String
   skill         SkillType
   attempt       Int           @default(1)
@@ -1371,8 +1559,59 @@ model ClassSection {
   questions      LessonQuestion[]
   prompts        SpeakingPrompt[]
   writingPrompts WritingPrompt[]
+  readingStage   ClassReadingStage?
+  writingStage   ClassWritingStage?
+  grammarStage   ClassGrammarStage?
+  speakingStage  ClassSpeakingStage?
 
   @@index([classId, skill, attempt])
+}
+
+// Private unpublished grammar repair, deleted with its owning class section.
+model ClassGrammarStage {
+  sectionId     String       @id
+  operationId   String       @unique @db.Uuid
+  incarnationId String       @db.Uuid
+  version       Int
+  sourceHash    String
+  materialHash  String
+  section       ClassSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+}
+
+// Private unpublished reading repair, deleted with its owning class section.
+model ClassReadingStage {
+  sectionId     String       @id
+  operationId   String       @unique @db.Uuid
+  incarnationId String       @db.Uuid
+  version       Int
+  source        Json
+  vocabulary    Json
+  materialHash  String
+  section       ClassSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+}
+
+// Private unpublished writing repair, deleted with its owning class section.
+model ClassWritingStage {
+  sectionId     String       @id
+  operationId   String       @unique @db.Uuid
+  incarnationId String       @db.Uuid
+  version       Int
+  sourceHash    String
+  materialHash  String
+  section       ClassSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+}
+
+// Private unpublished speaking repair and its sealed reference audio.
+model ClassSpeakingStage {
+  sectionId     String       @id
+  operationId   String       @unique @db.Uuid
+  incarnationId String       @db.Uuid
+  version       Int
+  sourceHash    String
+  materialHash  String
+  sealedHash    String?
+  section       ClassSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
 }
 
 // MC question for a GRAMMAR/READING/LISTENING section. Forked from the old
@@ -1380,6 +1619,7 @@ model ClassSection {
 model LessonQuestion {
   learningAssessment Json? // reviewed private objective attribution for this exact question
   id           String    @id @default(cuid())
+  incarnationId String   @unique @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   sectionId    String
   order        Int
   skill        SkillType
@@ -1401,6 +1641,7 @@ model LessonQuestion {
 
 // One submission per class attempt; aggregates the graded MC answers.
 model ClassSubmission {
+  incarnationId String @unique @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   attempt      Int? // class attempt that produced this receipt; null for historical submissions
   receipt      Json? // immutable result for the current submission attempt
   history      Json? // prior receipts and submitted answers retained across retakes
@@ -1419,6 +1660,7 @@ model ClassSubmission {
 }
 
 model SectionAnswer {
+  incarnationId String @unique @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   id            String   @id @default(cuid())
   submissionId  String
   sectionId     String
@@ -1431,6 +1673,7 @@ model SectionAnswer {
 
   @@unique([submissionId, questionId])
   @@index([sectionId])
+  @@index([questionId])
 }
 
 // ============ LANGUAGE LEARNING — SPEAKING ============
@@ -1440,17 +1683,26 @@ enum SpeakingGradeStatus {
   GRADING
   SCORED
   FAILED
+  UNRESOLVED
 }
 
 // One target phrase the learner must say aloud, hung off a SPEAKING ClassSection.
 // A speaking prompt hangs off EXACTLY ONE parent: a class section (gated class)
 // or a practice session (ungated). The XOR is enforced in app code.
 model SpeakingPrompt {
+  incarnationId String @unique @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  referenceEncryption Json? // private authenticated envelope for encrypted class reference audio
   learningObjectives Json? // exact criteria the speaking task is intended to assess
+  assessmentRubric String? @db.Text // private held-out assessment criteria
+  assessmentCriteria Json? // reviewed evidence modality for held-out speaking criteria
+  assessmentTaskMode String? // held-out task mode, bound to the assessment review
+  assessmentGuidance String? @db.Text // private assessment scoring context
+  assessmentReferenceIdentity Json? // selected immutable assessment reference audio identity
   id                String   @id @default(cuid())
   sectionId         String?
   practiceSessionId String?
   examSectionId     String?
+  assessmentSectionId String?
   order             Int
   targetPhrase      String   @db.Text
   translation       String   @db.Text
@@ -1461,29 +1713,47 @@ model SpeakingPrompt {
   section         ClassSection?       @relation(fields: [sectionId], references: [id], onDelete: Cascade)
   practiceSession PracticeSession?    @relation(fields: [practiceSessionId], references: [id], onDelete: Cascade)
   examSection     ExamSection?        @relation(fields: [examSectionId], references: [id], onDelete: Cascade)
-  recordings      SpeakingRecording[]
+  assessmentSection ClassAssessmentSection? @relation(fields: [assessmentSectionId], references: [id], onDelete: Cascade)
+  assessmentReference AssessmentSpeakingReference?
+  recordings      SpeakingRecording[] @relation("SpeakingPromptRecordings")
+  assessmentRecordings SpeakingRecording[] @relation("AssessmentSpeakingPromptRecordings")
 
   @@unique([sectionId, order])
   @@unique([practiceSessionId, order])
   @@unique([examSectionId, order])
+  @@unique([assessmentSectionId, order])
+  @@unique([id, assessmentSectionId])
   @@index([sectionId])
   @@index([practiceSessionId])
   @@index([examSectionId])
 }
 
+// Mutable storage locator. The sealed prompt retains the reviewed original identity.
+model AssessmentSpeakingReference {
+  promptId   String @id
+  currentUrl String @db.Text
+
+  prompt SpeakingPrompt @relation(fields: [promptId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
 // A learner's recorded attempt at a SpeakingPrompt, graded asynchronously.
 model SpeakingRecording {
+  incarnationId String @unique @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   objectiveEvidence Json? // criterion-specific findings supported by this recording's transcript
   attempt           Int                 @default(1)
   sttProvider       String? // provider selected by the immutable learning contract
   sttSelection      Json? // immutable model, endpoint and credential revision metadata, never secrets
+  gradingOperationId String?            @unique // current durable grading operation
+  gradingAcknowledgedAt DateTime? // learner accepted possible prior provider charges
   id                String              @id @default(cuid())
   sectionId         String?
   practiceSessionId String?
   examSectionId     String?
+  assessmentSectionId String?
   promptId          String
   userId            String
   audioUrl          String
+  assessmentAudioUrl String? // current assessment storage locator; audioUrl remains the admitted input
   transcript        String?             @db.Text
   overallScore      Float? // 0..1 combined pronunciation score
   rubricScores      Json? // { accuracy, fluency, completeness } each 0..1
@@ -1493,25 +1763,34 @@ model SpeakingRecording {
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
 
-  prompt          SpeakingPrompt   @relation(fields: [promptId], references: [id], onDelete: Cascade)
+  prompt          SpeakingPrompt   @relation("SpeakingPromptRecordings", fields: [promptId], references: [id], onDelete: Cascade)
+  assessmentPrompt SpeakingPrompt? @relation("AssessmentSpeakingPromptRecordings", fields: [promptId, assessmentSectionId], references: [id, assessmentSectionId], onDelete: Cascade)
+  committedAssessmentEvidence ClassAssessmentProductiveEvidence?
   user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   practiceSession PracticeSession? @relation(fields: [practiceSessionId], references: [id], onDelete: Cascade)
+  assessmentSection ClassAssessmentSection? @relation(fields: [assessmentSectionId], references: [id], onDelete: Cascade)
 
   @@index([sectionId])
   @@index([practiceSessionId])
   @@index([examSectionId])
+  @@index([assessmentSectionId])
   @@index([promptId])
   @@index([userId])
+  @@unique([id, assessmentSectionId, promptId])
+  @@index([assessmentSectionId, promptId, attempt])
 }
 
 // A writing task. Hangs off EXACTLY ONE parent (a class section or a practice
 // session), like SpeakingPrompt; XOR enforced in app code.
 model WritingPrompt {
   learningObjectives Json? // exact criteria the writing task is intended to assess
+  assessmentRubric String? @db.Text // private held-out assessment criteria
   id                String   @id @default(cuid())
+  incarnationId     String   @unique @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   sectionId         String?
   practiceSessionId String?
   examSectionId     String?
+  assessmentSectionId String?
   order             Int
   task              String   @db.Text // the writing task the learner responds to
   guidance          String?  @db.Text // optional hints / what to include
@@ -1523,11 +1802,15 @@ model WritingPrompt {
   section         ClassSection?     @relation(fields: [sectionId], references: [id], onDelete: Cascade)
   practiceSession PracticeSession?  @relation(fields: [practiceSessionId], references: [id], onDelete: Cascade)
   examSection     ExamSection?      @relation(fields: [examSectionId], references: [id], onDelete: Cascade)
-  responses       WritingResponse[]
+  assessmentSection ClassAssessmentSection? @relation(fields: [assessmentSectionId], references: [id], onDelete: Cascade)
+  responses       WritingResponse[] @relation("WritingPromptResponses")
+  assessmentResponses WritingResponse[] @relation("AssessmentWritingPromptResponses")
 
   @@unique([sectionId, order])
   @@unique([practiceSessionId, order])
   @@unique([examSectionId, order])
+  @@unique([assessmentSectionId, order])
+  @@unique([id, assessmentSectionId])
   @@index([sectionId])
   @@index([practiceSessionId])
   @@index([examSectionId])
@@ -1540,9 +1823,11 @@ model WritingResponse {
   gradingState      Json? // durable synchronous grade and provider outcome journal
   attempt           Int      @default(1)
   id                String   @id @default(cuid())
+  incarnationId     String   @unique @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   sectionId         String?
   practiceSessionId String?
   examSectionId     String?
+  assessmentSectionId String?
   promptId          String
   userId            String
   text              String   @db.Text
@@ -1552,15 +1837,20 @@ model WritingResponse {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
-  prompt          WritingPrompt    @relation(fields: [promptId], references: [id], onDelete: Cascade)
+  prompt          WritingPrompt    @relation("WritingPromptResponses", fields: [promptId], references: [id], onDelete: Cascade)
+  assessmentPrompt WritingPrompt? @relation("AssessmentWritingPromptResponses", fields: [promptId, assessmentSectionId], references: [id, assessmentSectionId], onDelete: Cascade)
+  committedAssessmentEvidence ClassAssessmentProductiveEvidence?
   user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   practiceSession PracticeSession? @relation(fields: [practiceSessionId], references: [id], onDelete: Cascade)
+  assessmentSection ClassAssessmentSection? @relation(fields: [assessmentSectionId], references: [id], onDelete: Cascade)
 
   @@index([sectionId])
   @@index([practiceSessionId])
   @@index([examSectionId])
+  @@index([assessmentSectionId])
   @@index([promptId])
   @@index([userId])
+  @@unique([id, assessmentSectionId, promptId])
 }
 
 // ============ LANGUAGE LEARNING — MOCK EXAMS ============

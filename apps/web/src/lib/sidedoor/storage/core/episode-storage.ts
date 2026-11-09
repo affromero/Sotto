@@ -36,6 +36,28 @@ export async function captureEpisodeStorage(
           class: { select: { course: { select: courseSelect } } },
         },
       },
+      assessmentSection: {
+        select: {
+          id: true,
+          assessmentId: true,
+          assessment: {
+            select: {
+              userId: true,
+              courseId: true,
+              classAttempt: true,
+              assessmentAttempt: true,
+              class: {
+                select: {
+                  id: true,
+                  createdAt: true,
+                  attempt: true,
+                  course: { select: courseSelect },
+                },
+              },
+            },
+          },
+        },
+      },
       examSection: {
         select: {
           id: true,
@@ -52,10 +74,19 @@ export async function captureEpisodeStorage(
     },
   });
   if (!episode || episode.deletedAt) throw new EpisodeStorageChangedError();
+  const assessment = episode.assessmentSection?.assessment;
+  if (
+    assessment &&
+    (assessment.userId !== episode.user.id ||
+      assessment.courseId !== assessment.class.course.id ||
+      assessment.userId !== assessment.class.course.user.id)
+  )
+    throw new EpisodeStorageChangedError();
   const courses = [
     episode.classSection?.class.course,
     episode.examSection?.exam.course,
     episode.practiceSession?.course,
+    assessment?.class.course,
   ].filter((course) => course !== undefined);
   const subjects = new Map<string, number>([
     [instance.subjectId, instance.generation],
@@ -66,6 +97,8 @@ export async function captureEpisodeStorage(
     subjects.set(`course:${course.id}`, course.createdAt.getTime());
     subjects.set(`profile:${course.user.id}`, course.user.createdAt.getTime());
   }
+  if (assessment)
+    subjects.set(`class:${assessment.class.id}`, assessment.class.createdAt.getTime());
   const examOwner = episode.examSection?.exam.user;
   if (examOwner) subjects.set(`profile:${examOwner.id}`, examOwner.createdAt.getTime());
   for (const id of new Set(additionalProfileIds)) {
@@ -98,6 +131,18 @@ export async function captureEpisodeStorage(
         ? { id: episode.examSection.id, examId: episode.examSection.examId }
         : null,
       practiceSession: episode.practiceSession?.id ?? null,
+      ...(episode.assessmentSection && assessment
+        ? {
+            assessmentSection: {
+              id: episode.assessmentSection.id,
+              assessmentId: episode.assessmentSection.assessmentId,
+              classId: assessment.class.id,
+              classAttempt: assessment.classAttempt,
+              currentClassAttempt: assessment.class.attempt,
+              assessmentAttempt: assessment.assessmentAttempt,
+            },
+          }
+        : {}),
     },
   };
 }
@@ -109,5 +154,8 @@ export async function validateEpisodeStorage(
   additionalProfileIds: readonly string[] = []
 ) {
   const current = await captureEpisodeStorage(database, episodeId, additionalProfileIds);
+  const assessment = current.associations.assessmentSection;
+  if (assessment && assessment.classAttempt !== assessment.currentClassAttempt)
+    throw new EpisodeStorageChangedError();
   if (!isDeepStrictEqual(current, expected)) throw new EpisodeStorageChangedError();
 }

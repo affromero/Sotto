@@ -9,6 +9,7 @@ import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 import { requireOriginalSottoAdmission } from '@/lib/sidedoor/access/core/request-identity';
 import {
   admitTranscriptExport,
+  readAccessibleTranscriptEpisode,
   TranscriptExportNotFoundError,
 } from '@/lib/sidedoor/storage/publication/transcript-export';
 import { deliverSottoJob } from '@/lib/sidedoor/jobs/core/job-delivery';
@@ -74,16 +75,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       prisma,
       async (tx) => {
         await requireOriginalSottoAdmission(tx, request, admission);
-        const current = await tx.episode.findUnique({
-          where: { id: episodeId },
-          select: { pdfUrl: true, userId: true, visibility: true, deletedAt: true },
-        });
-        if (
-          !current ||
-          current.deletedAt ||
-          (current.visibility === 'PRIVATE' && current.userId !== admission.userId)
-        )
-          throw new TranscriptExportNotFoundError();
+        const current = await readAccessibleTranscriptEpisode(tx, episodeId, admission.userId);
         await requireOriginalSottoAdmission(tx, request, admission);
         request.signal.throwIfAborted();
         return current;

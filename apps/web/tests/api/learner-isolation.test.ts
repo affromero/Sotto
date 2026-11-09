@@ -16,10 +16,28 @@ vi.mock('@/lib/api-keys', () => ({
 }));
 
 const mockCourseFindFirst = vi.fn();
-vi.mock('@/lib/prisma', () => ({
-  prisma: {
+vi.mock('@/lib/prisma', () => {
+  const database = {
     course: { findFirst: (...args: unknown[]) => mockCourseFindFirst(...args) },
-  },
+  };
+  return { prisma: database, prismaUnfiltered: database };
+});
+vi.mock('@/lib/sidedoor/access/state/transaction', () => ({
+  sottoTransaction: async (database: unknown, operation: (database: unknown) => Promise<unknown>) =>
+    operation(database),
+}));
+vi.mock('@/lib/sidedoor/credentials/runtime/provider-execution', () => ({
+  sottoRequestExecution: (...args: [unknown, { userId: string }]) => ({
+    userId: args[1].userId,
+    authorize: async () => ({ userId: args[1].userId }),
+  }),
+}));
+vi.mock('@/lib/classes/lesson/initial-a1-provenance', () => ({
+  classTaskMaterialHash: vi.fn().mockResolvedValue('material'),
+  readInitialA1PracticeAuthorization: vi.fn().mockResolvedValue(null),
+}));
+vi.mock('@/lib/classes/help/content/prerequisite-token', () => ({
+  createPrerequisiteTokenizer: () => ({ material: () => 'revision', dispose: () => {} }),
 }));
 
 const mockGetMemoryGraph = vi.fn();
@@ -132,7 +150,7 @@ describe('GET /api/v1/classes/[classId] — class isolation', () => {
       params: Promise.resolve({ classId: 'class-A' }),
     });
     expect(res.status).toBe(200);
-    expect(mockGetClassForUser).toHaveBeenCalledWith('class-A', OWNER);
+    expect(mockGetClassForUser).toHaveBeenCalledWith('class-A', OWNER, expect.anything());
   });
 
   it('blocks another learner from reading class-A (404)', async () => {
@@ -142,6 +160,6 @@ describe('GET /api/v1/classes/[classId] — class isolation', () => {
       params: Promise.resolve({ classId: 'class-A' }),
     });
     expect(res.status).toBe(404);
-    expect(mockGetClassForUser).toHaveBeenCalledWith('class-A', INTRUDER);
+    expect(mockGetClassForUser).toHaveBeenCalledWith('class-A', INTRUDER, expect.anything());
   });
 });

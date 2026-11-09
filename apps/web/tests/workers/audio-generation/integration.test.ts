@@ -85,6 +85,7 @@ suite('audio generation through real transactions, local storage and Redis', () 
   let duringSpeech: (() => Promise<void>) | null;
   let requests: Array<Record<string, unknown>>;
   let speechStatus: number;
+  let speechSignal: AbortSignal | null;
   let episodes: string[];
   const audio = Buffer.alloc(44 + 32000);
   audio.write('RIFF', 0);
@@ -123,6 +124,7 @@ suite('audio generation through real transactions, local storage and Redis', () 
     invalidateServerInfra();
     duringSpeech = null;
     speechStatus = 200;
+    speechSignal = null;
     requests = [];
     episodes = [];
     binding.loseSegment = null;
@@ -148,6 +150,7 @@ suite('audio generation through real transactions, local storage and Redis', () 
       }
       if (request.url !== 'http://tts.example.test/tts')
         throw new Error(`Unexpected HTTP request: ${request.url}`);
+      speechSignal = request.signal;
       requests.push((await request.json()) as Record<string, unknown>);
       await duringSpeech?.();
       return new Response(
@@ -768,6 +771,19 @@ suite('audio generation through real transactions, local storage and Redis', () 
       (await instance.database.segment.findUniqueOrThrow({ where: { id: segment.id } })).audioUrl
     ).toBeNull();
     expect(await queuedStitches(episode.id)).toEqual([]);
+  });
+
+  it('propagates worker cancellation to an in-flight speech request', async () => {
+    const { segment, job } = await fixture();
+    const controller = new AbortController();
+    duringSpeech = async () => {
+      controller.abort(new Error('Worker stopped'));
+    };
+    await expect(processAudioGeneration(job, controller.signal)).rejects.toThrow();
+    expect(speechSignal?.aborted).toBe(true);
+    expect(
+      (await instance.database.segment.findUniqueOrThrow({ where: { id: segment.id } })).audioUrl
+    ).toBeNull();
   });
 
   it('rejects audio publication when the parent is cancelled during speech', async () => {

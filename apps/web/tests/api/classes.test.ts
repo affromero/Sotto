@@ -1,7 +1,9 @@
 // @vitest-environment node
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
+import { generationCases } from './classes/generation-cases';
 import { sampleTeaching } from '../helpers/learning/class-teaching';
+import { classDetailResponseSchema, createSkillRequirements } from '@sotto/shared';
 import {
   SAMPLE_CLASS_UNSUBMITTED,
   SAMPLE_CLASS_SPEAKING,
@@ -34,6 +36,31 @@ vi.mock('@/lib/prisma', () => ({
     },
     $transaction: (...args: unknown[]) => mockTransaction(...args),
   },
+  prismaUnfiltered: { $transaction: (...args: unknown[]) => mockTransaction(...args) },
+}));
+
+vi.mock('@/lib/sidedoor/credentials/runtime/provider-execution', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('@/lib/sidedoor/credentials/runtime/provider-execution')
+  >()),
+  sottoRequestExecution: (_request: unknown, identity: { userId: string }) => ({
+    userId: identity.userId,
+    authorize: async () => ({ userId: identity.userId }),
+  }),
+}));
+
+const mockReadPrerequisiteSource = vi.fn();
+const mockClassTaskMaterialHash = vi.fn();
+const mockReadInitialA1PracticeAuthorization = vi.fn();
+vi.mock('@/lib/classes/lesson/initial-a1-provenance', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/classes/lesson/initial-a1-provenance')>()),
+  classTaskMaterialHash: (...args: unknown[]) => mockClassTaskMaterialHash(...args),
+  readInitialA1PracticeAuthorization: (...args: unknown[]) =>
+    mockReadInitialA1PracticeAuthorization(...args),
+}));
+vi.mock('@/lib/classes/help/content/prerequisite-source', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/classes/help/content/prerequisite-source')>()),
+  readPrerequisiteSource: (...args: unknown[]) => mockReadPrerequisiteSource(...args),
 }));
 
 const mockGetClassForUser = vi.fn();
@@ -79,6 +106,11 @@ import {
 } from '@/app/api/v1/courses/[courseId]/generation/route';
 import { PreparationConflictError } from '@/lib/classes/preparation-state';
 import { ClassIncompleteError } from '@/lib/class-service';
+import { PrerequisiteSourceConflict } from '@/lib/classes/help/content/prerequisite-source';
+import { PrerequisiteDeletionConflict } from '@/lib/classes/help/prerequisite-deletion';
+import { SpeakingDeletionConflict } from '@/lib/sidedoor/jobs/stitch/speaking-grading-deletion';
+import { AssessmentFenceConflict } from '@/lib/learning/classes/lifecycle/assessment-fence';
+import { InitialA1PracticeBlocked } from '@/lib/classes/lesson/initial-a1-provenance';
 
 // ---- Helpers ----
 
@@ -94,16 +126,118 @@ function classParams(classId: string) {
   return { params: Promise.resolve({ classId }) };
 }
 
-function courseParams(courseId: string) {
-  return { params: Promise.resolve({ courseId }) };
-}
-
 // ---- GET /api/v1/classes/[classId] ----
 
 describe('GET /api/v1/classes/[classId]', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubEnv('BYOK_ENCRYPTION_KEY', 'class-test-key');
+    mockClassTaskMaterialHash.mockResolvedValue('b'.repeat(64));
+    mockReadInitialA1PracticeAuthorization.mockResolvedValue(null);
     mockAuthenticateRequest.mockResolvedValue({ userId: 'u1' });
+    mockTransaction.mockImplementation(async (operation: (database: object) => Promise<unknown>) =>
+      operation({})
+    );
+  });
+  afterEach(() => vi.unstubAllEnvs());
+
+  it('returns distinct opaque revisions for prerequisite guidance and task material', async () => {
+    vi.stubEnv('BYOK_ENCRYPTION_KEY', 'class-test-key');
+    const requirements = createSkillRequirements({
+      scope: 'CLASS',
+      nativeLang: 'es',
+      targetLang: 'ru',
+      level: 'A1',
+      ttsProvider: null,
+      sttProvider: null,
+    });
+    mockGetClassForUser.mockResolvedValue({
+      ...SAMPLE_CLASS_UNSUBMITTED,
+      teaching: sampleTeaching,
+      skillRequirements: requirements,
+    });
+    mockReadPrerequisiteSource.mockResolvedValue({
+      sourceHash: 'a'.repeat(64),
+      source: { lesson: { level: 'A1' } },
+    });
+    const res = await GET(
+      makeRequest('http://localhost/api/v1/classes/class-1', 'GET'),
+      classParams('class-1')
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    const revision = body.prerequisiteSourceHash;
+    expect(revision).toMatch(/^[a-f0-9]{64}$/);
+    expect(revision).not.toBe('a'.repeat(64));
+    expect(body.taskMaterialRevision).toMatch(/^[a-f0-9]{64}$/);
+    expect(body.taskMaterialRevision).not.toBe('b'.repeat(64));
+    expect(body.taskMaterialRevision).not.toBe(revision);
+  });
+
+  it('binds complete legacy A1 guidance even when skill requirements were not saved', async () => {
+    vi.stubEnv('BYOK_ENCRYPTION_KEY', 'class-test-key');
+    mockGetClassForUser.mockResolvedValue({
+      ...SAMPLE_CLASS_UNSUBMITTED,
+      teaching: sampleTeaching,
+      skillRequirements: null,
+    });
+    mockReadPrerequisiteSource.mockResolvedValue({
+      sourceHash: 'a'.repeat(64),
+      source: { lesson: { level: 'A1' } },
+    });
+    const res = await GET(
+      makeRequest('http://localhost/api/v1/classes/class-1', 'GET'),
+      classParams('class-1')
+    );
+    expect(res.status).toBe(200);
+    const revision = (await res.json()).prerequisiteSourceHash;
+    expect(revision).toMatch(/^[a-f0-9]{64}$/);
+    expect(revision).not.toBe('a'.repeat(64));
+  });
+
+  it('surfaces unexpected prerequisite source failures instead of silently hiding them', async () => {
+    const requirements = createSkillRequirements({
+      scope: 'CLASS',
+      nativeLang: 'es',
+      targetLang: 'ru',
+      level: 'A1',
+      ttsProvider: null,
+      sttProvider: null,
+    });
+    mockGetClassForUser.mockResolvedValue({
+      ...SAMPLE_CLASS_UNSUBMITTED,
+      teaching: sampleTeaching,
+      skillRequirements: requirements,
+    });
+    mockReadPrerequisiteSource.mockRejectedValue(new Error('database unavailable'));
+    const res = await GET(
+      makeRequest('http://localhost/api/v1/classes/class-1', 'GET'),
+      classParams('class-1')
+    );
+    expect(res.status).toBe(500);
+  });
+
+  it('keeps an incomplete A1 class readable without enabling prerequisite help', async () => {
+    const requirements = createSkillRequirements({
+      scope: 'CLASS',
+      nativeLang: 'es',
+      targetLang: 'ru',
+      level: 'A1',
+      ttsProvider: null,
+      sttProvider: null,
+    });
+    mockGetClassForUser.mockResolvedValue({
+      ...SAMPLE_CLASS_UNSUBMITTED,
+      teaching: sampleTeaching,
+      skillRequirements: requirements,
+    });
+    mockReadPrerequisiteSource.mockRejectedValue(new PrerequisiteSourceConflict());
+    const res = await GET(
+      makeRequest('http://localhost/api/v1/classes/class-1', 'GET'),
+      classParams('class-1')
+    );
+    expect(res.status).toBe(200);
+    expect((await res.json()).prerequisiteSourceHash).toBeNull();
   });
 
   it('returns 401 when unauthenticated', async () => {
@@ -148,6 +282,114 @@ describe('GET /api/v1/classes/[classId]', () => {
       correctIndex: SAMPLE_CLASS_UNSUBMITTED.sections[0].questions[0].correctIndex,
       explanation: SAMPLE_CLASS_UNSUBMITTED.sections[0].questions[0].explanation,
     });
+  });
+  it('returns prior writing and quiz work as private read-only history', async () => {
+    const history = [
+      {
+        sectionId: 'old',
+        attempt: 1,
+        prompts: [
+          { id: 'prompt', order: 1, task: 'Write a greeting', savedDraft: 'Hola', responses: [] },
+        ],
+      },
+    ];
+    mockGetClassForUser.mockResolvedValue({
+      ...SAMPLE_CLASS_UNSUBMITTED,
+      writingHistory: history,
+      speakingHistory: [
+        {
+          sectionId: 'old-speech',
+          attempt: 1,
+          prompts: [
+            {
+              id: 'prompt',
+              order: 1,
+              targetPhrase: 'Hallo',
+              translation: 'Hello',
+              recordings: [
+                {
+                  id: 'recording',
+                  attempt: 1,
+                  attemptMatches: true,
+                  status: 'SCORED',
+                  transcript: 'Hallo',
+                  overallScore: 0.9,
+                  rubricScores: null,
+                  phonemeScores: null,
+                  feedback: 'Clear.',
+                  createdAt: '2024-01-01T00:00:00.000Z',
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      orphanWritingDrafts: [{ id: 'orphan', text: 'Saved words' }],
+      quizHistory: [
+        {
+          sectionId: 'old-quiz',
+          skill: 'GRAMMAR',
+          attempt: 1,
+          questions: [
+            {
+              id: 'q',
+              order: 1,
+              question: 'Choose',
+              passageText: null,
+              options: ['a', 'b'],
+              savedChoice: 0,
+              submissions: [
+                { attempt: null, submittedAt: null, selectedIndex: null, isCorrect: null },
+              ],
+            },
+          ],
+        },
+      ],
+      orphanQuizAnswers: [{ sectionId: null, questionId: null, savedChoice: 2, submissions: [] }],
+      quizHistoryUnreadable: true,
+      quizSubmissionReceipts: [
+        {
+          attempt: 1,
+          submittedAt: null,
+          passed: false,
+          overallScore: 0.4,
+          answersUnavailable: true,
+          passedSections: null,
+          totalSections: null,
+          sections: [],
+          summaryIncomplete: true,
+        },
+      ],
+    });
+    const res = await GET(
+      makeRequest('http://localhost/api/v1/classes/class-1', 'GET'),
+      classParams('class-1')
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers.get('cache-control')).toBe('private, no-store');
+    const body = await res.json();
+    expect(body).toMatchObject({
+      writingHistory: history,
+      speakingHistory: [expect.objectContaining({ sectionId: 'old-speech' })],
+      orphanWritingDrafts: [{ id: 'orphan', text: 'Saved words' }],
+      quizHistory: [expect.objectContaining({ sectionId: 'old-quiz' })],
+      orphanQuizAnswers: [{ sectionId: null, questionId: null, savedChoice: 2, submissions: [] }],
+      quizHistoryUnreadable: true,
+      quizSubmissionReceipts: [
+        {
+          attempt: 1,
+          submittedAt: null,
+          passed: false,
+          overallScore: 0.4,
+          answersUnavailable: true,
+          passedSections: null,
+          totalSections: null,
+          sections: [],
+          summaryIncomplete: true,
+        },
+      ],
+    });
+    expect(classDetailResponseSchema.safeParse(body).success).toBe(true);
   });
   it('preserves the section mastery threshold independently of the class threshold', async () => {
     mockGetClassForUser.mockResolvedValue({
@@ -199,6 +441,30 @@ describe('GET /api/v1/classes/[classId]', () => {
     });
   });
 
+  it('returns an authenticated playback path for encrypted speaking audio', async () => {
+    mockGetClassForUser.mockResolvedValue({
+      ...SAMPLE_CLASS_SPEAKING,
+      sections: SAMPLE_CLASS_SPEAKING.sections.map((section) => ({
+        ...section,
+        prompts: section.prompts.map((prompt) => ({
+          ...prompt,
+          referenceTtsUrl: 'https://storage.example/private.bin',
+          referenceEncryption: { version: 1 },
+        })),
+      })),
+    });
+    const response = await GET(
+      makeRequest('http://localhost/api/v1/classes/class-1', 'GET'),
+      classParams('class-1')
+    );
+    const body = await response.json();
+    expect(body.sections[0].prompts[0].referenceTtsUrl).toBe(
+      '/api/v1/classes/class-1/speaking/p1/reference/audio'
+    );
+    expect(JSON.stringify(body)).not.toContain('private.bin');
+    expect(JSON.stringify(body)).not.toContain('referenceEncryption');
+  });
+
   it('returns the LISTENING episode (audio url + title) for the player', async () => {
     mockGetClassForUser.mockResolvedValue(SAMPLE_CLASS_LISTENING);
 
@@ -232,6 +498,30 @@ describe('GET /api/v1/classes/[classId]', () => {
     const questions = body.sections[0].questions;
     expect(questions[0]).toHaveProperty('correctIndex', 0);
     expect(questions[0]).toHaveProperty('explanation', 'Exp1');
+  });
+
+  it('returns the validated saved result without private receipt fields', async () => {
+    const receipt = {
+      source: 'ASSESSMENT',
+      passed: true,
+      overallScore: 0.9,
+      passedSections: 1,
+      totalSections: 1,
+      sections: [{ id: 'held-out-reading', skill: 'READING', score: 0.9, passed: true }],
+    };
+    mockGetClassForUser.mockResolvedValue({
+      ...SAMPLE_CLASS_SUBMITTED,
+      submission: {
+        ...SAMPLE_CLASS_SUBMITTED.submission,
+        receipt: { ...receipt, privateRubric: 'secret' },
+      },
+    });
+    const response = await GET(
+      makeRequest('http://localhost/api/v1/classes/class-1', 'GET'),
+      classParams('class-1')
+    );
+    expect(response.status).toBe(200);
+    expect((await response.json()).submission.receipt).toEqual(receipt);
   });
 
   it('returns the full class envelope', async () => {
@@ -316,6 +606,21 @@ describe('POST /api/v1/classes/[classId]', () => {
       error: expect.stringMatching(/cleanup.*confirmed/i),
     });
   });
+  it('reports that assessment work must be preserved before regeneration', async () => {
+    mockRequestPreparation.mockRejectedValue(
+      new PreparationConflictError(
+        'This class has assessment work that must be preserved before regeneration.'
+      )
+    );
+    const response = await POST(
+      makeRequest('http://localhost/api/v1/classes/class-1', 'POST', { expectedAttempt: 1 }),
+      classParams('class-1')
+    );
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      error: expect.stringMatching(/assessment work/),
+    });
+  });
   it('admits a targeted section retry with its confirmed progress revision', async () => {
     const response = await POST(
       makeRequest('http://localhost/api/v1/classes/class-1', 'POST', {
@@ -389,7 +694,11 @@ describe('DELETE /api/v1/classes/[classId]', () => {
     );
 
     expect(res.status).toBe(200);
-    expect(mockDeleteClassForUser).toHaveBeenCalledWith('class-1', 'u1');
+    expect(mockDeleteClassForUser).toHaveBeenCalledWith(
+      'class-1',
+      'u1',
+      expect.objectContaining({ userId: 'u1', authorize: expect.any(Function) })
+    );
     const body = await res.json();
     expect(body).toEqual({ deleted: true });
   });
@@ -403,6 +712,39 @@ describe('DELETE /api/v1/classes/[classId]', () => {
     );
 
     expect(res.status).toBe(404);
+  });
+
+  it('reports active prerequisite work as a recoverable conflict', async () => {
+    mockDeleteClassForUser.mockRejectedValue(new PrerequisiteDeletionConflict());
+    const res = await DELETEClass(
+      makeRequest('http://localhost/api/v1/classes/class-1', 'DELETE'),
+      classParams('class-1')
+    );
+    expect(res.status).toBe(409);
+  });
+
+  it('reports active assessment work as a recoverable conflict', async () => {
+    mockDeleteClassForUser.mockRejectedValue(new AssessmentFenceConflict());
+    const res = await DELETEClass(
+      makeRequest('http://localhost/api/v1/classes/class-1', 'DELETE'),
+      classParams('class-1')
+    );
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ error: expect.stringContaining('assessment') });
+  });
+
+  it('reports retained legacy speaking work as a conflict', async () => {
+    mockDeleteClassForUser.mockRejectedValue(
+      new SpeakingDeletionConflict('Older speaking history requires course-level cleanup.')
+    );
+    const res = await DELETEClass(
+      makeRequest('http://localhost/api/v1/classes/class-1', 'DELETE'),
+      classParams('class-1')
+    );
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({
+      error: 'Older speaking history requires course-level cleanup.',
+    });
   });
 });
 
@@ -509,6 +851,21 @@ describe('POST /api/v1/classes/[classId]/submit', () => {
     expect(body.sections[0].skill).toBe('GRAMMAR');
   });
 
+  it('returns a recoverable conflict when prerequisite teaching must be reviewed', async () => {
+    mockSubmitClass.mockRejectedValue(new InitialA1PracticeBlocked());
+    const res = await POSTSubmit(
+      makeRequest('http://localhost/api/v1/classes/class-1/submit', 'POST', {
+        answers: VALID_ANSWERS,
+      }),
+      classParams('class-1')
+    );
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({
+      error: expect.stringMatching(/review the prerequisite teaching/i),
+      code: 'PREREQUISITE_ACK_REQUIRED',
+    });
+  });
+
   it('rejects selectedIndex outside 0-3', async () => {
     const res = await POSTSubmit(
       makeRequest('http://localhost/api/v1/classes/class-1/submit', 'POST', {
@@ -522,453 +879,16 @@ describe('POST /api/v1/classes/[classId]/submit', () => {
   });
 });
 
-// ---- GET /api/v1/courses/[courseId]/generation ----
-
-const EXPECTED_TEST_SKILLS = ['GRAMMAR', 'READING', 'LISTENING', 'SPEAKING', 'WRITING'];
-describe('GET /api/v1/courses/[courseId]/generation', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockAuthenticateRequest.mockResolvedValue({ userId: 'u1' });
-    mockReadPreparation.mockResolvedValue(null);
-    mockPreparationActivity.mockResolvedValue({
-      operationId: 'operation-1',
-      updatedAt: new Date(1000).toISOString(),
-      providerRequestsCompleted: 4,
-      providerRequestInFlight: true,
-    });
-  });
-
-  function generationState(
-    status: string,
-    classId = 'older-class',
-    classCreatedAt = 2000,
-    attempt = 1,
-    classStatus = 'AVAILABLE'
-  ) {
-    mockCourseFindFirst.mockResolvedValue({
-      id: 'course-1',
-      classes: [
-        {
-          id: 'current-class',
-          status: classStatus,
-          attempt,
-          createdAt: new Date(classCreatedAt),
-          updatedAt: new Date(3000),
-          lesson: { title: 'Current lesson' },
-          sections: [],
-        },
-      ],
-    });
-    mockReadPreparation.mockResolvedValue({
-      id: 'operation-1',
-      status,
-      classId,
-      result: status === 'COMPLETED' ? 'done' : null,
-      createdAt: 500,
-      updatedAt: 1000,
-      availableAt: 500,
-      timeZone: 'UTC',
-      maxProviderRequests: 20,
-      deferAudio: true,
-      audioEpisodeIds: [],
-      selection: {
-        provider: 'meta',
-        model: 'muse-spark-1.3',
-        credentialFingerprint: 'private-binding',
-      },
-      grant: { revision: 'private-grant' },
-    });
-  }
-  async function progress() {
-    return (
-      await GETGeneration(
-        makeRequest('http://localhost/api/v1/courses/course-1/generation', 'GET'),
-        courseParams('course-1')
-      )
-    ).json();
-  }
-  it.each(['FAILED', 'CANCELLED', 'COMPLETED'])(
-    'shows a newer class after terminal preparation %s',
-    async (status) => {
-      generationState(status);
-      const body = await progress();
-      expect(body).toMatchObject({
-        classId: 'current-class',
-        status: 'AVAILABLE',
-        lessonTitle: 'Current lesson',
-      });
-      expect(body).not.toHaveProperty('operationId');
-      expect(body).not.toHaveProperty('aiProvider');
-    }
-  );
-  it.each(['QUEUED', 'RUNNING', 'CANCELLING', 'UNRESOLVED'])(
-    'keeps unresolved or active preparation visible: %s',
-    async (status) => {
-      generationState(status, 'current-class', 500, 2);
-      expect(await progress()).toMatchObject({
-        operationId: 'operation-1',
-        operationStatus: status,
-      });
-    }
-  );
-  it('shows section milestones and provider activity while durable preparation is running', async () => {
-    generationState('RUNNING', 'current-class', 500, 1, 'GENERATING');
-    const course = await mockCourseFindFirst();
-    course.classes[0].sections = [
-      { skill: 'GRAMMAR', status: 'READY', attempt: 1, updatedAt: new Date(4000), episode: null },
-      { skill: 'READING', status: 'PENDING', attempt: 1, updatedAt: new Date(5000), episode: null },
-    ];
-    mockCourseFindFirst.mockResolvedValue(course);
-    expect(await progress()).toMatchObject({
-      operationStatus: 'RUNNING',
-      status: 'GENERATING',
-      stage: 'Generating reading questions',
-      progress: 0.34,
-      currentStep: 2,
-      updatedAt: new Date(5000).toISOString(),
-      providerRequestsCompleted: 4,
-      providerRequestInFlight: true,
-    });
-  });
-  it('excludes old section attempts from whole-class regeneration progress', async () => {
-    generationState('RUNNING', 'current-class', 500, 2, 'GENERATING');
-    mockReadPreparation.mockResolvedValue({
-      ...(await mockReadPreparation()),
-      intent: { kind: 'REGENERATE', attempt: 2, skills: EXPECTED_TEST_SKILLS },
-    });
-    const course = await mockCourseFindFirst();
-    course.classes[0].sections = EXPECTED_TEST_SKILLS.map((skill) => ({
-      skill,
-      status: 'READY',
-      attempt: 1,
-      updatedAt: new Date(9000),
-      episode: null,
-    }));
-    mockCourseFindFirst.mockResolvedValue(course);
-    expect(await progress()).toMatchObject({
-      stage: 'Preparing class',
-      progress: 0,
-      sections: [],
-      updatedAt: new Date(3000).toISOString(),
-    });
-  });
-  it('counts preserved passed material when repairing another skill', async () => {
-    generationState('RUNNING', 'current-class', 500, 2, 'GENERATING');
-    mockReadPreparation.mockResolvedValue({
-      ...(await mockReadPreparation()),
-      intent: { kind: 'REPAIR', attempt: 2, skills: ['READING'] },
-    });
-    const course = await mockCourseFindFirst();
-    course.classes[0].sections = [
-      { skill: 'GRAMMAR', status: 'PASSED', attempt: 1, updatedAt: new Date(3000), episode: null },
-      { skill: 'READING', status: 'PENDING', attempt: 2, updatedAt: new Date(5000), episode: null },
-    ];
-    mockCourseFindFirst.mockResolvedValue(course);
-    expect(await progress()).toMatchObject({
-      stage: 'Generating reading questions',
-      progress: 0.34,
-    });
-  });
-  it('does not combine activity from a replacement preparation', async () => {
-    generationState('RUNNING', 'current-class', 500);
-    mockPreparationActivity.mockResolvedValue({ operationId: 'new-operation' });
-    const response = await GETGeneration(
-      makeRequest('http://localhost/api/v1/courses/course-1/generation', 'GET'),
-      courseParams('course-1')
-    );
-    expect(response.status).toBe(409);
-  });
-  it.each([
-    ['FAILED', 'GENERATING'],
-    ['FAILED', 'AVAILABLE'],
-    ['FAILED', 'FAILED'],
-    ['CANCELLED', 'GENERATING'],
-    ['CANCELLED', 'AVAILABLE'],
-    ['CANCELLED', 'FAILED'],
-    ['COMPLETED', 'AVAILABLE'],
-  ])('shows the regenerated class after %s preparation as %s', async (status, classStatus) => {
-    generationState(status, 'current-class', 500, 2, classStatus);
-    mockReadPreparation.mockResolvedValue({
-      ...(await mockReadPreparation()),
-      result: status === 'COMPLETED' ? 'gated' : null,
-    });
-    const body = await progress();
-    expect(body).toMatchObject({ classId: 'current-class', status: classStatus });
-    expect(body).not.toHaveProperty('operationId');
-  });
-  it.each(['FAILED', 'CANCELLED'])(
-    'keeps %s visible for the matching repair attempt',
-    async (status) => {
-      generationState(status, 'current-class', 500, 3, 'FAILED');
-      mockReadPreparation.mockResolvedValue({
-        ...(await mockReadPreparation()),
-        intent: { kind: 'REPAIR', classId: 'current-class', attempt: 3 },
-      });
-      expect(await progress()).toMatchObject({
-        operationId: 'operation-1',
-        operationStatus: status,
-      });
-    }
-  );
-  it('keeps cancellation visible for the original class attempt', async () => {
-    generationState('CANCELLED', 'current-class', 500);
-    expect(await progress()).toMatchObject({
-      operationId: 'operation-1',
-      operationStatus: 'CANCELLED',
-    });
-  });
-  it.each(['FAILED', 'CANCELLED', 'COMPLETED'])(
-    'retains terminal preparation when the other class is not newer: %s',
-    async (status) => {
-      generationState(status, 'older-class', 1000);
-      expect(await progress()).toMatchObject({
-        operationId: 'operation-1',
-        operationStatus: status,
-      });
-    }
-  );
-  it('preserves public operation metadata with matching completed class progress', async () => {
-    generationState('COMPLETED', 'current-class');
-    const operation = await mockReadPreparation();
-    mockReadPreparation.mockResolvedValue({ ...operation, result: 'created' });
-    const body = await progress();
-    expect(body).toMatchObject({
-      operationId: 'operation-1',
-      operationStatus: 'COMPLETED',
-      classId: 'current-class',
-      status: 'AVAILABLE',
-      stage: 'Class ready',
-      progress: 1,
-      aiProvider: 'meta',
-      aiModel: 'muse-spark-1.3',
-      maxProviderRequests: 20,
-    });
-    expect(JSON.stringify(body)).not.toContain('private-');
-  });
-
-  it('reports the durable task before a class record exists without exposing authority data', async () => {
-    mockCourseFindFirst.mockResolvedValue({ id: 'course-1', classes: [] });
-    mockReadPreparation.mockResolvedValue({
-      id: 'operation-1',
-      status: 'QUEUED',
-      classId: null,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-      availableAt: Date.now(),
-      timeZone: 'America/Bogota',
-      maxProviderRequests: 20,
-      deferAudio: true,
-      selection: {
-        provider: 'meta',
-        model: 'muse-spark-1.3',
-        credentialFingerprint: 'private-fingerprint',
-      },
-      grant: { revision: 'private-grant-revision' },
-    });
-    const response = await GETGeneration(
-      makeRequest('http://localhost/api/v1/courses/course-1/generation', 'GET'),
-      courseParams('course-1')
-    );
-    expect(response.status).toBe(200);
-    const body = await response.json();
-    expect(body).toMatchObject({
-      operationId: 'operation-1',
-      operationStatus: 'QUEUED',
-      classId: null,
-      stage: 'Queued preparation',
-      audioRequiresReview: true,
-      maxProviderRequests: 20,
-    });
-    expect(JSON.stringify(body)).not.toContain('private-');
-  });
-
-  it('reports pending listening audio when the class is available but audioUrl is missing', async () => {
-    mockCourseFindFirst.mockResolvedValue({
-      id: 'course-1',
-      classes: [
-        {
-          id: 'class-1',
-          status: 'AVAILABLE',
-          createdAt: new Date(Date.now() - 60_000),
-          updatedAt: new Date(),
-          lesson: { title: 'Past events' },
-          sections: [
-            { skill: 'GRAMMAR', status: 'READY', attempt: 1, updatedAt: new Date(), episode: null },
-            { skill: 'READING', status: 'READY', attempt: 1, updatedAt: new Date(), episode: null },
-            {
-              skill: 'LISTENING',
-              attempt: 1,
-              updatedAt: new Date(),
-              status: 'READY',
-              episode: { status: 'STITCHING', audioUrl: null, updatedAt: new Date() },
-            },
-            {
-              skill: 'SPEAKING',
-              status: 'READY',
-              attempt: 1,
-              updatedAt: new Date(),
-              episode: null,
-            },
-            { skill: 'WRITING', status: 'READY', attempt: 1, updatedAt: new Date(), episode: null },
-          ],
-        },
-      ],
-    });
-
-    const res = await GETGeneration(
-      makeRequest('http://localhost/api/v1/courses/course-1/generation', 'GET'),
-      courseParams('course-1')
-    );
-
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.stage).toBe('Rendering listening audio');
-    expect(body.detail).toMatch(/stitching/i);
-    expect(body.progress).toBeLessThan(1);
-  });
-
-  it('reports a stuck class when listening audio is ready but audioUrl is missing', async () => {
-    mockCourseFindFirst.mockResolvedValue({
-      id: 'course-1',
-      classes: [
-        {
-          id: 'class-1',
-          status: 'AVAILABLE',
-          createdAt: new Date(Date.now() - 60_000),
-          updatedAt: new Date(),
-          lesson: { title: 'Past events' },
-          sections: [
-            { skill: 'GRAMMAR', status: 'READY', attempt: 1, updatedAt: new Date(), episode: null },
-            { skill: 'READING', status: 'READY', attempt: 1, updatedAt: new Date(), episode: null },
-            {
-              skill: 'LISTENING',
-              attempt: 1,
-              updatedAt: new Date(),
-              status: 'READY',
-              episode: { status: 'READY', audioUrl: null, updatedAt: new Date() },
-            },
-            {
-              skill: 'SPEAKING',
-              status: 'READY',
-              attempt: 1,
-              updatedAt: new Date(),
-              episode: null,
-            },
-            { skill: 'WRITING', status: 'READY', attempt: 1, updatedAt: new Date(), episode: null },
-          ],
-        },
-      ],
-    });
-
-    const res = await GETGeneration(
-      makeRequest('http://localhost/api/v1/courses/course-1/generation', 'GET'),
-      courseParams('course-1')
-    );
-
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.stage).toBe('Class needs attention');
-    expect(body.detail).toMatch(/open this class/i);
-    expect(body.progress).toBe(1);
-  });
-});
-
-// ---- DELETE /api/v1/courses/[courseId]/generation ----
-
-describe('DELETE /api/v1/courses/[courseId]/generation', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockAuthenticateRequest.mockResolvedValue({ userId: 'u1' });
-    mockCancelPreparation.mockResolvedValue(null);
-    mockCourseUpdateMany.mockResolvedValue({ count: 1 });
-    mockCourseClassDeleteMany.mockResolvedValue({ count: 1 });
-    mockTransaction.mockImplementation((ops: Promise<unknown>[]) => Promise.all(ops));
-  });
-
-  it('returns 401 when unauthenticated', async () => {
-    mockAuthenticateRequest.mockResolvedValue(null);
-
-    const res = await DELETEGeneration(
-      makeRequest('http://localhost/api/v1/courses/course-1/generation', 'DELETE'),
-      courseParams('course-1')
-    );
-
-    expect(res.status).toBe(401);
-  });
-
-  it('returns 404 when the course is missing', async () => {
-    mockCourseFindFirst.mockResolvedValue(null);
-
-    const res = await DELETEGeneration(
-      makeRequest('http://localhost/api/v1/courses/course-1/generation', 'DELETE'),
-      courseParams('course-1')
-    );
-
-    expect(res.status).toBe(404);
-  });
-
-  it.each(['CANCELLED', 'CANCELLING'])(
-    'cancels durable work before a class exists: %s',
-    async (status) => {
-      mockCancelPreparation.mockResolvedValue({ id: 'operation-1', status, classId: null });
-      const response = await DELETEGeneration(
-        makeRequest('http://localhost/api/v1/courses/course-1/generation', 'DELETE'),
-        courseParams('course-1')
-      );
-      expect(response.status).toBe(200);
-      expect(await response.json()).toEqual({
-        cancelled: status === 'CANCELLED',
-        cancelling: status === 'CANCELLING',
-        operationId: 'operation-1',
-        classId: null,
-      });
-    }
-  );
-
-  it('surfaces revoked cancellation authority without deleting legacy work', async () => {
-    mockCancelPreparation.mockRejectedValue(new PreparationConflictError('The learner changed.'));
-    const response = await DELETEGeneration(
-      makeRequest('http://localhost/api/v1/courses/course-1/generation', 'DELETE'),
-      courseParams('course-1')
-    );
-    expect(response.status).toBe(409);
-    expect(await response.json()).toMatchObject({ error: 'The learner changed.' });
-  });
-
-  it('deletes the current generating legacy class and clears activeClassId', async () => {
-    mockCourseFindFirst.mockResolvedValue({
-      id: 'course-1',
-      classes: [{ id: 'class-generating' }],
-    });
-
-    const res = await DELETEGeneration(
-      makeRequest('http://localhost/api/v1/courses/course-1/generation', 'DELETE'),
-      courseParams('course-1')
-    );
-
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body).toEqual({ cancelled: true, classId: 'class-generating' });
-    expect(mockCourseUpdateMany).toHaveBeenCalledWith({
-      where: { id: 'course-1', userId: 'u1', activeClassId: 'class-generating' },
-      data: { activeClassId: null },
-    });
-    expect(mockCourseClassDeleteMany).toHaveBeenCalledWith({
-      where: { id: 'class-generating', courseId: 'course-1' },
-    });
-  });
-
-  it('is a no-op when no class is generating', async () => {
-    mockCourseFindFirst.mockResolvedValue({ id: 'course-1', classes: [] });
-
-    const res = await DELETEGeneration(
-      makeRequest('http://localhost/api/v1/courses/course-1/generation', 'DELETE'),
-      courseParams('course-1')
-    );
-
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body).toEqual({ cancelled: false });
-    expect(mockTransaction).not.toHaveBeenCalled();
-  });
+generationCases({
+  GETGeneration,
+  DELETEGeneration,
+  makeRequest,
+  mockAuthenticateRequest,
+  mockCancelPreparation,
+  mockCourseClassDeleteMany,
+  mockCourseFindFirst,
+  mockCourseUpdateMany,
+  mockPreparationActivity,
+  mockReadPreparation,
+  mockTransaction,
 });

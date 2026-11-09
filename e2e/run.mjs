@@ -133,9 +133,9 @@ try {
     cwd: resolve(root, 'apps/web'),
     env: {
       ...env,
-      WORKER_PROFILE: 'pipeline',
+      WORKER_PROFILE: 'all',
       WORKER_QUEUES:
-        'speaking-grading,vocabulary-index,vocabulary-audio,material-finalization,material-extraction,interactions',
+        'audio-generation,audio-stitching,learning-writing,speaking-grading,vocabulary-index,vocabulary-audio,material-finalization,material-extraction,interactions',
     },
     stdio: 'inherit',
     detached: true,

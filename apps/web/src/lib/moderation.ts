@@ -1,12 +1,17 @@
 import { createHash } from 'node:crypto';
+import { z } from 'zod';
 import { abortable } from 'thesidedoor-core/runtime/stream';
 import { cache } from './redis';
 import { logUsage } from './usage-logger';
 
-const MODERATION_API_URL = 'https://api.openai.com/v1/moderations';
+export const MODERATION_API_URL = 'https://api.openai.com/v1/moderations';
 const MODERATION_MODEL = 'omni-moderation-latest';
 const CACHE_TTL_SECONDS = 600;
 const MAX_INPUT_LENGTH = 32_000;
+
+export function moderationRequestBody(text: string, model = MODERATION_MODEL) {
+  return JSON.stringify({ model, input: text.slice(0, MAX_INPUT_LENGTH) });
+}
 
 const CATEGORY_THRESHOLDS: Record<string, number> = {
   'sexual/minors': 0.1,
@@ -34,6 +39,8 @@ export interface ModerationResult {
 export interface ModerationPort {
   fetch: typeof fetch;
   model?: string;
+  /** Durable provider replay must consume the same moderation exchange after restart. */
+  bypassCache?: boolean;
 }
 
 export class ContentModerationError extends Error {
@@ -44,6 +51,33 @@ export class ContentModerationError extends Error {
     this.name = 'ContentModerationError';
     this.categories = categories;
   }
+}
+
+/** Interpret a provider response identically for live calls and retained receipts. */
+export function interpretModerationResponse(data: unknown): ModerationResult {
+  const parsed = z
+    .object({
+      results: z
+        .array(
+          z.object({
+            categories: z.record(z.string(), z.boolean()),
+            category_scores: z.record(z.string(), z.number().finite().min(0).max(1)),
+          })
+        )
+        .min(1),
+    })
+    .safeParse(data);
+  if (!parsed.success) throw new Error('Moderation provider returned no result');
+  const result = parsed.data.results[0]!;
+  const blockedCategories = Object.entries(result.category_scores)
+    .filter(([category, score]) => score >= (CATEGORY_THRESHOLDS[category] ?? 0.5))
+    .map(([category]) => category);
+  return {
+    flagged: blockedCategories.length > 0,
+    categories: result.categories,
+    scores: result.category_scores,
+    blockedCategories,
+  };
 }
 
 function cacheKey(model: string, text: string): string {
@@ -61,14 +95,16 @@ export async function moderateContent(
   const truncated = text.slice(0, MAX_INPUT_LENGTH);
   const model = port.model ?? MODERATION_MODEL;
   const key = cacheKey(model, truncated);
-  const lookup = cache.get<ModerationResult>(key).catch(() => null);
-  const cached = await (signal ? abortable(lookup, signal) : lookup);
-  if (cached) return cached;
+  if (!port.bypassCache) {
+    const lookup = cache.get<ModerationResult>(key).catch(() => null);
+    const cached = await (signal ? abortable(lookup, signal) : lookup);
+    if (cached) return cached;
+  }
 
   const response = await port.fetch(MODERATION_API_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model, input: truncated }),
+    body: moderationRequestBody(truncated, model),
     signal,
   });
   if (!response.ok) {
@@ -76,23 +112,8 @@ export async function moderateContent(
     await response.body?.cancel();
     throw new Error(`Moderation provider returned HTTP ${status}`);
   }
-  const data = (await response.json()) as {
-    results?: Array<{
-      categories: Record<string, boolean>;
-      category_scores: Record<string, number>;
-    }>;
-  };
-  const result = data.results?.[0];
-  if (!result) throw new Error('Moderation provider returned no result');
-  const blockedCategories = Object.entries(result.category_scores)
-    .filter(([category, score]) => score >= (CATEGORY_THRESHOLDS[category] ?? 0.5))
-    .map(([category]) => category);
-  const moderation = {
-    flagged: blockedCategories.length > 0,
-    categories: result.categories,
-    scores: result.category_scores,
-    blockedCategories,
-  };
+  const data: unknown = await response.json();
+  const moderation = interpretModerationResponse(data);
   await logUsage({
     service: 'openai',
     model,
@@ -101,7 +122,7 @@ export async function moderateContent(
     metadata: { inputChars: truncated.length },
   });
   signal?.throwIfAborted();
-  await cache.set(key, moderation, CACHE_TTL_SECONDS);
+  if (!port.bypassCache) await cache.set(key, moderation, CACHE_TTL_SECONDS);
   return moderation;
 }
 

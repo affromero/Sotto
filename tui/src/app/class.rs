@@ -13,17 +13,22 @@
 
 use std::sync::Arc;
 
+use super::state;
 use crate::action::{Action, ApiResult};
-use crate::api::{NextClassOutcome, SpeakingUploadResponse, WritingGradeResponse, types};
+use crate::api::{
+    ClassRecordingRejected, ClassSpeakingBinding, NextClassOutcome, SpeakingUploadResponse,
+    WritingGradeResponse, types,
+};
 use crate::audio::AudioPlayer;
 
-use super::App;
 use super::state::{
-    ClassResult, ClassSection, Course, EpisodeDetail, FlowKind, SectionProgress, SpeakingPhase,
-    View, WritingInput, WritingPhase, answer_current_choice, class_ready_to_submit, class_sections,
-    collect_class_answers, collect_exam_answers, cursor_down, cursor_up, poll_is_terminal,
-    reduce_speaking_poll,
+    ClassResult, ClassSection, Course, EpisodeDetail, FlowKind, ProductiveWork, SectionProgress,
+    SpeakingPhase, View, WritingInput, WritingPhase, answer_current_choice, class_ready_to_submit,
+    class_sections, collect_class_answers, collect_exam_answers, cursor_down, cursor_up,
+    poll_is_terminal, reduce_speaking_poll,
 };
+use super::{App, PendingClassAudio};
 
 include!("class/flow.rs");
 include!("class/reducers.rs");
+include!("class/prelude.rs");

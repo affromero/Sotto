@@ -31,7 +31,11 @@ vi.mock('@/lib/prisma', async () => {
   return { prisma: database, prismaUnfiltered: database };
 });
 vi.mock('@/lib/learning-ai', () => ({
-  resolveCapturedLearningAi: async () => ({ provider: 'anthropic', model: 'captured' }),
+  resolveCapturedLearningAi: async (...args: [string, unknown]) => ({
+    provider: 'anthropic',
+    model: 'captured',
+    execution: args[1],
+  }),
   capturedLearningAiOptions: async () => ({}),
 }));
 vi.mock('@/lib/providers/ai', () => ({

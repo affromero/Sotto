@@ -8,11 +8,14 @@ import { learningTextGuardProps } from '@/components/ui/learningTextGuard';
 import styles from './SpeakingExercise.module.css';
 import {
   clearSpeakingUpload,
+  downloadSpeakingRecording,
   pendingSpeakingUpload,
+  rememberSpeakingUploadReceipt,
   recoverSpeakingUpload,
   retainSpeakingUpload,
 } from '@/components/learn/speaking/speakingUploadRecovery';
 import type { SpeakingEvidence } from '@sotto/shared';
+import { SpeakingRecoveryNotice } from '@/components/learn/speaking/SpeakingRecoveryNotice';
 
 // ---- Types ----
 
@@ -40,11 +43,20 @@ interface ScoringResult {
   overallScore?: number | null;
   rubricScores?: RubricScores | null;
   feedback?: string | null;
-  status: 'PENDING' | 'GRADING' | 'SCORED' | 'FAILED';
+  status: 'PENDING' | 'GRADING' | 'SCORED' | 'FAILED' | 'UNRESOLVED';
+  recoveryAcknowledged?: boolean;
 }
 
 type PromptPhase =
-  'idle' | 'recording' | 'uploading' | 'grading' | 'scored' | 'failed' | 'upload_unknown';
+  | 'idle'
+  | 'recording'
+  | 'recording_held'
+  | 'uploading'
+  | 'grading'
+  | 'scored'
+  | 'failed'
+  | 'upload_unknown'
+  | 'unresolved';
 
 interface PromptState {
   phase: PromptPhase;
@@ -63,6 +75,8 @@ interface SpeakingExerciseProps {
 // ---- Constants ----
 
 const POLL_INTERVAL_MS = 1500;
+const unresolvedMessage =
+  'The grading outcome is unknown. Your recording is saved. Contact your server administrator before another attempt.';
 const RUBRIC_LABELS: Record<string, string> = {
   accuracy: 'Recognized words',
   fluency: 'Timing fluency',
@@ -83,44 +97,47 @@ function PromptCard({ endpointBase, prompt, index, total }: PromptCardProps) {
   const communicative = prompt.taskMode === 'COMMUNICATIVE';
   const [state, setState] = useState<PromptState>(() => {
     const pending = pendingSpeakingUpload(endpointBase, prompt.id);
-    if (
-      pending &&
-      (!prompt.latestRecording || prompt.latestRecording.recordingId === pending.baseline)
-    )
+    if (pending)
       return {
         phase: 'upload_unknown',
         recordingId: null,
         result: null,
         error: 'Upload outcome is unknown. Check saved recording before recording another attempt.',
       };
-    if (pending) clearSpeakingUpload(endpointBase, prompt.id);
     return {
       phase: prompt.latestRecording
         ? prompt.latestRecording.status === 'SCORED'
           ? 'scored'
           : prompt.latestRecording.status === 'FAILED'
             ? 'failed'
-            : 'grading'
+            : prompt.latestRecording.status === 'UNRESOLVED'
+              ? 'unresolved'
+              : 'grading'
         : 'idle',
       recordingId: prompt.latestRecording?.recordingId ?? null,
       result: prompt.latestRecording ?? null,
       error:
         prompt.latestRecording?.status === 'FAILED'
           ? 'Scoring failed. Record another attempt.'
-          : null,
+          : prompt.latestRecording?.status === 'UNRESOLVED'
+            ? unresolvedMessage
+            : null,
     };
   });
 
   const acknowledgedId = useRef(prompt.latestRecording?.recordingId ?? null);
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cardGeneration = useRef(0);
   const referenceAudioRef = useRef<HTMLAudioElement | null>(null);
   const [isPlayingRef, setIsPlayingRef] = useState(false);
+  const [heldForPreviousUpload, setHeldForPreviousUpload] = useState(false);
 
   const recorder = useAudioRecorder({ maxSeconds: 60, minSeconds: 2 });
 
   // ---- Cleanup on unmount ----
   useEffect(() => {
     return () => {
+      cardGeneration.current += 1;
       if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
       if (referenceAudioRef.current) {
         referenceAudioRef.current.pause();
@@ -132,7 +149,20 @@ function PromptCard({ endpointBase, prompt, index, total }: PromptCardProps) {
   // ---- Upload after recording stops ----
   const uploadRecording = useCallback(
     async (blob: Blob) => {
-      retainSpeakingUpload(endpointBase, prompt.id, acknowledgedId.current);
+      const card = cardGeneration.current;
+      let fence: NonNullable<ReturnType<typeof pendingSpeakingUpload>>;
+      try {
+        fence = retainSpeakingUpload(endpointBase, prompt.id, acknowledgedId.current);
+      } catch {
+        setHeldForPreviousUpload(Boolean(pendingSpeakingUpload(endpointBase, prompt.id)));
+        setState((previous) => ({
+          ...previous,
+          phase: 'recording_held',
+          error: 'The recording cannot be sent safely. Download it before leaving.',
+        }));
+        return;
+      }
+      setHeldForPreviousUpload(false);
       setState((prev) => ({ ...prev, phase: 'uploading', error: null }));
 
       try {
@@ -144,7 +174,12 @@ function PromptCard({ endpointBase, prompt, index, total }: PromptCardProps) {
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
           const rejected = [400, 401, 403, 404, 413, 415].includes(res.status);
-          if (rejected) clearSpeakingUpload(endpointBase, prompt.id);
+          if (
+            cardGeneration.current !== card ||
+            pendingSpeakingUpload(endpointBase, prompt.id) !== fence
+          )
+            return;
+          if (rejected && !clearSpeakingUpload(endpointBase, prompt.id, fence)) return;
           setState((prev) => ({
             ...prev,
             phase: rejected ? 'failed' : 'upload_unknown',
@@ -155,14 +190,37 @@ function PromptCard({ endpointBase, prompt, index, total }: PromptCardProps) {
 
         const data: { recordingId: string } = await res.json();
         if (!data.recordingId) throw new Error('Upload acknowledgement is incomplete');
+        const receipt = rememberSpeakingUploadReceipt(
+          endpointBase,
+          prompt.id,
+          data.recordingId,
+          fence
+        );
+        fence = receipt.fence;
+        if (cardGeneration.current !== card) return;
+        if (!receipt.persisted) {
+          setState((previous) => ({
+            ...previous,
+            phase: 'upload_unknown',
+            recordingId: data.recordingId,
+            error:
+              'Your recording was saved, but its receipt could not be stored on this device. Check it before leaving.',
+          }));
+          return;
+        }
         acknowledgedId.current = data.recordingId;
-        clearSpeakingUpload(endpointBase, prompt.id);
+        if (!clearSpeakingUpload(endpointBase, prompt.id, fence)) return;
         setState((prev) => ({
           ...prev,
           phase: 'grading',
           recordingId: data.recordingId,
         }));
       } catch {
+        if (
+          cardGeneration.current !== card ||
+          pendingSpeakingUpload(endpointBase, prompt.id) !== fence
+        )
+          return;
         setState((prev) => ({
           ...prev,
           phase: 'upload_unknown',
@@ -199,12 +257,22 @@ function PromptCard({ endpointBase, prompt, index, total }: PromptCardProps) {
 
         const data: ScoringResult = await res.json();
 
-        if (data.status === 'SCORED' || data.status === 'FAILED') {
+        if (data.status === 'SCORED' || data.status === 'FAILED' || data.status === 'UNRESOLVED') {
           setState((prev) => ({
             ...prev,
-            phase: data.status === 'SCORED' ? 'scored' : 'failed',
+            phase:
+              data.status === 'SCORED'
+                ? 'scored'
+                : data.status === 'UNRESOLVED'
+                  ? 'unresolved'
+                  : 'failed',
             result: data,
-            error: data.status === 'FAILED' ? 'Scoring failed. Please try again.' : null,
+            error:
+              data.status === 'FAILED'
+                ? 'Scoring failed. Please try again.'
+                : data.status === 'UNRESOLVED'
+                  ? unresolvedMessage
+                  : null,
           }));
         } else {
           pollTimerRef.current = setTimeout(() => {
@@ -237,10 +305,21 @@ function PromptCard({ endpointBase, prompt, index, total }: PromptCardProps) {
       acknowledgedId.current = result.recordingId;
       setState({
         phase:
-          result.status === 'SCORED' ? 'scored' : result.status === 'FAILED' ? 'failed' : 'grading',
+          result.status === 'SCORED'
+            ? 'scored'
+            : result.status === 'FAILED'
+              ? 'failed'
+              : result.status === 'UNRESOLVED'
+                ? 'unresolved'
+                : 'grading',
         recordingId: result.recordingId,
         result,
-        error: result.status === 'FAILED' ? 'Scoring failed. Record another attempt.' : null,
+        error:
+          result.status === 'FAILED'
+            ? 'Scoring failed. Record another attempt.'
+            : result.status === 'UNRESOLVED'
+              ? unresolvedMessage
+              : null,
       });
     } catch (failure: unknown) {
       setState((previous) => ({
@@ -465,17 +544,59 @@ function PromptCard({ endpointBase, prompt, index, total }: PromptCardProps) {
             </div>
           )}
 
-          {phase === 'upload_unknown' && (
+          {(phase === 'upload_unknown' || phase === 'recording_held') && (
             <div className={styles.failedRow} role="alert">
               <span className={styles.failedText}>{error}</span>
-              <button
-                type="button"
-                className={styles.retryButton}
-                onClick={() => void checkSavedUpload()}
-              >
-                Check saved recording
-              </button>
+              {recorder.recordedBlob && (
+                <button
+                  type="button"
+                  className={styles.retryButton}
+                  onClick={() =>
+                    recorder.recordedBlob && downloadSpeakingRecording(recorder.recordedBlob)
+                  }
+                >
+                  Download recording
+                </button>
+              )}
+              {phase === 'recording_held' && recorder.recordedBlob && !heldForPreviousUpload && (
+                <button
+                  type="button"
+                  className={styles.retryButton}
+                  onClick={() =>
+                    recorder.recordedBlob && void uploadRecording(recorder.recordedBlob)
+                  }
+                >
+                  Upload this recording
+                </button>
+              )}
+              {phase === 'upload_unknown' && (
+                <button
+                  type="button"
+                  className={styles.retryButton}
+                  onClick={() => void checkSavedUpload()}
+                >
+                  Check saved recording
+                </button>
+              )}
             </div>
+          )}
+          {phase === 'unresolved' && (
+            <SpeakingRecoveryNotice
+              endpointBase={endpointBase}
+              promptId={prompt.id}
+              recordingId={state.recordingId}
+              acknowledged={result?.recoveryAcknowledged === true}
+              onAcknowledged={() =>
+                setState((previous) =>
+                  previous.phase === 'unresolved' &&
+                  previous.recordingId === state.recordingId &&
+                  previous.result
+                    ? { ...previous, result: { ...previous.result, recoveryAcknowledged: true } }
+                    : previous
+                )
+              }
+              onRetry={handleReset}
+            />
           )}
           {phase === 'failed' && (
             <div className={styles.failedRow} role="alert">

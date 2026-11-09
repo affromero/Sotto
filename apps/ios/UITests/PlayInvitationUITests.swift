@@ -172,7 +172,12 @@ final class PlayInvitationUITests: XCTestCase {
                     guard control.wait(for: \.isHittable, toEqual: true, timeout: timeout) else {
                         throw InteractionFailure.invisibleButton(title)
                     }
-                    control.tap()
+                    let switchControl = control.children(matching: .switch).firstMatch
+                    if type == .switch, switchControl.exists {
+                        switchControl.tap()
+                    } else {
+                        control.tap()
+                    }
                     return
                 }
                 let deadline = ContinuousClock.now.advanced(by: .seconds(timeout))

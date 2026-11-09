@@ -2,12 +2,541 @@
         Arc::new(Ok(outcome))
     }
 
+    fn accept_no_prelude(app: &mut App) {
+        let value = serde_json::from_value(serde_json::json!({"kind": "NOT_REQUIRED"})).unwrap();
+        app.on_class_prelude_loaded(app.request_gen, Arc::new(Ok(value)));
+        if let View::ClassPrelude { course, class_id, in_flight: true, .. } = &app.view {
+            app.view = View::class_view(course.clone(), class_id.clone());
+        }
+    }
+
+    #[tokio::test]
+    async fn reviewed_prelude_blocks_practice_until_acknowledged_and_discards_stale_results() {
+        let mut app = test_app();
+        app.enter_course_home(course("A"));
+        app.on_next_class();
+        let request = app.request_gen;
+        app.on_next_class_resolved(request, next_outcome(NextClassOutcome::Created { class_id: "cls1".into() }));
+        let prelude: types::ClassPreludeResponse = serde_json::from_value(serde_json::json!({
+            "kind": "BASE", "nativeLang": "es", "targetLang": "ru",
+            "receiptId": "00000000-0000-4000-a000-000000000001", "acknowledged": false,
+            "teaching": { "version": 1, "title": "Pedir", "explanation": "Usa cortesía.",
+                "workedExamples": [
+                    { "prompt": "Agua", "answer": "Вода", "explanation": "Una bebida." },
+                    { "prompt": "Té", "answer": "Чай", "explanation": "Otra bebida." }
+                ], "commonMistake": { "incorrect": "A", "correction": "B", "explanation": "Corrige." }
+            }
+        })).unwrap();
+        let current = app.request_gen;
+        app.on_class_prelude_loaded(current, Arc::new(Ok(prelude.clone())));
+        assert!(matches!(&app.view, View::ClassPrelude { value: Some(value), in_flight: false, .. } if value["kind"] == "BASE"));
+        app.class_prelude_select();
+        assert!(matches!(app.view, View::ClassPrelude { in_flight: true, .. }));
+        app.on_back();
+        app.on_class_prelude_loaded(current, Arc::new(Ok(prelude)));
+        assert!(matches!(app.view, View::CourseHome { .. }));
+    }
+
+    #[tokio::test]
+    async fn uncertain_preparation_requires_checking_saved_status_before_retry() {
+        let mut app = test_app();
+        app.enter_course_home(course("A"));
+        app.on_next_class();
+        let request = app.request_gen;
+        app.on_next_class_resolved(request, next_outcome(NextClassOutcome::Created { class_id: "cls1".into() }));
+        let available: types::ClassPreludeResponse = serde_json::from_value(serde_json::json!({
+            "kind": "ADDENDUM", "nativeLang": "es", "targetLang": "ru", "status": "AVAILABLE",
+            "request": { "sourceHash": "a".repeat(64), "snapshotHash": "b".repeat(64) }
+        })).unwrap();
+        let current = app.request_gen;
+        app.on_class_prelude_loaded(current, Arc::new(Ok(available)));
+        app.class_prelude_select();
+        assert!(matches!(app.view, View::ClassPrelude { in_flight: true, .. }));
+        app.on_class_prelude_loaded(current, Arc::new(Err("Connection lost".into())));
+        assert!(matches!(app.view, View::ClassPrelude { value: None, in_flight: false, error: Some(_), .. }));
+        app.class_prelude_select();
+        assert!(matches!(app.view, View::ClassPrelude { value: None, in_flight: false, .. }));
+        app.class_prelude_read();
+        assert!(matches!(app.view, View::ClassPrelude { value: None, in_flight: true, .. }));
+    }
+
+    #[tokio::test]
+    async fn pending_prelude_polls_and_navigation_cancels_its_wait() {
+        let mut app = test_app();
+        app.enter_course_home(course("A"));
+        app.on_next_class();
+        let request = app.request_gen;
+        app.on_next_class_resolved(request, next_outcome(NextClassOutcome::Created { class_id: "cls1".into() }));
+        let pending: types::ClassPreludeResponse = serde_json::from_value(serde_json::json!({
+            "kind": "ADDENDUM", "nativeLang": "es", "targetLang": "ru", "status": "PENDING", "recoverable": true,
+            "request": { "sourceHash": "a".repeat(64), "snapshotHash": "b".repeat(64) }
+        })).unwrap();
+        let current = app.request_gen;
+        app.on_class_prelude_loaded(current, Arc::new(Ok(pending)));
+        assert!(matches!(app.view, View::ClassPrelude { in_flight: true, polls: 1, .. }));
+        assert!(app.prelude_task.is_some());
+        app.on_back();
+        assert!(app.prelude_task.is_none());
+        assert!(matches!(app.view, View::CourseHome { .. }));
+    }
+
     fn class_detail(mut json: serde_json::Value) -> ApiResult<types::ClassDetailResponse> {
         if let Some(obj) = json.as_object_mut() {
             obj.entry("courseId")
                 .or_insert_with(|| serde_json::json!("course1"));
         }
         Arc::new(Ok(serde_json::from_value(json).expect("valid class JSON")))
+    }
+
+    #[test]
+    fn prerequisite_directions_require_the_current_receipt_source_and_every_task() {
+        let source = "a".repeat(64);
+        let receipt = "00000000-0000-4000-a000-000000000001";
+        let class = serde_json::json!({
+            "id": "cls1", "courseId": "course1", "status": "IN_PROGRESS", "order": 1,
+            "passThreshold": 0.7, "submitted": false, "prerequisiteSourceHash": source,
+            "taskMaterialRevision": "d".repeat(64),
+            "sections": [{ "id": "s1", "skill": "GRAMMAR", "status": "READY", "episode": null,
+                "prompts": [], "writingPrompts": [], "questions": [{ "id": "q1", "order": 1,
+                "question": "Преврати сообщение в вопрос.", "options": ["A", "B"] }] }]
+        });
+        let saved = serde_json::json!({
+            "status": "READY", "nativeLang": "es", "targetLang": "ru", "receiptId": receipt,
+            "acknowledged": true, "request": { "sourceHash": source, "snapshotHash": "b".repeat(64) },
+            "content": { "title": "Pedir", "explanation": "Usa cortesía.", "examples": [
+                { "target": "Вода", "meaning": "Agua", "explanation": "Una bebida." }
+            ], "directions": { "guided": "Haz una petición.", "tasks": [
+                { "sectionId": "s1", "taskId": "q1", "kind": "question", "instruction": "Formula una pregunta." }
+            ] } }
+        });
+        let parse = |value| serde_json::from_value::<types::ClassPrerequisiteResponse>(value).unwrap();
+        let detail: types::ClassDetailResponse = serde_json::from_value(class.clone()).unwrap();
+        let languages = ("es".to_string(), "ru".to_string());
+        let check = |saved: serde_json::Value| super::class::validate_class_directions(&detail, &parse(saved), "cls1", receipt, &source, &languages);
+        let directions = check(saved.clone()).unwrap();
+        assert!(super::class::validate_class_directions(&detail, &parse(saved.clone()), "different-class", receipt, &source, &languages).is_err());
+        assert_eq!(directions.tasks.get(&("s1".into(), "question".into(), "q1".into())).map(String::as_str), Some("Formula una pregunta."));
+        let mut app = test_app();
+        app.view = View::ClassPrelude { course: course("A"), class_id: "cls1".into(),
+            value: None, in_flight: true, error: None, scroll: 0, polls: 0, retained_work: Vec::new() };
+        let material = crate::api::ClassPreludeMaterial { detail: detail.clone(), directions: Some(directions.clone()) };
+        app.on_class_prelude_material_loaded(app.request_gen, Arc::new(Ok(material)));
+        assert!(matches!(&app.view, View::Class { directions: Some(shown), .. } if shown == &directions));
+        let mut stale = saved.clone(); stale["request"]["sourceHash"] = "c".repeat(64).into();
+        assert!(check(stale).is_err());
+        let mut wrong_receipt = saved.clone(); wrong_receipt["receiptId"] = "00000000-0000-4000-a000-000000000002".into();
+        assert!(check(wrong_receipt).is_err());
+        let mut missing = saved.clone(); missing["content"]["directions"]["tasks"] = serde_json::json!([]);
+        assert!(check(missing).is_err());
+        let mut foreign = saved.clone(); foreign["content"]["directions"]["tasks"][0]["taskId"] = "other".into();
+        assert!(check(foreign).is_err());
+        let mut duplicate = saved.clone(); let first = duplicate["content"]["directions"]["tasks"][0].clone();
+        duplicate["content"]["directions"]["tasks"].as_array_mut().unwrap().push(first);
+        assert!(check(duplicate).is_err());
+        let old = state::class_sections(&detail).unwrap();
+        let mut changed = class; changed["sections"][0]["questions"][0]["options"][1] = "Changed".into();
+        let changed: types::ClassDetailResponse = serde_json::from_value(changed).unwrap();
+        assert!(!super::class::same_class_tasks(&old, &state::class_sections(&changed).unwrap()));
+        let mut cached = View::class_view(course("A"), "cls1".into());
+        if let View::Class { sections, progress, .. } = &mut cached {
+            let mut retained = old;
+            if let SectionProgress::Mc { selected, .. } = &mut retained[0].progress { selected[0] = Some(1); }
+            *sections = Some(retained);
+            progress.dirty = true;
+        }
+        app.practice_cache.insert("CLASS/cls1/1".into(), cached);
+        app.view = View::ClassPrelude { course: course("A"), class_id: "cls1".into(),
+            value: None, in_flight: true, error: None, scroll: 0, polls: 0, retained_work: Vec::new() };
+        app.on_class_prelude_material_loaded(app.request_gen, Arc::new(Ok(crate::api::ClassPreludeMaterial { detail: changed, directions: Some(directions) })));
+        assert!(matches!(&app.view, View::ClassPrelude { error: Some(message), .. } if message.contains("local work remains in memory")));
+        assert!(matches!(&app.view, View::ClassPrelude { retained_work, .. } if retained_work.iter().any(|line| line.contains("Your choice: B"))));
+        assert!(app.practice_cache.contains_key("CLASS/cls1/1"));
+        app.view = View::ClassPrelude { course: course("A"), class_id: "cls1".into(),
+            value: Some(serde_json::json!({"kind": "NOT_REQUIRED"})), in_flight: true,
+            error: None, scroll: 0, polls: 0, retained_work: Vec::new() };
+        app.on_class_prelude_material_loaded(app.request_gen, Arc::new(Ok(crate::api::ClassPreludeMaterial { detail: detail.clone(), directions: None })));
+        assert!(matches!(&app.view, View::ClassPrelude { retained_work, error: Some(_), .. } if retained_work.iter().any(|line| line.contains("Your choice: B"))));
+        let earlier = app.practice_cache.remove("CLASS/cls1/1").unwrap();
+        app.practice_cache.insert("CLASS/cls1/0".into(), earlier);
+        app.view = View::ClassPrelude { course: course("A"), class_id: "cls1".into(),
+            value: Some(serde_json::json!({"kind": "NOT_REQUIRED"})), in_flight: true,
+            error: None, scroll: 0, polls: 0, retained_work: Vec::new() };
+        app.on_class_prelude_material_loaded(app.request_gen, Arc::new(Ok(crate::api::ClassPreludeMaterial { detail, directions: None })));
+        assert!(matches!(&app.view, View::ClassPrelude { retained_work, error: Some(_), .. } if retained_work.iter().any(|line| line.contains("Your choice: B"))));
+        assert!(app.practice_cache.contains_key("CLASS/cls1/0"));
+    }
+
+    #[test]
+    fn class_displays_learner_language_direction_with_the_matching_question() {
+        use ratatui::{Terminal, backend::TestBackend};
+        let mut app = test_app();
+        app.view = class_with_sections(serde_json::json!([{
+            "id": "s1", "skill": "GRAMMAR", "status": "READY", "episode": null,
+            "prompts": [], "writingPrompts": [], "questions": [{ "id": "q1", "order": 1,
+                "question": "Преврати сообщение в вопрос.", "options": ["A", "B"] }]
+        }]));
+        if let View::Class { directions, .. } = &mut app.view {
+            *directions = Some(crate::api::ClassDirections {
+                source_hash: "a".repeat(64),
+                tasks: [(("s1".into(), "question".into(), "q1".into()), "Formula una pregunta.".into())].into(),
+            });
+        }
+        let mut terminal = Terminal::new(TestBackend::new(100, 25)).unwrap();
+        terminal.draw(|frame| { app.draw(frame).unwrap(); }).unwrap();
+        let text: String = terminal.backend().buffer().content().iter().map(|cell| cell.symbol()).collect();
+        assert!(text.contains("Formula una pregunta."));
+        assert!(text.contains("Преврати сообщение в вопрос."));
+    }
+
+    #[tokio::test]
+    async fn previous_writing_is_read_only_scrollable_and_scoped_to_the_loaded_class() {
+        use ratatui::{Terminal, backend::TestBackend};
+        let mut app = test_app();
+        let detail = class_detail(serde_json::json!({
+            "id": "cls1", "status": "IN_PROGRESS", "order": 1, "passThreshold": 0.7,
+            "submitted": false, "sections": [{
+                "id": "current", "skill": "GRAMMAR", "status": "READY", "episode": null,
+                "prompts": [], "writingPrompts": [],
+                "questions": [{"id": "q1", "order": 1, "question": "Current?", "options": ["A", "B"]}]
+            }],
+            "speakingHistory": [{"sectionId": "old-speaking", "attempt": 1, "prompts": [{
+                "id": "speaking-prompt", "order": 1, "targetPhrase": "Hallo", "translation": "Hello",
+                "recordings": [{"id": "recording", "attempt": 1, "attemptMatches": true,
+                    "status": "SCORED", "transcript": "Hallo Mia", "overallScore": 0.8,
+                    "rubricScores": {"accuracy": 0.8, "broken": "legacy"},
+                    "phonemeScores": [{"op": "substitute", "expected": "r", "actual": "l"}, {"bad": true}],
+                    "feedback": "Clear speaking",
+                    "createdAt": "2026-01-01T00:00:00Z"}]
+            }]}],
+            "writingHistory": [{"sectionId": "old", "attempt": 2, "prompts": [{
+                "id": "prompt", "order": 1, "task": "Earlier task", "savedDraft": "Saved draft",
+                "responses": [{"id": "response", "attempt": 1, "attemptMatches": false,
+                    "text": "Prior response", "overallScore": 0.8, "feedback": "Good work",
+                    "corrections": [{"old": "a", "new": "b", "why": "Correction"}, {"bad": true}],
+                    "createdAt": "2026-01-01T00:00:00Z"}]
+            }]}],
+            "orphanWritingDrafts": [{"id": "orphan", "text": "Recovered words"}]
+        }));
+        app.view = View::class_view(course("A"), "cls1".into());
+        app.on_class_loaded(app.request_gen, detail);
+        assert!(matches!(app.map_key(key(KeyCode::F(2))), Some(Action::ClassHistoryToggle)));
+        app.class_history_toggle();
+        assert!(app.map_key(key(KeyCode::Enter)).is_none());
+        assert!(matches!(app.map_key(key(KeyCode::Down)), Some(Action::ClassHistoryScroll(true))));
+        let mut terminal = Terminal::new(TestBackend::new(100, 45)).unwrap();
+        terminal.draw(|frame| { app.draw(frame).unwrap(); }).unwrap();
+        let text: String = terminal.backend().buffer().content().iter().map(|cell| cell.symbol()).collect();
+        assert!(text.contains("Hallo Mia"));
+        assert!(text.contains("Clear speaking"));
+        assert!(text.contains("accuracy: 80%"));
+        assert!(text.contains("substitute: r → l"));
+        assert!(text.contains("Some speaking feedback could not be displayed."));
+        assert!(text.contains("Earlier task"));
+        assert!(text.contains("Saved draft"));
+        assert!(text.contains("Prior response"));
+        assert!(text.contains("Good work"));
+        assert!(!text.contains("Recovered words"));
+        app.class_history_scroll(true);
+        assert!(matches!(&app.view, View::Class { history_scroll: 1, progress, .. } if !progress.dirty));
+        let mut scrolls = 1;
+        let mut found = false;
+        while scrolls <= 100 {
+            terminal.draw(|frame| { app.draw(frame).unwrap(); }).unwrap();
+            let visible: String = terminal.backend().buffer().content().iter().map(|cell| cell.symbol()).collect();
+            if visible.contains("Recovered words") { found = true; break; }
+            app.class_history_scroll(true);
+            scrolls += 1;
+        }
+        assert!(found);
+        assert!(matches!(&app.view, View::Class { progress, .. } if !progress.dirty));
+        for _ in 0..scrolls { app.class_history_scroll(false); }
+        terminal.draw(|frame| { app.draw(frame).unwrap(); }).unwrap();
+        let visible: String = terminal.backend().buffer().content().iter().map(|cell| cell.symbol()).collect();
+        assert!(visible.contains("Hallo Mia"));
+        app.class_history_toggle();
+        assert!(matches!(&app.view, View::Class { history_open: false, progress, .. } if !progress.dirty));
+        app.view = View::class_view(course("B"), "other".into());
+        assert!(matches!(&app.view, View::Class { previous_work, .. } if previous_work.is_empty()));
+    }
+
+    #[tokio::test]
+    async fn saved_speaking_playback_fences_selection_and_closed_history() {
+        for incomplete in [false, true] {
+            let mut app = test_app();
+            let sections = if incomplete { serde_json::json!([]) } else { serde_json::json!([{
+                "id": "current", "skill": "GRAMMAR", "status": "READY", "episode": null,
+                "prompts": [], "writingPrompts": [],
+                "questions": [{"id": "q1", "order": 1, "question": "Current?", "options": ["A", "B"]}]
+            }]) };
+            let detail = class_detail(serde_json::json!({
+                "id": "cls1", "status": "IN_PROGRESS", "order": 1, "passThreshold": 0.7,
+                "submitted": false, "sections": sections,
+                "speakingHistory": [{"sectionId": "old", "attempt": 1, "prompts": [{
+                    "id": "prompt", "order": 1, "targetPhrase": "A very long speaking phrase that must not conceal the playback status on a narrow terminal", "translation": "Hello",
+                    "recordings": [
+                        {"id": "first", "attempt": 1, "attemptMatches": true, "status": "SCORED",
+                         "transcript": null, "overallScore": null, "rubricScores": null, "phonemeScores": null,
+                         "feedback": null, "createdAt": "2026-01-01T00:00:00Z"},
+                        {"id": "second", "attempt": 1, "attemptMatches": true, "status": "PENDING",
+                         "transcript": null, "overallScore": null, "rubricScores": null, "phonemeScores": null,
+                         "feedback": null, "createdAt": "2026-01-02T00:00:00Z"}
+                    ]
+                }]}],
+                "speakingHistoryUnlinked": [{"id": "unlinked", "attempt": 1, "status": "PENDING",
+                    "transcript": null, "overallScore": null, "rubricScores": null, "phonemeScores": null,
+                    "feedback": null, "createdAt": "2026-01-01T00:00:00Z"}]
+            }));
+            app.view = View::class_view(course("A"), "cls1".into());
+            app.on_class_loaded(app.request_gen, detail);
+            app.class_history_toggle();
+            assert!(matches!(app.map_key(key(KeyCode::Char(' '))), Some(Action::ClassHistoryAudioPlay)));
+            assert!(matches!(app.map_key(key(KeyCode::Char(']'))), Some(Action::ClassHistoryAudioMove(true))));
+            app.class_history_audio_play();
+            let first = match &app.view {
+                View::Class { history_audio, .. } | View::ClassRepair { history_audio, .. } => {
+                    assert_eq!(history_audio.items.len(), 2);
+                    history_audio.pending.unwrap()
+                }
+                _ => panic!("Expected class history"),
+            };
+            if let Some(task) = app.history_audio_task.take() { task.abort(); }
+            let pending = tokio::spawn(std::future::pending::<()>());
+            app.history_audio_task = Some(pending.abort_handle());
+            app.class_history_audio_move(true);
+            assert!(pending.await.unwrap_err().is_cancelled());
+            app.class_history_audio_play();
+            let second = match &app.view {
+                View::Class { history_audio, .. } | View::ClassRepair { history_audio, .. } => history_audio.pending.unwrap(),
+                _ => panic!("Expected class history"),
+            };
+            assert_ne!(first, second);
+            app.on_class_history_audio_downloaded(app.request_gen, first, "cls1", "prompt", "first", Arc::new(Err("old failure".into())));
+            assert!(matches!(&app.view, View::Class { history_audio, .. } | View::ClassRepair { history_audio, .. }
+                if history_audio.pending == Some(second) && history_audio.note.as_deref() == Some("Loading saved recording")));
+            app.class_history_toggle();
+            app.class_history_toggle();
+            app.on_class_history_audio_downloaded(app.request_gen, second, "cls1", "prompt", "second", Arc::new(Err("late failure".into())));
+            assert!(matches!(&app.view, View::Class { history_audio, history_open: true, .. } | View::ClassRepair { history_audio, history_open: true, .. }
+                if history_audio.pending.is_none() && history_audio.note.is_none()));
+            app.class_history_audio_play();
+            let current = match &app.view {
+                View::Class { history_audio, .. } | View::ClassRepair { history_audio, .. } => history_audio.pending.unwrap(),
+                _ => panic!("Expected class history"),
+            };
+            app.on_class_history_audio_downloaded(app.request_gen, current, "cls1", "prompt", "second", Arc::new(Err("offline".into())));
+            assert!(matches!(&app.view, View::Class { history_audio, .. } | View::ClassRepair { history_audio, .. }
+                if history_audio.pending.is_none() && history_audio.note.as_deref() == Some("Recording unavailable: offline")));
+            let mut terminal = ratatui::Terminal::new(ratatui::backend::TestBackend::new(40, 10)).unwrap();
+            terminal.draw(|frame| { app.draw(frame).unwrap(); }).unwrap();
+            let rendered: String = terminal.backend().buffer().content().iter().map(|cell| cell.symbol()).collect();
+            assert!(rendered.contains("A very long speaking"), "{rendered:?}");
+            assert!(rendered.contains("Recording unavailable"), "{rendered:?}");
+            app.class_history_audio_play();
+            let stale = match &app.view {
+                View::Class { history_audio, .. } | View::ClassRepair { history_audio, .. } => history_audio.pending.unwrap(),
+                _ => panic!("Expected class history"),
+            };
+            let old_generation = app.request_gen;
+            app.config.upsert_profile("other", crate::config::Profile {
+                server_url: "stub://other".into(), api_key: "other-key".into(), name: None,
+            });
+            app.accounts.open = true;
+            app.accounts.cursor = 1;
+            app.on_switch_account();
+            assert!(app.request_gen > old_generation);
+            app.on_class_history_audio_downloaded(old_generation, stale, "cls1", "prompt", "second", Arc::new(Err("old account".into())));
+            assert!(matches!(app.view, View::Loading));
+        }
+    }
+
+    #[tokio::test]
+    async fn previous_quiz_work_is_read_only_and_keeps_unlinked_answers() {
+        use ratatui::{Terminal, backend::TestBackend};
+        let mut app = test_app();
+        app.view = View::class_view(course("A"), "cls1".into());
+        app.on_class_loaded(app.request_gen, class_detail(serde_json::json!({
+            "id": "cls1", "status": "IN_PROGRESS", "order": 1, "passThreshold": 0.7,
+            "submitted": false, "sections": [{
+                "id": "current", "skill": "GRAMMAR", "status": "READY", "episode": null,
+                "prompts": [], "writingPrompts": [],
+                "questions": [{"id": "q1", "order": 1, "question": "Current?", "options": ["A", "B"]}]
+            }],
+            "quizHistory": [{"sectionId": "old", "skill": "GRAMMAR", "attempt": 1, "questions": [{
+                "id": "q-old", "order": 1, "question": "Earlier question", "passageText": null,
+                "options": ["Hola", "Adios"], "savedChoice": 0,
+                "submissions": [{"attempt": 1, "submittedAt": null, "selectedIndex": 1, "isCorrect": false},
+                    {"attempt": null, "submittedAt": null, "selectedIndex": 0, "isCorrect": null},
+                    {"attempt": 2, "submittedAt": null, "selectedIndex": null, "isCorrect": true}]
+            }]}],
+            "orphanQuizAnswers": [{"sectionId": null, "questionId": "missing", "savedChoice": 5, "submissions": []}],
+            "quizSubmissionReceipts": [{"attempt": 3, "submittedAt": null, "passed": false, "overallScore": 0.4,
+                "answersUnavailable": true, "passedSections": 1, "totalSections": 2,
+                "sections": [{"id": "speaking", "skill": "SPEAKING", "score": 0.8, "passed": true},
+                    {"id": null, "skill": "READING", "score": 0.7, "passed": null}], "summaryIncomplete": true}],
+            "quizHistoryUnreadable": true
+        })));
+        app.class_history_toggle();
+        let mut terminal = Terminal::new(TestBackend::new(100, 60)).unwrap();
+        terminal.draw(|frame| { app.draw(frame).unwrap(); }).unwrap();
+        let text: String = terminal.backend().buffer().content().iter().map(|cell| cell.symbol()).collect();
+        assert!(text.contains("Previous work"));
+        assert!(text.contains("Earlier question"));
+        assert!(text.contains("Saved choice: 1. Hola"));
+        assert!(text.contains("2. Adios · Incorrect"));
+        assert!(text.contains("1. Hola · Outcome unavailable"));
+        assert!(text.contains("Choice unavailable · Correct"));
+        assert!(text.contains("Choice index 5 (text unavailable)"));
+        assert!(text.contains("Some previous quiz records could not be displayed."));
+        assert!(text.contains("SPEAKING · Score: 80% · Passed"));
+        assert!(text.contains("READING · Score: 70% · Outcome unavailable"));
+        assert!(app.map_key(key(KeyCode::Enter)).is_none());
+        assert!(matches!(&app.view, View::Class { progress, .. } if !progress.dirty));
+    }
+
+    #[tokio::test]
+    async fn quiz_only_history_can_be_opened_before_incomplete_class_repair() {
+        let mut app = test_app();
+        app.view = View::class_view(course("A"), "cls1".into());
+        app.on_class_loaded(app.request_gen, class_detail(serde_json::json!({
+            "id": "cls1", "status": "IN_PROGRESS", "order": 1, "passThreshold": 0.7,
+            "submitted": false, "sections": [], "orphanQuizAnswers": [{
+                "sectionId": null, "questionId": "lost", "savedChoice": 0, "submissions": []
+            }]
+        })));
+        assert!(matches!(&app.view, View::ClassRepair { previous_work, .. } if previous_work.iter().any(|line| line.contains("Choice index 0"))));
+        assert!(matches!(app.map_key(key(KeyCode::F(2))), Some(Action::ClassHistoryToggle)));
+        app.class_history_toggle();
+        assert!(matches!(&app.view, View::ClassRepair { history_open: true, .. }));
+    }
+
+    #[tokio::test]
+    async fn previous_writing_remains_available_before_incomplete_class_repair() {
+        let mut app = test_app();
+        app.view = View::class_view(course("A"), "cls1".into());
+        app.on_class_loaded(app.request_gen, class_detail(serde_json::json!({
+            "id": "cls1", "status": "IN_PROGRESS", "order": 1, "passThreshold": 0.7,
+            "submitted": false, "sections": [],
+            "orphanWritingDrafts": [{"id": "old", "text": "Saved words"}]
+        })));
+        assert!(matches!(&app.view, View::ClassRepair { previous_work, .. } if previous_work.iter().any(|text| text.contains("Saved words"))));
+        assert!(matches!(app.map_key(key(KeyCode::F(2))), Some(Action::ClassHistoryToggle)));
+        app.class_history_toggle();
+        assert!(matches!(&app.view, View::ClassRepair { history_open: true, .. }));
+        app.class_history_toggle();
+        assert!(matches!(&app.view, View::ClassRepair { history_open: false, .. }));
+    }
+
+    #[tokio::test]
+    async fn clearing_history_during_refresh_never_traps_the_class_view() {
+        let mut app = test_app();
+        let base = serde_json::json!({
+            "id": "cls1", "status": "IN_PROGRESS", "order": 1, "passThreshold": 0.7,
+            "submitted": false, "sections": [{
+                "id": "current", "skill": "GRAMMAR", "status": "READY", "episode": null,
+                "prompts": [], "writingPrompts": [],
+                "questions": [{"id": "q1", "order": 1, "question": "Current?", "options": ["A", "B"]}]
+            }]
+        });
+        let mut with_history = base.clone();
+        with_history["orphanWritingDrafts"] = serde_json::json!([{"id": "old", "text": "Saved"}]);
+        app.view = View::class_view(course("A"), "cls1".into());
+        app.on_class_loaded(app.request_gen, class_detail(with_history));
+        app.class_history_toggle();
+        app.class_history_scroll(true);
+        app.on_class_loaded(app.request_gen, class_detail(base));
+        assert!(matches!(&app.view, View::Class { history_open: false, history_scroll: 0, .. }));
+        assert!(!matches!(app.map_key(key(KeyCode::Esc)), Some(Action::ClassHistoryToggle)));
+    }
+
+    #[test]
+    fn long_task_directions_scroll_without_replacing_the_exercise() {
+        use ratatui::{Terminal, backend::TestBackend};
+        let mut app = test_app();
+        app.view = class_with_sections(serde_json::json!([{
+            "id": "s1", "skill": "GRAMMAR", "status": "READY", "episode": null,
+            "prompts": [], "writingPrompts": [], "questions": [{ "id": "q1", "order": 1,
+                "question": "Elige A.", "options": ["A", "B"] }]
+        }]));
+        if let View::Class { directions, .. } = &mut app.view {
+            *directions = Some(crate::api::ClassDirections {
+                source_hash: "a".repeat(64),
+                tasks: [(("s1".into(), "question".into(), "q1".into()), format!("{} FIN DE INSTRUCCION", "palabra ".repeat(80)))].into(),
+            });
+        }
+        for _ in 0..9 { app.class_direction_scroll(true); }
+        let mut terminal = Terminal::new(TestBackend::new(60, 20)).unwrap();
+        terminal.draw(|frame| { app.draw(frame).unwrap(); }).unwrap();
+        let text: String = terminal.backend().buffer().content().iter().map(|cell| cell.symbol()).collect();
+        assert!(text.contains("FIN DE INSTRUCCION"));
+        assert!(text.contains("Elige A."));
+    }
+
+    #[test]
+    fn retained_work_includes_the_current_unsaved_writing_draft() {
+        let mut view = class_with_sections(serde_json::json!([{
+            "id": "writing", "skill": "WRITING", "status": "READY", "episode": null,
+            "questions": [], "prompts": [], "writingPrompts": [{ "id": "w0", "order": 1, "task": "Saluda a Ana." }]
+        }]));
+        let View::Class { sections: Some(sections), .. } = &mut view else { panic!("class sections missing") };
+        if let SectionProgress::Writing { input, .. } = &mut sections[0].progress {
+            *input = state::WritingInput::from_text("Hola, Ana.");
+        }
+        let retained = super::class::retained_class_work(sections);
+        assert!(retained.iter().any(|text| text.contains("Hola, Ana.")));
+    }
+
+    #[tokio::test]
+    async fn changed_source_during_refresh_returns_to_prelude_and_preserves_work() {
+        let mut app = test_app();
+        let sections = serde_json::json!([{
+            "id": "s1", "skill": "GRAMMAR", "status": "READY", "episode": null,
+            "prompts": [], "writingPrompts": [], "questions": [{ "id": "q1", "order": 1,
+                "question": "Elige A.", "options": ["A", "B"] }]
+        }]);
+        app.view = class_with_sections(sections.clone());
+        if let View::Class { material_source, progress, sections: Some(items), .. } = &mut app.view {
+            *material_source = Some("a".repeat(64));
+            progress.dirty = true;
+            if let SectionProgress::Mc { selected, .. } = &mut items[0].progress { selected[0] = Some(1); }
+        }
+        app.on_class_loaded(app.request_gen, class_detail(serde_json::json!({
+            "id": "cls1", "status": "IN_PROGRESS", "order": 1, "passThreshold": 0.7,
+            "submitted": false, "attempt": 1, "taskMaterialRevision": "b".repeat(64), "sections": sections
+        })));
+        assert!(matches!(app.view, View::ClassPrelude { .. }));
+        assert!(app.practice_cache.contains_key("CLASS/cls1/1"));
+    }
+
+    #[tokio::test]
+    async fn material_revision_controls_dirty_work_restoration_on_direct_detail_load() {
+        let sections = serde_json::json!([{
+            "id": "s1", "skill": "GRAMMAR", "status": "READY", "episode": null,
+            "prompts": [], "writingPrompts": [], "questions": [{ "id": "q1", "order": 1,
+                "question": "Elige A.", "options": ["A", "B"] }]
+        }]);
+        for (fresh_revision, should_restore) in [("a", true), ("b", false)] {
+            let mut app = test_app();
+            let mut cached = class_with_sections(sections.clone());
+            if let View::Class { material_source, progress, sections: Some(items), .. } = &mut cached {
+                *material_source = Some("a".repeat(64));
+                progress.dirty = true;
+                if let SectionProgress::Mc { selected, .. } = &mut items[0].progress { selected[0] = Some(1); }
+            }
+            app.practice_cache.insert("CLASS/cls1/1".into(), cached);
+            app.view = View::class_view(course("A"), "cls1".into());
+            app.on_class_loaded(app.request_gen, class_detail(serde_json::json!({
+                "id": "cls1", "status": "IN_PROGRESS", "order": 1, "passThreshold": 0.7,
+                "submitted": false, "attempt": 1, "taskMaterialRevision": fresh_revision.repeat(64), "sections": sections
+            })));
+            if should_restore {
+                assert!(matches!(&app.view, View::Class { sections: Some(items), .. }
+                    if matches!(&items[0].progress, SectionProgress::Mc { selected, .. } if selected[0] == Some(1))));
+            } else {
+                assert!(matches!(&app.view, View::ClassPrelude { retained_work, .. }
+                    if retained_work.iter().any(|line| line.contains("Your choice: B"))));
+                assert!(app.practice_cache.contains_key("CLASS/cls1/1"));
+            }
+        }
     }
 
     #[tokio::test]
@@ -40,6 +569,8 @@
                 class_id: "cls1".into(),
             }),
         );
+        assert!(matches!(app.view, View::ClassPrelude { .. }));
+        accept_no_prelude(&mut app);
         match &app.view {
             View::Class {
                 class_id, sections, ..
@@ -71,6 +602,26 @@
             } => assert_eq!(sections.len(), 1),
             other => panic!("expected loaded Class, got {other:?}"),
         }
+    }
+
+    #[tokio::test]
+    async fn class_without_prelude_loads_only_after_the_material_response() {
+        let mut app = test_app();
+        app.enter_course_home(course("A"));
+        app.on_next_class();
+        let request = app.request_gen;
+        app.on_next_class_resolved(request, next_outcome(NextClassOutcome::Created { class_id: "cls1".into() }));
+        let prelude = serde_json::from_value(serde_json::json!({"kind": "NOT_REQUIRED"})).unwrap();
+        app.on_class_prelude_loaded(app.request_gen, Arc::new(Ok(prelude)));
+        assert!(matches!(app.view, View::ClassPrelude { in_flight: true, .. }));
+        let detail: types::ClassDetailResponse = serde_json::from_value(serde_json::json!({
+            "id": "cls1", "courseId": "course1", "status": "IN_PROGRESS", "order": 1,
+            "passThreshold": 0.7, "submitted": false, "sections": [{ "id": "s1",
+                "skill": "GRAMMAR", "status": "READY", "episode": null, "prompts": [],
+                "writingPrompts": [], "questions": [{ "id": "q1", "order": 1, "question": "?", "options": ["A", "B"] }] }]
+        })).unwrap();
+        app.on_class_prelude_material_loaded(app.request_gen, Arc::new(Ok(crate::api::ClassPreludeMaterial { detail, directions: None })));
+        assert!(matches!(app.view, View::Class { sections: Some(_), directions: None, .. }));
     }
 
     #[tokio::test]
@@ -150,10 +701,34 @@
             class_id: "cls1".into(),
             attempt: 1,
             progress: Default::default(),
+            directions: None,
+            material_source: None,
+            direction_scroll: Default::default(),
+            previous_work: Vec::new(),
+            history_open: false,
+            history_scroll: 0,
+            history_audio: Default::default(),
             sections: Some(built),
             cursor: 0,
             submitting: false,
         }
+    }
+
+    #[test]
+    fn class_response_for_another_id_does_not_replace_saved_work() {
+        let mut app = test_app();
+        app.view = class_with_sections(serde_json::json!([
+            { "id": "original", "skill": "GRAMMAR", "status": "READY", "episode": null,
+              "prompts": [], "writingPrompts": [],
+              "questions": [{ "id": "q1", "order": 0, "question": "Original?", "options": ["a", "b"] }] }
+        ]));
+        let other = class_detail(serde_json::json!({
+            "id": "other", "status": "IN_PROGRESS", "order": 1, "passThreshold": 0.7,
+            "submitted": false, "sections": []
+        }));
+        app.on_class_loaded(app.request_gen, other);
+        assert!(matches!(&app.view, View::Class { class_id, sections: Some(sections), .. }
+            if class_id == "cls1" && sections.len() == 1 && sections[0].id == "original"));
     }
 
     #[tokio::test]
@@ -347,180 +922,3 @@
             other => panic!("expected listening section 1, got {other:?}"),
         }
     }
-
-    #[tokio::test]
-    async fn transcript_only_saved_class_requires_repair_before_completion() {
-        // A class with a single transcript-only listening section (no MC
-        // questions). Completing it must advance via next-class, not stall on
-        // View::Class. The submit route rejects empty answers (.min(1)), so this
-        // class cannot be submitted; the no-MC path re-resolves via next-class.
-        let mut app = test_app();
-        app.view = class_with_sections(serde_json::json!([
-            { "id": "sec-l", "skill": "LISTENING", "status": "READY",
-              "episode": { "id": "ep0", "audioUrl": null, "title": "Listen", "references": [] },
-              "prompts": [], "writingPrompts": [], "questions": [] }
-        ]));
-
-        let before = app.request_gen;
-        // Enter on the transcript-only section -> it is the last section -> the
-        // no-MC completion path dispatches next-class.
-        app.on_select();
-
-        // It must NOT stall on View::Class; the next-class dispatch shows Loading
-        // and bumps the generation.
-        assert!(
-            matches!(app.view, View::ClassRepair { .. }),
-            "no-MC class must advance (Loading after next-class dispatch), not stall on Class"
-        );
-        assert_eq!(
-            app.request_gen,
-            before,
-            "repair requires an explicit learner action"
-        );
-
-        app.on_next_class();
-        assert!(matches!(app.view, View::Loading));
-        // The accepted repair result resumes this same saved class.
-        let req_gen = app.request_gen;
-        app.on_next_class_resolved(req_gen, next_outcome(NextClassOutcome::Created { class_id: "cls1".into() }));
-        assert!(
-            matches!(app.view, View::Class { ref class_id, .. } if class_id == "cls1"),
-            "repair resumes the same saved class"
-        );
-    }
-
-    #[tokio::test]
-    async fn speaking_only_saved_class_requires_repair_after_last_prompt() {
-        // A speaking-only class: after the last prompt is graded, Enter advances
-        // past the final section into the no-MC completion path (next-class).
-        let mut app = test_app();
-        app.view = class_with_sections(serde_json::json!([
-            { "id": "sec-s", "skill": "SPEAKING", "status": "READY", "episode": null,
-              "questions": [], "writingPrompts": [],
-              "prompts": [{ "id": "s0", "order": 0, "targetPhrase": "Hola", "translation": "Hi", "ipa": null, "referenceTtsUrl": null }] }
-        ]));
-        // Mark the single prompt graded so Enter advances the section.
-        if let Some(section) = app.current_section_mut()
-            && let state::SectionProgress::Speaking { phase, .. } = &mut section.progress
-        {
-            *phase = state::SpeakingPhase::Graded {
-                score: Some(90),
-                transcript: None,
-                feedback: None,
-            };
-        }
-
-        let before = app.request_gen;
-        app.on_select(); // last graded prompt -> advance past last section -> next-class
-
-        assert!(
-            matches!(app.view, View::ClassRepair { .. }),
-            "speaking-only class must advance, not stall"
-        );
-        assert_eq!(
-            app.request_gen,
-            before,
-            "repair requires an explicit learner action"
-        );
-    }
-
-    // --- P6c: exams (hermetic, StubApi) -----------------------------------
-
-#[tokio::test]
-async fn an_active_partial_class_can_request_repair_without_advancing_the_course() {
-    let mut app = test_app();
-    app.view = View::class_view(course("A"), "partial-class".into());
-    if let View::Class { attempt, .. } = &mut app.view { *attempt = 4; }
-    let action = app.map_key(key(KeyCode::Char('N')));
-    assert!(matches!(action, Some(Action::NextClass)));
-    app.on_next_class();
-    assert!(matches!(app.view, View::Loading));
-    assert_eq!(app.pending_course.as_ref().map(|course| course.id.as_str()), Some("A"));
-    let req_gen = app.request_gen;
-    app.on_next_class_resolved(req_gen, next_outcome(NextClassOutcome::Created { class_id: "partial-class".into() }));
-    assert!(matches!(&app.view, View::Class { class_id, .. } if class_id == "partial-class"));
-}
-
-
-#[tokio::test]
-async fn class_repair_waits_for_saved_drafts_and_restores_retained_work_in_the_new_attempt() {
-    let mut app = test_app();
-    app.view = class_with_sections(serde_json::json!([{
-        "id": "writing", "skill": "WRITING", "status": "READY",
-        "episode": null, "questions": [], "prompts": [],
-        "writingPrompts": [{ "id": "w0", "task": "Greet Ana.", "order": 0 }]
-    }]));
-    for letter in "Hola Ana.".chars() { app.on_writing_input(letter); }
-    app.on_next_class();
-    let sequence = match &app.view {
-        View::Class { progress, .. } => progress.in_flight.expect("draft save pending"),
-        other => panic!("repair discarded the writing screen: {other:?}"),
-    };
-    assert!(app.pending_course.is_none());
-    app.on_next_class();
-    assert!(matches!(app.view, View::Class { .. }));
-    app.on_practice_progress_saved("CLASS/cls1/1".into(), sequence,
-        Arc::new(Ok(serde_json::from_value(serde_json::json!({
-            "saved": true, "progressRevision": 1
-        })).unwrap())));
-    app.on_next_class();
-    assert!(matches!(app.view, View::Loading));
-    app.on_next_class_resolved(app.request_gen, next_outcome(NextClassOutcome::Created { class_id: "cls1".into() }));
-    app.on_class_loaded(app.request_gen, class_detail(serde_json::json!({
-        "id": "cls1", "attempt": 2, "status": "IN_PROGRESS", "order": 1,
-        "passThreshold": 0.7, "submitted": false, "progressRevision": 1,
-        "writingDrafts": { "w0": "Hola Ana." },
-        "sections": [{ "id": "writing", "skill": "WRITING", "status": "READY",
-            "episode": null, "questions": [], "prompts": [],
-            "writingPrompts": [{ "id": "w0", "task": "Greet Ana.", "order": 0, "savedDraft": "Hola Ana." }] }]
-    })));
-    assert!(matches!(app.view, View::Class { attempt: 2, .. }));
-    assert!(matches!(app.current_section().map(|section| &section.progress),
-        Some(SectionProgress::Writing { input, .. }) if input.text() == "Hola Ana."));
-}
-
-#[tokio::test]
-async fn class_repair_keeps_an_unknown_recording_on_its_original_prompt() {
-    let mut app = test_app();
-    app.view = class_with_sections(serde_json::json!([{
-        "id": "speaking", "skill": "SPEAKING", "status": "READY",
-        "episode": null, "questions": [], "writingPrompts": [],
-        "prompts": [{ "id": "s0", "targetPhrase": "Hola", "translation": "Hello", "order": 0 }]
-    }]));
-    app.on_class_speaking_uploaded(app.request_gen, Arc::new(Err("Lost acknowledgement".into())));
-    app.on_next_class();
-    assert!(app.view.has_uncertain_upload());
-    assert!(matches!(app.view, View::Class { attempt: 1, .. }));
-    assert!(app.pending_course.is_none());
-}
-
-#[tokio::test]
-async fn class_saved_recording_identity_recovers_only_a_new_upload_after_lost_acknowledgement() {
-    let mut app = test_app();
-    let detail = |recording_id: &str| class_detail(serde_json::json!({
-        "id": "cls1", "attempt": 1, "status": "IN_PROGRESS", "order": 1,
-        "passThreshold": 0.7, "submitted": false,
-        "sections": [{ "id": "speaking", "skill": "SPEAKING", "status": "READY",
-            "episode": null, "questions": [], "writingPrompts": [],
-            "prompts": [{ "id": "s0", "targetPhrase": "Hola", "translation": "Hello", "order": 0,
-                "latestRecording": { "id": recording_id, "status": "SCORED",
-                    "overallScore": 0.9, "transcript": "Hola", "feedback": "Recognized greeting" } }] }]
-    }));
-    app.view = View::class_view(course("A"), "cls1".into());
-    app.on_class_loaded(app.request_gen, detail("previous-recording"));
-    if let View::Class { progress, .. } = &mut app.view { progress.conflict = true; }
-    app.cache_practice();
-    app.view = View::class_view(course("A"), "cls1".into());
-    app.on_class_loaded(app.request_gen, detail("recognized-recording"));
-    app.on_class_speaking_uploaded(app.request_gen, Arc::new(Err("Lost acknowledgement".into())));
-    app.cache_practice();
-    app.view = View::class_view(course("A"), "cls1".into());
-    app.on_class_loaded(app.request_gen, detail("recognized-recording"));
-    assert!(app.view.has_uncertain_upload());
-    app.cache_practice();
-    app.view = View::class_view(course("A"), "cls1".into());
-    app.on_class_loaded(app.request_gen, detail("new-recording"));
-    assert!(!app.view.has_uncertain_upload());
-    assert!(matches!(app.current_section().map(|section| &section.progress),
-        Some(SectionProgress::Speaking { phase: SpeakingPhase::Graded { score: Some(90), .. }, .. })));
-}

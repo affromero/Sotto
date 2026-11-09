@@ -122,6 +122,7 @@ pub(crate) fn reduce_start(view: View, resp: &types::StartPracticeResponse) -> V
         other => return other,
     };
     if matches!(resp, types::StartPracticeResponse::ReadyFull(_) | types::StartPracticeResponse::ReadyWriting(_))
+        || matches!(resp, types::StartPracticeResponse::ReadySpeaking(ready) if ready.prompts.iter().any(|prompt| prompt.latest_recording.is_some()))
         || serde_json::to_value(resp).ok().is_some_and(|value| value.get("skillRequirements").is_some()) {
         return practice_view(course, resp).unwrap_or_else(|course| course_home_notice(*course, due, Unavailable::Malformed));
     }
@@ -225,6 +226,12 @@ pub(crate) fn reduce_speaking_poll(
         types::SpeakingGradeStatus::Failed => SpeakingPhase::Failed {
             message: "Grading failed for this attempt. Try recording again.".to_string(),
         },
+        types::SpeakingGradeStatus::Unresolved if resp.recovery_acknowledged == Some(true) => SpeakingPhase::Failed {
+            message: "The earlier outcome is unknown. You acknowledged possible charges; record a new attempt when ready.".into(),
+        },
+        types::SpeakingGradeStatus::Unresolved => SpeakingPhase::Unresolved {
+            message: "Grading outcome is unknown. Your recording is saved. Review recovery in the Sotto web app.".into(),
+        },
         types::SpeakingGradeStatus::Pending | types::SpeakingGradeStatus::Grading => {
             SpeakingPhase::Polling {
                 recording_id: recording_id.to_string(),
@@ -238,7 +245,7 @@ pub(crate) fn reduce_speaking_poll(
 pub(crate) fn poll_is_terminal(phase: &SpeakingPhase) -> bool {
     matches!(
         phase,
-        SpeakingPhase::Graded { .. } | SpeakingPhase::Failed { .. }
+        SpeakingPhase::Graded { .. } | SpeakingPhase::Failed { .. } | SpeakingPhase::Unresolved { .. }
     )
 }
 

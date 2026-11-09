@@ -137,6 +137,9 @@ impl Api for StubApi {
     async fn download(&self, _url: &str) -> Result<Vec<u8>> {
         Ok(Vec::new())
     }
+    async fn class_history_audio(&self, _class_id: &str, _prompt_id: &str, _recording_id: &str) -> Result<Vec<u8>> {
+        Ok(Vec::new())
+    }
 
     async fn repair_class(
         &self,
@@ -154,6 +157,19 @@ impl Api for StubApi {
         Ok(NextClassOutcome::Done)
     }
 
+    async fn class_prelude(&self, _class_id: &str) -> Result<types::ClassPreludeResponse> {
+        Ok(serde_json::from_value(serde_json::json!({"kind": "NOT_REQUIRED"})).expect("valid prelude"))
+    }
+    async fn class_prerequisite(&self, _class_id: &str) -> Result<types::ClassPrerequisiteResponse> {
+        Err(color_eyre::eyre::eyre!("No prerequisite directions in this fixture"))
+    }
+    async fn prepare_class_prelude(&self, _class_id: &str, _request: types::ClassPrerequisiteRequest, _recovery: bool) -> Result<types::ClassPreludeResponse> {
+        Err(color_eyre::eyre::eyre!("No prerequisite preparation in this fixture"))
+    }
+    async fn acknowledge_class_prelude(&self, _class_id: &str, _request: types::ClassPreludeAcknowledgment) -> Result<types::ClassPreludeAcknowledgmentResponse> {
+        Err(color_eyre::eyre::eyre!("No prerequisite acknowledgment in this fixture"))
+    }
+
     async fn class(&self, _class_id: &str) -> Result<types::ClassDetailResponse> {
         Ok(serde_json::from_value(serde_json::json!({
             "id": "cls-stub",
@@ -165,6 +181,10 @@ impl Api for StubApi {
             "sections": []
         }))
         .expect("valid class JSON"))
+    }
+
+    async fn class_progress_recovery(&self, _class_id: &str) -> Result<types::ClassProgressRecovery> {
+        Err(color_eyre::eyre::eyre!("No class recovery in this fixture"))
     }
 
     async fn submit_class(
@@ -186,6 +206,7 @@ impl Api for StubApi {
         &self,
         _class_id: &str,
         _prompt_id: &str,
+        _binding: &crate::api::ClassSpeakingBinding,
         _wav: Vec<u8>,
     ) -> Result<SpeakingUploadResponse> {
         Ok(SpeakingUploadResponse {

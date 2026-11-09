@@ -38,7 +38,8 @@ const mocks = vi.hoisted(() => {
     user: { id: 'user-1', preferredSttModel: null },
   };
   const database = {
-    speakingRecording: { findUnique: vi.fn(), update },
+    $queryRaw: vi.fn().mockResolvedValue([]),
+    speakingRecording: { findUnique: vi.fn(), findUniqueOrThrow: vi.fn(), update },
     classSection: { findUnique: vi.fn() },
     practiceSession: { findUnique: vi.fn() },
     examSection: { findUnique: vi.fn() },
@@ -62,6 +63,7 @@ const mocks = vi.hoisted(() => {
     resolveStorageInput: vi.fn().mockResolvedValue({ input: storageInput, backend }),
     validateStorageInputs: vi.fn().mockResolvedValue([backend]),
     markCleanupUnconfirmed: vi.fn(),
+    readAuthorization: vi.fn(),
     transcribe: vi.fn(),
     generateResponse: vi.fn(),
     authenticatedFetch: vi.fn(async (_request, _init, observation) => {
@@ -86,6 +88,9 @@ const mocks = vi.hoisted(() => {
 });
 
 vi.mock('@/lib/prisma', () => ({ prismaUnfiltered: mocks.database }));
+vi.mock('@/lib/classes/lesson/initial-a1-provenance', () => ({
+  readInitialA1PracticeAuthorization: mocks.readAuthorization,
+}));
 vi.mock('@/lib/sidedoor/access/state/transaction', () => ({
   sottoTransaction: (_database: unknown, operation: (value: typeof mocks.database) => unknown) =>
     operation(mocks.database),
@@ -106,6 +111,7 @@ vi.mock('@/lib/r2', () => ({
   }),
 }));
 vi.mock('@/lib/sidedoor/jobs/core/job-execution-lifetime', () => ({
+  sottoJobExecutions: () => ({ requireParentDrained: vi.fn().mockResolvedValue(undefined) }),
   withSottoJobExecution: async (options: {
     validate: (database: typeof mocks.database) => Promise<boolean>;
     run: (context: { directory: string; markCleanupUnconfirmed: () => void }) => Promise<unknown>;
@@ -177,6 +183,7 @@ vi.mock('@/lib/server-config', () => ({
 
 import { processSpeakingGrading } from '@/workers/speaking-grading.worker';
 import { resolveCapturedSttProvider } from '@/lib/providers/stt';
+import { readSottoWorkerJob } from '@/lib/sidedoor/jobs/core/job-delivery';
 
 function job(): Job<SpeakingGradingPayload> {
   return {
@@ -194,7 +201,10 @@ describe('durable speaking grading', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.database.speakingRecording.findUnique.mockResolvedValue(mocks.recording);
+    mocks.database.speakingRecording.findUniqueOrThrow.mockResolvedValue(mocks.recording);
+    mocks.readAuthorization.mockReset().mockResolvedValue(null);
     mocks.database.classSection.findUnique.mockResolvedValue({
+      classId: 'class-1',
       class: { course: { targetLang: 'de' } },
     });
     mocks.transcribe.mockImplementation(async (_audio, options) => {
@@ -202,6 +212,67 @@ describe('durable speaking grading', () => {
       options.onSettled();
       return { text: 'Guten Morgen', segments: [], words: [] };
     });
+  });
+
+  it('retains a legacy recording as unresolved when its prerequisite proof is missing', async () => {
+    mocks.readAuthorization.mockResolvedValue({
+      kind: 'BASE',
+      receiptId: 'receipt',
+      materialHash: 'a'.repeat(64),
+    });
+    await processSpeakingGrading(job());
+    expect(mocks.transcribe).not.toHaveBeenCalled();
+    expect(mocks.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: 'UNRESOLVED' }),
+      })
+    );
+  });
+
+  it('does not replay a legacy class recording after grading had already started', async () => {
+    mocks.database.speakingRecording.findUnique.mockResolvedValue({
+      ...mocks.recording,
+      status: 'GRADING',
+    });
+    mocks.database.speakingRecording.findUniqueOrThrow.mockResolvedValue({ status: 'GRADING' });
+    await processSpeakingGrading(job());
+    expect(mocks.transcribe).not.toHaveBeenCalled();
+    expect(mocks.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: 'UNRESOLVED' }),
+      })
+    );
+  });
+
+  it('does not publish and marks cleanup uncertain when teaching changes after transcription', async () => {
+    const authorization = { kind: 'BASE', receiptId: 'receipt', materialHash: 'a'.repeat(64) };
+    mocks.readAuthorization.mockResolvedValue(authorization);
+    vi.mocked(readSottoWorkerJob).mockResolvedValueOnce({
+      complete: false,
+      operationId: '10000000-0000-4000-8000-000000000001',
+      fingerprint: 'd'.repeat(64),
+      scopes: [],
+      payload: {
+        recordingId: 'recording-1',
+        recordingCreatedAt: mocks.recording.createdAt.getTime(),
+        storage: mocks.storageInput,
+        ownership: mocks.ownership,
+        classAuthorization: { classId: 'class-1', authorization },
+      },
+    });
+    mocks.transcribe.mockImplementationOnce(async (_audio, options) => {
+      options.onDispatch();
+      options.onSettled();
+      mocks.readAuthorization.mockResolvedValue({ ...authorization, receiptId: 'replacement' });
+      return { text: 'Guten Morgen', segments: [], words: [] };
+    });
+    await expect(processSpeakingGrading(job())).rejects.toThrow(
+      'prerequisite authorization changed'
+    );
+    expect(mocks.markCleanupUnconfirmed).toHaveBeenCalled();
+    expect(mocks.update).not.toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: 'SCORED' }) })
+    );
   });
 
   it('rejects a queued credential revision change before sending the recording', async () => {
@@ -259,6 +330,7 @@ describe('durable speaking grading', () => {
       },
     });
     mocks.database.classSection.findUnique.mockResolvedValue({
+      classId: 'class-1',
       attempt: 1,
       class: {
         courseId: 'course-1',

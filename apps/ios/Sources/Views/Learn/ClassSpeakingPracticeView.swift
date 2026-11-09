@@ -21,15 +21,27 @@ struct ClassSpeakingPracticeView: View {
     @EnvironmentObject private var model: SottoAppModel
     let source: SpeakingPromptSource
     let prompts: [SottoSpeakingPrompt]
+    let classBinding: SottoClassSpeakingBinding?
+    let activityOwner: SottoLearnerIdentity?
     let onSelectionHelp: ((String, String) -> Void)?
+    let prerequisite: SottoClassPrerequisiteResponse?
+    let sectionId: String?
 
     init(
         source: SpeakingPromptSource,
         prompts: [SottoSpeakingPrompt],
+        classBinding: SottoClassSpeakingBinding? = nil,
+        activityOwner: SottoLearnerIdentity? = nil,
+        prerequisite: SottoClassPrerequisiteResponse? = nil,
+        sectionId: String? = nil,
         onSelectionHelp: ((String, String) -> Void)? = nil
     ) {
         self.source = source
         self.prompts = prompts
+        self.classBinding = classBinding
+        self.activityOwner = activityOwner
+        self.prerequisite = prerequisite
+        self.sectionId = sectionId
         self.onSelectionHelp = onSelectionHelp
     }
 
@@ -43,13 +55,24 @@ struct ClassSpeakingPracticeView: View {
                 .font(.callout)
                 .foregroundStyle(SottoTheme.muted)
 
-            ForEach(prompts.sorted { ($0.order ?? 0) < ($1.order ?? 0) }) { prompt in
+            if let activityOwner, let client = model.makeClient(), SottoLearnerIdentity(client) == activityOwner {
+              ForEach(prompts.sorted { ($0.order ?? 0) < ($1.order ?? 0) }) { prompt in
+                if let prerequisite, let sectionId, let instruction = prerequisite.content?.directions.instruction(
+                    sectionId: sectionId, taskId: prompt.id, kind: .speaking
+                ) {
+                    ClassPrerequisiteDirection(instruction: instruction, language: prerequisite.nativeLang)
+                }
                 ClassSpeakingPromptCard(
                     source: source,
                     prompt: prompt,
+                    classBinding: classBinding,
                     saved: model.speakingState(source: source, promptId: prompt.id),
                     onSelectionHelp: onSelectionHelp
                 )
+              }
+            } else {
+                Text("Reopen the activity for the current learner before recording.")
+                    .foregroundStyle(SottoTheme.muted)
             }
         }
         .padding(16)
@@ -63,6 +86,7 @@ private struct ClassSpeakingPromptCard: View {
 
     let source: SpeakingPromptSource
     let prompt: SottoSpeakingPrompt
+    let classBinding: SottoClassSpeakingBinding?
     let onSelectionHelp: ((String, String) -> Void)?
 
     @State private var recorder: AVAudioRecorder?
@@ -70,6 +94,9 @@ private struct ClassSpeakingPromptCard: View {
     @State private var isRecording = false
     @State private var statusText: String?
     @State private var errorMessage: String?
+    @State private var confirmRecovery = false
+    @State private var confirmDiscardRecording = false
+    @State private var recoveryBusy = false
     @ObservedObject var saved: NativeSpeakingState
     private var feedback: SottoSpeakingPollResponse? {
         get { saved.feedback }
@@ -80,11 +107,13 @@ private struct ClassSpeakingPromptCard: View {
     init(
         source: SpeakingPromptSource,
         prompt: SottoSpeakingPrompt,
+        classBinding: SottoClassSpeakingBinding?,
         saved: NativeSpeakingState,
         onSelectionHelp: ((String, String) -> Void)?
     ) {
         self.source = source
         self.prompt = prompt
+        self.classBinding = classBinding
         self.onSelectionHelp = onSelectionHelp
         self.saved = saved
     }
@@ -157,15 +186,22 @@ private struct ClassSpeakingPromptCard: View {
                     task = Task {
                         if saved.uploadUnknown {
                             do {
-                                if let recording = try await model.latestSpeakingRecording(source: source, promptId: prompt.id) {
+                                guard let owner = saved.recordingOwner else { throw CancellationError() }
+                                if let recording = try await model.latestSpeakingRecording(source: source, promptId: prompt.id, expectedClassBinding: saved.localBinding, expectedLearner: owner) {
                                     saved.receive(recording)
                                 }
-                                if saved.uploadUnknown { errorMessage = "The upload outcome is not confirmed. Check again before recording another attempt." }
+                                if saved.uploadUnknown { errorMessage = "The upload outcome is still unknown and cannot be confirmed automatically. Keep your recording before leaving." }
                             } catch { errorMessage = error.localizedDescription }
                         }
                         if let id = saved.recordingId { await resumeFeedback(recordingId: id) }
                     }
                 }.buttonStyle(SottoSecondaryButtonStyle())
+            }
+
+            if case .classSession = source, saved.feedback?.status == "UNRESOLVED", !saved.canRecord {
+                Button("Review another attempt") { confirmRecovery = true }
+                    .buttonStyle(SottoSecondaryButtonStyle())
+                    .disabled(recoveryBusy)
             }
 
             if let statusText {
@@ -178,6 +214,12 @@ private struct ClassSpeakingPromptCard: View {
                 Text(errorMessage)
                     .font(.callout)
                     .foregroundStyle(Color.red.opacity(0.82))
+            }
+
+            if !saved.recordingActive, let localAudioURL = saved.localAudioURL {
+                ShareLink("Save recording", item: localAudioURL).buttonStyle(SottoSecondaryButtonStyle())
+                Button("Remove local recording", role: .destructive) { confirmDiscardRecording = true }
+                    .buttonStyle(SottoSecondaryButtonStyle())
             }
 
             if let feedback {
@@ -193,19 +235,81 @@ private struct ClassSpeakingPromptCard: View {
                 .stroke(SottoTheme.line)
         )
         .task(id: "\(prompt.latestRecording?.id ?? "")/\(prompt.latestRecording?.status ?? "")") {
-            if let recording = prompt.latestRecording { saved.receive(recording) }
+            guard (try? recordingClient()) != nil else { return }
+            if let recording = prompt.latestRecording {
+                if !saved.uploadUnknown { saved.receive(recording) }
+            }
             if let id = saved.recordingId, !saved.canRecord { await resumeFeedback(recordingId: id) }
         }
         .onDisappear {
             recorder?.stop()
             task?.cancel()
+            saved.recordingActive = false
         }
+        .confirmationDialog("Start another attempt?", isPresented: $confirmRecovery, titleVisibility: .visible) {
+            Button("I understand, continue") {
+                guard case let .classSession(classId) = source, let recordingId = saved.recordingId else { return }
+                recoveryBusy = true
+                Task {
+                    defer { recoveryBusy = false }
+                    do {
+                        let client = try recordingClient()
+                        try await model.acknowledgeClassSpeakingRecovery(classId: classId, promptId: prompt.id, recordingId: recordingId)
+                        guard model.isCurrentLearningClient(client) else { throw CancellationError() }
+                        saved.acknowledgeRecovery(recordingId: recordingId)
+                        errorMessage = nil
+                    } catch is CancellationError {
+                        errorMessage = "The acknowledgment could not be confirmed. Check saved recording."
+                    } catch {
+                        errorMessage = "Recovery is not ready. Review the teaching and ask your server administrator to confirm cleanup."
+                    }
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("The earlier provider request may still complete or incur a charge. A new attempt may incur another charge.")
+        }
+        .confirmationDialog("Remove local recording?", isPresented: $confirmDiscardRecording, titleVisibility: .visible) {
+            Button("Remove recording", role: .destructive) {
+                do {
+                    try saved.removeLocalRecording()
+                } catch { errorMessage = "The local recording could not be removed." }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { Text("Save the recording first if you want to keep it.") }
     }
 
     private func startRecording() async {
+        guard let client = try? recordingClient() else {
+            errorMessage = "Reopen the activity for the current learner before recording."
+            return
+        }
+        if case .classSession = source, classBinding == nil {
+            errorMessage = "Reopen the class before recording."
+            return
+        }
+        saved.localBinding = classBinding
+        saved.recordingOwner = SottoLearnerIdentity(client)
+        saved.recordingActive = true
         guard await requestMicrophoneAccess() else {
+            saved.recordingActive = false
             errorMessage = "Microphone access is required to score pronunciation."
             return
+        }
+        guard saved.recordingActive else { return }
+        guard model.isCurrentLearningClient(client) else {
+            saved.recordingActive = false
+            errorMessage = "The learner changed. Reopen the activity before recording."
+            return
+        }
+        if case let .classSession(classId) = source {
+            guard let binding = classBinding, model.selectedClass?.id == classId,
+                  model.selectedClass?.attempt == binding.attempt,
+                  model.selectedClass?.taskMaterialRevision == binding.materialRevision else {
+                saved.recordingActive = false
+                errorMessage = "The class changed. Reopen it before recording."
+                return
+            }
         }
 
         do {
@@ -229,13 +333,15 @@ private struct ClassSpeakingPromptCard: View {
 
             recorder = nextRecorder
             audioURL = url
+            saved.localAudioURL = url
+            saved.uploadRejected = false
             isRecording = true
-            saved.previousRecordingId = saved.recordingId
             saved.recordingId = nil
             feedback = nil
             errorMessage = nil
             statusText = "Recording..."
         } catch {
+            saved.recordingActive = false
             errorMessage = error.localizedDescription
             statusText = nil
         }
@@ -246,8 +352,9 @@ private struct ClassSpeakingPromptCard: View {
         recorder = nil
         isRecording = false
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-        guard let audioURL else { return }
+        guard let audioURL else { saved.recordingActive = false; return }
         uploadAndPoll(audioURL)
+        saved.recordingActive = false
     }
 
     private func resumeFeedback(recordingId: String) async {
@@ -268,13 +375,25 @@ private struct ClassSpeakingPromptCard: View {
                 statusText = "Uploading voice sample..."
                 errorMessage = nil
                 let uploaded = try await upload(url)
+                try Task.checkCancellation()
+                _ = try recordingClient()
                 saved.recordingId = uploaded.recordingId
                 saved.uploadUnknown = false
+                do {
+                    try saved.removeLocalRecording()
+                } catch {
+                    errorMessage = "Your recording was uploaded, but its local copy could not be removed. You can save or remove it below."
+                }
 
                 statusText = "Scoring pronunciation..."
                 let result = try await waitForFeedback(recordingId: uploaded.recordingId)
                 feedback = result
                 statusText = result.status == "SCORED" ? "Feedback ready." : result.status.capitalized
+            } catch let SottoAPIError.classRecordingRejected(message) {
+                saved.uploadUnknown = false
+                saved.uploadRejected = true
+                errorMessage = "\(message) Save your recording before reopening the class."
+                statusText = nil
             } catch is CancellationError {
                 statusText = nil
             } catch {
@@ -288,7 +407,7 @@ private struct ClassSpeakingPromptCard: View {
         for _ in 0..<50 {
             try Task.checkCancellation()
             let result = try await poll(recordingId: recordingId)
-            if result.status == "SCORED" || result.status == "FAILED" {
+            if result.status == "SCORED" || result.status == "FAILED" || result.status == "UNRESOLVED" {
                 return result
             }
             try await Task.sleep(nanoseconds: 1_500_000_000)
@@ -297,12 +416,19 @@ private struct ClassSpeakingPromptCard: View {
     }
 
     private func upload(_ url: URL) async throws -> SottoSpeakingUploadResponse {
+        guard let owner = saved.recordingOwner, let client = model.makeClient(),
+              SottoLearnerIdentity(client) == owner else {
+            throw SottoAPIError.classRecordingRejected("The learner changed. Your recording remains on this device.")
+        }
         switch source {
         case let .classSession(classId):
+            guard let recordedBinding = saved.localBinding else { throw SottoAPIError.message("Reopen the class before recording.") }
             return try await model.uploadClassSpeakingRecording(
                 classId: classId,
                 promptId: prompt.id,
-                audioURL: url
+                audioURL: url,
+                binding: recordedBinding,
+                expectedLearner: owner
             )
         case let .practice(sessionId):
             return try await model.uploadPracticeSpeakingRecording(
@@ -320,26 +446,38 @@ private struct ClassSpeakingPromptCard: View {
     }
 
     private func poll(recordingId: String) async throws -> SottoSpeakingPollResponse {
+        let client = try recordingClient()
+        let result: SottoSpeakingPollResponse
         switch source {
         case let .classSession(classId):
-            return try await model.pollClassSpeakingRecording(
+            result = try await model.pollClassSpeakingRecording(
                 classId: classId,
                 promptId: prompt.id,
                 recordingId: recordingId
             )
         case let .practice(sessionId):
-            return try await model.pollPracticeSpeakingRecording(
+            result = try await model.pollPracticeSpeakingRecording(
                 sessionId: sessionId,
                 promptId: prompt.id,
                 recordingId: recordingId
             )
         case let .exam(examId):
-            return try await model.pollExamSpeakingRecording(
+            result = try await model.pollExamSpeakingRecording(
                 examId: examId,
                 promptId: prompt.id,
                 recordingId: recordingId
             )
         }
+        guard model.isCurrentLearningClient(client) else { throw CancellationError() }
+        return result
+    }
+
+    private func recordingClient() throws -> SottoAPIClient {
+        guard let client = model.makeClient(), let owner = saved.recordingOwner,
+              owner == SottoLearnerIdentity(client) else {
+            throw CancellationError()
+        }
+        return client
     }
 
     private func requestMicrophoneAccess() async -> Bool {

@@ -19,12 +19,37 @@ export async function canReadLocalObjectConsumer(
   }
   const { model, id } = parsed;
   if (model === 'CourseMaterial' || model === 'MaterialUploadPart') return false;
+  if (model === 'Episode' || model === 'Segment' || model === 'EpisodeVersion') {
+    const parent =
+      model === 'Episode'
+        ? { episodeId: id }
+        : model === 'Segment'
+          ? await database.segment.findUnique({ where: { id }, select: { episodeId: true } })
+          : await database.episodeVersion.findUnique({
+              where: { id },
+              select: { episodeId: true },
+            });
+    if (!parent) return false;
+    await database.$queryRaw`SELECT id FROM "Episode" WHERE id = ${parent.episodeId} FOR UPDATE`;
+    if (model === 'Segment')
+      await database.$queryRaw`SELECT id FROM "Segment" WHERE id = ${id} AND "episodeId" = ${parent.episodeId} FOR UPDATE`;
+    if (model === 'EpisodeVersion')
+      await database.$queryRaw`SELECT id FROM "EpisodeVersion" WHERE id = ${id} AND "episodeId" = ${parent.episodeId} FOR UPDATE`;
+    if ((await readStorageConsumerReference(database, consumer)) !== reference) return false;
+    return Boolean(
+      await database.episode.findFirst({
+        where: {
+          id: parent.episodeId,
+          deletedAt: null,
+          assessmentSection: { is: null },
+          assessmentAudioAssessmentId: null,
+          OR: [{ userId }, { visibility: 'UNLISTED' }],
+        },
+        select: { id: true },
+      })
+    );
+  }
   if ((await readStorageConsumerReference(database, consumer)) !== reference) return false;
-
-  const episode: Prisma.EpisodeWhereInput = {
-    deletedAt: null,
-    OR: [{ userId }, { visibility: 'UNLISTED' }],
-  };
   switch (model) {
     case 'CourseClass':
       return Boolean(
@@ -56,7 +81,7 @@ export async function canReadLocalObjectConsumer(
           where: {
             id,
             OR: [
-              { section: { class: { course: { userId } } } },
+              { section: { withdrawn: false, class: { course: { userId } } } },
               { practiceSession: { course: { userId } } },
               { examSection: { exam: { userId } } },
             ],
@@ -76,27 +101,6 @@ export async function canReadLocalObjectConsumer(
       return Boolean(
         await database.vocabularyPronunciation.findFirst({
           where: { id, course: { userId } },
-          select: { id: true },
-        })
-      );
-    case 'Episode':
-      return Boolean(
-        await database.episode.findFirst({
-          where: { id, ...episode },
-          select: { id: true },
-        })
-      );
-    case 'Segment':
-      return Boolean(
-        await database.segment.findFirst({
-          where: { id, episode },
-          select: { id: true },
-        })
-      );
-    case 'EpisodeVersion':
-      return Boolean(
-        await database.episodeVersion.findFirst({
-          where: { id, episode },
           select: { id: true },
         })
       );

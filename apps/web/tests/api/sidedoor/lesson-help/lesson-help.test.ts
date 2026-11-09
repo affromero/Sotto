@@ -6,6 +6,7 @@ import { NextRequest } from 'next/server';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { classLessonHelpResponseSchema, type ClassLessonHelpResponse } from '@sotto/shared';
 import type { PrismaClient } from '@/generated/prisma/client';
+import { readLessonHelpSource } from '@/lib/classes/help/lesson-source';
 import {
   createSharedTestInstance,
   type SharedTestInstance,
@@ -31,6 +32,7 @@ suite('optional lesson help through HTTP admission and the real interactions wor
   let classId: string;
   let runtime: typeof import('@/lib/queue');
   let route: typeof import('@/app/api/v1/classes/[classId]/lesson-help/route');
+  let classRoute: typeof import('@/app/api/v1/classes/[classId]/route');
   let processor: typeof import('@/workers/interaction.worker');
   let worker: Worker | undefined;
   let providerRequests: string[];
@@ -71,6 +73,7 @@ suite('optional lesson help through HTTP admission and the real interactions wor
     boundary.database = instance.database;
     runtime = await import('@/lib/queue');
     route = await import('@/app/api/v1/classes/[classId]/lesson-help/route');
+    classRoute = await import('@/app/api/v1/classes/[classId]/route');
     processor = await import('@/workers/interaction.worker');
   });
 
@@ -188,6 +191,12 @@ suite('optional lesson help through HTTP admission and the real interactions wor
     expect(response.status).toBe(200);
     return response.json();
   }
+  async function internalOperationId() {
+    return instance.database.$transaction(
+      async (database) =>
+        (await readLessonHelpSource(database, classId, identity.ownerId)).operationId
+    );
+  }
   async function startWorker() {
     worker = runtime.createWorker('interactions', processor.processInteraction, { concurrency: 2 });
     await worker.waitUntilReady();
@@ -209,6 +218,25 @@ suite('optional lesson help through HTTP admission and the real interactions wor
       where: { id: classId },
     });
     const initial = await status();
+    const internal = await instance.database.$transaction((database) =>
+      readLessonHelpSource(database, classId, identity.ownerId)
+    );
+    expect(initial.request.sourceHash).not.toBe(internal.context.sourceHash);
+    expect(initial.request.operationId).not.toBe(internal.operationId);
+    const detail = await classRoute.GET(
+      new NextRequest(`http://localhost:3000/api/v1/classes/${classId}`, {
+        headers: { cookie: `sotto_session=${identity.ownerToken}` },
+      }),
+      params()
+    );
+    expect(detail.status).toBe(200);
+    expect((await detail.json()).lessonHelpRevision).toBe(initial.request.sourceHash);
+    expect(
+      (await post({ ...initial.request, sourceHash: internal.context.sourceHash })).status
+    ).toBe(409);
+    expect((await post({ ...initial.request, operationId: internal.operationId })).status).toBe(
+      409
+    );
     expect(initial.status).toBe('AVAILABLE');
     expect(initial.nativeLang).toBe('en');
     expect(initial.targetLang).toBe('de');
@@ -216,6 +244,12 @@ suite('optional lesson help through HTTP admission and the real interactions wor
     expect(responses.map((response) => response.status)).toEqual([202, 202]);
     for (const response of responses)
       expect(classLessonHelpResponseSchema.parse(await response.json()).status).toBe('PENDING');
+    vi.stubEnv('BYOK_ENCRYPTION_KEY', 'rotated-lesson-help-key');
+    const rotatedPending = await status();
+    expect(rotatedPending.status).toBe('PENDING');
+    expect((await post(initial.request)).status).toBe(409);
+    expect((await post(rotatedPending.request)).status).toBe(202);
+    vi.stubEnv('BYOK_ENCRYPTION_KEY', 'lesson-help-test-encryption-key');
     await startWorker();
     expect((await settled('READY')).help).toEqual(help);
     const paidRequests = [...providerRequests];
@@ -224,6 +258,13 @@ suite('optional lesson help through HTTP admission and the real interactions wor
     expect(paidRequests.join('\n')).not.toMatch(/CONCEALED_|assessmentSecret/);
     expect((await post(initial.request)).status).toBe(200);
     expect((await status()).help).toEqual(help);
+    vi.stubEnv('BYOK_ENCRYPTION_KEY', 'rotated-lesson-help-key');
+    const rotated = await status();
+    expect(rotated.status).toBe('READY');
+    expect(rotated.request.sourceHash).not.toBe(initial.request.sourceHash);
+    expect(rotated.request.operationId).not.toBe(initial.request.operationId);
+    expect((await post(initial.request)).status).toBe(409);
+    expect((await post(rotated.request)).status).toBe(200);
     expect(providerRequests).toEqual(paidRequests);
     expect(
       await instance.database.courseClass.findUniqueOrThrow({ where: { id: classId } })
@@ -248,13 +289,12 @@ suite('optional lesson help through HTTP admission and the real interactions wor
 
   it('refuses stale teaching before provider dispatch', async () => {
     const initial = await status();
+    const operationId = await internalOperationId();
     expect((await post(initial.request)).status).toBe(202);
     await instance.database.courseClass.update({ where: { id: classId }, data: { attempt: 2 } });
     await startWorker();
     await vi.waitFor(async () => {
-      expect(
-        await (await runtime.interactionQueue.getJob(initial.request.operationId))?.getState()
-      ).toBe('failed');
+      expect(await (await runtime.interactionQueue.getJob(operationId))?.getState()).toBe('failed');
     });
     expect(providerRequests).toEqual([]);
     const fresh = await status();
@@ -273,7 +313,7 @@ suite('optional lesson help through HTTP admission and the real interactions wor
     expect(failure.error).toMatch(/unconfirmed|recovery/);
     await worker!.close();
     worker = undefined;
-    await (await runtime.interactionQueue.getJob(initial.request.operationId))?.remove();
+    await (await runtime.interactionQueue.getJob(await internalOperationId()))?.remove();
     const dispatched = [...providerRequests];
     expect(dispatched.length).toBeGreaterThan(0);
     expect((await post(initial.request)).status).toBe(409);
@@ -326,7 +366,7 @@ suite('optional lesson help through HTTP admission and the real interactions wor
       expect(failure.error).toMatch(/recovery|unconfirmed/);
       await worker!.close();
       worker = undefined;
-      await (await runtime.interactionQueue.getJob(initial.request.operationId))?.remove();
+      await (await runtime.interactionQueue.getJob(await internalOperationId()))?.remove();
       expect((await post(initial.request)).status).toBe(409);
       expect(providerRequests).toHaveLength(2);
       expect(affected.size).toBeGreaterThan(0);
@@ -342,6 +382,7 @@ suite('optional lesson help through HTTP admission and the real interactions wor
     });
     holdResponse = () => pending;
     const initial = await status();
+    const operationId = await internalOperationId();
     expect((await post(initial.request)).status).toBe(202);
     await startWorker();
     try {
@@ -355,9 +396,9 @@ suite('optional lesson help through HTTP admission and the real interactions wor
     }
     await vi.waitFor(
       async () => {
-        expect(
-          await (await runtime.interactionQueue.getJob(initial.request.operationId))?.getState()
-        ).toBe('failed');
+        expect(await (await runtime.interactionQueue.getJob(operationId))?.getState()).toBe(
+          'failed'
+        );
       },
       { timeout: 10_000 }
     );

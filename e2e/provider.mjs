@@ -29,6 +29,7 @@ export async function startProvider() {
   const unexpected = [];
   const audio = fixtureAudio();
   let expectedConnection = { token: 'local', model: 'browser-fixture' };
+  let transcription = 'Guten Morgen.';
   const server = createServer(async (request, response) => {
     try {
       const chunks = [];
@@ -50,6 +51,13 @@ export async function startProvider() {
         expectedConnection = { token: proposed.token, model: proposed.model };
         return send({ configured: true });
       }
+      if (request.method === 'POST' && request.url === '/fixture/transcription') {
+        const input = JSON.parse(Buffer.concat(chunks).toString());
+        if (typeof input.text !== 'string' || !/^Guten Tag, [A-Za-z]+!$/.test(input.text))
+          throw new Error('Invalid fixture transcription');
+        transcription = input.text;
+        return send({ configured: true });
+      }
       if (request.method === 'GET' && request.url === '/v1/models') {
         if (request.headers.authorization !== `Bearer ${expectedConnection.token}`)
           throw new Error('Model discovery did not match the fixture expectation');
@@ -62,7 +70,7 @@ export async function startProvider() {
         return response.end(audio);
       }
       if (request.method === 'POST' && request.url === '/v1/audio/transcriptions')
-        return send({ text: 'Guten Morgen.' });
+        return send({ text: transcription });
       if (request.method === 'POST' && request.url === '/v1/chat/completions') {
         const body = JSON.parse(Buffer.concat(chunks).toString());
         if (
@@ -73,7 +81,159 @@ export async function startProvider() {
         const messages = body.messages.map((message) => message.content).join('\n');
         const system = body.messages.find((message) => message.role === 'system')?.content || '';
         let content;
-        if (system.startsWith('Provide optional native-language support')) {
+        if (system.startsWith('Write an independent ')) {
+          const input = JSON.parse(
+            body.messages.find((message) => message.role === 'user').content
+          );
+          const names = ['Noah', 'Mila', 'Omar', 'Nora', 'Leo', 'Eva', 'Lena', 'Max'];
+          if (
+            input.source?.course?.targetLang !== 'de' ||
+            !input.prerequisite ||
+            !Number.isInteger(input.count) ||
+            input.count < 1 ||
+            input.count > names.length
+          )
+            throw new Error('Unexpected assessment authoring source');
+          const namesForItems = names.slice(0, input.count);
+          if (['GRAMMAR', 'READING', 'LISTENING'].includes(input.skill)) {
+            const items = namesForItems.map((name) => ({
+              question: `Choose the greeting for ${name} in ${input.skill.toLowerCase()}.`,
+              options: [
+                `Guten Tag, ${name}!`,
+                `Danke, ${name}!`,
+                `Tschüss, ${name}!`,
+                `Bitte, ${name}!`,
+              ],
+              correctIndex: 0,
+              explanation: 'Guten Tag is a greeting.',
+            }));
+            content = JSON.stringify({
+              skill: input.skill,
+              items,
+              ...(input.skill === 'READING'
+                ? { passage: 'Mara meets friends during the day.' }
+                : {}),
+              ...(input.skill === 'LISTENING'
+                ? { turns: [{ speaker: 'HOST', text: 'Guten Tag, Noah!' }] }
+                : {}),
+            });
+          } else if (input.skill === 'SPEAKING') {
+            content = JSON.stringify({
+              skill: input.skill,
+              items: namesForItems.map((name) => ({
+                task: `Guten Tag, ${name}!`,
+                mode: 'READ_ALOUD',
+                translation: `Good day, ${name}!`,
+                rubric:
+                  'Score recognized word accuracy and completeness. Use word timing for fluency only when available.',
+                guidance: 'Read the greeting aloud.',
+              })),
+            });
+          } else if (input.skill === 'WRITING') {
+            content = JSON.stringify({
+              skill: input.skill,
+              items: namesForItems.map((name) => ({
+                task: `Greet ${name} in German.`,
+                rubric: 'A clear greeting addressed to the named person.',
+                guidance: 'Write a greeting and the person’s name.',
+              })),
+            });
+          } else throw new Error('Unexpected assessment skill');
+        } else if (system.startsWith('Independently review this complete ')) {
+          const input = JSON.parse(
+            body.messages.find((message) => message.role === 'user').content
+          );
+          if (!input || !JSON.stringify(input).includes('Guten Tag'))
+            throw new Error('Unexpected assessment review source');
+          content = JSON.stringify({
+            taught: true,
+            independent: true,
+            correct: true,
+            unambiguous: true,
+            appropriate: true,
+            rubricsSound: true,
+            answersConcealed: true,
+            issues: [],
+          });
+        } else if (system.startsWith('Write a short prerequisite lesson')) {
+          const { source } = JSON.parse(
+            body.messages.find((message) => message.role === 'user').content
+          );
+          if (
+            source?.course?.nativeLang !== 'en' ||
+            source.course.targetLang !== 'de' ||
+            source.teaching?.title !== 'Greet a friend in German' ||
+            Object.keys(source.teaching.guidedPractice).sort().join(',') !== 'hint,prompt' ||
+            JSON.stringify(source).includes('correctIndex')
+          )
+            throw new Error('Unexpected or private prerequisite source');
+          content = JSON.stringify({
+            title: 'A German greeting',
+            explanation: 'Hallo is a greeting. Place the greeting before the person’s name.',
+            examples: [
+              {
+                target: 'Guten Tag, Lena!',
+                meaning: 'Good day, Lena!',
+                explanation: 'This greeting also comes before the name.',
+              },
+            ],
+          });
+        } else if (system.startsWith('Independently review the proposed prerequisite lesson')) {
+          const input = JSON.parse(
+            body.messages.find((message) => message.role === 'user').content
+          );
+          if (
+            input.source?.course?.targetLang !== 'de' ||
+            input.addendum?.title !== 'A German greeting' ||
+            JSON.stringify(input.source).includes('correctIndex')
+          )
+            throw new Error('Unexpected prerequisite review source');
+          content = JSON.stringify({
+            prerequisitesCovered: true,
+            accurate: true,
+            understandable: true,
+            answersConcealed: true,
+            issues: [],
+          });
+        } else if (system.startsWith('Explain the action required for each supplied exercise')) {
+          const input = JSON.parse(
+            body.messages.find((message) => message.role === 'user').content
+          );
+          if (
+            input.course?.targetLang !== 'de' ||
+            !Array.isArray(input.tasks) ||
+            !input.tasks.length ||
+            JSON.stringify(input).includes('correctIndex')
+          )
+            throw new Error('Unexpected prerequisite directions source');
+          content = JSON.stringify({
+            guided: input.guided ? 'Greet the person named in the prompt.' : null,
+            tasks: input.tasks.map(({ sectionId, taskId, kind }) => ({
+              sectionId,
+              taskId,
+              kind,
+              instruction:
+                kind === 'speaking'
+                  ? 'Read the displayed phrase aloud.'
+                  : kind === 'writing'
+                    ? 'Write the requested greeting.'
+                    : 'Choose the requested response.',
+            })),
+          });
+        } else if (system.startsWith('Independently review each proposed direction')) {
+          const input = JSON.parse(
+            body.messages.find((message) => message.role === 'user').content
+          );
+          if (input.course?.targetLang !== 'de' || !input.candidate || !Array.isArray(input.tasks))
+            throw new Error('Unexpected prerequisite directions review');
+          content = JSON.stringify({
+            faithful: true,
+            understandable: true,
+            challengePreserved: true,
+            answersConcealed: true,
+            issues: [],
+          });
+        } else if (system.startsWith('Provide optional native-language support')) {
           const input = JSON.parse(
             body.messages.find((message) => message.role === 'user').content
           );
@@ -236,6 +396,21 @@ export async function startProvider() {
               answerIndex: null,
               reasoning: "Selecting the greeting requires the hidden word's meaning.",
             })),
+          });
+        } else if (system.startsWith('You are a supportive') && system.includes('writing tutor')) {
+          const input = JSON.parse(
+            body.messages.find((message) => message.role === 'user').content
+          );
+          const formative =
+            input.task === 'Greet a friend.' && input.response === 'Guten Morgen, mein Freund!';
+          const assessment =
+            /^Greet [A-Za-z]+ in German\.$/.test(input.task) &&
+            input.response === `Guten Tag, ${input.task.split(' ')[1]}!`;
+          if (!formative && !assessment) throw new Error('Unexpected writing response fixture');
+          content = JSON.stringify({
+            overallScore: 1,
+            corrections: [],
+            feedback: 'Your greeting is clear.',
           });
         } else if (messages.includes('Grade the response.'))
           content = JSON.stringify({

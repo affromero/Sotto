@@ -3,9 +3,11 @@ import { createHash } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createSkillRequirements, learningSkills } from '@sotto/shared';
 import type { Prisma, PrismaClient } from '@/generated/prisma/client';
-import { publishClassGeneration } from '@/lib/learning/classes/class-generation-state';
-import { assertStoredClassMaterial } from '@/lib/learning/classes/class-material';
+import { publishClassGeneration } from '@/lib/learning/classes/formative/class-generation-state';
+import { assertStoredClassMaterial } from '@/lib/learning/classes/formative/class-material';
+import { submitClass } from '@/lib/learning/classes/progress/class-submission';
 import { learningScriptHash } from '@/lib/learning/script-hash';
+import { authorizedLearnerExecution } from '../../../helpers/runtime/provider-execution';
 import {
   createSharedTestInstance,
   type SharedTestInstance,
@@ -231,6 +233,92 @@ suite('class publication memory against PostgreSQL', () => {
     ).toBe('AVAILABLE');
   });
 
+  it('accepts valid saved short-choice material without relaxing new publication', async () => {
+    await instance.database.$transaction((database) => publish(database));
+    const question = await instance.database.lessonQuestion.findFirstOrThrow({
+      where: { section: { classId }, skill: 'GRAMMAR' },
+    });
+    await instance.database.lessonQuestion.update({
+      where: { id: question.id },
+      data: { options: ['ein Ticket', 'ein Buch'], correctIndex: 0 },
+    });
+    await expect(
+      assertStoredClassMaterial(instance.database, classId, 'saved')
+    ).resolves.toBeDefined();
+    await expect(assertStoredClassMaterial(instance.database, classId)).rejects.toThrow(
+      'question is incomplete'
+    );
+    await instance.database.lessonQuestion.update({
+      where: { id: question.id },
+      data: { correctIndex: 3 },
+    });
+    await expect(assertStoredClassMaterial(instance.database, classId, 'saved')).rejects.toThrow(
+      'question is incomplete'
+    );
+    await instance.database.lessonQuestion.update({
+      where: { id: question.id },
+      data: { correctIndex: 0 },
+    });
+    await instance.database.episode.update({
+      where: { id: episodeId },
+      data: { status: 'READY', audioUrl: '/saved-audio' },
+    });
+    const prompts = await instance.database.writingPrompt.findMany({
+      where: { section: { classId } },
+    });
+    for (const prompt of prompts)
+      await instance.database.writingResponse.create({
+        data: {
+          userId,
+          promptId: prompt.id,
+          sectionId: prompt.sectionId,
+          attempt: 2,
+          text: 'Mia kauft ein Ticket.',
+          overallScore: 0.8,
+          corrections: [],
+          feedback: 'Good.',
+        },
+      });
+    const questions = await instance.database.lessonQuestion.findMany({
+      where: { section: { classId } },
+    });
+    const receipt = await submitClass(
+      classId,
+      userId,
+      questions.map((item) => ({ questionId: item.id, selectedIndex: 0 })),
+      authorizedLearnerExecution(userId)
+    );
+    expect(receipt).toMatchObject({ passed: true });
+  });
+
+  it('keeps newly generated questions strict when a retained quiz has short choices', async () => {
+    await instance.database.$transaction((database) => publish(database));
+    const grammar = await instance.database.lessonQuestion.findFirstOrThrow({
+      where: { section: { classId }, skill: 'GRAMMAR' },
+    });
+    const reading = await instance.database.lessonQuestion.findFirstOrThrow({
+      where: { section: { classId }, skill: 'READING' },
+    });
+    await instance.database.lessonQuestion.updateMany({
+      where: { id: { in: [grammar.id, reading.id] } },
+      data: { options: ['ein Ticket', 'ein Buch'], correctIndex: 0 },
+    });
+    await expect(
+      assertStoredClassMaterial(instance.database, classId, {
+        retainedSections: [grammar.sectionId],
+      })
+    ).rejects.toThrow('question is incomplete');
+    await instance.database.lessonQuestion.update({
+      where: { id: reading.id },
+      data: { options: ['ein Ticket', 'ein Buch', 'einen Tisch', 'einen Hut'] },
+    });
+    await expect(
+      assertStoredClassMaterial(instance.database, classId, {
+        retainedSections: [grammar.sectionId],
+      })
+    ).resolves.toBeDefined();
+  });
+
   it('keeps existing word meanings and all vocabulary and grammar review state exact', async () => {
     const existing = await instance.database.learnerVocab.create({
       data: {
@@ -269,7 +357,7 @@ suite('class publication memory against PostgreSQL', () => {
 
   it('uses the newly accepted target seed and ignores vocabulary from an older listening attempt', async () => {
     const oldEpisode = await instance.database.episode.create({
-      data: { userId, title: 'Old script', topic: 'Old topic', status: 'FAILED' },
+      data: { userId, title: 'Old script', topic: 'Old topic', status: 'SCRIPT_READY' },
     });
     await instance.database.vocabularyEntry.create({
       data: { episodeId: oldEpisode.id, number: 1, word: 'verworfen', translation: 'discarded' },
@@ -284,6 +372,10 @@ suite('class publication memory against PostgreSQL', () => {
         spec: {},
         episodeId: oldEpisode.id,
       },
+    });
+    await instance.database.episode.update({
+      where: { id: oldEpisode.id },
+      data: { status: 'FAILED' },
     });
     await instance.database.$transaction((database) =>
       publish(database, {

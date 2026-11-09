@@ -1,4 +1,4 @@
-// @vitest-environment node
+// @vitest-environment private-redis
 import { createHash, randomUUID } from 'node:crypto';
 import { createServer, type Server } from 'node:http';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -8,6 +8,7 @@ import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PrismaClient } from '@/generated/prisma/client';
+import { copyOwnedBytesToFile } from 'thesidedoor-core/storage';
 import {
   POST as review,
   PATCH as revoke,
@@ -26,6 +27,7 @@ import { settleFailedMaterialJob } from '@/lib/course-materials/jobs/failure';
 import { writeStorageReference } from '@/lib/sidedoor/storage/core/storage-write';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 import { deliverSottoJob, sottoJobOutbox } from '@/lib/sidedoor/jobs/core/job-delivery';
+import { sottoJobExecutions } from '@/lib/sidedoor/jobs/core/job-execution-lifetime';
 import { durableQueueOperationId } from '@/lib/sidedoor/jobs/core/durable-queue';
 import { materialExtractionQueue } from '@/lib/queue';
 import { closeRedis } from '@/lib/redis';
@@ -37,7 +39,32 @@ import {
   type SharedTestIdentity,
 } from '../../helpers/setup/shared-instance';
 
-const boundary = vi.hoisted(() => ({ database: null as PrismaClient | null }));
+const boundary = vi.hoisted(() => ({ database: null as PrismaClient | null, failDownload: false }));
+vi.mock('@/lib/r2', async (original) => {
+  const actual = await original<typeof import('@/lib/r2')>();
+  return {
+    ...actual,
+    restoreStorageBackend: async (...args: Parameters<typeof actual.restoreStorageBackend>) => {
+      const backend = await actual.restoreStorageBackend(...args);
+      if (!boundary.failDownload) return backend;
+      return {
+        ...backend,
+        downloadToFile: async (_key: string, destination: string) =>
+          copyOwnedBytesToFile({
+            destination,
+            openSource: async () => ({
+              read: async () => {
+                throw new Error('Synthetic storage read failed');
+              },
+              close: async () => {
+                throw new Error('Synthetic storage close failed');
+              },
+            }),
+          }),
+      };
+    },
+  };
+});
 vi.mock('@/lib/prisma', async () => {
   const { prismaTestBoundary } = await import('../../helpers/setup/shared-instance');
   const database = prismaTestBoundary(boundary);
@@ -49,7 +76,10 @@ vi.mock('openai', async () => {
   return { default: createRequire(`${process.cwd()}/package.json`)('openai') };
 });
 
-const suite = process.env.SIDEDOOR_TEST_DATABASE_URL ? describe : describe.skip;
+const suite =
+  process.env.SIDEDOOR_TEST_DATABASE_URL && process.env.SOTTO_TEST_PRIVATE_REDIS_URL
+    ? describe
+    : describe.skip;
 const receiptSchema = z.object({
   materialId: z.uuid(),
   runId: z.uuid(),
@@ -97,6 +127,15 @@ suite('explicit reviewed full-page material recognition', () => {
   const jobs = new Set<string>();
   const fixtureErrors: unknown[] = [];
   beforeAll(async () => {
+    const privateUrl = new URL(process.env.SOTTO_TEST_PRIVATE_REDIS_URL!);
+    const redis = (await import('@/lib/redis')).getSharedQueueRedisClient();
+    if (
+      redis.options.host !== privateUrl.hostname ||
+      redis.options.port !== Number(privateUrl.port) ||
+      (redis.options.db ?? 0) !== Number(privateUrl.pathname.slice(1) || '0') ||
+      Boolean(redis.options.tls) !== (privateUrl.protocol === 'rediss:')
+    )
+      throw new Error('Extraction queue is not connected to private Redis');
     instance = await createSharedTestInstance('material_recognize_http');
     boundary.database = instance.database;
     directory = await mkdtemp(join(tmpdir(), 'sotto-recognition-http-'));
@@ -181,6 +220,7 @@ suite('explicit reviewed full-page material recognition', () => {
     endpoint = `http://127.0.0.1:${address.port}/v1`;
   });
   beforeEach(async () => {
+    boundary.failDownload = false;
     vi.stubEnv('SELF_HOSTED', 'true');
     vi.stubEnv('NEXT_PUBLIC_APP_URL', 'http://localhost:3000');
     vi.stubEnv('SIDEDOOR_PASSWORD_ORIGINS', '[]');
@@ -369,6 +409,28 @@ suite('explicit reviewed full-page material recognition', () => {
       .chunks.map((chunk) => chunk.text)
       .join('');
   }
+
+  it('retains extraction execution when reading the original has unconfirmed cleanup', async () => {
+    const { material } = await fixture();
+    await reviewed();
+    const { receipt } = await admitted(material.id);
+    const job = await delivered(material.id, receipt.processingRevision);
+    boundary.failDownload = true;
+    await expect(processMaterialExtraction(job)).rejects.toThrow();
+    const operationId = job.id!;
+    const record = await sottoTransaction(instance.database, (tx) =>
+      sottoJobOutbox(tx).read(operationId)
+    );
+    if (!record) throw new Error('Extraction job missing');
+    expect(
+      await sottoTransaction(instance.database, (tx) =>
+        sottoJobExecutions(tx).blockingStatus(operationId, record.fingerprint)
+      )
+    ).toBe('cleanup-unconfirmed');
+    boundary.failDownload = false;
+    await expect(processMaterialExtraction(job)).rejects.toThrow();
+    expect((await runStatus(receipt.runId)).status).not.toBe('COMPLETE');
+  });
 
   it('renders the retained original, dispatches once and publishes separate complete source evidence without mastery credit', async () => {
     const { material, initial, originalSha256 } = await fixture();

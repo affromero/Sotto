@@ -506,7 +506,7 @@ private struct CourseDetailPane: View {
     private func startOrResumeClass() {
         model.run {
             if let activeClassId = course.activeClassId {
-                await model.openClass(activeClassId)
+                model.beginClassPrelude(activeClassId)
             } else {
                 await model.startOrResumeClass(for: course)
             }

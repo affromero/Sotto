@@ -183,7 +183,58 @@ export async function readPristine(
       cursor = page.cursor;
     } while (cursor);
   }
-  const snapshot = createHash('sha256').update(JSON.stringify(cls)).digest('hex');
+  // Legacy snapshots did not bind withdrawal, so they cannot authorize a
+  // pristine regeneration after any section has been withdrawn.
+  if (cls.sections.some((section) => section.withdrawn)) throw new PristineRegenerationConflict();
+  // Preserve the original snapshot format for requests created before the
+  // incarnation columns were added.
+  const snapshotInput = JSON.parse(JSON.stringify(cls)) as {
+    prerequisiteGate?: unknown;
+    sections: Array<{
+      incarnationId?: string;
+      withdrawn?: boolean;
+      questions: Array<{ incarnationId?: string }>;
+      prompts: Array<{
+        incarnationId?: string;
+        referenceEncryption?: unknown;
+        assessmentRubric?: unknown;
+        assessmentCriteria?: unknown;
+        assessmentTaskMode?: unknown;
+        assessmentGuidance?: unknown;
+        assessmentReferenceIdentity?: unknown;
+        assessmentSectionId?: unknown;
+      }>;
+      writingPrompts: Array<{
+        incarnationId?: string;
+        assessmentRubric?: unknown;
+        assessmentSectionId?: unknown;
+      }>;
+    }>;
+  };
+  if (snapshotInput.prerequisiteGate == null) delete snapshotInput.prerequisiteGate;
+  for (const section of snapshotInput.sections) {
+    delete section.incarnationId;
+    delete section.withdrawn;
+    for (const question of section.questions) delete question.incarnationId;
+    for (const prompt of section.writingPrompts) {
+      delete prompt.incarnationId;
+      if (prompt.assessmentRubric == null) delete prompt.assessmentRubric;
+      if (prompt.assessmentSectionId == null) delete prompt.assessmentSectionId;
+    }
+    for (const prompt of section.prompts) {
+      if (prompt.assessmentRubric == null) delete prompt.assessmentRubric;
+      if (prompt.assessmentCriteria == null) delete prompt.assessmentCriteria;
+      if (prompt.assessmentTaskMode == null) delete prompt.assessmentTaskMode;
+      if (prompt.assessmentGuidance == null) delete prompt.assessmentGuidance;
+      if (prompt.assessmentReferenceIdentity == null) delete prompt.assessmentReferenceIdentity;
+      if (prompt.assessmentSectionId == null) delete prompt.assessmentSectionId;
+      if (prompt.referenceEncryption == null) {
+        delete prompt.incarnationId;
+        delete prompt.referenceEncryption;
+      }
+    }
+  }
+  const snapshot = createHash('sha256').update(JSON.stringify(snapshotInput)).digest('hex');
   return { cls, snapshot };
 }
 
@@ -241,6 +292,7 @@ export async function claimPristineRegeneration(
           failedAt: null,
           attempt,
           adaptiveSeed: Prisma.JsonNull,
+          prerequisiteGate: Prisma.DbNull,
           worksheetPdfUrl: null,
           ...(requirements
             ? { skillRequirements: requirements as unknown as Prisma.InputJsonValue }

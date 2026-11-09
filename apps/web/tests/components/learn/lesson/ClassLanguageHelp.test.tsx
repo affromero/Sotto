@@ -1,9 +1,9 @@
-import { webcrypto } from 'node:crypto';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { classTeachingSchema, type ClassLessonHelpResponse } from '@sotto/shared';
+import type { ClassLessonHelpResponse } from '@sotto/shared';
 import { ClassTeachingNotes } from '@/components/learn/lesson/ClassTeachingNotes';
 import { ClassLanguageHelp } from '@/components/learn/lesson/ClassLanguageHelp';
+import { ClassHub } from '@/components/learn/ClassHub';
 import { teaching } from './teaching-fixture';
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }));
@@ -31,6 +31,7 @@ const help = {
   guidedHint: 'Choose the auxiliary first.',
 };
 let response: ClassLessonHelpResponse;
+const revision = 'c'.repeat(64);
 const originalShowModal = Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype, 'showModal');
 const originalClose = Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype, 'close');
 
@@ -40,6 +41,7 @@ function showClass() {
       classId="native-help-class"
       courseId="course"
       teaching={lesson}
+      lessonHelpRevision={revision}
       intro={{
         purpose: 'Erzähle von gestern.',
         about: 'Ein Besuch.',
@@ -51,8 +53,7 @@ function showClass() {
   );
 }
 
-beforeEach(async () => {
-  vi.stubGlobal('crypto', webcrypto);
+beforeEach(() => {
   Object.defineProperty(HTMLDialogElement.prototype, 'showModal', {
     configurable: true,
     value: function (this: HTMLDialogElement) {
@@ -65,10 +66,6 @@ beforeEach(async () => {
       this.removeAttribute('open');
     },
   });
-  const hash = await webcrypto.subtle.digest(
-    'SHA-256',
-    new TextEncoder().encode(JSON.stringify(classTeachingSchema.parse(lesson)))
-  );
   response = {
     status: 'AVAILABLE',
     nativeLang: 'en',
@@ -77,7 +74,7 @@ beforeEach(async () => {
     request: {
       operationId: '00000000-0000-4000-a000-000000000001',
       attempt: 1,
-      sourceHash: Buffer.from(hash).toString('hex'),
+      sourceHash: revision,
       retryOf: null,
     },
   };
@@ -93,6 +90,28 @@ afterEach(() => {
 });
 
 describe('optional lesson language help', () => {
+  it('opens saved language help from the class hub with its class revision', async () => {
+    vi.stubGlobal('fetch', async () => Response.json({ ...response, status: 'READY', help }));
+    render(
+      <ClassHub
+        classId="native-help-class"
+        courseId="course"
+        lesson={{ title: lesson.title, level: 'B1', objective: 'Describe an event' }}
+        intro={{ purpose: 'Describe.', about: 'An event.', focus: [], examples: [], tips: [] }}
+        teaching={lesson}
+        lessonHelpRevision={revision}
+        order={1}
+        sections={[]}
+        scores={{}}
+        started={false}
+        onBegin={() => {}}
+        onRegenerate={() => {}}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Help in your language' }));
+    expect(await screen.findByText(help.explanation)).toBeVisible();
+  });
+
   it('keeps the guided answer concealed while beginner help is opened and reopened', async () => {
     // Only the translated guided prompt and hint are taken from the report.
     const savedLesson = {
@@ -137,10 +156,6 @@ describe('optional lesson language help', () => {
       guidedHint:
         'Lee el nombre de la bebida. Añade la fórmula de cortesía que acompaña una petición.',
     };
-    const hash = await webcrypto.subtle.digest(
-      'SHA-256',
-      new TextEncoder().encode(JSON.stringify(classTeachingSchema.parse(savedLesson)))
-    );
     vi.stubGlobal('fetch', async () =>
       Response.json({
         ...response,
@@ -148,7 +163,6 @@ describe('optional lesson language help', () => {
         nativeLang: 'es',
         targetLang: 'ru',
         help: translated,
-        request: { ...response.request, sourceHash: Buffer.from(hash).toString('hex') },
       })
     );
     render(
@@ -156,6 +170,7 @@ describe('optional lesson language help', () => {
         classId="beginner-class"
         courseId="course"
         teaching={savedLesson}
+        lessonHelpRevision={revision}
         intro={{
           purpose: 'Saludar.',
           about: 'Primeras palabras.',
@@ -230,12 +245,15 @@ describe('optional lesson language help', () => {
 
   it('discards completed help synchronously when the lesson gains another example', async () => {
     vi.stubGlobal('fetch', async () => Response.json({ ...response, status: 'READY', help }));
-    const view = render(<ClassLanguageHelp classId="class" teaching={lesson} />);
+    const view = render(
+      <ClassLanguageHelp classId="class" teaching={lesson} revision={revision} />
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Help in your language' }));
     expect(await screen.findByText(help.explanation)).toBeVisible();
     view.rerender(
       <ClassLanguageHelp
         classId="class"
+        revision={revision}
         teaching={{
           ...lesson,
           title: 'Eine neue Lektion',

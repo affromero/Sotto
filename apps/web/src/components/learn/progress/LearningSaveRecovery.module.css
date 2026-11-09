@@ -7,6 +7,10 @@
   margin: 0 0 0.75rem;
   overflow-wrap: anywhere;
 }
+.root pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 .root button {
   min-width: 44px;
   min-height: 44px;

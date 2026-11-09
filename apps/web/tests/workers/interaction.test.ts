@@ -13,15 +13,28 @@ const mockPrismaUserFindUnique = vi.fn().mockResolvedValue({ preferredLanguage: 
 const mockPrismaUserFindUniqueOrThrow = vi.fn().mockResolvedValue({ role: 'USER' });
 const mockPrismaSegmentFindMany = vi.fn().mockResolvedValue([]);
 const mockPrismaInteractionUpdate = vi.fn().mockResolvedValue({});
+const mockPrismaInteractionFindUnique = vi.fn();
+let mockInteractionOwner = 'user-001';
 const mockPrismaApiUsageLogCreate = vi.fn().mockResolvedValue({});
 
 vi.mock('@/lib/prisma', () => {
   const _mockPrisma = {
+    $queryRaw: vi.fn().mockResolvedValue([]),
     script: {
       findUnique: (...args: unknown[]) => mockPrismaScriptFindUnique(...args),
     },
     episode: {
-      findUnique: (...args: unknown[]) => mockPrismaEpisodeFindUnique(...args),
+      findUnique: (...args: unknown[]) => {
+        const query = args[0] as { select?: { assessmentSection?: unknown } };
+        if (query.select?.assessmentSection)
+          return Promise.resolve({
+            userId: mockInteractionOwner,
+            visibility: 'PRIVATE',
+            deletedAt: null,
+            assessmentSection: null,
+          });
+        return mockPrismaEpisodeFindUnique(...args);
+      },
     },
     user: {
       findUnique: (...args: unknown[]) => mockPrismaUserFindUnique(...args),
@@ -32,6 +45,7 @@ vi.mock('@/lib/prisma', () => {
     },
     interaction: {
       update: (...args: unknown[]) => mockPrismaInteractionUpdate(...args),
+      findUnique: (...args: unknown[]) => mockPrismaInteractionFindUnique(...args),
     },
     apiUsageLog: {
       create: (...args: unknown[]) => mockPrismaApiUsageLogCreate(...args),
@@ -97,8 +111,19 @@ vi.mock('@/lib/sidedoor/jobs/core/durable-queue', async (importOriginal) => ({
   durableJobProviderExecution: (_job: unknown, userId: string, signal?: AbortSignal) => ({
     userId,
     signal,
-    authorize: vi.fn(),
+    authorize: vi.fn().mockResolvedValue({ userId }),
   }),
+  completeDurableQueueJob: vi.fn().mockResolvedValue(undefined),
+}));
+vi.mock('@/lib/sidedoor/access/state/transaction', () => ({
+  sottoTransaction: async (database: unknown, operation: (database: unknown) => Promise<unknown>) =>
+    operation(database),
+}));
+vi.mock('@/lib/sidedoor/access/state/write-transaction', () => ({
+  sottoStateWriteTransaction: async (
+    database: unknown,
+    operation: (database: unknown) => Promise<unknown>
+  ) => operation(database),
 }));
 vi.mock('@/lib/learning-ai', () => ({
   resolveCapturedEpisodeAi: async ({
@@ -154,6 +179,8 @@ import type { Job } from 'bullmq';
 // ---- Helpers ----
 
 function createMockJob(data: ProcessInteractionPayload): Job<ProcessInteractionPayload> {
+  mockInteractionOwner = data.userId;
+  mockPrismaInteractionFindUnique.mockResolvedValue({ ...data, status: 'PENDING' });
   return {
     name: 'interactions.v1',
     data,

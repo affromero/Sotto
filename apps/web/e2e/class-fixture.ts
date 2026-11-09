@@ -24,7 +24,7 @@ import { upsertLiveVocab } from '@/lib/knowledge-graph';
 import {
   assertStoredClassMaterial,
   classQuestionMaterialSchema,
-} from '@/lib/learning/classes/class-material';
+} from '@/lib/learning/classes/formative/class-material';
 import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 
 export async function seedClass() {
@@ -42,6 +42,7 @@ export async function seedClass() {
       hasCompletedOnboarding: true,
       preferredAiProvider: 'local',
       preferredAiModel: 'local:browser-fixture',
+      preferredTtsProvider: 'local',
       preferredSttModel: 'browser-fixture',
     },
   });

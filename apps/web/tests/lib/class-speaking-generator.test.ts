@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { registerSpeakingReferencePublicationCases } from './classes/speaking/reference-publication-cases';
 import type { SourceDocuments } from '@/lib/providers/ai';
 import { sampleTeaching } from '../helpers/learning/class-teaching';
 import { authorizedLearnerExecution } from '../helpers/runtime/provider-execution';
@@ -13,16 +14,19 @@ const {
   mockClassSectionCreate,
   mockSpeakingPromptCreateMany,
   mockSpeakingPromptFindMany,
+  mockSpeakingPromptCreate,
   mockUserFindUnique,
 } = vi.hoisted(() => {
   const classSectionCreate = vi.fn();
   const speakingPromptCreateMany = vi.fn();
   const speakingPromptFindMany = vi.fn();
+  const speakingPromptCreate = vi.fn();
   const userFindUnique = vi.fn();
   return {
     mockClassSectionCreate: classSectionCreate,
     mockSpeakingPromptCreateMany: speakingPromptCreateMany,
     mockSpeakingPromptFindMany: speakingPromptFindMany,
+    mockSpeakingPromptCreate: speakingPromptCreate,
     mockUserFindUnique: userFindUnique,
   };
 });
@@ -69,6 +73,9 @@ const { mockCanResolveTts, mockResolveTtsProvider } = vi.hoisted(() => ({
 }));
 const { mockGetAutoModelConfig } = vi.hoisted(() => ({ mockGetAutoModelConfig: vi.fn() }));
 const { mockWriteStorageReference } = vi.hoisted(() => ({ mockWriteStorageReference: vi.fn() }));
+const { mockSpeakingRepairSourceHash } = vi.hoisted(() => ({
+  mockSpeakingRepairSourceHash: vi.fn(),
+}));
 const { mockLogUsage } = vi.hoisted(() => ({ mockLogUsage: vi.fn() }));
 
 // ---- Module mocks ----
@@ -85,6 +92,7 @@ vi.mock('@/lib/prisma', () => {
     speakingPrompt: {
       createMany: (...args: unknown[]) => mockSpeakingPromptCreateMany(...args),
       findMany: (...args: unknown[]) => mockSpeakingPromptFindMany(...args),
+      create: (...args: unknown[]) => mockSpeakingPromptCreate(...args),
     },
     user: {
       findUnique: (...args: unknown[]) => mockUserFindUnique(...args),
@@ -122,7 +130,8 @@ vi.mock('@/lib/providers/ai', () => ({
   createAIProvider: (...args: unknown[]) => mockCreateAIProvider(...args),
 }));
 
-vi.mock('@/lib/prompt-loader', () => ({
+vi.mock('@/lib/prompt-loader', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/prompt-loader')>()),
   loadAndRender: (...args: unknown[]) => mockLoadAndRender(...args),
 }));
 
@@ -146,6 +155,18 @@ vi.mock('@/lib/sidedoor/storage/core/storage-write', () => ({
 vi.mock('@/lib/sidedoor/storage/core/speaking-storage', () => ({
   captureSpeakingPromptStorage: vi.fn(),
 }));
+vi.mock('@/lib/classes/help/lifecycle/prerequisite-ownership', () => ({
+  capturePrerequisiteOwnership: async (...args: [unknown, string, string, string]) => ({
+    instanceId: 'instance',
+    scopes: [
+      { subjectId: `profile:${args[3]}`, generation: 1 },
+      { subjectId: `class:${args[1]}`, generation: 2 },
+    ],
+  }),
+}));
+vi.mock('@/lib/classes/repair/speaking-repair-source', () => ({
+  speakingRepairSourceHash: (...args: unknown[]) => mockSpeakingRepairSourceHash(...args),
+}));
 
 vi.mock('@/lib/usage-logger', () => ({
   logUsage: (...args: unknown[]) => mockLogUsage(...args),
@@ -157,7 +178,12 @@ vi.mock('@/lib/logger', () => ({
 
 // ---- Import under test (must come AFTER vi.mock calls) ----
 
-import { generateClassSpeaking, composeSpeakingPrompts } from '@/lib/class-speaking-generator';
+import {
+  generateClassSpeaking,
+  composeSpeakingPrompts,
+  sealInitialA1SpeakingReview,
+  materializeInitialA1SpeakingReview,
+} from '@/lib/class-speaking-generator';
 import { captureGenerationFailure } from '@/lib/classes/quality/generation-failure';
 import type { ClassSpeakingParams } from '@/lib/class-speaking-generator';
 
@@ -249,11 +275,164 @@ function setupHappyPath({ withTts = true }: { withTts?: boolean } = {}) {
   mockSpeakingPromptFindMany.mockResolvedValue(
     Array.from({ length: 4 }, (_, index) => ({ id: `prompt-${index + 1}` }))
   );
+  mockSpeakingPromptCreate.mockImplementation(async ({ data }) => ({ id: `prompt-${data.order}` }));
 }
 
 // ---- Tests ----
 
+registerSpeakingReferencePublicationCases(mockWriteStorageReference);
+
 describe('generateClassSpeaking', () => {
+  it('does not generate replacement speech without an admitted snapshot of saved work', async () => {
+    setupHappyPath({ withTts: true });
+    await expect(generateClassSpeaking({ ...PARAMS, repair: true })).rejects.toThrow(
+      'Speaking repair requires a durable staging operation.'
+    );
+    expect(mockGenerateResponse).not.toHaveBeenCalled();
+    expect(mockClassSectionCreate).not.toHaveBeenCalled();
+  });
+
+  it('does not save replacement prompts when saved speaking work changes during generation', async () => {
+    setupHappyPath({ withTts: false });
+    mockSpeakingRepairSourceHash.mockResolvedValueOnce('admitted').mockResolvedValueOnce('changed');
+    await expect(
+      generateClassSpeaking({
+        ...PARAMS,
+        repair: true,
+        execution: {
+          ...PARAMS.execution,
+          speakingRepairSourceHash: 'admitted',
+          stageClassSpeaking: vi.fn(),
+          verifySpeakingReferenceStage: vi.fn(),
+          sealClassSpeaking: vi.fn(),
+        },
+      })
+    ).rejects.toThrow('The saved speaking material changed during repair.');
+    expect(mockClassSectionCreate).not.toHaveBeenCalled();
+  });
+
+  it('binds reviewed beginner phrases to saved prompt IDs and the exact teaching', async () => {
+    setupHappyPath({ withTts: false });
+    mockResolveCapturedLearningAi.mockImplementation(async (_userId, execution) => ({
+      provider: 'anthropic',
+      model: 'm',
+      apiKey: 'k',
+      execution,
+    }));
+    const teaching = structuredClone(sampleTeaching);
+    const execution = { ...PARAMS.execution, initialA1Class: true };
+    const result = await generateClassSpeaking({
+      ...PARAMS,
+      execution,
+      teaching,
+      ttsProvider: null,
+      referenceAudioRequired: false,
+      reviewCourseId: 'course-1',
+    });
+    expect(result.reviewReceipt).toBeDefined();
+    const seed = { teaching };
+    const expected = {
+      classId: 'class-1',
+      courseId: 'course-1',
+      userId: 'u1',
+      attempt: 1,
+      level: PARAMS.level,
+      nativeLang: PARAMS.nativeLang,
+      targetLang: PARAMS.targetLang,
+      objective: PARAMS.objective,
+      targetVocab: PARAMS.targetVocab,
+      ttsProvider: null,
+      referenceAudioRequired: false,
+    };
+    expect(() =>
+      sealInitialA1SpeakingReview(seed, teaching, result.reviewReceipt!, {
+        ...expected,
+        objective: 'Changed objective',
+      })
+    ).toThrow();
+    sealInitialA1SpeakingReview(seed, teaching, result.reviewReceipt!, expected);
+    const proof = materializeInitialA1SpeakingReview(seed, expected);
+    expect(proof.prompts.map((prompt) => prompt.id)).toEqual([
+      'prompt-1',
+      'prompt-2',
+      'prompt-3',
+      'prompt-4',
+    ]);
+    expect(
+      proof.prompts.every(
+        (prompt) => prompt.referenceTtsUrl === null && prompt.learningObjectives === null
+      )
+    ).toBe(true);
+    teaching.explanation = 'Changed after review';
+    expect(() => materializeInitialA1SpeakingReview(seed, expected)).toThrow();
+  });
+  it('binds each reviewed phrase to the reference audio published for its prompt', async () => {
+    setupHappyPath({ withTts: true });
+    mockResolveCapturedLearningAi.mockImplementation(async (_userId, execution) => ({
+      provider: 'anthropic',
+      model: 'm',
+      apiKey: 'k',
+      execution,
+    }));
+    mockGenerateSpeech.mockImplementation(async ({ text }) => Buffer.from(text));
+    mockWriteStorageReference.mockImplementation(async ({ prefix }) => `stored:${prefix}`);
+    const teaching = structuredClone(sampleTeaching);
+    const result = await generateClassSpeaking({
+      ...PARAMS,
+      execution: { ...PARAMS.execution, initialA1Class: true },
+      teaching,
+      ttsProvider: 'cartesia',
+      referenceAudioRequired: true,
+      reviewCourseId: 'course-1',
+    });
+    const seed = { teaching };
+    const scope = {
+      classId: 'class-1',
+      courseId: 'course-1',
+      userId: 'u1',
+      attempt: 1,
+      level: PARAMS.level,
+      nativeLang: PARAMS.nativeLang,
+      targetLang: PARAMS.targetLang,
+      objective: PARAMS.objective,
+      targetVocab: PARAMS.targetVocab,
+      ttsProvider: 'cartesia' as const,
+      referenceAudioRequired: true,
+    };
+    sealInitialA1SpeakingReview(seed, teaching, result.reviewReceipt!, scope);
+    const proof = materializeInitialA1SpeakingReview(seed, scope);
+    for (const [index, prompt] of proof.prompts.entries()) {
+      const published = mockWriteStorageReference.mock.calls[index]![0];
+      expect(prompt.referenceTtsUrl).toBe(`stored:speaking-ref/${prompt.id}`);
+      expect(Buffer.from(published.body).toString()).toBe(prompt.targetPhrase);
+    }
+  });
+
+  it('rejects a changed lesson during optional reference audio generation', async () => {
+    setupHappyPath({ withTts: true });
+    mockResolveCapturedLearningAi.mockImplementation(async (_userId, execution) => ({
+      provider: 'anthropic',
+      model: 'm',
+      apiKey: 'k',
+      execution,
+    }));
+    const teaching = structuredClone(sampleTeaching);
+    mockGenerateSpeech.mockImplementation(async () => {
+      teaching.explanation = 'Changed while generating audio';
+      return Buffer.from('audio');
+    });
+    await expect(
+      generateClassSpeaking({
+        ...PARAMS,
+        execution: { ...PARAMS.execution, initialA1Class: true },
+        teaching,
+        ttsProvider: 'cartesia',
+        referenceAudioRequired: false,
+        reviewCourseId: 'course-1',
+      })
+    ).rejects.toThrow('speaking review is no longer valid');
+    expect(mockClassSectionCreate).not.toHaveBeenCalled();
+  });
   it('uses original PDF material for phrase authoring without attaching it to independent reviews', async () => {
     setupHappyPath({ withTts: false });
     const sourceDocuments: SourceDocuments = {
@@ -463,6 +642,20 @@ describe('generateClassSpeaking', () => {
         expect.objectContaining({ prefix: 'speaking-ref/prompt-1', contentType: 'audio/mpeg' })
       );
     });
+
+    it('rejects a changed learner before admitting reference audio', async () => {
+      setupHappyPath({ withTts: true });
+      let actor = 'u1';
+      await generateClassSpeaking({
+        ...PARAMS,
+        execution: { userId: 'u1', authorize: async () => ({ userId: actor }) },
+      });
+      actor = 'another-learner';
+      const published = mockWriteStorageReference.mock.calls[0]![0];
+      await expect(published.captureAdmission({})).rejects.toThrow(
+        'Speaking reference recipient changed'
+      );
+    });
   });
 
   describe('when canResolveTts is false', () => {
@@ -484,6 +677,58 @@ describe('generateClassSpeaking', () => {
   });
 
   describe('TTS failure is non-fatal', () => {
+    it('fails first-A1 review when reference storage has an unknown outcome', async () => {
+      setupHappyPath({ withTts: true });
+      mockResolveCapturedLearningAi.mockImplementation(async (_userId, execution) => ({
+        provider: 'anthropic',
+        model: 'm',
+        apiKey: 'k',
+        execution,
+      }));
+      mockWriteStorageReference.mockRejectedValue(new Error('Storage outcome unknown'));
+      await expect(
+        generateClassSpeaking({
+          ...PARAMS,
+          execution: { ...PARAMS.execution, initialA1Class: true },
+          teaching: structuredClone(sampleTeaching),
+          ttsProvider: 'cartesia',
+          referenceAudioRequired: false,
+          reviewCourseId: 'course-1',
+        })
+      ).rejects.toThrow('Storage outcome unknown');
+    });
+
+    it('stops optional reference generation when the operation is cancelled', async () => {
+      setupHappyPath({ withTts: true });
+      const controller = new AbortController();
+      mockGenerateSpeech.mockImplementation(async () => {
+        controller.abort(new Error('Speaking generation cancelled'));
+        throw new Error('TTS interrupted');
+      });
+      await expect(
+        generateClassSpeaking({
+          ...PARAMS,
+          execution: { ...PARAMS.execution, signal: controller.signal },
+        })
+      ).rejects.toThrow('Speaking generation cancelled');
+      expect(mockClassSectionCreate).not.toHaveBeenCalled();
+    });
+
+    it('stops optional reference publication when the operation is cancelled', async () => {
+      setupHappyPath({ withTts: true });
+      const controller = new AbortController();
+      mockWriteStorageReference.mockImplementation(async () => {
+        controller.abort(new Error('Speaking publication cancelled'));
+        throw new Error('Storage interrupted');
+      });
+      await expect(
+        generateClassSpeaking({
+          ...PARAMS,
+          execution: { ...PARAMS.execution, signal: controller.signal },
+        })
+      ).rejects.toThrow('Speaking publication cancelled');
+    });
+
     it('creates prompts with null referenceTtsUrl when TTS throws', async () => {
       setupHappyPath({ withTts: true });
       mockResolveTtsProvider.mockRejectedValue(new Error('TTS provider unavailable'));

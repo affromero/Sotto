@@ -15,6 +15,7 @@ import tempfile
 import unittest
 from importlib import import_module
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from scripts.deploy.images.metadata import record
@@ -39,6 +40,11 @@ class ReleaseRecoveryTests(unittest.TestCase):
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name).resolve()
         self.root.chmod(0o700)
+        interpreter = patch.object(
+            release, 'sys', SimpleNamespace(executable=str(self.root / 'python3')),
+        )
+        interpreter.start()
+        self.addCleanup(interpreter.stop)
         self.retention = self.root / 'retention'
         self.retention.mkdir(mode=0o700)
         self.host = self.root / 'host-state'
@@ -241,6 +247,11 @@ class ReleaseRecoveryTests(unittest.TestCase):
             name: record(value, 'captured')['sha256']
             for name, value in captured.items()
         }})
+
+    def test_startup_rejects_interpreter_path_with_unsafe_characters(self) -> None:
+        release.sys.executable = str(self.root / 'python with spaces')
+        with self.assertRaisesRegex(ValueError, 'literal-absolute-startup-paths-required'):
+            release.startup_unit(self.operations)
 
     def test_completed_unit_uses_verified_entry_without_starting_services(
         self,

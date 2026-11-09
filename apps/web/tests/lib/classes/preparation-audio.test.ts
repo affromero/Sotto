@@ -102,6 +102,17 @@ suite('preparation audio lineage and cancellation receipts', () => {
     ).rejects.toThrow('no longer authorized');
   });
 
+  it('allows an ordinary episode without a preparation lineage', async () => {
+    const episode = await instance.database.episode.create({
+      data: { userId: identity.ownerId, title: 'Ordinary', topic: 'Greetings' },
+    });
+    await expect(
+      sottoTransaction(instance.database, (tx) =>
+        validatePreparationAudio(tx, episode.id, 'ordinary-generation')
+      )
+    ).resolves.toBeUndefined();
+  });
+
   it('settles cancelled children that never began executing', async () => {
     const { operation, record } = await fixture();
     await setGrantStatus(instance.database, operation, 'revoked');

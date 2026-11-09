@@ -15,7 +15,7 @@
 //!   -> (start speaking)  -> SpeakingReview { ... }
 //! ```
 
-use crate::api::types;
+use crate::api::{ClassDirections, types};
 
 include!("state/core.rs");
 include!("state/learning_map.rs");

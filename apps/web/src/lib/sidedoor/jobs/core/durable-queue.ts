@@ -18,6 +18,7 @@ import {
 import { SIDEDOOR_STATE_ID, sottoStorageInstance } from '@/lib/sidedoor/access/state/store';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
+import type { SottoJobExecutionCapability } from '@/lib/sidedoor/jobs/core/job-execution-lifetime';
 import { classifyError, userMessage } from '@/lib/byok-errors';
 import { validatePreparationAudio } from '@/lib/classes/preparation-audio';
 import { settleVocabularyQueueFailure } from '@/lib/vocabulary/recovery/queue-failure';
@@ -31,6 +32,15 @@ import {
 } from '@/lib/course-materials/jobs/analysis-authority';
 
 const sha256Schema = z.string().regex(/^[a-f0-9]{64}$/);
+export class DurableDeliveryPendingError extends Error {
+  constructor(
+    readonly operationId: string,
+    readonly cause: unknown
+  ) {
+    super(cause instanceof Error ? cause.message : 'Durable job delivery is pending.');
+    this.name = 'DurableDeliveryPendingError';
+  }
+}
 const materialWorkInputSchema = z
   .object({
     materialId: z.uuid(),
@@ -118,6 +128,8 @@ const workByJob = new WeakMap<
     fingerprint: string;
     authority: DurableAuthority;
     markCleanupUnconfirmed?: () => void;
+    executionCapability?: SottoJobExecutionCapability;
+    executionDirectory?: string;
   }
 >();
 
@@ -551,12 +563,14 @@ interface DurableChild<Payload = unknown> {
   priority?: number;
   attempts?: number;
   version?: number;
+  existingOnly?: boolean;
 }
 
 /** Commit a mutation, any number of child admissions, and optional parent completion together. */
 export async function admitDurableQueueBatch(options: {
   parentJob?: Job<unknown>;
   authorize?: (database: Prisma.TransactionClient) => Promise<{ userId?: string } | void>;
+  distinguishDeliveryFailure?: boolean;
   prepare: (database: Prisma.TransactionClient) => Promise<readonly DurableChild[]>;
 }): Promise<void> {
   const admitted = await sottoTransaction(prisma, async (database) => {
@@ -614,6 +628,8 @@ export async function admitDurableQueueBatch(options: {
         throw new Error('Durable child recipient differs from its authorization');
       const outbox = sottoJobOutbox(database);
       const existing = await outbox.read(operationId);
+      if (child.existingOnly && !existing)
+        throw new Error('The original durable child is unavailable for replay');
       const record = await outbox.enqueue(
         prepareJob({
           id: operationId,
@@ -643,14 +659,21 @@ export async function admitDurableQueueBatch(options: {
     if (parent) await sottoJobOutbox(database).complete(parent.operationId, parent.fingerprint);
     return records;
   });
-  for (const { child, operationId, version, record } of admitted)
-    await deliverSottoJob({
-      database: prisma,
-      queue: child.queue,
-      operationId,
-      fingerprint: record.fingerprint,
-      version,
-    });
+  for (const { child, operationId, version, record } of admitted) {
+    try {
+      await deliverSottoJob({
+        database: prisma,
+        queue: child.queue,
+        operationId,
+        fingerprint: record.fingerprint,
+        version,
+      });
+    } catch (error) {
+      if (options.distinguishDeliveryFailure)
+        throw new DurableDeliveryPendingError(operationId, error);
+      throw error;
+    }
+  }
 }
 
 /** Load and validate a generic durable queue envelope. Raw Redis payloads are rejected. */
@@ -697,6 +720,13 @@ export function bindDurableQueueJob<Payload>(
   return bound;
 }
 
+/** Return only the identity bound by the durable queue loader. */
+export function durableQueueJobIdentity(job: Job<unknown>) {
+  const work = workByJob.get(job);
+  if (!work) throw new Error('Durable work binding is missing');
+  return { operationId: work.operationId, fingerprint: work.fingerprint };
+}
+
 export function durableJobProviderExecution(
   job: Job<unknown>,
   userId: string,
@@ -725,6 +755,31 @@ export function bindDurableQueueCleanup(
   const work = workByJob.get(job);
   if (!work) throw new Error('Durable work binding is missing');
   work.markCleanupUnconfirmed = markCleanupUnconfirmed;
+}
+
+/** Keep execution authority on the in-process bound job, never in its queue payload. */
+export function bindDurableQueueExecution(
+  job: Job<unknown>,
+  capability: SottoJobExecutionCapability,
+  directory: string
+): void {
+  const work = workByJob.get(job);
+  if (!work || work.executionCapability || !directory)
+    throw new Error('Durable execution binding is invalid');
+  work.executionCapability = capability;
+  work.executionDirectory = directory;
+}
+
+export function durableQueueExecutionDirectory(job: Job<unknown>): string {
+  const directory = workByJob.get(job)?.executionDirectory;
+  if (!directory) throw new Error('Durable execution directory is missing');
+  return directory;
+}
+
+export function durableQueueExecution(job: Job<unknown>): SottoJobExecutionCapability {
+  const capability = workByJob.get(job)?.executionCapability;
+  if (!capability) throw new Error('Durable execution capability is missing');
+  return capability;
 }
 
 /** Cleanup uncertainty must survive nested aggregate and causal errors. */
@@ -790,9 +845,22 @@ export async function reconcileDurableQueueFailure(options: {
     if (!episodeId) return null;
     const episode = await database.episode.findUnique({
       where: { id: episodeId },
-      select: { status: true, userId: true, pipelineGeneration: true },
+      select: {
+        status: true,
+        userId: true,
+        pipelineGeneration: true,
+        assessmentAudioAssessmentId: true,
+      },
     });
     if (!episode) throw new Error('Durable failure episode is missing');
+    // Assessment speech may have reached the provider. Keep its outbox and
+    // private episode intact until assessment-specific recovery resolves it.
+    if (options.handler === 'audio-generation' && episode.assessmentAudioAssessmentId) {
+      const recipient = await validateDurableAuthority(database, work.payload.authority);
+      if (!recipient || recipient.userId !== episode.userId)
+        throw new Error('Durable failure recipient changed');
+      return null;
+    }
     const admittedGeneration =
       work.payload.authority.kind === 'episode' ? work.payload.authority.pipelineGeneration : null;
     if (episode.pipelineGeneration !== admittedGeneration) {

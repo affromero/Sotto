@@ -7,7 +7,7 @@ import {
   prepareStorageReference,
 } from 'thesidedoor-core/storage';
 import type { Prisma, PrismaClient } from '@/generated/prisma/client';
-import { captureStorageBackend } from '@/lib/r2';
+import { captureStorageBackend, type CapturedStorageBackend } from '@/lib/r2';
 import { SIDEDOOR_STATE_ID } from '@/lib/sidedoor/access/state/store';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 
@@ -18,12 +18,14 @@ export async function relocateStorageFixture(options: {
   reference: string;
   consumers: string[];
   recordProof?: boolean;
+  transaction?: Prisma.TransactionClient;
+  backend?: CapturedStorageBackend;
   publish(tx: Prisma.TransactionClient, reference: string): Promise<unknown>;
 }) {
   const bytes = await readFile(
     join(options.directory, options.reference.replace('/api/v1/storage/', ''))
   );
-  const backend = await captureStorageBackend();
+  const backend = options.backend ?? (await captureStorageBackend());
   const key = `relocated/${randomUUID()}.bin`;
   const reference = await backend.writeBuffer(
     key,
@@ -33,7 +35,7 @@ export async function relocateStorageFixture(options: {
   );
   const readback = await readFile(join(options.directory, key));
   if (!bytes.equals(readback)) throw new Error('Fixture readback differs from source');
-  await sottoTransaction(options.database, async (tx) => {
+  const relocate = async (tx: Prisma.TransactionClient) => {
     const executor = {
       query: (sql: string, values: readonly unknown[]) =>
         tx.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...values),
@@ -77,6 +79,8 @@ export async function relocateStorageFixture(options: {
         },
       });
     await options.publish(tx, reference);
-  });
+  };
+  if (options.transaction) await relocate(options.transaction);
+  else await sottoTransaction(options.database, relocate);
   return reference;
 }

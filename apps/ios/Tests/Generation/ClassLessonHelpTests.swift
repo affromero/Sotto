@@ -2,30 +2,25 @@ import XCTest
 @testable import Sotto
 
 final class ClassLessonHelpTests: XCTestCase {
-    // Digests generated with Node's JSON.stringify and the shared teaching schema's trimmed fields.
     private let first = #"{"version":1,"title":"  Grüße \"Freund\"  ","explanation":"Line one\n\nZeile zwei 😀 / \\\t","workedExamples":[{"prompt":" Was?","answer":" Ja! ","explanation":"Ein Beispiel."},{"prompt":"Été","answer":"猫","explanation":"A\u0001B"}],"commonMistake":{"incorrect":"Falsch.","correction":"Richtig.","explanation":"\u00a0Hinweis\ufeff"},"guidedPractice":{"prompt":"Versuch.","hint":"Hilfe","answer":"Antwort","explanation":"Warum"}}"#
-    private let second = #"{"version":1,"title":"\u2028你好\u2029","explanation":"/\\\"\b\f\r\n","workedExamples":[{"prompt":"eins","answer":"zwei","explanation":"drei"},{"prompt":"vier","answer":"fünf","explanation":"sechs"}],"commonMistake":{"incorrect":"nein","correction":"ja","explanation":"warum"},"guidedPractice":{"prompt":"a","hint":"b","answer":"c","explanation":"d"}}"#
-
-    func testTeachingHashMatchesJavaScriptSchemaSerialization() throws {
-        let fixtures = [
-            (first, "b53d5af27e7a42b715beb57e6fc616e0d973a5b08893939ebc390d705690e3c2"),
-            (second, "62f830ddafd7f93e8288a8a7603e5badcb71a358eb1f35f2267dbf1386a2101f")
-        ]
-        for (input, expected) in fixtures {
-            let teaching = try JSONDecoder().decode(SottoClassTeaching.self, from: Data(input.utf8))
-            XCTAssertEqual(teaching.sourceHash, expected)
-        }
-    }
-
     func testRejectsHelpForAnotherLessonAndIncompleteReadyResponse() throws {
         let teaching = try JSONDecoder().decode(SottoClassTeaching.self, from: Data(first.utf8))
         let response = try JSONDecoder().decode(SottoClassLessonHelpResponse.self, from: Data(ClassLessonHelpProtocol.response.utf8))
-        XCTAssertThrowsError(try response.validate(for: teaching))
+        XCTAssertThrowsError(try response.validate(for: teaching, revision: String(repeating: "b", count: 64)))
         let incomplete = ClassLessonHelpProtocol.response
             .replacingOccurrences(of: "AVAILABLE", with: "READY")
-            .replacingOccurrences(of: String(repeating: "a", count: 64), with: teaching.sourceHash)
         let ready = try JSONDecoder().decode(SottoClassLessonHelpResponse.self, from: Data(incomplete.utf8))
-        XCTAssertThrowsError(try ready.validate(for: teaching))
+        XCTAssertThrowsError(try ready.validate(for: teaching, revision: String(repeating: "a", count: 64)))
+    }
+
+    func testClassDetailCarriesOpaqueHelpRevision() throws {
+        let revision = String(repeating: "c", count: 64)
+        let json = """
+        {"id":"class-1","courseId":"course-1","status":"AVAILABLE","order":1,
+         "passThreshold":0.7,"submitted":false,"sections":[],"lessonHelpRevision":"\(revision)"}
+        """
+        let detail = try JSONDecoder().decode(SottoClassDetail.self, from: Data(json.utf8))
+        XCTAssertEqual(detail.lessonHelpRevision, revision)
     }
 
     func testAuthenticatedAdmissionKeepsTheServerRequestIncludingNullRetry() async throws {

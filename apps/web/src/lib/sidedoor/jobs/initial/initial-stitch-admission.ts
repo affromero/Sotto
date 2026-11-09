@@ -36,17 +36,21 @@ const attemptSchema = z
   })
   .strict();
 
-function initialStitchAttemptStore(database: Prisma.TransactionClient, episodeId: string) {
+export function initialStitchAttemptId(episodeId: string) {
   const key = createHash('sha256')
     .update(JSON.stringify([SIDEDOOR_STATE_ID, episodeId]))
     .digest('hex');
+  return `sotto-initial-stitch:${key}`;
+}
+
+function initialStitchAttemptStore(database: Prisma.TransactionClient, episodeId: string) {
   return new OptimisticStateStore({
     backend: sqlStateBackend(
       {
         query: (sql, values) => database.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...values),
       },
       'postgres',
-      `sotto-initial-stitch:${key}`
+      initialStitchAttemptId(episodeId)
     ),
     parse: (value) => attemptSchema.parse(value),
     initial: () => ({ operationId: null, fingerprint: null }),

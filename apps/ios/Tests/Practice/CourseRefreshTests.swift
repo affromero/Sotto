@@ -30,14 +30,60 @@ final class CourseRefreshTests: XCTestCase {
     }
 
     @MainActor
-    func testPencilWorkbookOpensTheInteractiveClassWithoutRequiringAPDF() async {
+    func testPencilWorkbookOpensTheInteractiveClassWithoutRequiringAPDF() async throws {
         let model = model()
         await model.openWorkbook(for: "class-1", pencil: true)
+        XCTAssertNil(model.selectedClass)
+        let prelude = try XCTUnwrap(model.classPreludeNavigation)
+        XCTAssertEqual(prelude.destination, .pencil)
+        await model.finishClassPrelude(prelude)
         XCTAssertEqual(model.selectedClass?.id, "class-1")
         XCTAssertTrue(model.pencilWorkbook)
         XCTAssertNil(model.workbook)
         model.closeClass()
         XCTAssertFalse(model.pencilWorkbook)
+    }
+
+    @MainActor
+    func testSupersededPreludeCannotOpenItsOldClass() async throws {
+        let model = model()
+        model.beginClassPrelude("class-1")
+        let old = try XCTUnwrap(model.classPreludeNavigation)
+        model.beginClassPrelude("class-2")
+        let current = try XCTUnwrap(model.classPreludeNavigation)
+        await model.finishClassPrelude(old)
+        XCTAssertNil(model.selectedClass)
+        XCTAssertEqual(model.classPreludeNavigation, current)
+        model.cancelClassPrelude(current)
+        XCTAssertNil(model.classPreludeNavigation)
+    }
+
+    @MainActor
+    func testRemovedClassDuringPreludeClearsLoadingAndRefreshesCourses() async throws {
+        let model = model()
+        await model.loadCourses(showLoading: false)
+        await model.openClass("class-1")
+        model.beginClassPrelude("class-1")
+        let prelude = try XCTUnwrap(model.classPreludeNavigation)
+        await CourseRefreshServer.shared.set("reset", host: model.credentials!.serverURL.host!)
+        await model.finishClassPrelude(prelude)
+        XCTAssertFalse(model.isLoading)
+        XCTAssertNil(model.selectedClass)
+        XCTAssertNil(model.courses.first?.activeClassId)
+        XCTAssertTrue(model.errorMessage?.contains("removed") == true)
+    }
+
+    @MainActor
+    func testLeavingAReopenedPreludeHidesOldClassAndRetainsItsProgressStore() async throws {
+        let model = model()
+        await model.openClass("class-1")
+        let state = model.learningSessionState(path: "/api/v1/classes/class-1", attempt: 1, revision: 0)
+        model.beginClassPrelude("class-1")
+        model.cancelClassPrelude(try XCTUnwrap(model.classPreludeNavigation))
+        XCTAssertNil(model.selectedClass)
+        let retained = model.learningSessionState(path: "/api/v1/classes/class-1", attempt: 1, revision: 0)
+        XCTAssertTrue(state.progress === retained.progress)
+        XCTAssertTrue(state.drafts === retained.drafts)
     }
 
     @MainActor

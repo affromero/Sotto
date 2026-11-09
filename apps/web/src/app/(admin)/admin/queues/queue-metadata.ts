@@ -91,6 +91,10 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
     description: 'Transcribes learner speaking recordings and scores pronunciation',
     stage: 'Audio Pipeline',
   },
+  'learning-writing': {
+    description: 'Grades learner writing responses from saved requests',
+    stage: 'Interactions',
+  },
   'segment-regeneration': {
     description: 'Re-generates individual audio segments after edits',
     stage: 'Audio Pipeline',

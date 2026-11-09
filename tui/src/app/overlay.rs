@@ -642,6 +642,11 @@ pub(crate) fn help_rows(view: &View) -> Vec<(&'static str, &'static str)> {
             ("x", "cancel preparation"),
             ("R", "acknowledge and recover"),
         ],
+        View::ClassPrelude { .. } => vec![
+            ("enter", "prepare or acknowledge"),
+            ("r", "check status"),
+            ("PgUp/PgDn", "scroll"),
+        ],
         View::Class { .. } | View::Practice { .. } => vec![
             ("space", "play / pause (listening)"),
             ("r", "record (speaking)"),
@@ -659,6 +664,7 @@ pub(crate) fn help_rows(view: &View) -> Vec<(&'static str, &'static str)> {
             ("Ctrl-D", "submit (writing)"),
         ],
         View::ExamOutcome { .. } => vec![("enter", "continue")],
+        View::ExamRecovery { .. } => vec![("PgUp/PgDn", "scroll retained work")],
         View::PlacementLang { .. } => vec![
             ("↑/↓", "move"),
             ("tab", "switch column"),

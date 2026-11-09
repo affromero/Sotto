@@ -16,6 +16,7 @@ export function prepareStitchFailureEffects(options: {
   message: string;
 }) {
   const { outputs, episodeId, userId, message } = options;
+  if (options.storage.associations.assessmentSection) return [];
   return [
     {
       id: outputs.failedNotification,

@@ -114,6 +114,59 @@
         );
     }
 
+    #[tokio::test]
+    async fn saved_class_audio_uses_the_authenticated_server_and_encoded_identifiers() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut bytes = vec![0; 8192];
+            let count = socket.read(&mut bytes).await.unwrap();
+            let request = String::from_utf8_lossy(&bytes[..count]).to_string();
+            socket.write_all(b"HTTP/1.1 200 OK\r\nContent-Type: audio/wav\r\nContent-Length: 4\r\nConnection: close\r\n\r\nRIFF").await.unwrap();
+            request
+        });
+        let client = SottoClient::new(&format!("http://{addr}"), "secret-key").unwrap();
+        assert_eq!(client.class_history_audio("class", "prompt/other", "recording").await.unwrap(), b"RIFF");
+        let request = server.await.unwrap();
+        assert!(request.starts_with("GET /api/v1/classes/class/speaking/prompt%2Fother/recordings/recording/audio "));
+        assert!(request.to_ascii_lowercase().contains("authorization: bearer secret-key"));
+    }
+
+    #[tokio::test]
+    async fn saved_class_audio_never_follows_redirects_with_credentials() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let target = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let target_addr = target.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut bytes = [0; 8192];
+            let _ = socket.read(&mut bytes).await.unwrap();
+            let response = format!("HTTP/1.1 302 Found\r\nLocation: http://{target_addr}/audio\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+            socket.write_all(response.as_bytes()).await.unwrap();
+        });
+        let client = SottoClient::new(&format!("http://{addr}"), "secret-key").unwrap();
+        assert!(client.class_history_audio("class", "prompt", "recording").await.is_err());
+        server.await.unwrap();
+        assert!(tokio::time::timeout(std::time::Duration::from_millis(100), target.accept()).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn saved_class_audio_rejects_oversized_responses_before_buffering() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut bytes = [0; 8192];
+            let _ = socket.read(&mut bytes).await.unwrap();
+            socket.write_all(b"HTTP/1.1 200 OK\r\nContent-Type: audio/wav\r\nContent-Length: 67108865\r\nConnection: close\r\n\r\n").await.unwrap();
+        });
+        let client = SottoClient::new(&format!("http://{addr}"), "secret-key").unwrap();
+        assert!(client.class_history_audio("class", "prompt", "recording").await.unwrap_err().to_string().contains("too large"));
+        server.await.unwrap();
+    }
+
     /// Accept one connection, read the raw HTTP request, and reply with the given
     /// `status_line` (e.g. "200 OK") + JSON `body`. Returns the captured request.
     /// A flexible loopback stand-in for any route, used to verify each
@@ -281,7 +334,7 @@
 
         let client = SottoClient::new(&format!("http://{addr}"), "test-key").expect("client");
         let resp = client
-            .upload_class_speaking("cls-2", "p3", b"RIFF....WAVEx".to_vec())
+            .upload_class_speaking("cls-2", "p3", &ClassSpeakingBinding { attempt: 4, material_revision: "a".repeat(64) }, b"RIFF....WAVEx".to_vec())
             .await
             .expect("upload ok");
         assert_eq!(resp.recording_id, "rec-1");
@@ -299,6 +352,40 @@
         );
         assert!(lower.contains("authorization: bearer test-key"), "bearer");
         assert!(request.contains(r#"name="audio""#), "audio field");
+        assert!(request.contains("name=\"expectedAttempt\"\r\n\r\n4"));
+        assert!(request.contains(&format!("name=\"taskMaterialRevision\"\r\n\r\n{}", "a".repeat(64))));
+    }
+
+    #[tokio::test]
+    async fn only_typed_prepublication_class_conflicts_are_definite_rejections() {
+        for (status, definite) in [("409 Conflict", true), ("500 Internal Server Error", false)] {
+            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let address = listener.local_addr().unwrap();
+            let server = tokio::spawn(capture_with_response(listener, status,
+                r#"{"error":"class changed","code":"CLASS_MATERIAL_CHANGED"}"#));
+            let client = SottoClient::new(&format!("http://{address}"), "test-key").unwrap();
+            let error = client.upload_class_speaking("cls", "prompt", &ClassSpeakingBinding {
+                attempt: 1, material_revision: "a".repeat(64),
+            }, b"RIFF".to_vec()).await.unwrap_err();
+            assert_eq!(error.downcast_ref::<ClassRecordingRejected>().is_some(), definite);
+            server.await.unwrap();
+        }
+    }
+
+    #[tokio::test]
+    async fn incomplete_upload_receipts_do_not_confirm_the_recording() {
+        for body in [r#"{"recordingId":"","status":"PENDING"}"#, r#"{"recordingId":"rec","status":""}"#] {
+            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let address = listener.local_addr().unwrap();
+            let server = tokio::spawn(capture_with_response(listener, "201 Created", body));
+            let client = SottoClient::new(&format!("http://{address}"), "test-key").unwrap();
+            let error = client.upload_class_speaking("cls", "prompt", &ClassSpeakingBinding {
+                attempt: 1, material_revision: "a".repeat(64),
+            }, b"RIFF".to_vec()).await.unwrap_err();
+            assert!(error.to_string().contains("outcome is unknown"));
+            assert!(error.downcast_ref::<ClassRecordingRejected>().is_none());
+            server.await.unwrap();
+        }
     }
 
     #[tokio::test]
@@ -379,6 +466,44 @@
             lower.contains("authorization: bearer test-key"),
             "the live identity call must carry the bearer key"
         );
+    }
+
+    #[tokio::test]
+    async fn class_prelude_transport_preserves_recovery_and_receipt() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = tokio::spawn(capture_with_response(listener, "200 OK", r#"{"kind":"NOT_REQUIRED"}"#));
+        let client = SottoClient::new(&format!("http://{address}"), "test-key").unwrap();
+        client.class_prelude("class-1").await.unwrap();
+        let captured = server.await.unwrap();
+        assert!(captured.starts_with("GET /api/v1/classes/class-1/teaching-prelude "));
+        assert!(captured.to_lowercase().contains("authorization: bearer test-key"));
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let body = r#"{"kind":"ADDENDUM","nativeLang":"es","targetLang":"ru","status":"PENDING","request":{"sourceHash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","snapshotHash":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}}"#;
+        let server = tokio::spawn(capture_with_response(listener, "202 Accepted", body));
+        let client = SottoClient::new(&format!("http://{address}"), "test-key").unwrap();
+        let request = serde_json::from_str(r#"{"sourceHash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","snapshotHash":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}"#).unwrap();
+        client.prepare_class_prelude("class-1", request, true).await.unwrap();
+        let captured = server.await.unwrap();
+        assert!(captured.starts_with("POST /api/v1/classes/class-1/teaching-prelude/prepare?recover=1 "));
+        assert!(captured.to_lowercase().contains("authorization: bearer test-key"));
+        let sent: serde_json::Value = serde_json::from_str(captured.split("\r\n\r\n").nth(1).unwrap()).unwrap();
+        assert_eq!(sent["sourceHash"], "a".repeat(64));
+        assert_eq!(sent["snapshotHash"], "b".repeat(64));
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = tokio::spawn(capture_with_response(listener, "200 OK", r#"{"kind":"BASE","receiptId":"00000000-0000-4000-a000-000000000001","acknowledged":true}"#));
+        let client = SottoClient::new(&format!("http://{address}"), "test-key").unwrap();
+        let request = serde_json::from_value(serde_json::json!({"kind":"BASE","receiptId":"00000000-0000-4000-a000-000000000001"})).unwrap();
+        client.acknowledge_class_prelude("class-1", request).await.unwrap();
+        let captured = server.await.unwrap();
+        assert!(captured.starts_with("POST /api/v1/classes/class-1/teaching-prelude/acknowledge "));
+        assert!(captured.to_lowercase().contains("authorization: bearer test-key"));
+        let sent: serde_json::Value = serde_json::from_str(captured.split("\r\n\r\n").nth(1).unwrap()).unwrap();
+        assert_eq!(sent, serde_json::json!({"kind":"BASE","receiptId":"00000000-0000-4000-a000-000000000001"}));
     }
 
     #[tokio::test]

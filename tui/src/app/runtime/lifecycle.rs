@@ -65,14 +65,20 @@ impl App {
             action_rx,
             request_gen: 0,
             player: None,
+            history_audio_task: None,
             recorder: Recorder::new(),
+            class_recording_binding: None,
+            retained_class_recording: None,
+            pending_class_audio: Default::default(),
             pending_course: None,
             pending_admissions: Default::default(),
             pending_selections: Default::default(),
             practice_cache: Default::default(),
+            account_practice_cache: Default::default(),
             progress_sequence: 0,
             placement_transport: Default::default(),
             placement_task: None,
+            prelude_task: None,
             theme,
             theme_picker: ThemePicker::closed(),
             help_open: false,
@@ -84,7 +90,13 @@ impl App {
 
     /// Invalidate any in-flight request and return the new current generation.
     pub(super) fn bump_gen(&mut self) -> u64 {
+        if let Some(task) = self.history_audio_task.take() {
+            task.abort();
+        }
         if let Some(task) = self.placement_task.take() {
+            task.abort();
+        }
+        if let Some(task) = self.prelude_task.take() {
             task.abort();
         }
         self.request_gen += 1;
@@ -114,7 +126,17 @@ impl App {
 
     pub(super) fn handle_action(&mut self, action: Action, tui: &mut Tui) -> Result<()> {
         match action {
-            Action::Quit => self.should_quit = true,
+            Action::Quit => {
+                self.stop_audio();
+                if self.retained_class_recording.is_some() {
+                    self.status_bar.set_error(
+                        "Recording is still in memory. Press r to save it before leaving.".into(),
+                    );
+                    self.render();
+                } else {
+                    self.should_quit = true;
+                }
+            }
             Action::Render => {
                 tui.terminal.draw(|frame| {
                     let _ = self.draw(frame);
@@ -139,6 +161,11 @@ impl App {
             Action::ToggleRecord => self.on_toggle_record(),
             Action::ScrollUp => self.on_scroll(false),
             Action::ScrollDown => self.on_scroll(true),
+            Action::ClassDirectionScroll(down) => self.class_direction_scroll(down),
+            Action::ClassHistoryToggle => self.class_history_toggle(),
+            Action::ClassHistoryScroll(down) => self.class_history_scroll(down),
+            Action::ClassHistoryAudioMove(next) => self.class_history_audio_move(next),
+            Action::ClassHistoryAudioPlay => self.class_history_audio_play(),
             // Text input + submit route to the ask overlay when it is open on a
             // listening screen, otherwise to the writing section editor.
             Action::Input(c) => {
@@ -201,6 +228,12 @@ impl App {
             Action::NextClassResolved(req_gen, result) => {
                 self.on_next_class_resolved(req_gen, result)
             }
+            Action::ClassPreludeLoaded(req_gen, result) => {
+                self.on_class_prelude_loaded(req_gen, result)
+            }
+            Action::ClassPreludeMaterialLoaded(req_gen, result) => {
+                self.on_class_prelude_material_loaded(req_gen, result)
+            }
             Action::ClassLoaded(req_gen, result) => self.on_class_loaded(req_gen, result),
             Action::ClassSubmitted(req_gen, result) => self.on_class_submitted(req_gen, result),
             Action::ClassEpisodeLoaded(req_gen, result) => {
@@ -209,6 +242,21 @@ impl App {
             Action::ClassAudioDownloaded(req_gen, result) => {
                 self.on_class_audio_downloaded(req_gen, result)
             }
+            Action::ClassHistoryAudioDownloaded(
+                req_gen,
+                request,
+                class_id,
+                prompt_id,
+                recording_id,
+                result,
+            ) => self.on_class_history_audio_downloaded(
+                req_gen,
+                request,
+                &class_id,
+                &prompt_id,
+                &recording_id,
+                result,
+            ),
             Action::ClassSpeakingUploaded(req_gen, result) => {
                 self.on_class_speaking_uploaded(req_gen, result)
             }

@@ -1,8 +1,14 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from 'vitest';
-const serverConfiguration = vi.hoisted(() => ({ values: {} as Record<string, string | null> }));
+const serverConfiguration = vi.hoisted(() => ({
+  values: {} as Record<string, string | null>,
+  unavailable: false,
+}));
 vi.mock('@/lib/site-config', () => ({
-  getSiteConfig: async () => serverConfiguration.values,
+  getSiteConfig: async () => {
+    if (serverConfiguration.unavailable) throw new Error('Configuration unavailable');
+    return serverConfiguration.values;
+  },
 }));
 import { invalidateServerInfra } from '@/lib/server-config';
 import {
@@ -29,6 +35,7 @@ const selection: SharedApiSelection = {
 };
 afterEach(() => {
   serverConfiguration.values = {};
+  serverConfiguration.unavailable = false;
   invalidateServerInfra();
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
@@ -286,6 +293,24 @@ describe('shared API execution', () => {
     ).rejects.toBe(failure);
     expect(requests).toEqual(['https://api.groq.com/openai/v1/chat/completions']);
   });
+  it('uses a captured local endpoint and model even if current configuration is unavailable', async () => {
+    serverConfiguration.unavailable = true;
+    const fetch = vi.fn(async (input: RequestInfo | URL) => {
+      expect(String(input)).toContain('localhost:11434/v1/chat/completions');
+      return Response.json({
+        choices: [{ message: { role: 'assistant', content: 'Saved' }, finish_reason: 'stop' }],
+      });
+    });
+    const { createAIProvider } = await import('@/lib/providers/ai');
+    const result = await createAIProvider('local').generateResponse('', [], {
+      endpoint: 'http://localhost:11434/v1',
+      model: 'local:captured',
+      skipModeration: true,
+      fetch,
+    });
+    expect(result.content).toBe('Saved');
+  });
+
   it('preserves local endpoint paths, model prefixes and the configured local credential', async () => {
     serverConfiguration.values = {
       aiBaseUrl: 'http://localhost:11434/custom/api/',

@@ -94,6 +94,9 @@ impl Api for SottoClient {
     async fn download(&self, url: &str) -> Result<Vec<u8>> {
         SottoClient::download(self, url).await
     }
+    async fn class_history_audio(&self, class_id: &str, prompt_id: &str, recording_id: &str) -> Result<Vec<u8>> {
+        SottoClient::class_history_audio(self, class_id, prompt_id, recording_id).await
+    }
 
     async fn repair_class(
         &self,
@@ -107,8 +110,25 @@ impl Api for SottoClient {
         SottoClient::next_class(self, course_id).await
     }
 
+    async fn class_prelude(&self, class_id: &str) -> Result<types::ClassPreludeResponse> {
+        SottoClient::class_prelude(self, class_id).await
+    }
+    async fn class_prerequisite(&self, class_id: &str) -> Result<types::ClassPrerequisiteResponse> {
+        SottoClient::class_prerequisite(self, class_id).await
+    }
+    async fn prepare_class_prelude(&self, class_id: &str, request: types::ClassPrerequisiteRequest, recovery: bool) -> Result<types::ClassPreludeResponse> {
+        SottoClient::prepare_class_prelude(self, class_id, request, recovery).await
+    }
+    async fn acknowledge_class_prelude(&self, class_id: &str, request: types::ClassPreludeAcknowledgment) -> Result<types::ClassPreludeAcknowledgmentResponse> {
+        SottoClient::acknowledge_class_prelude(self, class_id, request).await
+    }
+
     async fn class(&self, class_id: &str) -> Result<types::ClassDetailResponse> {
         SottoClient::class(self, class_id).await
+    }
+
+    async fn class_progress_recovery(&self, class_id: &str) -> Result<types::ClassProgressRecovery> {
+        SottoClient::class_progress_recovery(self, class_id).await
     }
 
     async fn submit_class(
@@ -123,9 +143,10 @@ impl Api for SottoClient {
         &self,
         class_id: &str,
         prompt_id: &str,
+        binding: &ClassSpeakingBinding,
         wav: Vec<u8>,
     ) -> Result<SpeakingUploadResponse> {
-        SottoClient::upload_class_speaking(self, class_id, prompt_id, wav).await
+        SottoClient::upload_class_speaking(self, class_id, prompt_id, binding, wav).await
     }
 
     async fn poll_class_speaking(

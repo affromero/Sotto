@@ -1,12 +1,19 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
 import { ClassShell } from '@/components/learn/ClassShell';
-import type { ClassData, ClassSection } from '@/components/learn/classTypes';
+import { incompleteClass, recoverableClass } from './class-shell/fixtures';
+import { ClassPreludeContext } from '@/components/learn/lesson/ClassPreludeContext';
+import { classPresentationIssues } from '@/components/learn/classTypes';
+import { createSkillRequirements } from '@sotto/shared';
 import { teaching } from './lesson/teaching-fixture';
+import type { ReactNode } from 'react';
 
 const mockPush = vi.fn();
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: mockPush }) }));
+vi.mock('@/components/learn/lesson/ClassTeachingPrelude', () => ({
+  ClassTeachingPrelude: ({ children }: { children: ReactNode }) => children,
+}));
 
 function jsonResponse(body: unknown, status = 200) {
   return {
@@ -16,148 +23,38 @@ function jsonResponse(body: unknown, status = 200) {
   } as Response;
 }
 
-function section(skill: string, overrides: Partial<ClassSection> = {}): ClassSection {
-  return {
-    id: `section-${skill.toLowerCase()}`,
-    skill,
-    status: 'READY',
-    attempt: 1,
-    score: null,
-    passed: null,
-    episode: null,
-    questions: [],
-    prompts: [],
-    writingPrompts: [],
-    ...overrides,
-  };
-}
-
-function incompleteClass(): ClassData {
-  return {
-    id: 'class-15',
-    courseId: 'course-1',
-    status: 'AVAILABLE',
-    order: 15,
-    passThreshold: 0.7,
-    sourceUrl: null,
-    sourceTitle: null,
-    lesson: {
-      title: 'A tricky class',
-      level: 'B1',
-      objective: 'Practice the target structure.',
-    },
-    intro: {
-      purpose: 'Practice the target structure.',
-      about: 'A compact class.',
-      focus: ['Use the target phrase.'],
-      examples: [],
-      tips: [],
-    },
-    vocabulary: [],
-    submitted: false,
-    submission: null,
-    sections: [
-      section('GRAMMAR', {
-        questions: [
-          {
-            id: 'q-grammar',
-            order: 1,
-            question: 'Pick one.',
-            options: ['A', 'B'],
-          },
-        ],
-      }),
-      section('READING', {
-        questions: [
-          {
-            id: 'q-reading',
-            order: 1,
-            question: 'What happened?',
-            options: ['A', 'B'],
-            passageText: 'A readable passage.',
-          },
-        ],
-      }),
-      section('LISTENING', {
-        episode: {
-          id: 'episode-1',
-          audioUrl: null,
-          status: 'READY',
-          title: 'Listening scene',
-          references: [],
-        },
-        questions: [
-          {
-            id: 'q-listening',
-            order: 1,
-            question: 'What did you hear?',
-            options: ['A', 'B'],
-          },
-        ],
-      }),
-      section('SPEAKING', {
-        prompts: [
-          {
-            id: 'prompt-1',
-            order: 1,
-            targetPhrase: 'Hola',
-            translation: 'Hello',
-          },
-        ],
-      }),
-      section('WRITING', {
-        writingPrompts: [
-          {
-            id: 'writing-1',
-            order: 1,
-            task: 'Write one sentence.',
-            response: null,
-          },
-        ],
-      }),
-    ],
-  };
-}
-
-function recoverableClass(id: string): ClassData {
+it('requires reference audio for read-aloud prompts but not communicative tasks', () => {
   const cls = incompleteClass();
-  cls.id = id;
-  cls.attempt = 1;
-  cls.progressRevision = 10;
-  cls.learnerAnswers = { 'q-grammar': 0, 'q-listening': 0 };
-  for (const item of cls.sections) {
-    item.questions = item.questions.map((question) => ({
-      ...question,
-      correctIndex: 0,
-      explanation: 'Read the time expression.',
-    }));
-    if (item.episode) item.episode.audioUrl = '/demo-listening.mp3';
-    if (item.skill === 'READING')
-      item.questions = Array.from({ length: 5 }, (_, index) => ({
-        id: `reading-${index}`,
-        order: index + 1,
-        question: `What happened on day ${index + 1}?`,
-        options: ['A', 'B'],
-        correctIndex: 0,
-        explanation: 'The passage describes a visit.',
-        passageText: 'On Sunday, a student visited a museum.',
-      }));
-    for (const prompt of item.prompts)
-      prompt.latestRecording = {
-        id: 'saved-speaking',
-        status: 'SCORED',
-        overallScore: 1,
-      };
-    for (const prompt of item.writingPrompts)
-      prompt.response = {
-        text: 'I visited a museum.',
-        overallScore: 1,
-        corrections: [],
-        feedback: 'Clear sentence.',
-      };
-  }
-  return cls;
-}
+  cls.skillRequirements = createSkillRequirements({
+    scope: 'CLASS',
+    nativeLang: 'en',
+    targetLang: 'es',
+    level: 'A1',
+    ttsProvider: 'local',
+    sttProvider: 'local',
+  });
+  const speaking = cls.sections.find((entry) => entry.skill === 'SPEAKING')!;
+  speaking.prompts = [
+    {
+      id: 'one',
+      order: 1,
+      taskMode: 'COMMUNICATIVE',
+      targetPhrase: 'Ask for tea',
+      translation: 'Ask for tea',
+    },
+    {
+      id: 'two',
+      order: 2,
+      taskMode: 'READ_ALOUD',
+      targetPhrase: 'Hola',
+      translation: 'Hello',
+      referenceTtsUrl: '/audio',
+    },
+  ];
+  expect(classPresentationIssues(cls)).not.toContain('Speaking reference audio is incomplete.');
+  speaking.prompts[1].referenceTtsUrl = null;
+  expect(classPresentationIssues(cls)).toContain('Speaking reference audio is incomplete.');
+});
 
 function answerReading(correct: number) {
   for (let index = 0; index < 5; index += 1) {
@@ -176,6 +73,286 @@ describe('ClassShell', () => {
     vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
   });
   afterEach(() => vi.restoreAllMocks());
+
+  it('keeps a failed assessment result visible while retry is unavailable', async () => {
+    const cls = recoverableClass('failed-assessment-retry');
+    const receipt = {
+      source: 'ASSESSMENT' as const,
+      passed: false,
+      overallScore: 0.4,
+      passedSections: 0,
+      totalSections: 1,
+      sections: [
+        { id: 'assessment-section', skill: 'GRAMMAR' as const, score: 0.4, passed: false },
+      ],
+    };
+    cls.status = 'FAILED';
+    cls.submitted = true;
+    cls.submission = { passed: false, overallScore: 0.4, receipt };
+    global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === '/api/v1/users/me') return jsonResponse({ id: 'owner' });
+      return jsonResponse(cls);
+    });
+    render(<ClassShell classId={cls.id} />);
+    expect(
+      await screen.findByText('Your result is saved. Assessment retry is not available yet.')
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /Retry the missed sections/ })
+    ).not.toBeInTheDocument();
+  });
+
+  it('clears an exactly replayed assessment draft when a completed class is reopened', async () => {
+    const cls = recoverableClass('completed-assessment-recovery');
+    const receipt = {
+      source: 'ASSESSMENT' as const,
+      passed: true,
+      overallScore: 1,
+      passedSections: 1,
+      totalSections: 1,
+      sections: [{ id: 'assessment-section', skill: 'GRAMMAR' as const, score: 1, passed: true }],
+    };
+    cls.status = 'PASSED';
+    cls.submitted = true;
+    cls.submission = { passed: true, overallScore: 1, receipt };
+    const key = `assessment:${JSON.stringify(['owner', cls.id, 1, 'assessment', 'a'.repeat(64)])}`;
+    sessionStorage.setItem(
+      key,
+      JSON.stringify({
+        choices: { q: 0 },
+        drafts: {},
+        pending: [{ itemId: 'q', selectedIndex: 0 }],
+      })
+    );
+    global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === '/api/v1/users/me') return jsonResponse({ id: 'owner' });
+      if (url.endsWith('/assessment/assessment') && init?.method === 'POST')
+        return jsonResponse(receipt);
+      return jsonResponse(cls);
+    });
+    render(<ClassShell classId={cls.id} />);
+    await waitFor(() => expect(sessionStorage.getItem(key)).toBeNull());
+  });
+
+  it('saves first-lesson practice before opening the independent assessment', async () => {
+    const cls = recoverableClass('beginner-assessment-handoff');
+    const reading = cls.sections.find((item) => item.skill === 'READING')!;
+    const prelude = {
+      kind: 'BASE' as const,
+      nativeLang: 'en',
+      targetLang: 'de',
+      receiptId: '00000000-0000-4000-a000-000000000001',
+      acknowledged: true,
+      teaching: {
+        version: teaching.version,
+        title: teaching.title,
+        explanation: teaching.explanation,
+        workedExamples: teaching.workedExamples,
+        commonMistake: teaching.commonMistake,
+      },
+    };
+    const events: string[] = [];
+    global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === '/api/v1/users/me') return jsonResponse({ id: 'owner' });
+      if (url.endsWith('/focus-snapshot'))
+        return jsonResponse({
+          prelude,
+          progress: {
+            classId: cls.id,
+            status: 'AVAILABLE',
+            attempt: 1,
+            progressRevision: 10,
+            taskMaterialRevision: cls.taskMaterialRevision,
+          },
+        });
+      if (url.endsWith('/assessment/status')) {
+        events.push('assessment');
+        return jsonResponse({ status: 'PRACTICE_REQUIRED', classAttempt: 1 });
+      }
+      if (url.endsWith('/submit')) throw new Error('Legacy submission must not be used');
+      if (init?.method === 'PATCH') {
+        events.push('save');
+        return jsonResponse({ progressRevision: 11 });
+      }
+      return jsonResponse(cls);
+    });
+    render(
+      <ClassPreludeContext.Provider value={prelude}>
+        <ClassShell classId={cls.id} initialSectionId={reading.id} />
+      </ClassPreludeContext.Provider>
+    );
+    await screen.findByRole('heading', { name: 'Reading practice' });
+    answerReading(5);
+    fireEvent.click(screen.getByRole('button', { name: 'Continue · Listening' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continue · Speaking' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continue · Writing' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Finish class' }));
+    expect(
+      await screen.findByText('Finish the practice exercises before starting the assessment.')
+    ).toBeInTheDocument();
+    expect(events).toContain('save');
+    expect(events.indexOf('save')).toBeLessThan(events.indexOf('assessment'));
+  });
+
+  it('keeps owned previous speaking work available on the class overview', async () => {
+    const cls = recoverableClass('class-speaking-history');
+    cls.speakingHistory = [
+      {
+        sectionId: 'old',
+        attempt: 1,
+        prompts: [
+          {
+            id: 'old-prompt',
+            order: 1,
+            targetPhrase: 'Hallo',
+            translation: 'Hello',
+            recordings: [
+              {
+                id: 'recording',
+                attempt: 1,
+                attemptMatches: true,
+                status: 'SCORED',
+                transcript: 'Hallo Mia',
+                overallScore: 0.8,
+                rubricScores: null,
+                phonemeScores: null,
+                feedback: 'Clear.',
+                createdAt: '2026-01-01T00:00:00Z',
+              },
+            ],
+          },
+        ],
+      },
+    ];
+    global.fetch = vi.fn(async () => jsonResponse(cls));
+    render(<ClassShell classId={cls.id} />);
+    fireEvent.click(await screen.findByText('Previous speaking work'));
+    expect(screen.getByText('Transcript: Hallo Mia')).toBeVisible();
+    expect(screen.getByText('Feedback: Clear.')).toBeVisible();
+  });
+
+  it('restores the saved assessment result rather than formative section scores', async () => {
+    const cls = incompleteClass();
+    cls.status = 'PASSED';
+    cls.submitted = true;
+    cls.submission = {
+      passed: true,
+      overallScore: 0.9,
+      receipt: {
+        source: 'ASSESSMENT',
+        passed: true,
+        overallScore: 0.9,
+        passedSections: 1,
+        totalSections: 1,
+        sections: [{ id: 'assessment-reading', skill: 'READING', score: 0.9, passed: true }],
+      },
+    };
+    global.fetch = vi.fn(async () => jsonResponse(cls));
+    render(<ClassShell classId={cls.id} />);
+    expect(await screen.findByRole('img', { name: 'Score 90 percent' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Writing practice' })).toBeVisible();
+    expect(screen.queryByRole('img', { name: 'Score 0 percent' })).toBeNull();
+  });
+
+  it('keeps unverified answers separate until the learner retains a copy and continues', async () => {
+    const cls = recoverableClass('class-unverified-copy');
+    const reading = cls.sections.find((item) => item.skill === 'READING')!;
+    const endpoint = `/api/v1/classes/${cls.id}`;
+    sessionStorage.setItem(
+      `learning:${endpoint}/1`,
+      JSON.stringify({
+        revision: 10,
+        pending: { answers: { 'reading-0': 1 }, writingDrafts: { 'writing-1': 'Old draft' } },
+      })
+    );
+    const writes: unknown[] = [];
+    global.fetch = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === 'PATCH') {
+        writes.push(JSON.parse(String(init.body)));
+        return jsonResponse({ progressRevision: 11 });
+      }
+      return jsonResponse(cls);
+    });
+    render(<ClassShell classId={cls.id} initialSectionId={reading.id} />);
+    const recovery = await screen.findByRole('region', { name: 'Retained class work' });
+    expect(within(recovery).getByText('Old draft')).toBeVisible();
+    expect(screen.queryByRole('heading', { name: 'Reading practice' })).toBeNull();
+    fireEvent.click(within(recovery).getByRole('button', { name: 'Continue with current class' }));
+    fireEvent.click(within(recovery).getByRole('button', { name: 'Keep copy and continue' }));
+    await screen.findByRole('heading', { name: 'Reading practice' });
+    expect(
+      within(screen.getByRole('region', { name: 'Question 1' })).getByRole('button', {
+        name: 'Option 2: B',
+      })
+    ).toBeEnabled();
+    expect(screen.getByText('Old draft')).toBeVisible();
+    expect(writes).toEqual([]);
+    fireEvent.click(
+      within(screen.getByRole('region', { name: 'Question 1' })).getByRole('button', {
+        name: 'Option 2: B',
+      })
+    );
+    await waitFor(() =>
+      expect(writes).toEqual([
+        expect.objectContaining({
+          answers: { 'reading-0': 1 },
+          expectedAttempt: 1,
+          taskMaterialRevision: 'a'.repeat(64),
+        }),
+      ])
+    );
+  });
+
+  it('shows revision-bound directions next to their exercise and clears them when the source changes', async () => {
+    const cls = recoverableClass('direction-class');
+    cls.teaching = teaching;
+    cls.prerequisiteSourceHash = 'a'.repeat(64);
+    const reading = cls.sections.find((item) => item.skill === 'READING')!;
+    let sourceHash = cls.prerequisiteSourceHash;
+    global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).endsWith('/prerequisite'))
+        return jsonResponse({
+          status: 'READY',
+          receiptId: '00000000-0000-4000-a000-000000000001',
+          acknowledged: true,
+          request: { sourceHash, snapshotHash: 'b'.repeat(64) },
+          nativeLang: 'es',
+          targetLang: 'ru',
+          content: {
+            title: 'Antes de practicar',
+            explanation: 'Aprende la estructura.',
+            examples: [{ target: 'Вода', meaning: 'Agua', explanation: 'Una palabra.' }],
+            directions: {
+              guided: 'Pide la bebida con cortesía.',
+              tasks: reading.questions.map((question) => ({
+                sectionId: reading.id,
+                taskId: question.id,
+                kind: 'question',
+                instruction: `Lee y responde ${question.order}.`,
+              })),
+            },
+          },
+        });
+      if (init?.method === 'PATCH') return jsonResponse({ progressRevision: 11 });
+      return jsonResponse(cls);
+    });
+    render(<ClassShell classId={cls.id} initialSectionId={reading.id} />);
+    const first = await screen.findByRole('region', { name: 'Question 1' });
+    const instruction = await within(first).findByText('Lee y responde 1.');
+    expect(instruction).toHaveAttribute('lang', 'es');
+    expect(first).toHaveAccessibleDescription('Lee y responde 1.');
+    expect(screen.getByText('Pide la bebida con cortesía.')).toBeVisible();
+    fireEvent.click(within(first).getByRole('button', { name: 'Option 1: A' }));
+    sourceHash = 'c'.repeat(64);
+    fireEvent.focus(window);
+    await waitFor(() =>
+      expect(within(first).queryByText('Lee y responde 1.')).not.toBeInTheDocument()
+    );
+    expect(within(first).getByRole('button', { name: 'Option 1: A' })).toBeDisabled();
+  });
 
   it('identifies the class and current section, returns to its overview and retains an answer', async () => {
     const cls = recoverableClass('navigation-class');
@@ -284,6 +461,92 @@ describe('ClassShell', () => {
         }),
       ])
     );
+  });
+
+  it('keeps the current question and saved answer when language help is reopened', async () => {
+    const showModal = Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype, 'showModal');
+    const close = Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype, 'close');
+    Object.defineProperty(HTMLDialogElement.prototype, 'showModal', {
+      configurable: true,
+      value: function (this: HTMLDialogElement) {
+        this.setAttribute('open', '');
+      },
+    });
+    Object.defineProperty(HTMLDialogElement.prototype, 'close', {
+      configurable: true,
+      value: function (this: HTMLDialogElement) {
+        this.removeAttribute('open');
+      },
+    });
+    try {
+      const cls = recoverableClass('help-preserves-progress');
+      const revision = 'c'.repeat(64);
+      cls.teaching = teaching;
+      cls.lessonHelpRevision = revision;
+      const reading = cls.sections.find((item) => item.skill === 'READING')!;
+      const help = {
+        title: teaching.title,
+        explanation: 'Una explicación en español.',
+        workedExamples: teaching.workedExamples.map((example) => ({
+          prompt: example.prompt,
+          meaning: 'Un ejemplo.',
+          explanation: 'Una explicación.',
+        })),
+        correctionExplanation: 'Una corrección.',
+        guidedPrompt: 'Describe una visita.',
+        guidedHint: 'Piensa en el tiempo.',
+      };
+      const writes: Record<string, unknown>[] = [];
+      global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        if (String(input).includes('/lesson-help'))
+          return jsonResponse({
+            status: 'READY',
+            nativeLang: 'es',
+            targetLang: 'de',
+            canRetry: false,
+            help,
+            request: {
+              operationId: '00000000-0000-4000-a000-000000000001',
+              attempt: 1,
+              sourceHash: revision,
+              retryOf: null,
+            },
+          });
+        if (init?.method === 'PATCH') {
+          writes.push(JSON.parse(String(init.body)) as Record<string, unknown>);
+          return jsonResponse({ progressRevision: 11 });
+        }
+        return jsonResponse(cls);
+      });
+      render(<ClassShell classId={cls.id} initialSectionId={reading.id} />);
+      await screen.findByRole('heading', { name: 'Reading practice' });
+      const first = within(screen.getByRole('region', { name: 'Question 1' })).getByRole('button', {
+        name: 'Option 1: A',
+      });
+      fireEvent.click(first);
+      await waitFor(() => expect(first).toBeDisabled());
+      for (let index = 0; index < 2; index += 1) {
+        fireEvent.click(screen.getByRole('button', { name: 'Help in your language' }));
+        const dialog = await screen.findByRole('dialog', { name: teaching.title });
+        expect(await within(dialog).findByText(help.guidedPrompt)).toBeVisible();
+        expect(within(dialog).queryByText(teaching.guidedPractice.answer)).not.toBeInTheDocument();
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Back to lesson' }));
+        expect(first).toBeDisabled();
+        expect(screen.getByRole('region', { name: 'Question 2' })).toBeVisible();
+      }
+      await waitFor(() =>
+        expect(writes).toEqual([
+          expect.objectContaining({
+            answers: expect.objectContaining({ [reading.questions[0]!.id]: 0 }),
+          }),
+        ])
+      );
+    } finally {
+      if (showModal) Object.defineProperty(HTMLDialogElement.prototype, 'showModal', showModal);
+      else Reflect.deleteProperty(HTMLDialogElement.prototype, 'showModal');
+      if (close) Object.defineProperty(HTMLDialogElement.prototype, 'close', close);
+      else Reflect.deleteProperty(HTMLDialogElement.prototype, 'close');
+    }
   });
 
   it.each([
@@ -402,6 +665,8 @@ describe('ClassShell', () => {
       method: 'PATCH',
       body: {
         expectedRevision: 10,
+        expectedAttempt: 1,
+        taskMaterialRevision: 'a'.repeat(64),
         answers: Object.fromEntries(
           oldReading.questions.map((question, index) => [question.id, index < 3 ? 0 : 1])
         ),
@@ -565,7 +830,11 @@ describe('ClassShell', () => {
     expect(
       await screen.findByText(/This class is missing required presentation material/i)
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /regenerate class/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /regenerate class/i })).toHaveAttribute(
+      'aria-busy',
+      'false'
+    );
+    expect(screen.getByRole('button', { name: /regenerate class/i })).toBeEnabled();
     expect(screen.getByRole('button', { name: /back to learn/i })).toBeInTheDocument();
     expect(global.fetch).not.toHaveBeenCalledWith(
       '/api/v1/classes/class-15?background=1',

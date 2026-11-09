@@ -9,9 +9,15 @@ impl SottoClient {
         headers.insert(reqwest::header::AUTHORIZATION, auth);
 
         let http = reqwest::Client::builder()
-            .default_headers(headers)
+            .default_headers(headers.clone())
             .build()
             .map_err(|e| eyre!("failed to build HTTP client: {e}"))?;
+        let history_http = reqwest::Client::builder()
+            .default_headers(headers)
+            .redirect(reqwest::redirect::Policy::none())
+            .timeout(std::time::Duration::from_secs(120))
+            .build()
+            .map_err(|e| eyre!("failed to build recording client: {e}"))?;
 
         // Unauthenticated client for downloading presigned/CDN URLs. Never
         // carries the Sotto bearer key, so the credential cannot leak to the
@@ -27,6 +33,7 @@ impl SottoClient {
         Ok(Self {
             inner,
             http,
+            history_http,
             download_http,
             base_url,
         })
@@ -195,18 +202,26 @@ impl SottoClient {
             "{}/api/v1/practice/{}/speaking/{}",
             self.base_url, session_id, prompt_id
         );
-        self.upload_wav(&url, wav).await
+        self.upload_wav(&url, wav, None).await
     }
 
     /// POST a WAV as multipart (field `audio`, filename `attempt.wav`, mime
     /// `audio/wav`) to `url`. The Bearer header rides on the shared client.
     /// Shared by the practice and class speaking upload paths.
-    async fn upload_wav(&self, url: &str, wav: Vec<u8>) -> Result<SpeakingUploadResponse> {
+    async fn upload_wav(&self, url: &str, wav: Vec<u8>, binding: Option<&ClassSpeakingBinding>) -> Result<SpeakingUploadResponse> {
         let part = reqwest::multipart::Part::bytes(wav)
             .file_name("attempt.wav")
             .mime_str("audio/wav")
             .map_err(|e| eyre!("invalid audio mime: {e}"))?;
-        let form = reqwest::multipart::Form::new().part("audio", part);
+        let mut form = reqwest::multipart::Form::new().part("audio", part);
+        if let Some(binding) = binding {
+            if binding.attempt <= 0 || binding.material_revision.len() != 64 ||
+                !binding.material_revision.bytes().all(|value| value.is_ascii_digit() || (b'a'..=b'f').contains(&value)) {
+                return Err(eyre!("Class material identity is unavailable."));
+            }
+            form = form.text("expectedAttempt", binding.attempt.to_string())
+                .text("taskMaterialRevision", binding.material_revision.clone());
+        }
 
         let resp = self
             .http
@@ -218,11 +233,24 @@ impl SottoClient {
         let status = resp.status();
         if !status.is_success() {
             let body = resp.text().await.unwrap_or_default();
+            if binding.is_some() && serde_json::from_str::<serde_json::Value>(&body).ok()
+                .and_then(|value| value["code"].as_str().map(str::to_string))
+                .is_some_and(|code| match code.as_str() {
+                    "CLASS_MATERIAL_CHANGED" | "PREREQUISITE_ACK_REQUIRED" => status.as_u16() == 409,
+                    "CLASS_RECORDING_REJECTED" => [400, 401, 404, 409].contains(&status.as_u16()),
+                    _ => false,
+                }) {
+                return Err(ClassRecordingRejected.into());
+            }
             return Err(eyre!("speaking upload failed ({status}): {body}"));
         }
-        resp.json::<SpeakingUploadResponse>()
+        let receipt = resp.json::<SpeakingUploadResponse>()
             .await
-            .map_err(|e| eyre!("could not parse upload response: {e}"))
+            .map_err(|e| eyre!("could not parse upload response: {e}"))?;
+        if receipt.recording_id.trim().is_empty() || receipt.recording_id.trim() != receipt.recording_id || receipt.status != "PENDING" {
+            return Err(eyre!("The upload receipt is incomplete. Its outcome is unknown."));
+        }
+        Ok(receipt)
     }
 
     /// Download raw bytes from an absolute (presigned/CDN) URL.
@@ -231,6 +259,37 @@ impl SottoClient {
     /// key is never sent to the third-party host the presigned URL points at.
     /// Errors are reported without the URL, since presigned links carry
     /// credentials in their query string that must not be logged.
+    pub async fn class_history_audio(&self, class_id: &str, prompt_id: &str, recording_id: &str) -> Result<Vec<u8>> {
+        const MAX_BYTES: usize = 64 * 1024 * 1024;
+        if [class_id, prompt_id, recording_id].iter().any(|id| id.is_empty() || id.len() > 200 || *id == "." || *id == "..") {
+            return Err(eyre!("Invalid saved recording identity"));
+        }
+        let mut url = reqwest::Url::parse(&self.base_url).map_err(|_| eyre!("Invalid server URL"))?;
+        if !matches!(url.scheme(), "http" | "https") || !url.username().is_empty() || url.password().is_some() {
+            return Err(eyre!("Invalid server URL"));
+        }
+        url.set_query(None);
+        url.set_fragment(None);
+        {
+            let mut segments = url.path_segments_mut().map_err(|_| eyre!("Invalid server URL"))?;
+            segments.pop_if_empty().extend(["api", "v1", "classes", class_id, "speaking", prompt_id, "recordings", recording_id, "audio"]);
+        }
+        let mut response = self.history_http.get(url).header(reqwest::header::ACCEPT, "audio/*, application/octet-stream")
+            .send().await.map_err(|_| eyre!("Saved recording request failed"))?;
+        if response.status() != reqwest::StatusCode::OK { return Err(eyre!("Saved recording unavailable ({})", response.status())); }
+        let content_type = response.headers().get(reqwest::header::CONTENT_TYPE).and_then(|v| v.to_str().ok()).unwrap_or("");
+        if !content_type.starts_with("audio/") && !content_type.starts_with("application/octet-stream") {
+            return Err(eyre!("The server did not return audio"));
+        }
+        if response.content_length().is_some_and(|length| length > MAX_BYTES as u64) { return Err(eyre!("Saved recording is too large for terminal playback")); }
+        let mut bytes = Vec::new();
+        while let Some(chunk) = response.chunk().await.map_err(|_| eyre!("Could not read saved recording"))? {
+            if chunk.len() > MAX_BYTES.saturating_sub(bytes.len()) { return Err(eyre!("Saved recording is too large for terminal playback")); }
+            bytes.extend_from_slice(&chunk);
+        }
+        Ok(bytes)
+    }
+
     pub async fn download(&self, url: &str) -> Result<Vec<u8>> {
         let resp = self
             .download_http
@@ -330,6 +389,35 @@ impl SottoClient {
         })
     }
 
+    pub async fn class_prelude(&self, class_id: &str) -> Result<types::ClassPreludeResponse> {
+        Ok(self.inner.get_class_teaching_prelude(class_id).await
+            .map_err(|e| eyre!("failed to load prerequisite teaching: {e}"))?.into_inner())
+    }
+
+    pub async fn class_prerequisite(&self, class_id: &str) -> Result<types::ClassPrerequisiteResponse> {
+        Ok(self.inner.get_class_prerequisite(class_id).await
+            .map_err(|e| eyre!("failed to load prerequisite directions: {e}"))?.into_inner())
+    }
+
+    pub async fn prepare_class_prelude(
+        &self,
+        class_id: &str,
+        request: types::ClassPrerequisiteRequest,
+        recovery: bool,
+    ) -> Result<types::ClassPreludeResponse> {
+        Ok(self.inner.prepare_class_teaching_prelude(class_id, recovery.then_some("1"), &request).await
+            .map_err(|e| eyre!("failed to prepare prerequisite teaching: {e}"))?.into_inner())
+    }
+
+    pub async fn acknowledge_class_prelude(
+        &self,
+        class_id: &str,
+        request: types::ClassPreludeAcknowledgment,
+    ) -> Result<types::ClassPreludeAcknowledgmentResponse> {
+        Ok(self.inner.acknowledge_class_teaching_prelude(class_id, &request).await
+            .map_err(|e| eyre!("failed to save prerequisite acknowledgment: {e}"))?.into_inner())
+    }
+
     /// Fetch a class with its sections.
     pub async fn class(&self, class_id: &str) -> Result<types::ClassDetailResponse> {
         let resp = self
@@ -338,6 +426,11 @@ impl SottoClient {
             .await
             .map_err(|e| eyre!("failed to load class: {e}"))?;
         Ok(resp.into_inner())
+    }
+
+    pub async fn class_progress_recovery(&self, class_id: &str) -> Result<types::ClassProgressRecovery> {
+        Ok(self.inner.get_class_progress_recovery(class_id).await
+            .map_err(|e| eyre!("failed to check class progress: {e}"))?.into_inner())
     }
 
     /// Submit a class's MC answers and get the grade result.
@@ -360,13 +453,14 @@ impl SottoClient {
         &self,
         class_id: &str,
         prompt_id: &str,
+        binding: &ClassSpeakingBinding,
         wav: Vec<u8>,
     ) -> Result<SpeakingUploadResponse> {
         let url = format!(
             "{}/api/v1/classes/{}/speaking/{}",
             self.base_url, class_id, prompt_id
         );
-        self.upload_wav(&url, wav).await
+        self.upload_wav(&url, wav, Some(binding)).await
     }
 
     /// Poll grading for a class speaking attempt (raw GET; same response shape
@@ -496,7 +590,7 @@ impl SottoClient {
             "{}/api/v1/exams/{}/speaking/{}",
             self.base_url, exam_id, prompt_id
         );
-        self.upload_wav(&url, wav).await
+        self.upload_wav(&url, wav, None).await
     }
 
     /// Poll grading for an exam speaking attempt.

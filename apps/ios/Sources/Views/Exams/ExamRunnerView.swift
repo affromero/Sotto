@@ -13,6 +13,7 @@ struct ExamRunnerView: View {
     let examId: String
 
     @State private var exam: SottoExamDetail?
+    @State private var activityOwner: SottoLearnerIdentity?
     @State private var answers: [String: Int] = [:]
     @State private var score: SottoExamScoreResult?
     @State private var loadError: String?
@@ -127,7 +128,8 @@ struct ExamRunnerView: View {
             if !section.speakingPrompts.isEmpty {
                 ClassSpeakingPracticeView(
                     source: .exam(examId: exam.id),
-                    prompts: section.speakingPrompts
+                    prompts: section.speakingPrompts,
+                    activityOwner: activityOwner
                 )
             }
 
@@ -241,7 +243,10 @@ struct ExamRunnerView: View {
 
     private func load() async {
         do {
+            guard let client = model.makeClient() else { throw CancellationError() }
             let detail = try await model.fetchExam(examId: examId)
+            guard model.isCurrentLearningClient(client) else { throw CancellationError() }
+            activityOwner = SottoLearnerIdentity(client)
             exam = detail
             loadError = nil
         } catch {

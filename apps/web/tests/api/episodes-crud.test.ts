@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
+import { episodeDeleteCases } from './episodes/delete-cases';
 
 // Define mock functions at module scope for proper typing
 const mockEpisodeFindMany = vi.fn();
@@ -22,6 +23,7 @@ const mockUserFindUniqueOrThrow = vi.fn();
 
 vi.mock('@/lib/prisma', () => {
   const txProxy = {
+    $queryRaw: vi.fn().mockResolvedValue([]),
     episode: {
       findMany: (...args: unknown[]) => mockEpisodeFindMany(...args),
       count: (...args: unknown[]) => mockEpisodeCount(...args),
@@ -51,6 +53,14 @@ vi.mock('@/lib/prisma', () => {
 
 vi.mock('@/lib/api-keys', () => ({
   authenticateRequest: (...args: unknown[]) => mockAuthenticateRequest(...args),
+}));
+
+vi.mock('@/lib/sidedoor/access/state/transaction', () => ({
+  sottoTransaction: async (database: unknown, operation: (database: unknown) => Promise<unknown>) =>
+    operation(database),
+}));
+vi.mock('@/lib/sidedoor/access/core/request-identity', () => ({
+  requireOriginalSottoAdmission: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('@/lib/redis', () => ({
@@ -177,13 +187,6 @@ function createPatchRequest(path: string, body: unknown): NextRequest {
   });
 }
 
-function createDeleteRequest(path: string): NextRequest {
-  const url = new URL(path, 'http://localhost:3000');
-  return new NextRequest(url, {
-    method: 'DELETE',
-  });
-}
-
 const mockEpisode = {
   id: 'pod-1',
   userId: 'user-1',
@@ -259,6 +262,7 @@ describe('GET /api/v1/episodes', () => {
     expect(body).toHaveLength(1);
     expect(body[0].id).toBe('pod-1');
     expect(body[0].tags).toHaveLength(1);
+    expect(response.headers.get('cache-control')).toBe('private, no-store');
   });
 
   it('orders episodes by createdAt desc', async () => {
@@ -524,8 +528,10 @@ describe('POST /api/v1/episodes', () => {
 });
 
 describe('GET /api/v1/episodes/[episodeId]', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    const { cache } = await import('@/lib/redis');
+    vi.mocked(cache.get).mockResolvedValue(null);
   });
 
   it('returns 404 when episode not found', async () => {
@@ -540,6 +546,43 @@ describe('GET /api/v1/episodes/[episodeId]', () => {
     expect(response.status).toBe(404);
     const body = await response.json();
     expect(body).toMatchObject({ error: 'Episode not found' });
+  });
+
+  it.each([{ userId: 'user-1' }, { userId: 'other-user' }, null])(
+    'does not expose cached assessment segments to %s',
+    async (identity) => {
+      mockAuthenticateRequest.mockResolvedValue(identity);
+      const { cache } = await import('@/lib/redis');
+      vi.mocked(cache.get).mockResolvedValue({
+        ...mockEpisodeWithRelations,
+        visibility: 'UNLISTED',
+        segments: [{ text: 'PRIVATE_ASSESSMENT_TRANSCRIPT' }],
+      });
+      mockPrisma.episode.findUnique.mockResolvedValue({
+        ...mockEpisodeWithRelations,
+        visibility: 'UNLISTED',
+        assessmentSection: { id: 'assessment-section' },
+      });
+      const response = await getEpisode(createGetRequest('/api/v1/episodes/pod-1'), {
+        params: Promise.resolve({ episodeId: 'pod-1' }),
+      });
+      expect(response.status).toBe(404);
+      expect(JSON.stringify(await response.json())).not.toContain('PRIVATE_ASSESSMENT_TRANSCRIPT');
+    }
+  );
+
+  it('does not expose stale unlisted cache after an episode becomes private', async () => {
+    mockAuthenticateRequest.mockResolvedValue(null);
+    const { cache } = await import('@/lib/redis');
+    vi.mocked(cache.get).mockResolvedValue({ ...mockEpisodeWithRelations, visibility: 'UNLISTED' });
+    mockPrisma.episode.findUnique.mockResolvedValue({
+      ...mockEpisodeWithRelations,
+      visibility: 'PRIVATE',
+    });
+    const response = await getEpisode(createGetRequest('/api/v1/episodes/pod-1'), {
+      params: Promise.resolve({ episodeId: 'pod-1' }),
+    });
+    expect(response.status).toBe(404);
   });
 
   it('returns public episode without authentication', async () => {
@@ -679,6 +722,21 @@ describe('PATCH /api/v1/episodes/[episodeId]', () => {
       priorityQueue: true,
       analyticsEnabled: true,
     });
+  });
+
+  it('does not allow an assessment episode to be edited through the episode API', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockPrisma.episode.findUnique.mockResolvedValue({
+      userId: 'user-1',
+      deletedAt: null,
+      assessmentSection: { id: 'assessment-section' },
+    });
+    const response = await updateEpisode(
+      createPatchRequest('/api/v1/episodes/pod-1', { visibility: 'UNLISTED' }),
+      { params: Promise.resolve({ episodeId: 'pod-1' }) }
+    );
+    expect(response.status).toBe(404);
+    expect(mockPrisma.episode.update).not.toHaveBeenCalled();
   });
 
   it('returns 401 when not authenticated', async () => {
@@ -876,66 +934,10 @@ describe('PATCH /api/v1/episodes/[episodeId]', () => {
   });
 });
 
-describe('DELETE /api/v1/episodes/[episodeId]', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('returns 401 when not authenticated', async () => {
-    mockAuthenticateRequest.mockResolvedValue(null);
-
-    const request = createDeleteRequest('/api/v1/episodes/pod-1');
-    const response = await deleteEpisode(request, {
-      params: Promise.resolve({ episodeId: 'pod-1' }),
-    });
-
-    expect(response.status).toBe(401);
-    const body = await response.json();
-    expect(body).toMatchObject({ error: 'Unauthorized' });
-  });
-
-  it('returns 404 when episode not found', async () => {
-    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
-    mockPrisma.episode.findUnique.mockResolvedValue(null);
-
-    const request = createDeleteRequest('/api/v1/episodes/pod-999');
-    const response = await deleteEpisode(request, {
-      params: Promise.resolve({ episodeId: 'pod-999' }),
-    });
-
-    expect(response.status).toBe(404);
-    const body = await response.json();
-    expect(body).toMatchObject({ error: 'Episode not found' });
-  });
-
-  it('returns 403 when user is not the owner', async () => {
-    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-2' });
-    mockPrisma.episode.findUnique.mockResolvedValue({ userId: 'user-1' });
-
-    const request = createDeleteRequest('/api/v1/episodes/pod-1');
-    const response = await deleteEpisode(request, {
-      params: Promise.resolve({ episodeId: 'pod-1' }),
-    });
-
-    expect(response.status).toBe(403);
-    const body = await response.json();
-    expect(body).toMatchObject({ error: 'Forbidden' });
-  });
-
-  it('soft-deletes episode when user is owner', async () => {
-    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
-    mockPrisma.episode.findUnique.mockResolvedValue({ userId: 'user-1' });
-    mockPrisma.episode.update.mockResolvedValue(mockEpisode);
-
-    const request = createDeleteRequest('/api/v1/episodes/pod-1');
-    const response = await deleteEpisode(request, {
-      params: Promise.resolve({ episodeId: 'pod-1' }),
-    });
-
-    expect(response.status).toBe(204);
-    expect(mockEpisodeUpdate).toHaveBeenCalledWith({
-      where: { id: 'pod-1' },
-      data: { deletedAt: expect.any(Date) },
-    });
-  });
-});
+episodeDeleteCases(() => ({
+  deleteEpisode,
+  mockAuthenticateRequest,
+  mockEpisodeFindUnique,
+  mockEpisodeUpdate,
+  mockEpisode,
+}));

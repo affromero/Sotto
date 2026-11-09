@@ -10,7 +10,7 @@ import { worksheetPdfQueue } from '@/lib/queue';
 import { randomUUID } from 'node:crypto';
 import { prepareJob } from 'thesidedoor-core/runtime/outbox';
 import { requireOriginalSottoAdmission } from '@/lib/sidedoor/access/core/request-identity';
-import { captureCourseStorage } from '@/lib/sidedoor/storage/core/course-storage';
+import { capturePrerequisiteOwnership } from '@/lib/classes/help/lifecycle/prerequisite-ownership';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 import { deliverSottoJob, sottoJobOutbox } from '@/lib/sidedoor/jobs/core/job-delivery';
 import { SIDEDOOR_STATE_ID } from '@/lib/sidedoor/access/state/store';
@@ -142,13 +142,18 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           select: { id: true, courseId: true, updatedAt: true },
         });
         if (!cls) return null;
-        const ownership = await captureCourseStorage(database, cls.courseId);
+        const ownership = await capturePrerequisiteOwnership(
+          database,
+          cls.id,
+          cls.courseId,
+          authed.userId
+        );
         return sottoJobOutbox(database).enqueue(
           prepareJob({
             id: operationId,
             namespace: SIDEDOOR_STATE_ID,
             handler: 'worksheet-pdf',
-            version: 1,
+            version: 2,
             payload: {
               classId,
               classUpdatedAt: cls.updatedAt.getTime(),
@@ -167,7 +172,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       queue: worksheetPdfQueue,
       operationId,
       fingerprint: record.fingerprint,
-      version: 1,
+      version: 2,
     });
 
     return NextResponse.json({ status: 'PENDING', operationId }, { status: 202 });

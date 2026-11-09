@@ -222,6 +222,33 @@ self-host updates do not require this transition.
 
 Start the stack, open `/welcome`, and choose the AI, speech, and storage providers. Save hosted credentials or local service URLs there. Sidedoor encrypts credentials and applies the same configuration to web and worker processes. Provider usage and limits are configured in Admin alongside the corresponding saved credential.
 
+Speaking reference audio can use the optional `SOTTO_SPEAKING_REFERENCE_KEYRING` secret. It is a JSON object with `version: 1`, an `active` key ID or `legacy`, and a `keys` array of up to 16 distinct 32-byte keys encoded as lowercase hexadecimal. A key ID is the SHA-256 digest of the UTF-8 string `sotto-speaking-reference-key-id-v1` followed by the raw key bytes. With the setting omitted, references use a key derived from `BYOK_ENCRYPTION_KEY`. The legacy key remains readable while that BYOK secret is retained.
+
+Quote the JSON when setting it in an env file, which is also sourced by shell scripts:
+
+```sh
+SOTTO_SPEAKING_REFERENCE_KEYRING='{"version":1,"active":"legacy","keys":[]}'
+```
+
+To prepare a new key without printing it, create a private file outside the repository. The file starts with the legacy key active and records the new key ID in a comment:
+
+```sh
+umask 077
+python3 - <<'PY'
+import hashlib, json, os
+from pathlib import Path
+
+key = os.urandom(32)
+key_id = hashlib.sha256(b'sotto-speaking-reference-key-id-v1' + key).hexdigest()
+ring = json.dumps({'version': 1, 'active': 'legacy', 'keys': [key.hex()]}, separators=(',', ':'))
+path = Path.home() / '.sotto-speaking-keyring.env'
+with os.fdopen(os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), 'w') as output:
+    output.write(f"# Candidate key ID: {key_id}\nSOTTO_SPEAKING_REFERENCE_KEYRING='{ring}'\n")
+PY
+```
+
+Keep the keyring identical on every web and worker process and back it up with the database and audio storage. Before activating a new key, deploy keyring-capable readers everywhere, drain older processes, and ensure rollback images can read it. Keep old keys for all live audio and retained backups. Changing `BYOK_ENCRYPTION_KEY` also affects provider credentials; do not change it solely to rotate speaking audio. Rewrapping existing audio and automated key retirement are not yet available.
+
 For local media storage, select **Local** in `/welcome` or Admin and save the mounted shared storage root.
 
 For optional Caddy www-redirect:
@@ -482,6 +509,16 @@ waits for both asynchronous and synchronous executions to settle. It gracefully
 retires the exact old web and workers and rejects replacement processes under
 their Compose labels. The authoritative backup is taken and verified after
 those writers stop, so it includes their final accepted writes.
+
+Class repair operations can contain retained-quiz receipts that older services
+cannot read. Keep admissions fenced until all old web and worker processes have
+stopped. Once a new receipt is written, recover with receipt-aware services.
+During repair, database writers must run with the quiz triggers enabled and must
+not use replica mode. Stop imports or replication apply processes that can write
+class sections or questions while the application accepts repair work. Restrict
+trigger and function changes to the reviewed migration role. Application
+writers must not be able to switch to replica mode, change those triggers or
+functions, or create objects in schemas on the application search path.
 
 The controller records irreversible cutover before running the candidate's
 `prisma migrate deploy`. It then verifies the complete applied migration

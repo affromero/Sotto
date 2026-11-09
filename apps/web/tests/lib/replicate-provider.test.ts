@@ -255,6 +255,172 @@ describe('ReplicateProvider', () => {
   });
 
   describe('shared behavior', () => {
+    it.each([
+      { status: 'processing' },
+      { id: ' ', status: 'processing' },
+      { id: 'pred-1' },
+      { id: 'pred-1', status: 'unknown' },
+    ])('keeps a malformed prediction unresolved', async (prediction) => {
+      const fetchMock = vi.fn().mockResolvedValueOnce(Response.json(prediction));
+      const observedTransport = createProviderTransport({
+        rules: [
+          ...ReplicateProvider.speechEndpoints.map((url) => ({ method: 'POST', url })),
+          { method: 'GET', url: ReplicateProvider.predictionRoot, descendants: true },
+        ],
+        admit: async () => {},
+        implementation: fetchMock,
+      });
+      const provider = new ReplicateProvider('r8_testtoken', observedTransport, media);
+      const events: string[] = [];
+      await expect(
+        provider.generateSpeech({
+          text: 'Test',
+          voiceId: 'Ashley',
+          onDispatch: () => events.push('dispatch'),
+          onSettled: () => events.push('settled'),
+        })
+      ).rejects.toThrow();
+      expect(events).toEqual(['dispatch']);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+    it.each(['processing', 'succeeded'] as const)(
+      'rejects a different prediction identity while it is %s',
+      async (status) => {
+        const fetchMock = vi
+          .fn()
+          .mockResolvedValueOnce(Response.json({ id: 'pred-original', status: 'processing' }))
+          .mockResolvedValueOnce(
+            Response.json({
+              id: 'pred-other',
+              status,
+              output: 'https://replicate.delivery/audio.mp3',
+            })
+          );
+        const observedTransport = createProviderTransport({
+          rules: [
+            ...ReplicateProvider.speechEndpoints.map((url) => ({ method: 'POST', url })),
+            { method: 'GET', url: ReplicateProvider.predictionRoot, descendants: true },
+          ],
+          admit: async () => {},
+          implementation: fetchMock,
+        });
+        const provider = new ReplicateProvider('r8_testtoken', observedTransport, media);
+        const events: string[] = [];
+        const generation = provider.generateSpeech({
+          text: 'Test',
+          voiceId: 'Ashley',
+          onDispatch: () => events.push('dispatch'),
+          onSettled: () => events.push('settled'),
+        });
+        const result = generation.then(
+          () => null,
+          (error: unknown) => error
+        );
+        await vi.advanceTimersByTimeAsync(1_000);
+        expect(await result).toMatchObject({ message: 'Replicate prediction identity changed' });
+        expect(events).toEqual(['dispatch']);
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+      }
+    );
+    it.each(['failed', 'canceled'] as const)(
+      'accepts an initial %s prediction as terminal without polling',
+      async (status) => {
+        const fetchMock = vi.fn().mockResolvedValueOnce(
+          Response.json({
+            id: 'pred-terminal',
+            status,
+            output: null,
+            error: status === 'failed' ? 'generation failed' : null,
+          })
+        );
+        const observedTransport = createProviderTransport({
+          rules: [
+            ...ReplicateProvider.speechEndpoints.map((url) => ({ method: 'POST', url })),
+            { method: 'GET', url: ReplicateProvider.predictionRoot, descendants: true },
+          ],
+          admit: async () => {},
+          implementation: fetchMock,
+        });
+        const provider = new ReplicateProvider('r8_testtoken', observedTransport, media);
+        const events: string[] = [];
+        await expect(
+          provider.generateSpeech({
+            text: 'Test',
+            voiceId: 'Ashley',
+            onDispatch: () => events.push('dispatch'),
+            onSettled: () => events.push('settled'),
+          })
+        ).rejects.toThrow(status === 'failed' ? 'generation failed' : 'was canceled');
+        expect(events).toEqual(['dispatch', 'settled']);
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+      }
+    );
+    it.each(['succeeded', 'failed', 'canceled'] as const)(
+      'settles an accepted prediction only after it becomes %s',
+      async (status) => {
+        let release!: () => void;
+        let notifyPoll!: () => void;
+        const gate = new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        const polling = new Promise<void>((resolve) => {
+          notifyPoll = resolve;
+        });
+        const fetchMock = vi
+          .fn()
+          .mockResolvedValueOnce(
+            Response.json({ id: 'pred-terminal', status: 'processing', output: null, error: null })
+          )
+          .mockImplementationOnce(async () => {
+            notifyPoll();
+            await gate;
+            return Response.json({
+              id: 'pred-terminal',
+              status,
+              output: status === 'succeeded' ? 'https://replicate.delivery/audio.mp3' : null,
+              error: status === 'failed' ? 'generation failed' : null,
+            });
+          });
+        const observedTransport = createProviderTransport({
+          rules: [
+            ...ReplicateProvider.speechEndpoints.map((url) => ({ method: 'POST', url })),
+            { method: 'GET', url: ReplicateProvider.predictionRoot, descendants: true },
+          ],
+          admit: async () => {},
+          implementation: fetchMock,
+        });
+        const provider = new ReplicateProvider('r8_testtoken', observedTransport, {
+          downloadMedia: async () => mockAudioBytes,
+        });
+        const events: string[] = [];
+        const generation = provider.generateSpeech({
+          text: 'Test',
+          voiceId: 'Ashley',
+          onDispatch: () => events.push('dispatch'),
+          onSettled: () => events.push('settled'),
+        });
+        const outcome = generation.then(
+          (audio) => audio,
+          (error: unknown) => error
+        );
+        await vi.advanceTimersByTimeAsync(1_000);
+        try {
+          await Promise.race([
+            polling,
+            outcome.then((result) => {
+              throw new Error('Prediction finished before the terminal poll', { cause: result });
+            }),
+          ]);
+          expect(events).toEqual(['dispatch']);
+        } finally {
+          release();
+        }
+        const result = await outcome;
+        if (status === 'succeeded') expect(result).toEqual(Buffer.from(mockAudioBytes));
+        else expect(result).toBeInstanceOf(Error);
+        expect(events).toEqual(['dispatch', 'settled']);
+      }
+    );
     it('does not report remote settlement when polling loses an accepted prediction', async () => {
       const fetchMock = vi
         .fn()

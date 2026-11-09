@@ -16,7 +16,10 @@ vi.mock('next/navigation', () => ({
   },
 }));
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 describe('intro example meaning display', () => {
   it.each([true, false])(
@@ -140,6 +143,245 @@ function renderClass(
 }
 
 describe('class reading flow', () => {
+  it('shows prior quiz choices and grades without editable controls', () => {
+    render(
+      <ClassHub
+        classId="class-1"
+        courseId="course-1"
+        lesson={{ title: 'Grammar', level: 'A1', objective: 'Choose.' }}
+        intro={classIntro}
+        order={1}
+        sections={[]}
+        scores={{}}
+        started={false}
+        onBegin={vi.fn()}
+        onRegenerate={vi.fn()}
+        quizHistory={[
+          {
+            sectionId: 'old',
+            skill: 'GRAMMAR',
+            attempt: 1,
+            questions: [
+              {
+                id: 'q',
+                order: 1,
+                question: 'Choose a greeting',
+                passageText: null,
+                options: ['Hola', 'Adiós'],
+                savedChoice: 0,
+                submissions: [
+                  { attempt: 1, submittedAt: null, selectedIndex: 1, isCorrect: false },
+                  { attempt: 2, submittedAt: null, selectedIndex: null, isCorrect: true },
+                ],
+              },
+            ],
+          },
+        ]}
+        orphanQuizAnswers={[
+          { sectionId: null, questionId: 'missing', savedChoice: 4, submissions: [] },
+        ]}
+        quizHistoryUnreadable
+        quizSubmissionReceipts={[
+          {
+            attempt: 3,
+            submittedAt: null,
+            passed: false,
+            overallScore: 0.4,
+            answersUnavailable: true,
+            passedSections: 1,
+            totalSections: null,
+            sections: [
+              { id: 'speaking', skill: 'SPEAKING', score: 0.8, passed: true },
+              { id: null, skill: 'READING', score: 0.7, passed: null },
+            ],
+            summaryIncomplete: true,
+          },
+        ]}
+      />
+    );
+    fireEvent.click(screen.getByText('Previous quiz work'));
+    expect(screen.getByText('Choose a greeting')).toBeVisible();
+    expect(screen.getByText('Saved choice: 1. Hola')).toBeVisible();
+    expect(screen.getByText('2. Adiós · Incorrect')).toBeVisible();
+    expect(screen.getByText('Choice unavailable · Correct')).toBeVisible();
+    expect(screen.getByText('Some individual answers are unavailable.')).toBeVisible();
+    expect(screen.getByText('Speaking · Score: 80% · Passed')).toBeVisible();
+    expect(screen.getByText('Reading · Score: 70% · Outcome unavailable')).toBeVisible();
+    expect(screen.getByText('Recorded: 1 of ? skills passed')).toBeVisible();
+    expect(screen.getByText('Saved choice: Choice index 4 (text unavailable)')).toBeVisible();
+    expect(screen.getByText('Some previous quiz records could not be displayed.')).toBeVisible();
+    const history = screen.getByText('Previous quiz work').parentElement!;
+    expect(within(history).queryByRole('button')).toBeNull();
+    expect(within(history).queryByRole('radio')).toBeNull();
+  });
+  it('shows previous speaking attempts without editing or grading controls', () => {
+    render(
+      <ClassHub
+        classId="class-1"
+        courseId="course-1"
+        lesson={{ title: 'Speaking', level: 'A1', objective: 'Greet someone' }}
+        intro={classIntro}
+        order={1}
+        sections={[]}
+        scores={{}}
+        started={false}
+        onBegin={vi.fn()}
+        onRegenerate={vi.fn()}
+        speakingHistory={[
+          {
+            sectionId: 'old',
+            attempt: 1,
+            prompts: [
+              {
+                id: 'prompt',
+                order: 1,
+                targetPhrase: 'Hallo',
+                translation: 'Hello',
+                recordings: [
+                  {
+                    id: 'recording',
+                    attempt: 1,
+                    attemptMatches: true,
+                    status: 'SCORED',
+                    transcript: 'Hallo Mia',
+                    overallScore: 0.8,
+                    rubricScores: { accuracy: 0.8, broken: 'legacy' },
+                    phonemeScores: [
+                      { op: 'substitute', expected: 'r', actual: 'l' },
+                      { bad: true },
+                    ],
+                    feedback: 'Clear greeting',
+                    createdAt: '2026-01-01T00:00:00Z',
+                  },
+                ],
+              },
+            ],
+          },
+        ]}
+        speakingHistoryUnlinked={[
+          {
+            id: 'unlinked',
+            attempt: 1,
+            status: 'PENDING',
+            transcript: 'Saved speech',
+            overallScore: null,
+            rubricScores: null,
+            phonemeScores: null,
+            feedback: null,
+            createdAt: '2026-01-01T00:00:00Z',
+          },
+        ]}
+      />
+    );
+    fireEvent.click(screen.getByText('Previous speaking work'));
+    expect(screen.getByText('Transcript: Hallo Mia')).toBeVisible();
+    expect(screen.getByLabelText('Play saved recording')).toHaveAttribute(
+      'src',
+      '/api/v1/classes/class-1/speaking/prompt/recordings/recording/audio'
+    );
+    fireEvent.error(screen.getByLabelText('Play saved recording'));
+    expect(
+      screen.getByText('Recording unavailable. Your saved feedback is still shown below.')
+    ).toBeVisible();
+    fireEvent.canPlay(screen.getByLabelText('Play saved recording'));
+    expect(
+      screen.queryByText('Recording unavailable. Your saved feedback is still shown below.')
+    ).toBeNull();
+    expect(screen.getByText('Feedback: Clear greeting')).toBeVisible();
+    expect(screen.getByText('accuracy: 80%')).toBeVisible();
+    expect(screen.getByText('substitute: r → l')).toBeVisible();
+    expect(screen.getByText('Some speaking feedback could not be displayed.')).toBeVisible();
+    expect(screen.getByText('Recording without its original task')).toBeVisible();
+    expect(screen.getByText('Transcript: Saved speech')).toBeVisible();
+    const history = screen.getByText('Previous speaking work').parentElement!;
+    expect(within(history).queryByRole('button')).toBeNull();
+    expect(within(history).queryByRole('textbox')).toBeNull();
+  });
+
+  it('shows previous writing and recovered drafts without editing or grading controls', () => {
+    render(
+      <ClassHub
+        classId="class-1"
+        courseId="course-1"
+        lesson={{ title: 'Writing', level: 'A1', objective: 'Greet someone' }}
+        intro={classIntro}
+        order={1}
+        sections={[]}
+        scores={{}}
+        started={false}
+        onBegin={vi.fn()}
+        onRegenerate={vi.fn()}
+        writingHistory={[
+          {
+            sectionId: 'old-section',
+            attempt: 2,
+            prompts: [
+              {
+                id: 'old-prompt',
+                order: 1,
+                task: 'Write a greeting.',
+                savedDraft: 'New draft',
+                responses: [
+                  {
+                    id: 'response',
+                    attempt: 2,
+                    attemptMatches: true,
+                    text: 'Hallo',
+                    overallScore: 0.8,
+                    corrections: [{ old: 'Hallo', new: 'Hallo!', why: 'Add punctuation.' }],
+                    feedback: 'Clear greeting.',
+                    createdAt: '2026-01-01T00:00:00.000Z',
+                  },
+                ],
+              },
+            ],
+          },
+        ]}
+        orphanWritingDrafts={[{ id: 'orphan', text: 'Another saved draft' }]}
+      />
+    );
+    fireEvent.click(screen.getByText('Previous writing'));
+    expect(screen.getByText('Write a greeting.')).toBeVisible();
+    expect(screen.getByText('New draft')).toBeVisible();
+    expect(screen.getByText('Hallo')).toBeVisible();
+    expect(screen.getByText('Clear greeting.')).toBeVisible();
+    expect(screen.getByText('Hallo → Hallo!: Add punctuation.')).toBeVisible();
+    expect(screen.getByText('Another saved draft')).toBeVisible();
+    const history = screen.getByText('Previous writing').parentElement!;
+    expect(within(history).queryByRole('textbox')).toBeNull();
+    expect(within(history).queryByRole('button')).toBeNull();
+  });
+
+  it('offers prerequisite teaching for an A1 class with a later curriculum order', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        Response.json({
+          status: 'AVAILABLE',
+          request: { sourceHash: 'a'.repeat(64), snapshotHash: 'b'.repeat(64) },
+          nativeLang: 'es',
+          targetLang: 'ru',
+        })
+      )
+    );
+    render(
+      <ClassHub
+        classId="class-1"
+        courseId="course-1"
+        lesson={{ title: 'Ruso', level: 'A1', objective: 'Pedir.' }}
+        intro={classIntro}
+        teaching={teaching}
+        prerequisiteSourceHash={'a'.repeat(64)}
+        order={9}
+        sections={[]}
+        scores={{}}
+        started={false}
+        onBegin={vi.fn()}
+        onRegenerate={vi.fn()}
+      />
+    );
+    expect(await screen.findByRole('button', { name: 'Explain the basics' })).toBeVisible();
+  });
   it('teaches through worked examples before beginning and reveals guided answers only on request', () => {
     const { onBegin } = renderClass({ teaching });
     expect(screen.getByRole('button', { name: 'Help in your language' })).toBeVisible();

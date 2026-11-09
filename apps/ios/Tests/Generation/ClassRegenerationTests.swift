@@ -5,6 +5,35 @@ import XCTest
 
 final class ClassRegenerationTests: XCTestCase {
     @MainActor
+    func testReopeningSubmittedClassRestoresTheSavedAssessmentResult() async {
+        let model = model()
+        await ClassRegenerationServer.shared.setSubmittedAssessment(host: host(model))
+        await model.loadCourses(showLoading: false)
+        await model.openClass("class")
+        XCTAssertEqual(model.classResult?.source, "ASSESSMENT")
+        XCTAssertEqual(model.classResult?.overallScore, 0.5)
+        XCTAssertEqual(model.classResult?.passed, false)
+        model.signOut()
+    }
+
+    @MainActor
+    func testRejectedClassSubmissionKeepsSavedAnswersAvailableForRetry() async {
+        let model = model()
+        await model.loadCourses(showLoading: false)
+        await model.openClass("class")
+        let original = model.selectedClass
+        let submitted = await model.submitClassAnswers([
+            SottoSubmitAnswer(questionId: "old-question", selectedIndex: 1)
+        ])
+        XCTAssertFalse(submitted)
+        XCTAssertNil(model.classResult)
+        XCTAssertEqual(model.selectedClass, original)
+        XCTAssertEqual(model.selectedClass?.learnerAnswers, ["old-question": 1])
+        XCTAssertNotNil(model.errorMessage)
+        model.signOut()
+    }
+
+    @MainActor
     func testClassMenuRetriesConfirmedFailedPreparationWithTheCurrentAttempt() async throws {
         let model = model()
         await model.loadCourses(showLoading: false)
@@ -69,7 +98,8 @@ final class ClassRegenerationTests: XCTestCase {
             await model.openClass("class")
             let serverHost = host(model)
             let progress = LearningProgressStore()
-            progress.configure(client: model.makeClient(), path: "/api/v1/classes/class", revision: 4)
+            progress.configure(client: model.makeClient(), path: "/api/v1/classes/class", revision: 4,
+                               attempt: 4, materialRevision: String(repeating: "a", count: 64))
             let saving = expectation(description: "Progress save is active before removal")
             await ClassRegenerationServer.shared.holdProgress(host: serverHost, arrival: saving)
             addTeardownBlock {
@@ -675,6 +705,7 @@ private actor ClassRegenerationServer {
     private var removalStatuses: [String: Int] = [:]
     private var emptyClassStatuses: [String: String] = [:]
     private var submittedEmptyClasses = Set<String>()
+    private var submittedAssessmentClasses = Set<String>()
     private var methods: [String: [String]] = [:]
     private var paths: [String: [String]] = [:]
     private var detailStatuses: [String: Int] = [:]
@@ -688,6 +719,7 @@ private actor ClassRegenerationServer {
     private var progressReleases: [String: CheckedContinuation<Void, Never>] = [:]
 
     func set(_ phase: String, host: String) { phases[host] = phase }
+    func setSubmittedAssessment(host: String) { submittedAssessmentClasses.insert(host) }
     func setRemovalStatus(_ status: Int, host: String) { removalStatuses[host] = status }
     func setEmptyClass(_ status: String, host: String, submitted: Bool = false) {
         emptyClassStatuses[host] = status
@@ -795,6 +827,9 @@ private actor ClassRegenerationServer {
                 .replacingOccurrences(of: "\"id\":\"class\",\"courseId\"", with: "\"id\":\"other-class\",\"courseId\""))
         }
         if let status = detailStatuses[host], status != 200 { return (status, #"{"error":"Class detail unavailable."}"#) }
+        if submittedAssessmentClasses.contains(host) {
+            return (200, #"{"id":"class","courseId":"course","status":"FAILED","order":1,"passThreshold":0.8,"attempt":4,"submitted":true,"sections":[],"submission":{"passed":false,"overallScore":0.5,"receipt":{"source":"ASSESSMENT","passed":false,"overallScore":0.5,"passedSections":0,"totalSections":1,"sections":[{"id":"assessment-section","skill":"GRAMMAR","score":0.5,"passed":false}]}}}"#)
+        }
         if let status = emptyClassStatuses[host] {
             return (200, """
                 {"id":"class","courseId":"course","status":"\(status)","order":1,"passThreshold":0.8,"attempt":\(attempt),"progressRevision":\(attempt),"submitted":\(submittedEmptyClasses.contains(host)),"sections":[]}

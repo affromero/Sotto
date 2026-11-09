@@ -159,6 +159,21 @@ describe('POST /api/v1/episodes/[episodeId]/interact', () => {
     expect(body.error).toBe('Episode not found');
   });
 
+  it('rejects an interaction on an assessment episode', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'owner-123' });
+    mockEpisodeFindUnique.mockResolvedValue({
+      ...mockEpisode,
+      assessmentSection: { id: 'held-out' },
+    });
+    const { request, params } = createRequest('episode-123', {
+      question: 'What was said?',
+      timestamp: 1,
+    });
+    const response = await POST(request, params);
+    expect(response.status).toBe(404);
+    expect(await response.json()).toMatchObject({ error: 'Episode not found' });
+  });
+
   it('returns 400 when question is empty', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-123' });
     mockEpisodeFindUnique.mockResolvedValue(mockEpisode);

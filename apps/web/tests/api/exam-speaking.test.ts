@@ -217,6 +217,7 @@ describe('GET /api/v1/exams/[examId]/speaking/[promptId]', () => {
     vi.clearAllMocks();
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-001' });
     mockMockExamFindFirst.mockResolvedValue({ id: 'exam-001' });
+    mockSpeakingPromptFindFirst.mockResolvedValue({ examSectionId: 'esec-001' });
     mockSpeakingRecordingFindFirst.mockResolvedValue(SCORED_RECORDING);
   });
 

@@ -86,12 +86,142 @@ compose() {
 }
 
 candidate_compose() {
-  local arguments=(--project-directory "$install_dir" --env-file "$STAGING_DIR/.env" -f "$STAGING_DIR/docker-compose.yml")
-  arguments+=(-f "$STAGING_DIR/candidate-env.yml")
-  if [ -f "$STAGING_DIR/docker-compose.override.yml" ]; then
-    arguments+=(-f "$STAGING_DIR/docker-compose.override.yml")
+  local candidate_dir="${CANDIDATE_DIR:-$STAGING_DIR}"
+  local arguments=(--project-directory "$install_dir" --env-file "$candidate_dir/.env")
+  if [ -f "$candidate_dir/frozen-compose.json" ]; then
+    arguments+=(-f "$candidate_dir/frozen-compose.json")
+  else
+    arguments+=(-f "$candidate_dir/docker-compose.yml" -f "$candidate_dir/candidate-env.yml")
+    if [ -f "$candidate_dir/docker-compose.override.yml" ]; then
+      arguments+=(-f "$candidate_dir/docker-compose.override.yml")
+    fi
+  fi
+  if [ -f "$candidate_dir/candidate-images.yml" ]; then
+    arguments+=(-f "$candidate_dir/candidate-images.yml")
   fi
   compose "${arguments[@]}" "$@"
+}
+
+write_candidate_env() {
+  local directory=$1 path
+  path=${directory//\'/\'\'}
+  printf "services:\n  web:\n    env_file: ['%s/.env']\n  workers:\n    env_file: ['%s/.env']\n" "$path" "$path" > "$directory/candidate-env.yml"
+}
+
+# Resolve external Compose inputs once. A second parse must reproduce the
+# same model before this private snapshot can authorize any action.
+freeze_candidate_config() {
+  local candidate_dir="${CANDIDATE_DIR:-$STAGING_DIR}" web_id
+  [ ! -e "$candidate_dir/frozen-compose.json" ] || return 1
+  [ -f "$STAGING_DIR/resolved-image-ids" ] || return 1
+  web_id=$(sed -n '1p' "$STAGING_DIR/resolved-image-ids") || return 1
+  [[ "$web_id" =~ ^sha256:[0-9a-f]{64}$ ]] || return 1
+  candidate_compose config --format json > "$candidate_dir/rendered-compose.json" 2>/dev/null || return 1
+  docker run --rm -i --network none --entrypoint node "$web_id" -e '
+    // __SOTTO_FREEZE_CONFIG__
+    let input = "";
+    process.stdin.on("data", (part) => input += part);
+    process.stdin.on("end", () => {
+      try {
+        const normalize = (value) => {
+          if (Array.isArray(value)) return value.map(normalize);
+          if (value && typeof value === "object") {
+            const result = Object.create(null);
+            for (const [key, item] of Object.entries(value)) {
+              const restored = key.replaceAll("$$", () => "$");
+              if (Object.hasOwn(result, restored)) throw new Error();
+              result[restored] = normalize(item);
+            }
+            return result;
+          }
+          return value;
+        };
+        process.stdout.write(JSON.stringify(normalize(JSON.parse(input))));
+      } catch { process.exitCode = 1; }
+    });
+  ' < "$candidate_dir/rendered-compose.json" > "$candidate_dir/frozen-compose.tmp" 2>/dev/null || return 1
+  compose --project-directory "$install_dir" --env-file "$candidate_dir/.env" -f "$candidate_dir/frozen-compose.tmp" config --format json > "$candidate_dir/rerendered-compose.json" 2>/dev/null || return 1
+  {
+    printf '['
+    cat "$candidate_dir/rendered-compose.json" || return 1
+    printf ','
+    cat "$candidate_dir/rerendered-compose.json" || return 1
+    printf ']'
+  } | docker run --rm -i --network none --entrypoint node "$web_id" -e '
+    // __SOTTO_COMPARE_CONFIG__
+    let input = "";
+    process.stdin.on("data", (part) => input += part);
+    process.stdin.on("end", () => {
+      try {
+        const canonical = (value) => Array.isArray(value) ? value.map(canonical) :
+          value && typeof value === "object" ? Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonical(value[key])])) : value;
+        const models = JSON.parse(input);
+        if (!Array.isArray(models) || models.length !== 2 || JSON.stringify(canonical(models[0])) !== JSON.stringify(canonical(models[1]))) throw new Error();
+      } catch { process.exitCode = 1; }
+    });
+  ' >/dev/null 2>/dev/null || return 1
+  mv "$candidate_dir/frozen-compose.tmp" "$candidate_dir/frozen-compose.json" || return 1
+  rm -f "$candidate_dir/rendered-compose.json" "$candidate_dir/rerendered-compose.json"
+}
+
+# Inspect the effective roles without printing their environment, then pin the
+# exact images verified before the candidate pull. User overrides stay in the
+# configuration, but cannot replace the verified executable images.
+pin_candidate_images() {
+  local web_id worker_id web_ref worker_ref actual_web actual_worker candidate_dir="${CANDIDATE_DIR:-$STAGING_DIR}"
+  [ -f "$STAGING_DIR/resolved-image-ids" ] || return 1
+  web_id=$(sed -n '1p' "$STAGING_DIR/resolved-image-ids")
+  worker_id=$(sed -n '2p' "$STAGING_DIR/resolved-image-ids")
+  [[ "$web_id" =~ ^sha256:[0-9a-f]{64}$ && "$worker_id" =~ ^sha256:[0-9a-f]{64}$ ]] || return 1
+  [ "$web_id" != "$worker_id" ] || return 1
+  [ -f "$candidate_dir/frozen-compose.json" ] || return 1
+  candidate_compose config --format json | docker run --rm -i --network none --entrypoint node "$web_id" -e '
+    // __SOTTO_COMPOSE_IMAGE_PROBE__
+    let input = "";
+    process.stdin.on("data", (part) => input += part);
+    process.stdin.on("end", () => {
+      try {
+        const services = JSON.parse(input).services;
+        const web = services.web, workers = services.workers;
+        for (const role of [web, workers]) {
+          if (!role || typeof role.image !== "string" || !/^[^\s]+$/.test(role.image) ||
+              role.build || role.entrypoint || role.command ||
+              role.configs?.length || role.secrets?.length || role.tmpfs?.length ||
+              role.volumes_from?.length || role.post_start?.length || role.pre_stop?.length) throw new Error();
+          if (role.working_dir && role.working_dir !== "/app/apps/web") throw new Error();
+          for (const [name, value] of Object.entries(role.environment ?? {})) {
+            if (value && ((name.startsWith("NODE_") && name !== "NODE_ENV") ||
+                name.startsWith("LD_") || name.startsWith("TSX_") ||
+                ["PATH", "BASH_ENV", "ENV"].includes(name))) throw new Error();
+          }
+          for (const mount of role.volumes ?? []) {
+            const target = mount.target;
+            if (typeof target !== "string" || target === "/" ||
+                !target.startsWith("/") || require("node:path").posix.normalize(target) !== target ||
+                target.split("/").includes("..")) throw new Error();
+            const inside = (root) => target === root || target.startsWith(root + "/");
+            const privateData = inside("/app/apps/web/.sotto/storage") ||
+              inside("/app/apps/web/.sotto/runtime");
+            if ((!privateData && inside("/app")) ||
+                ["/usr", "/bin", "/sbin", "/lib", "/lib64", "/etc"].some(inside))
+              throw new Error();
+          }
+        }
+        for (const key of ["DATABASE_URL", "DIRECT_DATABASE_URL", "BYOK_ENCRYPTION_KEY", "SOTTO_SPEAKING_REFERENCE_KEYRING"]) {
+          if ((web.environment?.[key] ?? "") !== (workers.environment?.[key] ?? "")) throw new Error();
+        }
+        process.stdout.write(web.image + "\n" + workers.image + "\n");
+      } catch { process.exitCode = 1; }
+    });
+  ' > "$candidate_dir/effective-image-refs" || return 1
+  web_ref=$(sed -n '1p' "$candidate_dir/effective-image-refs")
+  worker_ref=$(sed -n '2p' "$candidate_dir/effective-image-refs")
+  [ -n "$web_ref" ] && [ -n "$worker_ref" ] || return 1
+  actual_web=$(docker image inspect --format '{{.Id}}' "$web_ref") || return 1
+  actual_worker=$(docker image inspect --format '{{.Id}}' "$worker_ref") || return 1
+  [ "$actual_web" = "$web_id" ] && [ "$actual_worker" = "$worker_id" ] || return 1
+  printf 'services:\n  web:\n    image: "%s"\n    pull_policy: never\n  workers:\n    image: "%s"\n    pull_policy: never\n' \
+    "$web_id" "$worker_id" > "$candidate_dir/candidate-images.yml"
 }
 
 require_install() {
@@ -115,6 +245,112 @@ set_env_value() {
   printf '%s=%s\n' "$key" "$value" >> "$tmp"
   chmod 600 "$tmp"
   mv "$tmp" "$SOTTO_DIR/.env"
+}
+
+# Preserve exact spelling and distinguish an absent assignment from an empty
+# one. Ambiguous shell/dotenv forms must not be used to authorize restoration.
+strict_env_assignment() {
+  local file=$1 key=$2
+  [ -r "$file" ] || return 1
+  awk -v key="$key" '
+    /^[[:space:]]*#/ { next }
+    $0 ~ "^[[:space:]]*(export[[:space:]]+)?" key "([[:space:]]|=|$)" {
+      count++
+      if ($0 !~ "^" key "=") invalid = 1
+      value = substr($0, length(key) + 2)
+      first = substr(value, 1, 1)
+      single = sprintf("%c", 39)
+      if (index(value, "\r")) invalid = 1
+      if (first == single || first == "\"") {
+        if (length(value) < 2 || substr(value, length(value), 1) != first) invalid = 1
+        inner = substr(value, 2, length(value) - 2)
+        if (index(inner, first)) invalid = 1
+        if (first == "\"" && (index(inner, "$") || index(inner, "`") || index(inner, "\\"))) invalid = 1
+      } else if (index(value, single) || index(value, "\"") || index(value, "$") || index(value, "`") || index(value, "\\")) invalid = 1
+    }
+    END {
+      if (invalid || count > 1) exit 1
+      if (count == 0) printf "absent"
+      else printf "present:%s", value
+    }
+  ' "$file"
+}
+
+# Compare the staged target with both rendered and running role environments.
+# Compose output and container environments stay in a pipe, never in logs.
+verify_rollback_effective_keys() {
+  local rollback_dir=$1 web_id worker_id web_image worker_image target_web target_worker web_ref worker_ref actual_web actual_worker
+  web_id=$(compose ps -q web 2>/dev/null) || return 1
+  worker_id=$(compose ps -q workers 2>/dev/null) || return 1
+  [[ "$web_id" =~ ^[0-9a-f]{64}$ && "$worker_id" =~ ^[0-9a-f]{64}$ && "$web_id" != "$worker_id" ]] || return 1
+  [ "$(docker inspect --format '{{.State.Running}}' "$web_id")" = true ] || return 1
+  [ "$(docker inspect --format '{{.State.Running}}' "$worker_id")" = true ] || return 1
+  web_image=$(docker inspect --format '{{.Image}}' "$web_id") || return 1
+  worker_image=$(docker inspect --format '{{.Image}}' "$worker_id") || return 1
+  target_web=$(sed -n '1p' "$STAGING_DIR/resolved-image-ids")
+  target_worker=$(sed -n '2p' "$STAGING_DIR/resolved-image-ids")
+  [[ "$web_image" =~ ^sha256:[0-9a-f]{64}$ && "$worker_image" =~ ^sha256:[0-9a-f]{64}$ && "$target_web" =~ ^sha256:[0-9a-f]{64}$ && "$target_worker" =~ ^sha256:[0-9a-f]{64}$ ]] || return 1
+  {
+    printf '['
+    compose config --format json 2>/dev/null || return 1
+    printf ','
+    candidate_compose config --format json 2>/dev/null || return 1
+    for id in "$web_id" "$worker_id"; do
+      printf ','
+      docker inspect --format '{{json .Config.Env}}' "$id" 2>/dev/null || return 1
+    done
+    for id in "$web_image" "$worker_image" "$target_web" "$target_worker"; do
+      printf ','
+      docker image inspect --format '{{json .Config.Env}}' "$id" 2>/dev/null || return 1
+    done
+    printf ']'
+  } | docker run --rm -i --network none --entrypoint node "$target_web" -e '
+    // __SOTTO_ROLLBACK_KEY_PROBE__
+    let input = "";
+    process.stdin.on("data", (part) => input += part);
+    process.stdin.on("end", () => {
+      try {
+        const [current, target, liveWeb, liveWorker, currentWebDefaults, currentWorkerDefaults, targetWebDefaults, targetWorkerDefaults] = JSON.parse(input);
+        const parse = (entries) => {
+          if (!Array.isArray(entries)) throw new Error();
+          const values = Object.create(null);
+          for (const entry of entries) {
+            if (typeof entry !== "string" || !entry.includes("=")) throw new Error();
+            const at = entry.indexOf("="), key = entry.slice(0, at);
+            if (Object.hasOwn(values, key)) throw new Error();
+            values[key] = entry.slice(at + 1);
+          }
+          return values;
+        };
+        const live = [parse(liveWeb), parse(liveWorker)];
+        const defaults = [currentWebDefaults, currentWorkerDefaults, targetWebDefaults, targetWorkerDefaults].map(parse);
+        const roles = [current.services.web, current.services.workers, target.services.web, target.services.workers];
+        const effective = roles.map((role, index) => {
+          if (!role || !role.environment || typeof role.environment !== "object" || Array.isArray(role.environment)) throw new Error();
+          const environment = Object.fromEntries(Object.entries(role.environment).map(([key, value]) =>
+            [key, typeof value === "string" ? value.replaceAll("$$", () => "$") : value]));
+          return { ...defaults[index], ...environment };
+        });
+        for (const key of ["BYOK_ENCRYPTION_KEY", "SOTTO_SPEAKING_REFERENCE_KEYRING"]) {
+          const values = [...live, ...effective].map((row) => row[key] === undefined ? "" : row[key]);
+          if (values.some((value) => typeof value !== "string") || new Set(values).size !== 1 ||
+              (key === "BYOK_ENCRYPTION_KEY" && !values[0])) throw new Error();
+        }
+        for (const role of [target.services.web, target.services.workers])
+          if (typeof role.image !== "string" || !/^[^\s]+$/.test(role.image)) throw new Error();
+        process.stdout.write(target.services.web.image + "\n" + target.services.workers.image + "\n");
+      } catch { process.exitCode = 1; }
+    });
+  ' > "$rollback_dir/effective-image-refs" 2>/dev/null || return 1
+  web_ref=$(sed -n '1p' "$rollback_dir/effective-image-refs")
+  worker_ref=$(sed -n '2p' "$rollback_dir/effective-image-refs")
+  [ -n "$web_ref" ] && [ -n "$worker_ref" ] || return 1
+  actual_web=$(docker image inspect --format '{{.Id}}' "$web_ref" 2>/dev/null) || return 1
+  actual_worker=$(docker image inspect --format '{{.Id}}' "$worker_ref" 2>/dev/null) || return 1
+  [ "$actual_web" = "$target_web" ] && [ "$actual_worker" = "$target_worker" ] || return 1
+  [ "$(compose ps -q web 2>/dev/null)" = "$web_id" ] && [ "$(compose ps -q workers 2>/dev/null)" = "$worker_id" ] || return 1
+  [ "$(docker inspect --format '{{.State.Running}}' "$web_id")" = true ] &&
+    [ "$(docker inspect --format '{{.State.Running}}' "$worker_id")" = true ]
 }
 
 web_port() {
@@ -214,7 +450,7 @@ cmd_update() {
   require_install
   cd "$SOTTO_DIR"
 
-  local target from revision source_base install_dir previous_revision
+  local target from revision source_base install_dir previous_revision CANDIDATE_DIR=""
   from=$(current_tag)
   if [ -n "$TO_REF" ]; then
     target=$(resolve_ref "$TO_REF")
@@ -243,6 +479,7 @@ cmd_update() {
   fi
 
   load_image_helper
+  CANDIDATE_DIR="$STAGING_DIR"
   acquire_install_lock "$SOTTO_DIR" || fail "Update is locked. Configuration has not changed."
   revision=$(resolve_images "$target") || fail "Could not verify the requested release. Configuration has not changed."
   target="${revision:0:8}"
@@ -277,14 +514,13 @@ cmd_update() {
   # --env-file controls interpolation; service env_file paths still resolve
   # relative to --project-directory. Add the staged base environment before
   # user overrides so their env_file and environment settings retain priority.
-  local staged_env_path="$STAGING_DIR/.env"
-  staged_env_path=${staged_env_path//\'/\'\'}
-  printf "services:\n  web:\n    env_file: ['%s']\n  workers:\n    env_file: ['%s']\n" \
-    "$staged_env_path" "$staged_env_path" > "$STAGING_DIR/candidate-env.yml"
+  write_candidate_env "$STAGING_DIR"
   cd "$STAGING_DIR"
   candidate_compose config --quiet || fail "Release configuration is invalid. Existing configuration has not changed."
   info "Pulling images..."
   candidate_compose pull || fail "Could not pull images tagged ${target}. Existing configuration has not changed.\n  Published tags: ${BOLD}https://github.com/${SOTTO_REPOSITORY}/pkgs/container/sotto-web${RESET}"
+  freeze_candidate_config || fail "Candidate configuration could not be frozen. Existing configuration has not changed."
+  pin_candidate_images || fail "Candidate images or runtime settings changed after verification. Existing configuration has not changed."
 
   info "Applying database migrations and updating the language curriculum..."
   candidate_compose run --rm --no-deps workers sh -c \
@@ -305,16 +541,16 @@ cmd_update() {
   set_env_value SOTTO_IMAGE_TAG "$from"
   SOTTO_DIR="$install_dir"
   for file in .env docker-compose.yml sync-cli-credentials.sh images.sh; do
-    mv "$STAGING_DIR/$file" "$SOTTO_DIR/$file"
+    cp "$STAGING_DIR/$file" "$SOTTO_DIR/$file"
   done
 
   info "Restarting Sotto..."
-  compose up -d
+  candidate_compose up -d --pull never
 
   printf "${CYAN}${BOLD}>${RESET} Waiting for health"
   local response=""
   for _ in $(seq 1 45); do
-    if response=$(health) && release_healthy "$response" "$target"; then break; fi
+    if response=$(health) && release_healthy "$response" "$target" "$(sed -n '1p' "$STAGING_DIR/resolved-image-ids")"; then break; fi
     response=""
     printf '.'
     sleep 2
@@ -322,7 +558,7 @@ cmd_update() {
   printf '\n'
 
   if [ -n "$response" ]; then
-    compose run --rm --no-deps web node dist/access.cjs finalize ||
+    candidate_compose run --rm --no-deps web node dist/access.cjs finalize ||
       fail "Sidedoor finalization failed. Source state remains available for rollback. Inspect the error before retrying."
     ok "Sotto is up on ${target}: ${response}"
   else
@@ -334,7 +570,7 @@ cmd_rollback() {
   require_install
   cd "$SOTTO_DIR"
 
-  local previous
+  local previous CANDIDATE_DIR="" install_dir="$SOTTO_DIR"
   previous=$(env_value SOTTO_PREVIOUS_IMAGE_TAG)
   [ -n "$previous" ] || fail "No previous tag recorded; nothing to roll back to.\n  Pin one yourself: ${BOLD}sotto-host update --to <commit>${RESET}"
 
@@ -343,9 +579,35 @@ cmd_rollback() {
   acquire_install_lock "$SOTTO_DIR" || fail "Rollback is locked. Configuration has not changed."
   resolve_images "$previous" >/dev/null || fail "Cannot pull the previous release. Configuration has not changed."
   if [ -f "$SOTTO_DIR/previous/docker-compose.yml" ]; then
+    local rollback_dir="$STAGING_DIR/rollback" key current_assignment previous_assignment
+    mkdir "$rollback_dir"
+    CANDIDATE_DIR="$rollback_dir"
     for file in .env docker-compose.yml sync-cli-credentials.sh images.sh docker-compose.override.yml; do
-      if [ -f "$SOTTO_DIR/previous/$file" ]; then
-        cp "$SOTTO_DIR/previous/$file" "$SOTTO_DIR/$file"
+      [ ! -f "$SOTTO_DIR/previous/$file" ] || cp "$SOTTO_DIR/previous/$file" "$rollback_dir/$file"
+    done
+    for key in BYOK_ENCRYPTION_KEY SOTTO_SPEAKING_REFERENCE_KEYRING; do
+      current_assignment=$(strict_env_assignment "$SOTTO_DIR/.env" "$key") ||
+        fail "Current key configuration is ambiguous. Configuration has not changed."
+      previous_assignment=$(strict_env_assignment "$rollback_dir/.env" "$key") ||
+        fail "Saved key configuration is unavailable or ambiguous. Configuration has not changed."
+      if [ "$key" = BYOK_ENCRYPTION_KEY ]; then
+        case "$current_assignment" in absent|present:|present:'""'|"present:''")
+          fail "Current encryption key is unavailable. Configuration has not changed." ;;
+        esac
+      fi
+      [ "$current_assignment" = "$previous_assignment" ] ||
+        fail "Saved encryption settings differ from the current installation. Configuration has not changed."
+    done
+    write_candidate_env "$rollback_dir"
+    freeze_candidate_config ||
+      fail "Saved configuration could not be frozen. Configuration has not changed."
+    verify_rollback_effective_keys "$rollback_dir" ||
+      fail "Running and saved encryption settings could not be verified. Configuration has not changed."
+    pin_candidate_images 2>/dev/null ||
+      fail "Saved image configuration could not be verified. Configuration has not changed."
+    for file in .env docker-compose.yml sync-cli-credentials.sh images.sh docker-compose.override.yml; do
+      if [ -f "$rollback_dir/$file" ]; then
+        cp "$rollback_dir/$file" "$SOTTO_DIR/$file"
       elif [ "$file" = docker-compose.override.yml ]; then
         rm -f "$SOTTO_DIR/$file"
       fi
@@ -353,14 +615,18 @@ cmd_rollback() {
   else
     set_env_value SOTTO_IMAGE_TAG "$previous"
   fi
-  compose up -d
+  if [ -n "$CANDIDATE_DIR" ]; then
+    candidate_compose up -d --pull never
+  else
+    compose up -d
+  fi
 
   # A rollback does not undo migrations: Prisma migrations are forward-only, so
   # the older image runs against the newer schema. Say so rather than imply the
   # database moved back too.
   warn "Images rolled back. Database migrations are forward-only and were not reverted."
   for _ in $(seq 1 45); do
-    if response=$(health) && release_healthy "$response" "$previous"; then
+    if response=$(health) && release_healthy "$response" "$previous" "$(sed -n '1p' "$STAGING_DIR/resolved-image-ids")"; then
       set_env_value SOTTO_PREVIOUS_IMAGE_TAG ""
       ok "Sotto is on ${previous}."
       return 0

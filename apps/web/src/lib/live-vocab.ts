@@ -35,14 +35,22 @@ export interface ReadingVocabularyQuestion {
 }
 
 /** Keys are private assessment evidence and must be valid before any provider request. */
-export function assertReadingQuestionKeys(questions: readonly ReadingVocabularyQuestion[]) {
+export function assertReadingQuestionKeys(
+  questions: readonly ReadingVocabularyQuestion[],
+  mode: 'generated' | 'saved' = 'generated'
+) {
   if (
     !questions.length ||
     questions.some(
       (question) =>
         !question.question.trim() ||
-        question.options.length !== 4 ||
+        (mode === 'generated'
+          ? question.options.length !== 4
+          : question.options.length < 2 || question.options.length > 4) ||
         question.options.some((option) => !option.trim()) ||
+        (mode === 'saved' &&
+          new Set(question.options.map((option) => option.trim().toLowerCase())).size !==
+            question.options.length) ||
         !Number.isInteger(question.correctIndex) ||
         question.correctIndex < 0 ||
         question.correctIndex >= question.options.length
@@ -62,6 +70,7 @@ export async function requestVocabularyExtraction(p: {
   label: 'TRANSCRIPT' | 'COURSE_NOTES';
   usageCategory: string;
   readingQuestions?: readonly ReadingVocabularyQuestion[];
+  readingQuestionMode?: 'generated' | 'saved';
   sourceVocabulary?: boolean;
   sourceInventory?: boolean;
   sourceInventoryRange?: { start: number; end: number };
@@ -102,7 +111,7 @@ export async function requestVocabularyExtraction(p: {
       p.preferredLemmas.some((lemma) => !lemma.trim() || lemma.length > 200))
   )
     throw new Error('Source vocabulary review preferences exceed the bounded source contract.');
-  if (p.readingQuestions) assertReadingQuestionKeys(p.readingQuestions);
+  if (p.readingQuestions) assertReadingQuestionKeys(p.readingQuestions, p.readingQuestionMode);
   if (p.readingCorrection && !p.readingQuestions && !p.sourceVocabulary)
     throw new Error('Reading vocabulary correction requires keyed reading questions.');
   if (p.readingProtocolCorrection) {

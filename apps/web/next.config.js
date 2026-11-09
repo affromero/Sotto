@@ -54,7 +54,6 @@ const nextConfig = {
   poweredByHeader: false,
   experimental: {
     proxyClientMaxBodySize: '150mb',
-    viewTransition: true,
   },
   transpilePackages: ['@sotto/shared', 'groundcheck'],
   turbopack: {

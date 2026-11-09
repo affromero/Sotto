@@ -4,6 +4,8 @@ import { errorResponse } from '@/lib/api-response';
 import { readLocalObject } from '@/lib/r2';
 import { validateStorageKey } from 'thesidedoor-core/storage';
 import { logger } from '@/lib/logger';
+import { isAccessError } from 'thesidedoor-core/access';
+import { requireOriginalSottoAdmission } from '@/lib/sidedoor/access/core/request-identity';
 
 type RouteParams = { params: Promise<{ key: string[] }> };
 const cacheHeaders = { 'Cache-Control': 'private, no-store' };
@@ -34,8 +36,26 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
   let object: Awaited<ReturnType<typeof readLocalObject>>;
   try {
-    object = await readLocalObject(storageKey, authed.userId, range);
+    object = await readLocalObject(
+      storageKey,
+      {
+        userId: authed.userId,
+        signal: request.signal,
+        authorize: async (database) => {
+          await requireOriginalSottoAdmission(database, request, authed);
+          return { userId: authed.userId };
+        },
+      },
+      range
+    );
   } catch (error: unknown) {
+    if (isAccessError(error))
+      return errorResponse(
+        error.message,
+        error.code === 'unauthorized' ? 401 : 409,
+        undefined,
+        cacheHeaders
+      );
     logger.error('Failed to read stored object', {
       error: error instanceof Error ? error.message : String(error),
     });

@@ -13,6 +13,7 @@ import { Readable } from 'stream';
 import { mkdir, unlink, writeFile } from 'fs/promises';
 import * as path from 'path';
 import { randomUUID } from 'crypto';
+import { isDeepStrictEqual } from 'node:util';
 import {
   LocalStorageCleanup,
   copyOwnedReadableToFile,
@@ -22,6 +23,7 @@ import {
   storageBackendBinding,
   storageCleanupDescriptorSchema,
   StorageReferenceRegistry,
+  withOwnedReadables,
   type StorageCleanupDescriptor,
   type StorageCopyContent,
 } from 'thesidedoor-core/storage';
@@ -40,8 +42,15 @@ import {
 } from '@/lib/storage/sidedoor/configuration';
 import { SIDEDOOR_STATE_ID } from '@/lib/sidedoor/access/state/store';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
-import { readLocalStorageFile } from '@/lib/storage/sidedoor/local-object-read';
+import {
+  readLocalStorageFile,
+  readLocalStorageRange,
+} from '@/lib/storage/sidedoor/local-object-read';
 import { canReadLocalObjectConsumer } from '@/lib/storage/sidedoor/local-object-access';
+import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
+import { resolveStorageInput, type StorageInput } from '@/lib/sidedoor/storage/core/storage-inputs';
+import { readResponseBytes } from 'thesidedoor-core/runtime/stream';
+import type { Prisma } from '@/generated/prisma/client';
 
 function localBaseDir(): string {
   return configuredLocalStorageRoot();
@@ -423,35 +432,73 @@ async function attributedStorageReference(reference: string) {
   );
 }
 
-async function attributedLocalPath(key: string, userId: string): Promise<string | null> {
+async function attributedLocalPath(
+  key: string,
+  execution: SottoProviderExecution,
+  expected?: StorageInput,
+  expectedDescriptor?: StorageCleanupDescriptor,
+  authorizeAssessmentAudio?: (database: Prisma.TransactionClient) => Promise<void>
+): Promise<string | null> {
   const reference = localUrlForKey(key);
-  return sottoTransaction(prismaUnfiltered, async (database) => {
-    const registry = new StorageReferenceRegistry(
-      {
-        query: (sql, values) => database.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...values),
-      },
-      'postgres',
-      SIDEDOOR_STATE_ID
-    );
-    const attributed = await registry.readReference(reference);
-    if (!attributed || attributed.backend.descriptor.kind !== 'local') return null;
-    if (attributed.asset.prepared.target.key !== key)
-      throw new Error('Local storage route attribution changed');
-    for (const consumer of attributed.asset.consumers) {
-      if (!(await canReadLocalObjectConsumer(database, userId, reference, consumer))) continue;
-      const current = await registry.resolve({ consumer, reference });
+  return sottoTransaction(
+    prismaUnfiltered,
+    async (database) => {
+      execution.signal?.throwIfAborted();
+      if ((await execution.authorize(database)).userId !== execution.userId)
+        throw new Error('Storage access recipient changed');
+      const registry = new StorageReferenceRegistry(
+        {
+          query: (sql, values) =>
+            database.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...values),
+        },
+        'postgres',
+        SIDEDOOR_STATE_ID
+      );
+      const attributed = await registry.readReference(reference);
+      if (!attributed || attributed.backend.descriptor.kind !== 'local') return null;
       if (
-        !current ||
-        current.assetId !== attributed.asset.id ||
-        current.backend.id !== attributed.backend.id ||
-        current.backend.binding !== attributed.backend.binding ||
-        current.prepared.target.key !== key
+        expectedDescriptor &&
+        !isDeepStrictEqual(attributed.backend.descriptor, expectedDescriptor)
       )
-        continue;
-      return pathInsideRoot(attributed.backend.descriptor.referenceRoot, key);
-    }
-    return null;
-  });
+        return null;
+      if (attributed.asset.prepared.target.key !== key)
+        throw new Error('Local storage route attribution changed');
+      for (const consumer of attributed.asset.consumers) {
+        if (authorizeAssessmentAudio) {
+          if (!expected || consumer !== expected.consumer) continue;
+          await authorizeAssessmentAudio(database);
+        } else if (
+          !(await canReadLocalObjectConsumer(database, execution.userId, reference, consumer))
+        )
+          continue;
+        const current = await registry.resolve({ consumer, reference });
+        if (
+          !current ||
+          current.assetId !== attributed.asset.id ||
+          current.backend.id !== attributed.backend.id ||
+          current.backend.binding !== attributed.backend.binding ||
+          current.prepared.target.key !== key
+        )
+          continue;
+        if (
+          expected &&
+          (consumer !== expected.consumer ||
+            reference !== expected.reference ||
+            current.assetId !== expected.assetId ||
+            current.backend.id !== expected.backendId ||
+            current.backend.binding !== expected.binding ||
+            key !== expected.key)
+        )
+          continue;
+        if ((await execution.authorize(database)).userId !== execution.userId)
+          throw new Error('Storage access recipient changed');
+        execution.signal?.throwIfAborted();
+        return pathInsideRoot(attributed.backend.descriptor.referenceRoot, key);
+      }
+      return null;
+    },
+    { signal: execution.signal }
+  );
 }
 
 /**
@@ -554,12 +601,171 @@ export async function getPresignedUrl(reference: string, expiresIn = 3600): Prom
  */
 export async function readLocalObject(
   key: string,
-  userId: string,
+  execution: SottoProviderExecution,
   range?: string | null
 ): Promise<{ body: Buffer; size: number; contentType: string; start: number; end: number } | null> {
-  const filePath = await attributedLocalPath(key, userId);
+  const filePath = await attributedLocalPath(key, execution);
   if (!filePath) return null;
   return readLocalStorageFile(filePath, key, range);
+}
+
+export const STORAGE_RANGE_MAX_BYTES = 512 * 1024;
+export type StorageRangeIdentity =
+  | {
+      kind: 'local';
+      device: string;
+      inode: string;
+      size: string;
+      modified: string;
+      changed: string;
+    }
+  | { kind: 'object'; etag: string; versionId: string | null };
+
+/** Read a bounded range from one captured, currently attributed backend. */
+type AttributedRangeOptions = {
+  input: StorageInput;
+  descriptor: StorageCleanupDescriptor;
+  execution: SottoProviderExecution;
+  start: number;
+  end: number;
+  expectedIdentity?: StorageRangeIdentity;
+};
+
+export function readAttributedStorageRange(options: AttributedRangeOptions) {
+  return readAttributedRange(options);
+}
+
+/** The caller must revalidate the owned assessment and its exact captured storage input. */
+export function readAssessmentAudioRange(
+  options: AttributedRangeOptions,
+  authorizeAssessmentAudio: (database: Prisma.TransactionClient) => Promise<void>
+) {
+  return readAttributedRange(options, authorizeAssessmentAudio);
+}
+
+async function readAttributedRange(
+  options: AttributedRangeOptions,
+  authorizeAssessmentAudio?: (database: Prisma.TransactionClient) => Promise<void>
+) {
+  const { input, descriptor, execution, start, end, expectedIdentity } = options;
+  if (
+    !Number.isSafeInteger(start) ||
+    !Number.isSafeInteger(end) ||
+    start < 0 ||
+    end < start ||
+    end - start + 1 > STORAGE_RANGE_MAX_BYTES
+  )
+    throw new Error('Invalid storage byte range');
+  await sottoTransaction(
+    prismaUnfiltered,
+    async (database) => {
+      if ((await execution.authorize(database)).userId !== execution.userId)
+        throw new Error('Storage access recipient changed');
+      const current = await resolveStorageInput(database, input);
+      if (
+        !isDeepStrictEqual(current.input, input) ||
+        !isDeepStrictEqual(current.backend.descriptor, descriptor)
+      )
+        throw new Error('Storage attribution changed');
+      if (authorizeAssessmentAudio) await authorizeAssessmentAudio(database);
+      else if (
+        !(await canReadLocalObjectConsumer(
+          database,
+          execution.userId,
+          input.reference,
+          input.consumer
+        ))
+      )
+        throw new Error('Storage consumer is not authorized');
+    },
+    { signal: execution.signal }
+  );
+  if (descriptor.kind === 'local') {
+    const filePath = await attributedLocalPath(
+      input.key,
+      execution,
+      input,
+      descriptor,
+      authorizeAssessmentAudio
+    );
+    if (!filePath) return null;
+    const result = await readLocalStorageRange(filePath, input.key, `bytes=${start}-${end}`);
+    if (result && expectedIdentity && !isDeepStrictEqual(result.identity, expectedIdentity))
+      throw new Error('Stored object identity changed');
+    return result;
+  }
+  const saved = storageCleanupDescriptorSchema.parse(descriptor);
+  if (saved.kind !== 'object' || !saved.access) throw new Error('Storage access is unavailable');
+  const config = await getObjectStorageConfig(
+    historicalObjectStorageSnapshot(saved, await getSiteConfig()),
+    undefined,
+    saved.access
+  );
+  if (expectedIdentity && expectedIdentity.kind !== 'object')
+    throw new Error('Stored object identity changed');
+  const response = await config.client.send(
+    new GetObjectCommand({
+      Bucket: config.bucket,
+      Key: input.key,
+      Range: `bytes=${start}-${end}`,
+      ...(expectedIdentity
+        ? {
+            IfMatch: expectedIdentity.etag,
+            ...(expectedIdentity.versionId ? { VersionId: expectedIdentity.versionId } : {}),
+          }
+        : {}),
+    }),
+    { abortSignal: execution.signal }
+  );
+  const body = response.Body;
+  if (!(body instanceof Readable)) throw new Error('Object storage returned an unsupported stream');
+  return withOwnedReadables([body], async () => {
+    if (!response.ETag) throw new Error('Object storage did not identify the returned bytes');
+    const identity = {
+      kind: 'object' as const,
+      etag: response.ETag,
+      versionId: response.VersionId ?? null,
+    };
+    if (expectedIdentity && !isDeepStrictEqual(identity, expectedIdentity))
+      throw new Error('Stored object identity changed');
+    const match = /^bytes (\d+)-(\d+)\/(\d+)$/.exec(response.ContentRange ?? '');
+    if (!match) throw new Error('Object storage did not return a bounded range');
+    const actualStart = Number(match[1]);
+    const actualEnd = Number(match[2]);
+    const size = Number(match[3]);
+    if (
+      !Number.isSafeInteger(size) ||
+      !Number.isSafeInteger(actualStart) ||
+      !Number.isSafeInteger(actualEnd) ||
+      actualStart !== start ||
+      actualEnd !== Math.min(end, size - 1) ||
+      actualEnd < actualStart ||
+      response.ContentLength !== actualEnd - actualStart + 1
+    )
+      throw new Error('Object storage returned a changed range');
+    const signal = execution.signal ?? new AbortController().signal;
+    const webBody = (Readable.toWeb(body) as ReadableStream<Uint8Array>).pipeThrough(
+      new TransformStream<Uint8Array, Uint8Array<ArrayBuffer>>({
+        transform(chunk, controller) {
+          controller.enqueue(new Uint8Array(chunk));
+        },
+      })
+    );
+    const bytes = await readResponseBytes(
+      { body: webBody },
+      { signal, maxBytes: STORAGE_RANGE_MAX_BYTES }
+    );
+    if (bytes.length !== actualEnd - actualStart + 1)
+      throw new Error('Object storage returned incomplete audio');
+    return {
+      body: Buffer.from(bytes),
+      size,
+      start: actualStart,
+      end: actualEnd,
+      contentType: 'application/octet-stream',
+      identity,
+    };
+  });
 }
 
 /**

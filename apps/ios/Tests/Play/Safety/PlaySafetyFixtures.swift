@@ -64,8 +64,17 @@ struct PlaySafetyHarness {
         let coordinator = model.play
         coordinator.navigate(screen)
         let polling = Task { await coordinator.foreground() }
-        try await waitForPlay("The canonical safety status is loaded for this profile") {
-            coordinator.safetyStatus?.profileId == profile && coordinator.safetyPolicy != nil
+        do {
+            try await waitForPlay("The canonical safety status is loaded for this profile", diagnostics: {
+                playDiagnostics(coordinator, server)
+            }) {
+                coordinator.safetyStatus?.profileId == profile && coordinator.safetyPolicy != nil
+            }
+        } catch {
+            polling.cancel()
+            coordinator.endForeground()
+            server.stop()
+            throw error
         }
         return Self(server: server, vault: vault, model: model, coordinator: coordinator, polling: polling)
     }

@@ -15,6 +15,7 @@ vi.mock('@/lib/api-keys', () => ({
 
 vi.mock('@/lib/prisma', () => {
   const _mockPrisma = {
+    $queryRaw: vi.fn().mockResolvedValue([]),
     episode: {
       findUnique: (...args: unknown[]) => mockEpisodeFindUnique(...args),
     },
@@ -32,6 +33,14 @@ vi.mock('@/lib/prisma', () => {
   };
   return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
 });
+
+vi.mock('@/lib/sidedoor/access/core/request-identity', () => ({
+  requireOriginalSottoAdmission: vi.fn().mockResolvedValue(undefined),
+}));
+vi.mock('@/lib/sidedoor/access/state/transaction', () => ({
+  sottoTransaction: async (database: unknown, operation: (database: unknown) => Promise<unknown>) =>
+    operation(database),
+}));
 
 vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
@@ -133,6 +142,37 @@ describe('GET /api/v1/episodes/[episodeId]/script', () => {
     expect(body).toMatchObject({ error: 'Script not found' });
   });
 
+  it('does not return the transcript of an assessment episode', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockEpisodeFindUnique.mockResolvedValue({
+      userId: 'user-1',
+      assessmentSection: { id: 'held-out-section' },
+    });
+    const response = await GET(createGetRequest(), await createParams('pod-1'));
+    expect(response.status).toBe(404);
+    expect(response.headers.get('cache-control')).toBe('private, no-store');
+    expect(await response.json()).toMatchObject({ error: 'Episode not found' });
+  });
+
+  it('does not return a transcript carrying an assessment audio marker', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockEpisodeFindUnique.mockResolvedValue({
+      userId: 'user-1',
+      assessmentSection: null,
+      assessmentAudioAssessmentId: 'assessment',
+    });
+    const response = await GET(createGetRequest(), await createParams('pod-1'));
+    expect(response.status).toBe(404);
+  });
+
+  it('does not return the transcript of a deleted episode', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockEpisodeFindUnique.mockResolvedValue({ userId: 'user-1', deletedAt: new Date() });
+    const response = await GET(createGetRequest(), await createParams('pod-1'));
+    expect(response.status).toBe(404);
+    expect(await response.json()).toMatchObject({ error: 'Episode not found' });
+  });
+
   it('returns script turns, references, and version on success', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockEpisodeFindUnique.mockResolvedValue({ userId: 'user-1', lowReferences: false });
@@ -195,6 +235,21 @@ describe('PATCH /api/v1/episodes/[episodeId]/script', () => {
     { speaker: 'HOST', text: 'Updated intro' },
     { speaker: 'EXPERT', text: 'Updated response' },
   ];
+
+  it('does not edit an assessment transcript', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockEpisodeFindUnique.mockResolvedValue({
+      userId: 'user-1',
+      status: 'SCRIPT_READY',
+      assessmentSection: { id: 'held-out-section' },
+    });
+    const response = await PATCH(
+      createPatchRequest({ turns: validTurns }),
+      await createParams('pod-1')
+    );
+    expect(response.status).toBe(404);
+    expect(mockScriptUpdate).not.toHaveBeenCalled();
+  });
 
   it('returns 401 when unauthenticated', async () => {
     mockAuthenticateRequest.mockResolvedValue(null);
@@ -300,7 +355,7 @@ describe('PATCH /api/v1/episodes/[episodeId]/script', () => {
     expect(body).toMatchObject({ error: 'Script not found' });
   });
 
-  it.each(['classSection', 'practiceSession'] as const)(
+  it.each(['classSection', 'practiceSession', 'examSection'] as const)(
     'preserves the reviewed script linked to %s',
     async (association) => {
       mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });

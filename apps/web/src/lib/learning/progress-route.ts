@@ -2,6 +2,9 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { authenticateRequest } from '../api-keys';
 import { errorResponse } from '../api-response';
 import { learningProgressSchema, LearningProgressConflict, saveLearningProgress } from './progress';
+import { sottoRequestExecution } from '../sidedoor/credentials/runtime/provider-execution';
+import { isAccessError } from 'thesidedoor-core/access';
+import { accessErrorStatus } from 'thesidedoor-core/access/http';
 
 export async function patchLearningProgress(
   request: NextRequest,
@@ -13,12 +16,19 @@ export async function patchLearningProgress(
   const input = learningProgressSchema.safeParse(await request.json().catch(() => null));
   if (!input.success) return errorResponse('Invalid saved progress', 400);
   try {
-    const found = await saveLearningProgress(kind, id, admission.userId, input.data);
+    const found = await saveLearningProgress(
+      kind,
+      id,
+      admission.userId,
+      input.data,
+      sottoRequestExecution(request, admission)
+    );
     return found
       ? NextResponse.json({ saved: true, progressRevision: found })
       : errorResponse('Learning session not found', 404);
   } catch (error) {
     if (error instanceof LearningProgressConflict) return errorResponse(error.message, 409);
+    if (isAccessError(error)) return errorResponse(error.code, accessErrorStatus(error));
     throw error;
   }
 }

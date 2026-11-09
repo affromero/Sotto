@@ -4,7 +4,7 @@ import { finished } from 'node:stream/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { z } from 'zod';
-import { StorageReadCleanupError } from 'thesidedoor-core/storage';
+import { isJobExecutionCleanupFailure } from 'thesidedoor-core/runtime/outbox';
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/api-keys';
 import { errorResponse } from '@/lib/api-response';
@@ -134,7 +134,7 @@ export async function GET(
     responseOwnsDirectory = true;
     return response;
   } catch (error) {
-    if (error instanceof StorageReadCleanupError) {
+    if (isJobExecutionCleanupFailure(error)) {
       cleanupUnconfirmed = true;
       logger.error('Material download cleanup is unconfirmed', { materialId, directory });
     }

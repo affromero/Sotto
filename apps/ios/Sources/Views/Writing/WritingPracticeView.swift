@@ -14,16 +14,22 @@ struct WritingPracticeView: View {
     let prompts: [SottoWritingPrompt]
     let onSelectionHelp: ((String, String) -> Void)?
     let offersHandwriting: Bool
+    let prerequisite: SottoClassPrerequisiteResponse?
+    let sectionId: String?
 
     init(
         drafts: WritingDraftStore,
         prompts: [SottoWritingPrompt],
         offersHandwriting: Bool = true,
+        prerequisite: SottoClassPrerequisiteResponse? = nil,
+        sectionId: String? = nil,
         onSelectionHelp: ((String, String) -> Void)? = nil
     ) {
         self.drafts = drafts
         self.prompts = prompts
         self.offersHandwriting = offersHandwriting
+        self.prerequisite = prerequisite
+        self.sectionId = sectionId
         self.onSelectionHelp = onSelectionHelp
     }
 
@@ -34,6 +40,11 @@ struct WritingPracticeView: View {
                 .foregroundStyle(SottoTheme.ink)
 
             ForEach(prompts.sorted { ($0.order ?? 0) < ($1.order ?? 0) }) { prompt in
+                if let prerequisite, let sectionId, let instruction = prerequisite.content?.directions.instruction(
+                    sectionId: sectionId, taskId: prompt.id, kind: .writing
+                ) {
+                    ClassPrerequisiteDirection(instruction: instruction, language: prerequisite.nativeLang)
+                }
                 WritingPromptCard(
                     drafts: drafts,
                     prompt: prompt,

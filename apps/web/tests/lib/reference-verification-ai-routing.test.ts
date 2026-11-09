@@ -73,7 +73,9 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe('reference verification AI routing', () => {
+const suite = process.env.SIDEDOOR_TEST_DATABASE_URL ? describe : describe.skip;
+
+suite('reference verification AI routing', () => {
   const fixture = useProviderCredentialDatabase();
 
   beforeAll(() => {

@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import {
   classLessonHelpResponseSchema,
-  classTeachingSchema,
   getLanguageLabel,
   type ClassLessonHelpResponse,
   type ClassTeaching,
@@ -14,14 +13,7 @@ import styles from './ClassLanguageHelp.module.css';
 interface ClassLanguageHelpProps {
   classId: string;
   teaching: ClassTeaching;
-}
-
-async function teachingHash(teaching: ClassTeaching) {
-  const bytes = await crypto.subtle.digest(
-    'SHA-256',
-    new TextEncoder().encode(JSON.stringify(classTeachingSchema.parse(teaching)))
-  );
-  return Array.from(new Uint8Array(bytes), (value) => value.toString(16).padStart(2, '0')).join('');
+  revision?: string | null;
 }
 
 function pause(signal: AbortSignal): Promise<void> {
@@ -39,17 +31,18 @@ function pause(signal: AbortSignal): Promise<void> {
   });
 }
 
-export function ClassLanguageHelp({ classId, teaching }: ClassLanguageHelpProps) {
+export function ClassLanguageHelp({ classId, teaching, revision }: ClassLanguageHelpProps) {
   return (
     <ClassLanguageHelpPane
-      key={JSON.stringify([classId, teaching])}
+      key={JSON.stringify([classId, teaching, revision])}
       classId={classId}
       teaching={teaching}
+      revision={revision}
     />
   );
 }
 
-function ClassLanguageHelpPane({ classId, teaching }: ClassLanguageHelpProps) {
+function ClassLanguageHelpPane({ classId, teaching, revision }: ClassLanguageHelpProps) {
   const titleId = useId();
   const dialog = useRef<HTMLDialogElement>(null);
   const active = useRef<AbortController | null>(null);
@@ -89,8 +82,8 @@ function ClassLanguageHelpPane({ classId, teaching }: ClassLanguageHelpProps) {
     setResult(null);
     const signal = controller.signal;
     try {
-      const hash = await teachingHash(teaching);
-      signal.throwIfAborted();
+      if (!revision)
+        throw new Error('The saved lesson changed. Reopen the class before requesting help.');
       const read = async () => {
         const response = await fetch(endpoint, { signal, cache: 'no-store' });
         const body: unknown = await response.json();
@@ -105,7 +98,7 @@ function ClassLanguageHelpPane({ classId, teaching }: ClassLanguageHelpProps) {
           throw new Error('Language help returned an incomplete response. Check its saved status.');
         const value = parsed.data;
         signal.throwIfAborted();
-        if (value.request.sourceHash !== hash)
+        if (value.request.sourceHash !== revision)
           throw new Error('The saved lesson changed. Reopen the class before requesting help.');
         return value;
       };

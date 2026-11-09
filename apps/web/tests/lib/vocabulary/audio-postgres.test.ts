@@ -1,10 +1,11 @@
-// @vitest-environment node
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+// @vitest-environment private-redis
+import { mkdir, mkdtemp, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import type { Worker } from 'bullmq';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PrismaClient } from '@/generated/prisma/client';
+import { copyOwnedBytesToFile } from 'thesidedoor-core/storage';
 import { createQueue, createWorker, withDispatchQueue } from '@/lib/queue';
 import { closeRedis } from '@/lib/redis';
 import { requestVocabularyAudio } from '@/lib/vocabulary/audio';
@@ -22,7 +23,39 @@ import {
   type SharedTestIdentity,
 } from '../../helpers/setup/shared-instance';
 
-const boundary = vi.hoisted(() => ({ database: null as PrismaClient | null, storageFails: false }));
+const boundary = vi.hoisted(() => ({
+  database: null as PrismaClient | null,
+  storageFails: false,
+  failDownload: false,
+  downloadDirectory: '',
+}));
+vi.mock('@/lib/r2', async (original) => {
+  const actual = await original<typeof import('@/lib/r2')>();
+  return {
+    ...actual,
+    restoreStorageBackend: async (...args: Parameters<typeof actual.restoreStorageBackend>) => {
+      const backend = await actual.restoreStorageBackend(...args);
+      if (!boundary.failDownload) return backend;
+      return {
+        ...backend,
+        downloadToFile: async (_key: string, destination: string) => {
+          boundary.downloadDirectory = dirname(destination);
+          return copyOwnedBytesToFile({
+            destination,
+            openSource: async () => ({
+              read: async () => {
+                throw new Error('Synthetic storage read failed');
+              },
+              close: async () => {
+                throw new Error('Synthetic storage close failed');
+              },
+            }),
+          });
+        },
+      };
+    },
+  };
+});
 vi.mock('@/lib/prisma', async () => {
   const { prismaTestBoundary } = await import('../../helpers/setup/shared-instance');
   const database = prismaTestBoundary(boundary);
@@ -40,7 +73,7 @@ vi.mock('@/lib/sidedoor/storage/core/storage-write', async (original) => {
 });
 
 const suite =
-  process.env.SIDEDOOR_TEST_DATABASE_URL && process.env.SIDEDOOR_TEST_REDIS_URL
+  process.env.SIDEDOOR_TEST_DATABASE_URL && process.env.SOTTO_TEST_PRIVATE_REDIS_URL
     ? describe
     : describe.skip;
 suite('persistent local dictionary pronunciation', () => {
@@ -67,7 +100,15 @@ suite('persistent local dictionary pronunciation', () => {
   const subject = () => ({ courseId, wordId });
 
   beforeAll(async () => {
-    vi.stubEnv('REDIS_URL', process.env.SIDEDOOR_TEST_REDIS_URL!);
+    const privateUrl = new URL(process.env.SOTTO_TEST_PRIVATE_REDIS_URL!);
+    const redis = (await import('@/lib/redis')).getSharedQueueRedisClient();
+    if (
+      redis.options.host !== privateUrl.hostname ||
+      redis.options.port !== Number(privateUrl.port) ||
+      (redis.options.db ?? 0) !== Number(privateUrl.pathname.slice(1) || '0') ||
+      Boolean(redis.options.tls) !== (privateUrl.protocol === 'rediss:')
+    )
+      throw new Error('Vocabulary queue is not connected to private Redis');
     vi.stubEnv('BYOK_ENCRYPTION_KEY', '1'.repeat(64));
     instance = await createSharedTestInstance('vocabulary_audio');
     boundary.database = instance.database;
@@ -81,6 +122,8 @@ suite('persistent local dictionary pronunciation', () => {
     calls = [];
     failTransport = false;
     boundary.storageFails = false;
+    boundary.failDownload = false;
+    boundary.downloadDirectory = '';
     await queue().drain(true);
     await instance.configureInfrastructure({
       ttsProvider: 'local',
@@ -189,6 +232,21 @@ suite('persistent local dictionary pronunciation', () => {
     await requestVocabularyAudio(subject(), execution(), true);
     await waitForAsset();
     expect(calls).toHaveLength(1);
+  });
+
+  it('retains playback staging when reading and closing storage both fail', async () => {
+    await requestVocabularyAudio(subject(), execution());
+    await waitForAsset();
+    boundary.failDownload = true;
+    try {
+      await expect(readVocabularyAudio(subject(), execution())).rejects.toThrow();
+      expect(boundary.downloadDirectory).not.toBe('');
+      expect((await stat(boundary.downloadDirectory)).isDirectory()).toBe(true);
+    } finally {
+      boundary.failDownload = false;
+      if (boundary.downloadDirectory)
+        await rm(boundary.downloadDirectory, { recursive: true, force: true });
+    }
   });
 
   it('shares concurrent first requests and reuses the stored audio across subsequent requests', async () => {

@@ -26,6 +26,7 @@ import { requireOriginalSottoAdmission } from '@/lib/sidedoor/access/core/reques
 import { captureSpeechAvailability } from '@/lib/providers/shared/speech-availability';
 import { assertProviderActivated } from '@/lib/providers/shared/runtime-activation';
 import type { SourceDocuments } from '@/lib/providers/ai';
+import type { ReadingVocabulary } from '@sotto/shared';
 
 export interface SottoProviderExecution {
   sourceDocuments?: SourceDocuments;
@@ -55,6 +56,51 @@ export interface SottoProviderExecution {
     episodeId: string,
     audioGenerationKey: string
   ) => Promise<void>;
+  stageClassReading?: (
+    database: Prisma.TransactionClient,
+    input: {
+      classId: string;
+      attempt: number;
+      sectionId: string;
+      source: {
+        digest: string;
+        progressRevision: number;
+        readingVocabulary: Prisma.JsonValue;
+        passage: string | null;
+      };
+      vocabulary: ReadingVocabulary;
+    }
+  ) => Promise<void>;
+  stageClassWriting?: (
+    database: Prisma.TransactionClient,
+    input: { classId: string; attempt: number; sectionId: string; sourceHash: string }
+  ) => Promise<void>;
+  writingRepairSourceHash?: string;
+  speakingRepairSourceHash?: string;
+  stageClassSpeaking?: (
+    database: Prisma.TransactionClient,
+    input: { classId: string; attempt: number; sectionId: string; sourceHash: string }
+  ) => Promise<void>;
+  verifySpeakingReferenceStage?: (
+    database: Prisma.TransactionClient,
+    input: { sectionId: string; promptId: string }
+  ) => Promise<import('@/lib/classes/speaking/speaking-reference-crypto').SpeakingReferenceBinding>;
+  sealClassSpeaking?: (
+    database: Prisma.TransactionClient,
+    input: {
+      sectionId: string;
+      references: ReadonlyMap<string, string>;
+      encryptions?: ReadonlyMap<
+        string,
+        import('@/lib/classes/speaking/speaking-reference-crypto').SpeakingReferenceEnvelope
+      >;
+    }
+  ) => Promise<void>;
+  stageClassGrammar?: (
+    database: Prisma.TransactionClient,
+    input: { classId: string; attempt: number; sectionId: string; sourceHash: string }
+  ) => Promise<void>;
+  grammarRepairSourceHash?: string;
 }
 
 export function sottoRequestExecution(

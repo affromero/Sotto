@@ -5031,6 +5031,863 @@
         "required": ["status", "request", "nativeLang", "targetLang", "canRetry"],
         "additionalProperties": false
       },
+      "ClassPrerequisiteRequest": {
+        "type": "object",
+        "properties": {
+          "sourceHash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "snapshotHash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": ["sourceHash", "snapshotHash"],
+        "additionalProperties": false
+      },
+      "ClassPrerequisiteResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "AVAILABLE",
+              "UNAVAILABLE",
+              "PENDING",
+              "UNRESOLVED",
+              "READY",
+              "FAILED",
+              "STALE"
+            ]
+          },
+          "request": {
+            "$ref": "#/components/schemas/ClassPrerequisiteRequest"
+          },
+          "nativeLang": {
+            "type": "string",
+            "pattern": "^[a-z]{2}$"
+          },
+          "targetLang": {
+            "type": "string",
+            "pattern": "^[a-z]{2}$"
+          },
+          "content": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 240
+              },
+              "explanation": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 8000
+              },
+              "examples": {
+                "minItems": 1,
+                "maxItems": 8,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "target": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 1000
+                    },
+                    "meaning": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 1000
+                    },
+                    "explanation": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    }
+                  },
+                  "required": ["target", "meaning", "explanation"],
+                  "additionalProperties": false
+                }
+              },
+              "directions": {
+                "type": "object",
+                "properties": {
+                  "guided": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000,
+                    "pattern": "^[^\\x00-\\x08\\x0b\\x0c\\x0e-\\x1f\\uD800-\\uDFFF]*$"
+                  },
+                  "tasks": {
+                    "minItems": 1,
+                    "maxItems": 100,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "sectionId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "taskId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": ["question", "speaking", "writing"]
+                        },
+                        "instruction": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 1000,
+                          "pattern": "^[^\\x00-\\x08\\x0b\\x0c\\x0e-\\x1f\\uD800-\\uDFFF]*$"
+                        }
+                      },
+                      "required": ["sectionId", "taskId", "kind", "instruction"],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": ["guided", "tasks"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["title", "explanation", "examples", "directions"],
+            "additionalProperties": false
+          },
+          "canRetry": {
+            "type": "boolean"
+          },
+          "recoverable": {
+            "type": "boolean"
+          },
+          "failure": {
+            "type": "string",
+            "enum": ["UNSAFE"]
+          },
+          "receiptId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "acknowledged": {
+            "type": "boolean"
+          }
+        },
+        "required": ["status", "request", "nativeLang", "targetLang"],
+        "additionalProperties": false
+      },
+      "ClassPrerequisiteAcknowledgment": {
+        "type": "object",
+        "properties": {
+          "sourceHash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "receiptId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": ["sourceHash", "receiptId"],
+        "additionalProperties": false
+      },
+      "ClassPreludeResponse": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": ["NOT_REQUIRED"]
+              }
+            },
+            "required": ["kind"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": ["REPLAY"]
+              }
+            },
+            "required": ["kind"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": ["GENERATING"]
+              }
+            },
+            "required": ["kind"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": ["UNAVAILABLE"]
+              }
+            },
+            "required": ["kind"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": ["BASE"]
+              },
+              "nativeLang": {
+                "type": "string",
+                "pattern": "^[a-z]{2}$"
+              },
+              "targetLang": {
+                "type": "string",
+                "pattern": "^[a-z]{2}$"
+              },
+              "receiptId": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "acknowledged": {
+                "type": "boolean"
+              },
+              "teaching": {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "number",
+                    "enum": [1]
+                  },
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  "explanation": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1800
+                  },
+                  "workedExamples": {
+                    "minItems": 2,
+                    "maxItems": 3,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "prompt": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 800
+                        },
+                        "answer": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 800
+                        },
+                        "explanation": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 1800
+                        }
+                      },
+                      "required": ["prompt", "answer", "explanation"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "commonMistake": {
+                    "type": "object",
+                    "properties": {
+                      "incorrect": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 800
+                      },
+                      "correction": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 800
+                      },
+                      "explanation": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 1800
+                      }
+                    },
+                    "required": ["incorrect", "correction", "explanation"],
+                    "additionalProperties": false
+                  }
+                },
+                "required": ["version", "title", "explanation", "workedExamples", "commonMistake"],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "kind",
+              "nativeLang",
+              "targetLang",
+              "receiptId",
+              "acknowledged",
+              "teaching"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": ["ADDENDUM"]
+              },
+              "nativeLang": {
+                "type": "string",
+                "pattern": "^[a-z]{2}$"
+              },
+              "targetLang": {
+                "type": "string",
+                "pattern": "^[a-z]{2}$"
+              },
+              "request": {
+                "$ref": "#/components/schemas/ClassPrerequisiteRequest"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "AVAILABLE",
+                  "UNAVAILABLE",
+                  "PENDING",
+                  "UNRESOLVED",
+                  "READY",
+                  "FAILED",
+                  "STALE"
+                ]
+              },
+              "content": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 240
+                  },
+                  "explanation": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 8000
+                  },
+                  "examples": {
+                    "minItems": 1,
+                    "maxItems": 8,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "target": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 1000
+                        },
+                        "meaning": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 1000
+                        },
+                        "explanation": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 2000
+                        }
+                      },
+                      "required": ["target", "meaning", "explanation"],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": ["title", "explanation", "examples"],
+                "additionalProperties": false
+              },
+              "receiptId": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "acknowledged": {
+                "type": "boolean"
+              },
+              "canRetry": {
+                "type": "boolean"
+              },
+              "recoverable": {
+                "type": "boolean"
+              },
+              "failure": {
+                "type": "string",
+                "enum": ["UNSAFE"]
+              }
+            },
+            "required": ["kind", "nativeLang", "targetLang", "request", "status"],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "ClassAssessmentStatus": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": ["PRACTICE_REQUIRED", "UNRESOLVED"]
+              },
+              "classAttempt": {
+                "type": "integer",
+                "minimum": 0,
+                "exclusiveMinimum": true,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": ["status", "classAttempt"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": ["AVAILABLE", "PENDING"]
+              },
+              "classAttempt": {
+                "type": "integer",
+                "minimum": 0,
+                "exclusiveMinimum": true,
+                "maximum": 9007199254740991
+              },
+              "revision": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "required": ["status", "classAttempt", "revision"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": ["READY"]
+              },
+              "classAttempt": {
+                "type": "integer",
+                "minimum": 0,
+                "exclusiveMinimum": true,
+                "maximum": 9007199254740991
+              },
+              "assessmentId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "revision": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "required": ["status", "classAttempt", "assessmentId", "revision"],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "ClassAssessmentPrepare": {
+        "type": "object",
+        "properties": {
+          "classAttempt": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "maximum": 9007199254740991
+          },
+          "revision": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": ["classAttempt", "revision"],
+        "additionalProperties": false
+      },
+      "ClassAssessmentMaterial": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "classAttempt": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "maximum": 9007199254740991
+          },
+          "assessmentAttempt": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "maximum": 9007199254740991
+          },
+          "sections": {
+            "maxItems": 5,
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 256
+                    },
+                    "skill": {
+                      "type": "string",
+                      "enum": ["GRAMMAR", "READING", "LISTENING"]
+                    },
+                    "passageText": {
+                      "type": "string",
+                      "maxLength": 100000,
+                      "nullable": true
+                    },
+                    "audioAvailable": {
+                      "type": "boolean"
+                    },
+                    "items": {
+                      "maxItems": 20,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 256
+                          },
+                          "question": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 100000
+                          },
+                          "options": {
+                            "minItems": 4,
+                            "maxItems": 4,
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 100000
+                            }
+                          }
+                        },
+                        "required": ["id", "question", "options"],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["id", "skill", "passageText", "audioAvailable", "items"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 256
+                    },
+                    "skill": {
+                      "type": "string",
+                      "enum": ["SPEAKING"]
+                    },
+                    "items": {
+                      "maxItems": 20,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 256
+                          },
+                          "task": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 100000
+                          },
+                          "mode": {
+                            "type": "string",
+                            "enum": ["READ_ALOUD", "COMMUNICATIVE"]
+                          },
+                          "referenceAudioAvailable": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": ["id", "task", "mode", "referenceAudioAvailable"],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["id", "skill", "items"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 256
+                    },
+                    "skill": {
+                      "type": "string",
+                      "enum": ["WRITING"]
+                    },
+                    "items": {
+                      "maxItems": 20,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 256
+                          },
+                          "task": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 100000
+                          }
+                        },
+                        "required": ["id", "task"],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["id", "skill", "items"],
+                  "additionalProperties": false
+                }
+              ]
+            }
+          }
+        },
+        "required": ["id", "classAttempt", "assessmentAttempt", "sections"],
+        "additionalProperties": false
+      },
+      "ClassAssessmentSubmit": {
+        "type": "object",
+        "properties": {
+          "choices": {
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "itemId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                "selectedIndex": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 3
+                }
+              },
+              "required": ["itemId", "selectedIndex"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["choices"],
+        "additionalProperties": false
+      },
+      "ClassAssessmentWritingRequest": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "maxLength": 4000
+          }
+        },
+        "required": ["text"],
+        "additionalProperties": false
+      },
+      "ClassAssessmentWritingStatus": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": ["NOT_STARTED"]
+              }
+            },
+            "required": ["status"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": ["RUNNING", "UNRESOLVED", "COMPLETED", "FAILED"]
+              },
+              "text": {
+                "type": "string",
+                "maxLength": 100000
+              }
+            },
+            "required": ["status", "text"],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "ClassAssessmentSpeakingStatus": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": ["NOT_STARTED"]
+              }
+            },
+            "required": ["status"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": ["RUNNING", "UNRESOLVED", "COMPLETED", "FAILED"]
+              },
+              "requestId": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              }
+            },
+            "required": ["status", "requestId"],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "ClassReceipt": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": ["ASSESSMENT"]
+          },
+          "passed": {
+            "type": "boolean"
+          },
+          "overallScore": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "passedSections": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "totalSections": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "maximum": 9007199254740991
+          },
+          "sections": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "skill": {
+                  "type": "string",
+                  "enum": ["GRAMMAR", "READING", "LISTENING", "SPEAKING", "WRITING"]
+                },
+                "score": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "passed": {
+                  "type": "boolean"
+                }
+              },
+              "required": ["id", "skill", "score", "passed"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["passed", "overallScore", "passedSections", "totalSections", "sections"],
+        "additionalProperties": false
+      },
+      "ClassPreludeAcknowledgment": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["BASE", "ADDENDUM"]
+          },
+          "receiptId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": ["kind", "receiptId"],
+        "additionalProperties": false
+      },
+      "ClassPreludeAcknowledgmentResponse": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["BASE", "ADDENDUM"]
+          },
+          "receiptId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "acknowledged": {
+            "type": "boolean",
+            "enum": [true]
+          }
+        },
+        "required": ["kind", "receiptId", "acknowledged"],
+        "additionalProperties": false
+      },
       "ClassRegenerationRequest": {
         "type": "object",
         "properties": {
@@ -5127,6 +5984,16 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 9007199254740991
+          },
+          "expectedAttempt": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "maximum": 9007199254740991
+          },
+          "taskMaterialRevision": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
           },
           "answers": {
             "type": "object",
@@ -5758,7 +6625,10 @@
               },
               "status": {
                 "type": "string",
-                "enum": ["PENDING", "GRADING", "SCORED", "FAILED"]
+                "enum": ["PENDING", "GRADING", "SCORED", "FAILED", "UNRESOLVED"]
+              },
+              "recoveryAcknowledged": {
+                "type": "boolean"
               },
               "transcript": {
                 "type": "string",
@@ -9223,7 +10093,10 @@
                     },
                     "status": {
                       "type": "string",
-                      "enum": ["PENDING", "GRADING", "SCORED", "FAILED"]
+                      "enum": ["PENDING", "GRADING", "SCORED", "FAILED", "UNRESOLVED"]
+                    },
+                    "recoveryAcknowledged": {
+                      "type": "boolean"
                     },
                     "transcript": {
                       "type": "string",
@@ -9555,13 +10428,20 @@
       },
       "SpeakingGradeStatus": {
         "type": "string",
-        "enum": ["PENDING", "GRADING", "SCORED", "FAILED"]
+        "enum": ["PENDING", "GRADING", "SCORED", "FAILED", "UNRESOLVED"]
       },
       "SpeakingPollResponse": {
         "type": "object",
         "properties": {
           "status": {
             "$ref": "#/components/schemas/SpeakingGradeStatus"
+          },
+          "recordingId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "recoveryAcknowledged": {
+            "type": "boolean"
           },
           "overallScore": {
             "type": "number",
@@ -9578,6 +10458,32 @@
         },
         "required": ["status", "overallScore", "transcript", "feedback"],
         "additionalProperties": {}
+      },
+      "SpeakingRecoveryRequest": {
+        "type": "object",
+        "properties": {
+          "recordingId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "acknowledgePossibleCharges": {
+            "type": "boolean",
+            "enum": [true]
+          }
+        },
+        "required": ["recordingId", "acknowledgePossibleCharges"],
+        "additionalProperties": false
+      },
+      "SpeakingRecoveryResponse": {
+        "type": "object",
+        "properties": {
+          "acknowledged": {
+            "type": "boolean",
+            "enum": [true]
+          }
+        },
+        "required": ["acknowledged"],
+        "additionalProperties": false
       },
       "SkillType": {
         "type": "string",
@@ -9669,7 +10575,10 @@
             "properties": {
               "status": {
                 "type": "string",
-                "enum": ["PENDING", "GRADING", "SCORED", "FAILED"]
+                "enum": ["PENDING", "GRADING", "SCORED", "FAILED", "UNRESOLVED"]
+              },
+              "recoveryAcknowledged": {
+                "type": "boolean"
               },
               "transcript": {
                 "type": "string",
@@ -9966,6 +10875,21 @@
               "guidedPractice"
             ],
             "additionalProperties": false
+          },
+          "prerequisiteSourceHash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "nullable": true
+          },
+          "taskMaterialRevision": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "nullable": true
+          },
+          "lessonHelpRevision": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "nullable": true
           },
           "skillRequirements": {
             "type": "object",
@@ -10337,6 +11261,492 @@
             },
             "nullable": true
           },
+          "writingHistory": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "sectionId": {
+                  "type": "string"
+                },
+                "attempt": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "exclusiveMinimum": true,
+                  "maximum": 9007199254740991
+                },
+                "prompts": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "order": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "task": {
+                        "type": "string"
+                      },
+                      "savedDraft": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "responses": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "attempt": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "exclusiveMinimum": true,
+                              "maximum": 9007199254740991
+                            },
+                            "attemptMatches": {
+                              "type": "boolean"
+                            },
+                            "text": {
+                              "type": "string"
+                            },
+                            "overallScore": {
+                              "type": "number",
+                              "nullable": true
+                            },
+                            "corrections": {},
+                            "feedback": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "createdAt": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "attempt",
+                            "attemptMatches",
+                            "text",
+                            "overallScore",
+                            "corrections",
+                            "feedback",
+                            "createdAt"
+                          ],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": ["id", "order", "task", "savedDraft", "responses"],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": ["sectionId", "attempt", "prompts"],
+              "additionalProperties": false
+            }
+          },
+          "orphanWritingDrafts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": ["id", "text"],
+              "additionalProperties": false
+            }
+          },
+          "speakingHistory": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "sectionId": {
+                  "type": "string"
+                },
+                "attempt": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "prompts": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "order": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "targetPhrase": {
+                        "type": "string"
+                      },
+                      "translation": {
+                        "type": "string"
+                      },
+                      "recordings": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "attempt": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "status": {
+                              "type": "string"
+                            },
+                            "transcript": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "overallScore": {
+                              "type": "number",
+                              "nullable": true
+                            },
+                            "rubricScores": {},
+                            "phonemeScores": {},
+                            "feedback": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "createdAt": {
+                              "type": "string"
+                            },
+                            "attemptMatches": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "attempt",
+                            "status",
+                            "transcript",
+                            "overallScore",
+                            "rubricScores",
+                            "phonemeScores",
+                            "feedback",
+                            "createdAt",
+                            "attemptMatches"
+                          ],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": ["id", "order", "targetPhrase", "translation", "recordings"],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": ["sectionId", "attempt", "prompts"],
+              "additionalProperties": false
+            }
+          },
+          "speakingHistoryUnlinked": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "attempt": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "status": {
+                  "type": "string"
+                },
+                "transcript": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "overallScore": {
+                  "type": "number",
+                  "nullable": true
+                },
+                "rubricScores": {},
+                "phonemeScores": {},
+                "feedback": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "createdAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "attempt",
+                "status",
+                "transcript",
+                "overallScore",
+                "rubricScores",
+                "phonemeScores",
+                "feedback",
+                "createdAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "quizHistory": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "sectionId": {
+                  "type": "string"
+                },
+                "skill": {
+                  "type": "string",
+                  "enum": ["GRAMMAR", "READING", "LISTENING"]
+                },
+                "attempt": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "questions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "order": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "question": {
+                        "type": "string"
+                      },
+                      "passageText": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "options": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "nullable": true
+                      },
+                      "savedChoice": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991,
+                        "nullable": true
+                      },
+                      "submissions": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "attempt": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "nullable": true
+                            },
+                            "submittedAt": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "selectedIndex": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "nullable": true
+                            },
+                            "isCorrect": {
+                              "type": "boolean",
+                              "nullable": true
+                            }
+                          },
+                          "required": ["attempt", "submittedAt", "selectedIndex", "isCorrect"],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "order",
+                      "question",
+                      "passageText",
+                      "options",
+                      "savedChoice",
+                      "submissions"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": ["sectionId", "skill", "attempt", "questions"],
+              "additionalProperties": false
+            }
+          },
+          "orphanQuizAnswers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "sectionId": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "questionId": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "savedChoice": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991,
+                  "nullable": true
+                },
+                "submissions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "attempt": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991,
+                        "nullable": true
+                      },
+                      "submittedAt": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "selectedIndex": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991,
+                        "nullable": true
+                      },
+                      "isCorrect": {
+                        "type": "boolean",
+                        "nullable": true
+                      }
+                    },
+                    "required": ["attempt", "submittedAt", "selectedIndex", "isCorrect"],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": ["sectionId", "questionId", "savedChoice", "submissions"],
+              "additionalProperties": false
+            }
+          },
+          "quizHistoryUnreadable": {
+            "type": "boolean"
+          },
+          "quizSubmissionReceipts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "attempt": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991,
+                  "nullable": true
+                },
+                "submittedAt": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "passed": {
+                  "type": "boolean",
+                  "nullable": true
+                },
+                "overallScore": {
+                  "type": "number",
+                  "nullable": true
+                },
+                "answersUnavailable": {
+                  "type": "boolean"
+                },
+                "passedSections": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991,
+                  "nullable": true
+                },
+                "totalSections": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991,
+                  "nullable": true
+                },
+                "sections": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "skill": {
+                        "type": "string",
+                        "enum": ["GRAMMAR", "READING", "LISTENING", "SPEAKING", "WRITING"],
+                        "nullable": true
+                      },
+                      "score": {
+                        "type": "number",
+                        "nullable": true
+                      },
+                      "passed": {
+                        "type": "boolean",
+                        "nullable": true
+                      }
+                    },
+                    "required": ["id", "skill", "score", "passed"],
+                    "additionalProperties": false
+                  }
+                },
+                "summaryIncomplete": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "attempt",
+                "submittedAt",
+                "passed",
+                "overallScore",
+                "answersUnavailable",
+                "passedSections",
+                "totalSections",
+                "sections",
+                "summaryIncomplete"
+              ],
+              "additionalProperties": false
+            }
+          },
           "progressRevision": {
             "type": "integer",
             "minimum": 0,
@@ -10368,6 +11778,28 @@
           "submitted": {
             "type": "boolean"
           },
+          "submission": {
+            "type": "object",
+            "properties": {
+              "passed": {
+                "type": "boolean",
+                "nullable": true
+              },
+              "overallScore": {
+                "type": "number",
+                "nullable": true
+              },
+              "submittedAt": {
+                "type": "string"
+              },
+              "receipt": {
+                "$ref": "#/components/schemas/ClassReceipt"
+              }
+            },
+            "required": ["passed", "overallScore"],
+            "additionalProperties": false,
+            "nullable": true
+          },
           "sections": {
             "type": "array",
             "items": {
@@ -10377,6 +11809,48 @@
         },
         "required": ["id", "courseId", "status", "order", "passThreshold", "submitted", "sections"],
         "additionalProperties": {}
+      },
+      "ClassProgressRecovery": {
+        "type": "object",
+        "properties": {
+          "classId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "$ref": "#/components/schemas/ClassStatus"
+          },
+          "attempt": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "maximum": 9007199254740991
+          },
+          "progressRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "taskMaterialRevision": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": ["classId", "status", "attempt", "progressRevision", "taskMaterialRevision"],
+        "additionalProperties": false
+      },
+      "ClassFocusSnapshot": {
+        "type": "object",
+        "properties": {
+          "prelude": {
+            "$ref": "#/components/schemas/ClassPreludeResponse"
+          },
+          "progress": {
+            "$ref": "#/components/schemas/ClassProgressRecovery"
+          }
+        },
+        "required": ["prelude", "progress"],
+        "additionalProperties": false
       },
       "NextClassCreatedResponse": {
         "type": "object",
@@ -13188,6 +14662,57 @@
         ]
       }
     },
+    "/api/v1/classes/{classId}/speaking/{promptId}/recovery": {
+      "post": {
+        "operationId": "acknowledgeClassSpeakingRecovery",
+        "summary": "Acknowledge possible charges from an unresolved class recording.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpeakingRecoveryResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "classId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "promptId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SpeakingRecoveryRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
     "/api/v1/classes/{classId}": {
       "get": {
         "operationId": "getClass",
@@ -13255,6 +14780,72 @@
             }
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/classes/{classId}/progress-recovery": {
+      "get": {
+        "operationId": "getClassProgressRecovery",
+        "summary": "Read the owned class revision needed to reconcile saved work.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClassProgressRecovery"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "classId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/classes/{classId}/focus-snapshot": {
+      "get": {
+        "operationId": "getClassFocusSnapshot",
+        "summary": "Read the owned teaching and class progress identities together.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClassFocusSnapshot"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "classId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "security": [
           {
             "bearerAuth": []
@@ -13378,6 +14969,560 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/ClassLessonHelpRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/classes/{classId}/teaching-prelude": {
+      "get": {
+        "operationId": "getClassTeachingPrelude",
+        "summary": "Read teaching available before first-A1 practice.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClassPreludeResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "classId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/classes/{classId}/teaching-prelude/prepare": {
+      "post": {
+        "operationId": "prepareClassTeachingPrelude",
+        "summary": "Prepare or recover prerequisite teaching before first-A1 practice.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClassPreludeResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClassPreludeResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "classId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "recover",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClassPrerequisiteRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/classes/{classId}/teaching-prelude/acknowledge": {
+      "post": {
+        "operationId": "acknowledgeClassTeachingPrelude",
+        "summary": "Acknowledge the current first-A1 prerequisite teaching.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClassPreludeAcknowledgmentResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "classId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClassPreludeAcknowledgment"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/classes/{classId}/assessment/status": {
+      "get": {
+        "operationId": "getClassAssessmentStatus",
+        "summary": "Read the current owned first-A1 assessment status.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClassAssessmentStatus"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "classId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "prepareClassAssessment",
+        "summary": "Prepare the current owned first-A1 assessment.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClassAssessmentStatus"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClassAssessmentStatus"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "classId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClassAssessmentPrepare"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/classes/{classId}/assessment/{assessmentId}": {
+      "get": {
+        "operationId": "getClassAssessment",
+        "summary": "Read reviewed assessment material after completing practice.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClassAssessmentMaterial"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "classId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "assessmentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "submitClassAssessment",
+        "summary": "Submit completed independent assessment work.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClassReceipt"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "classId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "assessmentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClassAssessmentSubmit"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/classes/{classId}/assessment/{assessmentId}/writing/{promptId}": {
+      "get": {
+        "operationId": "getClassAssessmentWritingStatus",
+        "summary": "Read the saved status of an independent assessment writing response.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClassAssessmentWritingStatus"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "classId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "assessmentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "promptId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "submitClassAssessmentWriting",
+        "summary": "Save and grade an independent assessment writing response.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClassAssessmentWritingStatus"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClassAssessmentWritingStatus"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "classId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "assessmentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "promptId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClassAssessmentWritingRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/classes/{classId}/prerequisite": {
+      "get": {
+        "operationId": "getClassPrerequisite",
+        "summary": "Read prerequisite repair status for the owned saved class.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClassPrerequisiteResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "classId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "prepareClassPrerequisite",
+        "summary": "Prepare prerequisite teaching for the current saved class.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClassPrerequisiteResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClassPrerequisiteResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "classId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClassPrerequisiteRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/classes/{classId}/prerequisite/acknowledge": {
+      "post": {
+        "operationId": "acknowledgeClassPrerequisite",
+        "summary": "Acknowledge the exact reviewed prerequisite explanation.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClassPrerequisiteResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "classId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClassPrerequisiteAcknowledgment"
               }
             }
           }

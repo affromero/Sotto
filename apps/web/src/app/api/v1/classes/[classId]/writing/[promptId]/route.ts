@@ -8,6 +8,9 @@ import {
   LearningWritingError,
 } from '@/lib/learning/writing/writing-submission';
 import { sottoRequestExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
+import { InitialA1PracticeBlocked } from '@/lib/classes/lesson/initial-a1-provenance';
+import { isAccessError } from 'thesidedoor-core/access';
+import { accessErrorStatus } from 'thesidedoor-core/access/http';
 
 type RouteParams = { params: Promise<{ classId: string; promptId: string }> };
 
@@ -38,6 +41,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json(grade);
   } catch (error: unknown) {
     if (error instanceof LearningWritingError) return errorResponse(error.message, error.status);
+    if (error instanceof InitialA1PracticeBlocked)
+      return errorResponse(error.message, 409, { code: 'PREREQUISITE_ACK_REQUIRED' });
+    if (isAccessError(error)) return errorResponse(error.code, accessErrorStatus(error));
     const message = error instanceof Error ? error.message : 'Failed to grade writing';
     logger.error('Failed to grade class writing', { error: message });
     return errorResponse(message, 500);

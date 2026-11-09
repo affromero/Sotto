@@ -73,12 +73,42 @@ export const preparationSchema = z
         attempt: z.number().int().positive(),
         priorStatus: z.string().min(1),
         classFingerprint: z.string().regex(/^[a-f0-9]{64}$/),
+        grammarSourceHash: z
+          .string()
+          .regex(/^[a-f0-9]{64}$/)
+          .optional(),
+        writingSourceHash: z
+          .string()
+          .regex(/^[a-f0-9]{64}$/)
+          .optional(),
+        speakingSourceHash: z
+          .string()
+          .regex(/^[a-f0-9]{64}$/)
+          .optional(),
         skills: z.array(z.enum(['GRAMMAR', 'READING', 'LISTENING', 'SPEAKING', 'WRITING'])),
+        retainedQuiz: z
+          .object({
+            version: z.literal(1),
+            sections: z.array(
+              z
+                .object({
+                  sectionId: z.string().min(1),
+                  digest: z.string().regex(/^[a-f0-9]{64}$/),
+                })
+                .strict()
+            ),
+          })
+          .strict()
+          .optional(),
         retry: z
           .object({
             sectionId: z.string().min(1),
             expectedAttempt: z.number().int().positive(),
             expectedRevision: z.number().int().nonnegative(),
+            sourceReceipt: z
+              .object({ version: z.literal(1), digest: z.string().regex(/^[a-f0-9]{64}$/) })
+              .strict()
+              .optional(),
             context: quizRetryContextSchema,
             readingVocabulary: z.json().optional(),
           })

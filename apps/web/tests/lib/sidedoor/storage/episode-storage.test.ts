@@ -9,6 +9,7 @@ import {
 } from '@/lib/sidedoor/storage/core/episode-storage';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 import { SIDEDOOR_STATE_ID } from '@/lib/sidedoor/access/state/store';
+import { incorporationPayloadSchema } from '@/lib/sidedoor/jobs/stitch/incorporation-work';
 import {
   createSharedTestInstance,
   type SharedTestInstance,
@@ -47,6 +48,159 @@ suite('episode storage erasure scopes', () => {
         validateEpisodeStorage(tx, item.id, stored[0]!.value)
       )
     ).resolves.toBeUndefined();
+  });
+  it('preserves legacy payloads and fences assessment attachment, ownership and class erasure', async () => {
+    const legacy = await episode();
+    const before = await capture(legacy.id);
+    expect(before.associations).not.toHaveProperty('assessmentSection');
+    const payload = {
+      episodeId: legacy.id,
+      interactionId: 'interaction',
+      insertAfterOrder: 0,
+      speaker: 'HOST',
+      newText: 'Text',
+      inputFingerprint: 'a'.repeat(64),
+      storage: before,
+    };
+    expect(incorporationPayloadSchema.parse(payload)).toEqual(payload);
+    const curriculum = await instance.database.curriculum.upsert({
+      where: { nativeLang_targetLang: { nativeLang: 'es', targetLang: 'ru' } },
+      create: { nativeLang: 'es', targetLang: 'ru', title: 'Russian' },
+      update: {},
+    });
+    const lesson = await instance.database.lesson.upsert({
+      where: { curriculumId_slug: { curriculumId: curriculum.id, slug: 'assessment-audio' } },
+      create: {
+        curriculumId: curriculum.id,
+        slug: 'assessment-audio',
+        level: 'A1',
+        order: 1,
+        title: 'First lesson',
+        objective: 'Greet',
+        grammarPoints: [],
+        targetVocab: [],
+        vocabThemes: [],
+      },
+      update: {},
+    });
+    const course = await instance.database.course.create({
+      data: {
+        userId: identity.ownerId,
+        curriculumId: curriculum.id,
+        nativeLang: 'es',
+        targetLang: 'ru',
+      },
+    });
+    const cls = await instance.database.courseClass.create({
+      data: { courseId: course.id, lessonId: lesson.id, order: 1 },
+    });
+    const operationId = randomUUID();
+    const assessment = await instance.database.classAssessment.create({
+      data: {
+        classId: cls.id,
+        courseId: course.id,
+        userId: identity.ownerId,
+        classAttempt: 1,
+        assessmentAttempt: 1,
+        requirements: {},
+        formativeRevision: 'revision',
+        generationOperationId: operationId,
+      },
+    });
+    const section = await instance.database.classAssessmentSection.create({
+      data: {
+        assessmentId: assessment.id,
+        skill: 'LISTENING',
+        passThreshold: 0.7,
+      },
+    });
+    const item = await instance.database.$transaction(async (tx) => {
+      const created = await tx.episode.create({
+        data: {
+          userId: identity.ownerId,
+          title: 'Assessment audio',
+          topic: 'Greetings',
+          assessmentAudioAssessmentId: assessment.id,
+          assessmentAudioSectionId: section.id,
+          assessmentAudioOperationId: operationId,
+        },
+      });
+      await tx.classAssessmentSection.update({
+        where: { id: section.id },
+        data: {
+          episodeId: created.id,
+          audioReservationEpisodeId: created.id,
+          audioReservationOperationId: operationId,
+        },
+      });
+      return created;
+    });
+    await expect(
+      sottoTransaction(instance.database, (tx) => validateEpisodeStorage(tx, item.id, before))
+    ).rejects.toBeInstanceOf(EpisodeStorageChangedError);
+    const captured = await capture(item.id);
+    expect(captured.associations).toMatchObject({
+      assessmentSection: {
+        id: section.id,
+        assessmentId: assessment.id,
+        classId: cls.id,
+        classAttempt: 1,
+        currentClassAttempt: 1,
+        assessmentAttempt: 1,
+      },
+    });
+    expect(captured.scopes).toEqual(
+      expect.arrayContaining([
+        { subjectId: `episode:${item.id}`, generation: item.createdAt.getTime() },
+        { subjectId: `course:${course.id}`, generation: course.createdAt.getTime() },
+        { subjectId: `class:${cls.id}`, generation: cls.createdAt.getTime() },
+        expect.objectContaining({ subjectId: `profile:${identity.ownerId}` }),
+      ])
+    );
+    expect(incorporationPayloadSchema.parse({ ...payload, storage: captured }).storage).toEqual(
+      captured
+    );
+    await instance.database.courseClass.update({ where: { id: cls.id }, data: { attempt: 2 } });
+    const historical = await capture(item.id);
+    expect(historical.associations.assessmentSection).toMatchObject({
+      classAttempt: 1,
+      currentClassAttempt: 2,
+    });
+    await expect(
+      sottoTransaction(instance.database, (tx) => validateEpisodeStorage(tx, item.id, captured))
+    ).rejects.toBeInstanceOf(EpisodeStorageChangedError);
+    await expect(
+      sottoTransaction(instance.database, (tx) => validateEpisodeStorage(tx, item.id, historical))
+    ).rejects.toBeInstanceOf(EpisodeStorageChangedError);
+    await instance.database.courseClass.update({ where: { id: cls.id }, data: { attempt: 1 } });
+    const other = await identity.household('Other');
+    await instance.database.episode.update({ where: { id: item.id }, data: { userId: other.id } });
+    await expect(capture(item.id)).rejects.toBeInstanceOf(EpisodeStorageChangedError);
+    await instance.database.episode.update({
+      where: { id: item.id },
+      data: { userId: identity.ownerId },
+    });
+    await expect(
+      instance.database.classAssessmentSection.update({
+        where: { id: section.id },
+        data: { episodeId: null },
+      })
+    ).rejects.toThrow('Assessment audio must remain attached until deleted');
+    const classScope = captured.scopes.find((scope) => scope.subjectId === `class:${cls.id}`)!;
+    await sottoTransaction(instance.database, (tx) =>
+      new StorageWriteJournal(
+        { query: (sql, values) => tx.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...values) },
+        'postgres',
+        SIDEDOOR_STATE_ID
+      ).forbidWrites(
+        prepareStorageTombstone({
+          namespace: SIDEDOOR_STATE_ID,
+          ...classScope,
+          jobId: randomUUID(),
+        })
+      )
+    );
+    await expect(capture(item.id)).rejects.toBeInstanceOf(EpisodeStorageChangedError);
   });
   it('includes instance, episode and owner generations and rejects a transferred episode', async () => {
     const item = await episode();

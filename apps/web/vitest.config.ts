@@ -26,6 +26,10 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      'vitest-environment-private-redis': path.resolve(
+        __dirname,
+        './tests/helpers/queue/private-redis-environment.ts'
+      ),
       // Stub optional dependencies that may not be installed
       openai: path.resolve(__dirname, './tests/setup/openai-stub.ts'),
     },

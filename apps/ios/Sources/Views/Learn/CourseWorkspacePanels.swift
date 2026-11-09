@@ -341,7 +341,7 @@ struct SourcedClassPanel: View {
         error = nil
         if let activeClassId {
             model.run {
-                await model.openClass(activeClassId)
+                model.beginClassPrelude(activeClassId)
             }
             return
         }
@@ -661,7 +661,7 @@ private struct CourseClassHistoryRow: View {
             HStack(spacing: 8) {
                 Button {
                     model.run {
-                        await model.openClass(item.id)
+                        model.beginClassPrelude(item.id)
                     }
                 } label: {
                     Label(primaryActionLabel(item.status), systemImage: "book.pages")

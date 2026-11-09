@@ -17,7 +17,28 @@ import {
 } from '../../sidedoor/jobs/core/job-execution-lifetime';
 import { isDurableQueueCleanupFailure } from '../../sidedoor/jobs/core/durable-queue';
 import type { SottoProviderExecution } from '../../sidedoor/credentials/runtime/provider-execution';
-import type { WritingGrade } from '../../writing-grader';
+import { WritingGradeRejected, type WritingGrade } from '../../writing-grader';
+import { capturePrerequisiteOwnership } from '../../classes/help/lifecycle/prerequisite-ownership';
+
+export const assessmentWritingBindingSchema = z
+  .object({
+    assessmentId: z.string().min(1),
+    classId: z.string().min(1),
+    classAttempt: z.number().int().positive(),
+    assessmentAttempt: z.number().int().positive(),
+    sectionId: z.string().min(1),
+    materialDigest: z.string().regex(/^[a-f0-9]{64}$/),
+    inputDigest: z.string().regex(/^[a-f0-9]{64}$/),
+  })
+  .strict();
+
+const classAuthorizationSchema = z
+  .object({
+    kind: z.enum(['BASE', 'ADDENDUM']),
+    receiptId: z.uuid(),
+    materialHash: z.string().regex(/^[a-f0-9]{64}$/),
+  })
+  .strict();
 
 export const writingExecutionSchema = z.object({
   status: z.enum(['RUNNING', 'FAILED', 'UNRESOLVED', 'COMPLETED']),
@@ -31,6 +52,8 @@ export const writingExecutionSchema = z.object({
   expiresAt: z.number(),
   grant: z.object({ id: z.uuid(), revision: z.uuid(), fingerprint: z.string().length(64) }),
   selection: preparationSchema.shape.selection,
+  classAuthorization: classAuthorizationSchema.nullable().optional(),
+  assessment: assessmentWritingBindingSchema.optional(),
 });
 
 /** Confirmed failures may be replaced only after the original executor has drained. */
@@ -51,10 +74,22 @@ export async function admitWritingExecution(
     courseId: string;
     execution: SottoProviderExecution;
     selection: WritingExecution['selection'];
+    classAuthorization?: WritingExecution['classAuthorization'];
+    assessment?: WritingExecution['assessment'];
+    queuedAssessment?: boolean;
   }
 ): Promise<WritingExecution> {
-  const { responseId, courseId, execution, selection } = input;
-  const ownership = await captureCourseStorage(database, courseId);
+  const { responseId, courseId, execution, selection, classAuthorization } = input;
+  const assessment = input.assessment
+    ? assessmentWritingBindingSchema.parse(input.assessment)
+    : null;
+  if (assessment && classAuthorization !== undefined)
+    throw new Error('Assessment writing cannot use formative authorization.');
+  if (input.queuedAssessment && !assessment)
+    throw new Error('Queued assessment writing requires an assessment binding.');
+  const ownership = assessment
+    ? await capturePrerequisiteOwnership(database, assessment.classId, courseId, execution.userId)
+    : await captureCourseStorage(database, courseId);
   const profile = ownership.scopes.find(
     (scope) => scope.subjectId === `profile:${execution.userId}`
   );
@@ -62,6 +97,16 @@ export async function admitWritingExecution(
   if (!profile || !course || ownership.userId !== execution.userId)
     throw new Error('Writing ownership changed.');
   const response = await database.writingResponse.findUniqueOrThrow({ where: { id: responseId } });
+  if (
+    assessment &&
+    (response.userId !== execution.userId ||
+      response.assessmentSectionId !== assessment.sectionId ||
+      response.attempt !== assessment.assessmentAttempt ||
+      response.sectionId !== null ||
+      response.practiceSessionId !== null ||
+      response.examSectionId !== null)
+  )
+    throw new Error('Assessment writing response identity changed.');
   const id = randomUUID();
   const grantSpec = {
     id,
@@ -80,13 +125,15 @@ export async function admitWritingExecution(
       id,
       namespace: SIDEDOOR_STATE_ID,
       handler: 'learning-writing',
-      version: 1,
+      version: assessment ? (input.queuedAssessment ? 3 : 2) : 1,
       payload: {
         responseId,
         text: response.text,
         promptId: response.promptId,
         attempt: response.attempt,
         selection,
+        ...(assessment ? { assessment } : {}),
+        ...(classAuthorization !== undefined ? { classAuthorization } : {}),
       },
       scopes: ownership.scopes,
       delivery: { attempts: 1, priority: 0, availableAt: Date.now() },
@@ -104,6 +151,8 @@ export async function admitWritingExecution(
     courseCreatedAt: course.generation,
     expiresAt: grantSpec.expiresAt,
     selection,
+    ...(assessment ? { assessment } : {}),
+    ...(classAuthorization !== undefined ? { classAuthorization } : {}),
   };
   await learningPreparationGrant(database, current, 'writing').create(grantSpec);
   await database.writingResponse.update({
@@ -121,10 +170,15 @@ export async function reconcileWritingResponse(
 ) {
   const first = await database.writingResponse.findUnique({
     where: { id: responseId },
-    include: { prompt: { include: { section: true } } },
+    include: {
+      prompt: { include: { section: true, assessmentSection: { include: { assessment: true } } } },
+    },
   });
   if (!first) return;
-  if (first.prompt.section)
+  if (first.prompt.assessmentSection) {
+    await database.$queryRaw`SELECT id FROM "CourseClass" WHERE id = ${first.prompt.assessmentSection.assessment.classId} FOR UPDATE`;
+    await database.$queryRaw`SELECT id FROM "ClassAssessment" WHERE id = ${first.prompt.assessmentSection.assessment.id} FOR UPDATE`;
+  } else if (first.prompt.section)
     await database.$queryRaw`SELECT id FROM "CourseClass" WHERE id = ${first.prompt.section.classId} FOR UPDATE`;
   else if (first.practiceSessionId)
     await database.$queryRaw`SELECT id FROM "PracticeSession" WHERE id = ${first.practiceSessionId} FOR UPDATE`;
@@ -181,20 +235,28 @@ export async function runWritingExecution(options: {
   const { responseId, operation: captured, execution } = options;
   const signal = execution.signal ?? new AbortController().signal;
   let unknown = false;
+  let validationFailed = false;
+  let gradeProduced = false;
   try {
     const validate = async (database: Prisma.TransactionClient) => {
-      await execution.authorize(database);
-      await options.validate(database);
-      const response = await database.writingResponse.findUniqueOrThrow({
-        where: { id: responseId },
-      });
-      const state = writingExecutionSchema.parse(response.gradingState);
-      if (
-        state.id !== captured.id ||
-        state.status !== 'RUNNING' ||
-        state.fingerprint !== captured.fingerprint
-      )
-        throw new Error('The writing execution changed.');
+      try {
+        await execution.authorize(database);
+        await options.validate(database);
+        const response = await database.writingResponse.findUniqueOrThrow({
+          where: { id: responseId },
+        });
+        const state = writingExecutionSchema.parse(response.gradingState);
+        if (
+          state.id !== captured.id ||
+          state.status !== 'RUNNING' ||
+          state.fingerprint !== captured.fingerprint
+        )
+          throw new Error('The writing execution changed.');
+        validationFailed = false;
+      } catch (error) {
+        validationFailed = true;
+        throw error;
+      }
     };
     const result = await withSottoJobExecution({
       database: prisma,
@@ -236,6 +298,7 @@ export async function runWritingExecution(options: {
             }
           ),
         });
+        gradeProduced = true;
         await sottoTransaction(
           prisma,
           async (database) => {
@@ -265,8 +328,15 @@ export async function runWritingExecution(options: {
         captured.id,
         captured.fingerprint
       );
-      const status = unknown || blocked ? 'UNRESOLVED' : 'FAILED';
-      await learningPreparationGrant(database, captured, 'writing').revoke(captured.grant);
+      const activity = await learningPreparationGrant(database, captured, 'writing').revoke(
+        captured.grant
+      );
+      const paidWorkUnsettled =
+        (validationFailed || gradeProduced || !(failure instanceof WritingGradeRejected)) &&
+        activity.attempts.some((attempt) =>
+          ['admitted', 'unknown', 'succeeded'].includes(attempt.outcome)
+        );
+      const status = unknown || blocked || paidWorkUnsettled ? 'UNRESOLVED' : 'FAILED';
       await database.writingResponse.update({
         where: { id: responseId },
         data: { gradingState: { ...captured, status } },

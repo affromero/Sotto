@@ -60,7 +60,10 @@ export type ClassStatus =
 export type SectionStatus =
   'PENDING' | 'GENERATING' | 'READY' | 'IN_PROGRESS' | 'SUBMITTED' | 'PASSED' | 'FAILED';
 
-export type SpeakingGradeStatus = 'PENDING' | 'GRADING' | 'SCORED' | 'FAILED';
+export type ClassAssessmentStatus =
+  'GENERATING' | 'READY' | 'COMMITTED' | 'FAILED' | 'UNRESOLVED' | 'RETIRED';
+
+export type SpeakingGradeStatus = 'PENDING' | 'GRADING' | 'SCORED' | 'FAILED' | 'UNRESOLVED';
 
 export type EdgeType =
   'VOCAB_VOCAB' | 'VOCAB_GRAMMAR' | 'VOCAB_CLASS' | 'VOCAB_EPISODE' | 'GRAMMAR_GRAMMAR';

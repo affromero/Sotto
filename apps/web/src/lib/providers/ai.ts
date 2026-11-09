@@ -451,7 +451,7 @@ const OPENAI_COMPATIBLE_LABELS = {
 class LocalProvider extends SharedCompatibleProvider {
   constructor() {
     super('Local', async (opts) => {
-      await getServerInfra();
+      if (!opts?.endpoint || !opts.model) await getServerInfra();
       const baseUrl = opts?.endpoint || infra('aiBaseUrl');
       if (!baseUrl)
         throw new Error(

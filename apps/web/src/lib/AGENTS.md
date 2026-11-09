@@ -1,5 +1,105 @@
 # src/lib/ — Core Libraries
 
+`classes/generation/class-content.ts` builds and reviews class content under
+the active generation fence. `classes/deletion/class-deletion.ts` admits class
+deletion and its owned media cleanup.
+
+`learning/classes/formative/class-practice-review.ts` applies formative class evidence to
+learning objectives and vocabulary review inside the submission transaction.
+
+`learning/classes/progress/listening-attachment-fence.ts` verifies and holds the database
+attachment fence before retiring or regenerating unassociated listening episodes.
+
+`learning/classes/material/assessment-material.ts` validates a private held-out
+assessment snapshot and projects learner-facing fields. Its scope, media and
+productive evidence inputs must come from owned, locked database records and
+durable operation receipts. Its exact-task comparison and structural projection
+do not replace independent semantic disclosure review.
+`learning/classes/material/assessment-audio.ts` binds assessment audio identities to
+canonical scripts, owned task IDs, content hashes and storage identities. Its
+hashes do not verify storage attribution or audio bytes; those require the
+authorized audio writer and current storage registry checks at publication.
+`learning/classes/audio/assessment-audio-failure.ts` retains a source-bound failure
+receipt and fences an uncertain parent without settling its provider attempt.
+The caller must prove the exact terminal queue delivery and fence concurrent
+retries. Listener and restart reconciliation integration are still required.
+`learning/classes/audio/assessment-audio-claim.ts` fences audio admission and
+publication while a drained child is inspected. Claims do not expire, and a
+crashed claimant requires verified recovery. Released claims can be erased only
+after their exact execution has drained and the owning scope is tombstoned.
+`learning/classes/audio/assessment-audio-deletion.ts` inventories completed assessment
+audio and its drained jobs before the existing storage cleanup tombstones them.
+`learning/classes/material/assessment-snapshot.ts` captures candidate rows and formative
+tasks under database locks. Capture is not publication authority: verify the
+durable review and operation receipts and fence storage registry changes before
+sealing, then revalidate selected media at playback and grading.
+An earlier Serializable snapshot can miss a child committed before its parent
+lock. Publication needs a source-writer fence, not only these row locks.
+The assessment formative revision binds the currently acknowledged teaching.
+Capture also checks the exact receipt. Neither proves that content conceals answers.
+`learning/classes/lifecycle/assessment-status.ts` reports owned assessment work without
+exposing provider or answer data. Recovery requires a settled parent receipt,
+and ready status rechecks practice and the sealed assessment.
+`learning/classes/audio/assessment-audio-read.ts` captures an exact owned audio
+locator after verifying the reviewed assessment. Playback must recheck it after
+reading and verify the downloaded bytes before returning them.
+`readAssessmentAudioRange` is reserved for the assessment audio route, whose
+callback rechecks that exact locator and the original request on each read.
+`learning/classes/assessment-writing-*` admits and reads retained held-out writing
+work. The operation binds the reviewed task and grading prompt; its sealed evidence
+is verified inside the private submission transaction. Speaking evidence and
+retakes are not yet connected. Never
+expose the private rubric or a score without the complete assessment receipt.
+New read-aloud speaking assessments bind the existing transcript-and-timing
+policy in their generation fence and require its fixed rubric during staging
+and review. Communicative practice is not converted to read-aloud assessment.
+Writing execution retains its one-shot launch claim. Completed writing can be
+erased only after its exact operation drains and an owning scope is tombstoned.
+Active or unresolved writing and assessment audio still block deletion.
+`learning/classes/history/assessment-archive.ts` retains completed generation fences.
+Historical generation verification checks the original operation without granting
+worker authority. Retakes still require verified submission linkage and deletion
+of every historical operation before the active fence can be replaced.
+Assessment history pages retain private reviewed material and formative inputs with
+an archive-bound digest. Submission verifies every page. Legacy outcomes without
+history remain readable but cannot be submitted without verified recovery.
+`learning/classes/history/assessment-failed-receipt.ts` checks the current failed receipt,
+saved choices, retained writing evidence, and recomputed mastery. It does not
+authorize a successor; repeat all checks inside eventual retake admission.
+Historical scoring policy 1 must retain its original scoring and receipt behavior.
+`learning/classes/writing/assessment-writing-task.ts` is the canonical private writing
+task projection used by assessment snapshots and historical evidence verification.
+`learning/classes/history/assessment-prior-exposure.ts` verifies each earlier committed
+attempt and projects learner-exposed tasks without private grading fields. Review
+proofs bind that prior list. Retake admission remains closed until aggregate review
+recovery, retained-work deletion, and successor linkage are complete.
+`learning/classes/review/assessment-review-capacity.ts` checks the complete staged review
+payload before audio admission. Audio lineage binds its digest, but staged content
+is not yet frozen across child dispatch; do not treat that check as a dispatch fence.
+
+`classes/help/content/` and `classes/help/lifecycle/` capture owned class material without learner work
+or private answer keys, admits a fenced repair request, and retains its reviewed
+result with the provider grant and job receipt. Keep publication and settlement
+atomic. Each job captures the class generation alongside course and profile scopes.
+Unknown provider attempts remain blocked after source changes.
+`classes/help/listening-deletion.ts` checks class listening episode ownership and
+settled jobs before admitting episode-scoped storage cleanup.
+Legacy worksheet cleanup verifies the course generation, class lifetime and
+drained jobs before delegating an unshared file to the target fence. Shared
+files retain their remaining consumers. Fence older writers before enabling
+delegated cleanup; the storage target fence migration covers older database
+writers, while a class tombstone alone does not fence course-scoped writers.
+Prerequisite deletion backfills retained job scope indexes inside the same
+Serializable transaction before inspecting class work. A timeout or conflict
+leaves deletion uncommitted; large retained outboxes can require recovery.
+`learning/classes/speaking/lifecycle/assessment-speaking-retention.ts` checks for private state
+left behind by an erased assessment speaking job.
+Direction batches identify every task by section, kind and ID. They omit options,
+passages and listening transcripts, and are checked before review and again at
+publication. The base review receives visible options and listening transcripts;
+those may permit answer inference even though key indexes are excluded. Never
+treat model review alone as proof that an answer remains concealed.
+
 ## Vocabulary lifecycle
 
 Failed initial class preparation can retain an unpublished `GENERATING` row.
@@ -266,7 +366,7 @@ repair preserves quotation identity, count and order while correcting headwords
 and parts of speech. Batch feedback indices address the complete candidate.
 Source inventory remains outside this repair path. Learner memory stays unchanged.
 
-`learning/classes/current-sections.ts` selects the latest section before filtering
+`learning/classes/progress/current-sections.ts` selects the latest section before filtering
 its state. `class-material.ts` validates counts, reading provenance, exact scripts,
 and owned reference audio. `class-generation-state.ts` and `class-repair.ts` retain
 attempt identity and surviving learner work. `class-submission.ts` commits receipts,
@@ -425,7 +525,7 @@ its actual total and field counts within the existing single replacement budget.
 Saved teaching retains its existing schema. The unit and selected vocabulary are frozen in `adaptiveSeed`
 and reused during section repair. Historical classes preserve missing teaching;
 invalid present teaching fails explicitly. Every skill and reviewer receives the
-accepted unit and targets. `learning/classes/class-memory.ts` seeds vocabulary
+accepted unit and targets. `learning/classes/formative/class-memory.ts` seeds vocabulary
 inside successful class publication, preserving existing mastery on upsert.
 Lesson teaching failures retain their runtime review identity. Durable failure
 records use the existing explanation category so older readers can validate them;
@@ -697,7 +797,7 @@ is unresolved. Canonical recovery restores `FAILED` only after exact owned root
 and audio receipts settle. Pristine replacement of incomplete audio requires that
 known failure and the existing lineage, fingerprint, revocation, and drain proofs.
 
-`learning/classes/class-quiz-retry.ts` admits fresh practice for a complete quiz
+`learning/classes/formative/class-quiz-retry.ts` admits fresh practice for a complete quiz
 below its stored mastery threshold. Capture missed concepts and every shown
 question on the server before preparing only that section. Keep other learner
 work and restore the prior material after known failure and settled execution.
@@ -1138,6 +1238,9 @@ current application field and owning record before generic local downloads.
 `readLocalObject` combines that policy with canonical current consumer resolution
 in one transaction. Historical attribution and household owner role grant no
 private learner access. Local download responses are private and uncached.
+Withdrawn class speaking prompts cannot authorize reference downloads; another
+live, independently authorized consumer may still authorize a shared object.
+Public or presigned object-store URLs do not use this local access policy.
 
 `sidedoor/redis-semaphore.ts` adapts one unused ioredis connection to the shared
 exact-token capacity lease. Reconnect, offline queuing and command replay stay off.
@@ -1257,6 +1360,18 @@ Provider factories require explicit runtime choices. External clients may log mi
 All lib functions throw descriptive errors. API routes catch and return proper HTTP status codes. Workers log errors and let BullMQ handle retries.
 
 ## Adding a New Lib File
+
+`classes/staging/staged-reading.ts` and `classes/staging/staged-writing.ts` bind private repair
+material to its preparation operation before atomic publication.
+`classes/repair/writing-repair-source.ts` captures and verifies the saved writing
+source under the class lock.
+`classes/staging/staged-grammar.ts` and `classes/repair/grammar-repair-source.ts` bind grammar
+repair to its saved questions, learner answers and graded evidence.
+`classes/staging/stage-guard.ts` verifies private section and activation triggers for
+grammar, reading and writing while holding their table locks. Function owners
+and other DDL-capable roles must be excluded from concurrent application writes.
+`learning/classes/progress/quiz-history.ts` projects owned saved choices and submitted
+results separately from active exercises, retaining partially readable records.
 
 `providers/shared-api.ts` binds captured Sotto API selections to Sidedoor SDK adapters.
 It preserves configured endpoints, messages, generation options and nullable usage.

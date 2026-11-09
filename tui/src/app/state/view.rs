@@ -1,3 +1,18 @@
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub(crate) struct HistoryAudioState {
+    pub items: Vec<HistoryAudioItem>,
+    pub cursor: usize,
+    pub pending: Option<uuid::Uuid>,
+    pub note: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct HistoryAudioItem {
+    pub prompt_id: String,
+    pub recording_id: String,
+    pub label: String,
+}
+
 /// The active screen and its state.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum View {
@@ -99,11 +114,28 @@ pub(crate) enum View {
         result: PracticeResult,
     },
     /// An in-progress gated class: walk `sections` in order, then submit.
+    ClassPrelude {
+        course: Course,
+        class_id: String,
+        value: Option<serde_json::Value>,
+        in_flight: bool,
+        error: Option<String>,
+        scroll: u16,
+        polls: u16,
+        retained_work: Vec<String>,
+    },
     Class {
         course: Course,
         class_id: String,
         attempt: i64,
         progress: ProgressSave,
+        directions: Option<ClassDirections>,
+        material_source: Option<String>,
+        direction_scroll: std::collections::BTreeMap<(String, String, String), u16>,
+        previous_work: Vec<String>,
+        history_open: bool,
+        history_scroll: u16,
+        history_audio: HistoryAudioState,
         /// The fetched class sections; `None` while the class load is in flight.
         sections: Option<Vec<ClassSection>>,
         /// Index of the section currently shown.
@@ -113,7 +145,8 @@ pub(crate) enum View {
     },
     /// The graded outcome of a submitted class, with a "next class" option.
     ClassOutcome { course: Course, class_id: String, attempt: i64, result: ClassResult },
-    ClassRepair { course: Course, class_id: String, attempt: i64, message: String },
+    ClassRepair { course: Course, class_id: String, attempt: i64, message: String,
+        previous_work: Vec<String>, history_open: bool, history_scroll: u16, history_audio: HistoryAudioState },
     /// The course has no further classes (next-class returned `{ done: true }`).
     ClassDone { course: Course },
     /// An in-progress mock exam: walk `sections` in order, then submit + score.
@@ -127,6 +160,7 @@ pub(crate) enum View {
         /// True while the exam submit is in flight.
         submitting: bool,
     },
+    ExamRecovery { course: Course, exam_id: String, retained_work: Vec<String>, scroll: u16 },
     /// The graded band/score outcome of a submitted exam.
     ExamOutcome { course: Course, result: ExamResult },
 
@@ -265,6 +299,13 @@ impl View {
             class_id,
             attempt: 0,
             progress: ProgressSave::default(),
+            directions: None,
+            material_source: None,
+            direction_scroll: Default::default(),
+            previous_work: Vec::new(),
+            history_open: false,
+            history_scroll: 0,
+            history_audio: HistoryAudioState::default(),
             sections: None,
             cursor: 0,
             submitting: false,
@@ -319,6 +360,7 @@ impl View {
         match self {
             Self::Practice { session_id, .. } => Some(session_id.clone()),
             Self::Class { class_id, attempt, .. } => Some(format!("CLASS/{class_id}/{attempt}")),
+            Self::Exam { exam_id: Some(id), .. } => Some(format!("EXAM/{id}")),
             _ => None,
         }
     }

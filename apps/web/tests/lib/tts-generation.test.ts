@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { access, rm } from 'node:fs/promises';
+import { access, mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join, relative } from 'node:path';
 
 let chunkAudio: Buffer;
 beforeAll(async () => {
@@ -384,14 +386,18 @@ describe('generateTtsAudio', () => {
   it('does not hide unconfirmed duration process cleanup behind an estimate', async () => {
     const failure = new MediaCleanupError({ cause: new Error('Process closure unconfirmed') });
     mockGetAudioDuration.mockRejectedValue(failure);
-    const error = await generateTtsAudio(defaultParams()).catch((caught: unknown) => caught);
-    expect(error).toBeInstanceOf(TtsMediaCleanupError);
-    const cleanup = error as TtsMediaCleanupError;
+    const workspace = await mkdtemp(join(tmpdir(), 'sotto-tts-execution-test-'));
+    const error = await generateTtsAudio(defaultParams({ executionDirectory: workspace })).catch(
+      (caught: unknown) => caught
+    );
     try {
+      expect(error).toBeInstanceOf(TtsMediaCleanupError);
+      const cleanup = error as TtsMediaCleanupError;
       expect(cleanup.cause).toBe(failure);
+      expect(relative(workspace, cleanup.directory)).toMatch(/^tts-media-/);
       await expect(access(cleanup.directory)).resolves.toBeUndefined();
     } finally {
-      await rm(cleanup.directory, { recursive: true, force: true });
+      await rm(workspace, { recursive: true, force: true });
     }
     expect(mockLogUsage).not.toHaveBeenCalled();
   });
@@ -511,6 +517,37 @@ describe('generateTtsAudio', () => {
   });
 
   describe('multi-chunk generation', () => {
+    it('reports each chunk as settled before dispatching the next', async () => {
+      (splitTextForTts as ReturnType<typeof vi.fn>).mockReturnValue(['first', 'second']);
+      const events: string[] = [];
+      mockGenerateSpeech.mockImplementation(
+        async (params: { text: string; onDispatch?: () => void; onSettled?: () => void }) => {
+          events.push(`begin:${params.text}`);
+          params.onDispatch?.();
+          await Promise.resolve();
+          params.onSettled?.();
+          events.push(`end:${params.text}`);
+          return chunkAudio;
+        }
+      );
+      const result = await generateTtsAudio(
+        defaultParams({
+          onDispatch: () => events.push('dispatch'),
+          onSettled: () => events.push('settled'),
+        })
+      );
+      expect(result?.audioBuffer.byteLength).toBeGreaterThan(0);
+      expect(events).toEqual([
+        'begin:first',
+        'dispatch',
+        'settled',
+        'end:first',
+        'begin:second',
+        'dispatch',
+        'settled',
+        'end:second',
+      ]);
+    });
     it('skips text context for v3 model and passes continuityIds between chunks', async () => {
       const chunk1 = 'First chunk of text.';
       const chunk2 = 'Second chunk of text.';

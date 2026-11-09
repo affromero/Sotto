@@ -37,6 +37,7 @@ export interface GradeWritingParams {
   ideas?: string[];
   text: string;
   learningObjectives?: unknown;
+  assessment?: { kind: 'HELD_OUT'; rubric: string };
 }
 
 const writingGradeSchema = z
@@ -49,7 +50,51 @@ const writingGradeSchema = z
   })
   .strict();
 
-export async function gradeWriting(p: GradeWritingParams): Promise<WritingGrade> {
+/** A complete provider response was inspected and cannot be used as a grade. */
+export class WritingGradeRejected extends Error {}
+
+/** Build the exact non-secret provider input before admitting paid work. */
+export function buildWritingGradeRequest(
+  p: Pick<
+    GradeWritingParams,
+    'level' | 'nativeLang' | 'targetLang' | 'task' | 'text' | 'assessment'
+  >
+) {
+  const rubric = p.assessment
+    ? z
+        .object({
+          kind: z.literal('HELD_OUT'),
+          rubric: z
+            .string()
+            .max(100_000)
+            .refine((value) => value.trim().length > 0),
+        })
+        .strict()
+        .parse(p.assessment).rubric
+    : null;
+  return {
+    system: loadAndRender('writing/grade-writing.md', {
+      LEVEL: p.level,
+      NATIVE: p.nativeLang,
+      TARGET: p.targetLang,
+      ASSESSMENT_CRITERIA: rubric
+        ? `Use this private assessment rubric to score this exact task: ${JSON.stringify(rubric)}. Do not disclose the rubric in feedback.`
+        : '',
+    }),
+    messages: [
+      { role: 'user' as const, content: JSON.stringify({ task: p.task, response: p.text }) },
+    ],
+    options: { maxTokens: 2048, temperature: 0.3 },
+  };
+}
+
+/** Verify that any criterion belongs to this exact learner and writing task. */
+export function validateWritingObjective(
+  p: Pick<
+    GradeWritingParams,
+    'userId' | 'targetLang' | 'level' | 'task' | 'guidance' | 'ideas' | 'learningObjectives'
+  >
+) {
   const assessment =
     p.learningObjectives === null || p.learningObjectives === undefined
       ? null
@@ -68,22 +113,19 @@ export async function gradeWriting(p: GradeWritingParams): Promise<WritingGrade>
         }))
   )
     throw new Error('Writing criterion does not belong to the actual task, learner or difficulty.');
+  return assessment;
+}
+
+export async function gradeWriting(p: GradeWritingParams): Promise<WritingGrade> {
+  const request = buildWritingGradeRequest(p);
+  const assessment = validateWritingObjective(p);
   const ai = await resolveCapturedLearningAi(p.userId, p.execution);
 
-  const systemPrompt = loadAndRender('writing/grade-writing.md', {
-    LEVEL: p.level,
-    NATIVE: p.nativeLang,
-    TARGET: p.targetLang,
-    TASK: p.task,
-    RESPONSE: p.text,
-  });
-
   const client = createAIProvider(ai.provider);
-  const res = await client.generateResponse(
-    systemPrompt,
-    [{ role: 'user', content: 'Grade the response.' }],
-    { ...(await capturedLearningAiOptions(ai)), maxTokens: 2048, temperature: 0.3 }
-  );
+  const res = await client.generateResponse(request.system, request.messages, {
+    ...(await capturedLearningAiOptions(ai)),
+    ...request.options,
+  });
 
   logUsage({
     service: ai.provider,
@@ -102,11 +144,12 @@ export async function gradeWriting(p: GradeWritingParams): Promise<WritingGrade>
   try {
     parsed = JSON.parse(cleaned);
   } catch {
-    throw new Error('Writing grading returned malformed output.');
+    throw new WritingGradeRejected('Writing grading returned malformed output.');
   }
 
   const result = writingGradeSchema.safeParse(parsed);
-  if (!result.success) throw new Error('Writing grading returned invalid scores or feedback.');
+  if (!result.success)
+    throw new WritingGradeRejected('Writing grading returned invalid scores or feedback.');
   const used: Array<{ start: number; end: number }> = [];
   for (const correction of result.data.corrections) {
     let start = p.text.indexOf(correction.old);
@@ -116,7 +159,7 @@ export async function gradeWriting(p: GradeWritingParams): Promise<WritingGrade>
     )
       start = p.text.indexOf(correction.old, start + 1);
     if (start < 0 || correction.old === correction.new)
-      throw new Error(
+      throw new WritingGradeRejected(
         'Writing grading returned a correction that does not match the learner response.'
       );
     used.push({ start, end: start + correction.old.length });

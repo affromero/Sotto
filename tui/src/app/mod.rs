@@ -3,6 +3,8 @@ mod class;
 mod exam;
 #[path = "runtime/input.rs"]
 mod input;
+#[path = "runtime/input-settings.rs"]
+mod input_settings;
 #[path = "runtime/learning_map.rs"]
 mod learning_map;
 #[path = "runtime/lifecycle.rs"]
@@ -83,18 +85,25 @@ pub(crate) struct App {
     /// Lazily-initialized audio output. `None` until first listening playback;
     /// holds `Err`-derived absence so a headless host degrades gracefully.
     player: Option<AudioPlayer>,
+    history_audio_task: Option<tokio::task::AbortHandle>,
     /// Microphone capture for speaking. Always present (idle until `start`);
     /// device failures surface from `start`/`stop`, not construction.
     recorder: Recorder,
+    class_recording_binding: Option<(String, String, crate::api::ClassSpeakingBinding)>,
+    retained_class_recording: Option<Vec<u8>>,
+    pending_class_audio: std::collections::BTreeMap<u64, PendingClassAudio>,
     /// The course carried across the `next-class` round trip, so the resolved
     /// class (or the done screen) can keep offering "next class".
     pending_course: Option<Course>,
     pending_admissions: std::collections::BTreeMap<uuid::Uuid, (String, types::PracticeKind)>,
     pending_selections: std::collections::BTreeMap<uuid::Uuid, types::LearningSelectionRequest>,
     practice_cache: std::collections::BTreeMap<String, View>,
+    account_practice_cache:
+        std::collections::BTreeMap<(String, String), std::collections::BTreeMap<String, View>>,
     progress_sequence: u64,
     placement_transport: placement_transport::PlacementTransport,
     placement_task: Option<tokio::task::AbortHandle>,
+    prelude_task: Option<tokio::task::AbortHandle>,
     /// The active theme, resolved from `config.theme` at startup and mutated
     /// live by the theme picker. Its [`Palette`] is threaded into rendering.
     theme: Theme,
@@ -114,12 +123,21 @@ pub(crate) struct App {
 /// (real client) and tests (stub) share one runtime-swappable path.
 type ClientFactory = Arc<dyn Fn(&Profile) -> Result<Arc<dyn Api>> + Send + Sync>;
 
+#[derive(Clone)]
+struct PendingClassAudio {
+    path: PathBuf,
+    owner: (String, String),
+    target: (String, String, crate::api::ClassSpeakingBinding),
+    origin: View,
+}
+
 #[cfg(test)]
 mod tests {
     include!("tests/support.rs");
     include!("tests/practice.rs");
     include!("tests/full-practice.rs");
     include!("tests/class_flow.rs");
+    include!("tests/class_recovery.rs");
     include!("tests/exam_placement.rs");
     include!("tests/ask_settings.rs");
     include!("tests/keymap.rs");

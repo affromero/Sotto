@@ -1,0 +1,77 @@
+.root {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 32px 20px 120px;
+  color: var(--ink);
+}
+
+.label {
+  color: var(--ink-soft);
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.section {
+  margin: 32px 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.section fieldset {
+  margin: 24px 0;
+  padding: 0;
+  border: 0;
+}
+
+.section legend,
+.writing label {
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+}
+
+.writing {
+  display: grid;
+  gap: 12px;
+  margin: 24px 0;
+}
+
+.writing textarea {
+  width: 100%;
+  min-height: 120px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--paper-2);
+  color: var(--ink);
+  font: inherit;
+}
+
+.root button {
+  min-height: 44px;
+  margin: 8px 12px 8px 0;
+  padding: 10px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--paper-2);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.root button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.root audio {
+  max-width: 100%;
+}

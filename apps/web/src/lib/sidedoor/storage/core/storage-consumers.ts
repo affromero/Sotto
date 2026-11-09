@@ -40,6 +40,31 @@ export async function readStorageConsumerReference(
   consumer: string
 ) {
   const { model, field, id } = parseStorageConsumer(consumer);
+  if (model === 'SpeakingRecording' && field === 'audioUrl') {
+    const recording = await database.speakingRecording.findUnique({
+      where: { id },
+      select: { assessmentSectionId: true, assessmentAudioUrl: true },
+    });
+    if (recording?.assessmentSectionId) {
+      if (!recording.assessmentAudioUrl) throw new Error('Assessment recording locator is missing');
+      return recording.assessmentAudioUrl;
+    }
+  }
+  if (model === 'SpeakingPrompt' && field === 'referenceTtsUrl') {
+    const prompt = await database.speakingPrompt.findUnique({
+      where: { id },
+      select: {
+        assessmentSectionId: true,
+        referenceTtsUrl: true,
+        assessmentReference: { select: { currentUrl: true } },
+      },
+    });
+    if (prompt?.assessmentSectionId) {
+      if (Boolean(prompt.referenceTtsUrl) !== Boolean(prompt.assessmentReference))
+        throw new Error('Assessment speaking locator is inconsistent');
+      return prompt.assessmentReference?.currentUrl ?? null;
+    }
+  }
   const rows = await database.$queryRawUnsafe<Array<{ reference: string | null }>>(
     `SELECT "${field}" AS reference FROM "${model}" WHERE id = $1`,
     id
@@ -55,6 +80,39 @@ export async function replaceStorageConsumerReference(
   next: string
 ) {
   const { model, field, id } = parseStorageConsumer(consumer);
+  if (model === 'SpeakingRecording' && field === 'audioUrl') {
+    const recording = await database.speakingRecording.findUnique({
+      where: { id },
+      select: {
+        assessmentSectionId: true,
+        assessmentSection: { select: { assessment: { select: { status: true } } } },
+      },
+    });
+    if (recording?.assessmentSectionId) {
+      if (recording.assessmentSection?.assessment.status !== 'COMMITTED')
+        throw new Error('Assessment recording cannot move while the assessment is active');
+      const updated = await database.speakingRecording.updateMany({
+        where: { id, assessmentAudioUrl: previous },
+        data: { assessmentAudioUrl: next },
+      });
+      if (updated.count !== 1) throw new Error('Storage consumer changed during publication');
+      return;
+    }
+  }
+  if (model === 'SpeakingPrompt' && field === 'referenceTtsUrl') {
+    const prompt = await database.speakingPrompt.findUnique({
+      where: { id },
+      select: { assessmentSectionId: true },
+    });
+    if (prompt?.assessmentSectionId) {
+      const updated = await database.assessmentSpeakingReference.updateMany({
+        where: { promptId: id, currentUrl: previous },
+        data: { currentUrl: next },
+      });
+      if (updated.count !== 1) throw new Error('Storage consumer changed during publication');
+      return;
+    }
+  }
   const rows = await database.$queryRawUnsafe<Array<{ id: string }>>(
     `UPDATE "${model}" SET "${field}" = $1 WHERE id = $2 AND "${field}" = $3 RETURNING id`,
     next,

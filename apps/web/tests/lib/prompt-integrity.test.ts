@@ -455,7 +455,7 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
     'TARGET',
     'VOCAB',
   ].sort(),
-  'writing/grade-writing.md': ['LEVEL', 'NATIVE', 'RESPONSE', 'TARGET', 'TASK'].sort(),
+  'writing/grade-writing.md': ['ASSESSMENT_CRITERIA', 'LEVEL', 'NATIVE', 'TARGET'].sort(),
   'writing/generate-translation-prompts.md': [
     'COUNT',
     'LANGUAGE_POLICY',

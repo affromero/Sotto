@@ -11,6 +11,7 @@ import { writeStorageReference } from '@/lib/sidedoor/storage/core/storage-write
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 import {
   readTranscriptExport,
+  readAccessibleTranscriptEpisode,
   validateTranscriptExport,
 } from '@/lib/sidedoor/storage/publication/transcript-export';
 import {
@@ -44,6 +45,7 @@ async function readWork(
   const work = await readStitchingArtifact(database, job, 'pdf-generation');
   if (work.complete) return work;
   const { payload } = work;
+  await readAccessibleTranscriptEpisode(database, payload.episodeId, payload.userId);
   const episode = await readEpisodeTranscript(database, payload.episodeId);
   if (
     episode.userId !== payload.userId ||
@@ -116,6 +118,12 @@ export async function processDurablePdfGeneration(
           captured.additionalProfileIds
         );
         if ('requesterId' in captured.payload) await validateTranscriptExport(tx, captured.payload);
+        else
+          await readAccessibleTranscriptEpisode(
+            tx,
+            captured.payload.episodeId,
+            captured.payload.userId
+          );
         const episode = await readEpisodeTranscript(tx, captured.payload.episodeId);
         if (
           !episode.pdfUrl ||

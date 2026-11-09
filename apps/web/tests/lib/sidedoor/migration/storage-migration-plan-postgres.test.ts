@@ -15,6 +15,7 @@ import {
 } from 'thesidedoor-core/storage';
 import type { Prisma } from '@/generated/prisma/client';
 import { readStorageMigrationAssetPage } from '@/lib/sidedoor/storage/migration/storage-migration-plan';
+import { captureEpisodeStorage } from '@/lib/sidedoor/storage/core/episode-storage';
 import { readStorageMigrationReferencePage } from '@/lib/sidedoor/storage/migration/storage-migration-references';
 import { planSottoStorageMigration } from '@/lib/sidedoor/storage/migration/storage-migration-dry-run';
 import {
@@ -30,6 +31,8 @@ import { resolveSottoRequest } from '@/lib/sidedoor/access/core/request-identity
 import { SHARED_SESSION_COOKIE } from '@/lib/sidedoor/access/core/session-identity';
 import { SIDEDOOR_STATE_ID, sottoStorageInstance } from '@/lib/sidedoor/access/state/store';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
+import { assessmentSpeakingGradingPayloadSchema } from '@/lib/sidedoor/jobs/stitch/speaking-grading-work';
+import { resolveStorageInput } from '@/lib/sidedoor/storage/core/storage-inputs';
 import {
   createSharedTestInstance,
   type SharedTestInstance,
@@ -534,6 +537,254 @@ suite('canonical storage migration inventory', () => {
       readStorageMigrationAssetPage({ database, ...authority })
     );
     expect(page).toEqual({ entries: [], issues: [], cursor: null });
+  });
+  it('includes historical listening and speaking assessment audio after class regeneration', async () => {
+    const curriculum = await instance.database.curriculum.upsert({
+      where: { nativeLang_targetLang: { nativeLang: 'es', targetLang: 'ru' } },
+      create: { nativeLang: 'es', targetLang: 'ru', title: 'Russian' },
+      update: {},
+    });
+    const lesson = await instance.database.lesson.upsert({
+      where: { curriculumId_slug: { curriculumId: curriculum.id, slug: 'historical-audio' } },
+      create: {
+        curriculumId: curriculum.id,
+        slug: 'historical-audio',
+        level: 'A1',
+        order: 1,
+        title: 'First lesson',
+        objective: 'Greet',
+        grammarPoints: [],
+        targetVocab: [],
+        vocabThemes: [],
+      },
+      update: {},
+    });
+    const course = await instance.database.course.create({
+      data: {
+        userId: identity.ownerId,
+        curriculumId: curriculum.id,
+        nativeLang: 'es',
+        targetLang: 'ru',
+      },
+    });
+    const cls = await instance.database.courseClass.create({
+      data: { courseId: course.id, lessonId: lesson.id, order: 1 },
+    });
+    const operationId = randomUUID();
+    const assessment = await instance.database.classAssessment.create({
+      data: {
+        classId: cls.id,
+        courseId: course.id,
+        userId: identity.ownerId,
+        classAttempt: 1,
+        assessmentAttempt: 1,
+        requirements: {},
+        formativeRevision: 'revision',
+        generationOperationId: operationId,
+      },
+    });
+    const listening = await instance.database.classAssessmentSection.create({
+      data: {
+        assessmentId: assessment.id,
+        skill: 'LISTENING',
+        passThreshold: 0.7,
+      },
+    });
+    const episode = await sottoTransaction(instance.database, async (tx) => {
+      const created = await tx.episode.create({
+        data: {
+          userId: identity.ownerId,
+          title: 'Assessment',
+          topic: 'Test',
+          assessmentAudioAssessmentId: assessment.id,
+          assessmentAudioSectionId: listening.id,
+          assessmentAudioOperationId: operationId,
+        },
+      });
+      await tx.classAssessmentSection.update({
+        where: { id: listening.id },
+        data: {
+          episodeId: created.id,
+          audioReservationEpisodeId: created.id,
+          audioReservationOperationId: operationId,
+        },
+      });
+      return created;
+    });
+    const speaking = await instance.database.classAssessmentSection.create({
+      data: { assessmentId: assessment.id, skill: 'SPEAKING', passThreshold: 0.7 },
+    });
+    const prompt = await instance.database.speakingPrompt.create({
+      data: {
+        assessmentSectionId: speaking.id,
+        assessmentTaskMode: 'READ_ALOUD',
+        order: 1,
+        targetPhrase: 'Привет',
+        translation: 'Hola',
+        assessmentRubric: 'Pronounce the greeting',
+      },
+    });
+    const recordingId = randomUUID();
+    const ownership = await sottoTransaction(instance.database, (tx) =>
+      captureEpisodeStorage(tx, episode.id)
+    );
+    const consumer = `episode:${episode.id}:audio`;
+    const speakingConsumers = [
+      `speaking-prompt:${prompt.id}:reference`,
+      `recording:${recordingId}:audio`,
+    ];
+    const saved = await seed(
+      [],
+      [consumer, ...speakingConsumers],
+      ownership.scopes.filter((scope) => !scope.subjectId.startsWith('instance:'))
+    );
+    await instance.database.episode.update({
+      where: { id: episode.id },
+      data: { audioUrl: saved.prepared.reference },
+    });
+    await instance.database.speakingPrompt.update({
+      where: { id: prompt.id },
+      data: { referenceTtsUrl: saved.prepared.reference },
+    });
+    await instance.database.speakingRecording.create({
+      data: {
+        id: recordingId,
+        assessmentSectionId: speaking.id,
+        promptId: prompt.id,
+        userId: identity.ownerId,
+        audioUrl: saved.prepared.reference,
+      },
+    });
+    await expect(
+      sottoTransaction(instance.database, async (tx) => {
+        await tx.speakingPrompt.update({
+          where: { id: prompt.id },
+          data: { referenceTtsUrl: null },
+        });
+        await tx.classAssessment.update({
+          where: { id: assessment.id },
+          data: {
+            status: 'READY',
+            teachingKind: 'BASE',
+            teachingReceiptId: randomUUID(),
+            reviewOperationId: randomUUID(),
+            reviewedMaterialDigest: 'a'.repeat(64),
+            reviewReceipt: {},
+            sealedAt: new Date(),
+          },
+        });
+        const captured = await captureSpeakingRecordingStorage(tx, recordingId);
+        const storage = await resolveStorageInput(tx, {
+          consumer: `recording:${recordingId}:audio`,
+          reference: saved.prepared.reference,
+        });
+        const operation = randomUUID();
+        expect(
+          assessmentSpeakingGradingPayloadSchema.safeParse({
+            recordingId,
+            recordingCreatedAt: captured.associations.createdAt,
+            storage: storage.input,
+            ownership: captured,
+            grant: { id: operation, revision: randomUUID(), fingerprint: 'b'.repeat(64) },
+            assessment: {
+              version: 1,
+              operationId: operation,
+              recordingId,
+              assessmentId: assessment.id,
+              classId: cls.id,
+              courseId: course.id,
+              userId: identity.ownerId,
+              classAttempt: 1,
+              assessmentAttempt: 1,
+              sectionId: speaking.id,
+              promptId: prompt.id,
+              materialDigest: 'a'.repeat(64),
+              taskDigest: 'c'.repeat(64),
+              speakingPolicy: 'READ_ALOUD_TRANSCRIPT_V1',
+              audio: { sha256: 'd'.repeat(64), bytes: 3, contentType: 'audio/webm' },
+              selection: {
+                providerId: 'speech',
+                model: 'model',
+                baseUrl: null,
+                credentialFingerprint: null,
+              },
+              gradingSelection: {
+                provider: 'ai',
+                model: 'model',
+                credentialFingerprint: null,
+                moderationCredentialFingerprint: null,
+              },
+            },
+          }).success
+        ).toBe(true);
+        throw new Error('Roll back assessment job fixture');
+      })
+    ).rejects.toThrow('Roll back assessment job fixture');
+    await expect(
+      instance.database.speakingRecording.create({
+        data: {
+          id: randomUUID(),
+          assessmentSectionId: speaking.id,
+          promptId: prompt.id,
+          userId: identity.ownerId,
+          audioUrl: saved.prepared.reference,
+        },
+      })
+    ).rejects.toThrow(/unique constraint/i);
+    await instance.database.courseClass.update({ where: { id: cls.id }, data: { attempt: 2 } });
+    const authority = await original();
+    const page = await sottoTransaction(instance.database, (database) =>
+      readStorageMigrationAssetPage({ database, ...authority })
+    );
+    expect(page.issues).toEqual([
+      expect.objectContaining({ consumer: speakingConsumers[1], reason: 'unsupported-consumer' }),
+    ]);
+    expect(page.entries).toEqual([]);
+    await expect(
+      sottoTransaction(instance.database, (tx) =>
+        replaceStorageConsumerReference(
+          tx,
+          speakingConsumers[1]!,
+          saved.prepared.reference,
+          '/moved'
+        )
+      )
+    ).rejects.toThrow('Assessment recording cannot move while the assessment is active');
+    const promptConsumer = speakingConsumers[0]!;
+    await expect(
+      sottoTransaction(instance.database, async (tx) => {
+        await tx.classAssessment.update({
+          where: { id: assessment.id },
+          data: {
+            status: 'READY',
+            teachingKind: 'BASE',
+            teachingReceiptId: randomUUID(),
+            reviewOperationId: randomUUID(),
+            reviewedMaterialDigest: 'a'.repeat(64),
+            reviewReceipt: {},
+            sealedAt: new Date(),
+          },
+        });
+        await replaceStorageConsumerReference(
+          tx,
+          promptConsumer,
+          saved.prepared.reference,
+          '/moved'
+        );
+        expect(await readStorageConsumerReference(tx, promptConsumer)).toBe('/moved');
+        expect(
+          (await tx.speakingPrompt.findUniqueOrThrow({ where: { id: prompt.id } })).referenceTtsUrl
+        ).toBe(saved.prepared.reference);
+        const references = await readStorageMigrationReferencePage({ database: tx, ...authority });
+        expect(references.references.filter((item) => item.consumer === promptConsumer)).toEqual([
+          expect.objectContaining({ reference: '/moved', attribution: 'unregistered' }),
+        ]);
+        await expect(
+          replaceStorageConsumerReference(tx, promptConsumer, saved.prepared.reference, '/other')
+        ).rejects.toThrow('Storage consumer changed during publication');
+        throw new Error('Roll back locator fixture');
+      })
+    ).rejects.toThrow('Roll back locator fixture');
   });
   it('reports deleted episode parents without aborting the inventory page', async () => {
     const episode = await instance.database.episode.create({

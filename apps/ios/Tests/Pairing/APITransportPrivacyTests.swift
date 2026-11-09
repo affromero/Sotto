@@ -78,6 +78,84 @@ private final class VocabularyDictionaryProtocol: URLProtocol {
 }
 
 final class APITransportPrivacyTests: XCTestCase {
+    @MainActor
+    func testClassRecordingIsNotSentAfterLearnerChanges() async throws {
+        let server = try LocalHTTPServer { _ in .json(#"{"recordingId":"unexpected"}"#) }
+        try await server.start()
+        defer { server.stop() }
+        let profile = SottoProfile(id: "second", name: "Second", avatarUrl: "/avatars/penguin.png", isOwner: true,
+            role: "ADMIN", courseCount: nil, primaryCourse: nil, isActive: nil)
+        let model = SottoAppModel(credentials: SottoCredentials(serverURL: server.url, apiKey: "secret", user: nil, selectedProfile: profile), session: URLSession(configuration: .ephemeral))
+        let original = SottoLearnerIdentity(SottoAPIClient(serverURL: server.url, apiKey: "secret", profileId: "first"))
+        do {
+            _ = try await model.uploadClassSpeakingRecording(classId: "class", promptId: "prompt",
+                audioURL: URL(fileURLWithPath: "/unused"),
+                binding: SottoClassSpeakingBinding(attempt: 1, materialRevision: String(repeating: "a", count: 64)),
+                expectedLearner: original)
+            XCTFail("A recording must remain with its original learner")
+        } catch SottoAPIError.classRecordingRejected(_) {
+            XCTAssertTrue(server.requests.isEmpty)
+        }
+        do {
+            _ = try await model.latestSpeakingRecording(source: .practice(sessionId: "session"),
+                promptId: "prompt", expectedLearner: original)
+            XCTFail("A recording must not be recovered under another learner")
+        } catch is CancellationError {
+            XCTAssertTrue(server.requests.isEmpty)
+        }
+    }
+
+    @MainActor
+    func testLateClassUploadReceiptDoesNotCrossLearners() async throws {
+        let server = try LocalHTTPServer { _ in
+            .init(status: 201, headers: [:], body: #"{"recordingId":"saved","status":"PENDING"}"#, delay: 0.5)
+        }
+        try await server.start()
+        defer { server.stop() }
+        let first = PlayTestIdentity.connection(server: server.url, id: "first")
+        let second = PlayTestIdentity.connection(server: server.url, id: "second")
+        let model = SottoAppModel(credentials: first, session: URLSession(configuration: .ephemeral),
+            credentialStore: PlayCredentialMemoryStore())
+        let owner = SottoLearnerIdentity(try XCTUnwrap(model.makeClient()))
+        let audio = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+        try Data("RIFF sample audio".utf8).write(to: audio)
+        defer { try? FileManager.default.removeItem(at: audio) }
+        let upload = Task {
+            try await model.uploadClassSpeakingRecording(classId: "class", promptId: "prompt", audioURL: audio,
+                binding: SottoClassSpeakingBinding(attempt: 1, materialRevision: String(repeating: "a", count: 64)),
+                expectedLearner: owner)
+        }
+        for _ in 0..<100 where server.requests.isEmpty { try await Task.sleep(nanoseconds: 10_000_000) }
+        XCTAssertEqual(server.requests.count, 1)
+        try model.persistCredentials(second)
+        do {
+            _ = try await upload.value
+            XCTFail("A late receipt must not update another learner")
+        } catch is CancellationError {
+            XCTAssertTrue(FileManager.default.fileExists(atPath: audio.path))
+        }
+    }
+
+    @MainActor
+    func testCredentialRotationKeepsPendingSpeakingAndReopensCleanPrompts() throws {
+        let server = URL(string: "https://school.example")!
+        let profile = PlayTestIdentity.profile("learner")
+        let original = SottoCredentials(serverURL: server, apiKey: "old", user: nil, selectedProfile: profile)
+        let model = SottoAppModel(credentials: original, credentialStore: PlayCredentialMemoryStore())
+        let state = model.learningSessionState(path: "/api/v1/classes/class", attempt: 1, revision: 0)
+        let clean = model.speakingState(source: .classSession(classId: "class"), promptId: "clean")
+        let pending = model.speakingState(source: .classSession(classId: "class"), promptId: "pending")
+        let previousOwner = try XCTUnwrap(pending.recordingOwner)
+        pending.uploadUnknown = true
+        try model.persistCredentials(SottoCredentials(serverURL: server, apiKey: "new", user: nil, selectedProfile: profile))
+        let reopened = model.learningSessionState(path: "/api/v1/classes/class", attempt: 1, revision: 0)
+        let currentOwner = SottoLearnerIdentity(try XCTUnwrap(model.makeClient()))
+        XCTAssertTrue(reopened === state)
+        XCTAssertEqual(reopened.owner, currentOwner)
+        XCTAssertEqual(clean.recordingOwner, currentOwner)
+        XCTAssertEqual(pending.recordingOwner, previousOwner)
+        XCTAssertFalse(pending.canRecord)
+    }
     func testProofOnlyGamePostRejectsSameOriginRedirectsWithoutCookiesBearerOrBrowserOrigin() async throws {
         let server = try LocalHTTPServer { _ in .init(status: 307, headers: ["Location": "/api/v1/play/retargeted"], body: "") }
         try await server.start()
@@ -90,7 +168,11 @@ final class APITransportPrivacyTests: XCTestCase {
             let _: [String: Bool] = try await client.play("/api/v1/play/invitations", body: Data("{}".utf8),
                 proof: "claimant-proof", authorized: false)
             XCTFail("A game proof must not follow redirects.")
-        } catch { guard case SottoAPIError.http(307, _) = error else { return XCTFail("Expected a refused redirect, got \(error)") } }
+        } catch let SottoAPIError.http(status, _) {
+            XCTAssertEqual(status, 307, "Server received \(server.requests.count) requests")
+        } catch {
+            XCTFail("Expected a refused redirect, got \(error); server received \(server.requests.count) requests")
+        }
         let request = try XCTUnwrap(server.requests.first)
         XCTAssertTrue(request.hasPrefix("POST /api/v1/play/invitations "))
         XCTAssertFalse(server.requests.contains { $0.contains("retargeted") })
@@ -297,6 +379,55 @@ final class APITransportPrivacyTests: XCTestCase {
         XCTAssertEqual(payload?["writingDrafts"] as? [String: String], ["w0": "Hola\nAna"])
     }
 
+    func testClassSpeakingUploadPinsAttemptAndMaterialWhilePracticeRemainsUnchanged() async throws {
+        let server = try LocalHTTPServer { _ in
+            .init(status: 201, headers: [:], body: #"{"recordingId":"recording","status":"PENDING"}"#)
+        }
+        try await server.start()
+        defer { server.stop() }
+        let audio = FileManager.default.temporaryDirectory.appendingPathComponent("speaking-test-\(UUID().uuidString).wav")
+        try Data("RIFF sample audio".utf8).write(to: audio)
+        defer { try? FileManager.default.removeItem(at: audio) }
+        let client = SottoAPIClient(serverURL: server.url, apiKey: "speaking-secret", profileId: "learner", session: URLSession(configuration: .ephemeral))
+        let revision = String(repeating: "a", count: 64)
+        do {
+            _ = try await client.uploadClassSpeakingRecording(classId: "class", promptId: "prompt", audioURL: audio,
+                binding: SottoClassSpeakingBinding(attempt: 0, materialRevision: revision))
+            XCTFail("An invalid class binding must not be uploaded")
+        } catch { XCTAssertTrue(server.requests.isEmpty) }
+        _ = try await client.uploadClassSpeakingRecording(classId: "class", promptId: "prompt", audioURL: audio,
+            binding: SottoClassSpeakingBinding(attempt: 4, materialRevision: revision))
+        _ = try await client.uploadPracticeSpeakingRecording(sessionId: "session", promptId: "prompt", audioURL: audio)
+        XCTAssertEqual(server.requests.count, 2)
+        let classRequest = server.requests[0]
+        XCTAssertTrue(classRequest.hasPrefix("POST /api/v1/classes/class/speaking/prompt "))
+        XCTAssertTrue(classRequest.contains("name=\"audio\""))
+        XCTAssertTrue(classRequest.contains("name=\"expectedAttempt\"\r\n\r\n4"))
+        XCTAssertTrue(classRequest.contains("name=\"taskMaterialRevision\"\r\n\r\n\(revision)"))
+        XCTAssertTrue(classRequest.lowercased().contains("authorization: bearer speaking-secret"))
+        XCTAssertFalse(server.requests[1].contains("expectedAttempt"))
+        XCTAssertFalse(server.requests[1].contains("taskMaterialRevision"))
+    }
+
+    func testOnlyTypedPrepublicationRejectionsAreDefinite() throws {
+        let client = SottoAPIClient(serverURL: URL(string: "https://school.example")!, apiKey: "key")
+        let url = URL(string: "https://school.example/api/v1/classes/class/speaking/prompt")!
+        let data = Data(#"{"error":"The class changed.","code":"CLASS_MATERIAL_CHANGED"}"#.utf8)
+        for status in [409, 500] {
+            let response = HTTPURLResponse(url: url, statusCode: status, httpVersion: nil, headerFields: nil)!
+            do {
+                let _: SottoSpeakingUploadResponse = try client.decodeResponse(data, response: response, acceptedStatuses: [201])
+                XCTFail("Expected rejection")
+            } catch let error as SottoAPIError {
+                if status == 409 {
+                    guard case .classRecordingRejected = error else { return XCTFail("Expected definite rejection") }
+                } else {
+                    guard case .http(500, _) = error else { return XCTFail("Expected unknown server failure") }
+                }
+            }
+        }
+    }
+
     @MainActor
     func testRemovingASessionDiscardsQueuedProgressWithoutASaveAfterDismissal() async throws {
         let server = try LocalHTTPServer { _ in .json(#"{"saved":true,"progressRevision":2}"#) }
@@ -322,7 +453,9 @@ final class APITransportPrivacyTests: XCTestCase {
         defer { server.stop() }
         let client = SottoAPIClient(serverURL: server.url, apiKey: "practice-secret", profileId: "learner", session: URLSession(configuration: .ephemeral))
         let progress = LearningProgressStore()
-        progress.configure(client: client, path: "/api/v1/classes/kept", revision: 1)
+        progress.configure(client: client, path: "/api/v1/classes/kept", revision: 0)
+        progress.configure(client: client, path: "/api/v1/classes/kept", revision: 1,
+            attempt: 1, materialRevision: String(repeating: "a", count: 64))
         await progress.suspend()
         progress.update(answers: ["g0": 2], writingDrafts: ["w0": "Preserved draft"])
         progress.resume()
@@ -375,6 +508,237 @@ final class APITransportPrivacyTests: XCTestCase {
         XCTAssertEqual(fixture.answers, ["g0": 1])
     }
 
+    @MainActor
+    func testClassRecoveryChecksMaterialAndSavesOnlyAfterConfirmation() async throws {
+        let fixture = ClassProgressConflictFixture()
+        let server = try LocalHTTPServer { request in fixture.respond(request) }
+        try await server.start()
+        defer { server.stop() }
+        let client = SottoAPIClient(serverURL: server.url, apiKey: "secret", profileId: "learner", session: URLSession(configuration: .ephemeral))
+        let progress = LearningProgressStore()
+        progress.configure(client: client, path: "/api/v1/classes/saved", revision: 1,
+            attempt: 1, materialRevision: String(repeating: "a", count: 64))
+        progress.update(answers: ["g0": 2], writingDrafts: ["w0": "Local draft"])
+        await progress.flush()
+        XCTAssertNotNil(progress.errorMessage)
+        try await progress.prepareReconciliation()
+        XCTAssertEqual(fixture.answers, ["g0": 1])
+        progress.confirmReconciliation()
+        await progress.flush()
+        XCTAssertNil(progress.errorMessage)
+        XCTAssertEqual(fixture.answers, ["g0": 2])
+        XCTAssertTrue(server.requests.contains { $0.hasPrefix("GET /api/v1/classes/saved/progress-recovery ") })
+        XCTAssertTrue(server.requests.contains { $0.contains("\"expectedAttempt\":1") && $0.contains(String(repeating: "a", count: 64)) })
+    }
+
+    @MainActor
+    func testClassRecoveryKeepsEditsWhenMaterialChanged() async throws {
+        let fixture = ClassProgressConflictFixture(material: String(repeating: "b", count: 64))
+        let server = try LocalHTTPServer { request in fixture.respond(request) }
+        try await server.start()
+        defer { server.stop() }
+        let client = SottoAPIClient(serverURL: server.url, apiKey: "secret", profileId: "learner", session: URLSession(configuration: .ephemeral))
+        let progress = LearningProgressStore()
+        progress.configure(client: client, path: "/api/v1/classes/saved", revision: 1,
+            attempt: 1, materialRevision: String(repeating: "a", count: 64))
+        progress.update(answers: ["g0": 2], writingDrafts: ["w0": "Local draft"])
+        await progress.flush()
+        do { try await progress.prepareReconciliation(); XCTFail("Changed material was accepted") }
+        catch { XCTAssertTrue(error.localizedDescription.contains("changed")) }
+        progress.confirmReconciliation()
+        await progress.flush()
+        XCTAssertEqual(progress.answers, ["g0": 2])
+        XCTAssertEqual(fixture.answers, ["g0": 1])
+    }
+
+    @MainActor
+    func testClassRecoveryDoesNotConfirmAfterLearnerOrLocalEditsChange() async throws {
+        let fixture = ClassProgressConflictFixture()
+        let server = try LocalHTTPServer { request in fixture.respond(request) }
+        try await server.start()
+        defer { server.stop() }
+        let client = SottoAPIClient(serverURL: server.url, apiKey: "secret", profileId: "learner", session: URLSession(configuration: .ephemeral))
+        let progress = LearningProgressStore()
+        var current = true
+        progress.configure(client: client, path: "/api/v1/classes/saved", revision: 1,
+            attempt: 1, materialRevision: String(repeating: "a", count: 64), isCurrent: { current })
+        progress.update(answers: ["g0": 2], writingDrafts: ["w0": "First draft"])
+        await progress.flush()
+        try await progress.prepareReconciliation()
+        progress.update(answers: ["g0": 3], writingDrafts: ["w0": "New draft"])
+        progress.confirmReconciliation()
+        await progress.flush()
+        XCTAssertEqual(fixture.answers, ["g0": 1])
+        try await progress.prepareReconciliation()
+        current = false
+        progress.confirmReconciliation()
+        await progress.flush()
+        XCTAssertEqual(progress.answers, ["g0": 3])
+        XCTAssertEqual(fixture.answers, ["g0": 1])
+    }
+
+    @MainActor
+    func testClassRecoveryRetainsPendingEditsAcrossCredentialRotation() async throws {
+        let fixture = ClassProgressConflictFixture()
+        let server = try LocalHTTPServer { request in fixture.respond(request) }
+        try await server.start()
+        defer { server.stop() }
+        let oldClient = SottoAPIClient(serverURL: server.url, apiKey: "old-secret", profileId: "learner", session: URLSession(configuration: .ephemeral))
+        let newClient = SottoAPIClient(serverURL: server.url, apiKey: "new-secret", profileId: "learner", session: URLSession(configuration: .ephemeral))
+        let progress = LearningProgressStore()
+        progress.configure(client: oldClient, path: "/api/v1/classes/saved", revision: 1,
+            attempt: 1, materialRevision: String(repeating: "a", count: 64))
+        await progress.suspend()
+        progress.update(answers: ["g0": 2], writingDrafts: ["w0": "Retained draft"])
+        progress.configure(client: newClient, path: "/api/v1/classes/saved", revision: 2,
+            attempt: 1, materialRevision: String(repeating: "a", count: 64))
+        progress.resume()
+        await progress.flush()
+        XCTAssertEqual(fixture.answers, ["g0": 1])
+        XCTAssertNotNil(progress.errorMessage)
+        try await progress.prepareReconciliation()
+        progress.confirmReconciliation()
+        await progress.flush()
+        XCTAssertEqual(fixture.answers, ["g0": 2])
+        XCTAssertTrue(server.requests.allSatisfy { $0.lowercased().contains("authorization: bearer new-secret") })
+    }
+
+    @MainActor
+    func testCleanClassSessionBindsMaterialAfterServerUpgrade() async throws {
+        let server = try LocalHTTPServer { _ in .json(#"{"saved":true,"progressRevision":2}"#) }
+        try await server.start()
+        defer { server.stop() }
+        let client = SottoAPIClient(serverURL: server.url, apiKey: "secret", profileId: "learner", session: URLSession(configuration: .ephemeral))
+        let progress = LearningProgressStore()
+        progress.configure(client: client, path: "/api/v1/classes/saved", revision: 0, attempt: 1)
+        progress.configure(client: client, path: "/api/v1/classes/saved", revision: 1,
+            attempt: 1, materialRevision: String(repeating: "a", count: 64))
+        progress.update(answers: ["g0": 2], writingDrafts: [:])
+        await progress.flush()
+        XCTAssertNil(progress.errorMessage)
+        XCTAssertTrue(server.requests.contains { $0.contains("\"expectedAttempt\":1") })
+    }
+
+    func testSpeakingRecoverySendsExactRecordingAndExplicitAcknowledgment() async throws {
+        let server = try LocalHTTPServer { _ in .json(#"{"acknowledged":true}"#) }
+        try await server.start()
+        defer { server.stop() }
+        let client = SottoAPIClient(serverURL: server.url, apiKey: "secret", profileId: "learner", session: URLSession(configuration: .ephemeral))
+        try await client.acknowledgeClassSpeakingRecovery(classId: "class", promptId: "prompt", recordingId: "recording")
+        let request = try XCTUnwrap(server.requests.first)
+        XCTAssertTrue(request.hasPrefix("POST /api/v1/classes/class/speaking/prompt/recovery "))
+        XCTAssertTrue(request.lowercased().contains("authorization: bearer secret"))
+        XCTAssertTrue(request.contains("\"recordingId\":\"recording\""))
+        XCTAssertTrue(request.contains("\"acknowledgePossibleCharges\":true"))
+    }
+
+    @MainActor
+    func testPracticeCredentialRotationKeepsUnverifiedPendingEditsOnScreen() async throws {
+        let server = try LocalHTTPServer { _ in .json(#"{"saved":true,"progressRevision":2}"#) }
+        try await server.start()
+        defer { server.stop() }
+        let oldClient = SottoAPIClient(serverURL: server.url, apiKey: "old-secret", profileId: "learner", session: URLSession(configuration: .ephemeral))
+        let newClient = SottoAPIClient(serverURL: server.url, apiKey: "new-secret", profileId: "learner", session: URLSession(configuration: .ephemeral))
+        let progress = LearningProgressStore()
+        progress.configure(client: oldClient, path: "/api/v1/practice/saved", revision: 1)
+        await progress.suspend()
+        progress.update(answers: ["g0": 2], writingDrafts: ["w0": "Retained draft"])
+        progress.configure(client: newClient, path: "/api/v1/practice/saved", revision: 1)
+        progress.resume()
+        await progress.flush()
+        XCTAssertEqual(progress.answers, ["g0": 2])
+        XCTAssertTrue(progress.errorMessage?.contains("copy") == true)
+        XCTAssertTrue(progress.recoverableText?.contains("Retained draft") == true)
+        XCTAssertTrue(progress.recoverableText?.contains("Question g0: option 3") == true)
+        XCTAssertTrue(server.requests.isEmpty)
+    }
+
+    @MainActor
+    func testConfirmedPracticeReloadReopensSavedWork() async throws {
+        let saved = #"{"status":"ready_writing","sessionId":"saved","courseId":"course","prompts":[{"id":"w0","task":"Write a greeting"}],"progressRevision":2}"#
+        let server = try LocalHTTPServer { request in
+            request.hasPrefix("GET ") ? .json(saved) : .json(#"{"saved":true,"progressRevision":3}"#)
+        }
+        try await server.start()
+        defer { server.stop() }
+        let profile = SottoProfile(id: "learner", name: "Learner", avatarUrl: "/avatars/penguin.png", isOwner: true,
+            role: "ADMIN", courseCount: nil, primaryCourse: nil, isActive: nil)
+        let model = SottoAppModel(credentials: SottoCredentials(serverURL: server.url, apiKey: "new-secret", user: nil, selectedProfile: profile), session: URLSession(configuration: .ephemeral))
+        let initial = try JSONDecoder().decode(SottoPracticeStart.self, from: Data(saved.utf8))
+        model.practiceStart = initial
+        let oldState = model.learningSessionState(path: "/api/v1/practice/saved", attempt: 1, revision: 1)
+        let speaking = NativeSpeakingState()
+        oldState.speaking["prompt"] = speaking
+        await oldState.progress.suspend()
+        oldState.progress.update(answers: ["g0": 2], writingDrafts: ["w0": "Copied draft"])
+        try await model.reloadPracticeDiscardingLocalEdits(sessionId: "saved", progress: oldState.progress)
+        let replacement = model.learningSessionState(path: "/api/v1/practice/saved", attempt: 1, revision: 2)
+        XCTAssertFalse(replacement === oldState)
+        XCTAssertTrue(replacement.speaking["prompt"] === speaking)
+        XCTAssertEqual(model.practiceStart?.progressRevision, 2)
+        await oldState.progress.flush()
+        XCTAssertEqual(server.requests.filter { $0.hasPrefix("PATCH ") }.count, 0)
+        replacement.progress.update(answers: ["g0": 1], writingDrafts: [:])
+        await replacement.progress.flush()
+        XCTAssertTrue(server.requests.contains { $0.hasPrefix("PATCH /api/v1/practice/saved ") })
+    }
+
+    @MainActor
+    func testPracticeReloadRejectsWrongSessionAndIncompleteResponse() async throws {
+        let saved = #"{"status":"ready_writing","sessionId":"saved","courseId":"course","prompts":[{"id":"w0","task":"Write a greeting"}],"progressRevision":1}"#
+        let server = try LocalHTTPServer { _ in .json(#"{"status":"ready_writing","sessionId":"saved","courseId":"course","prompts":[],"progressRevision":2}"#) }
+        try await server.start()
+        defer { server.stop() }
+        let profile = SottoProfile(id: "learner", name: "Learner", avatarUrl: "/avatars/penguin.png", isOwner: true,
+            role: "ADMIN", courseCount: nil, primaryCourse: nil, isActive: nil)
+        let model = SottoAppModel(credentials: SottoCredentials(serverURL: server.url, apiKey: "secret", user: nil, selectedProfile: profile), session: URLSession(configuration: .ephemeral))
+        model.practiceStart = try JSONDecoder().decode(SottoPracticeStart.self, from: Data(saved.utf8))
+        let state = model.learningSessionState(path: "/api/v1/practice/saved", attempt: 1, revision: 1)
+        let other = model.learningSessionState(path: "/api/v1/practice/other", attempt: 1, revision: 1)
+        await state.progress.suspend()
+        state.progress.update(answers: [:], writingDrafts: ["w0": "Still here"])
+        do { try await model.reloadPracticeDiscardingLocalEdits(sessionId: "saved", progress: other.progress); XCTFail("Wrong session accepted") }
+        catch { XCTAssertFalse(error.localizedDescription.isEmpty) }
+        do { try await model.reloadPracticeDiscardingLocalEdits(sessionId: "saved", progress: state.progress); XCTFail("Empty response accepted") }
+        catch { XCTAssertFalse(error.localizedDescription.isEmpty) }
+        XCTAssertTrue(model.learningSessionState(path: "/api/v1/practice/saved", attempt: 1, revision: 1) === state)
+        XCTAssertTrue(model.learningSessionState(path: "/api/v1/practice/other", attempt: 1, revision: 1) === other)
+        XCTAssertTrue(state.progress.recoverableText?.contains("Still here") == true)
+        let speaking = NativeSpeakingState()
+        speaking.uploadUnknown = true
+        state.speaking["prompt"] = speaking
+        let requestCount = server.requests.count
+        do { try await model.reloadPracticeDiscardingLocalEdits(sessionId: "saved", progress: state.progress); XCTFail("Speaking work was discarded") }
+        catch { XCTAssertFalse(error.localizedDescription.isEmpty) }
+        XCTAssertEqual(server.requests.count, requestCount)
+        XCTAssertTrue(state.speaking["prompt"] === speaking)
+        speaking.uploadUnknown = false
+        speaking.recordingActive = true
+        do { try await model.reloadPracticeDiscardingLocalEdits(sessionId: "saved", progress: state.progress); XCTFail("Active recording was discarded") }
+        catch { XCTAssertFalse(error.localizedDescription.isEmpty) }
+        XCTAssertEqual(server.requests.count, requestCount)
+    }
+
+    @MainActor
+    func testFailedPracticeReloadKeepsLocalEditsAndSession() async throws {
+        let saved = #"{"status":"ready_writing","sessionId":"saved","courseId":"course","prompts":[],"progressRevision":1}"#
+        let server = try LocalHTTPServer { _ in .init(status: 404, headers: [:], body: #"{"error":"Not found"}"#) }
+        try await server.start()
+        defer { server.stop() }
+        let profile = SottoProfile(id: "learner", name: "Learner", avatarUrl: "/avatars/penguin.png", isOwner: true,
+            role: "ADMIN", courseCount: nil, primaryCourse: nil, isActive: nil)
+        let model = SottoAppModel(credentials: SottoCredentials(serverURL: server.url, apiKey: "new-secret", user: nil, selectedProfile: profile), session: URLSession(configuration: .ephemeral))
+        model.practiceStart = try JSONDecoder().decode(SottoPracticeStart.self, from: Data(saved.utf8))
+        let state = model.learningSessionState(path: "/api/v1/practice/saved", attempt: 1, revision: 1)
+        await state.progress.suspend()
+        state.progress.update(answers: ["g0": 2], writingDrafts: ["w0": "Still here"])
+        do { try await model.reloadPracticeDiscardingLocalEdits(sessionId: "saved", progress: state.progress); XCTFail("Missing session was accepted") }
+        catch { XCTAssertFalse(error.localizedDescription.isEmpty) }
+        XCTAssertTrue(model.learningSessionState(path: "/api/v1/practice/saved", attempt: 1, revision: 1) === state)
+        XCTAssertTrue(state.progress.recoverableText?.contains("Still here") == true)
+        await state.progress.flush()
+        XCTAssertFalse(server.requests.contains { $0.hasPrefix("PATCH ") })
+    }
     func test307DoesNotForwardHouseholdPasswordToAnotherOrigin() async throws {
         try await rejectRedirect(status: 307)
     }
@@ -437,6 +801,33 @@ final class APITransportPrivacyTests: XCTestCase {
     }
 }
 
+
+private final class ClassProgressConflictFixture: @unchecked Sendable {
+    private let lock = NSLock()
+    private var revision = 2
+    private var savedAnswers = ["g0": 1]
+    private let material: String
+    var answers: [String: Int] { lock.withLock { savedAnswers } }
+    init(material: String = String(repeating: "a", count: 64)) { self.material = material }
+
+    func respond(_ request: String) -> LocalHTTPServer.Response {
+        lock.withLock {
+            if request.hasPrefix("GET ") {
+                return .json("{\"classId\":\"saved\",\"status\":\"AVAILABLE\",\"attempt\":1,\"progressRevision\":\(revision),\"taskMaterialRevision\":\"\(material)\"}")
+            }
+            let body = request.components(separatedBy: "\r\n\r\n").last ?? ""
+            let payload = (try? JSONSerialization.jsonObject(with: Data(body.utf8))) as? [String: Any]
+            guard payload?["expectedRevision"] as? Int == revision,
+                  payload?["expectedAttempt"] as? Int == 1,
+                  payload?["taskMaterialRevision"] as? String == material else {
+                return .init(status: 409, headers: [:], body: #"{"error":"Progress changed."}"#)
+            }
+            savedAnswers = payload?["answers"] as? [String: Int] ?? savedAnswers
+            revision += 1
+            return .json("{\"saved\":true,\"progressRevision\":\(revision)}")
+        }
+    }
+}
 
 private final class ProgressConflictFixture: @unchecked Sendable {
     private let lock = NSLock()

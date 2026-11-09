@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { randomUUID } from 'node:crypto';
-import { requiredLearningSkills } from '@sotto/shared';
+import { createSkillRequirements, requiredLearningSkills } from '@sotto/shared';
 import type { PrismaClient } from '@/generated/prisma/client';
 import { useProviderCredentialDatabase } from '../../helpers/runtime/provider-credentials-postgres';
 import { EMPTY_INFRA, setSiteConfig } from '@/lib/site-config';
@@ -16,7 +16,35 @@ import {
   sottoRequestExecution,
   createSottoProviderTransport,
 } from '@/lib/sidedoor/credentials/runtime/provider-execution';
-import { readSkillRequirements, resolveSkillRequirements } from '@/lib/learning/skill-requirements';
+import {
+  classRequirementsOrLegacy,
+  readSkillRequirements,
+  resolveSkillRequirements,
+} from '@/lib/learning/skill-requirements';
+
+describe('saved class requirements', () => {
+  it('retains all five legacy skills and does not weaken malformed or explicit settings', () => {
+    const context = { nativeLang: 'es', targetLang: 'ru', level: 'A1' };
+    const legacy = classRequirementsOrLegacy(null, context);
+    expect(requiredLearningSkills(legacy)).toEqual([
+      'GRAMMAR',
+      'READING',
+      'LISTENING',
+      'SPEAKING',
+      'WRITING',
+    ]);
+    expect(legacy.referenceAudioRequired).toBe(true);
+    expect(() => classRequirementsOrLegacy({ version: 1 }, context)).toThrow();
+    const saved = createSkillRequirements({
+      ...context,
+      level: 'A1',
+      scope: 'CLASS',
+      ttsProvider: null,
+      sttProvider: null,
+    });
+    expect(classRequirementsOrLegacy(saved, context)).toEqual(saved);
+  });
+});
 
 let database: PrismaClient;
 vi.mock('@/lib/prisma', () => ({

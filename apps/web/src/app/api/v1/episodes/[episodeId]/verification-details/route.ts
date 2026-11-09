@@ -47,10 +47,10 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
 
   const episode = await prisma.episode.findUnique({
     where: { id: episodeId },
-    select: { userId: true, status: true },
+    select: { userId: true, status: true, deletedAt: true, assessmentAudioAssessmentId: true },
   });
 
-  if (!episode) {
+  if (!episode || episode.deletedAt || episode.assessmentAudioAssessmentId) {
     return errorResponse('Episode not found', 404);
   }
   if (episode.userId !== session.user.id) {

@@ -1,12 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { speakingTaskMode } from '@/lib/learning-map/evidence/communicative-speaking';
-import { classRegenerationRequestSchema } from '@sotto/shared';
+import {
+  classReceiptSchema,
+  classRegenerationRequestSchema,
+  skillRequirementsSchema,
+} from '@sotto/shared';
 import { sottoRequestExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import { authenticateRequest } from '@/lib/api-keys';
 import { errorResponse } from '@/lib/api-response';
 import { logger } from '@/lib/logger';
-import { prisma } from '@/lib/prisma';
+import { prisma, prismaUnfiltered } from '@/lib/prisma';
+import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
+import {
+  PrerequisiteSourceConflict,
+  readPrerequisiteSource,
+} from '@/lib/classes/help/content/prerequisite-source';
 import { deleteClassForUser, getClassForUser } from '@/lib/class-service';
+import { PrerequisiteDeletionConflict } from '@/lib/classes/help/prerequisite-deletion';
+import { SpeakingDeletionConflict } from '@/lib/sidedoor/jobs/stitch/speaking-grading-deletion';
+import { AssessmentFenceConflict } from '@/lib/learning/classes/lifecycle/assessment-fence';
+import { createPrerequisiteTokenizer } from '@/lib/classes/help/content/prerequisite-token';
+import { lessonHelpTeachingHash } from '@/lib/classes/help/lesson-source';
+import { classProgressRevision } from '@/lib/learning/classes/progress/progress-revision';
 import { requestClassPreparation } from '@/lib/classes/preparation';
 import { PreparationConflictError } from '@/lib/classes/preparation-state';
 import {
@@ -38,7 +53,41 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       request.nextUrl.searchParams.get('pristineSnapshot') === '1'
         ? await readPristineRegenerationSnapshot(classId, sottoRequestExecution(request, authed))
         : undefined;
-    const cls = await getClassForUser(classId, authed.userId);
+    const execution = sottoRequestExecution(request, authed);
+    const loaded = await sottoTransaction(
+      prismaUnfiltered,
+      async (database) => {
+        await execution.authorize(database);
+        const cls = await getClassForUser(classId, authed.userId, database);
+        if (!cls) return null;
+        const requirements = skillRequirementsSchema.safeParse(cls.skillRequirements);
+        let sourceHash: string | null = null;
+        if (cls.teaching && (!requirements.success || requirements.data.level === 'A1')) {
+          try {
+            const source = await readPrerequisiteSource(database, classId, authed.userId);
+            if (source.source.lesson.level === 'A1') sourceHash = source.sourceHash;
+          } catch (error) {
+            if (!(error instanceof PrerequisiteSourceConflict)) throw error;
+          }
+        }
+        const progress = await classProgressRevision(database, classId, authed.userId);
+        const tokenizer = createPrerequisiteTokenizer(classId, authed.userId);
+        try {
+          return {
+            cls,
+            prerequisiteSourceHash: sourceHash ? tokenizer.source(sourceHash) : null,
+            taskMaterialRevision: progress.revision,
+            lessonHelpRevision: cls.teaching
+              ? tokenizer.helpSource(lessonHelpTeachingHash(cls.teaching))
+              : null,
+          };
+        } finally {
+          tokenizer.dispose();
+        }
+      },
+      { signal: request.signal }
+    );
+    const cls = loaded?.cls;
     if (!cls) return errorResponse('Class not found', 404);
     if (pristineSnapshot)
       await validatePristineRegeneration(
@@ -87,11 +136,17 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         targetPhrase: p.targetPhrase,
         translation: p.translation,
         ipa: p.ipa,
-        referenceTtsUrl: p.referenceTtsUrl,
+        referenceTtsUrl:
+          p.referenceEncryption != null
+            ? p.referenceTtsUrl
+              ? `/api/v1/classes/${encodeURIComponent(classId)}/speaking/${encodeURIComponent(p.id)}/reference/audio`
+              : null
+            : p.referenceTtsUrl,
         latestRecording: p.recordings?.[0]
           ? {
               id: p.recordings[0].id,
               status: p.recordings[0].status,
+              recoveryAcknowledged: p.recordings[0].gradingAcknowledgedAt != null,
               transcript: p.recordings[0].transcript,
               overallScore: p.recordings[0].overallScore,
               rubricScores: p.recordings[0].rubricScores,
@@ -139,40 +194,62 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       sourceTitle: cls.sourceTitle,
     });
 
-    return NextResponse.json({
-      ...(pristineSnapshot ? { pristineSnapshot } : {}),
-      id: cls.id,
-      skillRequirements: cls.skillRequirements,
-      readingVocabulary: cls.readingVocabulary,
-      attempt: cls.attempt,
-      learnerAnswers: cls.learnerAnswers,
-      writingDrafts: cls.writingDrafts,
-      progressRevision: cls.progressRevision,
-      courseId: cls.courseId,
-      status: cls.status,
-      order: cls.order,
-      passThreshold: cls.passThreshold,
-      // Sourced-class attribution (null for curriculum classes).
-      sourceUrl: cls.sourceUrl,
-      sourceTitle: cls.sourceTitle,
-      lesson: {
-        title: cls.lesson.title,
-        level: cls.lesson.level,
-        objective: cls.lesson.objective,
+    const storedReceipt = classReceiptSchema.safeParse(cls.submission?.receipt);
+    return NextResponse.json(
+      {
+        ...(pristineSnapshot ? { pristineSnapshot } : {}),
+        prerequisiteSourceHash: loaded?.prerequisiteSourceHash ?? null,
+        taskMaterialRevision: loaded?.taskMaterialRevision ?? null,
+        lessonHelpRevision: loaded?.lessonHelpRevision ?? null,
+        id: cls.id,
+        skillRequirements: cls.skillRequirements,
+        readingVocabulary: cls.readingVocabulary,
+        attempt: cls.attempt,
+        learnerAnswers: cls.learnerAnswers,
+        writingDrafts: cls.writingDrafts,
+        writingHistory: cls.writingHistory,
+        speakingHistory: cls.speakingHistory,
+        speakingHistoryUnlinked: cls.speakingHistoryUnlinked,
+        orphanWritingDrafts: cls.orphanWritingDrafts,
+        quizHistory: cls.quizHistory,
+        orphanQuizAnswers: cls.orphanQuizAnswers,
+        quizSubmissionReceipts: cls.quizSubmissionReceipts,
+        quizHistoryUnreadable: cls.quizHistoryUnreadable,
+        progressRevision: cls.progressRevision,
+        courseId: cls.courseId,
+        status: cls.status,
+        order: cls.order,
+        passThreshold: cls.passThreshold,
+        // Sourced-class attribution (null for curriculum classes).
+        sourceUrl: cls.sourceUrl,
+        sourceTitle: cls.sourceTitle,
+        lesson: {
+          title: cls.lesson.title,
+          level: cls.lesson.level,
+          objective: cls.lesson.objective,
+        },
+        intro,
+        ...(cls.teaching ? { teaching: cls.teaching } : {}),
+        vocabulary: targetVocab
+          .filter((item) => typeof item.lemma === 'string' && item.lemma.trim() !== '')
+          .map((item) => ({
+            lemma: item.lemma,
+            gloss: item.gloss,
+            pos: item.pos ?? null,
+          })),
+        submission: cls.submission
+          ? {
+              passed: cls.submission.passed,
+              overallScore: cls.submission.overallScore,
+              submittedAt: cls.submission.submittedAt,
+              ...(storedReceipt.success ? { receipt: storedReceipt.data } : {}),
+            }
+          : null,
+        submitted,
+        sections,
       },
-      intro,
-      ...(cls.teaching ? { teaching: cls.teaching } : {}),
-      vocabulary: targetVocab
-        .filter((item) => typeof item.lemma === 'string' && item.lemma.trim() !== '')
-        .map((item) => ({
-          lemma: item.lemma,
-          gloss: item.gloss,
-          pos: item.pos ?? null,
-        })),
-      submission: cls.submission,
-      submitted,
-      sections,
-    });
+      { headers: { 'Cache-Control': 'private, no-store' } }
+    );
   } catch (error: unknown) {
     if (error instanceof PristineRegenerationConflict || error instanceof PreparationConflictError)
       return errorResponse(error.message, 409);
@@ -244,10 +321,20 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     if (!authed) return errorResponse('Unauthorized', 401);
     const { classId } = await params;
 
-    const ok = await deleteClassForUser(classId, authed.userId);
+    const ok = await deleteClassForUser(
+      classId,
+      authed.userId,
+      sottoRequestExecution(request, authed)
+    );
     if (!ok) return errorResponse('Class not found', 404);
     return NextResponse.json({ deleted: true });
   } catch (error: unknown) {
+    if (
+      error instanceof PrerequisiteDeletionConflict ||
+      error instanceof SpeakingDeletionConflict ||
+      error instanceof AssessmentFenceConflict
+    )
+      return errorResponse(error.message, 409);
     const message = error instanceof Error ? error.message : 'Failed to delete class';
     logger.error('Failed to delete class', { error: message });
     return errorResponse(message, 500);

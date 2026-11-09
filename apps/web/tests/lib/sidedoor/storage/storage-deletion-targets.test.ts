@@ -54,6 +54,21 @@ suite('storage ownership collection with PostgreSQL', () => {
     );
     for (const statement of audioMigration.split(';').filter((sql) => sql.trim()))
       await database.$executeRawUnsafe(statement);
+    await database.$executeRawUnsafe(
+      'ALTER TABLE "SpeakingPrompt" ADD COLUMN "assessmentSectionId" TEXT'
+    );
+    await database.$executeRawUnsafe(
+      'ALTER TABLE "SpeakingRecording" ADD COLUMN "assessmentAudioUrl" TEXT, ADD COLUMN "assessmentSectionId" TEXT'
+    );
+    await database.$executeRawUnsafe(
+      'CREATE TABLE "ClassAssessment" (id TEXT PRIMARY KEY, "classId" TEXT NOT NULL, "courseId" TEXT NOT NULL)'
+    );
+    await database.$executeRawUnsafe(
+      'CREATE TABLE "ClassAssessmentSection" (id TEXT PRIMARY KEY, "assessmentId" TEXT NOT NULL)'
+    );
+    await database.$executeRawUnsafe(
+      'CREATE TABLE "AssessmentSpeakingReference" ("promptId" TEXT PRIMARY KEY, "currentUrl" TEXT NOT NULL)'
+    );
     for (const owner of ['first', 'second']) {
       await insert('User', {
         id: owner,
@@ -192,6 +207,79 @@ suite('storage ownership collection with PostgreSQL', () => {
       ...Object.values(values)
     );
   }
+  it('inventories only the selected class and its explicit episodes', async () => {
+    await insert('ClassAssessment', {
+      id: 'assessment-first',
+      classId: 'first',
+      courseId: 'first',
+    });
+    await insert('ClassAssessmentSection', {
+      id: 'assessment-speaking',
+      assessmentId: 'assessment-first',
+    });
+    await insert('SpeakingPrompt', {
+      id: 'assessment-prompt',
+      assessmentSectionId: 'assessment-speaking',
+      order: 0,
+      targetPhrase: 'Hola',
+      translation: 'Hello',
+      referenceTtsUrl: 'first/assessment-reference.mp3',
+    });
+    await insert('AssessmentSpeakingReference', {
+      promptId: 'assessment-prompt',
+      currentUrl: 'first/moved-assessment-reference.mp3',
+    });
+    await insert('SpeakingRecording', {
+      id: 'assessment-recording',
+      userId: 'first',
+      promptId: 'assessment-prompt',
+      audioUrl: 'first/assessment-recording.mp3',
+      updatedAt: new Date(),
+    });
+    await insert('SpeakingRecording', {
+      id: 'section-recording',
+      userId: 'first',
+      sectionId: 'first',
+      promptId: 'second-sectionId',
+      audioUrl: 'first/section-recording.mp3',
+      updatedAt: new Date(),
+    });
+    try {
+      const pages: StorageDeletionReferencePage[] = [];
+      await database.$transaction((tx) =>
+        visitStorageDeletionReferences(
+          tx,
+          { kind: 'class', id: 'first', episodeIds: ['first'] },
+          async (page) => {
+            pages.push(page);
+          }
+        )
+      );
+      const inventory = new Map(pages.map((page) => [page.source, page.rows.map((row) => row.id)]));
+      expect(Object.fromEntries(inventory)).toEqual({
+        episode: ['first'],
+        segment: ['first'],
+        version: ['first'],
+        class: ['first'],
+        prompt: ['assessment-prompt', 'first-sectionId'],
+        recording: ['assessment-recording', 'first', 'section-recording'],
+      });
+      expect(
+        pages.flatMap((page) => page.rows).find((row) => row.id === 'assessment-prompt')?.references
+          .referenceTtsUrl
+      ).toBe('first/moved-assessment-reference.mp3');
+    } finally {
+      await database.speakingRecording.deleteMany({
+        where: { id: { in: ['assessment-recording', 'section-recording'] } },
+      });
+      await database.assessmentSpeakingReference.deleteMany({
+        where: { promptId: 'assessment-prompt' },
+      });
+      await database.speakingPrompt.deleteMany({ where: { id: 'assessment-prompt' } });
+      await database.$executeRaw`DELETE FROM "ClassAssessmentSection" WHERE id = 'assessment-speaking'`;
+      await database.$executeRaw`DELETE FROM "ClassAssessment" WHERE id = 'assessment-first'`;
+    }
+  });
   it('captures independent exam-user and recording-practice cascades without collecting surviving prompts', async () => {
     await insert('MockExam', {
       id: 'cross-exam',

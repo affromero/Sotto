@@ -23,6 +23,8 @@ import { requireOriginalSottoAdmission } from '@/lib/sidedoor/access/core/reques
 import { SIDEDOOR_STATE_ID, sottoStorageInstance } from '@/lib/sidedoor/access/state/store';
 import { materialStorageScopes } from '@/lib/course-materials';
 import { materialUploadStorageScopes } from '@/lib/course-materials/uploads/scopes';
+import { sottoJobOutbox } from '@/lib/sidedoor/jobs/core/job-delivery';
+import { AssessmentFenceConflict } from '@/lib/learning/classes/lifecycle/assessment-fence';
 
 type Scope = { subjectId: string; generation: number };
 type ConsumerState = { reference: string | null; scopes: Scope[]; associations?: Prisma.JsonValue };
@@ -154,8 +156,43 @@ async function currentConsumer(
     return captureSpeakingPromptStorage(database, id);
   }
   if (kind === 'recording' && slot === 'audio') {
-    if (!(await database.speakingRecording.findUnique({ where: { id }, select: { id: true } })))
-      return { reference: null, scopes: [] };
+    const recording = await database.speakingRecording.findUnique({
+      where: { id },
+      select: {
+        assessmentSectionId: true,
+        gradingOperationId: true,
+        assessmentSection: {
+          select: {
+            assessment: {
+              select: { id: true, classId: true, courseId: true, userId: true, status: true },
+            },
+          },
+        },
+      },
+    });
+    if (!recording) return { reference: null, scopes: [] };
+    if (
+      recording.assessmentSectionId &&
+      recording.assessmentSection?.assessment.status !== 'COMMITTED'
+    )
+      return null;
+    if (recording.assessmentSectionId) {
+      const assessment = recording.assessmentSection?.assessment;
+      if (!assessment || !recording.gradingOperationId) throw new AssessmentFenceConflict();
+      const work = await sottoJobOutbox(database).read(recording.gradingOperationId);
+      if (!work) throw new AssessmentFenceConflict();
+      const { verifyAssessmentSpeakingForDeletion } =
+        await import('@/lib/learning/classes/speaking/lifecycle/assessment-speaking-deletion');
+      await verifyAssessmentSpeakingForDeletion(database, {
+        classId: assessment.classId,
+        courseId: assessment.courseId,
+        userId: assessment.userId,
+        assessmentId: assessment.id,
+        recordingId: id,
+        operationId: work.job.id,
+        fingerprint: work.fingerprint,
+      });
+    }
     return captureSpeakingRecordingStorage(database, id);
   }
   return null;
@@ -180,7 +217,8 @@ export async function inspectStorageMigrationConsumer(
     if (
       !(error instanceof EpisodeStorageChangedError) &&
       !(error instanceof CourseStorageChangedError) &&
-      !(error instanceof SpeakingStorageChangedError)
+      !(error instanceof SpeakingStorageChangedError) &&
+      !(error instanceof AssessmentFenceConflict)
     )
       throw error;
     return { reason: 'ownership-changed' as const, requiredScopes: [], requiredAssociations: null };

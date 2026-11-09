@@ -1,18 +1,28 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { sampleTeaching } from '../../helpers/learning/class-teaching';
 import { blockedProviderExecution } from '../../helpers/runtime/provider-execution';
+import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import {
   emptyTeachingCriticFixture,
   shapeTeachingProviderFixture,
 } from '../classes/quality/intro-provider-fixture';
 
-const boundary = vi.hoisted(() => ({ requests: vi.fn(), leak: false }));
+const boundary = vi.hoisted(() => ({
+  requests: vi.fn(),
+  leak: false,
+  ai: null as { apiKey?: string } | null,
+}));
 vi.mock('@/lib/learning-ai', () => ({
-  resolveCapturedLearningAi: async (...args: [string, unknown]) => ({
-    provider: 'fixture',
-    model: 'captured',
-    execution: args[1],
-  }),
+  resolveCapturedLearningAi: async (...args: [string, unknown]) => {
+    const ai = {
+      provider: 'fixture',
+      model: 'captured',
+      apiKey: 'fixture-key',
+      execution: { ...(args[1] as object) },
+    };
+    boundary.ai = ai;
+    return ai;
+  },
   capturedLearningAiOptions: async () => ({ model: 'captured' }),
 }));
 vi.mock('@/lib/usage-logger', () => ({ logUsage: vi.fn() }));
@@ -75,7 +85,13 @@ vi.mock('@/lib/providers/ai', () => ({
   }),
 }));
 
-import { generateSectionQuestions } from '@/lib/class-generation';
+import {
+  generateSectionQuestions,
+  requireInitialA1SectionReview,
+  bindInitialA1SectionReview,
+  sealInitialA1SectionReviews,
+  materializeInitialA1SectionReviews,
+} from '@/lib/class-generation';
 const authored = [
   {
     taskContext: 'Cuenta una visita terminada de ayer con yo.',
@@ -138,11 +154,162 @@ const params = {
 };
 
 beforeEach(() => {
-  boundary.requests.mockClear();
+  boundary.requests.mockReset();
   boundary.leak = false;
+  boundary.ai = null;
 });
 
 describe('assessing the accepted lesson', () => {
+  it('binds accepted first-A1 questions to the exact class, teaching and private answer keys', async () => {
+    const scope = {
+      ...params,
+      teaching: structuredClone(sampleTeaching),
+      level: 'A1',
+      execution: {
+        ...params.execution,
+        initialA1Class: true,
+        learningSelection: { provider: 'fixture', model: 'model-a', credentialFingerprint: null },
+      },
+      reviewScope: { classId: 'class-1', courseId: 'course-1', sectionId: 'section-1', attempt: 1 },
+    };
+    const questions = await generateSectionQuestions(scope);
+    const assessed = questions.map((question) => ({
+      ...structuredClone(question),
+      learningAssessment: null,
+    }));
+    expect(requireInitialA1SectionReview(questions, scope, assessed)).toHaveLength(
+      questions.length
+    );
+    const ids = questions.map((_, index) => `question-${index}`);
+    const receipt = bindInitialA1SectionReview(questions, scope, assessed, ids);
+    const seed = { teaching: scope.teaching };
+    const sealScope = {
+      classId: 'class-1',
+      courseId: 'course-1',
+      userId: 'u1',
+      attempt: 1,
+      skills: ['GRAMMAR'] as const,
+      level: scope.level,
+      nativeLang: scope.nativeLang,
+      targetLang: scope.targetLang,
+      objective: scope.objective,
+      grammarPoints: scope.grammarPoints,
+      targetVocab: scope.targetVocab,
+    };
+    expect(() =>
+      sealInitialA1SectionReviews(seed, scope.teaching, [receipt], {
+        ...sealScope,
+        objective: 'Changed objective',
+      })
+    ).toThrow('exercise review is no longer valid');
+    sealInitialA1SectionReviews(seed, scope.teaching, [receipt], sealScope);
+    const stored = materializeInitialA1SectionReviews(seed, {
+      classId: 'class-1',
+      userId: 'u1',
+      attempt: 1,
+    });
+    expect(stored[0].questions.map((question) => question.id)).toEqual(ids);
+    expect(() =>
+      materializeInitialA1SectionReviews(seed, { classId: 'other', userId: 'u1', attempt: 1 })
+    ).toThrow();
+    expect(() =>
+      bindInitialA1SectionReview(
+        questions,
+        scope,
+        assessed,
+        ids.map(() => 'same')
+      )
+    ).toThrow();
+    expect(() => requireInitialA1SectionReview(structuredClone(questions), scope)).toThrow(
+      'exercise review is no longer valid'
+    );
+    const changed = structuredClone(assessed);
+    changed[0].correctIndex = (changed[0].correctIndex + 1) % changed[0].options.length;
+    expect(() => requireInitialA1SectionReview(questions, scope, changed)).toThrow(
+      'exercise review is no longer valid'
+    );
+    expect(() => requireInitialA1SectionReview(questions, scope, [...assessed].reverse())).toThrow(
+      'exercise review is no longer valid'
+    );
+    scope.execution.learningSelection = { ...scope.execution.learningSelection, model: 'model-b' };
+    expect(() => requireInitialA1SectionReview(questions, scope)).toThrow(
+      'exercise review is no longer valid'
+    );
+    scope.execution.learningSelection = { ...scope.execution.learningSelection, model: 'model-a' };
+    scope.teaching.explanation = 'Changed teaching';
+    expect(() => requireInitialA1SectionReview(questions, scope)).toThrow(
+      'exercise review is no longer valid'
+    );
+  });
+
+  it('rejects a first-A1 section if teaching changes while its reviewer is running', async () => {
+    const scope = {
+      ...params,
+      teaching: structuredClone(sampleTeaching),
+      level: 'A1',
+      execution: { ...params.execution, initialA1Class: true },
+      reviewScope: { classId: 'class-1', courseId: 'course-1', sectionId: 'section-1', attempt: 1 },
+    };
+    boundary.requests.mockImplementation((_system, _messages, options) => {
+      if (options.jsonSchema.name === 'class_teaching_critic')
+        scope.teaching.explanation = 'Changed during review';
+    });
+    await expect(generateSectionQuestions(scope)).rejects.toThrow(
+      'Class generation failed its educational quality check.'
+    );
+    boundary.requests.mockReset();
+  });
+
+  it.each(['cleanup', 'audio registration', 'workspace cleanup'] as const)(
+    'invalidates a reviewed section when %s authority changes',
+    async (changedAuthority) => {
+      const execution: SottoProviderExecution = {
+        ...params.execution,
+        initialA1Class: true,
+        onCleanupError: () => {},
+        registerAudioEpisode: async () => {},
+        isolatedWorkspace: { directory: '/tmp/review', markCleanupUnconfirmed: () => {} },
+      };
+      const scope = {
+        ...params,
+        execution,
+        teaching: structuredClone(sampleTeaching),
+        level: 'A1',
+        reviewScope: {
+          classId: 'class-1',
+          courseId: 'course-1',
+          sectionId: 'section-1',
+          attempt: 1,
+        },
+      };
+      const questions = await generateSectionQuestions(scope);
+      if (changedAuthority === 'cleanup') execution.onCleanupError = () => {};
+      if (changedAuthority === 'audio registration')
+        execution.registerAudioEpisode = async () => {};
+      if (changedAuthority === 'workspace cleanup')
+        execution.isolatedWorkspace!.markCleanupUnconfirmed = () => {};
+      expect(() => requireInitialA1SectionReview(questions, scope)).toThrow(
+        'exercise review is no longer valid'
+      );
+    }
+  );
+
+  it('rejects a first-A1 section if the captured provider credential changes during review', async () => {
+    const scope = {
+      ...params,
+      teaching: structuredClone(sampleTeaching),
+      level: 'A1',
+      execution: { ...params.execution, initialA1Class: true },
+      reviewScope: { classId: 'class-1', courseId: 'course-1', sectionId: 'section-1', attempt: 1 },
+    };
+    boundary.requests.mockImplementation((_system, _messages, options) => {
+      if (options.jsonSchema.name === 'class_teaching_critic' && boundary.ai)
+        boundary.ai.apiKey = 'changed-key';
+    });
+    await expect(generateSectionQuestions(scope)).rejects.toThrow(
+      'Class generation failed its educational quality check.'
+    );
+  });
   it('does not require later beginner lessons to reteach every background word', async () => {
     const questions = await generateSectionQuestions({ ...params, level: 'A1' });
     expect(questions).toHaveLength(authored.length);
@@ -167,6 +334,30 @@ describe('assessing the accepted lesson', () => {
     expect(review?.[0]).toContain('When no teaching is supplied, assess standalone practice');
     const input = JSON.parse(review![1][0].content);
     expect(input.lessonContext.teaching).toBeUndefined();
+  });
+
+  it('reviews first A1 questions using teaching available before the guided answer', async () => {
+    const original = structuredClone(sampleTeaching);
+    await generateSectionQuestions({
+      ...params,
+      level: 'A1',
+      execution: { ...params.execution, initialA1Class: true },
+    });
+    const reviews = boundary.requests.mock.calls.filter(
+      ([, , options]) => options.jsonSchema.name !== 'class_section_questions'
+    );
+    expect(reviews.length).toBeGreaterThan(1);
+    for (const [system, messages] of reviews) {
+      const teaching = JSON.parse(messages[0].content).lessonContext.teaching;
+      expect(teaching.guidedPractice).toEqual({
+        prompt: sampleTeaching.guidedPractice.prompt,
+        hint: sampleTeaching.guidedPractice.hint,
+      });
+      expect(teaching.workedExamples).toEqual(sampleTeaching.workedExamples);
+      expect(system).toContain('guided answer and explanation are intentionally omitted');
+      expect(system).toContain('Neither is prior explained teaching');
+    }
+    expect(sampleTeaching).toEqual(original);
   });
 
   it('reviews the exact published choices and accepted teaching without exposing the private answer key to blind review', async () => {

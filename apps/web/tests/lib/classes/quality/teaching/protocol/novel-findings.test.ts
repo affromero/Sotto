@@ -3,6 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import type { PrismaClient } from '@/generated/prisma/client';
 import type { AIOptions, AIProvider, ChatMessage } from '@/lib/providers/ai';
 import type { CapturedLearningAi } from '@/lib/learning-ai';
+import { sampleTeaching } from '../../../../../helpers/learning/class-teaching';
 import {
   createSharedTestInstance,
   type SharedTestInstance,
@@ -51,6 +52,7 @@ type Proposal = {
 };
 type Payload = {
   items: Row[];
+  lessonContext?: { teaching?: { guidedPractice: Record<string, unknown> } };
   introContext?: unknown;
   criticisms?: { items: Array<{ index: number; findings: unknown[] }> };
   novelFindingProposals?: Proposal[];
@@ -371,6 +373,44 @@ suite('independent corroboration of novel teaching findings', () => {
       expect.objectContaining({ status: 'completed' }),
     ]);
     expect(teachingNovelFindingReceipts({ ...ai })).toEqual([]);
+  });
+
+  it('binds correction and novel-finding receipts to pre-disclosure first-A1 teaching', async () => {
+    ai.execution.initialA1Class = true;
+    const original = structuredClone(sampleTeaching);
+    await expect(
+      review(
+        { malformedCritic: true },
+        {
+          level: 'A1',
+          lessonContext: {
+            title: 'First lesson',
+            objective: 'Make a request.',
+            grammarPoints: [],
+            teaching: sampleTeaching,
+          },
+        }
+      )
+    ).resolves.toBeUndefined();
+    expect(requests.map(({ schema }) => schema)).toEqual([
+      'class_teaching_critic',
+      'class_teaching_critic',
+      'class_teaching_adjudicator',
+      'class_teaching_novel_finding_corroboration',
+    ]);
+    const visible = {
+      prompt: sampleTeaching.guidedPractice.prompt,
+      hint: sampleTeaching.guidedPractice.hint,
+    };
+    for (const request of requests)
+      expect(request.payload.lessonContext?.teaching?.guidedPractice).toEqual(visible);
+    const receipt = teachingNovelFindingReceipts(ai)[0];
+    expect(receipt).toMatchObject({
+      status: 'completed',
+      candidate: { lessonContext: { teaching: { guidedPractice: visible } } },
+      originalCandidate: { lessonContext: { teaching: { guidedPractice: visible } } },
+    });
+    expect(sampleTeaching).toEqual(original);
   });
 
   it('accepts a candidate without novel findings and retains no corroboration proof', async () => {

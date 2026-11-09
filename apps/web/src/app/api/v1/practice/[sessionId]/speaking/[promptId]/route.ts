@@ -99,7 +99,14 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       return errorResponse('Practice session not found', 404);
 
     const recording = await prisma.speakingRecording.findFirst({
-      where: { id: parsed.data.recordingId, promptId, userId },
+      where: {
+        id: parsed.data.recordingId,
+        promptId,
+        userId,
+        practiceSessionId: sessionId,
+        prompt: { practiceSessionId: sessionId },
+        practiceSession: { course: { userId } },
+      },
       select: {
         status: true,
         overallScore: true,

@@ -33,8 +33,47 @@ import {
   assertProviderActivated,
   ProviderActivationPendingError,
 } from '@/lib/providers/shared/runtime-activation';
+import { requireListeningAttachmentFence } from '@/lib/learning/classes/progress/listening-attachment-fence';
+import { DurableDeliveryPendingError } from '@/lib/sidedoor/jobs/core/durable-queue';
 
 type RouteParams = { params: Promise<{ episodeId: string }> };
+
+async function requireOrdinaryEpisode(
+  database: Prisma.TransactionClient,
+  request: Request,
+  identity: AuthenticatedRequest,
+  episodeId: string,
+  ownerId: string
+) {
+  await requireOriginalSottoAdmission(database, request, identity);
+  return lockOrdinaryEpisode(database, episodeId, ownerId);
+}
+
+async function lockOrdinaryEpisode(
+  database: Prisma.TransactionClient,
+  episodeId: string,
+  ownerId: string
+) {
+  await database.$queryRaw`SELECT id FROM "Episode" WHERE id = ${episodeId} FOR UPDATE`;
+  const current = await database.episode.findUnique({
+    where: { id: episodeId },
+    select: {
+      userId: true,
+      deletedAt: true,
+      assessmentAudioAssessmentId: true,
+      assessmentSection: { select: { id: true } },
+    },
+  });
+  if (
+    !current ||
+    current.deletedAt ||
+    current.assessmentSection ||
+    current.assessmentAudioAssessmentId ||
+    current.userId !== ownerId
+  )
+    throw new AccessError('conflict', 'Episode is no longer available for generation');
+  return { userId: ownerId };
+}
 
 async function admitPipelineStage<T>(options: {
   queue: Queue;
@@ -52,19 +91,28 @@ async function admitPipelineStage<T>(options: {
   return admitDurableJob(options.queue, options.type, options.payload, {
     jobId: options.jobId,
     authorize: async (database) => {
-      await requireOriginalSottoAdmission(database, options.request, options.identity);
       if (options.identity.userId !== options.ownerId && !options.identity.isOwner)
         throw new AccessError('forbidden');
-      const episode = await database.episode.findUnique({
-        where: { id: options.episodeId },
-        select: { userId: true },
-      });
-      if (!episode || episode.userId !== options.ownerId) throw new AccessError('conflict');
-      return { userId: options.ownerId };
+      return requireOrdinaryEpisode(
+        database,
+        options.request,
+        options.identity,
+        options.episodeId,
+        options.ownerId
+      );
     },
     mutate: async (database, operationId) => {
+      await requireListeningAttachmentFence(database);
       const claimed = await database.episode.updateMany({
-        where: { id: options.episodeId, status: { in: [...options.expected] } },
+        where: {
+          id: options.episodeId,
+          status: { in: [...options.expected] },
+          classSection: { is: null },
+          practiceSession: { is: null },
+          examSection: { is: null },
+          assessmentSection: { is: null },
+          assessmentAudioAssessmentId: null,
+        },
         data: {
           status: options.status,
           pipelineGeneration: operationId,
@@ -74,6 +122,11 @@ async function admitPipelineStage<T>(options: {
       });
       if (claimed.count !== 1)
         throw new AccessError('conflict', 'Episode is no longer in the expected pipeline state');
+      if (options.expected.includes('FAILED'))
+        await database.job.updateMany({
+          where: { episodeId: options.episodeId, status: 'failed' },
+          data: { status: 'superseded' },
+        });
       await options.mutate?.(database);
     },
   });
@@ -89,25 +142,44 @@ async function enqueueAfterClaim(
     | 'COMPILING'
     | 'GENERATING_AUDIO'
     | 'STITCHING',
-  enqueue: () => Promise<unknown>
+  enqueue: () => Promise<unknown>,
+  ownerId: string,
+  generationKey: string
 ): Promise<void> {
   try {
     await enqueue();
   } catch (error) {
-    await prisma.episode.updateMany({
-      where: { id: episodeId, status: claimedStatus },
-      data: {
-        status: 'FAILED',
-        failedAtStatus: claimedStatus,
-        failureReason: 'The pipeline could not be queued. Retry generation.',
-        technicalError: error instanceof Error ? error.message : String(error),
-      },
+    if (error instanceof DurableDeliveryPendingError) throw error;
+    await sottoTransaction(prismaUnfiltered, async (database) => {
+      await lockOrdinaryEpisode(database, episodeId, ownerId);
+      await database.episode.updateMany({
+        where: { id: episodeId, status: claimedStatus, audioGenerationKey: generationKey },
+        data: {
+          status: 'FAILED',
+          failedAtStatus: claimedStatus,
+          failureReason: 'The pipeline could not be queued. Retry generation.',
+          technicalError: error instanceof Error ? error.message : String(error),
+        },
+      });
     });
     throw error;
   }
 }
 
 export async function POST(request: NextRequest, { params }: RouteParams) {
+  try {
+    return await generateEpisode(request, { params });
+  } catch (error) {
+    if (isAccessError(error))
+      return errorResponse(
+        error.message,
+        error.code === 'unauthorized' ? 401 : error.code === 'forbidden' ? 403 : 409
+      );
+    throw error;
+  }
+}
+
+async function generateEpisode(request: NextRequest, { params }: RouteParams) {
   const { episodeId } = await params;
   const authResult = await authenticateRequest(request);
 
@@ -132,13 +204,21 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       failedAtStatus: true,
       audioGenerationKey: true,
       ttsProvider: true,
+      deletedAt: true,
+      assessmentSection: { select: { id: true } },
+      assessmentAudioAssessmentId: true,
       discovery: {
         select: { id: true, sourceUrl: true, sourceContent: true, durationTarget: true },
       },
     },
   });
 
-  if (!episode) {
+  if (
+    !episode ||
+    episode.deletedAt ||
+    episode.assessmentSection ||
+    episode.assessmentAudioAssessmentId
+  ) {
     return errorResponse('Episode not found', 404);
   }
 
@@ -186,11 +266,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
   // For FAILED episodes: smart resume or force restart
   if (episode.status === 'FAILED') {
-    await prisma.job.updateMany({
-      where: { episodeId, status: 'failed' },
-      data: { status: 'superseded' },
-    });
-
+    await sottoTransaction(
+      prismaUnfiltered,
+      (database) =>
+        requireOrdinaryEpisode(database, request, authResult, episodeId, episode.userId),
+      { signal: request.signal }
+    );
     const forceRestart = request.nextUrl.searchParams.get('forceRestart') === 'true';
 
     if (forceRestart) {
@@ -442,26 +523,42 @@ async function routeResume(
 
     case 'SCRIPT_READY': {
       // Clear TTS provider so user re-enters audio config UI (CAS on FAILED)
-      const casReady = await prisma.episode.updateMany({
-        where: { id: episodeId, status: 'FAILED' },
-        data: {
-          status: 'SCRIPT_READY',
-          failedAtStatus: null,
-          failureReason: null,
-          ttsProvider: null,
-          ttsModel: null,
+      const casReady = await sottoTransaction(
+        prismaUnfiltered,
+        async (database) => {
+          await requireOrdinaryEpisode(
+            database,
+            admission.request,
+            admission.identity,
+            episodeId,
+            admission.ownerId
+          );
+          const claimed = await database.episode.updateMany({
+            where: { id: episodeId, status: 'FAILED' },
+            data: {
+              status: 'SCRIPT_READY',
+              failedAtStatus: null,
+              failureReason: null,
+              ttsProvider: null,
+              ttsModel: null,
+            },
+          });
+          if (claimed.count === 0) return claimed;
+          await database.job.updateMany({
+            where: { episodeId, status: 'failed' },
+            data: { status: 'superseded' },
+          });
+          await database.episodeVersionSegment.deleteMany({ where: { version: { episodeId } } });
+          await database.episodeVersion.deleteMany({ where: { episodeId } });
+          await database.segment.deleteMany({ where: { episodeId } });
+          await database.episodeVoice.deleteMany({ where: { episodeId } });
+          return claimed;
         },
-      });
+        { signal: admission.request.signal }
+      );
       if (casReady.count === 0) {
         return errorResponse('Episode is no longer in a resumable state', 409);
       }
-      await prisma.$transaction([
-        prisma.episodeVersionSegment.deleteMany({ where: { version: { episodeId } } }),
-        prisma.episodeVersion.deleteMany({ where: { episodeId } }),
-        prisma.segment.deleteMany({ where: { episodeId } }),
-        prisma.episodeVoice.deleteMany({ where: { episodeId } }),
-      ]);
-
       return NextResponse.json({
         success: true,
         message: 'Script is ready for review — approve to continue',
@@ -471,42 +568,82 @@ async function routeResume(
 
     case 'GENERATE_AUDIO': {
       const audioGenerationKey = randomUUID();
-      const casAudio = await prisma.episode.updateMany({
-        where: { id: episodeId, status: 'FAILED' },
-        data: {
-          status: 'GENERATING_AUDIO',
-          failedAtStatus: null,
-          failureReason: null,
-          audioGenerationKey,
+      const casAudio = await sottoTransaction(
+        prismaUnfiltered,
+        async (database) => {
+          await requireOrdinaryEpisode(
+            database,
+            admission.request,
+            admission.identity,
+            episodeId,
+            admission.ownerId
+          );
+          const claimed = await database.episode.updateMany({
+            where: { id: episodeId, status: 'FAILED' },
+            data: {
+              status: 'GENERATING_AUDIO',
+              failedAtStatus: null,
+              failureReason: null,
+              audioGenerationKey,
+            },
+          });
+          return claimed;
         },
-      });
+        { signal: admission.request.signal }
+      );
       if (casAudio.count === 0) {
         return errorResponse('Episode is no longer in a resumable state', 409);
       }
-      if (ttsOverride) {
-        await prisma.$transaction([
-          prisma.episode.update({
-            where: { id: episodeId },
-            data: { ttsProvider: ttsOverride.provider, ttsModel: ttsOverride.model ?? null },
-          }),
-          prisma.episodeVoice.deleteMany({ where: { episodeId } }),
-        ]);
-      }
-
       let segmentCount = 0;
-      await enqueueAfterClaim(episodeId, 'GENERATING_AUDIO', async () => {
-        segmentCount = await restartExistingSegmentAudio(episodeId, audioGenerationKey, {
-          authorize: async (database) => {
-            await requireOriginalSottoAdmission(database, admission.request, admission.identity);
-            const current = await database.episode.findUnique({
-              where: { id: episodeId },
-              select: { userId: true },
+      try {
+        await enqueueAfterClaim(
+          episodeId,
+          'GENERATING_AUDIO',
+          async () => {
+            segmentCount = await restartExistingSegmentAudio(episodeId, audioGenerationKey, {
+              authorize: async (database) => {
+                return requireOrdinaryEpisode(
+                  database,
+                  admission.request,
+                  admission.identity,
+                  episodeId,
+                  admission.ownerId
+                );
+              },
+              onPrepared: async (database) => {
+                if (ttsOverride) {
+                  await database.episode.update({
+                    where: { id: episodeId },
+                    data: {
+                      ttsProvider: ttsOverride.provider,
+                      ttsModel: ttsOverride.model ?? null,
+                    },
+                  });
+                  await database.episodeVoice.deleteMany({ where: { episodeId } });
+                }
+                await database.job.updateMany({
+                  where: { episodeId, status: 'failed' },
+                  data: { status: 'superseded' },
+                });
+              },
             });
-            if (!current || current.userId !== admission.ownerId) throw new AccessError('conflict');
-            return { userId: admission.ownerId };
           },
-        });
-      });
+          admission.ownerId,
+          audioGenerationKey
+        );
+      } catch (error) {
+        if (!(error instanceof DurableDeliveryPendingError)) throw error;
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              'Audio generation was admitted, but delivery could not be confirmed. Check its status before retrying.',
+            resumedAt: 'GENERATE_AUDIO',
+            deliveryPending: true,
+          },
+          { status: 409 }
+        );
+      }
 
       return NextResponse.json({
         success: true,
@@ -524,8 +661,8 @@ async function routeResume(
         const identities = prepareInitialStitchIdentities();
         const result = await sottoTransaction(
           prismaUnfiltered,
-          (tx) =>
-            admitInitialStitch(tx, {
+          async (tx) => {
+            const admitted = await admitInitialStitch(tx, {
               episodeId,
               generationKey,
               soundPolicy: DEFAULT_INITIAL_STITCH_SOUND_POLICY,
@@ -533,19 +670,27 @@ async function routeResume(
               fromPhase: 'FAILED',
               signal: admission.request.signal,
               authorize: async (database) => {
-                await requireOriginalSottoAdmission(
-                  database,
-                  admission.request,
-                  admission.identity
-                );
                 if (
                   admission.ownerId !== admission.identity.userId &&
                   !isUserAdmin(admission.identity)
                 )
                   throw new AccessError('forbidden');
-                return { userId: admission.ownerId };
+                return requireOrdinaryEpisode(
+                  database,
+                  admission.request,
+                  admission.identity,
+                  episodeId,
+                  admission.ownerId
+                );
               },
-            }),
+            });
+            if (admitted.kind === 'admitted')
+              await tx.job.updateMany({
+                where: { episodeId, status: 'failed' },
+                data: { status: 'superseded' },
+              });
+            return admitted;
+          },
           { signal: admission.request.signal }
         );
         if (result.kind === 'waiting')

@@ -6,7 +6,7 @@ import { startVocabularyStudy } from '@/lib/vocabulary/study-admission';
 import { actOnVocabularyStudy } from '@/lib/vocabulary/study-actions';
 import { getDueItems } from '@/lib/knowledge-graph';
 import { resumePractice } from '@/lib/practice/resume';
-import { saveLearningProgress } from '@/lib/learning/progress';
+import { saveLearningProgress as saveAuthorizedProgress } from '@/lib/learning/progress';
 import { submitPractice } from '@/lib/practice/submission';
 import { readDictionary } from '@/lib/vocabulary/dictionary';
 import { authorizedLearnerExecution } from '../../helpers/runtime/provider-execution';
@@ -23,6 +23,12 @@ vi.mock('@/lib/prisma', async () => {
 });
 
 const suite = process.env.SIDEDOOR_TEST_DATABASE_URL ? describe : describe.skip;
+const saveLearningProgress = (
+  kind: 'CLASS' | 'PRACTICE',
+  id: string,
+  userId: string,
+  progress: Parameters<typeof saveAuthorizedProgress>[3]
+) => saveAuthorizedProgress(kind, id, userId, progress, authorizedLearnerExecution(userId));
 suite('owned dictionary study against PostgreSQL', () => {
   let instance: SharedTestInstance;
   let userId: string;

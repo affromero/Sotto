@@ -98,7 +98,19 @@ export function createSubmissionFixture(binding: { database: PrismaClient | null
       },
     });
   }
-  async function seedClass(contract: SkillRequirements) {
+  async function seedClass(contract: SkillRequirements, options: { firstA1?: boolean } = {}) {
+    if (!options.firstA1)
+      await instance.database.courseClass.create({
+        data: {
+          courseId,
+          lessonId,
+          order: 0,
+          status: 'PASSED',
+          passedAt: new Date('2020-01-01T00:00:00Z'),
+          createdAt: new Date('2020-01-01T00:00:00Z'),
+          skillRequirements: contract,
+        },
+      });
     const cls = await instance.database.courseClass.create({
       data: { courseId, lessonId, order: 1, status: 'AVAILABLE', skillRequirements: contract },
     });

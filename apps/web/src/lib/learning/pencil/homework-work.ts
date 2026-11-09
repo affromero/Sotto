@@ -7,7 +7,7 @@ import {
   type PencilHomeworkRequest,
 } from '@sotto/shared';
 import type { Prisma } from '@/generated/prisma/client';
-import { currentClassSections } from '@/lib/learning/classes/current-sections';
+import { currentClassSections } from '@/lib/learning/classes/progress/current-sections';
 import { captureCourseStorage } from '@/lib/sidedoor/storage/core/course-storage';
 import { sottoJobSnapshot } from '@/lib/sidedoor/jobs/core/job-delivery';
 import type { PencilTask } from './homework-vision';

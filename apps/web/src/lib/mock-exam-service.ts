@@ -185,7 +185,7 @@ async function buildExamSection(
           explanation: q.explanation,
         })),
       });
-      await queueListeningAudio(listening, execution);
+      await queueListeningAudio(listening, execution, { examId, examSectionId: examSection.id });
     } else if (section.format === 'speaking') {
       const composed = await composeSpeakingPrompts({
         execution,

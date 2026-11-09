@@ -8,7 +8,11 @@ import { blockedProviderExecution } from '../../../helpers/runtime/provider-exec
 
 const generate = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/learning-ai', () => ({
-  resolveCapturedLearningAi: async () => ({ provider: 'anthropic', model: 'captured' }),
+  resolveCapturedLearningAi: async (...args: [string, unknown]) => ({
+    provider: 'anthropic',
+    model: 'captured',
+    execution: args[1],
+  }),
   capturedLearningAiOptions: async () => ({ model: 'captured' }),
 }));
 vi.mock('@/lib/providers/ai', () => ({ createAIProvider: () => ({ generateResponse: generate }) }));

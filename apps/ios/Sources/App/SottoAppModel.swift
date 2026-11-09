@@ -6,8 +6,10 @@ final class SottoAppModel: ObservableObject {
     @Published private(set) var profiles: [SottoProfile] = []
     @Published private(set) var courses: [SottoCourse] = []
     @Published var selectedClass: SottoClassDetail?
+    @Published var classPreludeNavigation: ClassPreludeNavigation?
     @Published var pencilWorkbook = false
     var learningSessions: [String: NativeLearningSessionState] = [:]
+    var practiceRecoveryId: UUID?
     var pendingPracticeAdmissions: [String: UUID] = [:]
     @Published var practiceStart: SottoPracticeStart?
     @Published var vocabularyCourseId: String?
@@ -136,6 +138,7 @@ final class SottoAppModel: ObservableObject {
     /// explicit cancellation action on the course progress panel.
     func cancelWork() async {
         work?.cancel()
+        if let navigation = classPreludeNavigation { cancelClassPrelude(navigation) }
         classRemovalId = nil
         work = nil
         workId = nil
@@ -230,6 +233,7 @@ final class SottoAppModel: ObservableObject {
     }
 
     private func resetLearnerState() {
+        practiceRecoveryId = nil
         classGenerationAdmissionId = nil
         classRemovalId = nil
         isLoading = false
@@ -241,6 +245,7 @@ final class SottoAppModel: ObservableObject {
         practiceOverviewCourseId = nil
         courses = []
         selectedClass = nil
+        classPreludeNavigation = nil
         practiceStart = nil
         vocabularyCourseId = nil
         pencilWorkbook = false
@@ -257,7 +262,8 @@ final class SottoAppModel: ObservableObject {
         classGenerationObservations.removeAll()
     }
 
-    func closeClass() {
+    func closeClass(preservePrelude: Bool = false) {
+        if !preservePrelude { classPreludeNavigation = nil }
         selectedClass = nil
         pencilWorkbook = false
         classResult = nil
@@ -331,15 +337,18 @@ final class SottoAppModel: ObservableObject {
 
     func startOrResumeClass(for course: SottoCourse) async {
         if let activeClassId = course.activeClassId {
-            await openClass(activeClassId)
+            beginClassPrelude(activeClassId)
             return
         }
 
         startClassGeneration(for: course)
     }
 
-    func openClass(_ classId: String) async {
+    func openClass(_ classId: String, navigationId: UUID? = nil) async {
         guard let client = makeClient() else { return }
+        func isCurrent() -> Bool {
+            !Task.isCancelled && isCurrentLearningClient(client) && (navigationId == nil || classPreludeNavigation?.id == navigationId)
+        }
         pencilWorkbook = false
         isLoading = true
         errorMessage = nil
@@ -347,7 +356,7 @@ final class SottoAppModel: ObservableObject {
         do {
             var classDetail = try await client.fetchClass(classId: classId)
             if !classDetail.submitted, classDetail.status == "GENERATING" {
-                guard isCurrentLearningClient(client) else { return }
+                guard isCurrent() else { return }
                 observePreparingClass(classDetail, client: client)
                 loadingOperation = nil
                 isLoading = false
@@ -370,7 +379,8 @@ final class SottoAppModel: ObservableObject {
                     classId: classId,
                     courseId: classDetail.courseId,
                     startedAt: startedAt,
-                    initialIssues: classPresentationIssues(classDetail)
+                    initialIssues: classPresentationIssues(classDetail),
+                    isCurrent: isCurrent
                 )
             }
 
@@ -381,15 +391,15 @@ final class SottoAppModel: ObservableObject {
                 )
             }
 
-            guard isCurrentLearningClient(client) else { return }
+            guard isCurrent() else { return }
             selectedClass = classDetail
-            classResult = nil
+            classResult = classDetail.submitted ? classDetail.submission?.receipt : nil
         } catch {
-            if isCurrentLearningClient(client) {
+            if isCurrent() {
                 if case SottoAPIError.http(404, _) = error {
-                    if selectedClass?.id == classId { closeClass() }
+                    if selectedClass?.id == classId { closeClass(preservePrelude: navigationId != nil) }
                     await loadCourses(showLoading: false)
-                    if isCurrentLearningClient(client) {
+                    if isCurrent() {
                         errorMessage = courseRefreshError == nil
                             ? "This class was removed. Your courses have been refreshed."
                             : "This class was removed, but the course list could not be refreshed. Try again."
@@ -398,8 +408,10 @@ final class SottoAppModel: ObservableObject {
             }
         }
 
-        loadingOperation = nil
-        isLoading = false
+        if isCurrent() {
+            loadingOperation = nil
+            isLoading = false
+        }
     }
 
     private func waitForRefreshedClass(
@@ -407,14 +419,17 @@ final class SottoAppModel: ObservableObject {
         classId: String,
         courseId: String,
         startedAt: Date,
-        initialIssues: [String]
+        initialIssues: [String],
+        isCurrent: () -> Bool
     ) async throws -> SottoClassDetail {
         let deadline = startedAt.addingTimeInterval(900)
         var lastIssues = initialIssues
 
         while !Task.isCancelled {
+            guard isCurrent() else { throw CancellationError() }
             let elapsedSeconds = Int(Date().timeIntervalSince(startedAt))
             let progress = try? await client.fetchClassGenerationProgress(courseId: courseId)
+            guard isCurrent() else { throw CancellationError() }
             loadingOperation = classRefreshOperation(
                 progress: progress,
                 elapsedSeconds: elapsedSeconds,
@@ -422,6 +437,7 @@ final class SottoAppModel: ObservableObject {
             )
 
             let classDetail = try await client.fetchClass(classId: classId)
+            guard isCurrent() else { throw CancellationError() }
             let issues = classDetail.submitted ? [] : classPresentationIssues(classDetail)
             lastIssues = issues
 
@@ -566,20 +582,24 @@ final class SottoAppModel: ObservableObject {
         return saved
     }
 
-    func submitClassAnswers(_ answers: [SottoSubmitAnswer]) async {
-        guard let client = makeClient(), let selectedClass else { return }
+    func submitClassAnswers(_ answers: [SottoSubmitAnswer]) async -> Bool {
+        guard let client = makeClient(), let selectedClass else { return false }
         isLoading = true
         errorMessage = nil
+        defer { isLoading = false }
 
         do {
-            classResult = try await client.submitClass(classId: selectedClass.id, answers: answers)
-            self.selectedClass = try await client.fetchClass(classId: selectedClass.id)
+            let result = try await client.submitClass(classId: selectedClass.id, answers: answers)
+            let refreshed = try await client.fetchClass(classId: selectedClass.id)
+            guard isCurrentLearningClient(client), self.selectedClass?.id == selectedClass.id else { return false }
+            classResult = result
+            self.selectedClass = refreshed
             await loadCourses()
+            return true
         } catch {
             report(error)
+            return false
         }
-
-        isLoading = false
     }
 
     func submitPracticeAnswers(_ answers: [SottoPracticeAnswer]) async {
@@ -624,16 +644,24 @@ final class SottoAppModel: ObservableObject {
     func uploadClassSpeakingRecording(
         classId: String,
         promptId: String,
-        audioURL: URL
+        audioURL: URL,
+        binding: SottoClassSpeakingBinding,
+        expectedLearner: SottoLearnerIdentity
     ) async throws -> SottoSpeakingUploadResponse {
         guard let client = makeClient() else {
             throw SottoAPIError.message("Pair this device before recording speaking feedback.")
         }
-        return try await client.uploadClassSpeakingRecording(
+        guard SottoLearnerIdentity(client) == expectedLearner else {
+            throw SottoAPIError.classRecordingRejected("The learner changed. Your recording remains on this device.")
+        }
+        let response = try await client.uploadClassSpeakingRecording(
             classId: classId,
             promptId: promptId,
-            audioURL: audioURL
+            audioURL: audioURL,
+            binding: binding
         )
+        guard isCurrentLearningClient(client) else { throw CancellationError() }
+        return response
     }
 
     func pollClassSpeakingRecording(

@@ -28,7 +28,11 @@ it('keeps the reading limit while explicitly segmenting complete source document
 const logError = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/logger', () => ({ logger: { error: logError, warn: vi.fn(), info: vi.fn() } }));
 vi.mock('@/lib/learning-ai', () => ({
-  resolveCapturedLearningAi: async () => ({ provider: 'anthropic', model: 'fixture' }),
+  resolveCapturedLearningAi: async (...args: [string, unknown]) => ({
+    provider: 'anthropic',
+    model: 'fixture',
+    execution: args[1],
+  }),
   capturedLearningAiOptions: async () => ({}),
 }));
 vi.mock('@/lib/providers/ai', () => ({ createAIProvider: () => ({ generateResponse: generate }) }));
@@ -128,6 +132,42 @@ beforeEach(() => {
 });
 
 describe('reading vocabulary extraction', () => {
+  it.each([2, 3])(
+    'extracts from a saved question with %i choices without weakening new questions',
+    async (count) => {
+      const saved = { ...question, options: question.options.slice(0, count) };
+      await expect(extractReadingVocabulary({ ...options, questions: [saved] })).rejects.toThrow(
+        'private question keys'
+      );
+      expect(generate).not.toHaveBeenCalled();
+      const result = await extractReadingVocabulary({
+        ...options,
+        questions: [saved],
+        readingQuestionMode: 'saved',
+      });
+      expect(result.words[0]?.questionIds).toEqual([saved.id]);
+      expect(JSON.parse(generate.mock.calls[0]![1][0].content).questions[0]).toMatchObject({
+        options: saved.options,
+        correctIndex: saved.correctIndex,
+      });
+    }
+  );
+
+  it('rejects invalid saved answer keys before contacting a provider', async () => {
+    for (const saved of [
+      { ...question, options: ['Coffee', 'Tea'], correctIndex: 2 },
+      { ...question, options: ['Coffee', ' coffee '], correctIndex: 0 },
+    ]) {
+      await expect(
+        extractReadingVocabulary({
+          ...options,
+          questions: [saved],
+          readingQuestionMode: 'saved',
+        })
+      ).rejects.toThrow('private question keys');
+    }
+    expect(generate).not.toHaveBeenCalled();
+  });
   it('preserves inflected source forms and exact assessed question IDs without audio', async () => {
     const result = await extractReadingVocabulary(options);
     expect(result).toMatchObject({
@@ -194,63 +234,73 @@ describe('reading vocabulary extraction', () => {
     });
     expect((await extractReadingVocabulary(options)).words[0]?.questionIds).toEqual([]);
   });
-  it('corrects metadata once while preserving the original keyed reading material', async () => {
-    const replacement = {
-      ...word,
-      lemma: 'bestellen',
-      gloss: 'to place an order',
-    };
-    const originalQuestions = structuredClone(options.questions);
-    generate.mockReset();
-    generate
-      .mockResolvedValueOnce(response([{ ...word, lemma: 'trinken', gloss: 'to drink' }]))
-      .mockResolvedValueOnce(response(rejected))
-      .mockResolvedValueOnce(metadataResponse([replacement]))
-      .mockResolvedValueOnce(
-        response({
-          items: [
-            {
-              ...approved().items[0],
-              associations: [
-                {
-                  questionIndex: 0,
-                  canAnswerWithoutWord: true,
-                  reasoning: 'The order can be identified without understanding the verb.',
-                },
-              ],
-            },
-          ],
-        })
-      );
-    const result = await extractReadingVocabulary(options);
-    expect(result.words).toEqual([
-      {
+  it.each(['generated', 'saved'] as const)(
+    'corrects metadata for %s questions while preserving the original keyed reading material',
+    async (mode) => {
+      const selectedQuestion =
+        mode === 'saved' ? { ...question, options: question.options.slice(0, 2) } : question;
+      const selectedOptions = {
+        ...options,
+        questions: [selectedQuestion],
+        readingQuestionMode: mode,
+      };
+      const replacement = {
+        ...word,
         lemma: 'bestellen',
         gloss: 'to place an order',
-        pos: 'verb',
-        sourceForm: 'bestellt',
-        questionIds: [],
-      },
-    ]);
-    const initial = JSON.parse(generate.mock.calls[0]![1][0].content);
-    const correction = JSON.parse(generate.mock.calls[2]![1][0].content);
-    expect(correction).toMatchObject({
-      passageText: initial.passageText,
-      questions: initial.questions,
-      correction: {
-        words: [{ lemma: 'trinken', sourceForm: 'bestellt' }],
-        feedback: [{ index: 0, feedback: rejected.items[0]!.metadata.feedback }],
-      },
-    });
-    expect(generate.mock.calls[2]![2].jsonSchema.name).toBe('vocabulary_metadata_repair');
-    expect(JSON.parse(generate.mock.calls[3]![1][0].content).items[0].content).toMatchObject({
-      sourceQuote: word.sourceForm,
-      questionIndices: [0],
-      assessedQuestions: [question],
-    });
-    expect(generate.mock.calls[3]![0]).toContain('faithful contextual synonyms');
-    expect(options.questions).toEqual(originalQuestions);
-  });
+      };
+      const originalQuestions = structuredClone(selectedOptions.questions);
+      generate.mockReset();
+      generate
+        .mockResolvedValueOnce(response([{ ...word, lemma: 'trinken', gloss: 'to drink' }]))
+        .mockResolvedValueOnce(response(rejected))
+        .mockResolvedValueOnce(metadataResponse([replacement]))
+        .mockResolvedValueOnce(
+          response({
+            items: [
+              {
+                ...approved().items[0],
+                associations: [
+                  {
+                    questionIndex: 0,
+                    canAnswerWithoutWord: true,
+                    reasoning: 'The order can be identified without understanding the verb.',
+                  },
+                ],
+              },
+            ],
+          })
+        );
+      const result = await extractReadingVocabulary(selectedOptions);
+      expect(result.words).toEqual([
+        {
+          lemma: 'bestellen',
+          gloss: 'to place an order',
+          pos: 'verb',
+          sourceForm: 'bestellt',
+          questionIds: [],
+        },
+      ]);
+      const initial = JSON.parse(generate.mock.calls[0]![1][0].content);
+      const correction = JSON.parse(generate.mock.calls[2]![1][0].content);
+      expect(correction).toMatchObject({
+        passageText: initial.passageText,
+        questions: initial.questions,
+        correction: {
+          words: [{ lemma: 'trinken', sourceForm: 'bestellt' }],
+          feedback: [{ index: 0, feedback: rejected.items[0]!.metadata.feedback }],
+        },
+      });
+      expect(generate.mock.calls[2]![2].jsonSchema.name).toBe('vocabulary_metadata_repair');
+      expect(JSON.parse(generate.mock.calls[3]![1][0].content).items[0].content).toMatchObject({
+        sourceQuote: word.sourceForm,
+        questionIndices: [0],
+        assessedQuestions: [selectedQuestion],
+      });
+      expect(generate.mock.calls[3]![0]).toContain('faithful contextual synonyms');
+      expect(selectedOptions.questions).toEqual(originalQuestions);
+    }
+  );
   it('admits supported assessment links while retaining denied incidental words as background exposure', async () => {
     const readingQuestion = {
       id: 'reading-purchase',

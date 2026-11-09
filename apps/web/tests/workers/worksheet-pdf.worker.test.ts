@@ -54,7 +54,13 @@ vi.mock('@/lib/sidedoor/jobs/core/job-delivery', () => ({
     complete: false,
     operationId: '10000000-0000-4000-8000-000000000001',
     fingerprint: 'f'.repeat(64),
-    scopes: [{ subjectId: 'course:course-1', generation: 1 }],
+    scopes:
+      job.name === 'worksheet-pdf.v2'
+        ? [
+            { subjectId: 'class:class-1', generation: 2 },
+            { subjectId: 'course:course-1', generation: 1 },
+          ]
+        : [{ subjectId: 'course:course-1', generation: 1 }],
     payload: {
       classId: 'class-1',
       classUpdatedAt: mocks.cls.updatedAt.getTime(),
@@ -71,6 +77,16 @@ vi.mock('@/lib/sidedoor/storage/core/course-storage', () => ({
     instanceId: 'instance-1',
     userId: 'user-1',
     scopes: [{ subjectId: 'course:course-1', generation: 1 }],
+  }),
+}));
+vi.mock('@/lib/classes/help/lifecycle/prerequisite-ownership', () => ({
+  capturePrerequisiteOwnership: vi.fn().mockResolvedValue({
+    instanceId: 'instance-1',
+    userId: 'user-1',
+    scopes: [
+      { subjectId: 'class:class-1', generation: 2 },
+      { subjectId: 'course:course-1', generation: 1 },
+    ],
   }),
 }));
 vi.mock('@/lib/sidedoor/storage/core/storage-write', () => ({
@@ -91,6 +107,7 @@ vi.mock('playwright', () => ({
 }));
 
 import { processWorksheetPdf } from '@/workers/worksheet-pdf.worker';
+import { capturePrerequisiteOwnership } from '@/lib/classes/help/lifecycle/prerequisite-ownership';
 
 function job(appBaseUrl = 'https://selfhost.example.com') {
   return {
@@ -142,6 +159,41 @@ describe('durable worksheet PDF generation', () => {
       where: { id: 'class-1' },
       data: { worksheetPdfUrl: 'https://storage.example/worksheet.pdf' },
     });
+  });
+
+  it('publishes new worksheets under their class ownership', async () => {
+    let capturedScopes: unknown;
+    mocks.writeStorageReference.mockImplementation(async (options) => {
+      const admission = await options.captureAdmission(mocks.database);
+      capturedScopes = admission.scopes;
+      await options.validateAdmission(mocks.database, admission);
+      await options.commit(mocks.database, 'https://storage.example/worksheet.pdf', admission);
+      return 'https://storage.example/worksheet.pdf';
+    });
+    await processWorksheetPdf({ ...job(), name: 'worksheet-pdf.v2' } as never);
+    expect(capturedScopes).toEqual([
+      { subjectId: 'class:class-1', generation: 2 },
+      { subjectId: 'course:course-1', generation: 1 },
+    ]);
+    expect(mocks.database.courseClass.update).toHaveBeenCalledWith({
+      where: { id: 'class-1' },
+      data: { worksheetPdfUrl: 'https://storage.example/worksheet.pdf' },
+    });
+  });
+
+  it('rejects a worksheet when its class ownership changed before generation', async () => {
+    vi.mocked(capturePrerequisiteOwnership).mockResolvedValueOnce({
+      instanceId: 'instance-1',
+      userId: 'user-1',
+      scopes: [
+        { subjectId: 'class:class-1', generation: 3 },
+        { subjectId: 'course:course-1', generation: 1 },
+      ],
+    });
+    await expect(
+      processWorksheetPdf({ ...job(), name: 'worksheet-pdf.v2' } as never)
+    ).rejects.toThrow('Worksheet ownership changed before generation');
+    expect(mocks.writeStorageReference).not.toHaveBeenCalled();
   });
 
   it('keeps durable work retryable when Chromium is unavailable', async () => {

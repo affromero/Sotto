@@ -21,7 +21,7 @@ final class PlayActionRecoveryTests: XCTestCase {
         coordinator.navigate(.room(latest.id))
         let polling = Task { await coordinator.foreground() }
         defer { polling.cancel(); coordinator.endForeground() }
-        try await waitForPlay("The newer room is already displayed") { coordinator.room == latest }
+        try await waitForPlay("The newer room is already displayed", diagnostics: { playDiagnostics(coordinator, server) }) { coordinator.room == latest }
         do { try await coordinator.command(.choose(.A), in: displayed); XCTFail("An older reconciliation baseline must be refused.") }
         catch { guard case SottoAPIError.http(409, _) = error else { throw error } }
         XCTAssertEqual(coordinator.room, latest)
@@ -78,7 +78,7 @@ final class PlayActionRecoveryTests: XCTestCase {
         coordinator.navigate(.room(before.id))
         let polling = Task { await coordinator.foreground() }
         defer { polling.cancel(); coordinator.endForeground() }
-        try await waitForPlay("The finished round is visible") { coordinator.room != nil }
+        try await waitForPlay("The finished round is visible", diagnostics: { playDiagnostics(coordinator, server) }) { coordinator.room != nil }
         try await coordinator.refresh(coordinator.epoch)
         do { try await coordinator.roomAction(.nextRound, in: before); XCTFail("A stale Next button must refuse.") }
         catch { XCTAssertTrue(error.localizedDescription.contains("game changed")) }
@@ -191,7 +191,7 @@ final class PlayActionRecoveryTests: XCTestCase {
         coordinator.navigate(.room(before.id))
         let polling = Task { await coordinator.foreground() }
         defer { polling.cancel(); coordinator.endForeground() }
-        try await waitForPlay("The round is visible") { coordinator.room != nil }
+        try await waitForPlay("The round is visible", diagnostics: { playDiagnostics(coordinator, server) }) { coordinator.room != nil }
         let action = Task { try await coordinator.command(.choose(.A), in: before) }
         try await waitForPlay("The action crossed the HTTP boundary") { server.requests.contains { $0.hasPrefix("POST ") } }
         do { try await coordinator.refresh(coordinator.epoch); XCTFail("Access must be refused.") }

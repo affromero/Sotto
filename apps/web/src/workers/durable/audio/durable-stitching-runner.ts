@@ -33,6 +33,8 @@ import { withSottoJobExecution } from '@/lib/sidedoor/jobs/core/job-execution-li
 import { prepareStitchFailureEffects } from '@/lib/sidedoor/jobs/stitch/stitch-failure-effects';
 import { logger } from '@/lib/logger';
 import { publishLearningAudioIdentity } from '@/lib/learning-map/evidence/audio';
+import { bindAssessmentAudioIdentity } from '@/lib/learning/classes/audio/assessment-audio-lineage';
+import { verifyAssessmentAudioRecovery } from '@/lib/learning/classes/audio/assessment-audio-recovery';
 import type { InitialStitchOutputs } from '@/lib/sidedoor/jobs/initial/initial-stitch-contract';
 import {
   readInitialStitchOutcome,
@@ -252,44 +254,48 @@ async function executeDurableStitching(
     });
     return null;
   });
-  const sideEffects = [
-    {
-      id: outputs.readyNotification,
-      handler: 'notifications',
-      payload: {
-        userId: episode.userId,
-        type: 'EPISODE_READY',
-        title: 'Your lesson is ready!',
-        message: `"${episode.title}" is ready to play.`,
-        data: { episodeId: episode.id },
-      },
-    },
-    {
-      id: outputs.pdf,
-      handler: 'pdf-generation',
-      payload: {
-        episodeId: episode.id,
-        userId: episode.userId,
-        episodeVersion: version,
-        stitchKey,
-      },
-    },
-    {
-      id: outputs.waveform,
-      handler: 'waveform-generation',
-      payload: {
-        episodeId: episode.id,
-        userId: episode.userId,
-        episodeVersion: version,
-        stitchKey,
-      },
-    },
-    {
-      id: outputs.readyStatus,
-      handler: 'episode-status',
-      payload: { episodeId: episode.id, status: 'READY' },
-    },
-  ].map((effect) =>
+  const sideEffects = (
+    payload.storage.associations.assessmentSection
+      ? []
+      : [
+          {
+            id: outputs.readyNotification,
+            handler: 'notifications',
+            payload: {
+              userId: episode.userId,
+              type: 'EPISODE_READY',
+              title: 'Your lesson is ready!',
+              message: `"${episode.title}" is ready to play.`,
+              data: { episodeId: episode.id },
+            },
+          },
+          {
+            id: outputs.pdf,
+            handler: 'pdf-generation',
+            payload: {
+              episodeId: episode.id,
+              userId: episode.userId,
+              episodeVersion: version,
+              stitchKey,
+            },
+          },
+          {
+            id: outputs.waveform,
+            handler: 'waveform-generation',
+            payload: {
+              episodeId: episode.id,
+              userId: episode.userId,
+              episodeVersion: version,
+              stitchKey,
+            },
+          },
+          {
+            id: outputs.readyStatus,
+            handler: 'episode-status',
+            payload: { episodeId: episode.id, status: 'READY' },
+          },
+        ]
+  ).map((effect) =>
     prepareJob({
       id: effect.id,
       namespace: SIDEDOOR_STATE_ID,
@@ -340,6 +346,18 @@ async function executeDurableStitching(
         outcome.stitchKey !== stitchKey
       )
         throw new Error('Committed stitching outcome does not match publication');
+      const association = payload.storage.associations.assessmentSection;
+      if (association)
+        await verifyAssessmentAudioRecovery(tx, {
+          episodeId: episode.id,
+          userId: payload.storage.userId,
+          generationKey: current.audioGenerationKey!,
+          audioUrl: committedReference,
+          version,
+          stitchKey,
+          association,
+          signal,
+        });
     }
     await validateEpisodeStorage(tx, episode.id, payload.storage, [payload.contributorId]);
   }
@@ -413,13 +431,17 @@ async function executeDurableStitching(
             activeStitchOwner: null,
           },
         });
-        await publishLearningAudioIdentity(tx, {
+        const identity = await publishLearningAudioIdentity(tx, {
           episodeId: episode.id,
           audioUrl,
           contentSha256: audioContentSha256,
           contentBytes: audio.length,
           version,
         });
+        if (payload.storage.associations.assessmentSection) {
+          if (!identity) throw new Error('Assessment audio identity is unavailable');
+          await bindAssessmentAudioIdentity(tx, identity);
+        }
         await tx.pipelineEvent.create({
           data: {
             episodeId: episode.id,

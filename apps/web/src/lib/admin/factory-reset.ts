@@ -7,6 +7,7 @@ import { admitLearningStorageDeletion } from '@/lib/sidedoor/access/deletion/lea
 import { runSottoStorageCleanup } from '@/lib/sidedoor/storage/migration/storage-cleanup-runtime';
 import { SIDEDOOR_STATE_ID } from '@/lib/sidedoor/access/state/store';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
+import { eraseCompletedClassCleanupReceipts } from '@/lib/classes/help/prerequisite-deletion';
 
 export interface FactoryResetResult {
   profilesPreserved: number;
@@ -97,6 +98,7 @@ export async function factoryReset(): Promise<FactoryResetResult> {
   const admitted = await sottoTransaction(
     prismaUnfiltered,
     async (database) => {
+      await eraseCompletedClassCleanupReceipts(database);
       const [profilesPreserved, episodes, courses, materials] = await Promise.all([
         database.user.count(),
         database.episode.findMany({ select: { id: true, createdAt: true } }),

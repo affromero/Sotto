@@ -1,6 +1,9 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
+import { PrerequisiteDeletionConflict } from '@/lib/classes/help/prerequisite-deletion';
+import { SpeakingDeletionConflict } from '@/lib/sidedoor/jobs/stitch/speaking-grading-deletion';
+import { AssessmentFenceConflict } from '@/lib/learning/classes/lifecycle/assessment-fence';
 
 const mockRequireAdmin = vi.fn();
 vi.mock('@/lib/auth-guards', () => ({
@@ -67,6 +70,33 @@ describe('POST /api/v1/admin/factory-reset', () => {
 
     expect(res.status).toBe(400);
     expect(mockFactoryReset).not.toHaveBeenCalled();
+    expect(mockInvalidateServerInfra).not.toHaveBeenCalled();
+  });
+
+  it('leaves configuration intact when prerequisite work requires recovery', async () => {
+    mockRequireAdmin.mockResolvedValue('local-user');
+    mockFactoryReset.mockRejectedValue(new PrerequisiteDeletionConflict());
+    const POST = await getHandler();
+    const res = await POST(postRequest({ confirm: 'DELETE EVERYTHING' }));
+    expect(res.status).toBe(409);
+    expect(mockInvalidateServerInfra).not.toHaveBeenCalled();
+  });
+
+  it('leaves configuration intact when speaking work requires recovery', async () => {
+    mockRequireAdmin.mockResolvedValue('local-user');
+    mockFactoryReset.mockRejectedValue(new SpeakingDeletionConflict());
+    const POST = await getHandler();
+    const res = await POST(postRequest({ confirm: 'DELETE EVERYTHING' }));
+    expect(res.status).toBe(409);
+    expect(mockInvalidateServerInfra).not.toHaveBeenCalled();
+  });
+
+  it('leaves configuration intact when assessment work requires recovery', async () => {
+    mockRequireAdmin.mockResolvedValue('local-user');
+    mockFactoryReset.mockRejectedValue(new AssessmentFenceConflict());
+    const POST = await getHandler();
+    const res = await POST(postRequest({ confirm: 'DELETE EVERYTHING' }));
+    expect(res.status).toBe(409);
     expect(mockInvalidateServerInfra).not.toHaveBeenCalled();
   });
 

@@ -239,7 +239,7 @@ struct SottoLearningProgressResponse: Decodable {
 
 extension SottoSpeakingRecording {
     private enum EvidenceKeys: String, CodingKey {
-        case id, recordingId, status, transcript, overallScore, rubricScores, phonemeScores, feedback
+        case id, recordingId, status, transcript, overallScore, rubricScores, phonemeScores, feedback, recoveryAcknowledged
     }
 
     init(from decoder: Decoder) throws {
@@ -251,5 +251,6 @@ extension SottoSpeakingRecording {
         rubricScores = try values.decodeIfPresent([String: Double].self, forKey: .rubricScores)
         phonemeScores = try values.decodeIfPresent([SottoSpeakingAlignmentToken].self, forKey: .phonemeScores)
         feedback = try values.decodeIfPresent(String.self, forKey: .feedback)
+        recoveryAcknowledged = try values.decodeIfPresent(Bool.self, forKey: .recoveryAcknowledged)
     }
 }

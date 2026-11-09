@@ -56,7 +56,10 @@ const initialModels = {
 };
 
 /** Tests use their own initialized schema, never application or production tables. */
-export async function createSharedTestInstance(label: string) {
+export async function createSharedTestInstance(
+  label: string,
+  options: { beforeMigration?: string } = {}
+) {
   const databaseUrl = process.env.SIDEDOOR_TEST_DATABASE_URL;
   if (!databaseUrl || !/^[a-z_]{1,24}$/.test(label))
     throw new Error('Use a named isolated test instance');
@@ -79,6 +82,7 @@ export async function createSharedTestInstance(label: string) {
     const directory = 'prisma/migrations';
     for (const entry of (await readdir(directory, { withFileTypes: true }))
       .filter((item) => item.isDirectory())
+      .filter((item) => !options.beforeMigration || item.name < options.beforeMigration)
       .sort((left, right) => left.name.localeCompare(right.name))) {
       await connection.query(await readFile(join(directory, entry.name, 'migration.sql'), 'utf8'));
     }
@@ -99,6 +103,8 @@ export async function createSharedTestInstance(label: string) {
   async function reset() {
     process.env.DIRECT_DATABASE_URL = databaseUrl;
     await database.$executeRawUnsafe(`TRUNCATE "${schema}"."User" CASCADE`);
+    await database.assessmentAudioProtectedMedia.deleteMany({});
+    await database.assessmentAudioSourceFreeze.deleteMany({});
     await database.$executeRawUnsafe(`TRUNCATE "${schema}"."SidedoorState"`);
     const instanceId = randomUUID();
     await sottoTransaction(database, async (tx) => {

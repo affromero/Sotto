@@ -44,6 +44,11 @@ describe('TTS media resource ownership', () => {
     expect(await readdir(directory)).toEqual([]);
   });
 
+  it('rejects a truncated audio header and removes temporary files', async () => {
+    await expect(measureTtsAudio(Buffer.from('ID3'), { directory })).rejects.toThrow();
+    expect(await readdir(directory)).toEqual([]);
+  });
+
   it.each(['ffmpeg', 'ffprobe'] as const)(
     'confirms %s exit before returning cancellation and removing its files',
     async (command) => {

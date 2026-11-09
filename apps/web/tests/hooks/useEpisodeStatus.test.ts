@@ -72,6 +72,28 @@ function deferredStatus() {
 }
 
 describe('useEpisodeStatus', () => {
+  it('reconciles a previously failed episode when monitoring is explicitly started again', async () => {
+    const onStatusChange = vi.fn();
+    const initialProps: { episodeId: string | null; initialStatus?: string } = {
+      episodeId: null,
+      initialStatus: 'FAILED',
+    };
+    const { rerender } = renderHook(
+      ({ episodeId, initialStatus }: { episodeId: string | null; initialStatus?: string }) =>
+        useEpisodeStatus({ episodeId, initialStatus, onStatusChange }),
+      { initialProps }
+    );
+    rerender({ episodeId: 'pod-1', initialStatus: undefined });
+    expect(MockEventSource.instances).toHaveLength(1);
+    mockFetchStatus('FAILED', { failureReason: 'Audio failed.' });
+    await act(async () => {
+      MockEventSource.instances[0]!.simulateOpen();
+    });
+    expect(onStatusChange).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'FAILED', failureReason: 'Audio failed.' })
+    );
+  });
+
   it('closes the previous stream before layout consumers can deliver an old episode event', () => {
     let previous: MockEventSource | undefined;
     const { result, rerender } = renderHook(

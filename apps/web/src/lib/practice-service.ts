@@ -715,7 +715,7 @@ async function startFull(
     referenceTtsUrl: references.get(prompt.id) ?? prompt.referenceTtsUrl,
   }));
 
-  if (listening) await queueListeningAudio(listening, execution);
+  if (listening) await queueListeningAudio(listening, execution, { practiceSessionId: session.id });
 
   logger.info('Full practice generated', {
     sessionId: session.id,
@@ -799,7 +799,7 @@ async function startListening(
     },
     lifecycle
   );
-  await queueListeningAudio(listening, execution);
+  await queueListeningAudio(listening, execution, { practiceSessionId: session.id });
   return {
     status: 'ready',
     sessionId: session.id,

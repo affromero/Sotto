@@ -12,6 +12,20 @@ final class AudioDownloadTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: file), Data("audio fixture".utf8))
     }
 
+    func testSavedSpeakingAudioUsesAuthenticatedRouteAndMediaType() async throws {
+        let file = try await client().downloadLearningAudio(from: "/api/v1/classes/class/speaking/prompt/recordings/recording/audio")
+        defer { try? FileManager.default.removeItem(at: file) }
+        XCTAssertEqual(file.pathExtension, "mp3")
+        XCTAssertEqual(try Data(contentsOf: file), Data("audio fixture".utf8))
+    }
+
+    func testSpeakingReferenceUsesAuthenticatedRouteAndMediaType() async throws {
+        let file = try await client().downloadLearningAudio(from: "/api/v1/classes/class/speaking/prompt/reference/audio")
+        defer { try? FileManager.default.removeItem(at: file) }
+        XCTAssertEqual(file.pathExtension, "mp3")
+        XCTAssertEqual(try Data(contentsOf: file), Data("audio fixture".utf8))
+    }
+
     func testExternalAudioDownloadsWithoutLearnerCredentials() async throws {
         let file = try await client().downloadLearningAudio(from: "https://cdn.example/lesson.mp3")
         defer { try? FileManager.default.removeItem(at: file) }
