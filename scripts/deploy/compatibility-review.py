@@ -646,7 +646,7 @@ def published_migration_additions(
         ) or pair['candidateSha256'] is None:
             raise ValueError('Previously published migration files must remain unchanged')
         added.append(name)
-    if not 1 <= len(added) <= 16:
+    if not 1 <= len(added) <= 32:
         raise ValueError('Bounded added migration inventory required')
     return sorted(added)
 

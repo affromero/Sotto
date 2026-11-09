@@ -518,7 +518,7 @@ class MigrationStageTests(unittest.TestCase):
                     after = dict(before)
                 elif change == 'too-many':
                     added = {PREFIX + str(index) + '/migration.sql': 'f' * 64
-                             for index in range(17)}
+                             for index in range(33)}
                     after = {**before, **added}
                 elif change == 'changed':
                     after[sorted(before)[0]] = 'f' * 64

@@ -183,7 +183,18 @@ class SchemaReviewTests(unittest.TestCase):
     def test_each_stage_reuses_the_same_immutable_bounded_sql_guard(self) -> None:
         files = self.provider['reviewedRuntimeFiles']
         self.assertEqual(REVIEW.published_migration_additions(files), [MIGRATION])
-        for count in (0, 17):
+        for count in (21, 32):
+            changes = {
+                f'apps/web/prisma/migrations/stage_{index:02}/migration.sql': {
+                    'previousSha256': None, 'candidateSha256': 'a' * 64,
+                } for index in range(count)
+            }
+            with self.subTest(count=count):
+                self.assertEqual(
+                    REVIEW.published_migration_additions(changes),
+                    sorted(changes),
+                )
+        for count in (0, 33):
             changes = {
                 f'apps/web/prisma/migrations/stage_{index}/migration.sql': {
                     'previousSha256': None, 'candidateSha256': 'a' * 64,
