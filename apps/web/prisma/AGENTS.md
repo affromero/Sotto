@@ -2,6 +2,12 @@
 
 ## Schema Overview
 
+`SidedoorState_storage_target_fence` serializes storage write intents and live
+reference allocations against target retirement, including writes from older
+application versions. Retired target rows cannot be changed, renamed or deleted.
+Keep the database hashing identical to Sidedoor's physical target identity.
+Application roles must not truncate the state table or disable or replace the trigger.
+
 ClassAssessment records are separate from formative ClassSection rows. Their
 review and provider operation IDs require durable, owned receipt validation
 before publication. Assessment audio, speaking, and writing resources must be

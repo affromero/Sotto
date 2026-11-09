@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { isDeepStrictEqual } from 'node:util';
 import {
   prepareStorageBackend,
   prepareStorageCleanup,
@@ -19,6 +20,8 @@ import {
   type StorageDeletionScope,
 } from '@/lib/storage/sidedoor/deletion-targets';
 import { captureStorageBackend } from '@/lib/r2';
+import { captureCourseStorage } from '@/lib/sidedoor/storage/core/course-storage';
+import { worksheetPdfPayloadSchema } from '@/lib/sidedoor/jobs/stitch/worksheet-pdf-work';
 import { getSiteConfig } from '@/lib/site-config';
 import { consumerForStorageField } from '@/lib/sidedoor/storage/core/storage-consumers';
 import { SIDEDOOR_STATE_ID } from '@/lib/sidedoor/access/state/store';
@@ -46,10 +49,25 @@ import {
 import {
   inspectClassListeningDeletion,
   requireClassWorksheetOwnership,
-  requireLegacyWorksheetDeletionSafe,
+  inspectLegacyWorksheetDeletion,
 } from '@/lib/classes/help/listening-deletion';
 
 type Subject = { subjectId: string; generation: number };
+
+/** Delegated cleanup requires the database fence, including during rollbacks. */
+export async function requireStorageTargetFence(database: Prisma.TransactionClient) {
+  const rows = await database.$queryRaw<{ active: boolean }[]>`
+    SELECT EXISTS (
+      SELECT 1 FROM pg_trigger
+      WHERE tgrelid = to_regclass('"SidedoorState"')
+        AND tgname = 'SidedoorState_storage_target_fence'
+        AND tgfoid = to_regprocedure('"guardStorageTargetFence"()')
+        AND NOT tgisinternal
+        AND tgtype = 31 AND tgnargs = 0 AND tgqual IS NULL
+        AND (tgenabled = 'A' OR (tgenabled = 'O' AND current_setting('session_replication_role') <> 'replica'))
+    ) AS active`;
+  if (rows[0]?.active !== true) throw new Error('Storage target fence is unavailable');
+}
 
 function stores(database: Prisma.TransactionClient) {
   const executor = {
@@ -187,6 +205,13 @@ export async function admitLearningStorageDeletion(options: {
     options.scope.kind === 'class'
       ? { ...options.scope, episodeIds: [...options.scope.episodeIds, ...assessmentEpisodeIds] }
       : options.scope;
+  let legacy: {
+    classId: string;
+    courseScope: Subject;
+    scopes: Subject[];
+    operations: { id: string; fingerprint: string }[];
+    reference: string | null;
+  } | null = null;
   if (options.scope.kind === 'class') {
     const classId = options.scope.id;
     const inventory = prerequisite[0]!;
@@ -198,16 +223,33 @@ export async function admitLearningStorageDeletion(options: {
       (scope) => scope.subjectId === `course:${inventory.courseId}`
     );
     if (!cls || !courseScope) throw new Error('Class media requires complete cleanup');
+    const operations = await inspectLegacyWorksheetDeletion(
+      database,
+      courseScope,
+      classId,
+      inventory.courseId
+    );
+    const ownership = operations.length
+      ? await captureCourseStorage(database, inventory.courseId)
+      : null;
+    if (ownership)
+      legacy = {
+        classId,
+        courseScope,
+        scopes: ownership.scopes,
+        operations,
+        reference: cls.worksheetPdfUrl,
+      };
     if (cls.worksheetPdfUrl)
       await requireClassWorksheetOwnership(
         database,
         classId,
         cls.worksheetPdfUrl,
         inventory.scopes,
-        inventory.worksheetOperations
+        inventory.worksheetOperations,
+        ownership ? { scopes: ownership.scopes, operations } : undefined
       );
     await requireLegacySpeakingClassDeletionSafe(database, courseScope, classId);
-    await requireLegacyWorksheetDeletionSafe(database, courseScope, classId);
   }
   const assessmentSpeaking = prerequisite.flatMap((item) => item.assessmentSpeakingOperations);
   const speaking = await inspectSpeakingGradingDeletion(
@@ -308,6 +350,45 @@ export async function admitLearningStorageDeletion(options: {
     });
     await state.cleanup.createJob(job);
     jobs.set(subject.subjectId, job);
+  }
+  if (legacy) await requireStorageTargetFence(database);
+  if (legacy?.reference) {
+    const reference = legacy.reference;
+    const consumer = `class:${legacy.classId}:worksheet`;
+    const resolved = await state.references.resolve({ consumer, reference });
+    if (resolved && isDeepStrictEqual(resolved.prepared.scopes, legacy.scopes)) {
+      const job = jobs.get(`class:${legacy.classId}`);
+      if (!job) throw new Error('Legacy worksheet deletion scope is missing');
+      const current = legacy;
+      const asset = await state.references.readAsset(resolved.assetId);
+      if (!asset || !asset.asset.consumers.includes(consumer))
+        throw new Error('Legacy worksheet consumer changed');
+      if (asset.asset.consumers.length > 1) {
+        await state.references.retire({
+          operationId: randomUUID(),
+          consumer,
+          previousReference: reference,
+        });
+      } else
+        await state.attribution.admitDelegatedAsset({
+          jobId: job.id,
+          epoch: job.epoch,
+          subjectId: job.subjectId,
+          generation: job.generation,
+          originalScope: current.courseScope,
+          operationId: randomUUID(),
+          consumer,
+          reference,
+          verifyOwnership: async () => {
+            const cls = await database.courseClass.findUnique({
+              where: { id: current.classId },
+              select: { worksheetPdfUrl: true },
+            });
+            return cls?.worksheetPdfUrl === reference;
+          },
+        });
+      consumers.delete(consumer);
+    }
   }
   for (const [consumer, reference] of consumers) {
     const resolved = await state.references.resolve({ consumer, reference });
@@ -484,6 +565,29 @@ export async function admitLearningStorageDeletion(options: {
   }
   await eraseSpeakingGradingDeletion(database, speaking);
   await eraseAssessmentSpeakingForDeletion(database, assessedSpeaking);
+  if (legacy) {
+    const job = jobs.get(`class:${legacy.classId}`);
+    if (!job) throw new Error('Legacy worksheet deletion scope is missing');
+    const current = legacy;
+    for (const operation of current.operations) {
+      await outbox.eraseDelegated({
+        ...operation,
+        expectedHandler: 'worksheet-pdf',
+        expectedVersion: 1,
+        originalScope: current.courseScope,
+        deletionScope: { subjectId: job.subjectId, generation: job.generation },
+        cleanupJobId: job.id,
+        verifyOwnership: async (record) => {
+          const payload = worksheetPdfPayloadSchema.safeParse(record.job.payload);
+          return (
+            payload.success &&
+            payload.data.classId === current.classId &&
+            isDeepStrictEqual(record.job.scopes, current.scopes)
+          );
+        },
+      });
+    }
+  }
   for (const copy of copies.values()) {
     const tombstone = await state.writes.tombstone(copy.scope.subjectId);
     if (!tombstone || tombstone.generation !== copy.scope.generation)

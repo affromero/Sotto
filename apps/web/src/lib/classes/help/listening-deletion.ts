@@ -3,6 +3,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { StorageReferenceRegistry } from 'thesidedoor-core/storage';
 import { SIDEDOOR_STATE_ID } from '@/lib/sidedoor/access/state/store';
 import { captureEpisodeStorage } from '@/lib/sidedoor/storage/core/episode-storage';
+import { captureCourseStorage } from '@/lib/sidedoor/storage/core/course-storage';
 import { sottoJobOutbox } from '@/lib/sidedoor/jobs/core/job-delivery';
 import { sottoJobExecutions } from '@/lib/sidedoor/jobs/core/job-execution-lifetime';
 import { worksheetPdfPayloadSchema } from '@/lib/sidedoor/jobs/stitch/worksheet-pdf-work';
@@ -10,12 +11,26 @@ import { transcriptExportPayloadSchema } from '@/lib/sidedoor/storage/publicatio
 import { PrerequisiteDeletionConflict } from './prerequisite-deletion';
 
 /** Legacy worksheet jobs do not have a class scope, so inspect their course index. */
-export async function requireLegacyWorksheetDeletionSafe(
+export async function inspectLegacyWorksheetDeletion(
   database: Prisma.TransactionClient,
   courseScope: { subjectId: string; generation: number },
-  classId: string
+  classId: string,
+  courseId: string
 ) {
   const outbox = sottoJobOutbox(database);
+  const executions = sottoJobExecutions(database);
+  const ownership = await captureCourseStorage(database, courseId);
+  if (
+    courseScope.subjectId !== `course:${courseId}` ||
+    !ownership.scopes.some((scope) => isDeepStrictEqual(scope, courseScope))
+  )
+    throw new PrerequisiteDeletionConflict();
+  const cls = await database.courseClass.findFirst({
+    where: { id: classId, courseId },
+    select: { createdAt: true, updatedAt: true },
+  });
+  if (!cls) throw new PrerequisiteDeletionConflict();
+  const operations: { id: string; fingerprint: string }[] = [];
   let cursor: string | null = null;
   do {
     const page = await outbox.listForScope(courseScope.subjectId, courseScope.generation, cursor);
@@ -33,15 +48,25 @@ export async function requireLegacyWorksheetDeletionSafe(
       const payload = worksheetPdfPayloadSchema.safeParse(record?.job.payload);
       if (!record || record.fingerprint !== item.fingerprint || !payload.success)
         throw new PrerequisiteDeletionConflict();
-      if (payload.data.classId === classId)
+      if (payload.data.classId !== classId) continue;
+      if (
+        receipt.status !== 'complete' ||
+        !record.complete ||
+        payload.data.classUpdatedAt < cls.createdAt.getTime() ||
+        payload.data.classUpdatedAt > cls.updatedAt.getTime() ||
+        !isDeepStrictEqual(record.job.scopes, ownership.scopes)
+      )
         throw new PrerequisiteDeletionConflict(
           'This class has older worksheet work that requires complete cleanup before deletion.'
         );
+      await executions.requireParentDrained(item.id, item.fingerprint);
+      operations.push({ id: item.id, fingerprint: item.fingerprint });
     }
     if (page.cursor !== null && cursor !== null && page.cursor <= cursor)
       throw new PrerequisiteDeletionConflict();
     cursor = page.cursor;
   } while (cursor !== null);
+  return operations;
 }
 
 /** Require the saved worksheet to belong to this exact class generation. */
@@ -50,9 +75,13 @@ export async function requireClassWorksheetOwnership(
   classId: string,
   reference: string,
   scopes: readonly { subjectId: string; generation: number }[],
-  operations: readonly { id: string; fingerprint: string }[]
+  operations: readonly { id: string; fingerprint: string }[],
+  legacy?: {
+    scopes: readonly { subjectId: string; generation: number }[];
+    operations: readonly { id: string; fingerprint: string }[];
+  }
 ) {
-  if (!operations.length)
+  if (!operations.length && !legacy?.operations.length)
     throw new PrerequisiteDeletionConflict(
       'This class has a worksheet that requires complete media cleanup before deletion.'
     );
@@ -62,7 +91,13 @@ export async function requireClassWorksheetOwnership(
     SIDEDOOR_STATE_ID
   );
   const asset = await registry.resolve({ consumer: `class:${classId}:worksheet`, reference });
-  if (!asset || !isDeepStrictEqual(asset.prepared.scopes, scopes))
+  if (
+    !asset ||
+    !(
+      (operations.length && isDeepStrictEqual(asset.prepared.scopes, scopes)) ||
+      (legacy?.operations.length && isDeepStrictEqual(asset.prepared.scopes, legacy.scopes))
+    )
+  )
     throw new PrerequisiteDeletionConflict(
       'This class has a worksheet that requires complete media cleanup before deletion.'
     );

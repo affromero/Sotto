@@ -76,7 +76,7 @@
     "bullmq": "6.5.2",
     "ioredis": "6.0.0",
     "pg": "^8.23.1",
-    "thesidedoor-core": "0.5.7",
+    "thesidedoor-core": "0.5.8",
     "zod": "^4.6.7"
   },
   "devDependencies": {

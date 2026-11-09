@@ -2,7 +2,7 @@ import { prerequisiteFenceStateId } from '@/lib/classes/help/lifecycle/prerequis
 import {
   inspectClassListeningDeletion,
   requireClassWorksheetOwnership,
-  requireLegacyWorksheetDeletionSafe,
+  inspectLegacyWorksheetDeletion,
 } from '@/lib/classes/help/listening-deletion';
 import {
   admitPrerequisiteClassDeletion,
@@ -15,6 +15,7 @@ import {
 import { logger } from '@/lib/logger';
 import { prismaUnfiltered } from '@/lib/prisma';
 import { captureStorageBackend } from '@/lib/r2';
+import { captureCourseStorage } from '@/lib/sidedoor/storage/core/course-storage';
 import { admitLearningStorageDeletion } from '@/lib/sidedoor/access/deletion/learning-deletion';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 import { sottoJobOutbox } from '@/lib/sidedoor/jobs/core/job-delivery';
@@ -33,7 +34,7 @@ export async function deleteClassForUser(
 ): Promise<boolean> {
   const existing = await prismaUnfiltered.courseClass.findFirst({
     where: { id: classId, course: { userId } },
-    select: { id: true, createdAt: true },
+    select: { id: true, createdAt: true, courseId: true },
   });
   if (!existing) {
     const recovered = await sottoTransaction(
@@ -78,10 +79,22 @@ export async function deleteClassForUser(
       const actor = await execution.authorize(database);
       if (actor.userId !== userId) throw new PrerequisiteDeletionConflict();
       await backfillDeletionJobScopes(database);
-      return sottoJobOutbox(database).listForScope(
+      const course = await captureCourseStorage(database, existing.courseId);
+      const courseScope = course.scopes.find(
+        (scope) => scope.subjectId === `course:${existing.courseId}`
+      );
+      if (!courseScope) throw new PrerequisiteDeletionConflict();
+      const legacy = await inspectLegacyWorksheetDeletion(
+        database,
+        courseScope,
+        classId,
+        existing.courseId
+      );
+      const jobs = await sottoJobOutbox(database).listForScope(
         `class:${classId}`,
         existing.createdAt.getTime()
       );
+      return { jobs: jobs.jobs, legacy };
     },
     { timeoutMs: 60_000, signal: execution.signal }
   );
@@ -92,7 +105,11 @@ export async function deleteClassForUser(
     where: { classId, episodeId: { not: null } },
   });
   const backend =
-    savedFence || classJobs.jobs.length || promptReferences || listeningReferences
+    savedFence ||
+    classJobs.jobs.length ||
+    classJobs.legacy.length ||
+    promptReferences ||
+    listeningReferences
       ? await captureStorageBackend()
       : null;
 
@@ -130,7 +147,15 @@ export async function deleteClassForUser(
       );
       if (!courseScope) throw new PrerequisiteDeletionConflict();
       await requireLegacySpeakingClassDeletionSafe(database, courseScope, classId);
-      await requireLegacyWorksheetDeletionSafe(database, courseScope, classId);
+      const legacy = await inspectLegacyWorksheetDeletion(
+        database,
+        courseScope,
+        classId,
+        cls.courseId
+      );
+      const legacyOwnership = legacy.length
+        ? await captureCourseStorage(database, cls.courseId)
+        : null;
       const speaking = await inspectSpeakingGradingDeletion(
         database,
         [inventory.classScope],
@@ -142,7 +167,8 @@ export async function deleteClassForUser(
           classId,
           cls.worksheetPdfUrl,
           inventory.scopes,
-          inventory.worksheetOperations
+          inventory.worksheetOperations,
+          legacyOwnership ? { scopes: legacyOwnership.scopes, operations: legacy } : undefined
         );
       const listening = await inspectClassListeningDeletion(
         database,
@@ -165,6 +191,7 @@ export async function deleteClassForUser(
         inventory.assessmentOperations.length ||
         inventory.copyOperations.length ||
         inventory.worksheetOperations.length ||
+        legacy.length ||
         speaking.length ||
         classSpeakingMedia ||
         listening.length;
@@ -176,6 +203,7 @@ export async function deleteClassForUser(
           inventory.assessmentSpeakingOperations.length ||
           inventory.copyOperations.length ||
           inventory.worksheetOperations.length ||
+          legacy.length ||
           inventory.audio.episodeIds.length ||
           classSpeakingMedia ||
           listening.length

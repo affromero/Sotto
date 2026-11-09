@@ -84,6 +84,11 @@ atomic. Each job captures the class generation alongside course and profile scop
 Unknown provider attempts remain blocked after source changes.
 `classes/help/listening-deletion.ts` checks class listening episode ownership and
 settled jobs before admitting episode-scoped storage cleanup.
+Legacy worksheet cleanup verifies the course generation, class lifetime and
+drained jobs before delegating an unshared file to the target fence. Shared
+files retain their remaining consumers. Fence older writers before enabling
+delegated cleanup; the storage target fence migration covers older database
+writers, while a class tombstone alone does not fence course-scoped writers.
 Prerequisite deletion backfills retained job scope indexes inside the same
 Serializable transaction before inspecting class work. A timeout or conflict
 leaves deletion uncommitted; large retained outboxes can require recovery.
