@@ -11,7 +11,16 @@ struct CredentialStore: SottoCredentialPersistence {
     private let service = "fm.sotto.app"
     private let account: String
 
-    init(account: String = "default") { self.account = account }
+    init(account: String = "default") {
+        #if DEBUG
+        if let namespace = ProcessInfo.processInfo.environment["SOTTO_UI_TEST_NAMESPACE"],
+           UUID(uuidString: namespace) != nil {
+            self.account = "\(account)-ui-test-\(namespace)"
+            return
+        }
+        #endif
+        self.account = account
+    }
 
     func load() throws -> SottoCredentials? {
         guard let data = try loadData() else { return nil }

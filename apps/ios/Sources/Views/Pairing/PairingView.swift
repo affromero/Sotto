@@ -187,15 +187,26 @@ struct PairingView: View {
 
 private struct QRScannerPanel: View {
     let onCode: (String) -> Void
+    @State private var isScanning = false
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
-            QRScannerView(onCode: onCode)
-                .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .stroke(.white.opacity(0.64), lineWidth: 1)
-                )
+            if isScanning {
+                QRScannerView(onCode: onCode)
+                    .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 22, style: .continuous)
+                            .stroke(.white.opacity(0.64), lineWidth: 1)
+                    )
+            } else {
+                Button {
+                    isScanning = true
+                } label: {
+                    Label("Open camera", systemImage: "camera")
+                }
+                .buttonStyle(SottoPrimaryButtonStyle())
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
 
             VStack(alignment: .leading, spacing: 8) {
                 Label("Scan pairing code", systemImage: "qrcode.viewfinder")
@@ -249,6 +260,9 @@ struct QRScannerView: UIViewControllerRepresentable {
 final class QRScannerViewController: UIViewController, AVCaptureMetadataOutputObjectsDelegate {
     private let coordinator: QRScannerView.Coordinator
     private let session = AVCaptureSession()
+    private let sessionQueue = DispatchQueue(label: "fm.sotto.pairing-camera")
+    private var isVisible = false
+    private var isConfigured = false
     private var previewLayer: AVCaptureVideoPreviewLayer?
     private var rotationCoordinator: AVCaptureDevice.RotationCoordinator?
     private var previewRotationObservation: NSKeyValueObservation?
@@ -268,7 +282,6 @@ final class QRScannerViewController: UIViewController, AVCaptureMetadataOutputOb
         super.viewDidLoad()
         view.backgroundColor = .black
         configureMessageLabel()
-        requestCameraAccess()
     }
 
     override func viewDidLayoutSubviews() {
@@ -279,7 +292,9 @@ final class QRScannerViewController: UIViewController, AVCaptureMetadataOutputOb
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+        isVisible = true
         updatePreviewOrientation()
+        requestCameraAccess()
     }
 
     override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
@@ -295,8 +310,9 @@ final class QRScannerViewController: UIViewController, AVCaptureMetadataOutputOb
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
-        if session.isRunning {
-            DispatchQueue.global(qos: .userInitiated).async {
+        isVisible = false
+        sessionQueue.async {
+            if self.session.isRunning {
                 self.session.stopRunning()
             }
         }
@@ -326,10 +342,11 @@ final class QRScannerViewController: UIViewController, AVCaptureMetadataOutputOb
         case .notDetermined:
             AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
                 DispatchQueue.main.async {
+                    guard let self, self.isVisible else { return }
                     if granted {
-                        self?.configureSession()
+                        self.configureSession()
                     } else {
-                        self?.messageLabel.isHidden = false
+                        self.messageLabel.isHidden = false
                     }
                 }
             }
@@ -339,6 +356,10 @@ final class QRScannerViewController: UIViewController, AVCaptureMetadataOutputOb
     }
 
     private func configureSession() {
+        if isConfigured {
+            startSession()
+            return
+        }
         guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) else {
             messageLabel.isHidden = false
             return
@@ -380,9 +401,16 @@ final class QRScannerViewController: UIViewController, AVCaptureMetadataOutputOb
         }
         updatePreviewOrientation()
         messageLabel.isHidden = true
+        isConfigured = true
+        startSession()
+    }
 
-        DispatchQueue.global(qos: .userInitiated).async {
-            self.session.startRunning()
+    private func startSession() {
+        sessionQueue.async {
+            guard DispatchQueue.main.sync(execute: { self.isVisible }) else { return }
+            if !self.session.isRunning {
+                self.session.startRunning()
+            }
         }
     }
 
@@ -404,6 +432,7 @@ final class QRScannerViewController: UIViewController, AVCaptureMetadataOutputOb
         from connection: AVCaptureConnection
     ) {
         guard
+            isVisible,
             let object = metadataObjects.first as? AVMetadataMachineReadableCodeObject,
             object.type == .qr,
             let value = object.stringValue

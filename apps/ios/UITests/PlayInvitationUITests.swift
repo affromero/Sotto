@@ -2,6 +2,26 @@ import XCTest
 
 @MainActor
 final class PlayInvitationUITests: XCTestCase {
+    func testCameraStartsOnlyAfterChoosingToScan() throws {
+        let app = XCUIApplication()
+        app.launchEnvironment["SOTTO_UI_TEST_NAMESPACE"] = UUID().uuidString
+        app.resetAuthorizationStatus(for: .camera)
+        app.launch()
+        let cameraAlert = XCUIApplication(bundleIdentifier: "com.apple.springboard").alerts.matching(
+            NSPredicate(format: "label CONTAINS[c] %@ AND label CONTAINS[c] %@", "Sotto", "camera")
+        ).firstMatch
+        let openCamera = app.buttons["Open camera"]
+        XCTAssertTrue(openCamera.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertFalse(cameraAlert.waitForExistence(timeout: 2))
+        try tap("Open camera", app: app)
+        XCTAssertTrue(openCamera.waitForNonExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(cameraAlert.waitForExistence(timeout: 5))
+        let allow = cameraAlert.buttons["Allow"]
+        XCTAssertTrue(allow.waitForExistence(timeout: 5))
+        allow.tap()
+        XCTAssertTrue(cameraAlert.waitForNonExistence(timeout: 5))
+    }
+
     func testSystemInvitationCreatesAnApprovedProfileAndPlaysAllThreeNativeGames() async throws {
         continueAfterFailure = false
         let fixture = try PlayUIFixture()
@@ -15,7 +35,9 @@ final class PlayInvitationUITests: XCTestCase {
         try await server.start()
         defer { server.stop() }
         let app = XCUIApplication()
+        app.launchEnvironment["SOTTO_UI_TEST_NAMESPACE"] = UUID().uuidString
         app.terminate()
+        app.resetAuthorizationStatus(for: .camera)
         var url = URLComponents(string: "sotto://play/join")!
         url.queryItems = [URLQueryItem(name: "v", value: "1"), URLQueryItem(name: "server", value: server.url.absoluteString),
             URLQueryItem(name: "code", value: "ABCDEFGHJK23")]
@@ -23,16 +45,13 @@ final class PlayInvitationUITests: XCTestCase {
         let cameraAlert = XCUIApplication(bundleIdentifier: "com.apple.springboard").alerts.matching(
             NSPredicate(format: "label CONTAINS[c] %@ AND label CONTAINS[c] %@", "Sotto", "camera")
         ).firstMatch
-        if cameraAlert.waitForExistence(timeout: 3) {
-            let allow = cameraAlert.buttons["Allow"]
-            XCTAssertTrue(allow.waitForExistence(timeout: 5))
-            allow.tap()
-            XCTAssertTrue(cameraAlert.waitForNonExistence(timeout: 5))
-        }
+        XCTAssertFalse(cameraAlert.waitForExistence(timeout: 3))
         let name = app.textFields["play.newName"]
         XCTAssertTrue(name.waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertFalse(cameraAlert.exists)
         XCTAssertFalse(name.isEnabled, "The proposed name stays local until conduct is accepted.")
         try tap("play.conductConsent", type: .switch, app: app)
+        XCTAssertEqual(app.switches["play.conductConsent"].value as? String, "1")
         XCTAssertTrue(name.wait(for: \.isEnabled, toEqual: true, timeout: 10), app.debugDescription)
         try fill("play.newName", value: "Native Sam", app: app)
         let preview = app.staticTexts["Alex invited you to a little of everything."]

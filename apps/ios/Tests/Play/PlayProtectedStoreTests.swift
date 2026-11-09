@@ -1,8 +1,32 @@
+import Darwin
 import XCTest
 
 @testable import Sotto
 
 final class PlayProtectedStoreTests: XCTestCase {
+    #if DEBUG
+    func testUITestNamespaceDoesNotReadOrOverwriteNormalCredentials() throws {
+        let key = "SOTTO_UI_TEST_NAMESPACE"
+        let previous = ProcessInfo.processInfo.environment[key]
+        let account = "namespace-test-\(UUID().uuidString)"
+        let namespace = UUID().uuidString
+        unsetenv(key)
+        let normal = CredentialStore(account: account)
+        defer {
+            try? normal.delete()
+            if let previous { setenv(key, previous, 1) } else { unsetenv(key) }
+        }
+        try normal.saveData(Data("normal".utf8))
+        setenv(key, namespace, 1)
+        let isolated = CredentialStore(account: account)
+        defer { try? isolated.delete() }
+        XCTAssertNil(try isolated.loadData())
+        try isolated.saveData(Data("test".utf8))
+        XCTAssertEqual(try normal.loadData(), Data("normal".utf8))
+        XCTAssertEqual(try isolated.loadData(), Data("test".utf8))
+    }
+    #endif
+
     func testKeychainReloadPreservesExactIntakeProofAndPriorConnectionWithoutUserDefaults() throws {
         let account = "play-test-\(UUID())"
         let store = PlayProtectedStore(account: account)
