@@ -490,6 +490,12 @@ suite('durable notification inbox and device receipts', () => {
       expect(pages).toHaveLength(Math.ceil((count + 2) / 100));
       for (const page of pages) await processDurableNotificationFanout(queued(page.state));
       expect(await children()).toHaveLength(count + 3);
+      const firstPage = pages[0]!.state;
+      expect(
+        await sottoTransaction(instance.database, (tx) =>
+          sottoJobOutbox(tx).receipt(firstPage.job.id)
+        )
+      ).toMatchObject({ status: 'complete' });
     },
     60_000
   );

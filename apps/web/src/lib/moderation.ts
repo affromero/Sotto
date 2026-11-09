@@ -5,7 +5,7 @@ import { cache } from './redis';
 import { logUsage } from './usage-logger';
 
 export const MODERATION_API_URL = 'https://api.openai.com/v1/moderations';
-export const MODERATION_MODEL = 'omni-moderation-latest';
+const MODERATION_MODEL = 'omni-moderation-latest';
 const CACHE_TTL_SECONDS = 600;
 const MAX_INPUT_LENGTH = 32_000;
 

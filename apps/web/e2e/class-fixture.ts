@@ -42,6 +42,7 @@ export async function seedClass() {
       hasCompletedOnboarding: true,
       preferredAiProvider: 'local',
       preferredAiModel: 'local:browser-fixture',
+      preferredTtsProvider: 'local',
       preferredSttModel: 'browser-fixture',
     },
   });

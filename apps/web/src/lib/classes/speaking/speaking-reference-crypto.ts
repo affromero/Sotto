@@ -10,7 +10,7 @@ const uuid = z.uuid();
 const digest = z.string().regex(/^[a-f0-9]{64}$/);
 const base64 = z.string().regex(/^[A-Za-z0-9+/]+={0,2}$/);
 
-export const speakingReferenceBindingSchema = z
+const speakingReferenceBindingSchema = z
   .object({
     instanceId: uuid,
     userId: id,

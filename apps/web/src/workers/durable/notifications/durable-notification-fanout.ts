@@ -105,14 +105,18 @@ export async function processDurableNotificationFanout(
           version: 3,
           payload: { ...captured.payload, page: captured.next },
         });
-  await sottoTransaction(prisma, async (tx) => {
-    const current = await readPage(tx, queued);
-    if (current.complete) return;
-    if (!isDeepStrictEqual(current, captured))
-      throw new Error('Notification fan-out snapshot changed');
-    const outbox = sottoJobOutbox(tx);
-    if (!(await outbox.complete(captured.operationId, captured.fingerprint))) return;
-    for (const delivery of deliveries) await outbox.enqueue(delivery);
-    if (next) await outbox.enqueue(next);
-  });
+  await sottoTransaction(
+    prisma,
+    async (tx) => {
+      const current = await readPage(tx, queued);
+      if (current.complete) return;
+      if (!isDeepStrictEqual(current, captured))
+        throw new Error('Notification fan-out snapshot changed');
+      const outbox = sottoJobOutbox(tx);
+      if (!(await outbox.complete(captured.operationId, captured.fingerprint))) return;
+      for (const delivery of deliveries) await outbox.enqueue(delivery);
+      if (next) await outbox.enqueue(next);
+    },
+    { timeoutMs: 60_000 }
+  );
 }

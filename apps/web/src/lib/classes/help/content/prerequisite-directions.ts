@@ -33,7 +33,7 @@ const directionInputSchema = z.discriminatedUnion('kind', [
     })
     .strict(),
 ]);
-export const prerequisiteDirectionTaskSchema = classPrerequisiteDirectionTaskSchema;
+const prerequisiteDirectionTaskSchema = classPrerequisiteDirectionTaskSchema;
 export const prerequisiteDirectionBatchSchema = z
   .object({
     guided: classPrerequisiteDirectionsSchema.shape.guided.nullable(),

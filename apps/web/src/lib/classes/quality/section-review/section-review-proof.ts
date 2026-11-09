@@ -19,7 +19,7 @@ export type InitialA1SectionSnapshot = {
 };
 
 /** Fields that determine the visible task, its private key, and its feedback. */
-export function reviewedQuestionProjection(questions: readonly GeneratedQuestion[]) {
+function reviewedQuestionProjection(questions: readonly GeneratedQuestion[]) {
   return questions.map((question) => ({
     question: question.question,
     options: [...question.options],

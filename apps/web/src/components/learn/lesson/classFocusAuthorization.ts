@@ -10,8 +10,6 @@ const bindingSchema = z
   })
   .strict();
 
-export type ClassFocusBinding = z.infer<typeof bindingSchema>;
-
 /** Compare newly read authority with the exact class and lesson already displayed. */
 export function classFocusAuthorizationMatches(input: {
   binding: unknown;
