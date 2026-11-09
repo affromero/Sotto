@@ -39,6 +39,7 @@ import {
   replaceStorageConsumerReference,
 } from '@/lib/sidedoor/storage/core/storage-consumers';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
+import { isBundledAvatarImage } from '@/lib/avatars';
 
 const identity = z.string().min(1).max(200);
 const digest = z.string().regex(/^[a-f0-9]{64}$/);
@@ -233,7 +234,8 @@ export async function verifyStorageCopyForDeletion(
     id: string;
     fingerprint: string;
     scope: { subjectId: string; generation: number };
-    consumers: ReadonlySet<string>;
+    subjects: readonly { subjectId: string; generation: number }[];
+    consumers: ReadonlyMap<string, string>;
   }
 ) {
   const parent = await sottoJobOutbox(database).read(input.id);
@@ -249,12 +251,155 @@ export async function verifyStorageCopyForDeletion(
   )
     throw new Error('Storage copy cannot be retired');
   const payload = payloadSchema.parse(parent.job.payload);
-  if (payload.claims.some((claim) => !input.consumers.has(claim.consumer)))
-    throw new Error('Storage copy has consumers outside the deletion scope');
   if (!(await hasSettledSottoExecution(database, { id: input.id, fingerprint: input.fingerprint })))
     throw new Error('Storage copy execution is not settled');
   await sottoJobExecutions(database).requireParentDrained(input.id, input.fingerprint);
-  await completedCopy(database, parent, payload, new AbortController().signal);
+  const instance = await sottoStorageInstance(database).read();
+  if (
+    payload.claims.some(
+      (claim) =>
+        !claim.requiredScopes.some(
+          (scope) =>
+            scope.subjectId !== instance.subjectId &&
+            input.subjects.some((subject) => isDeepStrictEqual(subject, scope))
+        )
+    )
+  )
+    throw new Error('Storage copy has consumers outside the deletion scope');
+  const page = await sottoJobSnapshot(database).read(parent.job.id, parent.fingerprint, 0);
+  if (page.pages !== 1 || page.next !== null || page.items.length !== 1)
+    throw new Error('Storage copy outcome is incomplete');
+  const outcome = outcomeSchema.parse(page.items[0]);
+  const registry = references(database);
+  const source = await registry.readAsset(payload.sourceAssetId);
+  const destination = await registry.readAsset(outcome.assetId);
+  if (
+    !source ||
+    !destination ||
+    !isDeepStrictEqual(source.asset.prepared, payload.source) ||
+    destination.asset.prepared.operationId !== outcome.copyOperationId ||
+    destination.asset.prepared.reference !== outcome.reference ||
+    !isDeepStrictEqual(destination.backend.descriptor, payload.target)
+  )
+    throw new Error('Storage copy outcome attribution changed');
+  const readOnly = new StorageRelocationRegistry(
+    {
+      query: (sql, values) => {
+        if (sql !== 'SELECT "revision", "state" FROM "SidedoorState" WHERE "id" = $1')
+          throw new Error('Storage relocation verification cannot modify evidence');
+        return database.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...values);
+      },
+    },
+    'postgres',
+    SIDEDOOR_STATE_ID
+  );
+  await readOnly.record({
+    operationId: outcome.copyOperationId,
+    sourceAssetId: payload.sourceAssetId,
+    destinationAssetId: outcome.assetId,
+    consumers: payload.claims.map((claim) => claim.consumer),
+    sourceRead: { assetId: payload.sourceAssetId, ...outcome.content },
+    destinationRead: { assetId: outcome.assetId, ...outcome.content },
+  });
+  const retiredConsumers = new Set<string>();
+  for (const claim of payload.claims) {
+    const currentReference = await readStorageConsumerReference(database, claim.consumer);
+    if (currentReference !== null && input.consumers.get(claim.consumer) !== currentReference)
+      throw new Error('Storage copy has consumers outside the deletion scope');
+    const bundledAvatar =
+      claim.consumer.startsWith('profile:') &&
+      claim.consumer.endsWith(':avatar') &&
+      currentReference !== null &&
+      isBundledAvatarImage(currentReference);
+    if (currentReference && !bundledAvatar) {
+      const proof = await relocations(database).resolve({
+        consumer: claim.consumer,
+        originalReference: payload.source.reference,
+        currentReference,
+        maxHops: 1000,
+        signal: new AbortController().signal,
+        requiredOperation: {
+          operationId: outcome.copyOperationId,
+          sourceAssetId: payload.sourceAssetId,
+          destinationAssetId: outcome.assetId,
+        },
+      });
+      if (!proof || !isDeepStrictEqual(proof.content, outcome.content))
+        throw new Error('Storage copy publication cannot be verified');
+      const current = await inspectStorageMigrationConsumer(
+        database,
+        claim.consumer,
+        proof.current.prepared
+      );
+      if (
+        current.reason ||
+        !isDeepStrictEqual(current.requiredScopes, claim.requiredScopes) ||
+        !isDeepStrictEqual(current.requiredAssociations, claim.requiredAssociations)
+      )
+        throw new Error('Storage copy consumer ownership changed');
+      continue;
+    }
+    const avatarProfile = claim.consumer.endsWith(':avatar')
+      ? claim.consumer.slice(0, -':avatar'.length)
+      : '';
+    if (
+      !avatarProfile.startsWith('profile:') ||
+      !claim.requiredScopes.some(
+        (scope) =>
+          scope.subjectId === avatarProfile &&
+          input.subjects.some((subject) => isDeepStrictEqual(subject, scope))
+      )
+    )
+      throw new Error('Retired storage consumer is outside the deleted profile');
+    const current = await inspectStorageMigrationConsumer(
+      database,
+      claim.consumer,
+      destination.asset.prepared
+    );
+    if (
+      current.reason !== 'stale-reference' ||
+      !isDeepStrictEqual(current.requiredScopes, claim.requiredScopes) ||
+      !isDeepStrictEqual(current.requiredAssociations, claim.requiredAssociations) ||
+      destination.asset.consumers.includes(claim.consumer)
+    )
+      throw new Error('Storage copy consumer ownership changed');
+    let after: string | null = null;
+    let retired = false;
+    do {
+      const retirements = await registry.listRetirements(after);
+      for (const retirement of retirements.retirements)
+        if (
+          retirement.consumer === claim.consumer &&
+          retirement.status === 'pending' &&
+          retirement.replacementAssetId === null &&
+          retirement.previousReference === outcome.reference &&
+          retirement.attribution?.assetId === outcome.assetId &&
+          isDeepStrictEqual(retirement.attribution.prepared, destination.asset.prepared)
+        )
+          retired = true;
+      if (retirements.cursor !== null && after !== null && retirements.cursor <= after)
+        throw new Error('Storage retirement cursor did not advance');
+      after = retirements.cursor;
+    } while (after !== null);
+    if (!retired) throw new Error('Storage copy retirement evidence is missing');
+    retiredConsumers.add(claim.consumer);
+  }
+  if (retiredConsumers.size) {
+    let after: string | null = null;
+    do {
+      const assets = await registry.listAssets(after);
+      if (
+        assets.assets.some((asset) =>
+          asset.consumers.some((consumer) => retiredConsumers.has(consumer))
+        )
+      )
+        throw new Error('Retired storage consumer is still attached');
+      if (assets.cursor !== null && after !== null && assets.cursor <= after)
+        throw new Error('Storage asset cursor did not advance');
+      after = assets.cursor;
+    } while (after !== null);
+  }
+  return outcome.copyOperationId;
 }
 
 /** Execute an admitted one-asset copy. Configuration activation belongs to the migration coordinator. */

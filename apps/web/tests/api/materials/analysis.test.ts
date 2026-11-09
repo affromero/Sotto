@@ -1,4 +1,4 @@
-// @vitest-environment node
+// @vitest-environment private-redis
 import { registerFocusedMaterialPracticeCases } from './analysis/focused-practice-cases';
 import { createHash, randomUUID } from 'node:crypto';
 import { createServer, type Server } from 'node:http';

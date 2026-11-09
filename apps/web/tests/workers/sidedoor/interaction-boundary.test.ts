@@ -97,7 +97,7 @@ suite('durable interaction assessment boundary', () => {
     await instance?.close();
   });
 
-  async function work(attachBeforeAdmission = false) {
+  async function work(attachBeforeAdmission = false, canonicalInteractionJob = false) {
     const episode = attachBeforeAdmission
       ? await attach()
       : await instance.database.episode.create({
@@ -131,7 +131,9 @@ suite('durable interaction assessment boundary', () => {
         handler: 'interactions',
         type: 'process_interaction',
         payload,
-        jobId: `test-${randomUUID()}`,
+        jobId: canonicalInteractionJob
+          ? `interaction-${payload.interactionId}`
+          : `test-${randomUUID()}`,
       });
     });
     const queued = {
@@ -222,6 +224,65 @@ suite('durable interaction assessment boundary', () => {
       return episode;
     });
   }
+
+  it('completes a legacy receipt after its answer was already saved', async () => {
+    const item = await work(false, true);
+    await instance.database.interaction.update({
+      where: { id: item.payload.interactionId },
+      data: { status: 'ANSWERED', answer: 'Existing answer' },
+    });
+
+    await processInteraction(item.job);
+
+    const interaction = await instance.database.interaction.findUniqueOrThrow({
+      where: { id: item.payload.interactionId },
+    });
+    const receipt = await sottoTransaction(instance.database, (tx) =>
+      sottoJobOutbox(tx).receipt(item.record.job.id)
+    );
+    expect(interaction).toMatchObject({ status: 'ANSWERED', answer: 'Existing answer' });
+    expect(receipt?.status).toBe('complete');
+    expect(boundary.generate).not.toHaveBeenCalled();
+  });
+
+  it.each(['RESOLVED', 'INCORPORATING', 'INCORPORATED'] as const)(
+    'preserves a published answer in %s state during legacy recovery',
+    async (status) => {
+      const item = await work(false, true);
+      await instance.database.interaction.update({
+        where: { id: item.payload.interactionId },
+        data: { status, answer: 'Existing answer' },
+      });
+
+      await processInteraction(item.job);
+
+      const interaction = await instance.database.interaction.findUniqueOrThrow({
+        where: { id: item.payload.interactionId },
+      });
+      const receipt = await sottoTransaction(instance.database, (tx) =>
+        sottoJobOutbox(tx).receipt(item.record.job.id)
+      );
+      expect(interaction).toMatchObject({ status, answer: 'Existing answer' });
+      expect(receipt?.status).toBe('complete');
+      expect(boundary.generate).not.toHaveBeenCalled();
+    }
+  );
+
+  it('does not complete another operation from a published answer', async () => {
+    const item = await work();
+    await instance.database.interaction.update({
+      where: { id: item.payload.interactionId },
+      data: { status: 'ANSWERED', answer: 'Existing answer' },
+    });
+
+    await expect(processInteraction(item.job)).rejects.toThrow('Interaction operation changed');
+
+    const receipt = await sottoTransaction(instance.database, (tx) =>
+      sottoJobOutbox(tx).receipt(item.record.job.id)
+    );
+    expect(receipt?.status).toBe('pending');
+    expect(boundary.generate).not.toHaveBeenCalled();
+  });
 
   it('retains the answer and completed receipt if logging fails after publication', async () => {
     const item = await work();

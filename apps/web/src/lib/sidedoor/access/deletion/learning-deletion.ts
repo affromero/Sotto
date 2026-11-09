@@ -291,7 +291,10 @@ export async function admitLearningStorageDeletion(options: {
     assessmentSpeaking
   );
   const { consumers, publicUrl } = await deletionReferences(database, storageScope);
-  const copies = new Map<string, { id: string; fingerprint: string; scope: Subject }>();
+  const copies = new Map<
+    string,
+    { id: string; fingerprint: string; scope: Subject; relocationId: string }
+  >();
   const outbox = sottoJobOutbox(database);
   for (const subject of subjects.values()) {
     let copyCursor: string | null = null;
@@ -318,16 +321,18 @@ export async function admitLearningStorageDeletion(options: {
             throw new Error('Storage copy scope index changed');
           continue;
         }
-        await verifyStorageCopyForDeletion(database, {
+        const relocationId = await verifyStorageCopyForDeletion(database, {
           id: reference.id,
           fingerprint: reference.fingerprint,
           scope: subject,
-          consumers: new Set(consumers.keys()),
+          subjects: [...subjects.values()],
+          consumers,
         });
         copies.set(reference.id, {
           id: reference.id,
           fingerprint: reference.fingerprint,
           scope: subject,
+          relocationId,
         });
       }
       if (page.cursor !== null && copyCursor !== null && page.cursor <= copyCursor)
@@ -340,6 +345,22 @@ export async function admitLearningStorageDeletion(options: {
       if (copies.get(expected.id)?.fingerprint !== expected.fingerprint)
         throw new Error('Storage copy scope index is incomplete');
     }
+  }
+  const verifiedRelocations = new Set([...copies.values()].map((copy) => copy.relocationId));
+  for (const subject of subjects.values()) {
+    let cursor: string | null = null;
+    do {
+      const page = await state.relocations.listForSubject(subject.subjectId, cursor);
+      for (const receipt of page.receipts)
+        if (
+          receipt.scopes.some((scope) => isDeepStrictEqual(scope, subject)) &&
+          !verifiedRelocations.has(receipt.operationId)
+        )
+          throw new Error('Storage relocation has no verified copy for deletion');
+      if (page.cursor !== null && cursor !== null && page.cursor <= cursor)
+        throw new Error('Storage relocation cursor did not advance');
+      cursor = page.cursor;
+    } while (cursor !== null);
   }
   const jobs = new Map<string, StorageCleanupJob>();
   for (const subject of subjects.values()) {

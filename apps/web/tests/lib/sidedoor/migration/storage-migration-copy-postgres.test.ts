@@ -8,6 +8,7 @@ import {
   LocalStorageCleanup,
   StorageBackendRegistry,
   StorageReferenceRegistry,
+  StorageRelocationRegistry,
   prepareStorageBackend,
   prepareStorageReference,
 } from 'thesidedoor-core/storage';
@@ -17,7 +18,11 @@ import { LOCAL_STORAGE_URL_PREFIX } from '@/lib/r2';
 import {
   admitSottoStorageCopy,
   executeSottoStorageCopy,
+  verifyStorageCopyForDeletion,
 } from '@/lib/sidedoor/storage/migration/storage-migration-copy';
+import { admitLearningStorageDeletion } from '@/lib/sidedoor/access/deletion/learning-deletion';
+import { openSottoStorageConnection } from '@/lib/sidedoor/storage/core/storage-connection';
+import { runSottoStorageCleanup } from '@/lib/sidedoor/storage/migration/storage-cleanup-runtime';
 import { readStorageMigrationAssetPage } from '@/lib/sidedoor/storage/migration/storage-migration-plan';
 import { resolveSottoRequest } from '@/lib/sidedoor/access/core/request-identity';
 import { SHARED_SESSION_COOKIE } from '@/lib/sidedoor/access/core/session-identity';
@@ -56,9 +61,10 @@ suite('storage copy publication with PostgreSQL and local files', () => {
       () => {}
     );
   }
-  async function fixture(episodeId?: string) {
+  async function fixture(episodeId?: string, shared = false) {
     const source = await backend();
     const target = await backend();
+    const other = shared ? await identity.household('Other learner') : null;
     const bytes = Buffer.from('A complete immutable avatar');
     const key = `${randomUUID()}.png`;
     const reference = await source.writeBuffer(key, bytes, 'image/png');
@@ -71,11 +77,20 @@ suite('storage copy publication with PostgreSQL and local files', () => {
       await new StorageBackendRegistry(executor, 'postgres', SIDEDOOR_STATE_ID).register(captured);
       const current = await sottoStorageInstance(tx).read();
       const owner = await tx.user.findUniqueOrThrow({ where: { id: identity.ownerId } });
+      const otherUser = other ? await tx.user.findUniqueOrThrow({ where: { id: other.id } }) : null;
       const scopes = episodeId
         ? (await captureEpisodeStorage(tx, episodeId)).scopes
         : [
             { subjectId: current.subjectId, generation: current.generation },
             { subjectId: `profile:${owner.id}`, generation: owner.createdAt.getTime() },
+            ...(otherUser
+              ? [
+                  {
+                    subjectId: `profile:${otherUser.id}`,
+                    generation: otherUser.createdAt.getTime(),
+                  },
+                ]
+              : []),
           ];
       await new StorageReferenceRegistry(executor, 'postgres', SIDEDOOR_STATE_ID).replaceMany({
         consumers: [
@@ -83,6 +98,9 @@ suite('storage copy publication with PostgreSQL and local files', () => {
             consumer: episodeId ? `episode:${episodeId}:audio` : `profile:${owner.id}:avatar`,
             previousReference: null,
           },
+          ...(otherUser
+            ? [{ consumer: `profile:${otherUser.id}:avatar`, previousReference: null }]
+            : []),
         ],
         next: prepareStorageReference({
           namespace: SIDEDOOR_STATE_ID,
@@ -95,7 +113,11 @@ suite('storage copy publication with PostgreSQL and local files', () => {
       });
       if (episodeId)
         await tx.episode.update({ where: { id: episodeId }, data: { audioUrl: reference } });
-      else await tx.user.update({ where: { id: owner.id }, data: { image: reference } });
+      else {
+        await tx.user.update({ where: { id: owner.id }, data: { image: reference } });
+        if (otherUser)
+          await tx.user.update({ where: { id: otherUser.id }, data: { image: reference } });
+      }
     });
     const request = new Request('http://localhost/api/v1/admin/storage/migrate', {
       headers: { cookie: `${SHARED_SESSION_COOKIE}=${identity.ownerToken}` },
@@ -123,7 +145,9 @@ suite('storage copy publication with PostgreSQL and local files', () => {
     return {
       bytes,
       reference,
+      source,
       target,
+      other,
       options: {
         database: instance.database,
         request,
@@ -155,6 +179,343 @@ suite('storage copy publication with PostgreSQL and local files', () => {
         target: { ...test.target, writeStream: rejectIo, downloadToFile: rejectIo },
       })
     ).toEqual(outcome);
+  });
+  it.each([null, '/avatars/capybara.png'])(
+    'cleans a migrated avatar after replacement with %s',
+    async (replacement) => {
+      const test = await fixture();
+      const outcome = await executeSottoStorageCopy(test.options);
+      const owner = await instance.database.user.findUniqueOrThrow({
+        where: { id: identity.ownerId },
+      });
+      const scope = { subjectId: `profile:${owner.id}`, generation: owner.createdAt.getTime() };
+      await sottoTransaction(instance.database, async (tx) => {
+        const registry = new StorageReferenceRegistry(
+          { query: (sql, values) => tx.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...values) },
+          'postgres',
+          SIDEDOOR_STATE_ID
+        );
+        await registry.retire({
+          operationId: randomUUID(),
+          consumer: `profile:${owner.id}:avatar`,
+          previousReference: outcome.reference,
+        });
+        await tx.user.update({ where: { id: owner.id }, data: { image: replacement } });
+      });
+      const wrongScope = { ...scope, generation: scope.generation + 1 };
+      await expect(
+        sottoTransaction(instance.database, (tx) =>
+          verifyStorageCopyForDeletion(tx, {
+            id: test.options.operationId,
+            fingerprint: test.options.fingerprint,
+            scope,
+            subjects: [wrongScope],
+            consumers: new Map(),
+          })
+        )
+      ).rejects.toThrow('outside the deletion scope');
+      await expect(
+        sottoTransaction(instance.database, async (tx) => {
+          await admitLearningStorageDeletion({
+            database: tx,
+            scope: { kind: 'profile', id: owner.id },
+            subjects: [scope],
+            currentBackend: test.target,
+          });
+          await tx.user.delete({ where: { id: owner.id } });
+          throw new Error('Simulated final deletion failure');
+        })
+      ).rejects.toThrow('Simulated final deletion failure');
+      expect(
+        await instance.database.user.findUniqueOrThrow({ where: { id: owner.id } })
+      ).toMatchObject({
+        image: replacement,
+      });
+      expect(
+        await sottoTransaction(instance.database, (tx) =>
+          sottoJobOutbox(tx).receipt(test.options.operationId)
+        )
+      ).toMatchObject({ status: 'complete' });
+      const remaining = await sottoTransaction(instance.database, (tx) =>
+        new StorageRelocationRegistry(
+          { query: (sql, values) => tx.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...values) },
+          'postgres',
+          SIDEDOOR_STATE_ID
+        ).listForSubject(scope.subjectId)
+      );
+      expect(remaining.receipts).toHaveLength(1);
+      const rollbackRoot = await mkdtemp(join(tmpdir(), 'sotto-copy-rollback-read-'));
+      roots.push(rollbackRoot);
+      const rollbackPath = join(rollbackRoot, 'target');
+      await test.target.downloadToFile(outcome.reference, rollbackPath);
+      expect(await readFile(rollbackPath)).toEqual(test.bytes);
+      const rollbackSource = join(rollbackRoot, 'source');
+      await test.source.downloadToFile(test.reference, rollbackSource);
+      expect(await readFile(rollbackSource)).toEqual(test.bytes);
+      const [cleanup] = await sottoTransaction(instance.database, (tx) =>
+        admitLearningStorageDeletion({
+          database: tx,
+          scope: { kind: 'profile', id: owner.id },
+          subjects: [scope],
+          currentBackend: test.target,
+        })
+      );
+      if (!cleanup) throw new Error('Missing profile cleanup');
+      await runSottoStorageCleanup(instance.database, cleanup.id, {
+        openConnection: () =>
+          openSottoStorageConnection(process.env.SIDEDOOR_TEST_DATABASE_URL, instance.schema),
+      });
+      const root = await mkdtemp(join(tmpdir(), 'sotto-retired-copy-read-'));
+      roots.push(root);
+      await expect(
+        test.source.downloadToFile(test.reference, join(root, 'source'))
+      ).rejects.toThrow();
+      await expect(
+        test.target.downloadToFile(outcome.reference, join(root, 'target'))
+      ).rejects.toThrow();
+      expect(
+        await sottoTransaction(instance.database, (tx) =>
+          sottoJobOutbox(tx).receipt(test.options.operationId)
+        )
+      ).toMatchObject({ status: 'erased' });
+    }
+  );
+  it('keeps copied media when the avatar changed without retirement evidence', async () => {
+    const test = await fixture();
+    const outcome = await executeSottoStorageCopy(test.options);
+    const owner = await instance.database.user.findUniqueOrThrow({
+      where: { id: identity.ownerId },
+    });
+    const scope = { subjectId: `profile:${owner.id}`, generation: owner.createdAt.getTime() };
+    await instance.database.user.update({ where: { id: owner.id }, data: { image: null } });
+    await expect(
+      sottoTransaction(instance.database, (tx) =>
+        verifyStorageCopyForDeletion(tx, {
+          id: test.options.operationId,
+          fingerprint: test.options.fingerprint,
+          scope,
+          subjects: [scope],
+          consumers: new Map(),
+        })
+      )
+    ).rejects.toThrow('ownership changed');
+    const root = await mkdtemp(join(tmpdir(), 'sotto-unretired-copy-read-'));
+    roots.push(root);
+    const path = join(root, 'target');
+    await test.target.downloadToFile(outcome.reference, path);
+    expect(await readFile(path)).toEqual(test.bytes);
+  });
+  it('does not recreate missing relocation evidence while admitting deletion', async () => {
+    const test = await fixture();
+    const outcome = await executeSottoStorageCopy(test.options);
+    const owner = await instance.database.user.findUniqueOrThrow({
+      where: { id: identity.ownerId },
+    });
+    const scope = { subjectId: `profile:${owner.id}`, generation: owner.createdAt.getTime() };
+    await sottoTransaction(instance.database, async (tx) => {
+      await tx.$executeRaw`DELETE FROM "SidedoorState" WHERE state->>'kind' IN ('storage_relocation', 'storage_relocation_allocation')`;
+    });
+    await expect(
+      sottoTransaction(instance.database, (tx) =>
+        verifyStorageCopyForDeletion(tx, {
+          id: test.options.operationId,
+          fingerprint: test.options.fingerprint,
+          scope,
+          subjects: [scope],
+          consumers: new Map([[`profile:${owner.id}:avatar`, outcome.reference]]),
+        })
+      )
+    ).rejects.toThrow('cannot modify evidence');
+    const rows = await instance.database.$queryRaw<Array<{ count: bigint }>>`
+      SELECT count(*) AS count FROM "SidedoorState"
+      WHERE state->>'kind' IN ('storage_relocation', 'storage_relocation_allocation')
+    `;
+    expect(rows[0]?.count).toBe(0n);
+  });
+  it('rejects retirement when the consumer remains attached to another asset', async () => {
+    const test = await fixture();
+    const outcome = await executeSottoStorageCopy(test.options);
+    const owner = await instance.database.user.findUniqueOrThrow({
+      where: { id: identity.ownerId },
+    });
+    const scope = { subjectId: `profile:${owner.id}`, generation: owner.createdAt.getTime() };
+    const consumer = `profile:${owner.id}:avatar`;
+    await sottoTransaction(instance.database, async (tx) => {
+      const registry = new StorageReferenceRegistry(
+        { query: (sql, values) => tx.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...values) },
+        'postgres',
+        SIDEDOOR_STATE_ID
+      );
+      await registry.retire({
+        operationId: randomUUID(),
+        consumer,
+        previousReference: outcome.reference,
+      });
+      await tx.user.update({ where: { id: owner.id }, data: { image: null } });
+      const changed = await tx.$executeRaw`
+        UPDATE "SidedoorState"
+        SET state = jsonb_set(state, '{consumers}', jsonb_build_array(${consumer}::text))
+        WHERE state->>'kind' = 'storage_asset' AND state->'prepared'->>'reference' = ${test.reference}
+      `;
+      if (changed !== 1) throw new Error('Missing original asset fixture');
+    });
+    await expect(
+      sottoTransaction(instance.database, (tx) =>
+        verifyStorageCopyForDeletion(tx, {
+          id: test.options.operationId,
+          fingerprint: test.options.fingerprint,
+          scope,
+          subjects: [scope],
+          consumers: new Map(),
+        })
+      )
+    ).rejects.toThrow('still attached');
+  });
+  it('keeps retired non-avatar migration history fenced during profile deletion', async () => {
+    const episode = await instance.database.episode.create({
+      data: { userId: identity.ownerId, title: 'Episode', topic: 'Topic' },
+    });
+    const test = await fixture(episode.id);
+    const outcome = await executeSottoStorageCopy(test.options);
+    const owner = await instance.database.user.findUniqueOrThrow({
+      where: { id: identity.ownerId },
+    });
+    const scope = { subjectId: `profile:${owner.id}`, generation: owner.createdAt.getTime() };
+    await sottoTransaction(instance.database, async (tx) => {
+      const registry = new StorageReferenceRegistry(
+        { query: (sql, values) => tx.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...values) },
+        'postgres',
+        SIDEDOOR_STATE_ID
+      );
+      await registry.retire({
+        operationId: randomUUID(),
+        consumer: `episode:${episode.id}:audio`,
+        previousReference: outcome.reference,
+      });
+      await tx.episode.update({ where: { id: episode.id }, data: { audioUrl: null } });
+    });
+    await expect(
+      sottoTransaction(instance.database, (tx) =>
+        verifyStorageCopyForDeletion(tx, {
+          id: test.options.operationId,
+          fingerprint: test.options.fingerprint,
+          scope,
+          subjects: [scope],
+          consumers: new Map(),
+        })
+      )
+    ).rejects.toThrow('outside the deleted profile');
+  });
+  it('preserves a surviving learner’s retired episode linked to another profile’s course', async () => {
+    const survivor = await identity.household('Survivor');
+    const curriculum = await instance.database.curriculum.upsert({
+      where: { nativeLang_targetLang: { nativeLang: 'es', targetLang: 'ru' } },
+      create: { nativeLang: 'es', targetLang: 'ru', title: 'Russian' },
+      update: {},
+    });
+    const course = await instance.database.course.create({
+      data: {
+        userId: identity.ownerId,
+        curriculumId: curriculum.id,
+        nativeLang: 'es',
+        targetLang: 'ru',
+      },
+    });
+    const episode = await instance.database.episode.create({
+      data: { userId: survivor.id, title: 'Episode', topic: 'Topic' },
+    });
+    await instance.database.practiceSession.create({
+      data: {
+        courseId: course.id,
+        episodeId: episode.id,
+        kind: 'LISTENING',
+        items: [],
+        seed: 'test',
+      },
+    });
+    const test = await fixture(episode.id);
+    const outcome = await executeSottoStorageCopy(test.options);
+    const owner = await instance.database.user.findUniqueOrThrow({
+      where: { id: identity.ownerId },
+    });
+    const scope = { subjectId: `profile:${owner.id}`, generation: owner.createdAt.getTime() };
+    await sottoTransaction(instance.database, async (tx) => {
+      const registry = new StorageReferenceRegistry(
+        { query: (sql, values) => tx.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...values) },
+        'postgres',
+        SIDEDOOR_STATE_ID
+      );
+      await registry.retire({
+        operationId: randomUUID(),
+        consumer: `episode:${episode.id}:audio`,
+        previousReference: outcome.reference,
+      });
+      await tx.episode.update({ where: { id: episode.id }, data: { audioUrl: null } });
+    });
+    await expect(
+      sottoTransaction(instance.database, (tx) =>
+        admitLearningStorageDeletion({
+          database: tx,
+          scope: { kind: 'profile', id: owner.id },
+          subjects: [scope],
+          currentBackend: test.target,
+        })
+      )
+    ).rejects.toThrow('outside the deleted profile');
+    expect(
+      await instance.database.episode.findUniqueOrThrow({ where: { id: episode.id } })
+    ).toMatchObject({ userId: survivor.id, audioUrl: null });
+    expect(
+      await sottoTransaction(instance.database, (tx) =>
+        sottoJobOutbox(tx).receipt(test.options.operationId)
+      )
+    ).toMatchObject({ status: 'complete' });
+    const remaining = await sottoTransaction(instance.database, (tx) =>
+      new StorageRelocationRegistry(
+        { query: (sql, values) => tx.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...values) },
+        'postgres',
+        SIDEDOOR_STATE_ID
+      ).listForSubject(`profile:${survivor.id}`)
+    );
+    expect(remaining.receipts).toHaveLength(1);
+  });
+  it('preserves shared migrated media when another owner remains', async () => {
+    const test = await fixture(undefined, true);
+    if (!test.other) throw new Error('Missing shared owner');
+    const outcome = await executeSottoStorageCopy(test.options);
+    const owner = await instance.database.user.findUniqueOrThrow({
+      where: { id: identity.ownerId },
+    });
+    const scope = { subjectId: `profile:${owner.id}`, generation: owner.createdAt.getTime() };
+    await expect(
+      sottoTransaction(instance.database, (tx) =>
+        verifyStorageCopyForDeletion(tx, {
+          id: test.options.operationId,
+          fingerprint: test.options.fingerprint,
+          scope,
+          subjects: [scope],
+          consumers: new Map([[`profile:${owner.id}:avatar`, outcome.reference]]),
+        })
+      )
+    ).rejects.toThrow('outside the deletion scope');
+    await expect(
+      sottoTransaction(instance.database, (tx) =>
+        admitLearningStorageDeletion({
+          database: tx,
+          scope: { kind: 'profile', id: owner.id },
+          subjects: [scope],
+          currentBackend: test.target,
+        })
+      )
+    ).rejects.toThrow('outside the deletion scope');
+    expect(
+      await instance.database.user.findUniqueOrThrow({ where: { id: test.other.id } })
+    ).toMatchObject({ image: outcome.reference });
+    const root = await mkdtemp(join(tmpdir(), 'sotto-shared-copy-read-'));
+    roots.push(root);
+    const path = join(root, 'target');
+    await test.target.downloadToFile(outcome.reference, path);
+    expect(await readFile(path)).toEqual(test.bytes);
   });
   it('rejects a changed destination before copying and retains the original reference', async () => {
     const test = await fixture();

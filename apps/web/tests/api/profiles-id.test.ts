@@ -164,191 +164,112 @@ suite('profile changes and durable deletion with PostgreSQL', () => {
       ).status
     ).toBe(400);
   });
-  it.each(['commit', 'rollback'] as const)(
-    'keeps relocated avatar evidence atomic with profile deletion on %s',
-    async (outcome) => {
-      const member = await identity.household('Relocated');
-      const survivor = await identity.household('Survivor');
-      const user = await instance.database.user.findUniqueOrThrow({
-        where: { id: member.id },
-        select: { createdAt: true },
+  it('preserves shared relocation evidence when profile deletion cannot verify its copy', async () => {
+    const member = await identity.household('Relocated');
+    const survivor = await identity.household('Survivor');
+    const user = await instance.database.user.findUniqueOrThrow({
+      where: { id: member.id },
+      select: { createdAt: true },
+    });
+    const survivorUser = await instance.database.user.findUniqueOrThrow({
+      where: { id: survivor.id },
+      select: { createdAt: true },
+    });
+    const consumer = `profile:${member.id}:avatar`;
+    const survivorConsumer = `profile:${survivor.id}:avatar`;
+    const consumers = [consumer, survivorConsumer];
+    const scopes = [
+      { subjectId: `profile:${member.id}`, generation: user.createdAt.getTime() },
+      { subjectId: `profile:${survivor.id}`, generation: survivorUser.createdAt.getTime() },
+    ];
+    const endpoints = await sottoTransaction(instance.database, async (tx) => {
+      const storageInstance = await sottoStorageInstance(tx).read();
+      scopes.push({
+        subjectId: storageInstance.subjectId,
+        generation: storageInstance.generation,
       });
-      const survivorUser = await instance.database.user.findUniqueOrThrow({
-        where: { id: survivor.id },
-        select: { createdAt: true },
+      const registry = new StorageReferenceRegistry(executor(tx), 'postgres', SIDEDOOR_STATE_ID);
+      const location = {
+        kind: 'object' as const,
+        endpoint: 'https://storage.example',
+        bucket: 'avatars',
+      };
+      const backend = prepareStorageBackend(SIDEDOOR_STATE_ID, {
+        kind: 'object',
+        location,
+        binding: storageBackendBinding(location),
+        publicUrl: 'https://media.example',
       });
-      const consumer = `profile:${member.id}:avatar`;
-      const survivorConsumer = `profile:${survivor.id}:avatar`;
-      const consumers = [consumer, survivorConsumer];
-      const scopes = [
-        { subjectId: `profile:${member.id}`, generation: user.createdAt.getTime() },
-        { subjectId: `profile:${survivor.id}`, generation: survivorUser.createdAt.getTime() },
-      ];
-      const endpoints = await sottoTransaction(instance.database, async (tx) => {
-        const storageInstance = await sottoStorageInstance(tx).read();
-        scopes.push({
-          subjectId: storageInstance.subjectId,
-          generation: storageInstance.generation,
-        });
-        const registry = new StorageReferenceRegistry(executor(tx), 'postgres', SIDEDOOR_STATE_ID);
-        const location = {
-          kind: 'object' as const,
-          endpoint: 'https://storage.example',
-          bucket: 'avatars',
-        };
-        const backend = prepareStorageBackend(SIDEDOOR_STATE_ID, {
-          kind: 'object',
-          location,
-          binding: storageBackendBinding(location),
-          publicUrl: 'https://media.example',
-        });
-        await new StorageBackendRegistry(executor(tx), 'postgres', SIDEDOOR_STATE_ID).register(
-          backend
-        );
-        const prepared = [randomUUID(), randomUUID()].map((operationId) =>
-          prepareStorageReference({
-            namespace: SIDEDOOR_STATE_ID,
-            operationId,
-            reference: `https://media.example/${operationId}.png`,
-            target: { backendId: backend.id, binding: backend.binding, key: `${operationId}.png` },
-            scopes,
-          })
-        );
-        const source = prepared[0]!;
-        const destination = prepared[1]!;
-        await registry.replaceMany({
-          next: source,
-          consumers: consumers.map((consumer) => ({ consumer, previousReference: null })),
-        });
-        await registry.replaceMany({
-          next: destination,
-          consumers: consumers.map((consumer) => ({
-            consumer,
-            previousReference: source.reference,
-          })),
-        });
-        const original = await registry.readReference(source.reference);
-        const current = await registry.readReference(destination.reference);
-        const content = { sha256: createHash('sha256').update('avatar').digest('hex'), bytes: 6 };
-        await new StorageRelocationRegistry(executor(tx), 'postgres', SIDEDOOR_STATE_ID).record({
-          operationId: destination.operationId,
-          sourceAssetId: original!.asset.id,
-          destinationAssetId: current!.asset.id,
-          consumers,
-          sourceRead: { assetId: original!.asset.id, ...content },
-          destinationRead: { assetId: current!.asset.id, ...content },
-        });
-        await tx.user.updateMany({
-          where: { id: { in: [member.id, survivor.id] } },
-          data: { image: destination.reference },
-        });
-        return { source, destination };
-      });
-      if (outcome === 'rollback') {
-        await instance.database.$executeRawUnsafe(
-          `CREATE FUNCTION reject_relocation_cascade() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'cascade unavailable'; END $$`
-        );
-        await instance.database.$executeRawUnsafe(
-          `CREATE TRIGGER reject_relocation_cascade BEFORE DELETE ON "User" FOR EACH ROW EXECUTE FUNCTION reject_relocation_cascade()`
-        );
-        try {
-          expect((await DELETE(request('DELETE', member.id), context(member.id))).status).toBe(503);
-          await assertNoDeletion(member.id);
-          expect(
-            (
-              await new StorageRelocationRegistry(
-                executor(),
-                'postgres',
-                SIDEDOOR_STATE_ID
-              ).listForSubject(`profile:${member.id}`)
-            ).receipts
-          ).toHaveLength(1);
-          expect(
-            (
-              await new StorageReferenceRegistry(
-                executor(),
-                'postgres',
-                SIDEDOOR_STATE_ID
-              ).readReference(endpoints.destination.reference)
-            )?.asset.consumers.sort()
-          ).toEqual([...consumers].sort());
-        } finally {
-          await instance.database.$executeRawUnsafe(
-            'DROP TRIGGER reject_relocation_cascade ON "User"'
-          );
-          await instance.database.$executeRawUnsafe('DROP FUNCTION reject_relocation_cascade()');
-        }
-        return;
-      }
-      const response = await DELETE(request('DELETE', member.id), context(member.id));
-      expect(response.status).toBe(202);
-      const body = await response.json();
-      expect(await instance.database.user.findUnique({ where: { id: member.id } })).toBeNull();
-      expect(
-        await instance.database.user.findUnique({
-          where: { id: survivor.id },
-          select: { image: true },
+      await new StorageBackendRegistry(executor(tx), 'postgres', SIDEDOOR_STATE_ID).register(
+        backend
+      );
+      const prepared = [randomUUID(), randomUUID()].map((operationId) =>
+        prepareStorageReference({
+          namespace: SIDEDOOR_STATE_ID,
+          operationId,
+          reference: `https://media.example/${operationId}.png`,
+          target: { backendId: backend.id, binding: backend.binding, key: `${operationId}.png` },
+          scopes,
         })
-      ).toEqual({ image: endpoints.destination.reference });
-      expect(
-        (
-          await new StorageReferenceRegistry(
-            executor(),
-            'postgres',
-            SIDEDOOR_STATE_ID
-          ).readReference(endpoints.destination.reference)
-        )?.asset.consumers
-      ).toEqual([survivorConsumer]);
-      const entries: unknown[] = [];
-      const unresolvedEntries: unknown[] = [];
-      let cursor: string | null = null;
-      do {
-        const page = await journal().listManifests(body.cleanup.id, cursor);
-        entries.push(...page.pages.flatMap((manifest) => manifest.entries));
-        unresolvedEntries.push(
-          ...page.pages
-            .filter((manifest) => !manifest.resolution)
-            .flatMap((manifest) => manifest.entries)
-        );
-        cursor = page.cursor;
-      } while (cursor !== null);
-      expect(unresolvedEntries).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            kind: 'storage_relocation_dependency',
-            role: 'destination',
-            prepared: endpoints.destination,
-          }),
-        ])
       );
-      expect(entries).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            kind: 'storage_relocation_dependency',
-            role: 'source',
-            prepared: endpoints.source,
-          }),
-          expect.objectContaining({
-            kind: 'storage_relocation_dependency',
-            role: 'destination',
-            prepared: endpoints.destination,
-          }),
-        ])
-      );
+      const source = prepared[0]!;
+      const destination = prepared[1]!;
+      await registry.replaceMany({
+        next: source,
+        consumers: consumers.map((consumer) => ({ consumer, previousReference: null })),
+      });
+      await registry.replaceMany({
+        next: destination,
+        consumers: consumers.map((consumer) => ({
+          consumer,
+          previousReference: source.reference,
+        })),
+      });
+      const original = await registry.readReference(source.reference);
+      const current = await registry.readReference(destination.reference);
+      const content = { sha256: createHash('sha256').update('avatar').digest('hex'), bytes: 6 };
+      await new StorageRelocationRegistry(executor(tx), 'postgres', SIDEDOOR_STATE_ID).record({
+        operationId: destination.operationId,
+        sourceAssetId: original!.asset.id,
+        destinationAssetId: current!.asset.id,
+        consumers,
+        sourceRead: { assetId: original!.asset.id, ...content },
+        destinationRead: { assetId: current!.asset.id, ...content },
+      });
+      await tx.user.updateMany({
+        where: { id: { in: [member.id, survivor.id] } },
+        data: { image: destination.reference },
+      });
+      return { source, destination };
+    });
+    const response = await DELETE(request('DELETE', member.id), context(member.id));
+    expect(response.status).toBe(503);
+    await assertNoDeletion(member.id);
+    expect(
+      await instance.database.user.findUniqueOrThrow({
+        where: { id: survivor.id },
+        select: { image: true },
+      })
+    ).toEqual({ image: endpoints.destination.reference });
+    expect(
+      (
+        await new StorageReferenceRegistry(executor(), 'postgres', SIDEDOOR_STATE_ID).readReference(
+          endpoints.destination.reference
+        )
+      )?.asset.consumers.sort()
+    ).toEqual([...consumers].sort());
+    for (const profile of [member, survivor]) {
       expect(
         (
           await new StorageRelocationRegistry(
             executor(),
             'postgres',
             SIDEDOOR_STATE_ID
-          ).listForSubject(`profile:${member.id}`)
+          ).listForSubject(`profile:${profile.id}`)
         ).receipts
-      ).toEqual([]);
-      const cleanupJob = await journal().get(body.cleanup.id);
-      expect(cleanupJob.phase).toBe('preparing');
-      expect(cleanupJob.unresolvedManifests).toBeGreaterThan(0);
+      ).toHaveLength(1);
     }
-  );
+  });
   it('rejects invalid admission, foreign origins and deletion of the Admin profile', async () => {
     const member = await identity.household('Learner');
     expect((await DELETE(request('DELETE', member.id, 'invalid'), context(member.id))).status).toBe(
