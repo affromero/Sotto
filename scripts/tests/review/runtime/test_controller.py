@@ -574,6 +574,12 @@ class ReviewControllerTests(unittest.TestCase):
         manifest = self.attempt.manifest()
         manifest['stages'] = [cast(list[dict[str, object]],
                                    manifest['stages'])[-1]]
+        stage = cast(list[dict[str, object]], manifest['stages'])[0]
+        migrations = cast(dict[str, str], stage['migrations'])
+        migrations.update({
+            f'apps/web/prisma/migrations/extra_{index:02}/migration.sql': 'f' * 64
+            for index in range(33)
+        })
         self.attempt = Attempt.create(self.root, 'invalid-stage', manifest,
                                       original.evidence_hash)
         for name in self.files:
