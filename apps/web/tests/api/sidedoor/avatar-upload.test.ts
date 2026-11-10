@@ -27,6 +27,7 @@ const binding = vi.hoisted(() => ({
   duringWrite: null as (() => Promise<void>) | null,
   loseCommit: false,
   afterCommit: null as (() => Promise<void>) | null,
+  committedResponseLost: false,
 }));
 vi.mock('@/lib/prisma', async () => {
   const { prismaTestBoundary } = await import('../../helpers/setup/shared-instance');
@@ -54,7 +55,7 @@ vi.mock('@/lib/prisma', async () => {
         }, options);
         if (changed && binding.loseCommit) {
           binding.loseCommit = false;
-          await binding.afterCommit?.();
+          binding.committedResponseLost = true;
           throw new Error('Connection lost after database committed');
         }
         return result;
@@ -62,6 +63,26 @@ vi.mock('@/lib/prisma', async () => {
     },
   });
   return { prisma: database, prismaUnfiltered: database };
+});
+vi.mock('@/lib/sidedoor/storage/core/storage-connection', async (original) => {
+  const actual = await original<typeof import('@/lib/sidedoor/storage/core/storage-connection')>();
+  return {
+    ...actual,
+    openSottoStorageConnection: async (
+      ...args: Parameters<typeof actual.openSottoStorageConnection>
+    ) => {
+      const connection = await actual.openSottoStorageConnection(...args);
+      return {
+        ...connection,
+        close: async () => {
+          await connection.close();
+          if (!binding.committedResponseLost) return;
+          binding.committedResponseLost = false;
+          await binding.afterCommit?.();
+        },
+      };
+    },
+  };
 });
 vi.mock('@aws-sdk/client-s3', async (original) => {
   const sdk = await original<typeof import('@aws-sdk/client-s3')>();
@@ -117,6 +138,7 @@ suite('avatar uploads with shared authority and durable storage writes', () => {
     binding.duringWrite = null;
     binding.loseCommit = false;
     binding.afterCommit = null;
+    binding.committedResponseLost = false;
     await instance.database.user.update({
       where: { id: identity.ownerId },
       data: { image: '/avatars/toucan.png' },
