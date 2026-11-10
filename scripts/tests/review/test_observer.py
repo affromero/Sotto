@@ -21,6 +21,7 @@ from scripts.deploy.images.metadata import record
 from scripts.deploy.review.build_observer import (
     BUILDER,
     SOURCE,
+    SHARED_TARGET,
     TARGET,
     build,
     git,
@@ -43,6 +44,71 @@ IMAGE = (
 
 
 class ObserverIntegrityTests(unittest.TestCase):
+    def test_shared_predecessor_uses_its_own_locked_sdk(self) -> None:
+        old_lock, old_sdk = historical_lock(ROOT)
+        shared_lock, shared_sdk = historical_lock(ROOT, SHARED_TARGET)
+        self.assertEqual(old_sdk['version'], '0.3.4')
+        self.assertEqual(shared_sdk['version'], '0.5.7')
+        self.assertNotEqual(sha(old_lock), sha(shared_lock))
+        with self.assertRaisesRegex(ValueError, 'Unreviewed historical source'):
+            historical_lock(ROOT, 'a' * 40)
+
+    def test_shared_observer_cannot_be_admitted_for_another_predecessor(
+        self,
+    ) -> None:
+        lock, sdk = historical_lock(ROOT, SHARED_TARGET)
+        packages = record(
+            record(json.loads(lock), 'lock')['packages'], 'packages'
+        )
+        zod = record(packages['node_modules/zod'], 'zod')
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            bundle, receipt = root / 'observer.cjs', root / 'receipt.json'
+            bundle.write_bytes(b'shared observer')
+            bundle.chmod(0o600)
+            source = (ROOT / SOURCE).read_bytes()
+            builder = (ROOT / BUILDER).read_bytes()
+            evidence = {
+                'schemaVersion': 1,
+                'purpose': 'sotto-review-readonly-observer',
+                'targetSource': SHARED_TARGET,
+                'targetLockSha256': sha(lock),
+                'toolRevision': 'a' * 40,
+                'sourceCommitted': True,
+                'observerSourceSha256': sha(source),
+                'builderSourceSha256': sha(builder),
+                'bundleSha256': sha(bundle.read_bytes()),
+                'sdkVersion': sdk['version'],
+                'sdkIntegrity': sdk['integrity'],
+                'zodVersion': zod['version'],
+                'zodIntegrity': zod['integrity'],
+                'sdkArchiveSha256': 'b' * 64,
+                'zodArchiveSha256': 'c' * 64,
+                'esbuildExecutableSha256': 'd' * 64,
+                'externals': {
+                    name: record(packages['node_modules/' + name], name)[
+                        'version'
+                    ] for name in ['pg', 'ioredis']
+                },
+                'inputs': {'project/' + str(SOURCE): sha(source)},
+            }
+            receipt.write_text(json.dumps(evidence))
+            receipt.chmod(0o600)
+
+            def git_file(_root: Path, _show: str, identity: str) -> bytes:
+                return source if identity.endswith(str(SOURCE)) else builder
+
+            with patch('scripts.deploy.review.preflight.git', git_file):
+                validate_bundle(
+                    ROOT, bundle, receipt, 'a' * 40,
+                    sha(bundle.read_bytes()), SHARED_TARGET,
+                )
+                with self.assertRaisesRegex(ValueError, 'differs'):
+                    validate_bundle(
+                        ROOT, bundle, receipt, 'a' * 40,
+                        sha(bundle.read_bytes()), TARGET,
+                    )
+
     def test_archive_must_match_lock_and_cannot_escape_extraction(
         self,
     ) -> None:
@@ -151,6 +217,51 @@ class ObserverIntegrityTests(unittest.TestCase):
                     validate_bundle(
                         ROOT, bundle, receipt, 'a' * 40, expected_digest
                     )
+
+
+@unittest.skipUnless(
+    all(os.environ.get(name) for name in (
+        'SOTTO_SHARED_REVIEW_SDK_ARCHIVE',
+        'SOTTO_SHARED_REVIEW_ZOD_ARCHIVE',
+        'SOTTO_SHARED_REVIEW_DATABASE_URL',
+        'SOTTO_SHARED_REVIEW_REDIS_URL',
+    )),
+    'requires isolated shared-review predecessor fixtures',
+)
+class SharedPredecessorObserverTests(unittest.TestCase):
+    def test_real_bundle_reads_retained_jobs_without_writing(self) -> None:
+        database = os.environ['SOTTO_SHARED_REVIEW_DATABASE_URL']
+        redis = os.environ['SOTTO_SHARED_REVIEW_REDIS_URL']
+        database_url, redis_url = urlsplit(database), urlsplit(redis)
+        if (database_url.hostname not in {'localhost', '127.0.0.1'}
+                or database_url.path != '/demo_before'
+                or redis_url.hostname not in {'localhost', '127.0.0.1'}
+                or redis_url.path != '/15'):
+            raise ValueError('Isolated local review fixtures are required')
+        with tempfile.TemporaryDirectory(prefix='review-shared-observer-') as tmp:
+            output = Path(tmp) / 'output'
+            receipt = build(
+                ROOT, Path(os.environ['SOTTO_SHARED_REVIEW_SDK_ARCHIVE']),
+                Path(os.environ['SOTTO_SHARED_REVIEW_ZOD_ARCHIVE']),
+                output, SHARED_TARGET,
+            )
+            self.assertEqual(receipt['targetSource'], SHARED_TARGET)
+            self.assertEqual(receipt['sdkVersion'], '0.5.7')
+            environment = dict(os.environ, DATABASE_URL=database, REDIS_URL=redis,
+                               NODE_PATH=str(ROOT / 'node_modules'))
+            observations = []
+            for _ in range(2):
+                result = subprocess.run(
+                    ['node', str(output / 'observer.cjs')], cwd=ROOT,
+                    env=environment, capture_output=True, timeout=90, check=True,
+                )
+                observations.append(json.loads(result.stdout))
+            self.assertEqual(observations[0], observations[1])
+            self.assertIs(observations[0]['database']['readOnly'], True)
+            statuses = [job['status'] for job in observations[0]['jobs']]
+            self.assertEqual(statuses.count('pending'), 3)
+            self.assertEqual(statuses.count('complete'), 110)
+            self.assertFalse(observations[0]['zeroWork'])
 
 
 @unittest.skipUnless(
@@ -294,7 +405,14 @@ m.exports.runScenario(process.argv[1],s).then(r=>console.log(JSON.stringify(r)))
         self.assertTrue(value['unchanged'])
         return value
 
-    def run_fixture(self, script: str, argument: str) -> dict[str, object]:
+    def run_fixture(
+        self, script: str, argument: str, *, argument_stdin: bool = False,
+    ) -> dict[str, object]:
+        bundle = (self.root / 'fixture.cjs').read_text()
+        payload = (
+            json.dumps({'bundle': bundle, 'argument': json.loads(argument)})
+            if argument_stdin else bundle
+        )
         result = subprocess.run(
             [
                 'docker',
@@ -319,9 +437,9 @@ m.exports.runScenario(process.argv[1],s).then(r=>console.log(JSON.stringify(r)))
                 IMAGE,
                 '-e',
                 script,
-                argument,
+                *([] if argument_stdin else [argument]),
             ],
-            input=(self.root / 'fixture.cjs').read_text(),
+            input=payload,
             text=True,
             capture_output=True,
             timeout=60,
@@ -348,7 +466,7 @@ m.exports.runScenario(process.argv[1],s).then(r=>console.log(JSON.stringify(r)))
 process.stdin.on('end',()=>{
 const Module=require('module'),m=new Module('/app/apps/web/observer.cjs');
 m.filename=m.id;m.paths=Module._nodeModulePaths('/app/apps/web');
-m._compile(s,m.id);const input=JSON.parse(process.argv[1]);
+const payload=JSON.parse(s);m._compile(payload.bundle,m.id);const input=payload.argument;
 m.exports[input.operation](input.options).then(r=>console.log(JSON.stringify(r)))
 .catch(e=>{console.error(e);process.exitCode=1});});"""
         previous: dict[str, str] = {}
@@ -429,26 +547,30 @@ m.exports[input.operation](input.options).then(r=>console.log(JSON.stringify(r))
                     for path, digest in previous.items()
                 ), 'Published migration bytes changed')
                 added = sorted(set(migrations) - set(previous))
-                self.assertTrue(1 <= len(added) <= 16)
-                options: dict[str, object] = {
-                    'schema': schema,
-                    'migrations': [
-                        migrations[path].decode() for path in added
-                    ],
-                    'storageRoot': str(storage),
-                }
-                value = self.run_fixture(script, json.dumps({
-                    'operation': (
-                        'seedWorksheetScenario' if index == 0
-                        else 'migrateWorksheetScenario'
-                    ),
-                    'options': options,
-                }))
-                actual_inventory = preserve_original_data()
-                if protected_inventory is None:
-                    protected_inventory = actual_inventory
-                else:
-                    self.assertEqual(actual_inventory, protected_inventory)
+                self.assertTrue(added, 'Historical stage must add migrations')
+                if index == 0:
+                    self.assertLessEqual(len(added), 16)
+                for offset in range(0, len(added), 16):
+                    batch = added[offset:offset + 16]
+                    options: dict[str, object] = {
+                        'schema': schema,
+                        'migrations': [migrations[path].decode() for path in batch],
+                        'storageRoot': str(storage),
+                    }
+                    value = self.run_fixture(script, json.dumps({
+                        'operation': (
+                            'seedWorksheetScenario' if index == 0
+                            else 'migrateWorksheetScenario'
+                        ),
+                        'options': options,
+                    }), argument_stdin=True)
+                    actual_inventory = preserve_original_data()
+                    if protected_inventory is None:
+                        protected_inventory = actual_inventory
+                    else:
+                        self.assertEqual(actual_inventory, protected_inventory)
+                    if index != 0:
+                        self.assertEqual(value['preserved'], seed['before'])
                 if index == 0:
                     seed = value
                     capture_result = run_runtime('capture')
@@ -521,7 +643,7 @@ m.exports[input.operation](input.options).then(r=>console.log(JSON.stringify(r))
                     unchanged = self.run_fixture(script, json.dumps({
                         'operation': 'migrateWorksheetScenario',
                         'options': {'schema': schema, 'migrations': []},
-                    }))
+                    }), argument_stdin=True)
                     self.assertEqual(unchanged['preserved'], seed['before'])
                 else:
                     self.assertEqual(value['preserved'], seed['before'])

@@ -117,6 +117,27 @@ class HostCommandTests(unittest.TestCase):
                                  'a' * 64)
         self.operations = HostOperations(attempt, self.lock)
 
+    def test_retained_attempt_reopens_against_its_original_tool_bundle(
+        self,
+    ) -> None:
+        repository = Path(__file__).resolve().parents[4]
+        frozen = self.root / 'frozen'
+        changed = self.root / 'changed'
+        shutil.copytree(repository / 'scripts/deploy', frozen / 'scripts/deploy')
+        shutil.copytree(frozen, changed)
+        tools = {
+            str(path.relative_to(frozen)): hashlib.sha256(path.read_bytes()).hexdigest()
+            for path in (frozen / 'scripts/deploy').rglob('*')
+            if path.is_file() and path.suffix in {'.py', '.ts', '.cjs'}
+        }
+        attempt = Attempt.create(self.root, 'retained', {'tools': tools}, 'b' * 64)
+        reopened = Attempt(attempt.directory)
+        changed_builder = changed / 'scripts/deploy/review/build_observer.py'
+        changed_builder.write_bytes(changed_builder.read_bytes() + b'\n')
+        HostOperations.verify_tool_inventory(frozen, reopened.manifest())
+        with self.assertRaisesRegex(ValueError, 'runtime-tool-changed'):
+            HostOperations.verify_tool_inventory(changed, reopened.manifest())
+
     def test_standard_input_handoff_runs_exact_command_with_same_lock(
         self,
     ) -> None:

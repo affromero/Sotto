@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import stat
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -15,6 +16,7 @@ from scripts.deploy.images.metadata import record
 from scripts.deploy.review.build_observer import (
     BUILDER,
     SOURCE,
+    SHARED_TARGET,
     TARGET,
     historical_lock,
     sha,
@@ -119,7 +121,7 @@ else:
         )
         fake.chmod(0o700)
 
-    def invoke(self) -> None:
+    def invoke(self, target: str = TARGET) -> None:
         def committed(_root: Path, _operation: str, identity: str) -> bytes:
             return (
                 ROOT / (SOURCE if identity.endswith(str(SOURCE)) else BUILDER)
@@ -144,7 +146,48 @@ else:
                 CONTAINER,
                 IMAGE,
                 self.output,
+                target,
             )
+
+    def test_shared_predecessor_executes_only_with_its_exact_source_guard(
+        self,
+    ) -> None:
+        lock, sdk = historical_lock(ROOT, SHARED_TARGET)
+        packages = record(
+            record(json.loads(lock), 'lock')['packages'], 'packages'
+        )
+        zod = record(packages['node_modules/zod'], 'zod')
+        self.evidence.update({
+            'targetSource': SHARED_TARGET,
+            'targetLockSha256': sha(lock),
+            'sdkVersion': sdk['version'],
+            'sdkIntegrity': sdk['integrity'],
+            'zodVersion': zod['version'],
+            'zodIntegrity': zod['integrity'],
+            'externals': {
+                name: record(packages['node_modules/' + name], name)['version']
+                for name in ['pg', 'ioredis']
+            },
+        })
+        self.receipt.write_text(json.dumps(self.evidence))
+        self.invoke(SHARED_TARGET)
+        executed = (self.root / 'executed.bin').read_bytes()
+        self.assertIn(SHARED_TARGET.encode(), executed)
+        self.assertNotIn(TARGET.encode(), executed)
+        prelude = (
+            b"process.getuid=()=>1000;"
+            b"process.cwd=()=>'/app/apps/web';\n"
+        )
+        for actual, succeeds in ((SHARED_TARGET, True), (TARGET, False)):
+            result = subprocess.run(
+                ['node', '-'], input=prelude + executed,
+                env=dict(os.environ, COMMIT_SHA=actual), capture_output=True,
+                timeout=10,
+            )
+            self.assertEqual(result.returncode == 0, succeeds)
+            if not succeeds:
+                self.assertIn(b'Historical observer runtime mismatch',
+                              result.stderr)
 
     def test_only_captured_runtime_receives_validated_bytes_and_private_output(
         self,
