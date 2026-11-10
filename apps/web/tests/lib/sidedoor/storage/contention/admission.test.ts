@@ -120,6 +120,24 @@ suite('storage write phase admission with PostgreSQL', () => {
     ]);
   }
 
+  it('releases admission after a timed-out transaction rolls back', async () => {
+    const id = randomUUID();
+    await expect(
+      sottoStateWriteTransaction(
+        instance.database,
+        async (tx) => {
+          await write(tx, id);
+          await tx.$queryRawUnsafe('SELECT pg_sleep(0.3)');
+        },
+        signal(),
+        { timeoutMs: 100 }
+      )
+    ).rejects.toThrow();
+    await expect(
+      sottoStateWriteTransaction(instance.database, (tx) => has(tx, id), signal())
+    ).resolves.toBe(false);
+  });
+
   it('starts a waiting state writer with the storage predecessor committed snapshot', async () => {
     const entered = barrier();
     const release = barrier();

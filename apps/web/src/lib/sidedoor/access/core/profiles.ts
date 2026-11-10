@@ -37,6 +37,26 @@ export function prepareSottoProfileUpdate(id: string, name?: string): PreparedSo
   return { ...profileManagement().prepareUpdate(id, name), storageOperationId: randomUUID() };
 }
 
+/** Retire the previous avatar in the same transaction as its replacement. */
+export async function retirePreviousProfileAvatar(
+  database: Prisma.TransactionClient,
+  id: string,
+  nextImage: string | null,
+  operationId: string
+) {
+  const previous = await database.user.findUniqueOrThrow({
+    where: { id },
+    select: { image: true },
+  });
+  if (!previous.image || previous.image === nextImage || isBundledAvatarImage(previous.image))
+    return;
+  await new StorageReferenceRegistry(
+    { query: (sql, values) => database.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...values) },
+    'postgres',
+    SIDEDOOR_STATE_ID
+  ).retire({ operationId, consumer: `profile:${id}:avatar`, previousReference: previous.image });
+}
+
 export async function updateSottoProfile(
   database: Prisma.TransactionClient,
   request: Request,
@@ -54,27 +74,13 @@ export async function updateSottoProfile(
         : { kind: 'session' as const, token: cookieValue(request, SHARED_SESSION_COOKIE)! };
     await store.transact((current) => prepared.apply(current, credential));
   } else if (identity.principalId !== prepared.id) throw new AccessError('forbidden');
-  if (avatarSlug !== undefined) {
-    const previous = await database.user.findUniqueOrThrow({
-      where: { id: prepared.id },
-      select: { image: true },
-    });
-    const nextImage = avatarSlug ? avatarImagePath(avatarSlug) : null;
-    if (previous.image && previous.image !== nextImage && !isBundledAvatarImage(previous.image)) {
-      await new StorageReferenceRegistry(
-        {
-          query: (sql, values) =>
-            database.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...values),
-        },
-        'postgres',
-        SIDEDOOR_STATE_ID
-      ).retire({
-        operationId: prepared.storageOperationId,
-        consumer: `profile:${prepared.id}:avatar`,
-        previousReference: previous.image,
-      });
-    }
-  }
+  if (avatarSlug !== undefined)
+    await retirePreviousProfileAvatar(
+      database,
+      prepared.id,
+      avatarSlug ? avatarImagePath(avatarSlug) : null,
+      prepared.storageOperationId
+    );
   const user = await database.user.update({
     where: { id: prepared.id },
     data: {

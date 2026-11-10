@@ -1,22 +1,25 @@
 import { randomUUID } from 'node:crypto';
+import { isDeepStrictEqual } from 'node:util';
 import {
-  acquirePostgresBackendLock,
+  acquirePostgresBackendLockGroup,
   CleanupExecutionJournal,
   runStorageCleanup,
   StorageBackendRegistry,
   StorageReferenceRegistry,
-  type BackendLock,
+  type BackendLockGroup,
   type DedicatedBackendConnection,
   type PreparedStorageBackend,
   type StorageCleanupBackendPort,
   type StorageCleanupCollectorRecord,
   type StorageCleanupTargetInput,
 } from 'thesidedoor-core/storage';
+import type { SqlExecutor } from 'thesidedoor-core/storage/sql';
 import type { PrismaClient } from '@/generated/prisma/client';
 import { captureStorageCleanup } from '@/lib/r2';
 import { openSottoStorageConnection } from '@/lib/sidedoor/storage/core/storage-connection';
 import { SIDEDOOR_STATE_ID } from '@/lib/sidedoor/access/state/store';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
+import { BINDING_SQL, parseBinding } from '@/lib/sidedoor/access/state/write-transaction';
 
 function executor(database: {
   $queryRawUnsafe<T = unknown>(query: string, ...values: unknown[]): Promise<T>;
@@ -154,10 +157,16 @@ export async function runSottoStorageCleanup(
   const { signal } = options;
   const backends = await registeredBackends(database, jobId);
   if (!backends.length) throw new Error('Storage cleanup has no registered backends');
-  const locks = new Map<string, BackendLock>();
+  const bindings = [...new Set(backends.map((backend) => backend.binding))];
+  const stateBinding = parseBinding(
+    await database.$queryRawUnsafe<Record<string, unknown>[]>(BINDING_SQL)
+  );
+  let lock: BackendLockGroup | undefined;
+  let verified = false;
   const executorId = randomUUID();
   let inFlight = 0;
   let operationFailure: unknown;
+  let operationFailed = false;
   const tracked = async <T>(operation: () => Promise<T>): Promise<T> => {
     inFlight += 1;
     try {
@@ -167,21 +176,19 @@ export async function runSottoStorageCleanup(
     }
   };
   try {
-    for (const binding of new Set(backends.map((backend) => backend.binding))) {
-      locks.set(
-        binding,
-        await acquirePostgresBackendLock({
-          namespace: SIDEDOOR_STATE_ID,
-          binding,
-          signal,
-          openConnection: options.openConnection ?? (() => openSottoStorageConnection()),
-        })
-      );
-    }
-    const lifetime = AbortSignal.any([
-      ...(signal ? [signal] : []),
-      ...[...locks.values()].map((lock) => lock.signal),
-    ]);
+    lock = await acquirePostgresBackendLockGroup({
+      bindings,
+      signal,
+      openConnection:
+        options.openConnection ??
+        (() => openSottoStorageConnection(undefined, stateBinding.schema)),
+    });
+    await lock.transaction(async (transaction) => {
+      if (!isDeepStrictEqual(stateBinding, parseBinding(await transaction.query(BINDING_SQL, []))))
+        throw new Error('Storage cleanup connection targets a different state relation');
+    });
+    verified = true;
+    const lifetime = AbortSignal.any([...(signal ? [signal] : []), lock.signal]);
     const ports: StorageCleanupBackendPort[] = [];
     for (const backend of backends) {
       const cleanup = await captureStorageCleanup(backend.descriptor);
@@ -209,31 +216,31 @@ export async function runSottoStorageCleanup(
       jobId,
       executorId,
       signal: lifetime,
-      transaction: <Result>(
-        run: (transaction: Parameters<typeof executor>[0]) => Promise<Result>
-      ) => sottoTransaction(database, run),
-      executor,
+      transaction: <Result>(run: (transaction: SqlExecutor) => Promise<Result>) =>
+        lock!.transaction(run),
+      executor: (transaction: SqlExecutor) => transaction,
       ports,
     });
   } catch (error) {
+    operationFailed = true;
     operationFailure = error;
     if (
       backends.every((backend) => backend.descriptor.kind === 'local') &&
       inFlight === 0 &&
-      locks.size > 0 &&
+      lock &&
+      verified &&
       !signal?.aborted &&
-      [...locks.values()].every((lock) => !lock.signal.aborted)
+      !lock.signal.aborted
     ) {
       try {
-        for (const lock of locks.values()) lock.assertHeld();
-        await sottoTransaction(database, async (transaction) => {
-          for (const lock of locks.values()) lock.assertHeld();
-          const journal = new CleanupExecutionJournal(
-            executor(transaction),
-            'postgres',
-            SIDEDOOR_STATE_ID
-          );
-          for (const [binding, lock] of locks) {
+        lock.assertHeld();
+        // The local adapter awaits filesystem operations and iterator closure. Once
+        // tracked work reaches zero, this executor will not dispatch another operation.
+        const evidence = { id: randomUUID(), kind: 'remote-operations-settled' as const };
+        await lock.transaction(async (transaction) => {
+          lock!.assertHeld();
+          const journal = new CleanupExecutionJournal(transaction, 'postgres', SIDEDOOR_STATE_ID);
+          for (const binding of bindings) {
             const current = await journal.current(binding);
             if (
               current?.status === 'unconfirmed' &&
@@ -241,16 +248,19 @@ export async function runSottoStorageCleanup(
               current.jobId === jobId &&
               current.backendBinding === binding
             )
-              await journal.settle({
-                executionId: current.executionId,
-                executorId: current.executorId,
-                jobId: current.jobId,
-                backendBinding: current.backendBinding,
-              });
-            lock.assertHeld();
+              await journal.resolveUnconfirmed(
+                {
+                  executionId: current.executionId,
+                  executorId: current.executorId,
+                  jobId: current.jobId,
+                  backendBinding: current.backendBinding,
+                },
+                evidence
+              );
+            lock!.assertHeld();
           }
           if (signal?.aborted) signal.throwIfAborted();
-          for (const lock of locks.values()) lock.assertHeld();
+          lock!.assertHeld();
         });
       } catch (settlementError) {
         operationFailure = new AggregateError(
@@ -260,19 +270,15 @@ export async function runSottoStorageCleanup(
       }
     }
   }
-  const releases = await Promise.allSettled(
-    [...locks.values()].reverse().map((lock) => lock.release())
-  );
-  const releaseFailures = releases.filter(
-    (result): result is PromiseRejectedResult => result.status === 'rejected'
-  );
-  if (releaseFailures.length)
-    throw new AggregateError(
-      [
-        ...(operationFailure === undefined ? [] : [operationFailure]),
-        ...releaseFailures.map((failure) => failure.reason),
-      ],
-      'Storage cleanup execution or backend lock closure failed'
-    );
-  if (operationFailure !== undefined) throw operationFailure;
+  if (lock) {
+    try {
+      await lock.release();
+    } catch (error) {
+      throw new AggregateError(
+        [...(operationFailed ? [operationFailure] : []), error],
+        'Storage cleanup execution or backend lock closure failed'
+      );
+    }
+  }
+  if (operationFailed) throw operationFailure;
 }

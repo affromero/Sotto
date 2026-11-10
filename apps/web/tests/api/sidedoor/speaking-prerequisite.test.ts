@@ -953,25 +953,30 @@ suite('speaking upload prerequisite admission', () => {
           database.speakingRecording.update({ where: { id: recording.id }, data: { audioUrl } }),
       });
       expect(await verify()).toBe(false);
-      await sottoTransaction(instance.database, async (database) => {
-        await admitLearningStorageDeletion({
-          database,
-          scope: { kind: 'course', id: parent.courseId, episodeIds: [] },
-          subjects: [subject],
-          currentBackend: backend,
-        });
-        await database.course.delete({ where: { id: parent.courseId } });
-      });
+      await expect(
+        sottoTransaction(instance.database, async (database) => {
+          await admitLearningStorageDeletion({
+            database,
+            scope: { kind: 'course', id: parent.courseId, episodeIds: [] },
+            subjects: [subject],
+            currentBackend: backend,
+          });
+          await database.course.delete({ where: { id: parent.courseId } });
+        })
+      ).rejects.toThrow('Storage relocation has no verified copy for deletion');
+      expect(
+        await instance.database.course.findUnique({ where: { id: parent.courseId } })
+      ).not.toBeNull();
       expect(
         await instance.database.$transaction((database) =>
           sottoJobOutbox(database).receipt(recording.operationId)
         )
-      ).toMatchObject({ status: 'erased', fingerprint: recording.fingerprint });
+      ).toMatchObject({ status: 'complete', fingerprint: recording.fingerprint });
       expect(
         await instance.database.sidedoorState.findUnique({
           where: { id: `${SIDEDOOR_STATE_ID}:speaking-grant:${recording.operationId}` },
         })
-      ).toBeNull();
+      ).not.toBeNull();
     } finally {
       vi.unstubAllEnvs();
       await rm(directory, { recursive: true, force: true });

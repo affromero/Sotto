@@ -868,29 +868,46 @@ export async function checkAssessmentOutcomeSubmission({
             });
           });
         try {
-          await expect(
-            runSottoStorageCleanup(instance.database, jobs[0]!.id, {
-              signal: cancellation.signal,
-              openConnection: async () => {
-                const connection = await openSottoStorageConnection(
-                  process.env.SIDEDOOR_TEST_DATABASE_URL,
-                  instance.schema
-                );
-                if (selectedMode !== 'submission_speaking_lock_loss') return connection;
-                const rows = await connection.query('SELECT pg_backend_pid() AS pid', []);
-                if (typeof rows[0]?.pid !== 'number') throw new Error('Missing backend PID');
-                backendPid = rows[0].pid;
-                return {
-                  ...connection,
-                  onLoss: (listener) =>
-                    connection.onLoss((error) => {
-                      listener(error);
-                      reportLoss();
-                    }),
-                };
-              },
-            })
-          ).rejects.toThrow('Simulated interruption after file deletion');
+          const failure: unknown = await runSottoStorageCleanup(instance.database, jobs[0]!.id, {
+            signal: cancellation.signal,
+            openConnection: async () => {
+              const connection = await openSottoStorageConnection(
+                process.env.SIDEDOOR_TEST_DATABASE_URL,
+                instance.schema
+              );
+              if (selectedMode !== 'submission_speaking_lock_loss') return connection;
+              const rows = await connection.query('SELECT pg_backend_pid() AS pid', []);
+              if (typeof rows[0]?.pid !== 'number') throw new Error('Missing backend PID');
+              backendPid = rows[0].pid;
+              return {
+                ...connection,
+                onLoss: (listener) =>
+                  connection.onLoss((error) => {
+                    listener(error);
+                    reportLoss();
+                  }),
+              };
+            },
+          }).then(
+            () => null,
+            (error: unknown) => error
+          );
+          if (selectedMode === 'submission_speaking_lock_loss') {
+            expect(failure).toBeInstanceOf(AggregateError);
+            expect((failure as AggregateError).errors).toEqual(
+              expect.arrayContaining([
+                expect.objectContaining({ message: 'Simulated interruption after file deletion' }),
+              ])
+            );
+            expect((failure as AggregateError).message).toBe(
+              'Storage cleanup failed and execution settlement could not be recorded'
+            );
+          } else
+            expect(failure).toEqual(
+              expect.objectContaining({
+                message: 'Simulated interruption after file deletion',
+              })
+            );
         } finally {
           interrupted.mockRestore();
         }

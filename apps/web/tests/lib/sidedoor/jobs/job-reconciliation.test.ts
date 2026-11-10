@@ -1,9 +1,15 @@
 // @vitest-environment private-redis
 import { randomUUID } from 'node:crypto';
-import { Queue, Worker } from 'bullmq';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { Queue, Worker, type Job } from 'bullmq';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { prepareJob } from 'thesidedoor-core/runtime/outbox';
+import { prepareStorageCleanup, StorageCleanupJournal } from 'thesidedoor-core/storage';
 import { deliverSottoJob, sottoJobOutbox } from '@/lib/sidedoor/jobs/core/job-delivery';
+import { enqueueDurableQueueJob } from '@/lib/sidedoor/jobs/core/durable-queue';
+import {
+  sottoJobExecutions,
+  withSottoJobExecution,
+} from '@/lib/sidedoor/jobs/core/job-execution-lifetime';
 import {
   reconcileSottoJobs,
   startSottoJobReconciliation,
@@ -19,6 +25,31 @@ import {
   createSharedTestInstance,
   type SharedTestInstance,
 } from '../../../helpers/setup/shared-instance';
+
+const connectionBoundary = vi.hoisted(() => ({ failNextClose: false }));
+vi.mock('@/lib/sidedoor/storage/core/storage-connection', async (original) => {
+  const actual = await original<typeof import('@/lib/sidedoor/storage/core/storage-connection')>();
+  return {
+    ...actual,
+    openSottoStorageConnection: async (
+      ...args: Parameters<typeof actual.openSottoStorageConnection>
+    ) => {
+      const connection = await actual.openSottoStorageConnection(...args);
+      return {
+        ...connection,
+        close: async () => {
+          await connection.close();
+          if (connectionBoundary.failNextClose) {
+            connectionBoundary.failNextClose = false;
+            const error = new Error('Connection cleanup could not be confirmed');
+            error.name = 'PostgresConnectionCleanupError';
+            throw error;
+          }
+        },
+      };
+    },
+  };
+});
 
 const suite =
   process.env.SIDEDOOR_TEST_DATABASE_URL && process.env.SOTTO_TEST_PRIVATE_REDIS_URL
@@ -36,6 +67,7 @@ suite('durable reconciliation with PostgreSQL and Redis', () => {
     instance = await createSharedTestInstance('job_reconciliation');
   });
   beforeEach(async () => {
+    connectionBoundary.failNextClose = false;
     await instance.reset();
     queue = new Queue('notifications', { connection, prefix: `reconcile-${randomUUID()}` });
   });
@@ -63,6 +95,217 @@ suite('durable reconciliation with PostgreSQL and Redis', () => {
     });
     return sottoTransaction(instance.database, (tx) => sottoJobOutbox(tx).enqueue(prepared));
   };
+
+  it.each([
+    {
+      state: 'failed',
+      published: true,
+      blocked: false,
+      deleted: false,
+      erased: false,
+      cleanup: false,
+    },
+    {
+      state: 'completed',
+      published: true,
+      blocked: false,
+      deleted: false,
+      erased: false,
+      cleanup: false,
+    },
+    {
+      state: 'failed',
+      published: false,
+      blocked: false,
+      deleted: false,
+      erased: false,
+      cleanup: false,
+    },
+    {
+      state: 'completed',
+      published: false,
+      blocked: false,
+      deleted: false,
+      erased: false,
+      cleanup: false,
+    },
+    {
+      state: 'failed',
+      published: true,
+      blocked: true,
+      deleted: false,
+      erased: false,
+      cleanup: false,
+    },
+    {
+      state: 'failed',
+      published: true,
+      blocked: false,
+      deleted: true,
+      erased: false,
+      cleanup: false,
+    },
+    {
+      state: 'failed',
+      published: true,
+      blocked: false,
+      deleted: false,
+      erased: true,
+      cleanup: false,
+    },
+    {
+      state: 'failed',
+      published: true,
+      blocked: false,
+      deleted: false,
+      erased: false,
+      cleanup: true,
+    },
+  ] as const)(
+    'preserves published=$published blocked=$blocked deleted=$deleted erased=$erased cleanup=$cleanup work after its queue job is $state',
+    async ({ state, published, blocked, deleted, erased, cleanup }) => {
+      await queue.close();
+      queue = new Queue('interactions', { connection, prefix: `reconcile-${randomUUID()}` });
+      const user = await instance.database.user.findFirstOrThrow({ where: { role: 'ADMIN' } });
+      const episode = await instance.database.episode.create({
+        data: { userId: user.id, title: 'Episode', topic: 'Topic' },
+      });
+      const payload = {
+        episodeId: episode.id,
+        interactionId: randomUUID(),
+        userId: user.id,
+        question: 'What was said?',
+        timestamp: 1,
+      };
+      const record = await sottoTransaction(instance.database, async (tx) => {
+        await tx.interaction.create({
+          data: {
+            id: payload.interactionId,
+            episodeId: episode.id,
+            userId: user.id,
+            question: payload.question,
+            timestamp: payload.timestamp,
+            status: published ? 'ANSWERED' : 'PENDING',
+            answer: published ? 'Existing answer' : null,
+          },
+        });
+        return enqueueDurableQueueJob(tx, {
+          handler: 'interactions',
+          type: 'process_interaction',
+          payload,
+          jobId: `interaction-${payload.interactionId}`,
+          attempts: 1,
+        });
+      });
+      await deliverSottoJob({
+        database: instance.database,
+        queue,
+        operationId: record.job.id,
+        version: 1,
+      });
+      const worker = new Worker(
+        queue.name,
+        async () => {
+          if (state === 'failed') throw new Error('Lost completion');
+        },
+        { connection, prefix: queue.opts.prefix, autorun: false }
+      );
+      try {
+        const finished = new Promise<void>((resolve, reject) => {
+          const timer = setTimeout(() => reject(new Error('Interaction job did not finish')), 5000);
+          worker.on(state, (job: Job | undefined) => {
+            if (job?.id !== record.job.id) return;
+            clearTimeout(timer);
+            resolve();
+          });
+        });
+        void worker.run();
+        await finished;
+      } finally {
+        await worker.close();
+      }
+
+      if (blocked) {
+        await expect(
+          withSottoJobExecution({
+            database: instance.database,
+            parentId: record.job.id,
+            fingerprint: record.fingerprint,
+            signal: new AbortController().signal,
+            validate: async () => true,
+            isCleanupFailure: () => false,
+            run: async ({ markCleanupUnconfirmed }) => {
+              markCleanupUnconfirmed();
+              throw new Error('Execution cleanup is unconfirmed');
+            },
+          })
+        ).rejects.toThrow('Execution cleanup is unconfirmed');
+      }
+      if (deleted)
+        await instance.database.episode.update({
+          where: { id: episode.id },
+          data: { deletedAt: new Date() },
+        });
+
+      connectionBoundary.failNextClose = cleanup;
+      let queueUses = 0;
+      const results = (
+        await reconcileSottoJobs({
+          ...options(),
+          withQueue: async <Result>(
+            name: string,
+            signal: AbortSignal,
+            operation: (target: Queue) => Promise<Result>
+          ) => {
+            if (name !== queue.name) throw new Error('Unexpected queue');
+            signal.throwIfAborted();
+            queueUses += 1;
+            if (erased && queueUses === 2) {
+              const scope = record.job.scopes[0]!;
+              await sottoTransaction(instance.database, async (tx) => {
+                await new StorageCleanupJournal(
+                  {
+                    query: (sql, values) =>
+                      tx.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...values),
+                  },
+                  'postgres',
+                  SIDEDOOR_STATE_ID
+                ).createJob(prepareStorageCleanup({ namespace: SIDEDOOR_STATE_ID, ...scope }));
+                await sottoJobOutbox(tx).complete(record.job.id, record.fingerprint);
+                await sottoJobOutbox(tx).erase(record.job.id, record.fingerprint, scope);
+              });
+            }
+            return operation(queue);
+          },
+        })
+      ).results;
+      const failure = results.find((result) => result.status === 'failed');
+      const recovered = published && !blocked && !deleted && !erased && !cleanup;
+      if (recovered && failure?.status === 'failed') throw failure.error;
+      expect(results).toMatchObject([
+        { id: record.job.id, status: erased ? 'erased' : recovered ? 'complete' : 'failed' },
+      ]);
+      expect(
+        await instance.database.interaction.findUniqueOrThrow({
+          where: { id: payload.interactionId },
+        })
+      ).toMatchObject({
+        status: published ? 'ANSWERED' : 'PENDING',
+        answer: published ? 'Existing answer' : null,
+      });
+      expect(
+        await sottoTransaction(instance.database, (tx) => sottoJobOutbox(tx).receipt(record.job.id))
+      ).toMatchObject({
+        status: erased ? 'erased' : recovered || cleanup ? 'complete' : 'pending',
+      });
+      if (cleanup)
+        expect(
+          await sottoTransaction(instance.database, (tx) =>
+            sottoJobExecutions(tx).blockingStatus(record.job.id, record.fingerprint)
+          )
+        ).toBe('cleanup-unconfirmed');
+    }
+  );
 
   it('restores accepted but incomplete work after Redis loses its queue', async () => {
     const record = await fixture();

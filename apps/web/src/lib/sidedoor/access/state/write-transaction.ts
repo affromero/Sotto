@@ -15,7 +15,7 @@ const bindingSchema = z.object({
   port: z.number().int().nullable(),
 });
 
-const BINDING_SQL = `
+export const BINDING_SQL = `
   SELECT current_database() AS database, namespace.nspname AS schema,
          relation.oid::text AS relation, inet_server_addr()::text AS address,
          inet_server_port() AS port
@@ -24,7 +24,7 @@ const BINDING_SQL = `
   WHERE relation.oid = to_regclass('"SidedoorState"')
 `;
 
-function parseBinding(rows: readonly Record<string, unknown>[]) {
+export function parseBinding(rows: readonly Record<string, unknown>[]) {
   if (rows.length !== 1) throw new Error('Storage state relation could not be identified');
   return bindingSchema.parse(rows[0]);
 }
@@ -33,7 +33,8 @@ function parseBinding(rows: readonly Record<string, unknown>[]) {
 export async function sottoStateWriteTransaction<Result>(
   database: PrismaClient,
   operation: (transaction: Prisma.TransactionClient) => Promise<Result>,
-  callerSignal: AbortSignal
+  callerSignal: AbortSignal,
+  options: { timeoutMs?: number } = {}
 ): Promise<Result> {
   callerSignal.throwIfAborted();
   const binding = parseBinding(
@@ -89,7 +90,7 @@ export async function sottoStateWriteTransaction<Result>(
         signal.throwIfAborted();
         return result;
       },
-      { signal }
+      { signal, ...options }
     );
   } catch (error) {
     failed = true;

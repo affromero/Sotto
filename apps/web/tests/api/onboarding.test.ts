@@ -6,22 +6,35 @@ const mockUserUpdate = vi.fn();
 const mockTagFindMany = vi.fn();
 const mockTagUpsert = vi.fn();
 const mockTransaction = vi.fn();
+const mockUserFindUniqueOrThrow = vi.fn();
 
 vi.mock('@/lib/api-keys', () => ({
   authenticateRequest: (...args: unknown[]) => mockAuthenticateRequest(...args),
 }));
 
-vi.mock('@/lib/prisma', () => ({
-  prisma: {
+vi.mock('@/lib/prisma', () => {
+  const database = {
     user: {
       update: (...args: unknown[]) => mockUserUpdate(...args),
+      findUniqueOrThrow: (...args: unknown[]) => mockUserFindUniqueOrThrow(...args),
     },
     tag: {
       findMany: (...args: unknown[]) => mockTagFindMany(...args),
       upsert: (...args: unknown[]) => mockTagUpsert(...args),
     },
     $transaction: (...args: unknown[]) => mockTransaction(...args),
-  },
+  };
+  return { prisma: database, prismaUnfiltered: database };
+});
+
+vi.mock('@/lib/sidedoor/access/core/request-identity', () => ({
+  requireOriginalSottoAdmission: vi.fn(),
+}));
+vi.mock('@/lib/sidedoor/access/state/write-transaction', () => ({
+  sottoStateWriteTransaction: async (
+    database: unknown,
+    operation: (database: unknown) => Promise<unknown>
+  ) => operation(database),
 }));
 
 vi.mock('@/lib/slugify', () => ({
@@ -185,6 +198,7 @@ describe('POST /api/v1/onboarding/name', () => {
     vi.clearAllMocks();
     mockValidateDisplayName.mockReturnValue({ valid: true });
     mockModerateDisplayName.mockResolvedValue({ valid: true });
+    mockUserFindUniqueOrThrow.mockResolvedValue({ image: null });
   });
 
   it('returns 401 when unauthenticated', async () => {

@@ -7,6 +7,7 @@ import { admitLearningStorageDeletion } from '@/lib/sidedoor/access/deletion/lea
 import { runSottoStorageCleanup } from '@/lib/sidedoor/storage/migration/storage-cleanup-runtime';
 import { SIDEDOOR_STATE_ID } from '@/lib/sidedoor/access/state/store';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
+import { sottoStateWriteTransaction } from '@/lib/sidedoor/access/state/write-transaction';
 
 export interface CourseDeletionResult {
   episodesDeleted: number;
@@ -112,7 +113,7 @@ async function courseEpisodeIds(
 /** Revoke storage authority and remove one course with its generated episodes atomically. */
 export async function deleteCourseCompletely(courseId: string): Promise<CourseDeletionResult> {
   const backend = await captureStorageBackend();
-  const admitted = await sottoTransaction(
+  const admitted = await sottoStateWriteTransaction(
     prismaUnfiltered,
     async (database) => {
       const course = await database.course.findUniqueOrThrow({
@@ -156,6 +157,7 @@ export async function deleteCourseCompletely(courseId: string): Promise<CourseDe
         jobs: jobs.map((job) => ({ id: job.id })),
       };
     },
+    AbortSignal.timeout(120_000),
     { timeoutMs: 60_000 }
   );
 

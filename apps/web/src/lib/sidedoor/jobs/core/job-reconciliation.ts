@@ -104,6 +104,30 @@ export async function reconcileSottoJobs(options: ReconciliationOptions) {
       } catch (error) {
         if (
           error instanceof SottoTerminalDeliveryError &&
+          (error.observation.state === 'failed' || error.observation.state === 'completed') &&
+          error.observation.handler === 'interactions' &&
+          error.observation.version === 1
+        ) {
+          const { reconcilePublishedInteraction } =
+            await import('@/lib/sidedoor/jobs/interaction-recovery');
+          const state = error.observation.state;
+          const recover = (target: Queue) =>
+            reconcilePublishedInteraction({
+              database,
+              queue: target,
+              operationId: reference.id,
+              fingerprint: reference.fingerprint,
+              state,
+              signal,
+            });
+          const recovered = await (options.withQueue
+            ? options.withQueue(receipt.handler, signal, recover)
+            : recover(queue));
+          if (recovered) return recovered;
+          throw error;
+        }
+        if (
+          error instanceof SottoTerminalDeliveryError &&
           error.observation.state === 'failed' &&
           error.observation.handler === 'learning-writing' &&
           error.observation.version === 3

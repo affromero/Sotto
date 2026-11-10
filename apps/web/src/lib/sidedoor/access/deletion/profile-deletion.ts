@@ -20,8 +20,10 @@ import { sharedAccess } from '@/lib/sidedoor/access/core/service';
 import { SHARED_SESSION_COOKIE } from '@/lib/sidedoor/access/core/session-identity';
 import { SIDEDOOR_STATE_ID, sidedoorStateStore } from '@/lib/sidedoor/access/state/store';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
+import { sottoStateWriteTransaction } from '@/lib/sidedoor/access/state/write-transaction';
 import { eraseSottoProviderCredentials } from '@/lib/sidedoor/credentials/config/credential-sharing';
 import { admitLearningStorageDeletion } from '@/lib/sidedoor/access/deletion/learning-deletion';
+import { finalizeRetainedProfileHistory } from '@/lib/sidedoor/storage/migration/relocation/proof';
 import { runSottoStorageCleanup } from '@/lib/sidedoor/storage/migration/storage-cleanup-runtime';
 
 function cleanup(database: Prisma.TransactionClient) {
@@ -124,7 +126,7 @@ async function deleteProfile(
   const removal = prepareRemoval(id, captured.epoch, captured.selfPrincipal);
   let job: { id: string };
   try {
-    job = await sottoTransaction(
+    job = await sottoStateWriteTransaction(
       database,
       async (tx) => {
         if (expected) await requireOriginalSottoAdmission(tx, request, expected);
@@ -133,11 +135,15 @@ async function deleteProfile(
         if (!user || user.createdAt.getTime() !== captured.generation)
           throw new AccessError('conflict');
         removal.apply(envelope.access, credential);
+        let retainedAsset: string | undefined;
         const [prepared] = await admitLearningStorageDeletion({
           database: tx,
           scope: { kind: 'profile', id },
           subjects: [{ subjectId: `profile:${id}`, generation: captured.generation }],
           currentBackend: backend,
+          deferRetainedProfile: (assetId) => {
+            retainedAsset = assetId;
+          },
         });
         if (!prepared) throw new Error('Profile cleanup admission failed');
         const revision = envelope.revision;
@@ -151,9 +157,17 @@ async function deleteProfile(
         await tx.feedback.deleteMany({ where: { userId: id } });
         await eraseSottoProviderCredentials(tx, id);
         await tx.user.delete({ where: { id }, select: { id: true } });
+        if (retainedAsset)
+          await finalizeRetainedProfileHistory(tx, retainedAsset, {
+            subjectId: prepared.subjectId,
+            generation: prepared.generation,
+            jobId: prepared.id,
+            epoch: prepared.epoch,
+          });
         return prepared;
       },
-      { signal: request.signal, timeoutMs: 60_000 }
+      request.signal,
+      { timeoutMs: 60_000 }
     );
   } catch (error) {
     const recovered = await sottoTransaction(database, async (tx) => {

@@ -220,6 +220,24 @@ export async function exerciseDurableWaveform(options: {
     const replayed = await database.episode.findUniqueOrThrow({ where: { id: episodeId } });
     expect(replayed.waveformUrl).toBe(episode.waveformUrl);
     expect(replayed.spectrogramUrl).toBe(episode.spectrogramUrl);
+    await sottoTransaction(database, async (tx) => {
+      const registry = new StorageReferenceRegistry(
+        { query: (sql, values) => tx.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...values) },
+        'postgres',
+        SIDEDOOR_STATE_ID
+      );
+      for (const [field, reference] of [
+        ['waveform', replayed.waveformUrl],
+        ['spectrogram', replayed.spectrogramUrl],
+      ] as const) {
+        expect(
+          await registry.resolve({
+            consumer: `episode:${episodeId}:${field}`,
+            reference: reference!,
+          })
+        ).not.toBeNull();
+      }
+    });
   } finally {
     await job.remove();
   }

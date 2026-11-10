@@ -1,7 +1,7 @@
 import { cookieValue, readAccessJson } from 'thesidedoor-core/access/http';
 import { isStorageManifestLimitError } from 'thesidedoor-core/storage';
 import { accessOperation } from '@/lib/sidedoor/access/core/http';
-import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
+import { sottoStateWriteTransaction } from '@/lib/sidedoor/access/state/write-transaction';
 import { prepareSottoProfileUpdate, updateSottoProfile } from '@/lib/sidedoor/access/core/profiles';
 import { NextRequest, NextResponse } from 'next/server';
 import { prismaUnfiltered } from '@/lib/prisma';
@@ -23,8 +23,10 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     const parsed = updateProfileSchema.safeParse(await readAccessJson(request));
     if (!parsed.success) return errorResponse(parsed.error.flatten(), 400);
     const prepared = prepareSottoProfileUpdate(id, parsed.data.name);
-    const user = await sottoTransaction(prismaUnfiltered, (database) =>
-      updateSottoProfile(database, request, prepared, parsed.data.avatarSlug)
+    const user = await sottoStateWriteTransaction(
+      prismaUnfiltered,
+      (database) => updateSottoProfile(database, request, prepared, parsed.data.avatarSlug),
+      request.signal
     );
     return NextResponse.json(user);
   });

@@ -4,7 +4,7 @@ import type { Prisma } from '@/generated/prisma/client';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { captureStorageBackend } from '@/lib/r2';
 import { logger } from '@/lib/logger';
-import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
+import { sottoStateWriteTransaction } from '@/lib/sidedoor/access/state/write-transaction';
 import { requireOriginalSottoAdmission } from '@/lib/sidedoor/access/core/request-identity';
 import { admitLearningStorageDeletion } from '@/lib/sidedoor/access/deletion/learning-deletion';
 import { runSottoStorageCleanup } from '@/lib/sidedoor/storage/migration/storage-cleanup-runtime';
@@ -75,7 +75,7 @@ export async function cancelMaterialUpload(
   uploadId: string
 ) {
   const backend = await captureStorageBackend();
-  const result = await sottoTransaction(
+  const result = await sottoStateWriteTransaction(
     prisma,
     async (database) => {
       await requireOriginalSottoAdmission(database, request, admission);
@@ -88,7 +88,8 @@ export async function cancelMaterialUpload(
         upload: uploadResponse(await readOwnedUpload(database, admission.userId, uploadId)),
       };
     },
-    { signal: request.signal, timeoutMs: 60000 }
+    request.signal,
+    { timeoutMs: 60000 }
   );
   await finishCleanup(uploadId, result.jobs, request.signal);
   return result.upload;
@@ -117,7 +118,7 @@ export async function maintainMaterialUploads(
   for (const candidate of candidates) {
     signal.throwIfAborted();
     try {
-      const jobs = await sottoTransaction(
+      const jobs = await sottoStateWriteTransaction(
         prisma,
         async (database) => {
           const upload = await readOwnedUpload(
@@ -133,7 +134,8 @@ export async function maintainMaterialUploads(
             return retireUploadParts(database, upload, backend, 'EXPIRED');
           return [];
         },
-        { signal, timeoutMs: 60000 }
+        signal,
+        { timeoutMs: 60000 }
       );
       await finishCleanup(candidate.id, jobs, signal);
     } catch (error) {

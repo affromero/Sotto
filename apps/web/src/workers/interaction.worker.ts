@@ -12,6 +12,7 @@ import {
   completeDurableQueueJob,
   durableJobProviderExecution,
 } from '@/lib/sidedoor/jobs/core/durable-queue';
+import { completePublishedInteraction } from '@/lib/sidedoor/jobs/interaction-recovery';
 import { getLanguageLabel } from '@sotto/shared';
 import { CHARS_PER_SECOND } from '@/lib/duration';
 import { logger } from '@/lib/logger';
@@ -61,16 +62,21 @@ export async function processInteraction(
       await execution.authorize(database);
       const interaction = await database.interaction.findUnique({
         where: { id: interactionId, episodeId },
-        select: { userId: true, question: true, timestamp: true, status: true },
+        select: { userId: true, question: true, timestamp: true, status: true, answer: true },
       });
       if (
         !interaction ||
         interaction.userId !== userId ||
         interaction.question !== question ||
-        interaction.timestamp !== timestamp ||
-        interaction.status !== 'PENDING'
+        interaction.timestamp !== timestamp
       )
         throw new Error('Interaction inputs changed');
+      if (
+        interaction.answer !== null &&
+        ['ANSWERED', 'RESOLVED', 'INCORPORATING', 'INCORPORATED'].includes(interaction.status)
+      )
+        return { published: true as const };
+      if (interaction.status !== 'PENDING') throw new Error('Interaction inputs changed');
       const [episode, user, script, segments] = await Promise.all([
         database.episode.findUnique({
           where: { id: episodeId },
@@ -84,10 +90,21 @@ export async function processInteraction(
           select: { order: true, startTime: true, duration: true },
         }),
       ]);
-      return { episode, user, script, segments };
+      return { published: false as const, episode, user, script, segments };
     },
     { signal }
   );
+  if (capture.published) {
+    await sottoStateWriteTransaction(
+      prisma,
+      async (database) => {
+        if (!(await completePublishedInteraction(database, job, signal)))
+          throw new Error('Interaction operation changed');
+      },
+      signal ?? new AbortController().signal
+    );
+    return;
+  }
   const { episode, user, script, segments } = capture;
 
   if (!episode) throw new Error(`Episode not found: ${episodeId}`);

@@ -241,11 +241,15 @@ final class LayoutAppearanceTests: XCTestCase {
         let visible = scroll.bounds.insetBy(dx: -1, dy: -1)
         XCTAssertTrue(visible.contains(field.convert(field.bounds, to: scroll)))
         attach(host.content.view, name: "pairing-short-tablet-last-field")
-        let cameraMessage = try XCTUnwrap(descendants(of: host.content.view)
-            .compactMap { $0 as? UILabel }.first {
-                $0.text == "Camera unavailable. Paste the pairing link instead."
+        XCTAssertFalse(descendants(of: host.content.view).compactMap { $0 as? UILabel }.contains {
+            $0.text == "Camera unavailable. Paste the pairing link instead."
+        })
+        let formFrame = scroll.convert(scroll.bounds, to: host.content.view)
+        let scannerScroll = try XCTUnwrap(descendants(of: host.content.view)
+            .compactMap { $0 as? UIScrollView }.first {
+                $0 !== scroll && $0.contentSize.height > $0.bounds.height
+                    && $0.convert($0.bounds, to: host.content.view).minX >= formFrame.maxX - 1
             })
-        let scannerScroll = try XCTUnwrap(scrollAncestor(of: cameraMessage))
         XCTAssertFalse(scannerScroll === scroll,
                        "The scanner and manual form must scroll independently.")
         XCTAssertGreaterThan(scannerScroll.contentSize.height, scannerScroll.bounds.height)
