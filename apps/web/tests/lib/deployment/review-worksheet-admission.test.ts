@@ -349,7 +349,7 @@ suite('historical worksheet first-worker admission', () => {
           fingerprint: '0'.repeat(64),
           error: /reference/,
         },
-        { payload, scopes: fixture.scopes, version: 2, error: /Unsupported/ },
+        { payload, scopes: fixture.scopes, version: 999, error: /Unsupported/ },
         { payload: {}, scopes: fixture.scopes, version: 1, error: /classId|Invalid/ },
         {
           payload: { ...payload, classId: randomUUID() },

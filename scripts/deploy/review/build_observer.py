@@ -19,6 +19,11 @@ from typing import cast
 from scripts.deploy.images.metadata import record, source_sha
 
 TARGET = '41e03c38b3b6833d0719c5d708acb56c305e484a'
+SHARED_TARGET = 'ffdf1278eedb744cf838e87afc56b636d1141428'
+HISTORICAL_SDKS = {
+    TARGET: ('apps/web/node_modules/thesidedoor-core', '0.3.4'),
+    SHARED_TARGET: ('node_modules/thesidedoor-core', '0.5.7'),
+}
 SOURCE = Path('scripts/deploy/review/observer.ts')
 BUILDER = Path('scripts/deploy/review/build_observer.py')
 MAX_BYTES = 32 * 1024 * 1024
@@ -53,11 +58,16 @@ def git(root: Path, *arguments: str) -> bytes:
     )
 
 
-def historical_lock(root: Path) -> tuple[bytes, dict[str, object]]:
-    raw = git(root, 'show', TARGET + ':package-lock.json')
+def historical_lock(
+    root: Path, target: str = TARGET,
+) -> tuple[bytes, dict[str, object]]:
+    if target not in HISTORICAL_SDKS:
+        raise ValueError('Unreviewed historical source')
+    package_path, version = HISTORICAL_SDKS[target]
+    raw = git(root, 'show', target + ':package-lock.json')
     packages = record(record(json.loads(raw), 'lock')['packages'], 'packages')
-    sdk = record(packages['apps/web/node_modules/thesidedoor-core'], 'SDK')
-    if sdk.get('version') != '0.3.4':
+    sdk = record(packages[package_path], 'SDK')
+    if sdk.get('version') != version:
         raise ValueError('Historical SDK version differs')
     return raw, sdk
 
@@ -120,9 +130,10 @@ def build(
     archive: Path,
     zod_archive: Path,
     output: Path,
+    target: str = TARGET,
 ) -> dict[str, object]:
     source = bounded_bytes(root / SOURCE)
-    lock, sdk = historical_lock(root)
+    lock, sdk = historical_lock(root, target)
     packages = record(record(json.loads(lock), 'lock')['packages'], 'packages')
     zod = record(packages['node_modules/zod'], 'historical zod')
     output.mkdir(mode=0o700, parents=False, exist_ok=False)
@@ -130,7 +141,10 @@ def build(
         prefix='sotto-observer-sdk-'
     ) as temporary:
         stage = Path(temporary).resolve()
-        package = unpack(archive, stage / 'sdk', cast(str, sdk['integrity']))
+        package = unpack(
+            archive, stage / 'sdk', cast(str, sdk['integrity']),
+            version=cast(str, sdk['version']),
+        )
         unpack(
             zod_archive,
             stage / 'zod',
@@ -247,14 +261,14 @@ esbuild.build(input.options).then(result =>
     result: dict[str, object] = {
         'schemaVersion': 1,
         'purpose': 'sotto-review-readonly-observer',
-        'targetSource': TARGET,
+        'targetSource': target,
         'targetLockSha256': sha(lock),
         'toolRevision': revision,
         'sourceCommitted': committed,
         'observerSourceSha256': sha(source),
         'bundleSha256': sha(bounded_bytes(bundle)),
         'builderSourceSha256': sha(bounded_bytes(Path(__file__))),
-        'sdkVersion': '0.3.4',
+        'sdkVersion': sdk['version'],
         'sdkIntegrity': sdk['integrity'],
         'sdkArchiveSha256': sha(bounded_bytes(archive)),
         'zodVersion': zod['version'],
@@ -284,9 +298,10 @@ def main() -> None:
     parser.add_argument('--sdk-archive', type=Path, required=True)
     parser.add_argument('--zod-archive', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--target', choices=sorted(HISTORICAL_SDKS), default=TARGET)
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[3]
-    build(root, args.sdk_archive, args.zod_archive, args.output)
+    build(root, args.sdk_archive, args.zod_archive, args.output, args.target)
     print('Historical observer bundle and integrity receipt prepared.')
 
 

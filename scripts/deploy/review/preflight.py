@@ -14,6 +14,7 @@ from pathlib import Path
 from scripts.deploy.images.metadata import digest, record, source_sha
 from scripts.deploy.review.build_observer import (
     BUILDER,
+    HISTORICAL_SDKS,
     SOURCE,
     TARGET,
     bounded_bytes,
@@ -29,6 +30,7 @@ def validate_bundle(
     receipt: Path,
     revision: str,
     expected_bundle_sha256: str,
+    target: str = TARGET,
 ) -> tuple[dict[str, object], bytes]:
     """Require reviewed tool identity and exact historical dependencies."""
     source_sha(revision)
@@ -39,13 +41,13 @@ def validate_bundle(
     evidence = record(
         json.loads(bounded_bytes(receipt, private=True)), 'observer receipt'
     )
-    lock, sdk = historical_lock(root)
+    lock, sdk = historical_lock(root, target)
     packages = record(record(json.loads(lock), 'lock')['packages'], 'packages')
     zod = record(packages['node_modules/zod'], 'zod')
     expected: dict[str, object] = {
         'schemaVersion': 1,
         'purpose': 'sotto-review-readonly-observer',
-        'targetSource': TARGET,
+        'targetSource': target,
         'targetLockSha256': sha(lock),
         'toolRevision': revision,
         'sourceCommitted': True,
@@ -103,9 +105,10 @@ def observe(
     container: str,
     image: str,
     output: Path,
+    target: str = TARGET,
 ) -> None:
     evidence, content = validate_bundle(
-        root, bundle, receipt, revision, expected_bundle_sha256
+        root, bundle, receipt, revision, expected_bundle_sha256, target
     )
     if not re.fullmatch(r'[0-9a-f]{64}', container):
         raise ValueError('A complete existing container identity is required')
@@ -136,7 +139,7 @@ def observe(
         raise ValueError('Captured running historical web identity changed')
     prelude = (
         'if(process.env.COMMIT_SHA!=='
-        + json.dumps(TARGET)
+        + json.dumps(target)
         + "||process.getuid()!==1000||process.cwd()!=='/app/apps/web')"
         + "throw Error('Historical observer runtime mismatch');\n"
     )
@@ -228,6 +231,7 @@ def main() -> None:
     parser.add_argument('--container', required=True)
     parser.add_argument('--image', required=True)
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--target', choices=sorted(HISTORICAL_SDKS), default=TARGET)
     args = parser.parse_args()
     observe(
         Path(__file__).resolve().parents[3],
@@ -238,6 +242,7 @@ def main() -> None:
         args.container,
         args.image,
         args.output,
+        args.target,
     )
     print('Read-only historical observation saved privately.')
 
