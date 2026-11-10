@@ -3,17 +3,24 @@ import { dirname } from 'node:path';
 import filesystem from 'node:fs/promises';
 import { syncBuiltinESMExports } from 'node:module';
 import { expect, vi } from 'vitest';
-import { LocalStorageReader, StorageReadCleanupError } from 'thesidedoor-core/storage';
+import {
+  LocalStorageReader,
+  LocalStorageWriter,
+  StorageReadCleanupError,
+  StorageWriteJournal,
+} from 'thesidedoor-core/storage';
 import { ProcessRunner, ProcessExecutionError } from 'thesidedoor-core/runtime/process';
 import type { PrismaClient } from '@/generated/prisma/client';
 import { processWaveformGeneration } from '@/workers/waveform-generation.worker';
 import { sottoJobExecutions } from '@/lib/sidedoor/jobs/core/job-execution-lifetime';
 import { sottoJobOutbox } from '@/lib/sidedoor/jobs/core/job-delivery';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
+import { SIDEDOOR_STATE_ID } from '@/lib/sidedoor/access/state/store';
 import { JobExecutionCleanupError } from 'thesidedoor-core/runtime/outbox';
 
 export const waveformExecutionScenarios = [
   'waveform download cancellation',
+  'waveform upload cancellation',
   'waveform post-commit cancellation',
   'waveform post-commit cleanup failure',
   'waveform download and cleanup failure',
@@ -43,6 +50,7 @@ export async function exerciseWaveformExecution(options: {
   const progress = job.updateProgress.bind(job);
   const execute = ProcessRunner.prototype.execute;
   const open = filesystem.open;
+  const write = LocalStorageWriter.prototype.writeImmutable;
   let downloadSettled = false;
   let workspace = '';
   const copies = vi
@@ -65,6 +73,12 @@ export async function exerciseWaveformExecution(options: {
         }
       }
       return copy.apply(this, args);
+    });
+  const writes = vi
+    .spyOn(LocalStorageWriter.prototype, 'writeImmutable')
+    .mockImplementation(async function (this: LocalStorageWriter, ...args) {
+      await write.apply(this, args);
+      if (scenario === 'waveform upload cancellation') controller.abort(reason);
     });
   if (scenario === 'waveform storage cleanup failure') {
     filesystem.open = async (...args: Parameters<typeof open>) => {
@@ -129,6 +143,19 @@ export async function exerciseWaveformExecution(options: {
     expect(
       (await sottoTransaction(database, (tx) => sottoJobOutbox(tx).read(job.id!)))?.complete
     ).toBe(published);
+    if (scenario === 'waveform upload cancellation') {
+      const intents = await sottoTransaction(database, async (tx) => {
+        const journal = new StorageWriteJournal(
+          { query: (sql, values) => tx.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...values) },
+          'postgres',
+          SIDEDOOR_STATE_ID
+        );
+        return (await journal.list(scope.subjectId)).intents.filter((intent) =>
+          /\/(waveform|spectrogram)\//.test(intent.target.key)
+        );
+      });
+      expect(intents).toMatchObject([{ status: 'settled', outcome: 'unreferenced' }]);
+    }
     if (uncertain) {
       expect((await unresolved()).executions).toMatchObject([{ status: 'cleanup-unconfirmed' }]);
       await expect(
@@ -141,6 +168,7 @@ export async function exerciseWaveformExecution(options: {
     filesystem.open = open;
     syncBuiltinESMExports();
     copies.mockRestore();
+    writes.mockRestore();
     progresses.mockRestore();
     processes.mockRestore();
   }

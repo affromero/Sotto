@@ -4,6 +4,7 @@ import { NextRequest } from 'next/server';
 
 const mockAuthenticateRequest = vi.fn();
 const mockUserFindUnique = vi.fn();
+const mockUserFindUniqueOrThrow = vi.fn();
 const mockUserUpdate = vi.fn();
 const mockTagFindMany = vi.fn();
 const mockUserInterestDeleteMany = vi.fn();
@@ -15,6 +16,7 @@ const txClient = {
   user: {
     update: (...args: unknown[]) => mockUserUpdate(...args),
     findUnique: (...args: unknown[]) => mockUserFindUnique(...args),
+    findUniqueOrThrow: (...args: unknown[]) => mockUserFindUniqueOrThrow(...args),
   },
   tag: { findMany: (...args: unknown[]) => mockTagFindMany(...args) },
   userInterest: {
@@ -25,6 +27,23 @@ const txClient = {
 
 vi.mock('@/lib/api-keys', () => ({
   authenticateRequest: (...args: unknown[]) => mockAuthenticateRequest(...args),
+}));
+
+vi.mock('@/lib/sidedoor/access/state/write-transaction', () => ({
+  sottoStateWriteTransaction: async (
+    _database: unknown,
+    operation: (tx: unknown) => Promise<unknown>
+  ) => operation(txClient),
+}));
+vi.mock('@/lib/sidedoor/access/core/request-identity', () => ({
+  requireOriginalSottoAdmission: vi.fn(),
+}));
+vi.mock('@/lib/sidedoor/access/core/profiles', () => ({
+  retirePreviousProfileAvatar: vi.fn(),
+}));
+vi.mock('@/lib/sidedoor/access/avatar/url', () => ({
+  ManagedAvatarUrlError: class ManagedAvatarUrlError extends Error {},
+  requireExternalAvatarUrl: vi.fn(),
 }));
 
 vi.mock('@/lib/providers/ai-registry', () => ({
@@ -229,6 +248,7 @@ describe('GET /api/v1/users/me', () => {
 describe('PATCH /api/v1/users/me', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUserFindUniqueOrThrow.mockResolvedValue({ image: null });
   });
 
   it('returns 401 when user is not authenticated', async () => {

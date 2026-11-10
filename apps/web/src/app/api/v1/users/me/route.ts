@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { randomUUID } from 'node:crypto';
 import { authenticateRequest } from '@/lib/api-keys';
 import { prisma, prismaUnfiltered } from '@/lib/prisma';
 import { customTagSchema, deleteAccountSchema } from '@/lib/validations';
@@ -27,6 +28,10 @@ import { accessOperation } from '@/lib/sidedoor/access/core/http';
 import { ACTIVE_PROFILE_COOKIE } from '@/lib/profiles/profile-cookie';
 import { SHARED_SESSION_COOKIE } from '@/lib/sidedoor/access/core/session-identity';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
+import { sottoStateWriteTransaction } from '@/lib/sidedoor/access/state/write-transaction';
+import { retirePreviousProfileAvatar } from '@/lib/sidedoor/access/core/profiles';
+import { ManagedAvatarUrlError, requireExternalAvatarUrl } from '@/lib/sidedoor/access/avatar/url';
+import type { Prisma } from '@/generated/prisma/client';
 import { requireOriginalSottoAdmission } from '@/lib/sidedoor/access/core/request-identity';
 import { isAccessError } from 'thesidedoor-core/access';
 import { accessErrorStatus, readAccessJson } from 'thesidedoor-core/access/http';
@@ -237,7 +242,17 @@ export async function PATCH(request: NextRequest) {
         (data as Record<string, unknown>).preferredSttModel = preferredSttModel;
     }
 
-    const updatedUser = await sottoTransaction(prismaUnfiltered, async (tx) => {
+    const avatarOperationId = randomUUID();
+    const update = async (tx: Prisma.TransactionClient) => {
+      if (data.image !== undefined) {
+        await requireOriginalSottoAdmission(tx, request, authResult);
+        const previous = await tx.user.findUniqueOrThrow({
+          where: { id: authResult.userId },
+          select: { image: true },
+        });
+        if (previous.image !== data.image) await requireExternalAvatarUrl(tx, data.image);
+        await retirePreviousProfileAvatar(tx, authResult.userId, data.image, avatarOperationId);
+      }
       if (validatedTtsProvider !== undefined) {
         const current = await tx.user.findUnique({
           where: { id: authResult.userId },
@@ -340,7 +355,11 @@ export async function PATCH(request: NextRequest) {
       }
 
       return user;
-    });
+    };
+    const updatedUser =
+      data.image === undefined
+        ? await sottoTransaction(prismaUnfiltered, update)
+        : await sottoStateWriteTransaction(prismaUnfiltered, update, request.signal);
 
     const response = NextResponse.json({
       id: updatedUser.id,
@@ -369,6 +388,8 @@ export async function PATCH(request: NextRequest) {
     return response;
   } catch (error: unknown) {
     if (error instanceof SpeechPreferenceConflictError) return errorResponse(error.message, 409);
+    if (error instanceof ManagedAvatarUrlError) return errorResponse(error.message, 400);
+    if (isAccessError(error)) return errorResponse(error.code, accessErrorStatus(error));
     logger.error('Failed to update user', {
       error: error instanceof Error ? error.message : String(error),
     });

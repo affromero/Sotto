@@ -16,6 +16,7 @@ import { HubRail, TimelineRail } from './navigation/ClassRails';
 import { ClassLoadingState, ClassErrorState, ClassRecoveryState } from './recovery/ClassShellState';
 import { ClassHub } from './ClassHub';
 import { ClassNavigation } from './navigation/ClassNavigation';
+import { isClassPresentationStillRendering, orderSections } from './navigation/classSections';
 import { ClassTeachingNotes } from './lesson/ClassTeachingNotes';
 import { ClassTeachingPrelude } from './lesson/ClassTeachingPrelude';
 import { useClassPrelude } from './lesson/ClassPreludeContext';
@@ -40,7 +41,6 @@ import {
   type ClassData,
   type ClassFeedbackNote,
   type ClassReference,
-  type ClassSection,
   type ClassSpeakingRecording,
   type ClassSubmitResult,
   type WritingResponse,
@@ -55,27 +55,6 @@ interface ClassShellProps {
 }
 
 class ClassLoadSuperseded extends Error {}
-
-/** Order the sections so the hour runs grammar → reading → listening → speaking → writing. */
-const SKILL_ORDER: Record<string, number> = {
-  GRAMMAR: 0,
-  READING: 1,
-  LISTENING: 2,
-  SPEAKING: 3,
-  WRITING: 4,
-};
-
-function orderSections(sections: ClassSection[]): ClassSection[] {
-  return [...sections].sort((a, b) => (SKILL_ORDER[a.skill] ?? 99) - (SKILL_ORDER[b.skill] ?? 99));
-}
-
-function isClassPresentationStillRendering(cls: ClassData): boolean {
-  const listening = cls.sections.find((section) => section.skill === 'LISTENING');
-  const episode = listening?.episode;
-  return Boolean(
-    episode && !episode.audioUrl && episode.status !== 'READY' && episode.status !== 'FAILED'
-  );
-}
 
 export function ClassShell({ classId, initialSectionId }: ClassShellProps) {
   return (
@@ -111,6 +90,7 @@ function ClassShellContent({ classId, initialSectionId }: ClassShellProps) {
     useState<ClassPrerequisiteDirections | null>(null);
 
   const [segIdx, setSegIdx] = useState(0);
+  const [visitedSection, setVisitedSection] = useState(false);
   // running 0..100 score for the active segment (drives the rail + gate)
   const [curScore, setCurScore] = useState(0);
   const [mcCompletion, setMcCompletion] = useState<{
@@ -200,6 +180,7 @@ function ClassShellContent({ classId, initialSectionId }: ClassShellProps) {
     setLiveWritingResponses({});
     setResult(null);
     setSegIdx(0);
+    setVisitedSection(false);
     setCurScore(0);
   }, []);
 
@@ -456,8 +437,6 @@ function ClassShellContent({ classId, initialSectionId }: ClassShellProps) {
 
   function beginHour() {
     setView('hour');
-    setSegIdx(0);
-    setCurScore(0);
   }
 
   async function submitClass() {
@@ -648,7 +627,7 @@ function ClassShellContent({ classId, initialSectionId }: ClassShellProps) {
 
   // ---- elapsed progress for the rail (committed sections + live segment) ----
   const committedCount = sections.filter((s) => (scores[s.id] ?? 0) > 0).length;
-  const startedHour = committedCount > 0;
+  const startedHour = committedCount > 0 || visitedSection;
   const activeSectionProgress =
     view === 'hour' && sections.length > 0 ? Math.min(curScore / Math.max(gate, 1), 1) : 0;
   const completionPct =
@@ -913,7 +892,14 @@ function ClassShellContent({ classId, initialSectionId }: ClassShellProps) {
                   ? 'Grading class'
                   : 'Lesson overview'
         }
-        onOverview={view === 'hour' ? () => setView('hub') : undefined}
+        onOverview={
+          view === 'hour'
+            ? () => {
+                setVisitedSection(true);
+                setView('hub');
+              }
+            : undefined
+        }
         busy={regenerating}
       />
       <aside className={styles.crail} aria-label="Class navigation">

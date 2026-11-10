@@ -10,6 +10,7 @@ import {
   StorageReferenceRegistry,
   StorageRelocationRegistry,
   StorageWriteJournal,
+  writeSurvivorProjection,
   type StorageCleanupJob,
 } from 'thesidedoor-core/storage';
 import type { Prisma } from '@/generated/prisma/client';
@@ -26,7 +27,17 @@ import { getSiteConfig } from '@/lib/site-config';
 import { consumerForStorageField } from '@/lib/sidedoor/storage/core/storage-consumers';
 import { SIDEDOOR_STATE_ID } from '@/lib/sidedoor/access/state/store';
 import { sottoJobOutbox, sottoJobSnapshot } from '@/lib/sidedoor/jobs/core/job-delivery';
-import { verifyStorageCopyForDeletion } from '@/lib/sidedoor/storage/migration/storage-migration-copy';
+import { prepareStorageCopiesForDeletion } from '@/lib/sidedoor/storage/migration/storage-migration-copy';
+import { captureRelocationComponent } from '@/lib/sidedoor/storage/migration/relocation/inventory';
+import { buildStorageSurvivorGraph } from '@/lib/sidedoor/storage/migration/relocation/paths';
+import { planStorageSurvivorProjection } from '@/lib/sidedoor/storage/migration/relocation/projection';
+import { verifyAvatarProjectionOwnership } from '@/lib/sidedoor/storage/migration/relocation/avatar-ownership';
+import {
+  retainSurvivorCopyProofs,
+  readSurvivorCopyProof,
+  verifySurvivorCopyProofInventory,
+} from '@/lib/sidedoor/storage/migration/relocation/proof';
+import { inspectRetainedAvatarProjection } from '@/lib/sidedoor/storage/migration/relocation/retained-avatar';
 import {
   eraseMaterialAnalysisState,
   materialAnalysisDeletionSubjects,
@@ -155,6 +166,7 @@ export async function admitLearningStorageDeletion(options: {
   scope: StorageDeletionInventoryScope;
   subjects: readonly Subject[];
   currentBackend: Awaited<ReturnType<typeof captureStorageBackend>>;
+  deferRetainedProfile?: (assetId: string) => void;
 }): Promise<StorageCleanupJob[]> {
   const { database } = options;
   if (options.scope.kind === 'profile')
@@ -291,10 +303,7 @@ export async function admitLearningStorageDeletion(options: {
     assessmentSpeaking
   );
   const { consumers, publicUrl } = await deletionReferences(database, storageScope);
-  const copies = new Map<
-    string,
-    { id: string; fingerprint: string; scope: Subject; relocationId: string }
-  >();
+  const copies = new Map<string, { id: string; fingerprint: string; scope: Subject }>();
   const outbox = sottoJobOutbox(database);
   for (const subject of subjects.values()) {
     let copyCursor: string | null = null;
@@ -321,18 +330,10 @@ export async function admitLearningStorageDeletion(options: {
             throw new Error('Storage copy scope index changed');
           continue;
         }
-        const relocationId = await verifyStorageCopyForDeletion(database, {
-          id: reference.id,
-          fingerprint: reference.fingerprint,
-          scope: subject,
-          subjects: [...subjects.values()],
-          consumers,
-        });
         copies.set(reference.id, {
           id: reference.id,
           fingerprint: reference.fingerprint,
           scope: subject,
-          relocationId,
         });
       }
       if (page.cursor !== null && copyCursor !== null && page.cursor <= copyCursor)
@@ -340,28 +341,82 @@ export async function admitLearningStorageDeletion(options: {
       copyCursor = page.cursor;
     } while (copyCursor !== null);
   }
+  const pendingCopies = [...copies.values()];
+  const preparedCopies = await prepareStorageCopiesForDeletion(
+    database,
+    pendingCopies.map((copy) => ({
+      id: copy.id,
+      fingerprint: copy.fingerprint,
+      scope: copy.scope,
+      subjects: [...subjects.values()],
+      consumers,
+    }))
+  );
+  const relocationIds = preparedCopies.map((copy) => copy.relocationId);
+  const sharedCopies = preparedCopies.filter((copy) => copy.survivingConsumers.size);
+  let sharedProjection: ReturnType<typeof planStorageSurvivorProjection> | null = null;
+  let sharedHistory = preparedCopies;
+  if (sharedCopies.length) {
+    const component = await captureRelocationComponent(database, {
+      seedAssetIds: sharedCopies.flatMap((copy) => [copy.sourceAssetId, copy.destinationAssetId]),
+    });
+    const graph = buildStorageSurvivorGraph(component);
+    const operations = new Set(graph.receipts.map((receipt) => receipt.operationId));
+    sharedHistory = preparedCopies.filter((copy) => operations.has(copy.relocationId));
+    sharedProjection = planStorageSurvivorProjection(graph, sharedHistory, [...subjects.values()]);
+  }
+  if (relocationIds.length !== pendingCopies.length || relocationIds.some((value) => !value))
+    throw new Error('Storage copy verification returned incomplete relocations');
   for (const inventory of prerequisite) {
     for (const expected of inventory.copyOperations) {
       if (copies.get(expected.id)?.fingerprint !== expected.fingerprint)
         throw new Error('Storage copy scope index is incomplete');
     }
   }
-  const verifiedRelocations = new Set([...copies.values()].map((copy) => copy.relocationId));
+  const verifiedRelocations = new Set(relocationIds);
+  const deferred = new Set<string>();
+  let deferredSeed: string | undefined;
   for (const subject of subjects.values()) {
     let cursor: string | null = null;
     do {
       const page = await state.relocations.listForSubject(subject.subjectId, cursor);
-      for (const receipt of page.receipts)
+      for (const receipt of page.receipts) {
+        if (
+          receipt.schemaVersion === 2 &&
+          options.scope.kind === 'profile' &&
+          subject.subjectId === `profile:${options.scope.id}` &&
+          options.deferRetainedProfile &&
+          !verifiedRelocations.has(receipt.operationId)
+        ) {
+          if (!deferredSeed) {
+            await verifySurvivorCopyProofInventory(database, 100_000);
+            const graph = buildStorageSurvivorGraph(
+              await captureRelocationComponent(database, {
+                seedAssetIds: [receipt.sourceAssetId],
+              })
+            );
+            for (const item of graph.receipts) await readSurvivorCopyProof(database, item);
+            for (const id of await inspectRetainedAvatarProjection(database, graph, {
+              subjects: [subject],
+              consumers,
+            }))
+              deferred.add(id);
+            deferredSeed = receipt.sourceAssetId;
+          }
+          if (deferred.has(receipt.operationId)) verifiedRelocations.add(receipt.operationId);
+        }
         if (
           receipt.scopes.some((scope) => isDeepStrictEqual(scope, subject)) &&
           !verifiedRelocations.has(receipt.operationId)
         )
           throw new Error('Storage relocation has no verified copy for deletion');
+      }
       if (page.cursor !== null && cursor !== null && page.cursor <= cursor)
         throw new Error('Storage relocation cursor did not advance');
       cursor = page.cursor;
     } while (cursor !== null);
   }
+  if (deferredSeed) options.deferRetainedProfile!(deferredSeed);
   const jobs = new Map<string, StorageCleanupJob>();
   for (const subject of subjects.values()) {
     const job = prepareStorageCleanup({
@@ -371,6 +426,32 @@ export async function admitLearningStorageDeletion(options: {
     });
     await state.cleanup.createJob(job);
     jobs.set(subject.subjectId, job);
+  }
+  if (sharedProjection) {
+    await requireStorageTargetFence(database);
+    const authorities = [...jobs.values()].map((job) => ({
+      subjectId: job.subjectId,
+      generation: job.generation,
+      jobId: job.id,
+      epoch: job.epoch,
+    }));
+    const projected = await writeSurvivorProjection({
+      database: {
+        query: (sql, values) => database.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...values),
+      },
+      dialect: 'postgres',
+      projection: sharedProjection,
+      authorities,
+      verifyApplication: async (original) => {
+        await verifyAvatarProjectionOwnership(database, original, sharedHistory, [
+          ...subjects.values(),
+        ]);
+        return true;
+      },
+    });
+    await retainSurvivorCopyProofs(database, projected, sharedHistory, authorities);
+    for (const removal of sharedProjection.removals)
+      for (const consumer of removal.consumers) consumers.delete(consumer);
   }
   if (legacy) await requireStorageTargetFence(database);
   if (legacy?.reference) {
@@ -428,10 +509,16 @@ export async function admitLearningStorageDeletion(options: {
   type AssetPage = Awaited<ReturnType<typeof state.references.listAssets>>;
   const assetsByJob = new Map<string, AssetPage['assets']>();
   const liveTargets = new Set<string>();
+  const affectedAssets = new Map<string, Subject[]>();
   let after: string | null = null;
   do {
     const page = await state.references.listAssets(after);
     for (const asset of page.assets) {
+      const affectedScopes = asset.prepared.scopes.filter((scope) => {
+        const subject = subjects.get(scope.subjectId);
+        return subject && isDeepStrictEqual(scope, subject);
+      });
+      if (affectedScopes.length) affectedAssets.set(asset.id, affectedScopes);
       const matchingScope = asset.prepared.scopes.find((scope) => {
         const job = jobs.get(scope.subjectId);
         return job?.generation === scope.generation;
@@ -460,6 +547,34 @@ export async function admitLearningStorageDeletion(options: {
     after = page.cursor;
   } while (after !== null);
 
+  let receiptCursor: string | null = null;
+  do {
+    const page = await state.relocations.listAll(receiptCursor);
+    for (const receipt of page.receipts) {
+      let needsAttribution = [receipt.sourceAssetId, receipt.destinationAssetId].some((id) =>
+        affectedAssets
+          .get(id)
+          ?.some((scope) => !receipt.scopes.some((item) => isDeepStrictEqual(item, scope)))
+      );
+      for (const scope of receipt.scopes) {
+        const subject = subjects.get(scope.subjectId);
+        if (subject && !isDeepStrictEqual(scope, subject)) {
+          needsAttribution = true;
+          continue;
+        }
+        if (
+          subject &&
+          !(await state.relocations.hasScopeIndex({ ...scope, operationId: receipt.operationId }))
+        )
+          throw new Error('Storage relocation scope index is incomplete');
+      }
+      if (needsAttribution) await state.relocations.verifyScopeAttribution(receipt.operationId);
+    }
+    if (page.cursor !== null && receiptCursor !== null && page.cursor <= receiptCursor)
+      throw new Error('Storage relocation inventory cursor did not advance');
+    receiptCursor = page.cursor;
+  } while (receiptCursor !== null);
+
   for (const job of jobs.values()) {
     let relocationCursor: string | null = null;
     do {
@@ -469,6 +584,7 @@ export async function admitLearningStorageDeletion(options: {
         jobId: job.id,
         epoch: job.epoch,
         after: relocationCursor,
+        deferProjectedOperationIds: [...deferred],
       });
       relocationCursor = page.cursor;
     } while (relocationCursor !== null);

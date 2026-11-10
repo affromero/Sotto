@@ -1,4 +1,7 @@
-import { blockedProviderExecution } from '../helpers/runtime/provider-execution';
+import {
+  authorizedLearnerExecution,
+  blockedProviderExecution,
+} from '../helpers/runtime/provider-execution';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mockCourseFindFirst = vi.fn();
@@ -12,6 +15,30 @@ const mockGetAutoModelConfig = vi.fn();
 const mockGetConfiguredTtsProviderId = vi.fn();
 const mockResolveTtsProvider = vi.fn();
 const mockGetVisualCueKey = vi.fn();
+const mockReadStorageReference = vi.fn();
+const mockRetireStorageReference = vi.fn();
+
+vi.mock('thesidedoor-core/storage', async (original) => ({
+  ...(await original<typeof import('thesidedoor-core/storage')>()),
+  StorageReferenceRegistry: class {
+    readReference = mockReadStorageReference;
+    retire = mockRetireStorageReference;
+  },
+}));
+vi.mock('@/lib/sidedoor/access/state/write-transaction', () => ({
+  sottoStateWriteTransaction: (
+    database: unknown,
+    operation: (tx: unknown) => unknown,
+    signal: AbortSignal
+  ) => {
+    signal.throwIfAborted();
+    return operation(database);
+  },
+}));
+vi.mock('@/lib/sidedoor/access/avatar/url', () => ({
+  requireExternalAvatarUrl: vi.fn(),
+  ManagedAvatarUrlError: class extends Error {},
+}));
 
 vi.mock('@/lib/prisma', () => {
   const database = {
@@ -97,6 +124,7 @@ beforeEach(() => {
     model: { ttsProvider: 'openai', ttsModel: 'tts-1-hd' },
   });
   mockGetVisualCueKey.mockResolvedValue(null);
+  mockReadStorageReference.mockResolvedValue(null);
   mockLearnerFocusTargetUpsert.mockImplementation(async (arg: { create: object }) => ({
     ...TARGET_ROW,
     ...arg.create,
@@ -126,6 +154,121 @@ describe('learning target text handling', () => {
 });
 
 describe('addVisualCue', () => {
+  it('does not publish when the request is cancelled during the provider request', async () => {
+    const controller = new AbortController();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation(async () => {
+        controller.abort(new Error('Request cancelled'));
+        return {
+          ok: true,
+          json: async () => ({
+            photos: [{ src: { landscape: 'https://images.pexels.com/new.jpg' } }],
+          }),
+        };
+      })
+    );
+    mockGetVisualCueKey.mockResolvedValue('user-pexels-key');
+    const execution = { ...authorizedLearnerExecution('u1'), signal: controller.signal };
+    await expect(addVisualCue('c1', 'u1', 'ft1', execution)).rejects.toThrow('Request cancelled');
+    expect(mockLearnerFocusTargetUpdate).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['https://unknown.example/image.jpg', null, false],
+    ['https://images.pexels.com/new.jpg', null, false],
+    ['https://images.pexels.com/old.jpg', 'pexels', true],
+  ])(
+    'handles a previous external cue %s according to its provenance',
+    async (previous, provider, allowed) => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: async () => ({
+            photos: [{ src: { landscape: 'https://images.pexels.com/new.jpg' } }],
+          }),
+        })
+      );
+      mockGetVisualCueKey.mockResolvedValue('user-pexels-key');
+      mockLearnerFocusTargetFindFirst.mockResolvedValue({
+        ...TARGET_ROW,
+        visualCueUrl: previous,
+        visualCueProvider: provider,
+        course: { userId: 'u1' },
+      });
+      const update = addVisualCue('c1', 'u1', 'ft1', authorizedLearnerExecution('u1'));
+      if (allowed) {
+        await expect(update).resolves.toBeDefined();
+        expect(mockLearnerFocusTargetUpdate).toHaveBeenCalled();
+      } else {
+        await expect(update).rejects.toThrow('Visual cue storage ownership needs recovery');
+        expect(mockLearnerFocusTargetUpdate).not.toHaveBeenCalled();
+      }
+      expect(mockRetireStorageReference).not.toHaveBeenCalled();
+    }
+  );
+
+  it('does not publish a provider response after learner access is revoked', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          photos: [{ src: { landscape: 'https://images.pexels.com/new.jpg' } }],
+        }),
+      })
+    );
+    mockGetVisualCueKey.mockResolvedValue('user-pexels-key');
+    const execution = {
+      userId: 'u1',
+      authorize: async () => {
+        throw new Error('Access revoked');
+      },
+    };
+
+    await expect(addVisualCue('c1', 'u1', 'ft1', execution)).rejects.toThrow('Access revoked');
+    expect(mockLearnerFocusTargetUpdate).not.toHaveBeenCalled();
+  });
+
+  it('rejects provider images on an unexpected host', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ photos: [{ src: { landscape: 'https://example.com/image.jpg' } }] }),
+      })
+    );
+    mockGetVisualCueKey.mockResolvedValue('user-pexels-key');
+
+    await expect(addVisualCue('c1', 'u1', 'ft1', authorizedLearnerExecution('u1'))).rejects.toThrow(
+      'Visual cue provider returned an invalid image URL'
+    );
+    expect(mockLearnerFocusTargetUpdate).not.toHaveBeenCalled();
+  });
+
+  it('does not replace a visual cue changed while the provider was responding', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          photos: [{ src: { landscape: 'https://images.pexels.com/new.jpg' } }],
+        }),
+      })
+    );
+    mockGetVisualCueKey.mockResolvedValue('user-pexels-key');
+    const original = { ...TARGET_ROW, course: { userId: 'u1' } };
+    mockLearnerFocusTargetFindFirst
+      .mockResolvedValueOnce(original)
+      .mockResolvedValueOnce({ ...original, visualCueUrl: 'https://images.pexels.com/other.jpg' });
+
+    await expect(addVisualCue('c1', 'u1', 'ft1', authorizedLearnerExecution('u1'))).rejects.toThrow(
+      'Learning target changed while fetching its visual cue'
+    );
+    expect(mockLearnerFocusTargetUpdate).not.toHaveBeenCalled();
+  });
+
   it('uses the learner visual-cue key before env fallback', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -150,10 +293,14 @@ describe('addVisualCue', () => {
       visualCueProvider: 'pexels',
     });
 
-    const target = await addVisualCue('c1', 'u1', 'ft1');
+    const target = await addVisualCue('c1', 'u1', 'ft1', authorizedLearnerExecution('u1'));
 
     expect(target.visualCueUrl).toBe('https://images.pexels.com/photo.jpg');
-    expect(mockGetVisualCueKey).toHaveBeenCalledWith('u1', 'pexels');
+    expect(mockGetVisualCueKey).toHaveBeenCalledWith(
+      'u1',
+      'pexels',
+      expect.objectContaining({ userId: 'u1' })
+    );
     expect(fetchMock).toHaveBeenCalledWith(
       expect.any(URL),
       expect.objectContaining({

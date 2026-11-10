@@ -209,6 +209,10 @@ suite('self profile deletion with canonical PostgreSQL authority', () => {
     'deletes the invited %s learner and revokes its authority while preserving other credentials',
     async (client) => {
       const learner = await invited(client);
+      const profile = await instance.database.user.findUniqueOrThrow({
+        where: { id: learner.id },
+        select: { createdAt: true },
+      });
       const other = await household('NATIVE');
       const session = await identity.household('Another learner');
       const otherPairing = await sottoTransaction(instance.database, async (tx) => {
@@ -232,6 +236,11 @@ suite('self profile deletion with canonical PostgreSQL authority', () => {
       expect(await journal().get(body.cleanup.id)).toMatchObject({
         subjectId: `profile:${learner.id}`,
       });
+      expect(
+        await new StorageWriteJournal(executor(), 'postgres', SIDEDOOR_STATE_ID).tombstone(
+          `profile:${learner.id}`
+        )
+      ).toMatchObject({ jobId: body.cleanup.id, generation: profile.createdAt.getTime() });
       expect(await instance.database.user.findUnique({ where: { id: learner.id } })).toBeNull();
       expect(await instance.database.episode.findUnique({ where: { id: owned.id } })).toBeNull();
       expect(

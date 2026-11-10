@@ -395,9 +395,7 @@ describe('ClassShell', () => {
     fireEvent.click(within(header).getByRole('button', { name: 'Lesson overview' }));
     await screen.findByRole('heading', { name: cls.lesson.title });
     expect(within(header).getByText('Lesson overview')).toHaveAttribute('aria-current', 'page');
-    fireEvent.click(screen.getByRole('button', { name: 'Begin the class' }));
-    await screen.findByRole('heading', { name: 'Grammar practice' });
-    fireEvent.click(screen.getByRole('button', { name: 'Continue · Reading' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Resume the class' }));
     await screen.findByRole('heading', { name: 'Reading practice' });
     expect(
       within(screen.getByRole('region', { name: 'Question 1' })).getByRole('button', {

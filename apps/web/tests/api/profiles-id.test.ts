@@ -14,9 +14,12 @@ import {
 } from 'thesidedoor-core/storage';
 import type { PrismaClient, Prisma } from '@/generated/prisma/client';
 import { PATCH, DELETE } from '@/app/api/v1/profiles/[id]/route';
+import { POST as setOnboardingName } from '@/app/api/v1/onboarding/name/route';
 import { GET as cleanupStatus } from '@/app/api/v1/admin/storage-cleanup/route';
 import { SIDEDOOR_STATE_ID, sottoStorageInstance } from '@/lib/sidedoor/access/state/store';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
+import { sottoStateWriteTransaction } from '@/lib/sidedoor/access/state/write-transaction';
+import { requireExternalAvatarUrl } from '@/lib/sidedoor/access/avatar/url';
 import {
   createSharedTestInstance,
   type SharedTestIdentity,
@@ -28,7 +31,28 @@ const binding = vi.hoisted(() => ({
   afterCapture: null as (() => Promise<void>) | null,
   loseCommit: false,
   afterLostCommit: null as (() => Promise<void>) | null,
+  afterLockContention: null as (() => void) | null,
 }));
+vi.mock('@/lib/sidedoor/storage/core/storage-connection', async (original) => {
+  const actual = await original<typeof import('@/lib/sidedoor/storage/core/storage-connection')>();
+  return {
+    ...actual,
+    openSottoStorageConnection: async (
+      ...parameters: Parameters<typeof actual.openSottoStorageConnection>
+    ) => {
+      const connection = await actual.openSottoStorageConnection(...parameters);
+      return {
+        ...connection,
+        query: async (sql: string, values: readonly unknown[]) => {
+          const rows = await connection.query(sql, values);
+          if (sql.includes('pg_try_advisory_lock') && rows[0]?.acquired === false)
+            binding.afterLockContention?.();
+          return rows;
+        },
+      };
+    },
+  };
+});
 vi.mock('@/lib/prisma', async () => {
   const { prismaTestBoundary } = await import('../helpers/setup/shared-instance');
   const database = new Proxy(prismaTestBoundary(binding), {
@@ -80,6 +104,7 @@ suite('profile changes and durable deletion with PostgreSQL', () => {
     binding.afterCapture = null;
     binding.loseCommit = false;
     binding.afterLostCommit = null;
+    binding.afterLockContention = null;
   });
   afterEach(() => vi.unstubAllEnvs());
   afterAll(async () => {
@@ -131,6 +156,56 @@ suite('profile changes and durable deletion with PostgreSQL', () => {
       )
     ).toEqual([]);
   }
+  it('waits for storage admission before changing a profile avatar', async () => {
+    const member = await identity.household('First');
+    let release!: () => void;
+    let entered!: () => void;
+    let contended!: () => void;
+    const released = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const ready = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    const waiting = new Promise<void>((resolve) => {
+      contended = resolve;
+    });
+    const holder = sottoStateWriteTransaction(
+      instance.database,
+      async () => {
+        entered();
+        await released;
+      },
+      new AbortController().signal
+    );
+    let update: Promise<Response> | undefined;
+    try {
+      await ready;
+      binding.afterLockContention = contended;
+      update = PATCH(
+        request('PATCH', member.id, identity.ownerToken, { avatarSlug: 'jaguar' }),
+        context(member.id)
+      );
+      await waiting;
+      expect(
+        await instance.database.user.findUniqueOrThrow({
+          where: { id: member.id },
+          select: { image: true },
+        })
+      ).toEqual({ image: null });
+    } finally {
+      binding.afterLockContention = null;
+      release();
+      await holder;
+    }
+    expect((await update!).status).toBe(200);
+    expect(
+      await instance.database.user.findUniqueOrThrow({
+        where: { id: member.id },
+        select: { image: true },
+      })
+    ).toEqual({ image: '/avatars/jaguar.png' });
+  });
   it('updates household display metadata and rejects unknown avatar presets', async () => {
     const member = await identity.household('First');
     expect(
@@ -163,6 +238,81 @@ suite('profile changes and durable deletion with PostgreSQL', () => {
         )
       ).status
     ).toBe(400);
+  });
+  it('retires an uploaded avatar atomically when onboarding selects a preset', async () => {
+    const member = await identity.household('Learner');
+    const profile = await instance.database.user.findUniqueOrThrow({ where: { id: member.id } });
+    const location = {
+      kind: 'object' as const,
+      endpoint: 'https://storage.example',
+      bucket: 'avatars',
+    };
+    const backend = prepareStorageBackend(SIDEDOOR_STATE_ID, {
+      kind: 'object',
+      location,
+      binding: storageBackendBinding(location),
+      publicUrl: 'https://media.example',
+    });
+    const reference = 'https://media.example/learner.png';
+    const consumer = `profile:${member.id}:avatar`;
+    await sottoTransaction(instance.database, async (tx) => {
+      const instanceScope = await sottoStorageInstance(tx).read();
+      await new StorageBackendRegistry(executor(tx), 'postgres', SIDEDOOR_STATE_ID).register(
+        backend
+      );
+      await new StorageReferenceRegistry(executor(tx), 'postgres', SIDEDOOR_STATE_ID).replace({
+        consumer,
+        previousReference: null,
+        next: prepareStorageReference({
+          namespace: SIDEDOOR_STATE_ID,
+          operationId: randomUUID(),
+          reference,
+          target: { backendId: backend.id, binding: backend.binding, key: 'learner.png' },
+          scopes: [
+            { subjectId: instanceScope.subjectId, generation: instanceScope.generation },
+            { subjectId: `profile:${member.id}`, generation: profile.createdAt.getTime() },
+          ],
+        }),
+      });
+      await tx.user.update({ where: { id: member.id }, data: { image: reference } });
+    });
+    await sottoTransaction(instance.database, async (tx) => {
+      await expect(requireExternalAvatarUrl(tx, reference)).rejects.toThrow('Upload this image');
+      await expect(
+        requireExternalAvatarUrl(tx, 'https://external.example/photo.png')
+      ).resolves.toBeUndefined();
+    });
+    const onboardingRequest = () =>
+      new NextRequest('http://localhost:3000/api/v1/onboarding/name', {
+        method: 'POST',
+        headers: { cookie: `sotto_session=${member.token}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ name: 'Learner', avatarSlug: 'jaguar' }),
+      });
+    await instance.database.$executeRawUnsafe(
+      `ALTER TABLE "User" ADD CONSTRAINT reject_onboarding_avatar CHECK ("image" <> '/avatars/jaguar.png')`
+    );
+    try {
+      expect((await setOnboardingName(onboardingRequest())).status).toBe(500);
+      const registry = new StorageReferenceRegistry(executor(), 'postgres', SIDEDOOR_STATE_ID);
+      expect(await registry.resolve({ consumer, reference })).not.toBeNull();
+      expect(
+        (await instance.database.user.findUniqueOrThrow({ where: { id: member.id } })).image
+      ).toBe(reference);
+    } finally {
+      await instance.database.$executeRawUnsafe(
+        'ALTER TABLE "User" DROP CONSTRAINT reject_onboarding_avatar'
+      );
+    }
+    expect((await setOnboardingName(onboardingRequest())).status).toBe(200);
+    const saved = await new StorageReferenceRegistry(
+      executor(),
+      'postgres',
+      SIDEDOOR_STATE_ID
+    ).readReference(reference);
+    expect(saved?.asset.consumers).not.toContain(consumer);
+    expect(
+      (await instance.database.user.findUniqueOrThrow({ where: { id: member.id } })).image
+    ).toBe('/avatars/jaguar.png');
   });
   it('preserves shared relocation evidence when profile deletion cannot verify its copy', async () => {
     const member = await identity.household('Relocated');

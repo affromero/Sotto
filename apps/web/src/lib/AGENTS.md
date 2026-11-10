@@ -814,6 +814,19 @@ publication and run inside their existing execution lifetime. Shared
 Profile deletion retains registered storage and relocation endpoint dependencies
 before cascading application rows. Shared relocation erasure runs in that same
 Serializable transaction under the exact cleanup job and profile tombstone.
+`sidedoor/storage/migration/relocation/inventory.ts` captures complete paginated
+relocation evidence and reports related records for application verification.
+`sidedoor/storage/migration/relocation/paths.ts` builds validated paths only when
+the captured history has no unclassified related records.
+`sidedoor/storage/migration/relocation/projection.ts` binds proposed removals
+and survivor scopes to the verified copy jobs for each asset and consumer. It
+currently accepts deletion ownership only for a profile's own avatar.
+`sidedoor/storage/migration/relocation/avatar-ownership.ts` locks and rechecks
+avatar owners and application references before a shared projection.
+`sidedoor/storage/migration/relocation/retained-avatar.ts` inspects projected
+avatar history and references. It does not prove copy provenance or authorize erasure.
+`sidedoor/storage/migration/relocation/proof.ts` retains survivor-only copy
+evidence tied to projected receipts and erased original job acknowledgements.
 Cleanup remains preparing until every manifest is classified. Missing endpoint
 attribution stays unresolved; removing metadata does not prove byte deletion.
 The pre-cascade visitor retires only exact registered consumers belonging to the

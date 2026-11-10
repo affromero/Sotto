@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
+import { AccessError } from 'thesidedoor-core/access';
 
 const {
   LearningTargetCourseNotFoundError,
@@ -131,6 +132,25 @@ describe('POST /api/v1/courses/[courseId]/learning-targets', () => {
 });
 
 describe('learning-target enhancement routes', () => {
+  it.each([
+    ['unauthorized', 401],
+    ['forbidden', 403],
+    ['invalid', 400],
+    ['rate_limited', 429],
+    ['conflict', 409],
+  ] as const)(
+    'reports %s when access changes during visual cue generation',
+    async (code, status) => {
+      mockAddVisualCue.mockRejectedValue(new AccessError(code));
+      const res = await visualPost(
+        new NextRequest('http://localhost/api/v1/courses/c1/learning-targets/ft1/visual-cue', {
+          method: 'POST',
+        }),
+        TARGET_PARAMS
+      );
+      expect(res.status).toBe(status);
+    }
+  );
   it('adds a visual cue when the provider is configured', async () => {
     mockAddVisualCue.mockResolvedValue({
       ...TARGET,
@@ -145,7 +165,16 @@ describe('learning-target enhancement routes', () => {
     );
 
     expect(res.status).toBe(200);
-    expect(mockAddVisualCue).toHaveBeenCalledWith('c1', 'u1', 'ft1');
+    expect(mockAddVisualCue).toHaveBeenCalledWith(
+      'c1',
+      'u1',
+      'ft1',
+      expect.objectContaining({
+        userId: 'u1',
+        authorize: expect.any(Function),
+        signal: expect.any(AbortSignal),
+      })
+    );
   });
 
   it('returns 422 when pronunciation cannot be generated', async () => {

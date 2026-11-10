@@ -1,13 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
+import { isAccessError } from 'thesidedoor-core/access';
+import { accessErrorStatus } from 'thesidedoor-core/access/http';
 import { authenticateRequest } from '@/lib/api-keys';
-import { prisma } from '@/lib/prisma';
+import { prismaUnfiltered } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { errorResponse } from '@/lib/api-response';
 import { avatarImagePath, isAnimalSlug } from '@/lib/avatars';
 import { validateDisplayName } from '@/lib/name-validation';
 import { moderateDisplayName } from '@/lib/name-moderation';
 import { isValidTimezone } from '@/lib/activity/heatmap';
+import { retirePreviousProfileAvatar } from '@/lib/sidedoor/access/core/profiles';
+import { requireOriginalSottoAdmission } from '@/lib/sidedoor/access/core/request-identity';
+import { sottoStateWriteTransaction } from '@/lib/sidedoor/access/state/write-transaction';
 
 const nameSchema = z.object({
   name: z
@@ -50,17 +56,33 @@ export async function POST(request: NextRequest) {
       return errorResponse(moderationCheck.reason!, 400);
     }
 
-    await prisma.user.update({
-      where: { id: userId },
-      data: {
-        name,
-        ...(avatarSlug !== undefined && { image: avatarImagePath(avatarSlug) }),
-        ...(timezone !== undefined && { timezone }),
+    const operationId = randomUUID();
+    await sottoStateWriteTransaction(
+      prismaUnfiltered,
+      async (database) => {
+        await requireOriginalSottoAdmission(database, request, authed);
+        if (avatarSlug !== undefined)
+          await retirePreviousProfileAvatar(
+            database,
+            userId,
+            avatarImagePath(avatarSlug),
+            operationId
+          );
+        await database.user.update({
+          where: { id: userId },
+          data: {
+            name,
+            ...(avatarSlug !== undefined && { image: avatarImagePath(avatarSlug) }),
+            ...(timezone !== undefined && { timezone }),
+          },
+        });
       },
-    });
+      request.signal
+    );
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
+    if (isAccessError(error)) return errorResponse(error.code, accessErrorStatus(error));
     logger.error('Failed to set onboarding name', {
       error: error instanceof Error ? error.message : String(error),
     });

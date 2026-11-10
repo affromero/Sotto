@@ -1,4 +1,6 @@
 import { isDeepStrictEqual } from 'node:util';
+import { randomUUID } from 'node:crypto';
+import { StorageReferenceRegistry } from 'thesidedoor-core/storage';
 import { prisma, prismaUnfiltered } from './prisma';
 import { getAutoModelConfig } from './auto-model-config';
 import {
@@ -12,6 +14,10 @@ import { getVisualCueKey } from './visual-cue-keys';
 import { logger } from './logger';
 import { captureFocusTargetStorage } from '@/lib/sidedoor/storage/core/focus-target-storage';
 import { writeStorageReference } from '@/lib/sidedoor/storage/core/storage-write';
+import { sottoStateWriteTransaction } from '@/lib/sidedoor/access/state/write-transaction';
+import { SIDEDOOR_STATE_ID } from '@/lib/sidedoor/access/state/store';
+import { ManagedAvatarUrlError, requireExternalAvatarUrl } from '@/lib/sidedoor/access/avatar/url';
+import type { SottoProviderExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import type { CefrLevel, FocusTargetKind, FocusTargetSource } from '@sotto/shared';
 import type { LearningDatabase } from './learning/database';
 
@@ -301,9 +307,14 @@ async function findTargetForUser(courseId: string, userId: string, targetId: str
   return target;
 }
 
-async function fetchPexelsCue(userId: string, query: string): Promise<VisualCueResult | null> {
-  const apiKey = await getVisualCueKey(userId, 'pexels');
+async function fetchPexelsCue(
+  userId: string,
+  query: string,
+  execution: SottoProviderExecution
+): Promise<VisualCueResult | null> {
+  const apiKey = await getVisualCueKey(userId, 'pexels', execution);
   if (!apiKey) return null;
+  execution.signal?.throwIfAborted();
 
   const url = new URL('https://api.pexels.com/v1/search');
   url.searchParams.set('query', query);
@@ -313,6 +324,7 @@ async function fetchPexelsCue(userId: string, query: string): Promise<VisualCueR
   const response = await fetch(url, {
     headers: { Authorization: apiKey },
     cache: 'no-store',
+    signal: execution.signal,
   });
   if (!response.ok) return null;
   const body = (await response.json()) as {
@@ -336,23 +348,122 @@ async function fetchPexelsCue(userId: string, query: string): Promise<VisualCueR
   };
 }
 
+function isPexelsImageUrl(reference: string) {
+  try {
+    const url = new URL(reference);
+    return (
+      url.protocol === 'https:' &&
+      url.hostname === 'images.pexels.com' &&
+      !url.username &&
+      !url.password &&
+      !url.port
+    );
+  } catch {
+    return false;
+  }
+}
+
 export async function addVisualCue(
   courseId: string,
   userId: string,
-  targetId: string
+  targetId: string,
+  execution: SottoProviderExecution
 ): Promise<LearningTargetDto> {
+  if (execution.userId !== userId)
+    throw new LearningTargetNotFoundError('Learning target not found');
   const target = await findTargetForUser(courseId, userId, targetId);
-  const cue = await fetchPexelsCue(userId, target.text);
+  const cue = await fetchPexelsCue(userId, target.text, execution);
   if (!cue) throw new LearningTargetUnavailableError('Visual cue provider is not configured');
-  const updated = await prisma.learnerFocusTarget.update({
-    where: { id: target.id },
-    data: {
-      visualCueUrl: cue.imageUrl,
-      visualCueAlt: cue.alt,
-      visualCueAttribution: cue.attribution,
-      visualCueProvider: cue.provider,
+  if (!isPexelsImageUrl(cue.imageUrl))
+    throw new LearningTargetUnavailableError('Visual cue provider returned an invalid image URL');
+  const operationId = randomUUID();
+  const updated = await sottoStateWriteTransaction(
+    prismaUnfiltered,
+    async (database) => {
+      const actor = await execution.authorize(database);
+      if (actor.userId !== userId)
+        throw new LearningTargetNotFoundError('Learning target not found');
+      const current = await database.learnerFocusTarget.findFirst({
+        where: { id: target.id, courseId, course: { userId } },
+        select: { createdAt: true, text: true, visualCueUrl: true, visualCueProvider: true },
+      });
+      if (
+        !current ||
+        !isDeepStrictEqual(current.createdAt, target.createdAt) ||
+        current.text !== target.text ||
+        current.visualCueUrl !== target.visualCueUrl ||
+        current.visualCueProvider !== target.visualCueProvider
+      )
+        throw new LearningTargetUnavailableError(
+          'Learning target changed while fetching its visual cue'
+        );
+      const references = new StorageReferenceRegistry(
+        {
+          query: (sql, values) =>
+            database.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...values),
+        },
+        'postgres',
+        SIDEDOOR_STATE_ID
+      );
+      try {
+        await requireExternalAvatarUrl(database, cue.imageUrl);
+      } catch (error) {
+        if (error instanceof ManagedAvatarUrlError)
+          throw new LearningTargetUnavailableError('Visual cue storage ownership needs recovery');
+        throw error;
+      }
+      if (await references.readReference(cue.imageUrl))
+        throw new LearningTargetUnavailableError(
+          'Visual cue provider returned a managed image URL'
+        );
+      if (current.visualCueUrl) {
+        const previous = await references.readReference(current.visualCueUrl);
+        if (previous) {
+          const consumer = `focus-target:${target.id}:visual`;
+          const ownership = await captureFocusTargetStorage(database, target.id);
+          if (
+            ownership.userId !== userId ||
+            !previous.asset.consumers.includes(consumer) ||
+            !ownership.scopes.every((scope) =>
+              previous.asset.prepared.scopes.some((candidate) =>
+                isDeepStrictEqual(candidate, scope)
+              )
+            )
+          )
+            throw new LearningTargetUnavailableError('Visual cue storage ownership changed');
+          if (current.visualCueUrl !== cue.imageUrl)
+            await references.retire({
+              operationId,
+              consumer,
+              previousReference: current.visualCueUrl,
+            });
+        } else {
+          if (current.visualCueProvider !== 'pexels' || !isPexelsImageUrl(current.visualCueUrl))
+            throw new LearningTargetUnavailableError('Visual cue storage ownership needs recovery');
+          try {
+            await requireExternalAvatarUrl(database, current.visualCueUrl);
+          } catch (error) {
+            if (error instanceof ManagedAvatarUrlError)
+              throw new LearningTargetUnavailableError(
+                'Visual cue storage ownership needs recovery'
+              );
+            throw error;
+          }
+        }
+      }
+      return database.learnerFocusTarget.update({
+        where: { id: target.id },
+        data: {
+          visualCueUrl: cue.imageUrl,
+          visualCueAlt: cue.alt,
+          visualCueAttribution: cue.attribution,
+          visualCueProvider: cue.provider,
+        },
+      });
     },
-  });
+    execution.signal ?? AbortSignal.timeout(120_000),
+    { timeoutMs: 60_000 }
+  );
   return toDto(updated);
 }
 

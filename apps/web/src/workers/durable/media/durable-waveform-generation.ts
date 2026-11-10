@@ -17,6 +17,7 @@ import { validateEpisodeStorage } from '@/lib/sidedoor/storage/core/episode-stor
 import { captureSottoStorageWriter } from '@/lib/sidedoor/storage/core/storage-write';
 import { sottoJobOutbox } from '@/lib/sidedoor/jobs/core/job-delivery';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
+import { sottoStorageWriteTransaction } from '@/lib/sidedoor/storage/admission/storage-write-transaction';
 import { SIDEDOOR_STATE_ID } from '@/lib/sidedoor/access/state/store';
 import { withSottoJobExecution } from '@/lib/sidedoor/jobs/core/job-execution-lifetime';
 import { isMediaCleanupFailure } from '@/lib/audio/media-process';
@@ -173,7 +174,9 @@ async function executeWaveformGeneration(
       dialect: 'postgres',
       signal,
       artifacts,
-      transaction: (operation) => sottoTransaction(prisma, operation),
+      // Settlement and committed-result recovery must run after cancellation too.
+      transaction: (operation) =>
+        sottoStorageWriteTransaction(prisma, operation, AbortSignal.timeout(30_000)),
       executor: (tx: Prisma.TransactionClient) => ({
         query: (sql, values) => tx.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...values),
       }),

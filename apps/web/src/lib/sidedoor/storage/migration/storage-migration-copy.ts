@@ -39,6 +39,7 @@ import {
   replaceStorageConsumerReference,
 } from '@/lib/sidedoor/storage/core/storage-consumers';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
+import { sottoStorageWriteTransaction } from '@/lib/sidedoor/storage/admission/storage-write-transaction';
 import { isBundledAvatarImage } from '@/lib/avatars';
 
 const identity = z.string().min(1).max(200);
@@ -81,6 +82,7 @@ const outcomeSchema = z
     content: z.object({ sha256: digest, bytes: z.number().int().nonnegative().safe() }).strict(),
   })
   .strict();
+export { payloadSchema as storageCopyPayloadSchema, outcomeSchema as storageCopyOutcomeSchema };
 type Payload = z.infer<typeof payloadSchema>;
 type Entry = Awaited<ReturnType<typeof readStorageMigrationAssetPage>>['entries'][number];
 const executor = (database: Prisma.TransactionClient) => ({
@@ -227,16 +229,18 @@ async function completedCopy(
   return outcome;
 }
 
-/** Verify a completed copy and every consumer before its owning data is removed. */
-export async function verifyStorageCopyForDeletion(
+type StorageCopyDeletionInput = {
+  id: string;
+  fingerprint: string;
+  scope: { subjectId: string; generation: number };
+  subjects: readonly { subjectId: string; generation: number }[];
+  consumers: ReadonlyMap<string, string>;
+};
+type RetiredCopyRequest = Parameters<StorageRelocationRegistry['verifyRetiredBatch']>[0][number];
+
+async function prepareStorageCopyForDeletion(
   database: Prisma.TransactionClient,
-  input: {
-    id: string;
-    fingerprint: string;
-    scope: { subjectId: string; generation: number };
-    subjects: readonly { subjectId: string; generation: number }[];
-    consumers: ReadonlyMap<string, string>;
-  }
+  input: StorageCopyDeletionInput
 ) {
   const parent = await sottoJobOutbox(database).read(input.id);
   if (
@@ -255,17 +259,6 @@ export async function verifyStorageCopyForDeletion(
     throw new Error('Storage copy execution is not settled');
   await sottoJobExecutions(database).requireParentDrained(input.id, input.fingerprint);
   const instance = await sottoStorageInstance(database).read();
-  if (
-    payload.claims.some(
-      (claim) =>
-        !claim.requiredScopes.some(
-          (scope) =>
-            scope.subjectId !== instance.subjectId &&
-            input.subjects.some((subject) => isDeepStrictEqual(subject, scope))
-        )
-    )
-  )
-    throw new Error('Storage copy has consumers outside the deletion scope');
   const page = await sottoJobSnapshot(database).read(parent.job.id, parent.fingerprint, 0);
   if (page.pages !== 1 || page.next !== null || page.items.length !== 1)
     throw new Error('Storage copy outcome is incomplete');
@@ -282,18 +275,7 @@ export async function verifyStorageCopyForDeletion(
     !isDeepStrictEqual(destination.backend.descriptor, payload.target)
   )
     throw new Error('Storage copy outcome attribution changed');
-  const readOnly = new StorageRelocationRegistry(
-    {
-      query: (sql, values) => {
-        if (sql !== 'SELECT "revision", "state" FROM "SidedoorState" WHERE "id" = $1')
-          throw new Error('Storage relocation verification cannot modify evidence');
-        return database.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...values);
-      },
-    },
-    'postgres',
-    SIDEDOOR_STATE_ID
-  );
-  await readOnly.record({
+  await relocations(database).verifyExisting({
     operationId: outcome.copyOperationId,
     sourceAssetId: payload.sourceAssetId,
     destinationAssetId: outcome.assetId,
@@ -302,15 +284,37 @@ export async function verifyStorageCopyForDeletion(
     destinationRead: { assetId: outcome.assetId, ...outcome.content },
   });
   const retiredConsumers = new Set<string>();
+  const retiredRequests: RetiredCopyRequest[] = [];
+  const survivingConsumers = new Set<string>();
+  const deletedConsumers = new Set<string>();
   for (const claim of payload.claims) {
     const currentReference = await readStorageConsumerReference(database, claim.consumer);
-    if (currentReference !== null && input.consumers.get(claim.consumer) !== currentReference)
+    const matchesScope = claim.requiredScopes.some(
+      (scope) =>
+        scope.subjectId !== instance.subjectId &&
+        input.subjects.some((subject) => isDeepStrictEqual(subject, scope))
+    );
+    const expectedReference = input.consumers.get(claim.consumer);
+    if (expectedReference !== undefined && expectedReference !== currentReference)
+      throw new Error('Storage copy consumer ownership changed');
+    if (expectedReference !== undefined && !matchesScope)
       throw new Error('Storage copy has consumers outside the deletion scope');
     const bundledAvatar =
       claim.consumer.startsWith('profile:') &&
       claim.consumer.endsWith(':avatar') &&
       currentReference !== null &&
       isBundledAvatarImage(currentReference);
+    const belongsToDeletion =
+      matchesScope &&
+      (currentReference === null || bundledAvatar || expectedReference !== undefined);
+    if (belongsToDeletion) deletedConsumers.add(claim.consumer);
+    if (matchesScope && currentReference && !bundledAvatar && expectedReference === undefined)
+      throw new Error('Storage copy deletion inventory is incomplete');
+    if (!belongsToDeletion) {
+      if (!currentReference || bundledAvatar)
+        throw new Error('Storage copy has consumers outside the deletion scope');
+      survivingConsumers.add(claim.consumer);
+    }
     if (currentReference && !bundledAvatar) {
       const proof = await relocations(database).resolve({
         consumer: claim.consumer,
@@ -363,28 +367,54 @@ export async function verifyStorageCopyForDeletion(
       destination.asset.consumers.includes(claim.consumer)
     )
       throw new Error('Storage copy consumer ownership changed');
-    let after: string | null = null;
-    let retired = false;
-    do {
-      const retirements = await registry.listRetirements(after);
-      for (const retirement of retirements.retirements)
-        if (
-          retirement.consumer === claim.consumer &&
-          retirement.status === 'pending' &&
-          retirement.replacementAssetId === null &&
-          retirement.previousReference === outcome.reference &&
-          retirement.attribution?.assetId === outcome.assetId &&
-          isDeepStrictEqual(retirement.attribution.prepared, destination.asset.prepared)
-        )
-          retired = true;
-      if (retirements.cursor !== null && after !== null && retirements.cursor <= after)
-        throw new Error('Storage retirement cursor did not advance');
-      after = retirements.cursor;
-    } while (after !== null);
-    if (!retired) throw new Error('Storage copy retirement evidence is missing');
+    retiredRequests.push({
+      consumer: claim.consumer,
+      originalAssetId: payload.sourceAssetId,
+      maxHops: 1000,
+      expectedContent: outcome.content,
+      requiredOperation: {
+        operationId: outcome.copyOperationId,
+        sourceAssetId: payload.sourceAssetId,
+        destinationAssetId: outcome.assetId,
+      },
+    });
     retiredConsumers.add(claim.consumer);
   }
+  return {
+    relocationId: outcome.copyOperationId,
+    retiredConsumers,
+    retiredRequests,
+    survivingConsumers,
+    deletedConsumers,
+    sourceAssetId: payload.sourceAssetId,
+    destinationAssetId: outcome.assetId,
+    jobId: input.id,
+    fingerprint: input.fingerprint,
+    deletionScope: { ...input.scope },
+    deletionSubjects: input.subjects.map((scope) => ({ ...scope })),
+    source: source.asset.prepared,
+    destination: destination.asset.prepared,
+    target: payload.target,
+    claims: payload.claims,
+    content: outcome.content,
+  };
+}
+
+/**
+ * Capture and verify the original copies in the deletion transaction.
+ * These records alone do not authorize projection or erasure of shared history.
+ */
+export async function prepareStorageCopiesForDeletion(
+  database: Prisma.TransactionClient,
+  inputs: readonly StorageCopyDeletionInput[]
+) {
+  const prepared = [];
+  for (const input of inputs) prepared.push(await prepareStorageCopyForDeletion(database, input));
+  const retiredRequests = prepared.flatMap((copy) => copy.retiredRequests);
+  const retiredConsumers = new Set(prepared.flatMap((copy) => [...copy.retiredConsumers]));
+  if (retiredRequests.length) await relocations(database).verifyRetiredBatch(retiredRequests);
   if (retiredConsumers.size) {
+    const registry = references(database);
     let after: string | null = null;
     do {
       const assets = await registry.listAssets(after);
@@ -399,7 +429,27 @@ export async function verifyStorageCopyForDeletion(
       after = assets.cursor;
     } while (after !== null);
   }
-  return outcome.copyOperationId;
+  return prepared;
+}
+
+/** Verify only copies whose consumers are all covered by the deletion. */
+export async function verifyStorageCopiesForDeletion(
+  database: Prisma.TransactionClient,
+  inputs: readonly StorageCopyDeletionInput[]
+) {
+  const prepared = await prepareStorageCopiesForDeletion(database, inputs);
+  if (prepared.some((copy) => copy.survivingConsumers.size))
+    throw new Error('Storage copy has consumers outside the deletion scope');
+  return prepared.map((copy) => copy.relocationId);
+}
+
+export async function verifyStorageCopyForDeletion(
+  database: Prisma.TransactionClient,
+  input: StorageCopyDeletionInput
+) {
+  const [relocationId] = await verifyStorageCopiesForDeletion(database, [input]);
+  if (!relocationId) throw new Error('Storage copy verification returned no relocation');
+  return relocationId;
 }
 
 /** Execute an admitted one-asset copy. Configuration activation belongs to the migration coordinator. */
@@ -513,7 +563,9 @@ export async function executeSottoStorageCopy(options: {
         dialect: 'postgres',
         signal,
         executor,
-        transaction: (run) => sottoTransaction(database, run),
+        // Settlement and committed-result recovery must run after cancellation too.
+        transaction: (run) =>
+          sottoStorageWriteTransaction(database, run, AbortSignal.timeout(30_000)),
         captureAdmission: async (tx) => {
           await pending(tx);
           return {

@@ -18,6 +18,7 @@ import { captureStorageBackend } from '@/lib/r2';
 import { captureCourseStorage } from '@/lib/sidedoor/storage/core/course-storage';
 import { admitLearningStorageDeletion } from '@/lib/sidedoor/access/deletion/learning-deletion';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
+import { sottoStateWriteTransaction } from '@/lib/sidedoor/access/state/write-transaction';
 import { sottoJobOutbox } from '@/lib/sidedoor/jobs/core/job-delivery';
 import {
   inspectClassSpeakingMedia,
@@ -113,7 +114,7 @@ export async function deleteClassForUser(
       ? await captureStorageBackend()
       : null;
 
-  const result = await sottoTransaction(
+  const result = await sottoStateWriteTransaction(
     prismaUnfiltered,
     async (database) => {
       const actor = await execution.authorize(database);
@@ -251,7 +252,8 @@ export async function deleteClassForUser(
         });
       return { jobIds: [...(job ? [job.id] : []), ...episodeJobs.map((entry) => entry.jobId)] };
     },
-    { timeoutMs: 60_000, signal: execution.signal }
+    execution.signal ?? AbortSignal.timeout(120_000),
+    { timeoutMs: 60_000 }
   );
   if (!result) return false;
   for (const jobId of result.jobIds) {

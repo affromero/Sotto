@@ -35,6 +35,12 @@ import {
   type SharedTestInstance,
   type SharedTestIdentity,
 } from '../../../helpers/setup/shared-instance';
+import {
+  expectSharedCopyAttribution,
+  expectUnverifiedSurvivorToBeRejected,
+} from './shared-copy-assertions';
+import { registerGenerationScopeTests } from './copy/generation-scope-tests';
+import { registerSharedHistoryTests } from './copy/shared-history-tests';
 
 const suite = process.env.SIDEDOOR_TEST_DATABASE_URL ? describe : describe.skip;
 suite('storage copy publication with PostgreSQL and local files', () => {
@@ -325,7 +331,7 @@ suite('storage copy publication with PostgreSQL and local files', () => {
           consumers: new Map([[`profile:${owner.id}:avatar`, outcome.reference]]),
         })
       )
-    ).rejects.toThrow('cannot modify evidence');
+    ).rejects.toThrow('receipt is missing');
     const rows = await instance.database.$queryRaw<Array<{ count: bigint }>>`
       SELECT count(*) AS count FROM "SidedoorState"
       WHERE state->>'kind' IN ('storage_relocation', 'storage_relocation_allocation')
@@ -479,6 +485,9 @@ suite('storage copy publication with PostgreSQL and local files', () => {
     );
     expect(remaining.receipts).toHaveLength(1);
   });
+  registerGenerationScopeTests({ fixture, context: () => ({ instance, identity }) });
+  registerSharedHistoryTests({ fixture, backend, context: () => ({ instance, identity }) });
+
   it('preserves shared migrated media when another owner remains', async () => {
     const test = await fixture(undefined, true);
     if (!test.other) throw new Error('Missing shared owner');
@@ -487,6 +496,9 @@ suite('storage copy publication with PostgreSQL and local files', () => {
       where: { id: identity.ownerId },
     });
     const scope = { subjectId: `profile:${owner.id}`, generation: owner.createdAt.getTime() };
+    const retainedBefore = await instance.database.sidedoorState.findMany({
+      orderBy: { id: 'asc' },
+    });
     await expect(
       sottoTransaction(instance.database, (tx) =>
         verifyStorageCopyForDeletion(tx, {
@@ -498,6 +510,9 @@ suite('storage copy publication with PostgreSQL and local files', () => {
         })
       )
     ).rejects.toThrow('outside the deletion scope');
+    expect(await instance.database.sidedoorState.findMany({ orderBy: { id: 'asc' } })).toEqual(
+      retainedBefore
+    );
     await expect(
       sottoTransaction(instance.database, (tx) =>
         admitLearningStorageDeletion({
@@ -508,6 +523,17 @@ suite('storage copy publication with PostgreSQL and local files', () => {
         })
       )
     ).rejects.toThrow('outside the deletion scope');
+    expect(await instance.database.sidedoorState.findMany({ orderBy: { id: 'asc' } })).toEqual(
+      retainedBefore
+    );
+    expect(
+      await instance.database.user.findUniqueOrThrow({ where: { id: owner.id } })
+    ).toMatchObject({ image: outcome.reference });
+    expect(
+      await sottoTransaction(instance.database, (tx) =>
+        sottoJobOutbox(tx).receipt(test.options.operationId)
+      )
+    ).toMatchObject({ status: 'complete' });
     expect(
       await instance.database.user.findUniqueOrThrow({ where: { id: test.other.id } })
     ).toMatchObject({ image: outcome.reference });
@@ -516,6 +542,77 @@ suite('storage copy publication with PostgreSQL and local files', () => {
     const path = join(root, 'target');
     await test.target.downloadToFile(outcome.reference, path);
     expect(await readFile(path)).toEqual(test.bytes);
+  });
+  it('deletes one profile while preserving a survivor’s shared relocated media and proof', async () => {
+    const test = await fixture(undefined, true);
+    if (!test.other) throw new Error('Missing shared owner');
+    const outcome = await executeSottoStorageCopy(test.options);
+    const removed = await instance.database.user.findUniqueOrThrow({
+      where: { id: test.other.id },
+    });
+    const scope = { subjectId: `profile:${removed.id}`, generation: removed.createdAt.getTime() };
+    await expectUnverifiedSurvivorToBeRejected({
+      database: instance.database,
+      sourceReference: test.reference,
+      destinationReference: outcome.reference,
+      removedProfileId: removed.id,
+      removedGeneration: scope.generation,
+      survivingProfileId: identity.ownerId,
+      target: test.target,
+    });
+    const jobs = await sottoTransaction(instance.database, async (tx) => {
+      const admitted = await admitLearningStorageDeletion({
+        database: tx,
+        scope: { kind: 'profile', id: removed.id },
+        subjects: [scope],
+        currentBackend: test.target,
+      });
+      await tx.user.delete({ where: { id: removed.id } });
+      return admitted;
+    });
+    for (const job of jobs)
+      await runSottoStorageCleanup(instance.database, job.id, {
+        openConnection: () =>
+          openSottoStorageConnection(process.env.SIDEDOOR_TEST_DATABASE_URL, instance.schema),
+      });
+    expect(await instance.database.user.findUnique({ where: { id: removed.id } })).toBeNull();
+    expect(
+      await instance.database.user.findUniqueOrThrow({ where: { id: identity.ownerId } })
+    ).toMatchObject({ image: outcome.reference });
+    const root = await mkdtemp(join(tmpdir(), 'sotto-shared-survivor-'));
+    roots.push(root);
+    const path = join(root, 'survivor');
+    await test.target.downloadToFile(outcome.reference, path);
+    expect(await readFile(path)).toEqual(test.bytes);
+    const proof = await sottoTransaction(instance.database, (tx) =>
+      new StorageRelocationRegistry(
+        { query: (sql, values) => tx.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...values) },
+        'postgres',
+        SIDEDOOR_STATE_ID
+      ).resolve({
+        consumer: `profile:${identity.ownerId}:avatar`,
+        originalReference: test.reference,
+        currentReference: outcome.reference,
+        maxHops: 1000,
+      })
+    );
+    expect(proof).toMatchObject({
+      current: { assetId: outcome.assetId },
+      content: outcome.content,
+    });
+    await expectSharedCopyAttribution({
+      database: instance.database,
+      sourceReference: test.reference,
+      destinationAssetId: outcome.assetId,
+      operationId: outcome.copyOperationId,
+      removedProfileId: removed.id,
+      survivingProfileId: identity.ownerId,
+    });
+    const retainedDeletedProfile = await instance.database.$queryRaw<{ id: string }[]>`
+      SELECT id FROM "SidedoorState"
+      WHERE id LIKE ${`%${test.options.operationId}%`} AND state::text LIKE ${`%${removed.id}%`}
+    `;
+    expect(retainedDeletedProfile).toEqual([]);
   });
   it('rejects a changed destination before copying and retains the original reference', async () => {
     const test = await fixture();
@@ -680,6 +777,210 @@ suite('storage copy publication with PostgreSQL and local files', () => {
       (await instance.database.user.findUniqueOrThrow({ where: { id: identity.ownerId } })).image
     ).toBe(second.reference);
   });
+  it('admits profile deletion after an avatar is relocated twice and retired', async () => {
+    const previous = await fixture();
+    const previousCopy = await executeSottoStorageCopy(previous.options);
+    await sottoTransaction(instance.database, async (tx) => {
+      const registry = new StorageReferenceRegistry(
+        { query: (sql, values) => tx.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...values) },
+        'postgres',
+        SIDEDOOR_STATE_ID
+      );
+      await registry.retire({
+        operationId: randomUUID(),
+        consumer: `profile:${identity.ownerId}:avatar`,
+        previousReference: previousCopy.reference,
+      });
+      await tx.user.update({ where: { id: identity.ownerId }, data: { image: null } });
+    });
+    const test = await fixture();
+    const first = await executeSottoStorageCopy(test.options);
+    const { request, admission } = test.options;
+    const page = await sottoTransaction(instance.database, (database) =>
+      readStorageMigrationAssetPage({ database, request, admission })
+    );
+    const entry = page.entries[0];
+    if (!entry || page.entries.length !== 1 || page.issues.length)
+      throw new Error('Missing second copy candidate');
+    const target = await backend();
+    const operationId = randomUUID();
+    const parent = await sottoTransaction(instance.database, (tx) =>
+      admitSottoStorageCopy(tx, {
+        request,
+        admission,
+        operationId,
+        entry,
+        target: target.descriptor,
+        timeoutMs: 30_000,
+      })
+    );
+    const second = await executeSottoStorageCopy({
+      ...test.options,
+      target,
+      operationId,
+      fingerprint: parent.fingerprint,
+    });
+    const owner = await instance.database.user.findUniqueOrThrow({
+      where: { id: identity.ownerId },
+    });
+    const scope = { subjectId: `profile:${owner.id}`, generation: owner.createdAt.getTime() };
+    await sottoTransaction(instance.database, async (tx) => {
+      const registry = new StorageReferenceRegistry(
+        { query: (sql, values) => tx.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...values) },
+        'postgres',
+        SIDEDOOR_STATE_ID
+      );
+      await registry.retire({
+        operationId: randomUUID(),
+        consumer: `profile:${owner.id}:avatar`,
+        previousReference: second.reference,
+      });
+      await tx.user.update({ where: { id: owner.id }, data: { image: null } });
+    });
+    const jobs = await sottoTransaction(instance.database, (tx) =>
+      admitLearningStorageDeletion({
+        database: tx,
+        scope: { kind: 'profile', id: owner.id },
+        subjects: [scope],
+        currentBackend: target,
+      })
+    );
+    expect(jobs.length).toBeGreaterThan(0);
+    for (const job of jobs) {
+      await runSottoStorageCleanup(instance.database, job.id, {
+        openConnection: () =>
+          openSottoStorageConnection(process.env.SIDEDOOR_TEST_DATABASE_URL, instance.schema),
+      });
+    }
+    const root = await mkdtemp(join(tmpdir(), 'sotto-multihop-cleanup-'));
+    roots.push(root);
+    await expect(
+      test.source.downloadToFile(test.reference, join(root, 'source'))
+    ).rejects.toThrow();
+    await expect(
+      test.target.downloadToFile(first.reference, join(root, 'first'))
+    ).rejects.toThrow();
+    await expect(target.downloadToFile(second.reference, join(root, 'second'))).rejects.toThrow();
+    await expect(
+      previous.source.downloadToFile(previous.reference, join(root, 'previous-source'))
+    ).rejects.toThrow();
+    await expect(
+      previous.target.downloadToFile(previousCopy.reference, join(root, 'previous-copy'))
+    ).rejects.toThrow();
+    for (const id of [previous.options.operationId, test.options.operationId, operationId])
+      expect(
+        await sottoTransaction(instance.database, (tx) => sottoJobOutbox(tx).receipt(id))
+      ).toMatchObject({ status: 'erased' });
+  });
+  it('cleans a retired avatar after repeated storage migrations', async () => {
+    const test = await fixture();
+    const copies = [{ backend: test.target, outcome: await executeSottoStorageCopy(test.options) }];
+    const operationIds = [test.options.operationId];
+    const { request, admission } = test.options;
+    for (let index = 0; index < 9; index++) {
+      const page = await sottoTransaction(instance.database, (database) =>
+        readStorageMigrationAssetPage({ database, request, admission })
+      );
+      const entry = page.entries[0];
+      if (!entry || page.entries.length !== 1 || page.issues.length)
+        throw new Error('Missing copy candidate');
+      const target = await backend();
+      const operationId = randomUUID();
+      const parent = await sottoTransaction(instance.database, (tx) =>
+        admitSottoStorageCopy(tx, {
+          request,
+          admission,
+          operationId,
+          entry,
+          target: target.descriptor,
+          timeoutMs: 30_000,
+        })
+      );
+      const outcome = await executeSottoStorageCopy({
+        ...test.options,
+        target,
+        operationId,
+        fingerprint: parent.fingerprint,
+      });
+      copies.push({ backend: target, outcome });
+      operationIds.push(operationId);
+    }
+    const owner = await instance.database.user.findUniqueOrThrow({
+      where: { id: identity.ownerId },
+    });
+    const final = copies.at(-1);
+    if (!final) throw new Error('Missing final copy');
+    await sottoTransaction(instance.database, async (tx) => {
+      const registry = new StorageReferenceRegistry(
+        { query: (sql, values) => tx.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...values) },
+        'postgres',
+        SIDEDOOR_STATE_ID
+      );
+      await registry.retire({
+        operationId: randomUUID(),
+        consumer: `profile:${owner.id}:avatar`,
+        previousReference: final.outcome.reference,
+      });
+      await tx.user.update({ where: { id: owner.id }, data: { image: null } });
+    });
+    const corruptId = [...operationIds].sort().at(-1);
+    if (!corruptId) throw new Error('Missing copy operation');
+    const snapshotRows = await instance.database.$queryRaw<
+      { id: string; state: Prisma.JsonValue }[]
+    >`
+      SELECT id, state FROM "SidedoorState" WHERE id LIKE ${`sd-js:1:%:${corruptId}:0`}
+    `;
+    const snapshot = snapshotRows[0];
+    if (!snapshot || snapshotRows.length !== 1) throw new Error('Missing copy snapshot');
+    await instance.database.$executeRaw`
+      UPDATE "SidedoorState" SET state = jsonb_set(state, '{items,0,content,bytes}', '999999'::jsonb)
+      WHERE id = ${snapshot.id}
+    `;
+    await expect(
+      sottoTransaction(instance.database, (tx) =>
+        admitLearningStorageDeletion({
+          database: tx,
+          scope: { kind: 'profile', id: owner.id },
+          subjects: [{ subjectId: `profile:${owner.id}`, generation: owner.createdAt.getTime() }],
+          currentBackend: final.backend,
+        })
+      )
+    ).rejects.toThrow();
+    expect(await instance.database.user.findUnique({ where: { id: owner.id } })).not.toBeNull();
+    for (const id of operationIds)
+      expect(
+        await sottoTransaction(instance.database, (tx) => sottoJobOutbox(tx).receipt(id))
+      ).toMatchObject({ status: 'complete' });
+    await instance.database.$executeRaw`
+      UPDATE "SidedoorState" SET state = ${JSON.stringify(snapshot.state)}::jsonb WHERE id = ${snapshot.id}
+    `;
+    const jobs = await sottoTransaction(instance.database, (tx) =>
+      admitLearningStorageDeletion({
+        database: tx,
+        scope: { kind: 'profile', id: owner.id },
+        subjects: [{ subjectId: `profile:${owner.id}`, generation: owner.createdAt.getTime() }],
+        currentBackend: final.backend,
+      })
+    );
+    for (const job of jobs)
+      await runSottoStorageCleanup(instance.database, job.id, {
+        openConnection: () =>
+          openSottoStorageConnection(process.env.SIDEDOOR_TEST_DATABASE_URL, instance.schema),
+      });
+    const root = await mkdtemp(join(tmpdir(), 'sotto-repeated-copy-cleanup-'));
+    roots.push(root);
+    await expect(
+      test.source.downloadToFile(test.reference, join(root, 'source'))
+    ).rejects.toThrow();
+    for (const [index, copy] of copies.entries())
+      await expect(
+        copy.backend.downloadToFile(copy.outcome.reference, join(root, `copy-${index}`))
+      ).rejects.toThrow();
+    for (const id of operationIds)
+      expect(
+        await sottoTransaction(instance.database, (tx) => sottoJobOutbox(tx).receipt(id))
+      ).toMatchObject({ status: 'erased' });
+  }, 60_000);
   it('rejects mismatched readback bytes without publishing the new reference', async () => {
     const test = await fixture();
     const target = {

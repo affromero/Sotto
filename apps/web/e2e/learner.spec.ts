@@ -286,6 +286,18 @@ test('a learner plays audio and completes all five skills on a narrow screen', a
       await expect(question.getByText('Hallo is a greeting.')).toHaveCount(0);
       await question.getByRole('button', { name: 'Option 1: Hallo' }).click();
       await expect(question.getByText('Hallo is a greeting.')).toBeVisible();
+      if (skill === 'READING' && index === fixture.counts[skill] - 1) {
+        await header.getByRole('button', { name: 'Lesson overview' }).click();
+        await helpButton.click();
+        await expect(languageHelp.getByText('Hello, Anna!', { exact: true })).toBeVisible();
+        await languageHelp.getByRole('button', { name: 'Back to lesson' }).click();
+        await page.getByRole('button', { name: 'Resume the class' }).click();
+        await expect(header.getByRole('navigation', { name: 'Class location' })).toContainText(
+          'Reading'
+        );
+        await expect(question.getByRole('button', { name: 'Option 1: Hallo' })).toBeDisabled();
+        expect(helpAdmissions).toBe(1);
+      }
     }
     await page.getByRole('button', { name: `Continue · ${next}` }).click();
   }
@@ -592,7 +604,30 @@ test('a learner plays audio and completes all five skills on a narrow screen', a
     await database.episode.findUnique({ where: { id: classListening.episodeId! } })
   ).toBeNull();
   await expect(stat(classListeningPath)).rejects.toMatchObject({ code: 'ENOENT' });
-  for (const path of audioPaths) await expect(stat(path)).rejects.toMatchObject({ code: 'ENOENT' });
+  for (const [index, path] of audioPaths.entries()) {
+    const exists = await stat(path).then(
+      () => true,
+      (error: NodeJS.ErrnoException) => {
+        if (error.code === 'ENOENT') return false;
+        throw error;
+      }
+    );
+    if (exists) {
+      const key = audioUrls[index]!.slice('/api/v1/storage/'.length);
+      const targets = await database.$queryRawUnsafe<Array<{ state: unknown }>>(
+        `SELECT state FROM "SidedoorState" WHERE id LIKE 'sd-d:1:%' AND state->>'key' = $1`,
+        key
+      );
+      const fences = await database.$queryRawUnsafe<Array<{ state: unknown }>>(
+        `SELECT state FROM "SidedoorState" WHERE id LIKE 'sd-tf:1:%'`
+      );
+      await test.info().attach('remaining-audio-cleanup.json', {
+        body: JSON.stringify({ key, targets, fences }, null, 2),
+        contentType: 'application/json',
+      });
+    }
+    expect(exists, `Assessment audio ${index} must be removed`).toBe(false);
+  }
   const deleted = await page.request.delete(`/api/v1/courses/${fixture.courseId}`, {
     data: { confirm: 'de' },
   });
