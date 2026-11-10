@@ -3,11 +3,6 @@
 Sotto includes the following third-party material in addition to dependencies
 installed from package registries.
 
-## thesidedoor-core
-
-`vendor/sidedoor-core` contains a package built from Sidedoor under the MIT
-License. Its license and source revision are recorded alongside the archive.
-
 ## mbfcext
 
 `apps/web/src/data/mbfc-combined.json` is derived from the `mbfcext` project:
