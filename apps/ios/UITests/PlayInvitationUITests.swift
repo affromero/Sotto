@@ -156,7 +156,8 @@ final class PlayInvitationUITests: XCTestCase {
         let entered = XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "value == %@", value), object: field
         )
-        guard XCTWaiter.wait(for: [entered], timeout: 10) == .completed else {
+        let result = XCTWaiter.wait(for: [entered], timeout: 10)
+        guard result == .completed || field.value as? String == value else {
             throw InteractionFailure.unexpectedFieldValue(identifier, String(describing: field.value))
         }
     }
