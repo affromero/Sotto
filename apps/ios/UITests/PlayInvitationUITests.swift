@@ -76,6 +76,7 @@ final class PlayInvitationUITests: XCTestCase {
         XCTAssertTrue(join.waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertFalse(join.isEnabled, "Joining requires explicit profile creation consent.")
         try tap("Create my learner profile on this server", type: .switch, app: app)
+        XCTAssertEqual(consent.value as? String, "1", app.debugDescription)
         XCTAssertTrue(join.wait(for: \.isEnabled, toEqual: true, timeout: 10), app.debugDescription)
         try tap("Ask to join as a new learner", app: app)
         try tap("Finish joining", app: app, timeout: 15)
@@ -132,7 +133,7 @@ final class PlayInvitationUITests: XCTestCase {
 
     private enum InteractionFailure: Error {
         case missingButton(String), invisibleButton(String), disabledButton(String)
-        case fieldNotReady(String), unexpectedFieldValue(String)
+        case fieldNotReady(String), unexpectedFieldValue(String, String)
     }
 
     private func fill(_ identifier: String, value: String, app: XCUIApplication) throws {
@@ -153,7 +154,7 @@ final class PlayInvitationUITests: XCTestCase {
             predicate: NSPredicate(format: "value == %@", value), object: field
         )
         guard XCTWaiter.wait(for: [entered], timeout: 10) == .completed else {
-            throw InteractionFailure.unexpectedFieldValue(identifier)
+            throw InteractionFailure.unexpectedFieldValue(identifier, String(describing: field.value))
         }
     }
 
@@ -193,6 +194,9 @@ final class PlayInvitationUITests: XCTestCase {
                     }
                     let switchControl = control.children(matching: .switch).firstMatch
                     if type == .switch, switchControl.exists {
+                        guard switchControl.wait(for: \.isHittable, toEqual: true, timeout: timeout) else {
+                            throw InteractionFailure.invisibleButton(title)
+                        }
                         switchControl.tap()
                     } else {
                         control.tap()
