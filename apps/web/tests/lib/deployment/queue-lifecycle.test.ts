@@ -196,7 +196,6 @@ suite('deployment queue and execution settlement', () => {
       return binding;
     });
   }
-
   function transition(addedNames: readonly string[] = ['vocabulary-audio']) {
     const previous = {
       ...runtime,
@@ -229,7 +228,6 @@ suite('deployment queue and execution settlement', () => {
       candidateInput: { transition: envelope, role: 'candidate' as const },
     };
   }
-
   it('admits explicit queue additions and restores original flags through interrupted pause and restore', async () => {
     const { previous, previousInput, candidateInput } = transition();
     await queue('vocabulary-audio').pause();
@@ -358,6 +356,43 @@ suite('deployment queue and execution settlement', () => {
     }
   });
 
+  it('distinguishes workers on the same Redis server by their selected database', async () => {
+    const otherUrl = new URL(process.env.SIDEDOOR_TEST_REDIS_URL!);
+    otherUrl.pathname = '/14';
+    const otherConnection = new Redis(otherUrl.toString(), { maxRetriesPerRequest: null });
+    const added = queue('vocabulary-audio');
+    const { previous, previousInput } = transition();
+    const otherWorker = new Worker(added.name, async () => 'done', {
+      connection: otherConnection,
+      prefix,
+    });
+    let sameWorker: Worker | undefined;
+    try {
+      await vi.waitFor(async () => expect((await added.getWorkers()).length).toBeGreaterThan(0));
+      await expect(run({ command: 'snapshot', ...previousInput }, previous)).resolves.toBeDefined();
+      sameWorker = new Worker(added.name, async () => 'done', { connection, prefix });
+      await vi.waitFor(async () => expect((await added.getWorkers()).length).toBeGreaterThan(1));
+      await expect(run({ command: 'snapshot', ...previousInput }, previous)).rejects.toThrow(
+        'Added queue has connected workers'
+      );
+    } finally {
+      await sameWorker?.close();
+      await otherWorker.close();
+      const otherQueue = new Queue(added.name, { connection: otherConnection, prefix });
+      await otherQueue.obliterate({ force: true });
+      await otherQueue.close();
+      await otherConnection.quit();
+    }
+  });
+  it('rejects worker records without a trustworthy Redis database', async () => {
+    const added = queue('vocabulary-audio');
+    runtime.createQueue = (name) => (name === added.name ? added : queue(name));
+    const { previous, previousInput } = transition();
+    vi.spyOn(added, 'getWorkers').mockResolvedValueOnce([{ name: 'worker' }] as never);
+    await expect(run({ command: 'snapshot', ...previousInput }, previous)).rejects.toThrow(
+      'Worker database unavailable'
+    );
+  });
   it('rejects an active added-queue job while leaving its worker and work intact', async () => {
     const added = queue('vocabulary-audio');
     const { previous, previousInput } = transition();

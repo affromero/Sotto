@@ -258,6 +258,31 @@ async function inspectExecutions(runtime, forbidden = []) {
   });
 }
 
+async function queueWorkersInDatabase(queue) {
+  const client = await queue.getBackend().client;
+  assert(typeof client.nodes !== 'function', 'Redis Cluster worker inspection is unsupported');
+  async function selectedDatabase() {
+    const info = await client.client('INFO');
+    assert.equal(typeof info, 'string', 'Redis client identity unavailable');
+    const fields = info
+      .trim()
+      .split(/\s+/)
+      .filter((field) => field.startsWith('db='));
+    assert.equal(fields.length, 1, 'Redis client database unavailable');
+    assert(/^db=(0|[1-9][0-9]*)$/.test(fields[0]), 'Invalid Redis client database');
+    return fields[0].slice(3);
+  }
+  const database = await selectedDatabase();
+  const workers = await queue.getWorkers();
+  for (const worker of workers)
+    assert(
+      typeof worker.db === 'string' && /^(0|[1-9][0-9]*)$/.test(worker.db),
+      'Worker database unavailable'
+    );
+  assert.equal(await selectedDatabase(), database, 'Redis client database changed');
+  return workers.filter((worker) => worker.db === database);
+}
+
 async function addedQueuesEmpty(runtime, queues, added) {
   await inspectExecutions(runtime, added);
   await readOnly(runtime.database, async (transaction) => {
@@ -292,7 +317,11 @@ async function addedQueuesEmpty(runtime, queues, added) {
   for (const queue of queues.filter((item) => added.includes(item.name))) {
     assert.equal((await queue.getJobs(undefined, 0, 0)).length, 0, 'Added queue contains work');
     assert.equal(await queue.getJobSchedulersCount(), 0, 'Added queue has a scheduler');
-    assert.equal((await queue.getWorkers()).length, 0, 'Added queue has connected workers');
+    assert.equal(
+      (await queueWorkersInDatabase(queue)).length,
+      0,
+      'Added queue has connected workers'
+    );
   }
 }
 
@@ -521,7 +550,7 @@ async function main() {
   }
 }
 
-module.exports = { run, connectionIdentity, main };
+module.exports = { run, connectionIdentity, main, queueWorkersInDatabase };
 if (require.main === module)
   main().catch(() => {
     console.error(
