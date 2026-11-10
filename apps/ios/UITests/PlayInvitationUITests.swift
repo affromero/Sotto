@@ -76,7 +76,10 @@ final class PlayInvitationUITests: XCTestCase {
         XCTAssertTrue(join.waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertFalse(join.isEnabled, "Joining requires explicit profile creation consent.")
         try tap("Create my learner profile on this server", type: .switch, app: app)
-        XCTAssertEqual(consent.value as? String, "1", app.debugDescription)
+        let consentAccepted = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "value == %@", "1"), object: consent
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [consentAccepted], timeout: 10), .completed, app.debugDescription)
         XCTAssertTrue(join.wait(for: \.isEnabled, toEqual: true, timeout: 10), app.debugDescription)
         try tap("Ask to join as a new learner", app: app)
         try tap("Finish joining", app: app, timeout: 15)
