@@ -120,7 +120,7 @@ suite('durable local storage cleanup', () => {
     }
   }, 60_000);
 
-  it('settles its execution after a PostgreSQL serialization failure', async () => {
+  it('retries an aborted cleanup transaction without stranding its execution', async () => {
     const root = await mkdtemp(join(tmpdir(), 'sotto-cleanup-serialization-'));
     roots.push(root);
     await setSiteConfig({ storageProvider: 'local', localStorageRoot: root }, identity.ownerId);
@@ -161,28 +161,26 @@ suite('durable local storage cleanup', () => {
     await other.connect();
     let injected = false;
     try {
-      await expect(
-        runSottoStorageCleanup(instance.database, job.id, {
-          openConnection: async () => {
-            const connection = await openSottoStorageConnection(databaseUrl, instance.schema);
-            let commits = 0;
-            return {
-              ...connection,
-              async query(sql, values) {
-                if (commits === 2 && !injected && sql !== 'BEGIN ISOLATION LEVEL SERIALIZABLE') {
-                  injected = true;
-                  await connection.query('SELECT value FROM serialization_conflict', []);
-                  await other.query('UPDATE serialization_conflict SET value = 2');
-                  await connection.query('UPDATE serialization_conflict SET value = 3', []);
-                }
-                const result = await connection.query(sql, values);
-                if (sql === 'COMMIT') commits++;
-                return result;
-              },
-            };
-          },
-        })
-      ).rejects.toMatchObject({ code: '40001' });
+      await runSottoStorageCleanup(instance.database, job.id, {
+        openConnection: async () => {
+          const connection = await openSottoStorageConnection(databaseUrl, instance.schema);
+          let commits = 0;
+          return {
+            ...connection,
+            async query(sql, values) {
+              if (commits === 2 && !injected && sql !== 'BEGIN ISOLATION LEVEL SERIALIZABLE') {
+                injected = true;
+                await connection.query('SELECT value FROM serialization_conflict', []);
+                await other.query('UPDATE serialization_conflict SET value = 2');
+                await connection.query('UPDATE serialization_conflict SET value = 3', []);
+              }
+              const result = await connection.query(sql, values);
+              if (sql === 'COMMIT') commits++;
+              return result;
+            },
+          };
+        },
+      });
       expect(injected).toBe(true);
       const current = await sottoTransaction(instance.database, (database) =>
         new CleanupExecutionJournal(

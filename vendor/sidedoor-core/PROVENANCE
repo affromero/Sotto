@@ -1,11 +1,11 @@
 Source: https://github.com/affromero/sidedoor
-Commit: c20e5a28bd3915d93353d40065d9541b885bfc34
+Commit: 9f03702aee8ce786d051e9d3723575dd92371325
 Package: thesidedoor-core 0.5.8
 Archive: thesidedoor-core-0.5.8.tgz
-SHA-256: b6a77c6e819227b9e4ad9b0d9b48a81cf9d900ecaa0dc1e776e6eb2f8c3fcc33
+SHA-256: 711a3716707868e286d1a5b45279cd609c0136cd26c9ec3a0b1445c0e9987cf8
 
 Built from a clean archive of the commit with Node 24.22.2 and npm 10.9.8.
 The source lockfile SHA-256 is a7db99c0da08e821f533e4f42ae74ee92f6558fc695325d4de90426cd4fa0547.
-After npm ci, npm run build --workspace thesidedoor-core was run twice,
-then npm pack --workspace thesidedoor-core produced this archive.
+After npm ci, npm run build --workspace thesidedoor-core produced identical
+files in two runs, then npm pack --workspace thesidedoor-core produced this archive.
 The license is included alongside the archive.
