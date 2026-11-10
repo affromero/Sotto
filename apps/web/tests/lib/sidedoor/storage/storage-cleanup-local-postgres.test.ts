@@ -120,6 +120,89 @@ suite('durable local storage cleanup', () => {
     }
   }, 60_000);
 
+  it('settles its execution after a PostgreSQL serialization failure', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'sotto-cleanup-serialization-'));
+    roots.push(root);
+    await setSiteConfig({ storageProvider: 'local', localStorageRoot: root }, identity.ownerId);
+    const backend = await captureStorageBackend();
+    const prepared = prepareStorageBackend(SIDEDOOR_STATE_ID, backend.descriptor);
+    const job = prepareStorageCleanup({
+      namespace: SIDEDOOR_STATE_ID,
+      subjectId: `profile:${identity.ownerId}`,
+      generation: Date.now(),
+    });
+    await instance.database.$executeRawUnsafe(
+      'CREATE TABLE serialization_conflict (value integer)'
+    );
+    await instance.database.$executeRawUnsafe('INSERT INTO serialization_conflict VALUES (1)');
+    await sottoTransaction(instance.database, async (database) => {
+      const executor = {
+        query: (sql: string, values: readonly unknown[]) =>
+          database.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...values),
+      };
+      await new StorageBackendRegistry(executor, 'postgres', SIDEDOOR_STATE_ID).register(prepared);
+      const cleanup = new StorageCleanupJournal(executor, 'postgres', SIDEDOOR_STATE_ID);
+      await cleanup.createJob(job);
+      await cleanup.registerCollectors(job.id, job.epoch, [
+        {
+          id: 'empty',
+          kind: 'inventory',
+          backendIds: [prepared.id],
+          scope: '__test/empty',
+          match: 'key',
+        },
+      ]);
+    });
+    const { Client } = await import('pg');
+    const other = new Client({
+      connectionString: databaseUrl,
+      options: `-c search_path=${instance.schema}`,
+    });
+    await other.connect();
+    let injected = false;
+    try {
+      await expect(
+        runSottoStorageCleanup(instance.database, job.id, {
+          openConnection: async () => {
+            const connection = await openSottoStorageConnection(databaseUrl, instance.schema);
+            let commits = 0;
+            return {
+              ...connection,
+              async query(sql, values) {
+                if (commits === 2 && !injected && sql !== 'BEGIN ISOLATION LEVEL SERIALIZABLE') {
+                  injected = true;
+                  await connection.query('SELECT value FROM serialization_conflict', []);
+                  await other.query('UPDATE serialization_conflict SET value = 2');
+                  await connection.query('UPDATE serialization_conflict SET value = 3', []);
+                }
+                const result = await connection.query(sql, values);
+                if (sql === 'COMMIT') commits++;
+                return result;
+              },
+            };
+          },
+        })
+      ).rejects.toMatchObject({ code: '40001' });
+      expect(injected).toBe(true);
+      const current = await sottoTransaction(instance.database, (database) =>
+        new CleanupExecutionJournal(
+          {
+            query: (sql, values) =>
+              database.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...values),
+          },
+          'postgres',
+          SIDEDOOR_STATE_ID
+        ).current(prepared.binding)
+      );
+      expect(current?.status).toBe('settled');
+      await runSottoStorageCleanup(instance.database, job.id, {
+        openConnection: () => openSottoStorageConnection(databaseUrl, instance.schema),
+      });
+    } finally {
+      await other.end();
+    }
+  });
+
   it('does not settle an earlier unresolved cleanup execution', async () => {
     const root = await mkdtemp(join(tmpdir(), 'sotto-cleanup-prior-execution-'));
     roots.push(root);

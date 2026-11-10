@@ -27,24 +27,64 @@ import {
 } from '@/lib/sidedoor/jobs/stitch/speaking-grading-deletion';
 import { runSottoStorageCleanup } from '@/lib/sidedoor/storage/migration/storage-cleanup-runtime';
 import { isSerializationConflict } from 'thesidedoor-core/storage/sql';
+import {
+  CLASS_PREPARATION_QUEUE,
+  classPreparationStore,
+  classPreparationPayload,
+  validateClassPreparation,
+} from '@/lib/classes/preparation/runtime';
+import { classPreparationGrant } from '@/lib/classes/preparation-grant';
+import { sottoJobExecutions } from '@/lib/sidedoor/jobs/core/job-execution-lifetime';
+import { SIDEDOOR_STATE_ID } from '@/lib/sidedoor/access/state/store';
+import { hasUnsettledClassSpeakingReferenceWrites } from '@/lib/classes/speaking/speaking-write-settlement';
+import { hasClassStorageWrites } from './storage-writes';
 
 export async function deleteClassForUser(
   classId: string,
   userId: string,
-  execution: import('@/lib/sidedoor/credentials/runtime/provider-execution').SottoProviderExecution
+  execution: import('@/lib/sidedoor/credentials/runtime/provider-execution').SottoProviderExecution,
+  expectedPreparation?: {
+    operationId: string;
+    courseId: string;
+    createdAt: number;
+    attempt: number;
+  },
+  expectedLegacy?: { courseId: string; createdAt: number; attempt: number }
 ): Promise<boolean> {
   const existing = await prismaUnfiltered.courseClass.findFirst({
     where: { id: classId, course: { userId } },
     select: { id: true, createdAt: true, courseId: true },
   });
   if (!existing) {
+    if (expectedLegacy) return false;
     const recovered = await sottoTransaction(
       prismaUnfiltered,
       async (database) => {
         const actor = await execution.authorize(database);
         if (actor.userId !== userId) throw new PrerequisiteDeletionConflict();
+        if (expectedPreparation) {
+          const operation = await validateClassPreparation(
+            database,
+            expectedPreparation.courseId,
+            expectedPreparation.operationId,
+            true
+          );
+          if (
+            operation.userId !== userId ||
+            operation.classId !== classId ||
+            operation.intent ||
+            operation.result === 'created' ||
+            !['FAILED', 'CANCELLED'].includes(operation.status)
+          )
+            throw new PrerequisiteDeletionConflict();
+        }
         try {
-          return await recoverPrerequisiteClassDeletion(database, classId, userId);
+          return await recoverPrerequisiteClassDeletion(
+            database,
+            classId,
+            userId,
+            expectedPreparation
+          );
         } catch (error) {
           if (isSerializationConflict(error) || execution.signal?.aborted) throw error;
           logger.error('Class prerequisite cleanup proof could not be verified', {
@@ -57,10 +97,11 @@ export async function deleteClassForUser(
     );
     if (!recovered) return false;
     for (const cleanup of [recovered, ...recovered.episodeJobs]) {
-      if (cleanup.phase === 'complete') continue;
+      if (cleanup.phase === 'complete' || !cleanup.id) continue;
       try {
         await runSottoStorageCleanup(prismaUnfiltered, cleanup.id, { signal: execution.signal });
       } catch (error) {
+        if (expectedPreparation) throw error;
         logger.error('Class prerequisite cleanup remains pending', {
           classId,
           jobId: cleanup.id,
@@ -95,7 +136,7 @@ export async function deleteClassForUser(
         `class:${classId}`,
         existing.createdAt.getTime()
       );
-      return { jobs: jobs.jobs, legacy };
+      return { jobs: jobs.jobs, legacy, hasWrites: await hasClassStorageWrites(database, classId) };
     },
     { timeoutMs: 60_000, signal: execution.signal }
   );
@@ -109,6 +150,7 @@ export async function deleteClassForUser(
     savedFence ||
     classJobs.jobs.length ||
     classJobs.legacy.length ||
+    classJobs.hasWrites ||
     promptReferences ||
     listeningReferences
       ? await captureStorageBackend()
@@ -119,12 +161,16 @@ export async function deleteClassForUser(
     async (database) => {
       const actor = await execution.authorize(database);
       if (actor.userId !== userId) throw new PrerequisiteDeletionConflict();
+      if (expectedPreparation || expectedLegacy)
+        await database.$queryRaw`SELECT id FROM "CourseClass" WHERE id = ${classId} FOR UPDATE`;
       const cls = await database.courseClass.findFirst({
         where: { id: classId, course: { userId } },
         select: {
           id: true,
           createdAt: true,
           courseId: true,
+          status: true,
+          attempt: true,
           worksheetPdfUrl: true,
           course: { select: { activeClassId: true } },
         },
@@ -132,6 +178,69 @@ export async function deleteClassForUser(
       if (!cls) return null;
       if (cls.createdAt.getTime() !== existing.createdAt.getTime())
         throw new PrerequisiteDeletionConflict();
+      if (expectedLegacy) {
+        if (
+          cls.courseId !== expectedLegacy.courseId ||
+          cls.createdAt.getTime() !== expectedLegacy.createdAt ||
+          cls.status !== 'GENERATING' ||
+          cls.attempt !== expectedLegacy.attempt ||
+          (await classPreparationStore(database, cls.courseId).read()) ||
+          (await hasUnsettledClassSpeakingReferenceWrites(database, cls.courseId, classId))
+        )
+          throw new PrerequisiteDeletionConflict();
+      }
+      if (expectedPreparation) {
+        if (
+          cls.courseId !== expectedPreparation.courseId ||
+          cls.createdAt.getTime() !== expectedPreparation.createdAt ||
+          cls.status !== 'GENERATING' ||
+          cls.attempt !== expectedPreparation.attempt
+        )
+          throw new PrerequisiteDeletionConflict();
+        const operation = await validateClassPreparation(
+          database,
+          cls.courseId,
+          expectedPreparation.operationId,
+          true
+        );
+        if (
+          operation.userId !== userId ||
+          operation.classId !== classId ||
+          operation.intent ||
+          operation.result === 'created' ||
+          !['FAILED', 'CANCELLED'].includes(operation.status)
+        )
+          throw new PrerequisiteDeletionConflict();
+        const job = await sottoJobOutbox(database).read(operation.id);
+        const grant = await classPreparationGrant(database, operation).read(operation.grant);
+        const payload = classPreparationPayload.safeParse(job?.job.payload);
+        const ownership = await captureCourseStorage(database, cls.courseId);
+        if (
+          !job?.complete ||
+          job.job.namespace !== SIDEDOOR_STATE_ID ||
+          job.job.handler !== CLASS_PREPARATION_QUEUE ||
+          job.job.version !== 1 ||
+          !payload.success ||
+          payload.data.courseId !== cls.courseId ||
+          payload.data.operationId !== operation.id ||
+          ownership.scopes.length !== job.job.scopes.length ||
+          ownership.scopes.some(
+            (scope) =>
+              !job.job.scopes.some(
+                (saved) =>
+                  saved.subjectId === scope.subjectId && saved.generation === scope.generation
+              )
+          ) ||
+          grant.status !== 'revoked'
+        )
+          throw new PrerequisiteDeletionConflict();
+        const executions = sottoJobExecutions(database);
+        if (await executions.blockingStatus(operation.id, job.fingerprint))
+          throw new PrerequisiteDeletionConflict();
+        await executions.requireParentDrained(operation.id, job.fingerprint);
+        if (await hasUnsettledClassSpeakingReferenceWrites(database, cls.courseId, classId))
+          throw new PrerequisiteDeletionConflict();
+      }
       const inventory = await inspectPrerequisiteDeletion(database, classId, cls.courseId, userId, {
         allowAssessmentSpeaking: true,
       });
@@ -187,6 +296,7 @@ export async function deleteClassForUser(
         },
         speaking
       );
+      const classWrites = await hasClassStorageWrites(database, classId);
       const hasWork =
         inventory.operations.length ||
         inventory.assessmentOperations.length ||
@@ -195,6 +305,7 @@ export async function deleteClassForUser(
         legacy.length ||
         speaking.length ||
         classSpeakingMedia ||
+        classWrites ||
         listening.length;
       if (hasWork && !backend) throw new PrerequisiteDeletionConflict();
       let job = null;
@@ -207,6 +318,7 @@ export async function deleteClassForUser(
           legacy.length ||
           inventory.audio.episodeIds.length ||
           classSpeakingMedia ||
+          classWrites ||
           listening.length
         ) {
           const episodeIds = listening.map((subject) => subject.subjectId.slice('episode:'.length));
@@ -230,13 +342,21 @@ export async function deleteClassForUser(
           });
         } else job = await admitPrerequisiteClassDeletion(database, inventory, backend, speaking);
       }
-      if (job)
+      if (job || expectedPreparation)
         await recordPrerequisiteClassDeletion(database, {
           classId,
           classGeneration: cls.createdAt.getTime(),
           userId,
-          jobId: job.id,
+          jobId: job?.id ?? null,
           episodeJobs,
+          ...(expectedPreparation
+            ? {
+                preparation: {
+                  operationId: expectedPreparation.operationId,
+                  attempt: expectedPreparation.attempt,
+                },
+              }
+            : {}),
         });
       await database.courseClass.delete({ where: { id: classId } });
       const episodeIds = [
@@ -260,6 +380,7 @@ export async function deleteClassForUser(
     try {
       await runSottoStorageCleanup(prismaUnfiltered, jobId, { signal: execution.signal });
     } catch (error) {
+      if (expectedPreparation) throw error;
       logger.error('Class prerequisite cleanup remains pending', {
         classId,
         jobId,

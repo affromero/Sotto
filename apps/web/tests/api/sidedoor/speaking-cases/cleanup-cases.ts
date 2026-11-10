@@ -41,6 +41,43 @@ interface SpeakingCleanupContext {
 }
 
 export function registerSpeakingCleanupCases(getContext: () => SpeakingCleanupContext) {
+  it('keeps a legacy class when its generation status changed before cancellation', async () => {
+    const { instance, identity, classId } = getContext();
+    const cls = await instance.database.courseClass.update({
+      where: { id: classId },
+      data: { status: 'GENERATING' },
+    });
+    const expected = {
+      courseId: cls.courseId,
+      createdAt: cls.createdAt.getTime(),
+      attempt: cls.attempt,
+    };
+    const execution = {
+      userId: identity.ownerId,
+      authorize: async () => ({ userId: identity.ownerId }),
+    };
+    await instance.database.courseClass.update({
+      where: { id: classId },
+      data: { status: 'AVAILABLE' },
+    });
+    await expect(
+      deleteClassForUser(classId, identity.ownerId, execution, undefined, expected)
+    ).rejects.toThrow();
+    expect(
+      await instance.database.courseClass.findUnique({ where: { id: classId } })
+    ).toMatchObject({
+      status: 'AVAILABLE',
+    });
+    await instance.database.courseClass.update({
+      where: { id: classId },
+      data: { status: 'GENERATING' },
+    });
+    await expect(
+      deleteClassForUser(classId, identity.ownerId, execution, undefined, expected)
+    ).resolves.toBe(true);
+    expect(await instance.database.courseClass.findUnique({ where: { id: classId } })).toBeNull();
+  });
+
   it('retries interrupted class listening cleanup and removes the episode audio', async () => {
     const { instance, identity, classId } = getContext();
     const episode = await instance.database.episode.create({

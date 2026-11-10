@@ -1,4 +1,4 @@
-import { Client } from 'pg';
+import { Client, DatabaseError } from 'pg';
 import { openPostgresDedicatedConnection } from 'thesidedoor-core/storage';
 
 /** Requires direct PostgreSQL or session pooling. Transaction pooling cannot hold session locks. */
@@ -27,6 +27,7 @@ export async function openSottoStorageConnection(
       query: async (sql, values) =>
         (await client.query<Record<string, unknown>>(sql, [...values])).rows,
       end: () => client.end(),
+      isTransactionAborted: (error) => error instanceof DatabaseError && error.code === '40001',
       onError(listener) {
         client.on('error', listener);
         return () => {

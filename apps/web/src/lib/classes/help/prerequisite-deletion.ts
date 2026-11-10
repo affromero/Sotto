@@ -2,6 +2,10 @@ import { isDeepStrictEqual } from 'node:util';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import {
+  classCleanupReceiptId,
+  classCleanupReceiptSchema,
+} from './lifecycle/class-cleanup-receipt';
+import {
   prepareStorageBackend,
   prepareStorageCleanup,
   StorageBackendRegistry,
@@ -56,29 +60,24 @@ export class PrerequisiteDeletionConflict extends Error {
   }
 }
 
-const classCleanupReceiptSchema = z
-  .object({
-    classId: z.string().min(1),
-    classGeneration: z.number().int().nonnegative().safe(),
-    userId: z.string().min(1),
-    userGeneration: z.number().int().nonnegative().safe(),
-    jobId: z.uuid(),
-    episodeJobs: z
-      .array(
-        z
-          .object({
-            episodeId: z.string().min(1),
-            generation: z.number().int().nonnegative().safe(),
-            jobId: z.uuid(),
-          })
-          .strict()
-      )
-      .optional(),
-  })
-  .strict();
-
-function classCleanupReceiptId(classId: string) {
-  return `${SIDEDOOR_STATE_ID}:class-cleanup:${classId}`;
+export async function readPreparationClassCleanup(
+  database: Prisma.TransactionClient,
+  classId: string,
+  userId: string,
+  operationId: string
+) {
+  const row = await database.sidedoorState.findUnique({
+    where: { id: classCleanupReceiptId(classId) },
+  });
+  if (!row) return null;
+  const receipt = classCleanupReceiptSchema.parse(row.state);
+  if (
+    receipt.classId !== classId ||
+    receipt.userId !== userId ||
+    receipt.preparation?.operationId !== operationId
+  )
+    throw new PrerequisiteDeletionConflict();
+  return { id: classId, createdAt: receipt.classGeneration, attempt: receipt.preparation.attempt };
 }
 
 async function readEpisodeCleanupJobs(
@@ -117,7 +116,8 @@ export async function recordPrerequisiteClassDeletion(
     classId: string;
     classGeneration: number;
     userId: string;
-    jobId: string;
+    jobId: string | null;
+    preparation?: { operationId: string; attempt: number };
     episodeJobs?: { episodeId: string; generation: number; jobId: string }[];
   }
 ) {
@@ -139,19 +139,22 @@ export async function recordPrerequisiteClassDeletion(
     'postgres',
     SIDEDOOR_STATE_ID
   ).tombstone(subjectId);
-  const job = await new StorageCleanupJournal(executor, 'postgres', SIDEDOOR_STATE_ID).get(
-    input.jobId
-  );
+  const job = input.jobId
+    ? await new StorageCleanupJournal(executor, 'postgres', SIDEDOOR_STATE_ID).get(input.jobId)
+    : null;
   if (
     !cls ||
     cls.createdAt.getTime() !== input.classGeneration ||
-    !tombstone ||
-    tombstone.jobId !== input.jobId ||
-    tombstone.generation !== input.classGeneration ||
-    job.subjectId !== subjectId ||
-    job.generation !== input.classGeneration ||
-    job.namespace !== SIDEDOOR_STATE_ID ||
-    job.retentionPolicy !== 'job-id-snapshots-v1'
+    (input.jobId === null
+      ? !input.preparation || Boolean(tombstone) || Boolean(input.episodeJobs?.length)
+      : !tombstone ||
+        tombstone.jobId !== input.jobId ||
+        tombstone.generation !== input.classGeneration ||
+        !job ||
+        job.subjectId !== subjectId ||
+        job.generation !== input.classGeneration ||
+        job.namespace !== SIDEDOOR_STATE_ID ||
+        job.retentionPolicy !== 'job-id-snapshots-v1')
   )
     throw new PrerequisiteDeletionConflict();
   const episodeIds = new Set<string>();
@@ -224,19 +227,28 @@ export async function eraseCompletedClassCleanupReceipts(
       if (row.id !== classCleanupReceiptId(saved.classId) || (userId && saved.userId !== userId))
         throw new PrerequisiteDeletionConflict();
       const tombstone = await writes.tombstone(`class:${saved.classId}`);
-      const job = await cleanup.get(saved.jobId);
+      const job = saved.jobId ? await cleanup.get(saved.jobId) : null;
       const episodeJobs = await readEpisodeCleanupJobs(writes, cleanup, saved.episodeJobs ?? []);
       if (
-        !tombstone ||
-        tombstone.jobId !== saved.jobId ||
-        tombstone.generation !== saved.classGeneration ||
-        job.subjectId !== `class:${saved.classId}` ||
-        job.generation !== saved.classGeneration ||
-        job.namespace !== SIDEDOOR_STATE_ID ||
-        job.id !== saved.jobId ||
-        job.retentionPolicy !== 'job-id-snapshots-v1' ||
-        job.phase !== 'complete' ||
-        episodeJobs.some((entry) => entry.phase !== 'complete')
+        saved.jobId === null
+          ? Boolean(tombstone) ||
+            Boolean(
+              await database.courseClass.findUnique({
+                where: { id: saved.classId },
+                select: { id: true },
+              })
+            )
+          : !tombstone ||
+            tombstone.jobId !== saved.jobId ||
+            tombstone.generation !== saved.classGeneration ||
+            !job ||
+            job.subjectId !== `class:${saved.classId}` ||
+            job.generation !== saved.classGeneration ||
+            job.namespace !== SIDEDOOR_STATE_ID ||
+            job.id !== saved.jobId ||
+            job.retentionPolicy !== 'job-id-snapshots-v1' ||
+            job.phase !== 'complete' ||
+            episodeJobs.some((entry) => entry.phase !== 'complete')
       )
         throw new PrerequisiteDeletionConflict(
           'Finish pending class cleanup before deleting this profile.'
@@ -844,7 +856,8 @@ export async function admitPrerequisiteClassDeletion(
 export async function recoverPrerequisiteClassDeletion(
   database: Prisma.TransactionClient,
   classId: string,
-  userId: string
+  userId: string,
+  expectedPreparation?: { operationId: string; attempt: number; createdAt: number }
 ) {
   if (await database.courseClass.findUnique({ where: { id: classId }, select: { id: true } }))
     return null;
@@ -861,6 +874,26 @@ export async function recoverPrerequisiteClassDeletion(
   const writes = new StorageWriteJournal(executor, 'postgres', SIDEDOOR_STATE_ID);
   if (await writes.tombstone(`profile:${userId}`)) return null;
   const tombstone = await writes.tombstone(subjectId);
+  const receipt = await database.sidedoorState.findUnique({
+    where: { id: classCleanupReceiptId(classId) },
+  });
+  if (receipt) {
+    const saved = classCleanupReceiptSchema.parse(receipt.state);
+    if (saved.jobId === null) {
+      if (
+        tombstone ||
+        !expectedPreparation ||
+        saved.classId !== classId ||
+        saved.userId !== userId ||
+        saved.userGeneration !== user.createdAt.getTime() ||
+        saved.preparation?.operationId !== expectedPreparation.operationId ||
+        saved.preparation.attempt !== expectedPreparation.attempt ||
+        saved.classGeneration !== expectedPreparation.createdAt
+      )
+        return null;
+      return { id: null, phase: 'complete' as const, episodeJobs: [] };
+    }
+  }
   if (!tombstone) return null;
   const job = await new StorageCleanupJournal(executor, 'postgres', SIDEDOOR_STATE_ID).get(
     tombstone.jobId
@@ -873,9 +906,6 @@ export async function recoverPrerequisiteClassDeletion(
     job.retentionPolicy !== 'job-id-snapshots-v1'
   )
     throw new PrerequisiteDeletionConflict();
-  const receipt = await database.sidedoorState.findUnique({
-    where: { id: classCleanupReceiptId(classId) },
-  });
   if (receipt) {
     const saved = classCleanupReceiptSchema.parse(receipt.state);
     if (
@@ -883,7 +913,11 @@ export async function recoverPrerequisiteClassDeletion(
       saved.classGeneration !== tombstone.generation ||
       saved.userId !== userId ||
       saved.userGeneration !== user.createdAt.getTime() ||
-      saved.jobId !== job.id
+      saved.jobId !== job.id ||
+      (expectedPreparation &&
+        (saved.preparation?.operationId !== expectedPreparation.operationId ||
+          saved.preparation.attempt !== expectedPreparation.attempt ||
+          saved.classGeneration !== expectedPreparation.createdAt))
     )
       return null;
     const episodeJobs = await readEpisodeCleanupJobs(
@@ -893,6 +927,7 @@ export async function recoverPrerequisiteClassDeletion(
     );
     return { id: job.id, phase: job.phase, episodeJobs };
   }
+  if (expectedPreparation) throw new PrerequisiteDeletionConflict();
   const outbox = sottoJobOutbox(database);
   const remaining = new Map<string, string>();
   let cursor: string | null = null;

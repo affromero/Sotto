@@ -12,13 +12,9 @@ import { claimClassRegenerationInTransaction } from '../learning/classes/formati
 import { readPristine } from './regeneration/pristine';
 import { targetFingerprint } from './regeneration/target-fingerprint';
 export { preparationProgress } from './generation/preparation-progress';
-import {
-  learningSpeechFingerprint,
-  matchesLearningSpeechFingerprint,
-} from '../learning/speech-configuration';
+import { learningSpeechFingerprint } from '../learning/speech-configuration';
 import { createHash, randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
-import { sqlStateBackend } from 'thesidedoor-core/storage/sql';
 import { prepareJob } from 'thesidedoor-core/runtime/outbox';
 import { z } from 'zod';
 import { delegationGrantBinding, type DelegationGrant } from 'thesidedoor-core/runtime/delegation';
@@ -37,9 +33,13 @@ import { sottoJobExecutions } from '@/lib/sidedoor/jobs/core/job-execution-lifet
 import { settlePreparationAudio } from './preparation-audio-settlement';
 import { writingRepairSourceHash } from './repair/writing-repair-source';
 import { speakingRepairSourceHash } from './repair/speaking-repair-source';
-import { hasUnsettledSpeakingReferenceWrites } from './speaking/speaking-write-settlement';
+import {
+  hasUnsettledClassSpeakingReferenceWrites,
+  hasUnsettledSpeakingReferenceWrites,
+} from './speaking/speaking-write-settlement';
 import { grammarRepairSourceHash } from './repair/grammar-repair-source';
 import { requireStageGuard } from './staging/stage-guard';
+import { isEmptyLegacyPreparationCleanup } from './preparation/legacy-cleanup';
 import {
   readLearningFailure,
   writeLearningFailure,
@@ -49,140 +49,26 @@ import {
 import {
   admitPreparation,
   cancelPreparation,
-  preparationStore,
   PreparationConflictError,
   newClassPreparationId,
   type ClassPreparation,
 } from './preparation-state';
 
-export const CLASS_PREPARATION_QUEUE = 'class-preparation';
-export const classPreparationPayload = z
-  .object({
-    courseId: z.string().min(1),
-    operationId: z.uuid(),
-    sourceUrl: z.string().url().max(4000).optional(),
-    topic: z.string().max(2000).optional(),
-  })
-  .strict();
-
-export function classPreparationBackend(database: Prisma.TransactionClient, courseId: string) {
-  return sqlStateBackend(
-    {
-      query: (sql, values) => database.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...values),
-    },
-    'postgres',
-    `${SIDEDOOR_STATE_ID}:class-preparation:${createHash('sha256').update(courseId).digest('hex')}`
-  );
-}
-
-export const classPreparationStore = (database: Prisma.TransactionClient, courseId: string) =>
-  preparationStore(classPreparationBackend(database, courseId));
-
-export async function validateClassPreparation(
-  database: Prisma.TransactionClient,
-  courseId: string,
-  operationId: string,
-  allowTerminal = false
-) {
-  const operation = await classPreparationStore(database, courseId).read();
-  if (!operation || operation.id !== operationId)
-    throw new PreparationConflictError('The preparation task was replaced.');
-  const ownership = await captureCourseStorage(database, courseId);
-  if (
-    ownership.userId !== operation.userId ||
-    ownership.instanceId !== operation.instanceId ||
-    !ownership.scopes.some(
-      (scope) =>
-        scope.subjectId === `course:${courseId}` && scope.generation === operation.courseCreatedAt
-    ) ||
-    !ownership.scopes.some(
-      (scope) =>
-        scope.subjectId === `profile:${operation.userId}` &&
-        scope.generation === operation.userCreatedAt
-    )
-  )
-    throw new PreparationConflictError('The preparation owner changed.');
-  if (!allowTerminal && (operation.status !== 'RUNNING' || Date.now() >= operation.expiresAt))
-    throw new PreparationConflictError('The preparation task is no longer authorized.');
-  if (!allowTerminal) {
-    await classPreparationGrant(database, operation).validate(operation.grant);
-    if (operation.intent) {
-      const target = await database.courseClass.findFirst({
-        where: {
-          id: operation.intent.classId,
-          courseId,
-          attempt: operation.intent.attempt,
-          status: 'GENERATING',
-        },
-      });
-      if (
-        !target ||
-        targetFingerprint(target) !== operation.intent.classFingerprint ||
-        JSON.stringify(readSkillRequirements(target.skillRequirements)) !==
-          JSON.stringify(operation.requirements)
-      )
-        throw new PreparationConflictError('The admitted class repair attempt changed.');
-      if (operation.intent.retry) {
-        const retry = operation.intent.retry;
-        const [skill] = operation.intent.skills;
-        if (!retry.sourceReceipt || operation.intent.skills.length !== 1 || !skill)
-          throw new PreparationConflictError('The admitted quiz retry source is unavailable.');
-        await database.$queryRaw`SELECT id FROM "CourseClass" WHERE id = ${target.id} FOR UPDATE`;
-        await requireRepairQuizFence(database);
-        await database.$queryRaw`
-          SELECT id FROM "ClassSection"
-          WHERE "classId" = ${target.id} AND skill::text = ${skill}
-            AND attempt < ${operation.intent.attempt}
-          ORDER BY id FOR UPDATE
-        `;
-        const source = await database.courseClass.findUniqueOrThrow({
-          where: { id: target.id },
-          include: {
-            sections: {
-              where: { skill, attempt: { lt: operation.intent.attempt } },
-              include: { questions: true },
-            },
-          },
-        });
-        if (
-          source.progressRevision !== retry.expectedRevision + 1 ||
-          quizRetrySourceDigest(source, skill, operation.intent.attempt) !==
-            retry.sourceReceipt.digest
-        )
-          throw new PreparationConflictError('The saved quiz retry source changed.');
-      }
-    }
-    if (operation.requirements) {
-      const course = await database.course.findUniqueOrThrow({
-        where: { id: courseId },
-        select: {
-          nativeLang: true,
-          targetLang: true,
-          currentLevel: true,
-        },
-      });
-      if (
-        !operation.intent &&
-        (course.nativeLang !== operation.requirements.nativeLang ||
-          course.targetLang !== operation.requirements.targetLang ||
-          course.currentLevel !== (operation.courseLevel ?? operation.requirements.level))
-      )
-        throw new PreparationConflictError('The admitted class language or level changed.');
-      if (
-        !(await matchesLearningSpeechFingerprint(
-          database,
-          async () => ({ userId: operation.userId }),
-          operation.requirements,
-          operation.speechFingerprint
-        ))
-      )
-        throw new PreparationConflictError(
-          'The selected speech model, endpoint or credential changed.'
-        );
-    }
-  }
-  return operation;
-}
+import {
+  CLASS_PREPARATION_QUEUE,
+  classPreparationBackend,
+  classPreparationPayload,
+  classPreparationStore,
+  validateClassPreparation,
+  validatePreparationSchedule,
+} from './preparation/runtime';
+export {
+  CLASS_PREPARATION_QUEUE,
+  classPreparationBackend,
+  classPreparationPayload,
+  classPreparationStore,
+  validateClassPreparation,
+} from './preparation/runtime';
 
 /** The operation and outbox record commit before callers receive an accepted response. */
 export async function requestClassPreparation(
@@ -206,34 +92,19 @@ export async function requestClassPreparation(
   } = {}
 ): Promise<ClassPreparation> {
   const now = Date.now();
-  const availableAt = input.availableAt ?? now;
-  const budgeted =
-    input.maxProviderRequests !== undefined || input.deferAudio === true || availableAt > now;
-  const maxProviderRequests = budgeted
-    ? z
-        .number()
-        .int()
-        .min(1)
-        .max(256)
-        .parse(input.maxProviderRequests ?? 128)
-    : null;
-  const timeZone = input.timeZone ?? 'UTC';
-  try {
-    new Intl.DateTimeFormat('en', { timeZone }).format(now);
-  } catch {
-    throw new PreparationConflictError('Choose a valid time zone.');
-  }
-  if (availableAt > now && input.deferAudio !== true)
-    throw new PreparationConflictError(
-      'Scheduled preparation requires audio review before generation.'
-    );
-  if (
-    !Number.isSafeInteger(availableAt) ||
-    availableAt < now - 60_000 ||
-    availableAt > now + 7 * 86_400_000
-  )
-    throw new PreparationConflictError('Choose a preparation time within the next seven days.');
+  const { availableAt, budgeted, maxProviderRequests, timeZone } = validatePreparationSchedule(
+    input,
+    now
+  );
   const revision = randomUUID();
+  classPreparationPayload.parse({
+    courseId,
+    operationId: revision,
+    ...(input.sourceUrl ? { sourceUrl: input.sourceUrl } : {}),
+    ...(input.topic ? { topic: input.topic } : {}),
+  });
+  if (input.expectedPreviousPreparation && input.intent)
+    throw new PreparationConflictError('Choose either a new class or an existing class.');
   const inputFingerprint = createHash('sha256')
     .update(JSON.stringify({ sourceUrl: input.sourceUrl || null, topic: input.topic || null }))
     .digest('hex');
@@ -251,6 +122,69 @@ export async function requestClassPreparation(
     credentialFingerprint: learningCredentialFingerprint(ai.execution.credential),
     moderationCredentialFingerprint: learningCredentialFingerprint(moderationCredential),
   };
+  const previous = await sottoTransaction(
+    prisma,
+    async (database) => {
+      const actor = await execution.authorize(database);
+      if (actor.userId !== execution.userId) throw new PreparationConflictError();
+      if (ai.execution.credential)
+        await validateSottoExecutionCredential(
+          database,
+          execution.authorize,
+          ai.execution.credential,
+          execution.signal
+        );
+      if (moderationCredential)
+        await validateSottoExecutionCredential(
+          database,
+          execution.authorize,
+          moderationCredential,
+          execution.signal
+        );
+      if (!input.intent) {
+        const course = await database.course.findFirst({
+          where: { id: courseId, userId: actor.userId },
+          select: { nativeLang: true, targetLang: true, currentLevel: true },
+        });
+        if (!course) throw new PreparationConflictError('Course not found.');
+        const requirements = await resolveSkillRequirementsInTransaction(database, execution, {
+          scope: 'CLASS',
+          nativeLang: course.nativeLang,
+          targetLang: course.targetLang,
+          level: course.currentLevel as CefrLevel,
+        });
+        await learningSpeechFingerprint(
+          database,
+          execution.authorize,
+          requirements,
+          execution.signal
+        );
+      }
+      if (input.expectedPreviousPreparation) {
+        const cls = await database.courseClass.findUnique({
+          where: { id: input.expectedPreviousPreparation.classId },
+          select: { courseId: true, status: true },
+        });
+        if (cls && (cls.courseId !== courseId || cls.status !== 'GENERATING'))
+          throw new PreparationConflictError('The unpublished class changed. Refresh its status.');
+        return input.expectedPreviousPreparation;
+      }
+      if (input.intent) return null;
+      const current = await classPreparationStore(database, courseId).read();
+      if (
+        !current ||
+        current.userId !== actor.userId ||
+        current.intent ||
+        current.result === 'created' ||
+        !current.classId ||
+        !['FAILED', 'CANCELLED'].includes(current.status)
+      )
+        return null;
+      return { operationId: current.id, classId: current.classId };
+    },
+    { signal: execution.signal }
+  );
+  if (previous) await cancelClassPreparation(courseId, execution, previous);
   const result = await sottoTransaction(
     prisma,
     async (database) => {
@@ -307,6 +241,25 @@ export async function requestClassPreparation(
         const cleanup = await settlePreparationCleanup(database, current);
         current = cleanup.operation;
         if (!cleanup.settled) return { cleanupBlocked: true as const };
+        if (cleanup.cleanupClass) {
+          const { recoverPrerequisiteClassDeletion } = await import('./help/prerequisite-deletion');
+          const recovered = await recoverPrerequisiteClassDeletion(
+            database,
+            cleanup.cleanupClass.id,
+            current.userId,
+            {
+              operationId: current.id,
+              attempt: cleanup.cleanupClass.attempt,
+              createdAt: cleanup.cleanupClass.createdAt,
+            }
+          );
+          if (
+            !recovered ||
+            recovered.phase !== 'complete' ||
+            recovered.episodeJobs.some((job) => job.phase !== 'complete')
+          )
+            return { cleanupBlocked: true as const };
+        }
         if (
           input.expectedPreviousPreparation &&
           (await database.courseClass.findUnique({
@@ -703,14 +656,14 @@ export async function cancelClassPreparation(
   execution: SottoProviderExecution,
   terminalCleanup?: { operationId: string; classId: string }
 ) {
-  return sottoTransaction(
+  const result = await sottoTransaction(
     prisma,
     async (database) => {
       const actor = await execution.authorize(database);
       const operation = await classPreparationStore(database, courseId).read();
       if (!operation) {
         if (terminalCleanup) throw new PreparationConflictError('The failed preparation changed.');
-        return null;
+        return { operation: null, cleanupClass: null };
       }
       await validateClassPreparation(database, courseId, operation.id, true);
       if (actor.userId !== operation.userId)
@@ -730,8 +683,9 @@ export async function cancelClassPreparation(
         Object.assign(current, cancelPreparation(current, Date.now()));
         return current;
       });
-      if (!terminalCleanup) return settleCancelledPreparation(database, cancelled);
       const cleanup = await settlePreparationCleanup(database, cancelled);
+      if (cleanup.cleanupClass) return cleanup;
+      if (!terminalCleanup) return { operation: cleanup.operation, cleanupClass: null };
       if (
         !cleanup.settled ||
         (await database.courseClass.findUnique({
@@ -742,10 +696,31 @@ export async function cancelClassPreparation(
         throw new PreparationConflictError(
           'Execution cleanup is not confirmed. Check status before removing this class.'
         );
-      return cleanup.operation;
+      return { operation: cleanup.operation, cleanupClass: null };
     },
     { signal: execution.signal }
   );
+  if (!result.cleanupClass || !result.operation) return result.operation;
+  const { deleteClassForUser } = await import('./deletion/class-deletion');
+  try {
+    const deleted = await deleteClassForUser(result.cleanupClass.id, execution.userId, execution, {
+      operationId: result.operation.id,
+      courseId,
+      createdAt: result.cleanupClass.createdAt,
+      attempt: result.cleanupClass.attempt,
+    });
+    if (!deleted) throw new PreparationConflictError('The unpublished class changed.');
+  } catch (error) {
+    if (error instanceof PreparationConflictError) throw error;
+    const [{ PrerequisiteDeletionConflict }, { SpeakingDeletionConflict }] = await Promise.all([
+      import('./help/prerequisite-deletion'),
+      import('@/lib/sidedoor/jobs/stitch/speaking-grading-deletion'),
+    ]);
+    if (error instanceof PrerequisiteDeletionConflict || error instanceof SpeakingDeletionConflict)
+      throw new PreparationConflictError('Class media cleanup is not confirmed.');
+    throw error;
+  }
+  return result.operation;
 }
 
 export async function settleCancelledPreparation(
@@ -758,7 +733,11 @@ export async function settleCancelledPreparation(
 async function settlePreparationCleanup(
   database: Prisma.TransactionClient,
   operation: ClassPreparation
-): Promise<{ operation: ClassPreparation; settled: boolean }> {
+): Promise<{
+  operation: ClassPreparation;
+  settled: boolean;
+  cleanupClass?: { id: string; createdAt: number; attempt: number; deleted: boolean };
+}> {
   if (!['CANCELLING', 'CANCELLED', 'UNRESOLVED', 'FAILED'].includes(operation.status))
     return { operation, settled: false };
   const record = await sottoJobOutbox(database).read(operation.id);
@@ -883,19 +862,37 @@ async function settlePreparationCleanup(
         : { status: 'FAILED', failedAt: new Date() },
     });
   }
+  let cleanupClass:
+    { id: string; createdAt: number; attempt: number; deleted: boolean } | undefined;
   if (!operation.intent && operation.classId && operation.result !== 'created') {
     const unpublished = await database.courseClass.findFirst({
-      where: { id: operation.classId, courseId: operation.courseId, status: 'GENERATING' },
-      select: { id: true },
+      where: { id: operation.classId, courseId: operation.courseId },
+      select: { id: true, createdAt: true, attempt: true, status: true },
     });
     if (unpublished) {
-      await database.course.updateMany({
-        where: { id: operation.courseId, activeClassId: unpublished.id },
-        data: { activeClassId: null },
-      });
-      await database.courseClass.deleteMany({
-        where: { id: unpublished.id, courseId: operation.courseId, status: 'GENERATING' },
-      });
+      if (unpublished.status !== 'GENERATING') return { operation, settled: false };
+      if (
+        await hasUnsettledClassSpeakingReferenceWrites(database, operation.courseId, unpublished.id)
+      )
+        return { operation, settled: false };
+      cleanupClass = {
+        id: unpublished.id,
+        createdAt: unpublished.createdAt.getTime(),
+        attempt: unpublished.attempt,
+        deleted: false,
+      };
+    } else {
+      const { readPreparationClassCleanup } = await import('./help/prerequisite-deletion');
+      const receipt = await readPreparationClassCleanup(
+        database,
+        operation.classId,
+        operation.userId,
+        operation.id
+      );
+      if (!receipt) {
+        if (!(await isEmptyLegacyPreparationCleanup(database, operation)))
+          return { operation, settled: false };
+      } else cleanupClass = { ...receipt, deleted: true };
     }
   }
   await sottoJobOutbox(database).complete(operation.id, record.fingerprint);
@@ -910,7 +907,11 @@ async function settlePreparationCleanup(
     current.updatedAt = Date.now();
     return current;
   });
-  return { operation: settled, settled: true };
+  return {
+    operation: settled,
+    settled: !cleanupClass || cleanupClass.deleted,
+    ...(cleanupClass ? { cleanupClass } : {}),
+  };
 }
 
 /** Acknowledgement never substitutes for execution or descendant cleanup receipts. */

@@ -885,6 +885,7 @@ generationCases({
   makeRequest,
   mockAuthenticateRequest,
   mockCancelPreparation,
+  mockDeleteClassForUser,
   mockCourseClassDeleteMany,
   mockCourseFindFirst,
   mockCourseUpdateMany,
