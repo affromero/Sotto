@@ -16,6 +16,7 @@ import type {
 } from '../../../../helpers/setup/shared-instance';
 
 type CopyFixture = {
+  reference: string;
   options: Parameters<typeof executeSottoStorageCopy>[0];
   target: Parameters<typeof admitLearningStorageDeletion>[0]['currentBackend'];
   other: { id: string } | null;
@@ -28,6 +29,24 @@ export function registerGenerationScopeTests({
   fixture(episodeId?: string, shared?: boolean): Promise<CopyFixture>;
   context(): { instance: SharedTestInstance; identity: SharedTestIdentity };
 }) {
+  it('rejects mismatched readback bytes without publishing the new reference', async () => {
+    const { instance, identity } = context();
+    const test = await fixture();
+    const target = {
+      ...test.target,
+      downloadToFile: async (...args: Parameters<typeof test.target.downloadToFile>) => {
+        const content = await test.target.downloadToFile(...args);
+        return { ...content, bytes: content.bytes + 1 };
+      },
+    };
+    await expect(executeSottoStorageCopy({ ...test.options, target })).rejects.toThrow(
+      'readback does not match source bytes'
+    );
+    expect(
+      (await instance.database.user.findUniqueOrThrow({ where: { id: identity.ownerId } })).image
+    ).toBe(test.reference);
+  });
+
   it('rejects deletion when a relocation has lost its scope index and copy job', async () => {
     const { instance, identity } = context();
     const test = await fixture();

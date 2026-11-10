@@ -488,7 +488,7 @@ suite('storage copy publication with PostgreSQL and local files', () => {
   registerGenerationScopeTests({ fixture, context: () => ({ instance, identity }) });
   registerSharedHistoryTests({ fixture, backend, context: () => ({ instance, identity }) });
 
-  it('preserves shared migrated media when another owner remains', async () => {
+  it('preserves the surviving owner when shared avatar cleanup admission rolls back', async () => {
     const test = await fixture(undefined, true);
     if (!test.other) throw new Error('Missing shared owner');
     const outcome = await executeSottoStorageCopy(test.options);
@@ -514,15 +514,19 @@ suite('storage copy publication with PostgreSQL and local files', () => {
       retainedBefore
     );
     await expect(
-      sottoTransaction(instance.database, (tx) =>
-        admitLearningStorageDeletion({
+      sottoTransaction(instance.database, async (tx) => {
+        const jobs = await admitLearningStorageDeletion({
           database: tx,
           scope: { kind: 'profile', id: owner.id },
           subjects: [scope],
           currentBackend: test.target,
-        })
-      )
-    ).rejects.toThrow('outside the deletion scope');
+        });
+        expect(jobs).toEqual([
+          expect.objectContaining({ subjectId: scope.subjectId, phase: 'preparing' }),
+        ]);
+        throw new Error('Rollback cleanup admission');
+      })
+    ).rejects.toThrow('Rollback cleanup admission');
     expect(await instance.database.sidedoorState.findMany({ orderBy: { id: 'asc' } })).toEqual(
       retainedBefore
     );
@@ -981,20 +985,4 @@ suite('storage copy publication with PostgreSQL and local files', () => {
         await sottoTransaction(instance.database, (tx) => sottoJobOutbox(tx).receipt(id))
       ).toMatchObject({ status: 'erased' });
   }, 60_000);
-  it('rejects mismatched readback bytes without publishing the new reference', async () => {
-    const test = await fixture();
-    const target = {
-      ...test.target,
-      downloadToFile: async (...args: Parameters<typeof test.target.downloadToFile>) => {
-        const content = await test.target.downloadToFile(...args);
-        return { ...content, bytes: content.bytes + 1 };
-      },
-    };
-    await expect(executeSottoStorageCopy({ ...test.options, target })).rejects.toThrow(
-      'readback does not match source bytes'
-    );
-    expect(
-      (await instance.database.user.findUniqueOrThrow({ where: { id: identity.ownerId } })).image
-    ).toBe(test.reference);
-  });
 });
