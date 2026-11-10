@@ -32,7 +32,6 @@ def verify_retained_network(
     stopped = {'web': 'stopped', 'workers': 'stopped'}
     if inspect_predecessor(previous, successor) != stopped:
         raise ValueError('both-predecessor-writers-must-be-stopped')
-    previous.verify_storage()
     previous.verify_egress()
     topology = record(previous.manifest['topology'], 'review topology')
     services = record(topology['services'], 'review services')
@@ -116,7 +115,6 @@ def verify_retained_network(
     check_membership()
     if inspect_predecessor(previous, successor) != stopped:
         raise ValueError('predecessor-stop-evidence-changed')
-    previous.verify_storage()
     previous.verify_egress()
     successor.verify_fence()
     check_membership()

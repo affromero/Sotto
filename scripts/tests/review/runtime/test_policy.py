@@ -128,6 +128,7 @@ class HelperResourceBindingTests(unittest.TestCase):
                                     '--max-old-space-size=384'}
             original: dict[str, object] = {
                 'Id': 'b' * 64, 'Image': 'sha256:' + 'c' * 64,
+                'Name': '/original', 'HostConfig': {},
                 'Config': {'Env': ['NODE_OPTIONS=' +
                                    original_environment['NODE_OPTIONS']]},
                 'State': {'Running': True, 'Pid': 123},

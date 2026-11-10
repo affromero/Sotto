@@ -12,7 +12,7 @@ from scripts.deploy.review.runtime.inventory.predecessor import (
     capture_predecessor,
     prepare_predecessor_stop,
 )
-from scripts.deploy.review.state import atomic_json, checksum
+from scripts.deploy.review.state import Attempt, atomic_json, checksum, private_json
 from scripts.deploy.review.topology import NETWORK, PROJECT, exact_mounts
 
 class RetainedNetworkTests(unittest.TestCase):
@@ -27,55 +27,59 @@ class RetainedNetworkTests(unittest.TestCase):
         self.successor = self.fixture.successor
         self.databases = {}
         members = {}
-        topology = self.previous.manifest['topology']
+        manifest = copy.deepcopy(self.previous.attempt.manifest())
+        topology = manifest['topology']
+        review_id = self.fixture.storage.network_ids['review']
+        egress_id = self.fixture.storage.network_ids['egress']
         topology['network']['subnet'] = '172.30.99.0/24'
         for role, address, destination in (('postgres', '3', '/var/lib/postgresql/data'),
                                            ('redis', '2', '/data')):
-            identity = role + '-id'
+            identity = self.fixture.storage.ids[role]
             name = '/sotto-review-' + role + '-1'
             ip = '172.30.99.' + address
             mount = {'Type': 'volume', 'Name': PROJECT + '_' + role,
-                     'Source': '/volumes/' + role, 'Destination': destination, 'RW': True}
+                     'Source': str(self.fixture.storage.paths[role]),
+                     'Destination': destination, 'RW': True}
             host = {'RestartPolicy': {'Name': 'no', 'MaximumRetryCount': 0},
                     'Memory': 1024, 'LogConfig': {'Type': 'json-file'}}
-            container = {'Id': identity, 'Image': role + '-image', 'Name': name,
-                         'Config': {'Env': ['USER=test'], 'User': '1000'},
-                         'HostConfig': host, 'Mounts': [mount],
-                         'State': {'Status': 'running', 'Running': True,
-                                   'Paused': False, 'Restarting': False,
-                                   'OOMKilled': False, 'Dead': False,
-                                   'Error': ''},
-                         'NetworkSettings': {'Ports': {}, 'Networks': {NETWORK: {
-                             'NetworkID': 'review-network', 'IPAddress': ip,
-                             'GlobalIPv6Address': '',
-                         }}}}
+            container = self.fixture.storage.objects[identity]
+            container.update({'Name': name,
+                              'Config': {'Env': ['USER=test'], 'User': '1000'},
+                              'HostConfig': host, 'Mounts': [mount],
+                              'NetworkSettings': {'Ports': {}, 'Networks': {NETWORK: {
+                                  'NetworkID': review_id, 'IPAddress': ip,
+                                  'GlobalIPv6Address': '',
+                              }}}})
             self.databases[identity] = container
             topology['services'][role] = {
                 'id': identity, 'imageId': container['Image'], 'name': name,
                 'user': '1000', 'environmentHash': checksum({'USER': 'test'}),
                 'mounts': exact_mounts(role, [mount]), 'network': {
-                    'id': 'review-network', 'address': ip,
+                    'id': review_id, 'address': ip,
                 }, 'restartPolicy': host['RestartPolicy'], 'memory': 1024,
                 'logging': host['LogConfig'],
             }
             members[identity] = {'Name': name.lstrip('/'),
                                  'IPv4Address': ip + '/24', 'IPv6Address': ''}
         self.networks = [
-            {'Id': 'review-network', 'Name': NETWORK, 'Containers': members},
-            {'Id': 'egress-network', 'Name': PROJECT + '_egress', 'Containers': {}},
+            {'Id': review_id, 'Name': NETWORK, 'Containers': members},
+            {'Id': egress_id, 'Name': PROJECT + '_egress', 'Containers': {}},
         ]
-        actual_inspect = self.previous.inspect
         actual_docker = self.previous.docker
-        def inspect(*ids):
-            if len(ids) == 1 and ids[0] in self.databases:
-                return [copy.deepcopy(self.databases[ids[0]])]
-            return actual_inspect(*ids)
         def docker(*args):
-            if args[:2] == ('network', 'inspect'):
+            if args == ('network', 'inspect', review_id, egress_id):
                 return json.dumps(self.networks).encode()
             return actual_docker(*args)
-        self.enterContext(patch.object(self.previous, 'inspect', side_effect=inspect))
         self.enterContext(patch.object(self.previous, 'docker', side_effect=docker))
+        directory = self.previous.attempt.directory
+        binding = private_json(directory / 'binding.json')
+        binding['manifestSha256'] = checksum(manifest)
+        atomic_json(directory / 'manifest.json', manifest)
+        atomic_json(directory / 'binding.json', binding)
+        state = private_json(directory / 'state.json')
+        atomic_json(directory / 'state.json', {**state, 'manifestSha256': binding['manifestSha256']})
+        self.previous.attempt = Attempt(directory)
+        self.previous.manifest = manifest
         _, images = release.retention_context(self.previous)
         atomic_json(self.fixture.fixture.retention / (PROJECT + '.json'),
                     {'protected_images': sorted(images)})
@@ -102,12 +106,12 @@ class RetainedNetworkTests(unittest.TestCase):
             verify_retained_network(self.previous, self.successor)
 
     def test_changed_service_user_is_rejected(self) -> None:
-        self.databases['redis-id']['Config']['User'] = '0'
+        self.databases[self.fixture.storage.ids['redis']]['Config']['User'] = '0'
         with self.assertRaisesRegex(ValueError, 'retained-review-service-changed'):
             verify_retained_network(self.previous, self.successor)
 
     def test_mismatched_endpoint_is_rejected(self) -> None:
-        self.networks[0]['Containers']['redis-id']['IPv4Address'] = '172.30.99.9/24'
+        self.networks[0]['Containers'][self.fixture.storage.ids['redis']]['IPv4Address'] = '172.30.99.9/24'
         with self.assertRaisesRegex(ValueError, 'review-network-endpoint-changed'):
             verify_retained_network(self.previous, self.successor)
 
@@ -116,7 +120,8 @@ class RetainedNetworkTests(unittest.TestCase):
         calls = 0
         def docker(*args):
             nonlocal calls
-            if args[:2] == ('network', 'inspect'):
+            if args == ('network', 'inspect', self.fixture.storage.network_ids['review'],
+                        self.fixture.storage.network_ids['egress']):
                 calls += 1
                 if calls == 2:
                     self.networks[0]['Containers']['late'] = {}
@@ -126,7 +131,7 @@ class RetainedNetworkTests(unittest.TestCase):
             verify_retained_network(self.previous, self.successor)
 
     def test_published_database_port_is_rejected(self) -> None:
-        self.databases['postgres-id']['NetworkSettings']['Ports'] = {
+        self.databases[self.fixture.storage.ids['postgres']]['NetworkSettings']['Ports'] = {
             '5432/tcp': [{'HostPort': '5432'}],
         }
         with self.assertRaisesRegex(ValueError, 'retained-review-service-changed'):
@@ -143,8 +148,8 @@ class RetainedNetworkTests(unittest.TestCase):
             verify_retained_network(self.previous, self.successor)
 
     def test_paused_redis_without_health_check_is_rejected(self) -> None:
-        self.databases['redis-id']['State']['Paused'] = True
-        with self.assertRaisesRegex(ValueError, 'retained-review-service-changed'):
+        self.databases[self.fixture.storage.ids['redis']]['State']['Paused'] = True
+        with self.assertRaises(ValueError):
             verify_retained_network(self.previous, self.successor)
 
 

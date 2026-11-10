@@ -11,7 +11,7 @@ from scripts.deploy.review.runtime.inventory.stopped_writer import (
     capture_running_writer,
     inspect_stopped_writer,
 )
-from scripts.deploy.review.runtime.policy import admit_queue_getter
+from scripts.deploy.review.runtime.inventory.storage import verify_completed_storage
 from scripts.deploy.review.state import atomic_json, checksum, private_json
 
 if TYPE_CHECKING:
@@ -80,7 +80,7 @@ def _verify_release(
             or Path(source_root).resolve() != previous.root
             or str(previous.root) != source_root):
         raise ValueError('predecessor-source-root-changed')
-    admit_queue_getter(previous)
+    verify_completed_storage(previous, successor)
 
 
 def _identity(

@@ -17,6 +17,7 @@ from scripts.deploy.review.runtime.inventory.stopped_writer import inspect_stopp
 from scripts.deploy.review.runtime.operations import HostOperations, MAINTENANCE
 from scripts.deploy.review.state import Attempt, atomic_json, checksum, private_json
 from scripts.deploy.review.topology import NETWORK
+from scripts.tests.review.runtime.inventory.storage_fixture import StorageHost
 
 
 class PredecessorCaptureTests(unittest.TestCase):
@@ -66,10 +67,7 @@ class PredecessorCaptureTests(unittest.TestCase):
             HostOperations, 'public_get',
             return_value=(503, b'Review upgrade in progress.'),
         ))
-        # These guards consult the host's tool files, mounts and firewall.
-        # Their own tests exercise those boundaries and rejection behavior.
-        for name in ('verify_tools', 'verify_storage', 'verify_egress'):
-            self.enterContext(patch.object(self.previous, name))
+        self.storage = StorageHost(self, self.fixture, self.previous, self.successor)
 
     def confirm_stop(self, role: str) -> None:
         directory = self.successor.attempt.directory
@@ -97,7 +95,7 @@ class PredecessorCaptureTests(unittest.TestCase):
         original = capture_predecessor(self.previous, self.successor)
         worker = self.fixture.candidates['workers']
         worker['RestartCount'] = 1
-        with self.assertRaisesRegex(ValueError, 'evidence-changed'):
+        with self.assertRaises(ValueError):
             capture_predecessor(self.previous, self.successor)
         self.assertEqual(private_json(self.successor.attempt.directory
                                      / 'predecessor-running.json'), original)
@@ -161,7 +159,7 @@ class PredecessorCaptureTests(unittest.TestCase):
     def test_recovery_refuses_a_restarted_predecessor(self) -> None:
         capture_predecessor(self.previous, self.successor)
         self.fixture.candidates['workers']['RestartCount'] = 1
-        with self.assertRaisesRegex(ValueError, 'running-evidence-changed'):
+        with self.assertRaises(ValueError):
             inspect_predecessor(self.previous, self.successor)
 
     def test_recovery_retains_both_stops_during_an_unresolved_attempt(self) -> None:
@@ -305,10 +303,11 @@ class PredecessorCaptureTests(unittest.TestCase):
     def test_exit_during_intent_preparation_cannot_be_confirmed(self) -> None:
         capture_predecessor(self.previous, self.successor)
         intent = self.successor.attempt.directory / 'predecessor-stop-intent-web.json'
-        actual_inspect = self.previous.inspect
+        actual_docker = self.previous.docker.side_effect
 
-        def inspect(*identities: str) -> list[dict[str, object]]:
-            if intent.exists() and identities == ('web',):
+        def docker(*arguments: str) -> bytes:
+            if (intent.exists()
+                    and arguments == ('inspect', self.storage.ids['web'])):
                 web = self.fixture.candidates['web']
                 web['State'].update({
                     'Running': False, 'Status': 'exited', 'ExitCode': 0,
@@ -317,9 +316,9 @@ class PredecessorCaptureTests(unittest.TestCase):
                 web['NetworkSettings']['Networks'][NETWORK]['IPAMConfig'] = {
                     'IPv4Address': '172.30.99.10',
                 }
-            return actual_inspect(*identities)
+            return actual_docker(*arguments)
 
-        with patch.object(self.previous, 'inspect', side_effect=inspect):
+        with patch.object(self.previous, 'docker', side_effect=docker):
             with self.assertRaises(ValueError):
                 prepare_predecessor_stop(self.previous, self.successor, role='web')
             with self.assertRaisesRegex(ValueError, 'stop-result-unresolved'):

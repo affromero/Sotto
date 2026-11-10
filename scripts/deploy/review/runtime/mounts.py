@@ -8,6 +8,7 @@ from pathlib import PurePosixPath
 from typing import cast
 
 from scripts.deploy.images.metadata import record
+from scripts.deploy.review.state import checksum
 from scripts.deploy.review.topology import rows
 
 MOUNT_PROBE = '''import json,os,sys
@@ -43,6 +44,36 @@ def physical_identity(value: object) -> list[int]:
     return cast(list[int], value)
 
 
+def container_inventory(
+    containers: Sequence[Mapping[str, object]], protected: set[str],
+) -> dict[str, object]:
+    """Bind mount declarations and process incarnations around a probe."""
+    from scripts.deploy.review.runtime.operations import HostOperations
+
+    result: dict[str, object] = {}
+    fields = ('Status', 'Running', 'Paused', 'Restarting', 'OOMKilled',
+              'Dead', 'Error', 'ExitCode', 'Pid', 'StartedAt', 'FinishedAt')
+    for container in containers:
+        identity = container.get('Id')
+        if not isinstance(identity, str) or identity in result:
+            raise ValueError('duplicate-review-storage-container')
+        state = record(container.get('State'), 'container state')
+        if type(state.get('Running')) is not bool:
+            raise ValueError('container-running-state-unknown')
+        value: dict[str, object] = {
+            'mounts': checksum(sorted(rows(container.get('Mounts'), 'container mounts'),
+                                      key=checksum)),
+            'restartCount': container.get('RestartCount'),
+            'state': {key: state.get(key) for key in fields},
+        }
+        if identity in protected:
+            value['writer'] = HostOperations.writer_binding(container)
+        result[identity] = value
+    if not protected <= result.keys():
+        raise ValueError('review-storage-container-set-changed')
+    return result
+
+
 def resolve_mounts(
     containers: Sequence[Mapping[str, object]], protected: set[str],
     probe: Callable[[bytes], bytes], retained: Mapping[str, object] | None,
@@ -51,30 +82,38 @@ def resolve_mounts(
     sources: set[str] = set()
     mounted: list[dict[str, object]] = []
     protected_keys: set[str] = set()
+    mounted_keys: set[str] = set()
     for container in containers:
         identity = str(container['Id'])
         state = record(container['State'], 'container state')
+        if type(state.get('Running')) is not bool:
+            raise ValueError('container-running-state-unknown')
         for mount in rows(container.get('Mounts'), 'mount'):
             source, destination = mount.get('Source'), mount.get('Destination')
+            if type(mount.get('RW')) is not bool:
+                raise ValueError('container-mount-write-state-unknown')
             for path in (source, destination):
                 if (not isinstance(path, str) or len(path) > 4096
                         or not path.startswith('/')
                         or '..' in PurePosixPath(path).parts):
                     raise ValueError('bounded-absolute-mount-path-required')
             sources.add(cast(str, source))
-            if identity not in protected:
-                continue
             key = identity + ':' + cast(str, destination)
-            if key in protected_keys:
-                raise ValueError('duplicate-protected-mount')
-            protected_keys.add(key)
-            if state.get('Running') is True:
+            if identity in protected:
+                if key in protected_keys:
+                    raise ValueError('duplicate-protected-mount')
+                protected_keys.add(key)
+            if (state.get('Running') is True
+                    and (identity in protected or mount['RW'] is True)):
+                if key in mounted_keys:
+                    raise ValueError('duplicate-running-mount')
+                mounted_keys.add(key)
                 pid = state.get('Pid')
                 if type(pid) is not int or pid <= 0:
                     raise ValueError('captured-running-process-required')
                 mounted.append({'key': key, 'id': identity, 'pid': pid,
-                                'destination': destination})
-            elif retained is None:
+                                'destination': destination, 'source': source})
+            elif identity in protected and retained is None:
                 raise ValueError('original-mounted-storage-proof-required')
     if len(sources) > 4000 or not protected_keys:
         raise ValueError('bounded-protected-mount-inventory-required')
@@ -99,11 +138,11 @@ def resolve_mounts(
             )]
             if not ancestors or len(ancestors) > 65:
                 raise ValueError('physical-mount-identity-missing')
+            key = identity + ':' + cast(str, mount['Destination'])
+            if key in actual_mounted and physical_identity(actual_mounted[key]) != ancestors[0]:
+                raise ValueError('original-mounted-source-changed' if identity in protected
+                                 else 'foreign-mounted-source-changed')
             if identity in protected:
-                key = identity + ':' + cast(str, mount['Destination'])
-                if key in actual_mounted:
-                    if physical_identity(actual_mounted[key]) != ancestors[0]:
-                        raise ValueError('original-mounted-source-changed')
                 bindings[key] = {'source': resolved['path'],
                                  'identity': ancestors[0]}
                 roots.append(ancestors)

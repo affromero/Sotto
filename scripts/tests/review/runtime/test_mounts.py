@@ -36,7 +36,13 @@ class ReviewMountTests(unittest.TestCase):
             ancestors = [[path.stat().st_dev, path.stat().st_ino]
                          for path in [resolved, *resolved.parents]]
             sources[source] = {'path': str(resolved), 'ancestors': ancestors}
-        mounted = {item['key']: self.original for item in request['mounted']}
+        mounted = {}
+        for item in request['mounted']:
+            if item['id'] == 'a' * 64:
+                mounted[item['key']] = self.original
+            else:
+                metadata = Path(item['source']).stat()
+                mounted[item['key']] = [metadata.st_dev, metadata.st_ino]
         return json.dumps({'sources': sources, 'mounted': mounted}).encode()
 
     def test_captured_inode_survives_stop_but_replaced_source_refuses(
@@ -101,3 +107,20 @@ class ReviewMountTests(unittest.TestCase):
         with self.assertRaises(FileNotFoundError):
             resolve_mounts([*self.containers, foreign], {'a' * 64},
                            self.probe, None)
+
+    def test_running_foreign_mount_must_match_its_current_source(self) -> None:
+        source = self.root / 'foreign-source'
+        source.mkdir()
+        foreign: dict[str, object] = {
+            'Id': 'b' * 64, 'State': {'Running': True, 'Pid': 2},
+            'Mounts': [{'Source': str(source), 'Destination': '/foreign', 'RW': True}],
+        }
+
+        def stale_mount(content: bytes) -> bytes:
+            result = json.loads(self.probe(content))
+            result['mounted']['b' * 64 + ':/foreign'] = self.original
+            return json.dumps(result).encode()
+
+        with self.assertRaisesRegex(ValueError, 'foreign-mounted-source-changed'):
+            resolve_mounts([*self.containers, foreign], {'a' * 64},
+                           stale_mount, None)

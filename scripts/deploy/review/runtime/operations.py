@@ -25,7 +25,9 @@ from scripts.deploy.review.egress import (
     verify_policy,
 )
 from scripts.deploy.review.runtime.channel import exchange
-from scripts.deploy.review.runtime.mounts import MOUNT_PROBE, resolve_mounts
+from scripts.deploy.review.runtime.mounts import (
+    MOUNT_PROBE, container_inventory, resolve_mounts,
+)
 from scripts.deploy.review.runtime.policy import (
     admit_queue_getter,
     bind_helper_environment,
@@ -205,10 +207,18 @@ class HostOperations:
                 content=content,
             )
 
-        result, bindings = resolve_mounts(
-            containers, protected, probe, retained,
-            self.admitted_writers(containers),
-        )
+        admitted = self.admitted_writers(containers)
+        watched = protected | admitted
+        before = container_inventory(containers, watched)
+        result, bindings = resolve_mounts(containers, protected, probe,
+                                          retained, admitted)
+        identities = self.docker('ps', '-aq', '--no-trunc').decode().split()
+        if len(identities) != len(before) or set(identities) != before.keys():
+            raise ValueError('review-storage-container-inventory-changed')
+        after = container_inventory(self.inspect(*identities), watched)
+        if after != before:
+            raise ValueError('review-storage-mount-inventory-changed')
+        self.lock.validate()
         if retained is None:
             atomic_json(path, bindings)
         return result
