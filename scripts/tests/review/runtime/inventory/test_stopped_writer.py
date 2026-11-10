@@ -7,7 +7,10 @@ import unittest
 from collections.abc import Mapping
 from typing import cast
 
-from scripts.deploy.review.runtime.inventory.stopped_writer import inspect_stopped_writer
+from scripts.deploy.review.runtime.inventory.stopped_writer import (
+    capture_running_writer,
+    inspect_stopped_writer,
+)
 from scripts.deploy.review.runtime.operations import HostOperations
 
 
@@ -34,6 +37,12 @@ class StoppedWriterTests(unittest.TestCase):
             },
         }
         self.binding = HostOperations.writer_binding(self.container)
+        self.running = copy.deepcopy(self.container)
+        running_state = cast(dict[str, object], self.running['State'])
+        running_state.update({'Status': 'running', 'Running': True})
+        self.baseline = capture_running_writer(
+            self.running, self.binding, role='workers',
+        )
 
     def inspect(
         self, container: dict[str, object] | None = None, *,
@@ -41,8 +50,7 @@ class StoppedWriterTests(unittest.TestCase):
     ) -> dict[str, object]:
         return inspect_stopped_writer(
             container or self.container, self.binding, role='workers',
-            started_at=self.started,
-            restart_count=0, previous=previous,
+            baseline=self.baseline, previous=previous,
         )
 
     def test_accepts_a_clean_stop_and_requires_identical_later_evidence(self) -> None:
@@ -73,23 +81,26 @@ class StoppedWriterTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.inspect(changed)
         observed = inspect_stopped_writer(
-            changed, self.binding, role='web', started_at=self.started,
-            restart_count=0,
+            changed, self.binding, role='web', baseline={
+                **self.baseline, 'role': 'web',
+            },
         )
         self.assertEqual(observed['role'], 'web')
         clean_web = inspect_stopped_writer(
-            self.container, self.binding, role='web', started_at=self.started,
-            restart_count=0,
+            self.container, self.binding, role='web', baseline={
+                **self.baseline, 'role': 'web',
+            },
         )
         with self.assertRaisesRegex(ValueError, 'evidence-changed'):
             self.inspect(previous=clean_web)
 
     def test_refuses_restarted_or_reconfigured_containers(self) -> None:
-        for field, value in (('StartedAt', '2026-10-26T01:22:12Z'),):
-            changed = copy.deepcopy(self.container)
-            cast(dict[str, object], changed['State'])[field] = value
-            with self.assertRaisesRegex(ValueError, 'stop-not-proven'):
-                self.inspect(changed)
+        changed = copy.deepcopy(self.container)
+        cast(dict[str, object], changed['State'])['StartedAt'] = (
+            '2026-10-26T01:22:12Z'
+        )
+        with self.assertRaisesRegex(ValueError, 'stop-not-proven'):
+            self.inspect(changed)
         changed = copy.deepcopy(self.container)
         changed['RestartCount'] = 1
         with self.assertRaisesRegex(ValueError, 'stop-not-proven'):
@@ -116,7 +127,25 @@ class StoppedWriterTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'stop-not-proven'):
             inspect_stopped_writer(
                 changed, HostOperations.writer_binding(changed),
-                role='workers', started_at=self.started, restart_count=0,
+                role='workers', baseline=self.baseline,
+            )
+
+    def test_baseline_requires_the_bound_running_instance(self) -> None:
+        with self.assertRaisesRegex(ValueError, 'running-instance-not-proven'):
+            capture_running_writer(self.container, self.binding, role='workers')
+        for field, value in (
+            ('Paused', True), ('Restarting', True), ('OOMKilled', True),
+            ('Error', 'unknown'), ('StartedAt', ''),
+        ):
+            changed = copy.deepcopy(self.running)
+            cast(dict[str, object], changed['State'])[field] = value
+            with self.subTest(field=field):
+                with self.assertRaises(ValueError):
+                    capture_running_writer(changed, self.binding, role='workers')
+        with self.assertRaisesRegex(ValueError, 'baseline-changed'):
+            inspect_stopped_writer(
+                self.container, self.binding, role='workers',
+                baseline={**self.baseline, 'id': 'c' * 64},
             )
 
     def test_orders_nanosecond_timestamps_and_rejects_invalid_values(self) -> None:
