@@ -6,6 +6,7 @@ import {
 } from 'thesidedoor-core/storage';
 import type { Prisma } from '@/generated/prisma/client';
 import type { AuthenticatedRequest } from '@/lib/api-keys';
+import { isBundledAvatarImage } from '@/lib/avatars';
 import { requireOriginalSottoAdmission } from '@/lib/sidedoor/access/core/request-identity';
 import { SIDEDOOR_STATE_ID } from '@/lib/sidedoor/access/state/store';
 import { inspectStorageMigrationConsumer } from '@/lib/sidedoor/storage/migration/storage-migration-plan';
@@ -77,6 +78,9 @@ export async function readStorageMigrationReferencePage(options: {
   const references = [];
   for (const row of rows) {
     request.signal.throwIfAborted();
+    if (row.model === 'User' && row.field === 'image' && isBundledAvatarImage(row.reference)) {
+      continue;
+    }
     // Empty strings are present application values, never successful migrations.
     try {
       const resolved = row.reference

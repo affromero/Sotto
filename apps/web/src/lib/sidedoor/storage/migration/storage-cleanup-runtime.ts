@@ -13,7 +13,7 @@ import {
   type StorageCleanupCollectorRecord,
   type StorageCleanupTargetInput,
 } from 'thesidedoor-core/storage';
-import type { SqlExecutor } from 'thesidedoor-core/storage/sql';
+import { retrySerializableTransaction, type SqlExecutor } from 'thesidedoor-core/storage/sql';
 import type { PrismaClient } from '@/generated/prisma/client';
 import { captureStorageCleanup } from '@/lib/r2';
 import { openSottoStorageConnection } from '@/lib/sidedoor/storage/core/storage-connection';
@@ -216,8 +216,10 @@ export async function runSottoStorageCleanup(
       jobId,
       executorId,
       signal: lifetime,
+      // SDK transaction callbacks contain SQL only. Storage I/O runs outside them.
+      // Keep settlement available after caller cancellation while the lock remains held.
       transaction: <Result>(run: (transaction: SqlExecutor) => Promise<Result>) =>
-        lock!.transaction(run),
+        retrySerializableTransaction(() => lock!.transaction(run), { signal: lock!.signal }),
       executor: (transaction: SqlExecutor) => transaction,
       ports,
     });
