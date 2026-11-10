@@ -165,14 +165,15 @@ final class PlayInvitationUITests: XCTestCase {
     private func tap(_ title: String, type: XCUIElement.ElementType = .button,
                      app: XCUIApplication, timeout: TimeInterval = 10) throws {
         let named = app.descendants(matching: type)[title].firstMatch
-        let control = named
-        guard control.waitForExistence(timeout: timeout) else {
+        guard named.waitForExistence(timeout: timeout) else {
             let hierarchy = XCTAttachment(string: app.debugDescription)
             hierarchy.name = "missing-control-\(title)"
             hierarchy.lifetime = .keepAlways
             add(hierarchy)
             throw InteractionFailure.missingButton(title)
         }
+        let nestedSwitch = named.children(matching: .switch).firstMatch
+        let control = type == .switch && nestedSwitch.exists ? nestedSwitch : named
         var scrolls = 0
         var geometryChecks = 0
         while geometryChecks < 8 {
@@ -196,15 +197,7 @@ final class PlayInvitationUITests: XCTestCase {
                     guard control.wait(for: \.isHittable, toEqual: true, timeout: timeout) else {
                         throw InteractionFailure.invisibleButton(title)
                     }
-                    let switchControl = control.children(matching: .switch).firstMatch
-                    if type == .switch, switchControl.exists {
-                        guard switchControl.wait(for: \.isHittable, toEqual: true, timeout: timeout) else {
-                            throw InteractionFailure.invisibleButton(title)
-                        }
-                        switchControl.tap()
-                    } else {
-                        control.tap()
-                    }
+                    control.tap()
                     return
                 }
                 let deadline = ContinuousClock.now.advanced(by: .seconds(timeout))
