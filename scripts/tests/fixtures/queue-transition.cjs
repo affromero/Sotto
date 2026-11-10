@@ -45,6 +45,7 @@ function fixture() {
     sottoJobOutbox: () => ({ listIncomplete: async () => ({ jobs: [], cursor: null }) }),
     createQueue: (name) => ({
       name,
+      getBackend: () => ({ client: Promise.resolve({ client: async () => 'id=1 db=13' }) }),
       isPaused: async () => flags.get(name) ?? false,
       pause: async () => flags.set(name, true),
       resume: async () => flags.set(name, false),
