@@ -433,7 +433,7 @@ export async function prepareStorageCopiesForDeletion(
 }
 
 /** Verify only copies whose consumers are all covered by the deletion. */
-export async function verifyStorageCopiesForDeletion(
+async function verifyStorageCopiesForDeletion(
   database: Prisma.TransactionClient,
   inputs: readonly StorageCopyDeletionInput[]
 ) {
