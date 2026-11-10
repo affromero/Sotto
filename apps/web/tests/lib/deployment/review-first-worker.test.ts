@@ -35,6 +35,7 @@ import {
   type SharedTestInstance,
 } from '../../helpers/setup/shared-instance';
 import { createPrivateRedis } from '../../helpers/queue/private-redis';
+import { registerRetainedChannelCase } from './retained/positive-channel-case';
 
 const boundary = vi.hoisted(() => ({ database: null as PrismaClient | null }));
 vi.mock('@/lib/prisma', async () => {
@@ -272,6 +273,14 @@ suite('bounded canonical review first-worker admission', () => {
       });
     return queue;
   }
+
+  registerRetainedChannelCase(() => ({
+    instance,
+    evidence,
+    redis,
+    redisUrl,
+    enqueueHistoricalDeliveries,
+  }));
 
   it('retains exact historical evidence after paused acknowledgments and new canonical startup work', async () => {
     const queue = await enqueueHistoricalDeliveries();
