@@ -19,6 +19,7 @@ import { runReviewReadiness } from '../readiness';
 import { REVIEW_WORKLOAD_TIMEOUT_MS, runReviewWorkloads } from './workload';
 import { inspectReviewQueuePolicy, reviewRuntimePolicySchema } from './policy/queues';
 import { inspectRetainedReviewRedis } from './inventory/retained-redis';
+import { createExclusiveRedisObserver } from './inventory/redis-clients';
 import { ALL_QUEUE_NAMES } from '../../../../apps/web/src/lib/queue';
 import { prismaUnfiltered } from '../../../../apps/web/src/lib/prisma';
 import { SIDEDOOR_STATE_ID } from '../../../../apps/web/src/lib/sidedoor/access/state/store';
@@ -43,6 +44,7 @@ const initialSchema = z
       'paused-admission',
       'queue-policy',
       'retained-inventory',
+      'retained-single-client',
     ]),
     input: z.unknown(),
     checkpoint: z.unknown().optional(),
@@ -206,7 +208,10 @@ export async function main(): Promise<void> {
         } finally {
           await queue.close();
         }
-      } else if (initial.mode === 'retained-inventory') {
+      } else if (
+        initial.mode === 'retained-inventory' ||
+        initial.mode === 'retained-single-client'
+      ) {
         // This is an observation only. A caller must bind the independently
         // admitted inputs and fence every writer before using its result.
         const input = z
@@ -223,19 +228,42 @@ export async function main(): Promise<void> {
           [...new Set(input.queues)].sort(),
           'Ordered unique queues required'
         );
+        const observer =
+          initial.mode === 'retained-single-client'
+            ? createExclusiveRedisObserver(redis)
+            : undefined;
+        const verify = async () => {
+          if (!observer) return;
+          await request('fence');
+          await observer.verify();
+        };
         const queue = runtime.createQueue('worksheet-pdf');
+        let completedInspection = false;
         try {
+          await verify();
           await inspectReviewFirstWorker(prismaUnfiltered, input.evidence);
           await inspectReviewContinuation(prismaUnfiltered, input.evidence, queue);
-          result = await inspectRetainedReviewRedis(redis, {
-            redisUrl: process.env.REDIS_URL,
-            queues: input.queues,
-            failedWorksheetIds: input.evidence.jobs.map((job) => job.id),
-          });
+          await verify();
+          result = await inspectRetainedReviewRedis(
+            redis,
+            {
+              redisUrl: process.env.REDIS_URL,
+              queues: input.queues,
+              failedWorksheetIds: input.evidence.jobs.map((job) => job.id),
+            },
+            verify
+          );
           await inspectReviewContinuation(prismaUnfiltered, input.evidence, queue);
           await inspectReviewFirstWorker(prismaUnfiltered, input.evidence);
+          await verify();
+          completedInspection = true;
         } finally {
-          await queue.close();
+          try {
+            await queue.close();
+            if (completedInspection) await verify();
+          } finally {
+            observer?.close();
+          }
         }
       } else if (initial.mode === 'consumers') {
         result = await inspectReviewPausedConsumers(runtime, initial.input);

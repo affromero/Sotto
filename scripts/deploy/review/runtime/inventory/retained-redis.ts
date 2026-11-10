@@ -30,7 +30,11 @@ interface RetainedInput {
  * The caller must independently admit the evidence and verify canonical job receipts.
  * SCAN and ZRANGE bound item counts, not individual response sizes from a hostile server.
  */
-export async function inspectRetainedReviewRedis(redis: Redis, input: RetainedInput) {
+export async function inspectRetainedReviewRedis(
+  redis: Redis,
+  input: RetainedInput,
+  verify?: () => Promise<void>
+) {
   const url = new URL(input.redisUrl);
   assert.equal(url.protocol, 'redis:', 'Dedicated Redis TCP connection required');
   assert(['', '/0'].includes(url.pathname), 'Dedicated review database 0 required');
@@ -179,8 +183,11 @@ export async function inspectRetainedReviewRedis(redis: Redis, input: RetainedIn
     };
   }
 
+  await verify?.();
   const first = await snapshot();
+  await verify?.();
   const second = await snapshot();
+  await verify?.();
   assert.deepEqual(second, first, 'Redis changed between inspections');
   return first;
 }

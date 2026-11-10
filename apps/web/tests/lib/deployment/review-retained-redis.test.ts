@@ -1,7 +1,9 @@
 // @vitest-environment node
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { Queue, QueueEvents, Worker } from 'bullmq';
+import Redis from 'ioredis';
 import { inspectRetainedReviewRedis } from '../../../../../scripts/deploy/review/runtime/inventory/retained-redis';
+import { createExclusiveRedisObserver } from '../../../../../scripts/deploy/review/runtime/inventory/redis-clients';
 import { createPrivateRedis } from '../../helpers/queue/private-redis';
 
 describe('retained review Redis inventory', () => {
@@ -44,6 +46,31 @@ describe('retained review Redis inventory', () => {
     const second = await inspect();
     expect(first).toEqual(second);
     expect(first).toMatchObject({ queues: 2, completed: 1, failed: 3, keys: 12 });
+  });
+
+  it('refuses retained evidence if another client appears between observations', async () => {
+    const observer = createExclusiveRedisObserver(fixture.client);
+    let stranger: Redis | undefined;
+    let checks = 0;
+    try {
+      await expect(
+        inspectRetainedReviewRedis(
+          fixture.client,
+          { redisUrl: fixture.url, queues, failedWorksheetIds },
+          async () => {
+            if (++checks === 2) {
+              stranger = new Redis(fixture.url, { db: 1, maxRetriesPerRequest: 0 });
+              await stranger.ping();
+            }
+            await observer.verify();
+          }
+        )
+      ).rejects.toThrow('Unexpected Redis client');
+      expect(await fixture.client.zcard('bull:worksheet-pdf:failed')).toBe(3);
+    } finally {
+      observer.close();
+      await stranger?.quit();
+    }
   });
 
   it('binds both retained job contents and sorted-set scores', async () => {

@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { once } from 'node:events';
 import { Queue, Worker } from 'bullmq';
 import type Redis from 'ioredis';
 import { expect, it } from 'vitest';
@@ -7,6 +8,7 @@ import {
   type ReviewFirstWorkerEvidence,
 } from '../../../../../../scripts/deploy/review/first-worker';
 import type { SharedTestInstance } from '../../../helpers/setup/shared-instance';
+import { createPrivateRedis } from '../../../helpers/queue/private-redis';
 
 type Context = {
   instance: SharedTestInstance;
@@ -52,7 +54,7 @@ export function registerRetainedChannelCase(context: () => Context) {
       const snapshot = async () => {
         const keys = (await redis.keys('*')).sort();
         return Promise.all(
-          keys.map(async (key) => [key, await redis.dump(key), await redis.pttl(key)])
+          keys.map(async (key) => [key, await redis.callBuffer('DUMP', key), await redis.pttl(key)])
         );
       };
       const before = await snapshot();
@@ -67,7 +69,12 @@ export function registerRetainedChannelCase(context: () => Context) {
         queueConcurrency: 1,
         privacyContactEmail: 'operator@example.com',
       };
-      const run = (value: ReviewFirstWorkerEvidence, queues = ['worksheet-pdf']) =>
+      const run = (
+        value: ReviewFirstWorkerEvidence,
+        queues = ['worksheet-pdf'],
+        mode = 'retained-inventory',
+        targetRedisUrl = redisUrl
+      ) =>
         new Promise<{ code: number | null; result: unknown; fences: number; errors: string }>(
           (resolve, reject) => {
             const bootstrap = `const {PrismaPg}=require('@prisma/adapter-pg');
@@ -82,7 +89,7 @@ require('../../scripts/deploy/review/runtime/channel.ts').main().catch(error=>{c
                 ...process.env,
                 NODE_ENV: 'test',
                 DATABASE_URL: process.env.SIDEDOOR_TEST_DATABASE_URL,
-                REDIS_URL: redisUrl,
+                REDIS_URL: targetRedisUrl,
                 SOTTO_TEST_SCHEMA: instance.schema,
               },
               stdio: ['pipe', 'pipe', 'pipe'],
@@ -134,7 +141,7 @@ require('../../scripts/deploy/review/runtime/channel.ts').main().catch(error=>{c
             });
             child.stdin.write(
               JSON.stringify({
-                mode: 'retained-inventory',
+                mode,
                 input: { evidence: value, queues },
                 policy,
               }) + '\n'
@@ -159,6 +166,50 @@ require('../../scripts/deploy/review/runtime/channel.ts').main().catch(error=>{c
       expect(await instance.database.sidedoorState.findMany({ orderBy: { id: 'asc' } })).toEqual(
         beforeState
       );
+      const isolated = await createPrivateRedis();
+      try {
+        const keys = (await redis.keys('*')).sort();
+        for (const key of keys) {
+          const payload = await redis.callBuffer('DUMP', key);
+          expect(Buffer.isBuffer(payload)).toBe(true);
+          if (!Buffer.isBuffer(payload)) throw new Error('Retained Redis key disappeared');
+          expect(await redis.pttl(key)).toBe(-1);
+          await isolated.client.restore(key, 0, payload);
+        }
+        const cloneBefore = await Promise.all(
+          keys.map(async (key) => [key, await isolated.client.callBuffer('DUMP', key)])
+        );
+        const closed = once(isolated.client, 'close');
+        isolated.client.disconnect();
+        await closed;
+        const strict = await run(
+          admitted,
+          ['worksheet-pdf'],
+          'retained-single-client',
+          isolated.url
+        );
+        expect(strict).toMatchObject({ code: 0, result: { queues: 1, failed: 3 } });
+        await isolated.client.connect();
+        expect((await isolated.client.keys('*')).sort()).toEqual(keys);
+        for (const [index, key] of keys.entries()) {
+          expect(await isolated.client.callBuffer('DUMP', key)).toEqual(cloneBefore[index][1]);
+          expect(await isolated.client.pttl(key)).toBe(-1);
+        }
+        const extraClient = await run(
+          admitted,
+          ['worksheet-pdf'],
+          'retained-single-client',
+          isolated.url
+        );
+        expect(extraClient.code).toBe(1);
+        expect(extraClient.errors).toContain('Unexpected Redis client');
+        expect((await isolated.client.keys('*')).sort()).toEqual(keys);
+        for (const [index, key] of keys.entries()) {
+          expect(await isolated.client.callBuffer('DUMP', key)).toEqual(cloneBefore[index][1]);
+        }
+      } finally {
+        await isolated.close();
+      }
       expect(workerErrors).toEqual([]);
     } finally {
       await worker.close();

@@ -85,12 +85,16 @@ Path(REJECTED).write_text(sys.stdin.readline())
 emit({'type':'fence','id':2});ack(2)
 emit({'type':'result','value':{'keys':112}})
 '''
-        self.assertEqual(self.run_child(script, mode='retained-inventory'),
-                         {'keys': 112})
-        self.assertEqual(self.fences, 2)
-        self.fence_failure_after = 3
-        with self.assertRaisesRegex(ValueError, 'actual-fence-missing'):
-            self.run_child(script, mode='retained-inventory')
+        for mode in ('retained-inventory', 'retained-single-client'):
+            with self.subTest(mode=mode):
+                self.fences = 0
+                self.fence_failure_after = None
+                self.assertEqual(self.run_child(script, mode=mode),
+                                 {'keys': 112})
+                self.assertEqual(self.fences, 2)
+                self.fence_failure_after = 3
+                with self.assertRaisesRegex(ValueError, 'actual-fence-missing'):
+                    self.run_child(script, mode=mode)
 
     def test_workload_budget_completes_after_4096_acknowledgements(
         self,
