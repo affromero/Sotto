@@ -9,6 +9,7 @@ export function generationCases({
   makeRequest,
   mockAuthenticateRequest,
   mockCancelPreparation,
+  mockDeleteClassForUser,
   mockCourseClassDeleteMany,
   mockCourseFindFirst,
   mockCourseUpdateMany,
@@ -21,6 +22,7 @@ export function generationCases({
   makeRequest: (url: string, method: string, body?: unknown) => NextRequest;
   mockAuthenticateRequest: Mock;
   mockCancelPreparation: Mock;
+  mockDeleteClassForUser: Mock;
   mockCourseClassDeleteMany: Mock;
   mockCourseFindFirst: Mock;
   mockCourseUpdateMany: Mock;
@@ -465,6 +467,7 @@ export function generationCases({
       vi.clearAllMocks();
       mockAuthenticateRequest.mockResolvedValue({ userId: 'u1' });
       mockCancelPreparation.mockResolvedValue(null);
+      mockDeleteClassForUser.mockResolvedValue(true);
       mockCourseUpdateMany.mockResolvedValue({ count: 1 });
       mockCourseClassDeleteMany.mockResolvedValue({ count: 1 });
       mockTransaction.mockImplementation((ops: Promise<unknown>[]) => Promise.all(ops));
@@ -523,7 +526,7 @@ export function generationCases({
     it('deletes the current generating legacy class and clears activeClassId', async () => {
       mockCourseFindFirst.mockResolvedValue({
         id: 'course-1',
-        classes: [{ id: 'class-generating' }],
+        classes: [{ id: 'class-generating', createdAt: new Date(1000), attempt: 1 }],
       });
 
       const res = await DELETEGeneration(
@@ -534,13 +537,21 @@ export function generationCases({
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body).toEqual({ cancelled: true, classId: 'class-generating' });
-      expect(mockCourseUpdateMany).toHaveBeenCalledWith({
-        where: { id: 'course-1', userId: 'u1', activeClassId: 'class-generating' },
-        data: { activeClassId: null },
+      expect(mockCourseClassDeleteMany).not.toHaveBeenCalled();
+    });
+
+    it('keeps the legacy class when verified deletion needs recovery', async () => {
+      mockCourseFindFirst.mockResolvedValue({
+        id: 'course-1',
+        classes: [{ id: 'class-generating', createdAt: new Date(1000), attempt: 1 }],
       });
-      expect(mockCourseClassDeleteMany).toHaveBeenCalledWith({
-        where: { id: 'class-generating', courseId: 'course-1' },
-      });
+      mockDeleteClassForUser.mockResolvedValue(false);
+      const response = await DELETEGeneration(
+        makeRequest('http://localhost/api/v1/courses/course-1/generation', 'DELETE'),
+        courseParams('course-1')
+      );
+      expect(response.status).toBe(409);
+      expect(mockCourseClassDeleteMany).not.toHaveBeenCalled();
     });
 
     it('is a no-op when no class is generating', async () => {

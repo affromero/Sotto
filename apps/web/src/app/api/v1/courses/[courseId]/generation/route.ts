@@ -13,6 +13,9 @@ import { currentClassSections } from '@/lib/learning/classes/progress/current-se
 import { readSkillRequirements } from '@/lib/learning/skill-requirements';
 import { sottoRequestExecution } from '@/lib/sidedoor/credentials/runtime/provider-execution';
 import { PreparationConflictError } from '@/lib/classes/preparation-state';
+import { deleteClassForUser } from '@/lib/class-service';
+import { PrerequisiteDeletionConflict } from '@/lib/classes/help/prerequisite-deletion';
+import { SpeakingDeletionConflict } from '@/lib/sidedoor/jobs/stitch/speaking-grading-deletion';
 
 type RouteParams = { params: Promise<{ courseId: string }> };
 
@@ -385,7 +388,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
         where: { status: 'GENERATING' },
         orderBy: [{ createdAt: 'desc' }],
         take: 1,
-        select: { id: true },
+        select: { id: true, createdAt: true, attempt: true },
       },
     },
   });
@@ -397,13 +400,20 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ cancelled: false });
   }
 
-  await prisma.$transaction([
-    prisma.course.updateMany({
-      where: { id: courseId, userId: authed.userId, activeClassId: cls.id },
-      data: { activeClassId: null },
-    }),
-    prisma.courseClass.deleteMany({ where: { id: cls.id, courseId } }),
-  ]);
+  try {
+    const deleted = await deleteClassForUser(
+      cls.id,
+      authed.userId,
+      sottoRequestExecution(request, authed),
+      undefined,
+      { courseId, createdAt: cls.createdAt.getTime(), attempt: cls.attempt }
+    );
+    if (!deleted) return errorResponse('The class changed before cancellation.', 409);
+  } catch (error) {
+    if (error instanceof PrerequisiteDeletionConflict || error instanceof SpeakingDeletionConflict)
+      return errorResponse('Class cleanup needs recovery before cancellation.', 409);
+    return errorResponse('Could not cancel preparation.', 500);
+  }
 
   return NextResponse.json({ cancelled: true, classId: cls.id });
 }
