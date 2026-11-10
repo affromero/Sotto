@@ -78,6 +78,20 @@ Path(REJECTED).write_text(sys.stdin.readline())
         self.assertEqual(self.fences, 200)
         self.assertEqual(rejected.read_bytes(), b'')
 
+    def test_retained_inventory_acknowledges_only_while_fence_holds(
+        self,
+    ) -> None:
+        script = '''emit({'type':'fence','id':1});ack(1)
+emit({'type':'fence','id':2});ack(2)
+emit({'type':'result','value':{'keys':112}})
+'''
+        self.assertEqual(self.run_child(script, mode='retained-inventory'),
+                         {'keys': 112})
+        self.assertEqual(self.fences, 2)
+        self.fence_failure_after = 3
+        with self.assertRaisesRegex(ValueError, 'actual-fence-missing'):
+            self.run_child(script, mode='retained-inventory')
+
     def test_workload_budget_completes_after_4096_acknowledgements(
         self,
     ) -> None:

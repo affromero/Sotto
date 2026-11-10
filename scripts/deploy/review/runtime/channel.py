@@ -29,7 +29,7 @@ def exchange(
     if initial.get('mode') not in {
         'inspect', 'prepare', 'providers', 'queues', 'capture',
         'continuation', 'consumers', 'workloads', 'paused-admission',
-        'queue-policy',
+        'queue-policy', 'retained-inventory',
     } or not 0 < timeout <= (3330 if initial.get('mode') == 'workloads'
                             else 330):
         raise ValueError('bounded-runtime-exchange-required')
