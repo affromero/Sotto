@@ -98,6 +98,46 @@ def _identity(
     }
 
 
+def _stop_binding(
+    baseline: dict[str, object], role: Literal['web', 'workers'],
+) -> dict[str, object]:
+    writers = record(baseline['writers'], 'predecessor writers')
+    writer = record(writers[role], 'predecessor running instance')
+    return {'role': role, 'id': writer['id'],
+            'runningEvidenceSha256': checksum(baseline)}
+
+
+def prepare_predecessor_stop(
+    previous: HostOperations, successor: HostOperations, *,
+    role: Literal['web', 'workers'],
+) -> None:
+    """Record one stop intent; caller must separately prove workload drain.
+
+    A retained intent is never permission to repeat an uncertain stop.
+    """
+    if role not in ('web', 'workers'):
+        raise ValueError('predecessor-role-invalid')
+    _verify_release(previous, successor, allow_unresolved=False)
+    path = successor.attempt.directory / ('predecessor-stop-intent-' + role + '.json')
+    if path.exists() or path.is_symlink():
+        raise ValueError('predecessor-stop-intent-already-exists')
+    if inspect_predecessor(previous, successor)[role] != 'running':
+        raise ValueError('predecessor-writer-not-running')
+    baseline = private_json(successor.attempt.directory / 'predecessor-running.json')
+    binding = _stop_binding(baseline, role)
+    successor.verify_fence()
+    atomic_json(path, binding)
+    candidate = services.verify_candidate(previous, role)
+    current = previous.inspect(candidate)
+    expected = record(record(baseline['writers'], 'writers')[role], 'writer')
+    recorded = private_json(previous.attempt.directory
+                            / ('candidate-' + role + '.json'))
+    if (len(current) != 1 or capture_running_writer(
+            current[0], recorded, role=role) != expected):
+        raise ValueError('predecessor-stop-preparation-unresolved')
+    successor.verify_fence()
+
+
 def inspect_predecessor(
     previous: HostOperations, successor: HostOperations,
 ) -> dict[str, object]:
@@ -145,11 +185,25 @@ def inspect_predecessor(
                 raise ValueError('predecessor-running-evidence-changed')
             observed[role] = 'running'
         else:
+            intent = directory / ('predecessor-stop-intent-' + role + '.json')
+            if (not intent.exists() or private_json(intent)
+                    != _stop_binding(baseline, typed_role)):
+                raise ValueError('predecessor-stop-intent-missing-or-changed')
             prior = record(retained[role], 'prior stop') if role in retained else None
-            stops[role] = inspect_stopped_writer(
+            stopped = inspect_stopped_writer(
                 actual[0], binding, role=typed_role, baseline=original,
                 previous=prior,
             )
+            result_path = directory / ('predecessor-stop-result-' + role + '.json')
+            expected_result = {
+                'outcome': 'confirmed',
+                'intentSha256': checksum(private_json(intent)),
+                'stopped': stopped,
+            }
+            if (not result_path.exists()
+                    or private_json(result_path) != expected_result):
+                raise ValueError('predecessor-stop-result-unresolved')
+            stops[role] = stopped
             observed[role] = 'stopped'
     successor.verify_fence()
     if stops != retained:

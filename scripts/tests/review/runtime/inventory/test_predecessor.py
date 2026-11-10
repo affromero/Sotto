@@ -11,9 +11,11 @@ from scripts.deploy.review.runtime import release
 from scripts.deploy.review.runtime.inventory.predecessor import (
     capture_predecessor,
     inspect_predecessor,
+    prepare_predecessor_stop,
 )
+from scripts.deploy.review.runtime.inventory.stopped_writer import inspect_stopped_writer
 from scripts.deploy.review.runtime.operations import HostOperations, MAINTENANCE
-from scripts.deploy.review.state import Attempt, atomic_json, private_json
+from scripts.deploy.review.state import Attempt, atomic_json, checksum, private_json
 from scripts.deploy.review.topology import NETWORK
 
 
@@ -68,6 +70,18 @@ class PredecessorCaptureTests(unittest.TestCase):
         # Their own tests exercise those boundaries and rejection behavior.
         for name in ('verify_tools', 'verify_storage', 'verify_egress'):
             self.enterContext(patch.object(self.previous, name))
+
+    def confirm_stop(self, role: str) -> None:
+        directory = self.successor.attempt.directory
+        intent = private_json(directory / ('predecessor-stop-intent-' + role + '.json'))
+        baseline = private_json(directory / 'predecessor-running.json')['writers'][role]
+        binding = private_json(self.previous.attempt.directory / ('candidate-' + role + '.json'))
+        stopped = inspect_stopped_writer(
+            self.fixture.candidates[role], binding, role=role, baseline=baseline,
+        )
+        atomic_json(directory / ('predecessor-stop-result-' + role + '.json'), {
+            'outcome': 'confirmed', 'intentSha256': checksum(intent), 'stopped': stopped,
+        })
 
     def test_persists_both_completed_release_writers_under_the_fence(self) -> None:
         result = capture_predecessor(self.previous, self.successor)
@@ -124,6 +138,7 @@ class PredecessorCaptureTests(unittest.TestCase):
 
     def test_recovery_remembers_a_partial_stop_and_refuses_changed_exit(self) -> None:
         capture_predecessor(self.previous, self.successor)
+        prepare_predecessor_stop(self.previous, self.successor, role='web')
         web = self.fixture.candidates['web']
         web['State'].update({
             'Running': False, 'Status': 'exited', 'ExitCode': 143,
@@ -132,6 +147,7 @@ class PredecessorCaptureTests(unittest.TestCase):
         web['NetworkSettings']['Networks'][NETWORK]['IPAMConfig'] = {
             'IPv4Address': '172.30.99.10',
         }
+        self.confirm_stop('web')
         self.assertEqual(inspect_predecessor(self.previous, self.successor), {
             'web': 'stopped', 'workers': 'running',
         })
@@ -150,6 +166,8 @@ class PredecessorCaptureTests(unittest.TestCase):
 
     def test_recovery_retains_both_stops_during_an_unresolved_attempt(self) -> None:
         capture_predecessor(self.previous, self.successor)
+        prepare_predecessor_stop(self.previous, self.successor, role='web')
+        prepare_predecessor_stop(self.previous, self.successor, role='workers')
         for role, address in (('web', '10'), ('workers', '11')):
             container = self.fixture.candidates[role]
             container['State'].update({
@@ -159,6 +177,7 @@ class PredecessorCaptureTests(unittest.TestCase):
             container['NetworkSettings']['Networks'][NETWORK]['IPAMConfig'] = {
                 'IPv4Address': '172.30.99.' + address,
             }
+            self.confirm_stop(role)
         path = self.successor.attempt.directory / 'state.json'
         atomic_json(path, {**self.successor.attempt.state(),
                            'status': 'unresolved'})
@@ -171,6 +190,7 @@ class PredecessorCaptureTests(unittest.TestCase):
 
     def test_recovery_refuses_worker_sigterm_exit(self) -> None:
         capture_predecessor(self.previous, self.successor)
+        prepare_predecessor_stop(self.previous, self.successor, role='workers')
         worker = self.fixture.candidates['workers']
         worker['State'].update({
             'Running': False, 'Status': 'exited', 'ExitCode': 143,
@@ -201,6 +221,7 @@ class PredecessorCaptureTests(unittest.TestCase):
 
     def test_recovery_does_not_record_a_stop_after_fence_loss(self) -> None:
         capture_predecessor(self.previous, self.successor)
+        prepare_predecessor_stop(self.previous, self.successor, role='web')
         web = self.fixture.candidates['web']
         web['State'].update({
             'Running': False, 'Status': 'exited', 'ExitCode': 0,
@@ -209,6 +230,7 @@ class PredecessorCaptureTests(unittest.TestCase):
         web['NetworkSettings']['Networks'][NETWORK]['IPAMConfig'] = {
             'IPv4Address': '172.30.99.10',
         }
+        self.confirm_stop('web')
         with patch.object(HostOperations, 'public_get', side_effect=[
             (503, b'Review upgrade in progress.'), (200, b'public'),
         ]):
@@ -216,6 +238,111 @@ class PredecessorCaptureTests(unittest.TestCase):
                 inspect_predecessor(self.previous, self.successor)
         self.assertFalse((self.successor.attempt.directory
                           / 'predecessor-stopped.json').exists())
+
+    def test_unplanned_exit_and_repeated_stop_intent_are_refused(self) -> None:
+        capture_predecessor(self.previous, self.successor)
+        prepare_predecessor_stop(self.previous, self.successor, role='workers')
+        with self.assertRaisesRegex(ValueError, 'stop-intent-already-exists'):
+            prepare_predecessor_stop(self.previous, self.successor, role='workers')
+        web = self.fixture.candidates['web']
+        web['State'].update({
+            'Running': False, 'Status': 'exited', 'ExitCode': 0,
+            'FinishedAt': '2026-10-26T01:23:00Z',
+        })
+        web['NetworkSettings']['Networks'][NETWORK]['IPAMConfig'] = {
+            'IPv4Address': '172.30.99.10',
+        }
+        with self.assertRaisesRegex(ValueError, 'stop-intent-missing-or-changed'):
+            inspect_predecessor(self.previous, self.successor)
+        self.assertFalse((self.successor.attempt.directory
+                          / 'predecessor-stopped.json').exists())
+
+    def test_recovery_observes_a_running_writer_with_an_uncertain_intent(self) -> None:
+        capture_predecessor(self.previous, self.successor)
+        prepare_predecessor_stop(self.previous, self.successor, role='web')
+        path = self.successor.attempt.directory / 'state.json'
+        atomic_json(path, {**self.successor.attempt.state(),
+                           'status': 'unresolved'})
+        self.assertEqual(inspect_predecessor(self.previous, self.successor), {
+            'web': 'running', 'workers': 'running',
+        })
+        with self.assertRaises(ValueError):
+            prepare_predecessor_stop(self.previous, self.successor, role='web')
+
+    def test_cross_role_stop_intent_cannot_authorize_an_exit(self) -> None:
+        capture_predecessor(self.previous, self.successor)
+        prepare_predecessor_stop(self.previous, self.successor, role='web')
+        directory = self.successor.attempt.directory
+        web_intent = private_json(directory / 'predecessor-stop-intent-web.json')
+        atomic_json(directory / 'predecessor-stop-intent-workers.json', web_intent)
+        worker = self.fixture.candidates['workers']
+        worker['State'].update({
+            'Running': False, 'Status': 'exited', 'ExitCode': 0,
+            'FinishedAt': '2026-10-26T01:23:00Z',
+        })
+        worker['NetworkSettings']['Networks'][NETWORK]['IPAMConfig'] = {
+            'IPv4Address': '172.30.99.11',
+        }
+        with self.assertRaisesRegex(ValueError, 'stop-intent-missing-or-changed'):
+            inspect_predecessor(self.previous, self.successor)
+
+    def test_clean_exit_without_confirmed_dispatch_remains_unresolved(self) -> None:
+        capture_predecessor(self.previous, self.successor)
+        prepare_predecessor_stop(self.previous, self.successor, role='web')
+        web = self.fixture.candidates['web']
+        web['State'].update({
+            'Running': False, 'Status': 'exited', 'ExitCode': 0,
+            'FinishedAt': '2026-10-26T01:23:00Z',
+        })
+        web['NetworkSettings']['Networks'][NETWORK]['IPAMConfig'] = {
+            'IPv4Address': '172.30.99.10',
+        }
+        with self.assertRaisesRegex(ValueError, 'stop-result-unresolved'):
+            inspect_predecessor(self.previous, self.successor)
+        self.assertFalse((self.successor.attempt.directory
+                          / 'predecessor-stopped.json').exists())
+
+    def test_exit_during_intent_preparation_cannot_be_confirmed(self) -> None:
+        capture_predecessor(self.previous, self.successor)
+        intent = self.successor.attempt.directory / 'predecessor-stop-intent-web.json'
+        actual_inspect = self.previous.inspect
+
+        def inspect(*identities: str) -> list[dict[str, object]]:
+            if intent.exists() and identities == ('web',):
+                web = self.fixture.candidates['web']
+                web['State'].update({
+                    'Running': False, 'Status': 'exited', 'ExitCode': 0,
+                    'FinishedAt': '2026-10-26T01:23:00Z',
+                })
+                web['NetworkSettings']['Networks'][NETWORK]['IPAMConfig'] = {
+                    'IPv4Address': '172.30.99.10',
+                }
+            return actual_inspect(*identities)
+
+        with patch.object(self.previous, 'inspect', side_effect=inspect):
+            with self.assertRaises(ValueError):
+                prepare_predecessor_stop(self.previous, self.successor, role='web')
+            with self.assertRaisesRegex(ValueError, 'stop-result-unresolved'):
+                inspect_predecessor(self.previous, self.successor)
+        self.assertTrue(intent.exists())
+
+    def test_changed_dispatch_result_is_not_accepted(self) -> None:
+        capture_predecessor(self.previous, self.successor)
+        prepare_predecessor_stop(self.previous, self.successor, role='web')
+        web = self.fixture.candidates['web']
+        web['State'].update({
+            'Running': False, 'Status': 'exited', 'ExitCode': 0,
+            'FinishedAt': '2026-10-26T01:23:00Z',
+        })
+        web['NetworkSettings']['Networks'][NETWORK]['IPAMConfig'] = {
+            'IPv4Address': '172.30.99.10',
+        }
+        self.confirm_stop('web')
+        path = self.successor.attempt.directory / 'predecessor-stop-result-web.json'
+        result = private_json(path)
+        atomic_json(path, {**result, 'intentSha256': 'f' * 64})
+        with self.assertRaisesRegex(ValueError, 'stop-result-unresolved'):
+            inspect_predecessor(self.previous, self.successor)
 
 
 if __name__ == '__main__':

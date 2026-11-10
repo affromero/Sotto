@@ -8,7 +8,10 @@ from unittest.mock import patch
 
 from scripts.deploy.review.runtime import release
 from scripts.deploy.review.runtime.inventory.network import verify_retained_network
-from scripts.deploy.review.runtime.inventory.predecessor import capture_predecessor
+from scripts.deploy.review.runtime.inventory.predecessor import (
+    capture_predecessor,
+    prepare_predecessor_stop,
+)
 from scripts.deploy.review.state import atomic_json, checksum
 from scripts.deploy.review.topology import NETWORK, PROJECT, exact_mounts
 
@@ -79,6 +82,8 @@ class RetainedNetworkTests(unittest.TestCase):
         atomic_json(self.previous.attempt.directory / 'release-record.json',
                     release.read_completed_record(self.previous, fenced=True))
         capture_predecessor(self.previous, self.successor)
+        prepare_predecessor_stop(self.previous, self.successor, role='web')
+        prepare_predecessor_stop(self.previous, self.successor, role='workers')
         for role, address in (('web', '10'), ('workers', '11')):
             container = self.fixture.fixture.candidates[role]
             container['State'].update({'Running': False, 'Status': 'exited', 'ExitCode': 0,
@@ -86,6 +91,7 @@ class RetainedNetworkTests(unittest.TestCase):
             container['NetworkSettings']['Networks'][NETWORK]['IPAMConfig'] = {
                 'IPv4Address': '172.30.99.' + address,
             }
+            self.fixture.confirm_stop(role)
 
     def test_exact_stopped_topology_is_accepted(self) -> None:
         verify_retained_network(self.previous, self.successor)
