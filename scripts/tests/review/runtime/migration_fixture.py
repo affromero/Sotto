@@ -179,6 +179,7 @@ class MigrationFixture:
         storage.mkdir()
         self.original: dict[str, object] = {
             'Id': 'b' * 64, 'Image': self.receipts[0]['imageId'],
+            'Name': '/original', 'HostConfig': {},
             'Config': {'Env': [key + '=' + value for key, value in
                                original_environment.items()]},
             'State': {'Running': True, 'Pid': 123},
