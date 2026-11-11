@@ -64,14 +64,6 @@
       "kind": "devDependencies",
       "name": "postcss",
       "reason": "Required by the root $postcss override to pin the transitive build dependency."
-    },
-    {
-      "tool": "vulture",
-      "mode": "all",
-      "file": "scripts/tests/test_production_retention.py",
-      "kind": "unused",
-      "name": "RetentionTests.docker_output: unused variable 'kwargs'",
-      "reason": "The subprocess test double accepts keyword arguments required by the subprocess.check_output boundary."
     }
   ]
 }

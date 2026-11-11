@@ -39,7 +39,7 @@ def capture_predecessor(
         if len(actual) != 1:
             raise ValueError('unique-predecessor-candidate-required')
         writers[role] = capture_running_writer(
-            actual[0], binding, role=cast(Literal['web', 'workers'], role),
+            actual[0], binding, role=role,
         )
     web = cast(dict[str, object], writers['web'])
     workers = cast(dict[str, object], writers['workers'])
@@ -177,21 +177,20 @@ def inspect_predecessor(
             raise ValueError('unique-predecessor-candidate-required')
         original = record(writers[role], 'predecessor running instance')
         state = record(actual[0].get('State'), 'predecessor state')
-        typed_role = cast(Literal['web', 'workers'], role)
         if state.get('Running') is True:
             if role in retained or capture_running_writer(
-                actual[0], binding, role=typed_role,
+                actual[0], binding, role=role,
             ) != original:
                 raise ValueError('predecessor-running-evidence-changed')
             observed[role] = 'running'
         else:
             intent = directory / ('predecessor-stop-intent-' + role + '.json')
             if (not intent.exists() or private_json(intent)
-                    != _stop_binding(baseline, typed_role)):
+                    != _stop_binding(baseline, role)):
                 raise ValueError('predecessor-stop-intent-missing-or-changed')
             prior = record(retained[role], 'prior stop') if role in retained else None
             stopped = inspect_stopped_writer(
-                actual[0], binding, role=typed_role, baseline=original,
+                actual[0], binding, role=role, baseline=original,
                 previous=prior,
             )
             result_path = directory / ('predecessor-stop-result-' + role + '.json')

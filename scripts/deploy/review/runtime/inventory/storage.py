@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path, PurePosixPath
-from typing import TYPE_CHECKING, Literal, cast
+from typing import TYPE_CHECKING, cast
 
 from scripts.deploy.images.metadata import digest, record
 from scripts.deploy.review.runtime import services
@@ -100,7 +100,7 @@ def inspect_completed_storage(
         state = record(actual['State'], 'candidate state')
         if state.get('Running') is not True and previous is None:
             raise ValueError('running-candidate-mount-proof-required')
-    proof = {'originalSha256': checksum(original),
+    proof: dict[str, object] = {'originalSha256': checksum(original),
              'mappedSha256': checksum(retained),
              'candidatesSha256': checksum(candidates)}
     if previous is not None and dict(previous) != proof:
@@ -212,9 +212,8 @@ def _retain_completed_storage(
         candidate = record(candidates[role], 'candidate')
         actual = record(by_id.get(candidate['id']), 'candidate container')
         state = record(actual['State'], 'candidate state')
-        typed_role = cast(Literal['web', 'workers'], role)
         if state.get('Running') is True:
-            value = capture_running_writer(actual, candidate, role=typed_role)
+            value = capture_running_writer(actual, candidate, role=role)
             if saved and value != retained_instances[role]:
                 raise ValueError('retained-storage-instance-changed')
             instances[role] = value
@@ -222,7 +221,7 @@ def _retain_completed_storage(
             if not saved:
                 raise ValueError('running-candidate-mount-proof-required')
             baseline = record(retained_instances[role], 'running candidate')
-            inspect_stopped_writer(actual, candidate, role=typed_role, baseline=baseline)
+            inspect_stopped_writer(actual, candidate, role=role, baseline=baseline)
             instances[role] = baseline
     proof = inspect_completed_storage(
         containers, topology, original, candidates, handover, probe=probe,
