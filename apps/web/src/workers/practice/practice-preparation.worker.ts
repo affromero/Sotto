@@ -102,10 +102,11 @@ export async function processPracticePreparation(job: Job<unknown>, workerSignal
           return;
         }
         let checking = false;
+        let heartbeat: Promise<void> | undefined;
         const timer = setInterval(() => {
           if (checking || signal.aborted) return;
           checking = true;
-          void sottoTransaction(prisma, async (database) => {
+          heartbeat = sottoTransaction(prisma, async (database) => {
             const current = await validatePracticePreparation(database, sessionId, operationId);
             if (Date.now() - current.operation.updatedAt >= 5_000)
               await writePracticePreparation(database, {
@@ -303,6 +304,7 @@ export async function processPracticePreparation(job: Job<unknown>, workerSignal
         } finally {
           clearInterval(timer);
           controller.abort();
+          await heartbeat;
         }
       },
     });
