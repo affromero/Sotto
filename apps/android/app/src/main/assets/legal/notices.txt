@@ -669,10 +669,10 @@ org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0|kotlinx-coroutines-andro
 org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.11.0|kotlinx-coroutines-core-jvm-1.11.0.jar
   Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0.txt
 
-org.jetbrains.kotlinx:kotlinx-serialization-core-jvm:1.12.0|kotlinx-serialization-core-jvm-1.12.0.jar
+org.jetbrains.kotlinx:kotlinx-serialization-core-jvm:1.13.0|kotlinx-serialization-core-jvm-1.13.0.jar
   Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0.txt
 
-org.jetbrains.kotlinx:kotlinx-serialization-json-jvm:1.12.0|kotlinx-serialization-json-jvm-1.12.0.jar
+org.jetbrains.kotlinx:kotlinx-serialization-json-jvm:1.13.0|kotlinx-serialization-json-jvm-1.13.0.jar
   Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0.txt
 
 org.jetbrains:annotations:23.0.0|annotations-23.0.0.jar
