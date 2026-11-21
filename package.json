@@ -55,7 +55,8 @@
     "@hono/node-server": "2.1.6",
     "@modelcontextprotocol/sdk": "1.32.2",
     "@prisma/config": {
-      "deepmerge-ts": "8.0.2"
+      "deepmerge-ts": "8.0.2",
+      "effect": "3.22.1"
     },
     "braces": "$braces",
     "esbuild": "$esbuild",
@@ -94,7 +95,7 @@
     "vitest": "4.1.12"
   },
   "optionalDependencies": {
-    "@next/swc-darwin-arm64": "^16.4.3"
+    "@next/swc-darwin-arm64": "^16.4.5"
   },
   "engines": {
     "node": ">=24 <25"
