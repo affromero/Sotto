@@ -174,13 +174,13 @@ for (const file of scripts) {
   } else allScriptTests = true;
 }
 if (allScriptTests) {
-  run('python3', ['-m', 'unittest', 'discover', '-s', 'scripts/tests', '-p', 'test*.py']);
+  run('npm', ['run', 'test:deploy']);
 } else {
   for (const test of scriptTests) {
-    run('python3', [
-      '-m',
-      'unittest',
-      'discover',
+    run('npm', [
+      'run',
+      'test:deploy',
+      '--',
       '-s',
       dirname(test),
       '-t',

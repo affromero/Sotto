@@ -14,7 +14,7 @@
     "access": "npm run access --workspace=@sotto/web --",
     "build": "scripts/run-with-env.sh npm run build --workspace=@sotto/web",
     "check:affected": "node scripts/ci/check-affected.mjs",
-    "ci": "node scripts/ci/audit-gate.mjs && python3 -m unittest discover -s scripts/tests -p 'test*.py' && npm run ci:web && npm run ci:packages",
+    "ci": "node scripts/ci/audit-gate.mjs && npm run test:deploy && npm run ci:web && npm run ci:packages",
     "ci:packages": "npm test --workspace=@sotto/shared -- --run && npm run type-check --workspace=@sotto/mcp && npm run build --workspace=@sotto/mcp && npm test --workspace=groundcheck -- --run && npm run typecheck --workspace=groundcheck && npm run build --workspace=groundcheck && npm test --workspace=@sotto/learning-model -- --run && npm run typecheck --workspace=@sotto/learning-model && npm run build --workspace=@sotto/learning-model",
     "ci:web": "npm run ci --workspace=@sotto/web",
     "dev": "scripts/run-with-env.sh npm run dev --workspace=@sotto/web",
@@ -36,6 +36,7 @@
     "test": "npm run test --workspace=@sotto/web --",
     "test:browser": "node e2e/run.mjs",
     "test:coverage": "npm run test:coverage --workspace=@sotto/web",
+    "test:deploy": "env -u PYTHONPATH uv run --locked --no-dev python -m unittest discover -s scripts/tests -p 'test*.py'",
     "test:smoke": "npm run test:smoke --workspace=@sotto/web",
     "test:watch": "npm run test:watch --workspace=@sotto/web",
     "type-check": "npm run type-check --workspace=@sotto/web"
@@ -77,7 +78,7 @@
     "bullmq": "6.5.2",
     "ioredis": "6.0.0",
     "pg": "^8.23.1",
-    "thesidedoor-core": "file:vendor/sidedoor-core/thesidedoor-core-0.5.8.tgz",
+    "thesidedoor-core": "file:vendor/sidedoor-core/thesidedoor-core-0.5.10.tgz",
     "zod": "^4.6.7"
   },
   "devDependencies": {

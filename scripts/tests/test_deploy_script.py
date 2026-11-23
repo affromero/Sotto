@@ -629,13 +629,16 @@ class DeploymentFailureTests(unittest.TestCase):
                     result = subprocess.CompletedProcess(command, process.returncode,
                                                          stdout.read_text(), stderr.read_text())
                 else:
-                    try:
-                        result = subprocess.run(command, env=environment, text=True,
-                                                capture_output=True, timeout=controller_timeout)
-                    except subprocess.TimeoutExpired as error:
-                        streams = [value.decode() if isinstance(value, bytes) else value or ''
-                                   for value in (error.stdout, error.stderr)]
-                        self.fail('Controller timed out:\n' + ''.join(streams))
+                    with subprocess.Popen(command, env=environment, text=True,
+                                          stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                          start_new_session=True) as process:
+                        try:
+                            stdout, stderr = process.communicate(timeout=controller_timeout)
+                        except subprocess.TimeoutExpired:
+                            os.killpg(process.pid, signal.SIGKILL)
+                            stdout, stderr = process.communicate()
+                            self.fail('Controller timed out:\n' + stdout + stderr)
+                        result = subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
             if success:
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             else:

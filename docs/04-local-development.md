@@ -11,6 +11,7 @@
 | Tool                            | Version        | Why                               |
 | ------------------------------- | -------------- | --------------------------------- |
 | Node.js                         | 24             | Next.js, workers, scripts         |
+| uv                              | Current stable | Runs CI tests with Python 3.11+   |
 | Docker Desktop or Docker Engine | Current stable | PostgreSQL and Redis              |
 | FFmpeg                          | 6+             | Audio stitching and normalization |
 | Git                             | 2.40+          | Source control                    |
