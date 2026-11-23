@@ -49,12 +49,20 @@ class AffectedChecksTests(unittest.TestCase):
         helper = self.root / 'scripts/ci/check-affected.mjs'
         helper.parent.mkdir(parents=True)
         shutil.copyfile(HELPER, helper)
+        project = HELPER.parents[2]
+        deploy_test = json.loads((project / 'package.json').read_text())['scripts']['test:deploy']
+        self.write('package.json', json.dumps({'scripts': {'test:deploy': deploy_test}}))
+        for name in ('pyproject.toml', 'uv.lock'):
+            shutil.copyfile(project / name, self.root / name)
+        self.environment['SOTTO_FIXTURE_NPM'] = shutil.which('npm')
         binaries = self.root / 'bin'
         binaries.mkdir()
         npm = binaries / 'npm'
         npm.write_text(
             '#!/usr/bin/env python3\n'
             'import json, os, sys\n'
+            'if sys.argv[1:3] == ["run", "test:deploy"]:\n'
+            '    os.execv(os.environ["SOTTO_FIXTURE_NPM"], sys.argv)\n'
             'with open(os.environ["SOTTO_AFFECTED_TEST_LOG"], "a") as log:\n'
             '    log.write(json.dumps(sys.argv[1:]) + "\\n")\n'
             'if os.environ.get("SOTTO_AFFECTED_TEST_FAIL"):\n'
