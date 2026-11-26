@@ -60,6 +60,12 @@ function matchAudioFormat(buffer: Buffer): AudioFormat | null {
     return { ext: 'm4a', mime: 'audio/mp4' };
   }
 
+  // ADTS AAC frame sync (0xFF followed by 0b1111_0xx0: 12-bit syncword + layer 00)
+  // Must run before the broader MP3 sync check, which also matches 0xFF 0xF1/0xF9.
+  if (buffer.length >= 2 && buffer[0] === 0xff && (buffer[1] & 0xf6) === 0xf0) {
+    return { ext: 'aac', mime: 'audio/aac' };
+  }
+
   // "ID3" tag or MPEG-audio frame sync (0xFF followed by 0b111xxxxx)
   if (buffer.length >= 3 && buffer.toString('ascii', 0, 3) === 'ID3') {
     return { ext: 'mp3', mime: 'audio/mpeg' };

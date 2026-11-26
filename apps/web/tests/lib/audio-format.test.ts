@@ -41,6 +41,11 @@ describe('detectAudioFormat', () => {
     expect(detectAudioFormat(withHeader([0xff, 0xfb]))).toEqual({ ext: 'mp3', mime: 'audio/mpeg' });
   });
 
+  it('detects raw ADTS AAC instead of mislabeling it as MP3', () => {
+    expect(detectAudioFormat(withHeader([0xff, 0xf1]))).toEqual({ ext: 'aac', mime: 'audio/aac' });
+    expect(detectAudioFormat(withHeader([0xff, 0xf9]))).toEqual({ ext: 'aac', mime: 'audio/aac' });
+  });
+
   it('falls back to mp3 for unrecognized input', () => {
     expect(detectAudioFormat(withHeader([0x00, 0x01, 0x02, 0x03]))).toEqual({
       ext: 'mp3',
@@ -72,6 +77,10 @@ describe('isRecognizedAudio', () => {
 
   it('returns true for an ID3 tag', () => {
     expect(isRecognizedAudio(withHeader('ID3'))).toBe(true);
+  });
+
+  it('returns true for an ADTS AAC header', () => {
+    expect(isRecognizedAudio(withHeader([0xff, 0xf1]))).toBe(true);
   });
 
   it('returns false for a zero-byte buffer', () => {
