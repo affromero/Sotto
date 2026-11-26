@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import hashlib
+import sys
+from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, cast
 
-from scripts.deploy.images.metadata import record
+from scripts.deploy.images.metadata import digest, record
+from scripts.deploy.review.build_observer import bounded_bytes
 from scripts.deploy.review.runtime import services
 from scripts.deploy.review.runtime.inventory.stopped_writer import (
     capture_running_writer,
@@ -136,6 +140,69 @@ def prepare_predecessor_stop(
             current[0], recorded, role=role) != expected):
         raise ValueError('predecessor-stop-preparation-unresolved')
     successor.verify_fence()
+
+
+def stop_predecessor(
+    previous: HostOperations, successor: HostOperations, *,
+    role: Literal['web', 'workers'],
+    verify_drained: Callable[[], None],
+) -> dict[str, object]:
+    """Dispatch once while the caller holds admission closed through the stop."""
+    if role not in ('web', 'workers'):
+        raise ValueError('predecessor-role-invalid')
+    _verify_release(previous, successor, allow_unresolved=False)
+    directory = successor.attempt.directory
+    result_path = directory / ('predecessor-stop-result-' + role + '.json')
+    intent_path = directory / ('predecessor-stop-intent-' + role + '.json')
+    if result_path.exists() or result_path.is_symlink():
+        raise ValueError('predecessor-stop-result-already-exists')
+    if intent_path.exists() or intent_path.is_symlink():
+        raise ValueError('predecessor-stop-intent-already-exists')
+    relative = 'scripts/deploy/stop-workers.py'
+    helper = successor.root / relative
+    source = bounded_bytes(helper)
+    tools = record(successor.manifest['tools'], 'bound review tools')
+    if hashlib.sha256(source).hexdigest() != digest(
+        tools.get(relative), 'predecessor stop helper',
+    ):
+        raise ValueError('predecessor-stop-helper-changed')
+    baseline = private_json(directory / 'predecessor-running.json')
+    intent = _stop_binding(baseline, role)
+    expected = record(record(baseline['writers'], 'writers')[role], 'writer')
+    binding_path = previous.attempt.directory / ('candidate-' + role + '.json')
+    binding = private_json(binding_path)
+    verify_drained()
+    prepare_predecessor_stop(previous, successor, role=role)
+    if private_json(intent_path) != intent:
+        raise ValueError('predecessor-stop-intent-missing-or-changed')
+    identity = cast(str, intent['id'])
+    successor.verify_fence()
+    if bounded_bytes(helper) != source:
+        raise ValueError('predecessor-stop-helper-changed')
+    operation = 'stop' if role == 'workers' else 'stop-web'
+    # Preserve the stop helper's deliberate absence of a forced-kill deadline.
+    successor.command(
+        [sys.executable, '-I', '-', operation, identity],
+        content=source, timeout=None,
+    )
+    _verify_release(previous, successor, allow_unresolved=False)
+    actual = successor.inspect(identity)
+    if len(actual) != 1:
+        raise ValueError('unique-predecessor-candidate-required')
+    stopped = inspect_stopped_writer(
+        actual[0], binding, role=role, baseline=expected,
+    )
+    if (private_json(directory / 'predecessor-running.json') != baseline
+            or private_json(intent_path) != intent
+            or private_json(binding_path) != binding
+            or result_path.exists() or result_path.is_symlink()):
+        raise ValueError('predecessor-stop-dispatch-evidence-changed')
+    successor.verify_fence()
+    atomic_json(result_path, {
+        'outcome': 'confirmed', 'intentSha256': checksum(intent),
+        'stopped': stopped,
+    })
+    return inspect_predecessor(previous, successor)
 
 
 def inspect_predecessor(
