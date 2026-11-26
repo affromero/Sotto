@@ -17,6 +17,11 @@ describe('tokenize', () => {
   it('splits on whitespace and drops empty tokens', () => {
     expect(tokenize('  Ich   heiße  Anna. ')).toEqual(['ich', 'heiße', 'anna']);
   });
+
+  it('preserves whitespace tokenization when another language is specified', () => {
+    const phrase = "L'amour porte-monnaie.";
+    expect(tokenize(phrase, 'fr')).toEqual(["l'amour", 'portemonnaie']);
+  });
 });
 
 describe('alignTokens', () => {
@@ -76,6 +81,18 @@ describe('alignTokens', () => {
 });
 
 describe('alignPhrase', () => {
+  it.each([
+    ['ja', '明日は学校に行きます。', '明日も学校に行きます。'],
+    ['zh-Hans', '我喜欢喝茶。', '我喜欢喝水。'],
+  ])('gives partial credit for an unspaced %s phrase', (language, expected, transcript) => {
+    const result = alignPhrase(expected, transcript, language);
+    expect(result.matched).toBeGreaterThan(0);
+    expect(result.accuracy).toBeGreaterThan(0);
+    expect(result.accuracy).toBeLessThan(1);
+    expect(result.wordErrorRate).toBeGreaterThan(0);
+    expect(result.wordErrorRate).toBeLessThan(1);
+  });
+
   it('normalizes case and punctuation before aligning', () => {
     const r = alignPhrase('Ich heiße Anna.', 'ich Heisse anna');
     // "heiße" vs "heisse" is a substitution (ß != ss without transliteration),
