@@ -7,7 +7,10 @@ from importlib import import_module
 from unittest.mock import patch
 
 from scripts.deploy.review.runtime import release
-from scripts.deploy.review.runtime.inventory.network import verify_retained_network
+from scripts.deploy.review.runtime.inventory.network import (
+    verify_retained_network,
+    verify_running_predecessor_network,
+)
 from scripts.deploy.review.runtime.inventory.predecessor import (
     capture_predecessor,
     prepare_predecessor_stop,
@@ -15,7 +18,7 @@ from scripts.deploy.review.runtime.inventory.predecessor import (
 from scripts.deploy.review.state import Attempt, atomic_json, checksum, private_json
 from scripts.deploy.review.topology import NETWORK, PROJECT, exact_mounts
 
-class RetainedNetworkTests(unittest.TestCase):
+class ReviewNetworkFixture(unittest.TestCase):
     def setUp(self) -> None:
         fixture_type = import_module(
             'scripts.tests.review.runtime.inventory.test_predecessor',
@@ -86,6 +89,11 @@ class RetainedNetworkTests(unittest.TestCase):
         atomic_json(self.previous.attempt.directory / 'release-record.json',
                     release.read_completed_record(self.previous, fenced=True))
         capture_predecessor(self.previous, self.successor)
+
+
+class RetainedNetworkTests(ReviewNetworkFixture):
+    def setUp(self) -> None:
+        super().setUp()
         prepare_predecessor_stop(self.previous, self.successor, role='web')
         prepare_predecessor_stop(self.previous, self.successor, role='workers')
         for role, address in (('web', '10'), ('workers', '11')):
@@ -151,6 +159,74 @@ class RetainedNetworkTests(unittest.TestCase):
         self.databases[self.fixture.storage.ids['redis']]['State']['Paused'] = True
         with self.assertRaises(ValueError):
             verify_retained_network(self.previous, self.successor)
+
+
+class RunningPredecessorNetworkTests(ReviewNetworkFixture):
+    def setUp(self) -> None:
+        super().setUp()
+        for role, address, egress in (('web', '10', '2'), ('workers', '11', '3')):
+            container = self.fixture.fixture.candidates[role]
+            attachments = container['NetworkSettings']['Networks']
+            name = container['Name'].lstrip('/')
+            for index, network, ip, prefix in (
+                (0, NETWORK, '172.30.99.' + address, 24),
+                (1, PROJECT + '_egress', '172.29.0.' + egress, 16),
+            ):
+                attachments[network].update({
+                    'IPAddress': ip, 'IPPrefixLen': prefix, 'GlobalIPv6Address': '',
+                })
+                self.networks[index]['Containers'][container['Id']] = {
+                    'Name': name, 'IPv4Address': f'{ip}/{prefix}', 'IPv6Address': '',
+                }
+
+    def test_exact_running_topology_is_accepted(self) -> None:
+        verify_running_predecessor_network(self.previous, self.successor)
+
+    def test_unknown_peer_on_either_network_is_rejected(self) -> None:
+        for network in self.networks:
+            with self.subTest(network=network['Name']):
+                members = network['Containers']
+                members['unexpected'] = {}
+                with self.assertRaisesRegex(ValueError, 'unexpected-review-network-member'):
+                    verify_running_predecessor_network(self.previous, self.successor)
+                del members['unexpected']
+
+    def test_egress_endpoint_must_match_the_captured_writer(self) -> None:
+        worker = self.fixture.fixture.candidates['workers']
+        self.networks[1]['Containers'][worker['Id']]['IPv4Address'] = '172.29.0.9/16'
+        with self.assertRaisesRegex(ValueError, 'review-network-endpoint-changed'):
+            verify_running_predecessor_network(self.previous, self.successor)
+
+    def test_rejects_coordinated_egress_address_drift_during_observation(self) -> None:
+        worker = self.fixture.fixture.candidates['workers']
+        boundary = self.previous.docker.side_effect
+        review_id = self.fixture.storage.network_ids['review']
+        egress_id = self.fixture.storage.network_ids['egress']
+
+        def docker(*args: str) -> bytes:
+            result = boundary(*args)
+            if args == ('network', 'inspect', review_id, egress_id):
+                worker['NetworkSettings']['Networks'][PROJECT + '_egress']['IPAddress'] = (
+                    '172.29.0.9'
+                )
+                self.networks[1]['Containers'][worker['Id']]['IPv4Address'] = '172.29.0.9/16'
+            return result
+
+        self.previous.docker.side_effect = docker
+        with self.assertRaisesRegex(ValueError, 'predecessor-network-evidence-changed'):
+            verify_running_predecessor_network(self.previous, self.successor)
+
+    def test_running_writer_binding_must_match_the_completed_release(self) -> None:
+        worker = self.fixture.fixture.candidates['workers']
+        worker['Config']['Env'] = ['UNADMITTED=fixture']
+        with self.assertRaisesRegex(ValueError, 'candidate-changed|writer-changed'):
+            verify_running_predecessor_network(self.previous, self.successor)
+
+    def test_running_members_are_required_for_queue_preflight(self) -> None:
+        worker = self.fixture.fixture.candidates['workers']
+        del self.networks[0]['Containers'][worker['Id']]
+        with self.assertRaisesRegex(ValueError, 'unexpected-review-network-member'):
+            verify_running_predecessor_network(self.previous, self.successor)
 
 
 if __name__ == '__main__':
