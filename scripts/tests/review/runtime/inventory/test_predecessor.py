@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import unittest
 from importlib import import_module
+from pathlib import Path
 from unittest.mock import patch
 
 from scripts.deploy.review.runtime import release
@@ -12,6 +14,7 @@ from scripts.deploy.review.runtime.inventory.predecessor import (
     capture_predecessor,
     inspect_predecessor,
     prepare_predecessor_stop,
+    stop_predecessor,
 )
 from scripts.deploy.review.runtime.inventory.stopped_writer import inspect_stopped_writer
 from scripts.deploy.review.runtime.operations import HostOperations, MAINTENANCE
@@ -57,7 +60,11 @@ class PredecessorCaptureTests(unittest.TestCase):
             atomic_json(self.previous.attempt.directory
                         / ('candidate-' + role + '.json'),
                         self.previous.writer_binding(container))
-        attempt = Attempt.create(self.fixture.host, 'successor', {}, 'b' * 64)
+        helper = 'scripts/deploy/stop-workers.py'
+        root = Path(__file__).resolve().parents[5]
+        attempt = Attempt.create(self.fixture.host, 'successor', {
+            'tools': {helper: hashlib.sha256((root / helper).read_bytes()).hexdigest()},
+        }, 'b' * 64)
         for phase in ('ADMITTED', 'PREPARED', 'FENCED'):
             attempt.advance(phase)
         attempt.install_marker(self.fixture.host / 'unresolved.json')
@@ -90,6 +97,95 @@ class PredecessorCaptureTests(unittest.TestCase):
         )
         self.assertEqual(capture_predecessor(self.previous, self.successor), result)
         self.assertEqual(self.fixture.started, [])
+
+    def test_dispatch_records_an_exact_stop_for_recovery(self) -> None:
+        capture_predecessor(self.previous, self.successor)
+        directory = self.successor.attempt.directory
+        web = self.fixture.candidates['web']
+        original_command = self.successor.command
+
+        def command(arguments: list[str], **options: object) -> bytes:
+            if arguments[1:3] != ['-I', '-']:
+                return original_command(arguments, **options)
+            self.assertEqual(arguments[3:], ['stop-web', web['Id']])
+            self.assertIsNone(options['timeout'])
+            self.assertEqual(options['content'], (
+                self.successor.root / 'scripts/deploy/stop-workers.py'
+            ).read_bytes())
+            self.assertTrue((directory / 'predecessor-stop-intent-web.json').exists())
+            web['State'].update({
+                'Running': False, 'Status': 'exited', 'ExitCode': 143,
+                'FinishedAt': '2026-10-26T01:23:00Z',
+            })
+            web['NetworkSettings']['Networks'][NETWORK]['IPAMConfig'] = {
+                'IPv4Address': '172.30.99.10',
+            }
+            return b''
+
+        with (
+            patch.object(self.successor, 'command', side_effect=command),
+            patch.object(self.successor, 'docker', side_effect=self.previous.docker),
+        ):
+            result = stop_predecessor(
+                self.previous, self.successor, role='web', verify_drained=lambda: None,
+            )
+            with self.assertRaisesRegex(ValueError, 'stop-result-already-exists'):
+                stop_predecessor(
+                    self.previous, self.successor, role='web', verify_drained=lambda: None,
+                )
+        self.assertEqual(result, {'web': 'stopped', 'workers': 'running'})
+        self.assertEqual(inspect_predecessor(self.previous, self.successor), result)
+
+    def test_failed_drain_leaves_running_writer_and_no_intent(self) -> None:
+        capture_predecessor(self.previous, self.successor)
+
+        def unresolved_drain() -> None:
+            raise ValueError('work still active')
+
+        with self.assertRaisesRegex(ValueError, 'work still active'):
+            stop_predecessor(
+                self.previous, self.successor, role='workers', verify_drained=unresolved_drain,
+            )
+        self.assertEqual(inspect_predecessor(self.previous, self.successor), {
+            'web': 'running', 'workers': 'running',
+        })
+        self.assertFalse((self.successor.attempt.directory
+                          / 'predecessor-stop-intent-workers.json').exists())
+
+    def test_changed_helper_leaves_running_writer_and_no_intent(self) -> None:
+        capture_predecessor(self.previous, self.successor)
+        self.successor.manifest['tools'] = {'scripts/deploy/stop-workers.py': 'a' * 64}
+        with self.assertRaisesRegex(ValueError, 'stop-helper-changed'):
+            stop_predecessor(
+                self.previous, self.successor, role='web', verify_drained=lambda: None,
+            )
+        self.assertEqual(inspect_predecessor(self.previous, self.successor), {
+            'web': 'running', 'workers': 'running',
+        })
+        self.assertFalse((self.successor.attempt.directory
+                          / 'predecessor-stop-intent-web.json').exists())
+
+    def test_interrupted_dispatch_never_authorizes_a_second_stop(self) -> None:
+        capture_predecessor(self.previous, self.successor)
+        original_command = self.successor.command
+
+        def command(arguments: list[str], **options: object) -> bytes:
+            if arguments[1:3] == ['-I', '-']:
+                raise RuntimeError('stop interrupted')
+            return original_command(arguments, **options)
+
+        with patch.object(self.successor, 'command', side_effect=command):
+            with self.assertRaisesRegex(RuntimeError, 'stop interrupted'):
+                stop_predecessor(
+                    self.previous, self.successor, role='web', verify_drained=lambda: None,
+                )
+            with self.assertRaisesRegex(ValueError, 'stop-intent-already-exists'):
+                stop_predecessor(
+                    self.previous, self.successor, role='web', verify_drained=lambda: None,
+                )
+        directory = self.successor.attempt.directory
+        self.assertTrue((directory / 'predecessor-stop-intent-web.json').exists())
+        self.assertFalse((directory / 'predecessor-stop-result-web.json').exists())
 
     def test_refuses_restart_and_retains_the_original_receipt(self) -> None:
         original = capture_predecessor(self.previous, self.successor)
