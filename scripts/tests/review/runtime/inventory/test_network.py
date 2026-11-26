@@ -20,11 +20,15 @@ from scripts.deploy.review.topology import NETWORK, PROJECT, exact_mounts
 
 class ReviewNetworkFixture(unittest.TestCase):
     def setUp(self) -> None:
+        self.prepare_network()
+        capture_predecessor(self.previous, self.successor)
+
+    def prepare_network(self, *, original_queues: dict[str, object] | None = None) -> None:
         fixture_type = import_module(
             'scripts.tests.review.runtime.inventory.test_predecessor',
         ).PredecessorCaptureTests
         self.fixture = fixture_type('runTest')
-        self.fixture.setUp()
+        self.fixture.prepare_predecessor(original_queues=original_queues)
         self.addCleanup(self.fixture.doCleanups)
         self.previous = self.fixture.previous
         self.successor = self.fixture.successor
@@ -88,7 +92,6 @@ class ReviewNetworkFixture(unittest.TestCase):
                     {'protected_images': sorted(images)})
         atomic_json(self.previous.attempt.directory / 'release-record.json',
                     release.read_completed_record(self.previous, fenced=True))
-        capture_predecessor(self.previous, self.successor)
 
 
 class RetainedNetworkTests(ReviewNetworkFixture):
@@ -163,7 +166,11 @@ class RetainedNetworkTests(ReviewNetworkFixture):
 
 class RunningPredecessorNetworkTests(ReviewNetworkFixture):
     def setUp(self) -> None:
-        super().setUp()
+        self.prepare_running_network()
+        capture_predecessor(self.previous, self.successor)
+
+    def prepare_running_network(self, *, original_queues: dict[str, object] | None = None) -> None:
+        self.prepare_network(original_queues=original_queues)
         for role, address, egress in (('web', '10', '2'), ('workers', '11', '3')):
             container = self.fixture.fixture.candidates[role]
             attachments = container['NetworkSettings']['Networks']

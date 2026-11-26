@@ -19,6 +19,9 @@ class SuccessorEnvironmentTests(unittest.TestCase):
         self.addCleanup(self.fixture.doCleanups)
         self.previous = self.fixture.previous
         self.successor = self.fixture.successor
+        self.prepare_environment()
+
+    def prepare_environment(self) -> None:
         self.directory = self.previous.attempt.directory
         original = {'DATABASE_URL': 'postgresql://fixture/secret',
                     'REDIS_URL': 'redis://fixture/0',

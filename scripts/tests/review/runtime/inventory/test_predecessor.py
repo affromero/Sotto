@@ -25,6 +25,9 @@ from scripts.tests.review.runtime.inventory.storage_fixture import StorageHost
 
 class PredecessorCaptureTests(unittest.TestCase):
     def setUp(self) -> None:
+        self.prepare_predecessor()
+
+    def prepare_predecessor(self, *, original_queues: dict[str, object] | None = None) -> None:
         fixture_type = import_module(
             'scripts.tests.review.runtime.test_release',
         ).ReleaseRecoveryTests
@@ -62,9 +65,12 @@ class PredecessorCaptureTests(unittest.TestCase):
                         self.previous.writer_binding(container))
         helper = 'scripts/deploy/stop-workers.py'
         root = Path(__file__).resolve().parents[5]
-        attempt = Attempt.create(self.fixture.host, 'successor', {
+        manifest: dict[str, object] = {
             'tools': {helper: hashlib.sha256((root / helper).read_bytes()).hexdigest()},
-        }, 'b' * 64)
+        }
+        if original_queues is not None:
+            manifest['originalQueues'] = original_queues
+        attempt = Attempt.create(self.fixture.host, 'successor', manifest, 'b' * 64)
         for phase in ('ADMITTED', 'PREPARED', 'FENCED'):
             attempt.advance(phase)
         attempt.install_marker(self.fixture.host / 'unresolved.json')
