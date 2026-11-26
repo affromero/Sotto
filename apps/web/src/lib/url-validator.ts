@@ -27,22 +27,38 @@ function isPrivateIPv4(ip: string): boolean {
   if (parts[0] === 192 && parts[1] === 168) return true;
   // 169.254.0.0/16 (link-local)
   if (parts[0] === 169 && parts[1] === 254) return true;
-  // 0.0.0.0
-  if (parts.every((p) => p === 0)) return true;
+  // 0.0.0.0/8 ("this" network)
+  if (parts[0] === 0) return true;
+  // 100.64.0.0/10 (Carrier-Grade NAT, RFC 6598)
+  if (parts[0] === 100 && parts[1] >= 64 && parts[1] <= 127) return true;
 
   return false;
 }
 
+function extractMappedIPv4(ip: string): string | null {
+  const dotted = ip.match(/^(?:::ffff:|0:0:0:0:0:ffff:)(\d{1,3}(?:\.\d{1,3}){3})$/i);
+  if (dotted) return dotted[1];
+
+  const hex = ip.match(/^(?:::ffff:|0:0:0:0:0:ffff:)([0-9a-f]{1,4}):([0-9a-f]{1,4})$/i);
+  if (!hex) return null;
+  const hi = parseInt(hex[1], 16);
+  const lo = parseInt(hex[2], 16);
+  return `${(hi >> 8) & 0xff}.${hi & 0xff}.${(lo >> 8) & 0xff}.${lo & 0xff}`;
+}
+
 function isPrivateIPv6(ip: string): boolean {
-  const normalized = ip.toLowerCase();
-  // ::1
-  if (normalized === '::1') return true;
+  const normalized = ip.toLowerCase().split('%')[0];
+  // ::1 (loopback)
+  if (normalized === '::1' || normalized === '0:0:0:0:0:0:0:1') return true;
+  // :: (unspecified)
+  if (normalized === '::' || normalized === '0:0:0:0:0:0:0:0') return true;
   // fc00::/7 (unique local)
   if (normalized.startsWith('fc') || normalized.startsWith('fd')) return true;
-  // fe80::/10 (link-local)
-  if (normalized.startsWith('fe80')) return true;
-  // :: (unspecified)
-  if (normalized === '::') return true;
+  // fe80::/10 (link-local: fe80..febf)
+  if (/^fe[89ab][0-9a-f]/i.test(normalized)) return true;
+  // IPv4-mapped IPv6 (e.g. ::ffff:127.0.0.1 or ::ffff:7f00:1)
+  const mapped = extractMappedIPv4(normalized);
+  if (mapped) return isPrivateIPv4(mapped);
 
   return false;
 }
@@ -64,9 +80,9 @@ async function validateUrl(url: string): Promise<void> {
     throw new UrlValidationError(`Unsupported protocol: ${parsed.protocol}`);
   }
 
-  const hostname = parsed.hostname.toLowerCase();
+  const hostname = parsed.hostname.toLowerCase().replace(/\.+$/, '');
 
-  if (BLOCKED_HOSTNAMES.has(hostname)) {
+  if (BLOCKED_HOSTNAMES.has(hostname) || hostname.endsWith('.localhost')) {
     throw new UrlValidationError(`Blocked hostname: ${hostname}`);
   }
 

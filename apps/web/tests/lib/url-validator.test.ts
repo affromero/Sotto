@@ -27,6 +27,20 @@ describe('safeFetch', () => {
     await expect(safeFetch('http://127.0.0.1/')).rejects.toThrow(UrlValidationError);
   });
 
+  it('rejects IPv4-mapped IPv6 addresses pointing to private IPs', async () => {
+    await expect(safeFetch('http://[::ffff:127.0.0.1]/')).rejects.toThrow(UrlValidationError);
+    await expect(safeFetch('http://[::ffff:169.254.169.254]/latest/meta-data/')).rejects.toThrow(
+      UrlValidationError
+    );
+    await expect(safeFetch('http://[::ffff:10.0.0.1]/')).rejects.toThrow(UrlValidationError);
+  });
+
+  it('rejects full fe80::/10 link-local IPv6 range and *.localhost subdomains', async () => {
+    await expect(safeFetch('http://[fe90::1]/')).rejects.toThrow(UrlValidationError);
+    await expect(safeFetch('http://[febf::1]/')).rejects.toThrow(UrlValidationError);
+    await expect(safeFetch('http://sub.localhost/')).rejects.toThrow(UrlValidationError);
+  });
+
   it('rejects redirect to internal IP', async () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       status: 302,
