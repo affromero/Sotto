@@ -64,7 +64,10 @@ export function cleanTextForTts(text: string): string {
  * Split priority: sentence boundary (.!?) > comma/semicolon > word boundary.
  */
 export function splitTextForTts(text: string, maxChars: number): string[] {
-  const target = Math.floor(maxChars * 0.8);
+  if (!Number.isFinite(maxChars) || maxChars <= 0) {
+    throw new RangeError('maxChars must be a positive finite number');
+  }
+  const target = Math.max(1, Math.floor(maxChars * 0.8));
   if (text.length <= target) return [text];
 
   const chunks: string[] = [];

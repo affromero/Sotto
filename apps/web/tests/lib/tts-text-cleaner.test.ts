@@ -126,4 +126,11 @@ describe('splitTextForTts', () => {
     // All original words should be present
     expect(reconstructed.replace(/\s+/g, ' ')).toBe(text.replace(/\s+/g, ' '));
   });
+
+  it('guards against non-positive maxChars and small limits without infinite looping', () => {
+    expect(() => splitTextForTts('Hello', 0)).toThrow(RangeError);
+    expect(() => splitTextForTts('Hello', -10)).toThrow(RangeError);
+    expect(() => splitTextForTts('Hello', NaN)).toThrow(RangeError);
+    expect(splitTextForTts('abc', 1)).toEqual(['a', 'b', 'c']);
+  });
 });
