@@ -1,8 +1,8 @@
 Source: https://github.com/affromero/sidedoor
-Commit: 62acc0649adf7d80019e62de4015dbc7f1d025aa
-Package: thesidedoor-core 0.5.10
-Archive: thesidedoor-core-0.5.10.tgz
-SHA-256: 47b55a84c3f30b3885486dca236495a4923df37060a78ad41164af7aab1ab3a2
+Commit: b197f83a02dd12692a584b4f09742a556fa72cb2
+Package: thesidedoor-core 0.6.0
+Archive: thesidedoor-core-0.6.0.tgz
+SHA-256: 558b8a284c76ec185157c33d76fc47fd1cb3d809b160c540306d649df2d9a1eb
 
-Retrieved from the npm registry with npm pack thesidedoor-core@0.5.10.
+Retrieved from the npm registry with npm pack thesidedoor-core@0.6.0.
 The license is included alongside the archive.
