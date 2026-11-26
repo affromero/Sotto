@@ -206,7 +206,7 @@ export class SelfContainedScorer implements PronunciationScorer {
 
   async score(input: PronunciationInput): Promise<PronunciationScore> {
     // Step 1 — deterministic alignment
-    const alignment = alignPhrase(input.targetPhrase, input.transcript);
+    const alignment = alignPhrase(input.targetPhrase, input.transcript, input.targetLang);
 
     // Step 2 — deterministic signals
     const deterministicAccuracy = alignment.accuracy;

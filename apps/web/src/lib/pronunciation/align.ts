@@ -27,7 +27,7 @@ export interface AlignmentResult {
   wordErrorRate: number;
 }
 
-/** Lowercase, NFC-normalize, and strip punctuation so "Straße," matches "strasse". */
+/** Lowercase, NFC-normalize, and strip punctuation so "Straße," matches "straße". */
 export function normalizeToken(token: string): string {
   return token
     .toLowerCase()
@@ -36,11 +36,15 @@ export function normalizeToken(token: string): string {
 }
 
 /** Split a phrase into normalized, non-empty word tokens. */
-export function tokenize(phrase: string): string[] {
-  return phrase
-    .split(/\s+/)
-    .map(normalizeToken)
-    .filter((t) => t.length > 0);
+export function tokenize(phrase: string, targetLang?: string): string[] {
+  const language = targetLang?.toLowerCase().split('-')[0];
+  const words =
+    language === 'ja' || language === 'zh'
+      ? Array.from(new Intl.Segmenter(language, { granularity: 'word' }).segment(phrase))
+          .filter(({ isWordLike }) => isWordLike)
+          .map(({ segment }) => segment)
+      : phrase.split(/\s+/);
+  return words.map(normalizeToken).filter((token) => token.length > 0);
 }
 
 /**
@@ -126,6 +130,10 @@ export function alignTokens(expected: string[], actual: string[]): AlignmentResu
 }
 
 /** Convenience: tokenize both inputs, then align. */
-export function alignPhrase(expectedPhrase: string, actualTranscript: string): AlignmentResult {
-  return alignTokens(tokenize(expectedPhrase), tokenize(actualTranscript));
+export function alignPhrase(
+  expectedPhrase: string,
+  actualTranscript: string,
+  targetLang?: string
+): AlignmentResult {
+  return alignTokens(tokenize(expectedPhrase, targetLang), tokenize(actualTranscript, targetLang));
 }

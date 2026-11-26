@@ -159,6 +159,21 @@ describe('SelfContainedScorer', () => {
   });
 
   describe('wrong transcript', () => {
+    it('gives partial alignment credit for a Japanese particle substitution', async () => {
+      mockGenerateResponse.mockResolvedValue(rubricResponse(0.8, 0.8, 0.8));
+
+      const result = await scorer.score(
+        makeInput({
+          targetLang: 'ja',
+          targetPhrase: '明日は学校に行きます。',
+          transcript: '明日も学校に行きます。',
+        })
+      );
+
+      expect(result.phonemeScores.some(({ op }) => op === 'match')).toBe(true);
+      expect(result.phonemeScores.some(({ op }) => op !== 'match')).toBe(true);
+    });
+
     it('scores below 0.5 overall when most words are wrong', async () => {
       mockGenerateResponse.mockResolvedValue(
         rubricResponse(0.1, 0.5, 0.3, 'Focus on the missing words.')
