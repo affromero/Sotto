@@ -37,8 +37,21 @@ describe('detectAudioFormat', () => {
     expect(detectAudioFormat(withHeader('ID3'))).toEqual({ ext: 'mp3', mime: 'audio/mpeg' });
   });
 
-  it('detects MP3 from an MPEG frame sync', () => {
-    expect(detectAudioFormat(withHeader([0xff, 0xfb]))).toEqual({ ext: 'mp3', mime: 'audio/mpeg' });
+  it.each([0xfb, 0xf3, 0xe3])('detects MP3 with sync byte %i', (sync) => {
+    const audio = Buffer.from([0xff, sync]);
+    expect(isRecognizedAudio(audio)).toBe(true);
+    expect(detectAudioFormat(audio)).toEqual({ ext: 'mp3', mime: 'audio/mpeg' });
+  });
+
+  it.each([0xf1, 0xf9])('detects an ADTS AAC frame with sync byte %i', (sync) => {
+    const audio = Buffer.from([0xff, sync, 0x50, 0x80, 0x01, 0x1f, 0xfc, 0]);
+    expect(detectAudioFormat(audio)).toEqual({ ext: 'aac', mime: 'audio/aac' });
+    expect(isRecognizedAudio(audio)).toBe(true);
+  });
+
+  it.each([0xf0, 0xf8])('detects a CRC-protected ADTS frame with sync byte %i', (sync) => {
+    const audio = Buffer.from([0xff, sync, 0x50, 0x80, 0x01, 0x5f, 0xfc, 0, 0, 0]);
+    expect(detectAudioFormat(audio)).toEqual({ ext: 'aac', mime: 'audio/aac' });
   });
 
   it('falls back to mp3 for unrecognized input', () => {
@@ -80,6 +93,14 @@ describe('isRecognizedAudio', () => {
 
   it('returns false for a too-small (3-byte) garbage buffer', () => {
     expect(isRecognizedAudio(Buffer.from([0x00, 0x01, 0x02]))).toBe(false);
+  });
+
+  it.each([
+    [0xff, 0xf1],
+    [0xff, 0xf1, 0x50, 0x80, 0x01, 0x1f, 0xfc],
+    [0xff, 0xf1, 0x7c, 0x80, 0x01, 0x1f, 0xfc, 0],
+  ])('rejects truncated or malformed AAC instead of recognizing it as MP3', (...bytes) => {
+    expect(isRecognizedAudio(Buffer.from(bytes))).toBe(false);
   });
 
   it('returns false for random bytes that match no container', () => {

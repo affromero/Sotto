@@ -3,6 +3,7 @@ import { open } from 'node:fs/promises';
 export function contentTypeForStorageKey(key: string): string {
   if (key.endsWith('.mp3')) return 'audio/mpeg';
   if (key.endsWith('.m4a')) return 'audio/mp4';
+  if (key.endsWith('.aac')) return 'audio/aac';
   if (key.endsWith('.wav')) return 'audio/wav';
   if (key.endsWith('.webm')) return 'audio/webm';
   if (key.endsWith('.ogg')) return 'audio/ogg';

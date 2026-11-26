@@ -47,6 +47,16 @@ describe('canonical local object reads', () => {
     });
   });
 
+  it('serves stored AAC recordings with their audio media type', async () => {
+    const path = join(directory, 'audio.aac');
+    const body = Buffer.from([0xff, 0xf1, 0x50, 0x80, 0x01, 0x1f, 0xfc, 0]);
+    await writeFile(path, body);
+    await expect(readLocalStorageFile(path, 'recordings/audio.aac')).resolves.toMatchObject({
+      body,
+      contentType: 'audio/aac',
+    });
+  });
+
   it('detects replacement of a stored file even when the size is unchanged', async () => {
     const before = await readLocalStorageRange(file, 'recordings/audio.mp3', 'bytes=0-1');
     await writeFile(file, 'abcdefghij');
