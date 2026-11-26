@@ -1,10 +1,10 @@
-"""Inspect the retained review network after both writers stop."""
+"""Inspect the retained review networks around the predecessor handover."""
 
 from __future__ import annotations
 
 import json
 from ipaddress import ip_interface, ip_network
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Literal, cast
 
 from scripts.deploy.images.metadata import record
 from scripts.deploy.review.runtime.inventory.predecessor import inspect_predecessor
@@ -20,6 +20,8 @@ from scripts.deploy.review.topology import (
 if TYPE_CHECKING:
     from scripts.deploy.review.runtime.operations import HostOperations
 
+Endpoints = dict[str, tuple[str, str]]
+
 
 def verify_retained_network(
     previous: HostOperations, successor: HostOperations,
@@ -29,23 +31,35 @@ def verify_retained_network(
     This observes network membership only. Host, client, provider and queue
     quiescence require separate controls and repeated checks by the caller.
     """
-    stopped = {'web': 'stopped', 'workers': 'stopped'}
-    if inspect_predecessor(previous, successor) != stopped:
-        raise ValueError('both-predecessor-writers-must-be-stopped')
+    _verify_network(previous, successor, writer_state='stopped')
+
+
+def verify_running_predecessor_network(
+    previous: HostOperations, successor: HostOperations,
+) -> None:
+    """Verify the exact fenced topology before predecessor queue work."""
+    _verify_network(previous, successor, writer_state='running')
+
+
+def _verify_network(
+    previous: HostOperations, successor: HostOperations, *,
+    writer_state: Literal['running', 'stopped'],
+) -> None:
+    expected_state = {'web': writer_state, 'workers': writer_state}
+    if inspect_predecessor(previous, successor) != expected_state:
+        raise ValueError('both-predecessor-writers-must-be-' + writer_state)
     previous.verify_egress()
     topology = record(previous.manifest['topology'], 'review topology')
     services = record(topology['services'], 'review services')
     review_id = record(topology['network'], 'review network')['id']
     egress_id = private_json(previous.attempt.directory / 'egress.json')['networkId']
     subnet = ip_network(cast(str, record(topology['network'], 'review network')['subnet']))
-    expected_ids: set[str] = set()
-    expected_endpoints: dict[str, tuple[str, str]] = {}
+    expected_endpoints: Endpoints = {}
     for role in ('postgres', 'redis'):
         expected = record(services[role], 'retained review service')
         identity = expected.get('id')
-        if not isinstance(identity, str) or identity in expected_ids:
+        if not isinstance(identity, str) or identity in expected_endpoints:
             raise ValueError('distinct-retained-services-required')
-        expected_ids.add(identity)
         actual = previous.inspect(identity)
         if len(actual) != 1:
             raise ValueError('unique-retained-service-required')
@@ -86,8 +100,51 @@ def verify_retained_network(
             raise ValueError('retained-review-service-changed')
         expected_endpoints[identity] = (
             cast(str, expected['name']).lstrip('/'),
-            cast(str, admitted_network['address']),
+            f"{admitted_network['address']}/{subnet.prefixlen}",
         )
+
+    def running_endpoints() -> tuple[Endpoints, Endpoints]:
+        review_members: Endpoints = {}
+        egress_members: Endpoints = {}
+        if writer_state == 'stopped':
+            return review_members, egress_members
+        for role in ('web', 'workers'):
+            binding = private_json(previous.attempt.directory
+                                   / ('candidate-' + role + '.json'))
+            identity = binding.get('id')
+            if (not isinstance(identity, str) or identity in expected_endpoints
+                    or identity in review_members):
+                raise ValueError('distinct-predecessor-writers-required')
+            actual = previous.inspect(identity)
+            if (len(actual) != 1
+                    or previous.writer_binding(actual[0]) != binding):
+                raise ValueError('predecessor-candidate-identity-changed')
+            container = actual[0]
+            name = cast(str, container['Name']).lstrip('/')
+            settings = record(container['NetworkSettings'], 'writer settings')
+            networks = record(settings['Networks'], 'writer networks')
+            if set(networks) != {NETWORK, PROJECT + '_egress'}:
+                raise ValueError('predecessor-network-endpoint-changed')
+            for network, expected_id, members in (
+                (NETWORK, review_id, review_members),
+                (PROJECT + '_egress', egress_id, egress_members),
+            ):
+                endpoint = record(networks.get(network), 'writer endpoint')
+                address = endpoint.get('IPAddress')
+                prefix = endpoint.get('IPPrefixLen')
+                if (endpoint.get('NetworkID') != expected_id
+                        or endpoint.get('GlobalIPv6Address') not in ('', None)
+                        or not isinstance(address, str) or not address
+                        or type(prefix) is not int or not 0 < prefix <= 32):
+                    raise ValueError('predecessor-network-endpoint-changed')
+                interface = ip_interface(f'{address}/{prefix}')
+                if interface.version != 4 or (network == NETWORK
+                                               and interface.network != subnet):
+                    raise ValueError('predecessor-network-endpoint-changed')
+                members[identity] = (name, str(interface))
+        return review_members, egress_members
+
+    writer_endpoints = running_endpoints()
 
     def check_membership() -> None:
         networks = rows(json.loads(previous.docker(
@@ -100,21 +157,26 @@ def verify_retained_network(
         egress = record(by_id[egress_id], 'egress network')
         if review.get('Name') != NETWORK or egress.get('Name') != PROJECT + '_egress':
             raise ValueError('review-network-names-changed')
-        members = record(review.get('Containers'), 'review members')
-        if (set(members) != expected_ids
-                or record(egress.get('Containers'), 'egress members')):
-            raise ValueError('unexpected-review-network-member')
-        for identity, (name, address) in expected_endpoints.items():
-            endpoint = record(members[identity], 'network endpoint')
-            interface = ip_interface(cast(str, endpoint.get('IPv4Address')))
-            if (endpoint.get('Name') != name
-                    or str(interface.ip) != address or interface.network != subnet
-                    or endpoint.get('IPv6Address') not in ('', None)):
-                raise ValueError('review-network-endpoint-changed')
+        for network, expected in (
+            (review, {**expected_endpoints, **writer_endpoints[0]}),
+            (egress, writer_endpoints[1]),
+        ):
+            members = record(network.get('Containers'), 'network members')
+            if set(members) != set(expected):
+                raise ValueError('unexpected-review-network-member')
+            for identity, (name, address) in expected.items():
+                endpoint = record(members[identity], 'network endpoint')
+                interface = ip_interface(cast(str, endpoint.get('IPv4Address')))
+                if (endpoint.get('Name') != name or str(interface) != address
+                        or endpoint.get('IPv6Address') not in ('', None)):
+                    raise ValueError('review-network-endpoint-changed')
 
     check_membership()
-    if inspect_predecessor(previous, successor) != stopped:
-        raise ValueError('predecessor-stop-evidence-changed')
+    if inspect_predecessor(previous, successor) != expected_state:
+        raise ValueError('predecessor-' + ('stop' if writer_state == 'stopped'
+                                           else 'running') + '-evidence-changed')
+    if running_endpoints() != writer_endpoints:
+        raise ValueError('predecessor-network-evidence-changed')
     previous.verify_egress()
     successor.verify_fence()
     check_membership()
