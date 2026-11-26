@@ -80,6 +80,33 @@ describe('createSttProvider', () => {
     expect(provider).toBeDefined();
   });
 
+  const adtsAudio = Buffer.from([0xff, 0xf1, 0x50, 0x80, 0x01, 0x1f, 0xfc, 0]);
+
+  it.each(['openai', 'groq'] as const)('reports that %s needs AAC in M4A', async (id) => {
+    const provider = createSttProvider(id, 'test-key');
+    await expect(provider.transcribe(adtsAudio)).rejects.toThrow(
+      'requires AAC in an M4A container'
+    );
+    expect(mockTranscriptionsCreate).not.toHaveBeenCalled();
+  });
+
+  it('sends raw ADTS as AAC to the selected local transcription endpoint', async () => {
+    serverConfiguration.values.sttBaseUrl = 'http://localhost:8000/v1';
+    mockTranscriptionsCreate.mockResolvedValueOnce({ text: 'hola', segments: [] });
+    try {
+      await expect(createSttProvider('local').transcribe(adtsAudio)).resolves.toMatchObject({
+        text: 'hola',
+      });
+      expect(mockTranscriptionsCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          file: expect.objectContaining({ name: 'audio.aac', type: 'audio/aac' }),
+        })
+      );
+    } finally {
+      delete serverConfiguration.values.sttBaseUrl;
+    }
+  });
+
   it('transcribes with the captured local model after the saved default changes', async () => {
     serverConfiguration.values.sttBaseUrl = 'http://localhost:8000/v1';
     serverConfiguration.values.sttModel = 'replacement-default';

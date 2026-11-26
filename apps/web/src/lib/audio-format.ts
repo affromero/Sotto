@@ -60,11 +60,26 @@ function matchAudioFormat(buffer: Buffer): AudioFormat | null {
     return { ext: 'm4a', mime: 'audio/mp4' };
   }
 
+  // ADTS uses layer bits 00, which are reserved in MPEG audio.
+  if (buffer.length >= 7 && buffer[0] === 0xff && (buffer[1] & 0xf6) === 0xf0) {
+    const frequencyIndex = (buffer[2] >> 2) & 0x0f;
+    const frameLength = ((buffer[3] & 0x03) << 11) | (buffer[4] << 3) | (buffer[5] >> 5);
+    const headerLength = buffer[1] & 0x01 ? 7 : 9;
+    if (frequencyIndex < 13 && frameLength > headerLength && frameLength <= buffer.length) {
+      return { ext: 'aac', mime: 'audio/aac' };
+    }
+  }
+
   // "ID3" tag or MPEG-audio frame sync (0xFF followed by 0b111xxxxx)
   if (buffer.length >= 3 && buffer.toString('ascii', 0, 3) === 'ID3') {
     return { ext: 'mp3', mime: 'audio/mpeg' };
   }
-  if (buffer.length >= 2 && buffer[0] === 0xff && (buffer[1] & 0xe0) === 0xe0) {
+  if (
+    buffer.length >= 2 &&
+    buffer[0] === 0xff &&
+    (buffer[1] & 0xe0) === 0xe0 &&
+    (buffer[1] & 0x06) !== 0
+  ) {
     return { ext: 'mp3', mime: 'audio/mpeg' };
   }
 
@@ -77,7 +92,7 @@ export function detectAudioFormat(buffer: Buffer): AudioFormat {
 
 /**
  * Whether the buffer's leading bytes match a known audio container (WAV, WebM,
- * Ogg, FLAC, MP4/M4A, or MP3). Unlike {@link detectAudioFormat}, this does NOT
+ * Ogg, FLAC, MP4/M4A, ADTS AAC, or MP3). Unlike {@link detectAudioFormat}, this does NOT
  * fall back to mp3, so zero-byte, too-small, or random-byte uploads return
  * false. Use it to reject empty/garbage audio before storing or grading it.
  */

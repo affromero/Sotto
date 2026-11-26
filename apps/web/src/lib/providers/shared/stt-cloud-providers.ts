@@ -25,11 +25,13 @@ export interface WhisperProviderConfig {
   baseURL?: string;
   model: string;
   name: string;
+  requiresContainerizedAac?: boolean;
 }
 
 export const OPENAI_WHISPER_CONFIG: WhisperProviderConfig = {
   model: getSttProviderMeta('openai').defaultModel,
   name: 'OpenAI Whisper',
+  requiresContainerizedAac: true,
 };
 
 function compatibleWhisperConfig(
@@ -48,7 +50,10 @@ function compatibleWhisperConfig(
 export const TOGETHER_WHISPER_CONFIG = compatibleWhisperConfig('together', 'Together AI Whisper');
 
 // Groq is OpenAI-compatible at /openai/v1 — reuse the Whisper provider.
-export const GROQ_WHISPER_CONFIG = compatibleWhisperConfig('groq', 'Groq Whisper');
+export const GROQ_WHISPER_CONFIG = {
+  ...compatibleWhisperConfig('groq', 'Groq Whisper'),
+  requiresContainerizedAac: true,
+};
 
 export class OpenAIWhisperProvider implements SttProvider {
   private config: WhisperProviderConfig;
@@ -69,6 +74,12 @@ export class OpenAIWhisperProvider implements SttProvider {
     audio: Buffer,
     opts: SttTranscriptionOptions = {}
   ): Promise<TranscriptionResult> {
+    const { ext, mime } = detectAudioFormat(audio);
+    if (ext === 'aac' && this.config.requiresContainerizedAac) {
+      throw new Error(
+        `${this.config.name} requires AAC in an M4A container. Upload M4A or WAV audio.`
+      );
+    }
     const { default: OpenAI } = await import('openai');
     const client = new OpenAI({
       apiKey: this.apiKey,
@@ -87,7 +98,6 @@ export class OpenAIWhisperProvider implements SttProvider {
 
     const startTime = Date.now();
     const uint8Array = new Uint8Array(audio);
-    const { ext, mime } = detectAudioFormat(audio);
     const file = new File([uint8Array], `audio.${ext}`, { type: mime });
     const language = normalizeSottoLanguageCode(opts?.language) ?? undefined;
 
