@@ -136,18 +136,16 @@ describe('assessment speaking recovery', () => {
 
   it('hides the saved assessment while the active profile is being rechecked', async () => {
     recorder.blob = new Blob(['audio'], { type: 'audio/webm' });
+    const ownerRecheck = Promise.withResolvers<void>();
     let pauseOwner = false;
-    let resolveOwner: ((response: Response) => void) | undefined;
     vi.stubGlobal(
       'fetch',
       vi.fn(async (input: RequestInfo | URL) => {
         const url = String(input);
-        if (url === '/api/v1/users/me')
-          return pauseOwner
-            ? new Promise<Response>((resolve) => {
-                resolveOwner = resolve;
-              })
-            : Response.json({ id: 'owner' });
+        if (url === '/api/v1/users/me') {
+          if (pauseOwner) await ownerRecheck.promise;
+          return Response.json({ id: 'owner' });
+        }
         if (url.endsWith('/assessment/status'))
           return Response.json({
             status: 'READY',
@@ -185,10 +183,9 @@ describe('assessment speaking recovery', () => {
     const download = await screen.findByRole('link', { name: 'Download recording' });
     pauseOwner = true;
     fireEvent.focus(window);
+    expect(download).toBeInTheDocument();
     expect(download).not.toBeVisible();
-    await waitFor(() => expect(resolveOwner).toBeDefined());
-    pauseOwner = false;
-    resolveOwner!(Response.json({ id: 'owner' }));
+    ownerRecheck.resolve();
     await waitFor(() => expect(download).toBeVisible());
     expect(recorder.reset).not.toHaveBeenCalled();
   });
