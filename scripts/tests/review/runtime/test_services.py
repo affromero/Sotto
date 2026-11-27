@@ -576,6 +576,44 @@ INSERT INTO "NewMigrationTable" VALUES ('migration bookkeeping');''')
         self.assertEqual(changed.returncode, 0, changed.stderr)
         self.assertNotEqual(json.loads(changed.stdout), snapshot)
 
+    def test_seed_projection_excludes_only_verified_additions(self) -> None:
+        self.sql('''CREATE TABLE "Curriculum" (id text PRIMARY KEY, title text);
+CREATE TABLE "Lesson" (id text PRIMARY KEY, "curriculumId" text);
+CREATE TABLE "LessonLearningObjective" ("lessonId" text, "objectiveId" text);
+CREATE TABLE "LearningMapRevision" ("targetLang" text, version integer, "catalogHash" text, definition jsonb);
+CREATE TABLE "LearningNodeIdentity" (id text PRIMARY KEY, "targetLang" text, branch text, kind text);
+INSERT INTO "Curriculum" VALUES ('existing','German');
+INSERT INTO "Lesson" VALUES ('german-lesson','existing');
+INSERT INTO "LessonLearningObjective" VALUES ('german-lesson','de.objective');
+INSERT INTO "LearningNodeIdentity" VALUES ('de.objective','de','grammar','OBJECTIVE');''')
+        initial = self.node(PRESERVATION_OBSERVER, None)
+        self.assertEqual(initial.returncode, 0, initial.stderr)
+        original = json.loads(initial.stdout)
+        projection = [{'table': table['table'], 'columns': table['columns']}
+                      for table in original['tables']]
+        seed = {'id': 'review-en-es-v1', 'target': 'es', 'expected': None}
+        request = {'projection': projection, 'seed': seed}
+        self.assertEqual(json.loads(self.node(PRESERVATION_OBSERVER, request).stdout), original)
+        self.sql('''INSERT INTO "Curriculum" VALUES ('review-en-es-v1','Spanish');
+INSERT INTO "Lesson" VALUES ('spanish-lesson','review-en-es-v1');
+INSERT INTO "LessonLearningObjective" VALUES ('spanish-lesson','es.objective');
+INSERT INTO "LearningMapRevision" VALUES ('es',1,'catalog',
+ '{"nodes":[{"id":"es.objective","branch":"grammar","kind":"OBJECTIVE"}]}');
+INSERT INTO "LearningNodeIdentity" VALUES ('es.objective','es','grammar','OBJECTIVE');''')
+        self.assertNotEqual(self.node(PRESERVATION_OBSERVER, request).returncode, 0)
+        seed['expected'] = {'lessons': 1, 'mapped': 1, 'catalogRevision': {
+            'version': 1, 'hash': 'catalog',
+        }}
+        verified = self.node(PRESERVATION_OBSERVER, request)
+        self.assertEqual(verified.returncode, 0, verified.stderr)
+        self.assertEqual(json.loads(verified.stdout), original)
+        self.sql('UPDATE "Curriculum" SET title=\'Changed\' WHERE id=\'existing\'')
+        changed = self.node(PRESERVATION_OBSERVER, request)
+        self.assertEqual(changed.returncode, 0, changed.stderr)
+        self.assertNotEqual(json.loads(changed.stdout), original)
+        self.sql('UPDATE "LearningNodeIdentity" SET branch=\'wrong\' WHERE id=\'es.objective\'')
+        self.assertNotEqual(self.node(PRESERVATION_OBSERVER, request).returncode, 0)
+
     def test_untrusted_identifiers_and_oversized_rows_fail_without_output(
         self,
     ) -> None:

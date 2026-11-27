@@ -386,7 +386,7 @@ class ReviewControllerTests(unittest.TestCase):
             patch.object(controller, 'HostOperations', return_value=host),
             patch.object(controller, 'admission', return_value=self.files['evidence.json']),
             patch.object(controller, 'bind_predecessor', return_value=self.host),
-            patch.object(services, 'verify_completed'),
+            patch.object(controller, 'verify_live_predecessor'),
             patch.object(controller, 'preflight_successor'),
             patch.object(controller, 'prepare_successor_data', side_effect=prepare_data),
             patch.object(host, 'retire_old_web') as legacy,

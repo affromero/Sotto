@@ -19,7 +19,7 @@ from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, cast
 
 from scripts.deploy.images.metadata import record
-from scripts.deploy.review.build_observer import TARGET, bounded_bytes
+from scripts.deploy.review.build_observer import bounded_bytes
 from scripts.deploy.review.egress import (
     RULES_PATH,
     bridge_name,
@@ -28,6 +28,10 @@ from scripts.deploy.review.egress import (
     host_addresses,
     render_rules,
     semantic_policy,
+)
+from scripts.deploy.review.runtime.release.preservation import (
+    PRESERVATION_OBSERVER as PRESERVATION_OBSERVER,
+    preserve_data as preserve_data,
 )
 from scripts.deploy.review.runtime.policy import helper_memory, runtime_policy
 from scripts.deploy.review.runtime.release import (
@@ -66,100 +70,6 @@ from scripts.deploy.review.topology import (
 
 if TYPE_CHECKING:
     from scripts.deploy.review.runtime.operations import HostOperations
-
-
-PRESERVATION_OBSERVER = r'''
-const assert=require('node:assert/strict');
-const crypto=require('node:crypto');
-const fs=require('node:fs');
-const {Client}=require('pg');
-const raw=fs.readFileSync(0);
-assert(raw.length<=262144);
-const retained=JSON.parse(raw);
-const client=new Client({connectionString:process.env.DATABASE_URL,
- connectionTimeoutMillis:5000,query_timeout:5000});
-const timer=setTimeout(()=>process.exit(124),60000);
-const quote=name=>{
- assert(typeof name==='string'&&/^[A-Za-z_][A-Za-z0-9_]*$/.test(name));
- return '"'+name+'"';
-};
-(async()=>{
- await client.connect();
- try{
-  await client.query('BEGIN ISOLATION LEVEL SERIALIZABLE READ ONLY');
-  await client.query("SET LOCAL statement_timeout='5000ms'");
-  const setting=await client.query('SHOW transaction_read_only');
-  assert.equal(setting.rows[0].transaction_read_only,'on');
-  let inventory;
-  if(retained===null){
-   const result=await client.query(`SELECT table_name,column_name
-    FROM information_schema.columns WHERE table_schema=current_schema()
-    AND table_name<>'_prisma_migrations'
-    ORDER BY table_name,ordinal_position`);
-   assert(result.rows.length>0&&result.rows.length<=10000);
-   const mapping=new Map();
-   for(const row of result.rows){
-    if(!mapping.has(row.table_name)) mapping.set(row.table_name,[]);
-    mapping.get(row.table_name).push(row.column_name);
-   }
-   inventory=[...mapping].map(([table,columns])=>({table,columns}));
-  }else inventory=retained;
-  assert(Array.isArray(inventory)&&inventory.length>0&&inventory.length<=256);
-  const names=new Set();const tables=[];let totalBytes=0,totalRows=0;
-  for(const item of inventory){
-   assert(!names.has(item.table));names.add(item.table);
-   assert(Array.isArray(item.columns)&&item.columns.length>0
-          &&item.columns.length<=256);
-   const selected=item.columns.map(quote).join(',');
-   const from='(SELECT '+selected+' FROM '+quote(item.table)+') v';
-   const budget=await client.query('SELECT count(*)::int AS count,'+
-    'coalesce(sum(octet_length(row_to_json(v)::text)),0)::text AS bytes FROM '
-    +from);
-   const count=budget.rows[0].count,bytes=Number(budget.rows[0].bytes);
-   totalRows+=count;totalBytes+=bytes;
-   assert(count<=10000&&bytes<=4194304&&totalRows<=50000&&totalBytes<=16777216);
-   const result=await client.query(
-    'SELECT row_to_json(v)::text AS value FROM '+from
-    +' ORDER BY row_to_json(v)::text');
-   assert.equal(result.rows.length,count);
-   const hash=crypto.createHash('sha256');let actualBytes=0;
-   for(const row of result.rows){
-    const size=Buffer.byteLength(row.value);assert(size<=262144);
-    actualBytes+=size;hash.update(row.value);hash.update('\n');
-   }
-   assert.equal(actualBytes,bytes);
-   tables.push({table:item.table,columns:item.columns,count,bytes,
-                sha256:hash.digest('hex')});
-  }
-  const output=JSON.stringify({schemaVersion:1,tables,totalBytes,totalRows});
-  assert(Buffer.byteLength(output)<=262144);console.log(output);
- }finally{
-  await client.query('ROLLBACK');await client.end();clearTimeout(timer);
- }
-})().catch(()=>{console.error('Review preservation observation refused');
- process.exitCode=1;clearTimeout(timer);});
-'''
-
-
-def preserve_data(operations: HostOperations) -> dict[str, object]:
-    path = operations.attempt.directory / 'original-data.json'
-    retained = private_json(path) if path.exists() else None
-    selected = None if retained is None else [
-        {'table': item['table'], 'columns': item['columns']}
-        for item in rows(retained['tables'], 'original table')
-    ]
-    topology = record(operations.manifest['topology'], 'topology')
-    web = record(record(topology['services'], 'services')['web'], 'old web')
-    actual = record(json.loads(operations.image_command(
-        {'reference': web['imageId'], 'sha': TARGET},
-        'node', ['-e', PRESERVATION_OBSERVER],
-        content=json.dumps(selected).encode(),
-    )), 'protected data observation')
-    if retained is not None and actual != retained:
-        raise ValueError('original-review-data-changed')
-    if retained is None:
-        atomic_json(path, actual)
-    return actual
 
 
 def private_inputs(operations: HostOperations) -> dict[str, object]:

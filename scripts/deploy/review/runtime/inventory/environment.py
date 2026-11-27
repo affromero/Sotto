@@ -109,9 +109,22 @@ def admit_migration_tool(
     ):
         raise ValueError('successor-migration-helper-not-admitted')
     if entrypoint == 'npx':
-        if (phase != 'SQL_STARTED' or state['sqlMayHaveStarted'] is not True
-                or state['status'] != 'active'
-                or mounts or tuple(arguments) != MIGRATE_DEPLOY or content is not None):
+        accepted = (phase == 'SQL_STARTED' and state['sqlMayHaveStarted'] is True
+                    and tuple(arguments) == MIGRATE_DEPLOY and content is None)
+        if phase == 'FINAL_SCHEMA_VERIFIED':
+            from scripts.deploy.review.runtime.release.fixture import (
+                admitted_review_seed, review_seed_command, review_seed_intent, review_seed_payload,
+            )
+
+            seed = admitted_review_seed(successor)
+            directory = successor.attempt.directory
+            accepted = (seed is not None and tuple(arguments) == review_seed_command(seed)
+                        and content == review_seed_payload(seed)
+                        and not (directory / 'review-seed-verified.json').exists()
+                        and not (directory / 'review-seed-verified.json').is_symlink()
+                        and private_json(directory / 'review-seed-intent.json')
+                        == review_seed_intent(successor, seed))
+        if not accepted or state['status'] != 'active' or mounts:
             raise ValueError('successor-schema-write-not-admitted')
     elif entrypoint == 'node':
         admit_migration_node(
@@ -165,6 +178,19 @@ def admit_migration_node(
         expected, _ = successor_preservation_input(operations)
         if content == expected:
             return
+        if phase == 'FINAL_SCHEMA_VERIFIED':
+            from scripts.deploy.review.runtime.release.fixture import (
+                admitted_review_seed, review_seed_intent, review_seed_projection,
+            )
+
+            seed = admitted_review_seed(operations)
+            if seed is not None:
+                if content == review_seed_projection(expected, seed, after=False):
+                    return
+                if (content == review_seed_projection(expected, seed, after=True)
+                        and private_json(operations.attempt.directory / 'review-seed-intent.json')
+                        == review_seed_intent(operations, seed)):
+                    return
         raise ValueError('successor-preservation-projection-not-admitted')
     if phase == 'BACKED_UP':
         raise ValueError('successor-schema-verifier-before-sql')

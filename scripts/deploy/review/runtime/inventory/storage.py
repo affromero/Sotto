@@ -112,6 +112,72 @@ def inspect_completed_storage(
     return proof
 
 
+def verify_running_completed_storage(
+    previous: HostOperations, successor: HostOperations,
+) -> None:
+    """Inspect the live completed generation without requiring a new fence."""
+    successor.lock.validate()
+    if previous.lock is not successor.lock or previous.attempt.state()['status'] != 'complete':
+        raise ValueError('completed-review-release-required')
+    directory = previous.attempt.directory
+    topology = record(previous.attempt.manifest()['topology'], 'completed topology')
+    backing = record(topology['services'], 'completed backing services')
+    original = private_json(directory / 'original-mount-objects.json')
+    handover = private_json(directory / 'auth-handover.json')
+    candidates = {
+        role: private_json(directory / ('candidate-' + role + '.json'))
+        for role in ('web', 'workers')
+    }
+    protected, _ = retained_candidate_mounts(topology, original, candidates, handover)
+    candidate_ids = {digest(value['id'], 'completed candidate') for value in candidates.values()}
+    identities = successor.docker('ps', '-aq', '--no-trunc').decode().split()
+    containers = successor.inspect(*identities)
+    indexed = {item['Id']: item for item in containers}
+
+    def verify_backing(index: Mapping[object, dict[str, object]]) -> None:
+        for role in ('postgres', 'redis'):
+            expected = record(backing[role], 'completed backing service')
+            actual = record(index.get(expected['id']), 'actual completed backing service')
+            state = record(actual['State'], 'completed backing state')
+            health = state.get('Health')
+            if (actual['Image'] != expected['imageId']
+                    or state.get('Running') is not True
+                    or state.get('Status') != 'running'
+                    or state.get('Paused') is not False
+                    or state.get('Restarting') is not False
+                    or state.get('OOMKilled') is not False
+                    or state.get('Dead') is not False or state.get('Error') != ''
+                    or (health is not None
+                        and record(health, 'backing health').get('Status') != 'healthy')):
+                raise ValueError('retained-storage-service-unavailable')
+
+    verify_backing(indexed)
+    verify_successor_network_members(previous, indexed, backing, candidate_ids)
+    before = container_inventory(containers, protected)
+
+    def probe(content: bytes) -> bytes:
+        return successor.command(
+            ['sudo', '-n', '/usr/bin/python3', '-c', MOUNT_PROBE], content=content,
+        )
+
+    proof = inspect_completed_storage(
+        containers, topology, original, candidates, handover, probe=probe,
+    )
+    expected = record(successor.attempt.manifest()['predecessorStorage'], 'predecessor storage')
+    if proof != expected:
+        raise ValueError('admitted-predecessor-storage-changed')
+    refreshed_ids = successor.docker('ps', '-aq', '--no-trunc').decode().split()
+    if set(refreshed_ids) != set(identities) or len(refreshed_ids) != len(identities):
+        raise ValueError('review-storage-container-inventory-changed')
+    refreshed = successor.inspect(*refreshed_ids)
+    if container_inventory(refreshed, protected) != before:
+        raise ValueError('review-storage-mount-inventory-changed')
+    checked = {item['Id']: item for item in refreshed}
+    verify_backing(checked)
+    verify_successor_network_members(previous, checked, backing, candidate_ids)
+    successor.lock.validate()
+
+
 def verify_completed_storage(
     previous: HostOperations, successor: HostOperations,
 ) -> None:
@@ -192,6 +258,7 @@ def verify_completed_storage(
         successor.attempt.directory / 'predecessor-mounted-storage.json', binding,
         containers, topology, original, candidates, handover,
         probe=probe, verify_fence=verify_after_probe,
+        admitted_proof=successor.attempt.manifest().get('predecessorStorage'),
     )
 
 
@@ -222,6 +289,7 @@ def verify_successor_storage(operations: HostOperations) -> None:
             or proof.get('predecessorEvidenceSha256') != previous.attempt.evidence_hash
             or proof.get('successorManifestSha256') != attempt.manifest_hash
             or proof.get('successorEvidenceSha256') != attempt.evidence_hash
+            or proof.get('proof') != attempt.manifest()['predecessorStorage']
             or proof.get('proof') != {'originalSha256': checksum(original),
                                      'mappedSha256': checksum(expected),
                                      'candidatesSha256': checksum(candidates)}):
@@ -323,6 +391,13 @@ def verify_successor_network_members(
         review_only.add(identity)
     networks = rows(json.loads(operations.docker('network', 'inspect', NETWORK, egress)),
                     'successor reviewed networks')
+    topology = record(operations.attempt.manifest()['topology'], 'network topology')
+    wanted = {
+        NETWORK: record(topology['network'], 'review network')['id'],
+        egress: private_json(directory / 'egress.json')['networkId'],
+    }
+    if {item['Name']: item['Id'] for item in networks} != wanted:
+        raise ValueError('successor-network-identity-changed')
     members = {item['Name']: set(record(item['Containers'], 'members'))
                for item in networks}
     if len(networks) != 2 or members != {NETWORK: review_only | running, egress: running}:
@@ -346,6 +421,7 @@ def _retain_completed_storage(
     original: Mapping[str, object], candidates: Mapping[str, object],
     handover: Mapping[str, object], *, probe: Callable[[bytes], bytes],
     verify_fence: Callable[[], None],
+    admitted_proof: object = None,
 ) -> None:
     saved = private_json(path) if path.exists() or path.is_symlink() else None
     if saved is not None and (set(saved) != {*binding, 'proof', 'instances'}
@@ -375,6 +451,8 @@ def _retain_completed_storage(
         containers, topology, original, candidates, handover, probe=probe,
         previous=record(saved['proof'], 'retained storage proof') if saved else None,
     )
+    if admitted_proof is not None and admitted_proof != proof:
+        raise ValueError('admitted-predecessor-storage-changed')
     verify_fence()
     if saved is None:
         atomic_json(path, {**binding, 'proof': proof, 'instances': instances})

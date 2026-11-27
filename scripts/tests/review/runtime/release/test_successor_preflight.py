@@ -10,6 +10,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from scripts.deploy.review.runtime.operations import HostOperations
+from scripts.deploy.review.runtime.release.fixture import prepare_review_seed
 from scripts.deploy.review.runtime.release.migrations import migration_inventory
 from scripts.deploy.review.runtime.release.successor import (
     migrate_successor_data,
@@ -22,6 +23,7 @@ from scripts.deploy.review.runtime.release.successor import (
     successor_compose_input,
     successor_restore_manifest,
     verify_successor_data,
+    verify_successor_workload,
 )
 from scripts.deploy.review.state import Attempt, DeploymentLock, atomic_json, private_json
 from scripts.tests.review.runtime import admitted_runtime_fixture
@@ -87,9 +89,10 @@ class SuccessorPreflightTests(unittest.TestCase):
         self.operations = HostOperations(successor, lock)
         self.enterContext(patch(runtime + 'release.successor.bind_predecessor',
                                 return_value=self.previous))
-        self.enterContext(patch(runtime + 'services.verify_completed'))
+        self.enterContext(patch(runtime + 'release.successor.verify_live_predecessor'))
         self.enterContext(patch(runtime + 'release.successor.retained_predecessor_startup'))
         self.enterContext(patch(runtime + 'release.successor.verify_successor_runtime_identity'))
+        self.enterContext(patch(runtime + 'release.successor.verify_successor_workload'))
         self.enterContext(patch(runtime + 'release.successor.observe_predecessor_environment',
                                 return_value=({}, {})))
         self.enterContext(patch.object(self.operations, 'verify_images'))
@@ -116,6 +119,32 @@ class SuccessorPreflightTests(unittest.TestCase):
         with (patch.dict(os.environ, {'DOCKER_HOST': 'ssh://foreign.example'}),
               self.assertRaisesRegex(ValueError, 'local-linux-docker-daemon-required')):
             preflight_successor(self.operations)
+        self.assertEqual(self.operations.attempt.state()['phase'], 'PRECHECK')
+
+    def test_preflight_requires_the_exact_workload_before_fencing(self) -> None:
+        profile = [
+            {'id': 'owner', 'preferences': {}, 'existingCourseIds': ['old-course'],
+             'fixture': {'native': 'en', 'target': 'es', 'curriculumId': 'seeded'}},
+            {'id': 'member', 'preferences': {}, 'existingCourseIds': [], 'fixture': None},
+        ]
+        inputs = {key: {'expectedOwnerId': 'owner', 'profiles': profile}
+                  for key in ('readiness', 'workloads')}
+        runtime = 'scripts.deploy.review.runtime.release.successor.services.'
+        with (
+            patch(runtime + 'private_inputs', return_value=inputs),
+            patch(runtime + 'verify_candidate', return_value='captured-worker'),
+            patch.object(self.operations, 'command', side_effect=[
+                b'{"profiles":2,"active":0}', b'{"profiles":2,"active":1}',
+            ]) as command,
+        ):
+            with self.assertRaisesRegex(ValueError, 'admitted-successor-workload-not-verified'):
+                verify_successor_workload(self.previous, self.operations)
+            verify_successor_workload(self.previous, self.operations)
+            request = json.loads(command.call_args.kwargs['content'])
+            self.assertIsNone(request['seed'])
+            dispatched = request['profiles']
+            self.assertEqual(dispatched[0]['existingCourseIds'], ['old-course'])
+            self.assertEqual(dispatched[0]['fixture']['curriculumId'], 'seeded')
         self.assertEqual(self.operations.attempt.state()['phase'], 'PRECHECK')
 
     def test_restore_preserves_predecessor_flags_and_unpauses_only_new_queues(self) -> None:
@@ -262,6 +291,51 @@ class SuccessorPreflightTests(unittest.TestCase):
             ])
             with self.assertRaisesRegex(ValueError, 'original-review-data-changed'):
                 verify_successor_data(self.previous, self.operations, phase='SQL_STARTED')
+
+    def test_seed_retries_a_lost_reply_and_verifies_completed_seed_read_only(self) -> None:
+        seed = {
+            'nativeLang': 'en', 'targetLang': 'es', 'curriculumId': 'review-en-es-v1',
+            'lessons': 14, 'mapped': 3, 'unresolved': 14, 'status': 'PUBLISHED',
+            'catalogRevision': {'version': 1, 'hash': 'a' * 64},
+        }
+        original = self.operations.attempt
+        attempt = Attempt.create(original.directory.parent, 'fixture-seed', {
+            **original.manifest(), 'predecessor': {}, 'reviewFixtureSeed': seed,
+        }, original.evidence_hash)
+        atomic = attempt.directory / 'original-data.json'
+        atomic.write_bytes((original.directory / atomic.name).read_bytes())
+        atomic.chmod(0o600)
+        operations = HostOperations(attempt, self.operations.lock)
+        for phase in ('ADMITTED', 'PREPARED', 'FENCED', 'QUIESCENT', 'BACKED_UP',
+                      'SQL_STARTED', 'FINAL_SCHEMA_VERIFIED'):
+            attempt.advance(phase)
+        events = []
+
+        def command(image, entrypoint, arguments, **options):
+            events.append(entrypoint)
+            if entrypoint == 'node':
+                return json.dumps(self.data).encode()
+            self.assertTrue((attempt.directory / 'review-seed-intent.json').exists())
+            self.assertEqual(json.loads(options['content']), seed)
+            self.assertEqual(arguments[-1], '--verify-receipt')
+            if events == ['node', 'npx']:
+                raise OSError('seed reply lost')
+            return json.dumps(seed).encode()
+
+        runtime = 'scripts.deploy.review.runtime.release.fixture.'
+        with (
+            patch.object(operations, 'verify_fence'),
+            patch.object(operations, 'image_command', side_effect=command),
+            patch.object(operations, 'settle_pending_helpers'),
+            patch(runtime + 'retained_inventory_network', return_value='container:retained'),
+        ):
+            with self.assertRaisesRegex(OSError, 'seed reply lost'):
+                prepare_review_seed(self.previous, operations, recover=False)
+            attempt.unresolved('seed-reply-lost')
+            prepare_review_seed(self.previous, operations, recover=True)
+            prepare_review_seed(self.previous, operations, recover=False)
+        self.assertEqual(events, ['node', 'npx', 'npx', 'node', 'node'])
+        self.assertTrue((attempt.directory / 'review-seed-verified.json').exists())
 
     def test_reconcile_binds_verified_never_started_compose_result(self) -> None:
         attempt = self.operations.attempt

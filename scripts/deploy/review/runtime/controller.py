@@ -40,6 +40,7 @@ from scripts.deploy.review.runtime.release.successor import (
     reconcile_created_candidates,
     retain_successor_restore_manifest,
     successor_restore_manifest,
+    verify_live_predecessor,
 )
 from scripts.deploy.review.state import (
     PHASES,
@@ -465,7 +466,7 @@ def execute(
             if predecessor is None:
                 operations.runtime_environment()
             else:
-                services.verify_completed(predecessor)
+                verify_live_predecessor(predecessor, operations)
             operations.capacity()
             operations.verify_tools()
             services.before_fence(operations)
@@ -475,7 +476,7 @@ def execute(
                 (HOST_STATE / 'unresolved.json').exists()
                 or (HOST_STATE / 'unresolved.json').is_symlink()
             ):
-                services.verify_completed(predecessor)
+                verify_live_predecessor(predecessor, operations)
             operations.fence()
             attempt.advance('FENCED')
         elif predecessor is not None and phase in ('FENCED', 'QUIESCENT'):

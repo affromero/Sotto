@@ -396,6 +396,15 @@ are checked. Learning and speech workloads run on one or two profiles with an
 admitted absent course pair and an existing seeded curriculum. A profile that
 already has that course can be checked without generating new learning work.
 
+If both review profiles already use the only seeded pair, the successor may
+admit the authored English-to-Spanish curriculum for one profile. Bind the
+seed receipt and matching private workload input to the attempt. Before
+fencing, verify the exact existing course IDs and confirm that the new pair,
+curriculum ID, and target catalog are absent. The runner applies the seed
+after verifying the migrated schema. The seed transaction checks the admitted
+receipt before committing. The runner then checks the new catalog and lesson
+records and rechecks the original data before starting the candidate.
+
 The private review policy binds separate service and helper memory limits,
 their Node heap settings, and the public operator contact through the existing
 `SOTTO_PRIVACY_CONTACT_EMAIL` setting. Helpers count toward capacity alongside

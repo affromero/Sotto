@@ -25,10 +25,21 @@ from scripts.deploy.review.runtime.inventory.network import verify_retained_netw
 from scripts.deploy.review.runtime.inventory.predecessor import bind_predecessor
 from scripts.deploy.review.runtime.inventory.quiescence import quiesce_predecessor
 from scripts.deploy.review.runtime.inventory.retained import observe_retained_inventory
+from scripts.deploy.review.runtime.inventory.storage import verify_running_completed_storage
 from scripts.deploy.review.runtime.policy import (
     retain_queue_intent,
     runtime_policy,
     successor_queue_policy_names,
+)
+from scripts.deploy.review.runtime.release import (
+    retained_predecessor_startup,
+    verify_completed_records,
+    verify_startup_unit,
+)
+from scripts.deploy.review.runtime.release.fixture import (
+    admitted_review_seed,
+    prepare_review_seed,
+    review_seed_intent,
 )
 from scripts.deploy.review.runtime.release.migrations import (
     admit_successor_migration,
@@ -37,7 +48,6 @@ from scripts.deploy.review.runtime.release.migrations import (
     read_applied_migrations,
     stage_progress,
 )
-from scripts.deploy.review.runtime.release import retained_predecessor_startup
 from scripts.deploy.review.topology import (
     DIRECTORY,
     PRESERVED_ENVIRONMENT,
@@ -49,6 +59,54 @@ from scripts.deploy.review.state import atomic_json, checksum, private_json
 
 if TYPE_CHECKING:
     from scripts.deploy.review.runtime.operations import HostOperations
+
+
+WORKLOAD_PREFLIGHT = r'''
+const assert = require('node:assert/strict');
+const {Client} = require('pg');
+const {profiles,seed} = JSON.parse(require('node:fs').readFileSync(0));
+const database = new Client({connectionString: process.env.DATABASE_URL,
+  connectionTimeoutMillis: 5000, query_timeout: 5000});
+(async () => {
+ await database.connect();
+ try {
+  await database.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
+  await database.query("SET LOCAL statement_timeout='5000ms'");
+  assert.equal((await database.query('SHOW transaction_read_only')).rows[0].transaction_read_only,'on');
+  let active = 0, seedProfiles = 0;
+  for (const profile of profiles) {
+   const courses = (await database.query(
+     'SELECT id, "nativeLang", "targetLang" FROM "Course" WHERE "userId"=$1 LIMIT 1001',
+     [profile.id])).rows;
+   assert(courses.length <= 1000);
+   assert.deepEqual(courses.map(row => row.id).sort(), [...profile.existingCourseIds].sort());
+   if (profile.fixture === null) continue;
+   const {native, target, curriculumId} = profile.fixture;
+   assert(!courses.some(row => row.nativeLang === native && row.targetLang === target));
+   const curricula = (await database.query(
+     'SELECT id, source FROM "Curriculum" WHERE "nativeLang"=$1 AND "targetLang"=$2',
+     [native, target])).rows;
+   if(seed&&native===seed.nativeLang&&target===seed.targetLang){
+    assert.equal(curriculumId,seed.curriculumId);
+    assert.deepEqual(curricula,[]);
+    seedProfiles++;
+   }else assert.deepEqual(curricula,[{id:curriculumId,source:'seeded'}]);
+   active++;
+  }
+  assert.equal(seedProfiles,seed?1:0);
+  if(seed){
+   const {rows}=await database.query(
+    'SELECT EXISTS (SELECT 1 FROM "Curriculum" WHERE id=$1) OR EXISTS (SELECT 1 FROM "LearningMapRevision" WHERE "targetLang"=$2) OR EXISTS (SELECT 1 FROM "LearningNodeIdentity" WHERE "targetLang"=$2) AS occupied',
+    [seed.curriculumId,seed.targetLang]);
+   assert.deepEqual(rows,[{occupied:false}]);
+  }
+  console.log(JSON.stringify({profiles:profiles.length,active}));
+ } finally {
+  await database.query('ROLLBACK');
+  await database.end();
+ }
+})().catch(() => { console.error('Admitted review workload unavailable'); process.exitCode = 1; });
+'''
 
 
 def preflight_successor(
@@ -82,7 +140,7 @@ def preflight_successor(
     previous = bind_predecessor(operations)
     if operations.manifest['topology'] != previous.manifest['topology']:
         raise ValueError('successor-physical-topology-changed')
-    services.verify_completed(previous)
+    verify_live_predecessor(previous, operations)
     files = record(operations.manifest['originalFiles'], 'successor original files')
     for name, path in (
         ('compose', Path(DIRECTORY) / 'compose.yml'),
@@ -94,6 +152,7 @@ def preflight_successor(
     retained_predecessor_startup(operations)
     values, _ = observe_predecessor_environment(previous)
     successor_compose_document(operations, values)
+    verify_successor_workload(previous, operations)
     operations.verify_images()
     operations.capacity()
     verify_successor_runtime_identity(operations)
@@ -103,6 +162,38 @@ def preflight_successor(
     )
     operations.lock.validate()
     return previous, initial, final
+
+
+def verify_live_predecessor(previous: HostOperations, successor: HostOperations) -> None:
+    """Verify the current release using its actual writers and retained mount roots."""
+    previous.verify_tools()
+    previous.verify_images(require_imports=False, final_only=True)
+    verify_completed_records(previous)
+    verify_startup_unit(previous)
+    verify_running_completed_storage(previous, successor)
+    services.wait_health(previous, public=True)
+
+
+def verify_successor_workload(previous: HostOperations, operations: HostOperations) -> None:
+    """Prove the candidate fixture is available before fencing the review site."""
+    from scripts.deploy.review.runtime.controller import admitted_workload_inputs
+
+    _, workload, active = admitted_workload_inputs(services.private_inputs(operations))
+    profiles = [
+        {name: profile[name] for name in ('id', 'existingCourseIds', 'fixture')}
+        for profile in rows(workload['profiles'], 'review workload profiles')
+    ]
+    identity = services.verify_candidate(previous, 'workers')
+    data = operations.command(
+        ['docker', 'exec', '-i', '-w', '/app/apps/web', identity,
+         'node', '-e', WORKLOAD_PREFLIGHT],
+        content=json.dumps({'profiles': profiles, 'seed': admitted_review_seed(operations)}).encode(),
+        timeout=25,
+    )
+    if json.loads(data) != {'profiles': 2, 'active': active}:
+        raise ValueError('admitted-successor-workload-not-verified')
+    if services.verify_candidate(previous, 'workers') != identity:
+        raise ValueError('successor-workload-predecessor-changed')
 
 
 def verify_successor_runtime_identity(operations: HostOperations) -> None:
@@ -188,7 +279,8 @@ def migrate_successor_data(
     if phase == 'FINAL_SCHEMA_VERIFIED':
         if applied != candidate:
             raise ValueError('successor-final-schema-changed')
-        verify_successor_data(previous, operations, phase='FINAL_SCHEMA_VERIFIED')
+        if not (attempt.directory / 'review-seed-intent.json').exists():
+            verify_successor_data(previous, operations, phase='FINAL_SCHEMA_VERIFIED')
         return
     continue_check()
     operations.verify_fence()
@@ -383,6 +475,8 @@ def prepare_successor_activation(
     """Prepare the sealed candidate and adopt the established auth and guard."""
     continue_check()
     prepare_successor_compose(previous, operations)
+    prepare_review_seed(previous, operations, recover=recover)
+    continue_check()
     verify_retained_network(previous, operations, phase='FINAL_SCHEMA_VERIFIED')
     previous.verify_egress()
     attempt = operations.attempt
@@ -439,6 +533,10 @@ def verify_successor_candidate_admission(
         'policyIntentSha256': checksum(intent),
     }:
         raise ValueError('successor-candidate-queue-policy-unverified')
+    seed = admitted_review_seed(operations)
+    if seed is not None and private_json(directory / 'review-seed-verified.json') != \
+            review_seed_intent(operations, seed):
+        raise ValueError('successor-candidate-review-seed-unverified')
     if role == 'workers':
         activation = private_json(directory / 'activation.json')
         if (activation.get('workerStartIntent') is not True
