@@ -254,6 +254,7 @@ def candidate_compose(
     auth_source: str, runtime_uid: int, runtime_gid: int,
     web_memory: int, worker_memory: int, egress_network: str,
     runtime_policy: Mapping[str, object],
+    isolate_project: bool = False,
 ) -> dict[str, object]:
     """Private JSON Compose document. Callers must never log its contents."""
     if not re.fullmatch(r'[a-z0-9][a-z0-9-]{0,39}', attempt_id):
@@ -306,8 +307,9 @@ def candidate_compose(
                         'options': {'max-size': '10m', 'max-file': '2'}},
             'networks': {'review': {'ipv4_address': address}, 'egress': {}},
         }
+    project = f'{PROJECT}-{attempt_id}-runtime' if isolate_project else PROJECT + '-runtime'
     return {
-        'name': PROJECT + '-runtime', 'services': services,
+        'name': project, 'services': services,
         'volumes': {'executions': {'external': True,
                                   'name': PROJECT + '_executions'}},
         'networks': {

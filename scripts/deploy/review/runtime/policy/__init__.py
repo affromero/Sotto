@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from importlib import import_module
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
@@ -80,8 +81,12 @@ def concurrent_memory(manifest: Mapping[str, object]) -> int:
 def verify_queue_policy(operations: HostOperations) -> None:
     """Getter-only verification is valid while stopped or processing work."""
     policy = runtime_policy(operations.manifest)
+    count = 27
+    if 'predecessor' in operations.manifest:
+        _, names = successor_queue_policy_names(operations)
+        count = len(names)
     result = operations.runtime_exchange('queue-policy', policy)
-    if result != {'queueCount': 27, 'concurrency': 1,
+    if result != {'queueCount': count, 'concurrency': 1,
                   'privacyContactEmail': policy['privacyContactEmail']}:
         raise ValueError('admitted-review-queue-policy-changed')
 
@@ -124,6 +129,31 @@ def bind_helper_environment(
     return checksum({**environment(image), **values})
 
 
+def successor_queue_policy_names(
+    operations: HostOperations,
+) -> tuple[list[str], list[str]]:
+    from scripts.deploy.review.topology import rows
+
+    manifest = operations.attempt.manifest()
+    if any(operations.manifest.get(key) != manifest[key] for key in (
+        'predecessor', 'queueTransition', 'originalQueues', 'finalWorker',
+    )):
+        raise ValueError('successor-queue-policy-admission-changed')
+    guard = import_module('scripts.deploy.compatibility-review')
+    transition = cast(
+        dict[str, list[str]], guard.validate_queue_transition(manifest['queueTransition']),
+    )
+    original = record(manifest['originalQueues'], 'original queues')
+    previous = transition['previousQueues']
+    candidate = transition['candidateQueues']
+    worker = record(manifest['finalWorker'], 'final worker')
+    runtime = record(worker['runtime'], 'final worker runtime')
+    if ([item['name'] for item in rows(original['queues'], 'original queue')] != previous
+            or runtime['queueNames'] != candidate):
+        raise ValueError('successor-queue-policy-inventory-changed')
+    return previous, candidate
+
+
 def retain_queue_intent(
     operations: HostOperations, value: Mapping[str, object],
 ) -> None:
@@ -131,11 +161,17 @@ def retain_queue_intent(
 
     original = record(operations.manifest['originalQueues'], 'original queues')
     queues = rows(original['queues'], 'original queue')
+    previous: set[str] = set()
+    names = [item['name'] for item in queues]
+    if 'predecessor' in operations.manifest:
+        prior, candidate = successor_queue_policy_names(operations)
+        previous = set(prior)
+        names = list(candidate)
     expected = {
-        'schemaVersion': 1,
+        'schemaVersion': 2 if previous else 1,
         'connectionIdentity': original['connectionIdentity'],
-        'queues': [{'name': item['name'], 'originalConcurrency': None,
-                    'concurrency': 1} for item in queues],
+        'queues': [{'name': name, 'originalConcurrency': 1 if name in previous else None,
+                    'concurrency': 1} for name in names],
     }
     if dict(value) != expected:
         raise ValueError('original-review-concurrency-intent-changed')

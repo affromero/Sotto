@@ -205,7 +205,9 @@ class ReviewTopologyTests(unittest.TestCase):
             egress_network=PROJECT + '_egress',
             runtime_policy=cast(dict[str, object],
                                 admitted_runtime_fixture()['runtimePolicy']),
+            isolate_project=True,
         )
+        self.assertEqual(result['name'], PROJECT + '-release-a-runtime')
         services = cast(dict[str, dict[str, object]], result['services'])
         self.assertEqual(set(services), {'web', 'workers'})
         self.assertEqual(services['web']['volumes'],
