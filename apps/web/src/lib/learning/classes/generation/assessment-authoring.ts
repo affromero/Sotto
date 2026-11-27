@@ -67,6 +67,14 @@ const legacySpeaking = z
 const speakingWithCriteria = z
   .object({ skill: z.literal('SPEAKING'), items: z.array(speakingV2).max(20) })
   .strict();
+const [grammar, reading, listening] = sectionVariants;
+const sectionBySkill = {
+  GRAMMAR: grammar,
+  READING: reading,
+  LISTENING: listening,
+  SPEAKING: legacySpeaking,
+  WRITING: authoredWriting,
+};
 const legacyAuthoredSectionSchema = z.discriminatedUnion('skill', [
   ...sectionVariants,
   legacySpeaking,
@@ -96,6 +104,7 @@ export async function authorAssessmentSection(
     requirements: z.infer<typeof skillRequirementsSchema>;
     skill: SkillType;
     materialVersion?: 1 | 2;
+    authorSchemaVersion?: 2;
     speakingPolicy?: typeof READ_ALOUD_ASSESSMENT_POLICY;
     priorTasks?: readonly (readonly AssessmentTask[])[];
   },
@@ -126,12 +135,18 @@ export async function authorAssessmentSection(
     })
   );
   requirePrerequisiteBaseCapacity(payload);
+  const legacySchema =
+    input.materialVersion === 2 ? authoredSectionV2Schema : legacyAuthoredSectionSchema;
+  const skillSchema =
+    input.materialVersion === 2 && input.skill === 'SPEAKING'
+      ? speakingWithCriteria
+      : sectionBySkill[input.skill];
   const schema =
     input.speakingPolicy === READ_ALOUD_ASSESSMENT_POLICY && input.skill === 'SPEAKING'
       ? readAloudAssessmentDraftSchema
-      : input.materialVersion === 2
-        ? authoredSectionV2Schema
-        : legacyAuthoredSectionSchema;
+      : input.authorSchemaVersion === 2
+        ? skillSchema
+        : legacySchema;
   const criteriaInstruction =
     input.materialVersion === 2 && input.skill === 'SPEAKING'
       ? ' Give each speaking task one or more private criteria with unique lowercase IDs. Label each criterion TRANSCRIPT only if it can be assessed from the transcript; pronunciation, accent, articulation and other acoustic claims require ACOUSTIC. The criteria must cover the entire rubric.'

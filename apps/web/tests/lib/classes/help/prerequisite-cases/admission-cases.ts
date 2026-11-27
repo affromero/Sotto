@@ -258,6 +258,7 @@ export function registerLearnerAssessmentAdmissionCase(getContext: () => Admissi
     ]);
     expect(second.job.id).toBe(first.job.id);
     expect(second.fingerprint).toBe(first.fingerprint);
+    expect(first.job.payload).toMatchObject({ fence: { authorSchemaVersion: 2 } });
     expect(await instance.database.classAssessment.count({ where: { classId } })).toBe(1);
     expect(
       await sottoTransaction(instance.database, (tx) =>

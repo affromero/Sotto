@@ -167,6 +167,7 @@ export async function admitAssessmentWork(
     userId: source.userId,
     classAttempt: source.classAttempt,
     assessmentAttempt: input.assessmentAttempt,
+    ...(!current || current.authorSchemaVersion === 2 ? { authorSchemaVersion: 2 as const } : {}),
     ...(input.materialVersion === 2 ? { materialVersion: 2 as const } : {}),
     ...(speakingPolicy ? { speakingPolicy } : {}),
     ownership: source.ownership,

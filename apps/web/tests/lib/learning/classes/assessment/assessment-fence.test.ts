@@ -123,6 +123,15 @@ describe('assessment operation fence', () => {
     expect(admitAssessmentFence(null, legacy)).not.toHaveProperty('materialVersion');
   });
 
+  it('keeps the author request schema version bound to the admitted work', () => {
+    const legacy = fixture();
+    const current = { ...legacy, authorSchemaVersion: 2 as const };
+    expect(() => admitAssessmentFence(legacy, current)).toThrow(/already active/);
+    expect(() => admitAssessmentFence(current, legacy)).toThrow(/already active/);
+    expect(admitAssessmentFence(current, current)).toEqual(current);
+    expect(admitAssessmentFence(legacy, legacy)).not.toHaveProperty('authorSchemaVersion');
+  });
+
   it('does not replay a legacy assessment under a different speaking policy', () => {
     const legacy = fixture();
     legacy.requirements = createSkillRequirements({

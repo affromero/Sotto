@@ -188,6 +188,7 @@ async function runAssessmentSection(
       prerequisite: source.prerequisite,
       requirements: source.requirements,
       skill,
+      authorSchemaVersion: current.authorSchemaVersion,
       ...(priorAssessments.length
         ? { priorTasks: priorAssessments.map((item) => item.tasks) }
         : {}),
