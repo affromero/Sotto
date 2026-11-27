@@ -82,6 +82,19 @@ class WorkloadForwardRecoveryTests(unittest.TestCase):
                     workload.effective_tool_manifest(self.source, self.attempt, manifest)
         self.assertEqual(self.attempt.manifest(), manifest)
 
+    def test_only_explicit_recovery_increases_the_attached_web_capacity(self) -> None:
+        prior = 512 * 1024 * 1024
+        resources = {'webMemoryBytes': prior}
+        attempt = Attempt.create(self.root, 'memory', {'resources': resources}, 'e' * 64)
+        self.assertEqual(workload.web_memory_delta(self.source, attempt), 0)
+        self.authorization['webMemory'] = {
+            'bindingSha256': 'b' * 64, 'oomEvidenceSha256': 'c' * 64,
+            'priorBytes': prior, 'bytes': 768 * 1024 * 1024,
+        }
+        with patch.object(workload, 'reviewed_source', return_value=self.authorization):
+            self.assertEqual(workload.web_memory_delta(self.source, attempt), 256 * 1024 * 1024)
+        self.assertEqual(attempt.manifest()['resources'], resources)
+
     def test_resume_retains_the_original_workload_and_never_renews_the_budget(self) -> None:
         with (patch.object(workload, 'reviewed_source', return_value=self.authorization),
               patch.object(workload.time, 'time', return_value=2_000) as clock):

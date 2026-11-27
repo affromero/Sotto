@@ -443,6 +443,7 @@ class ReviewControllerTests(unittest.TestCase):
         self.assertEqual(self.attempt.state()['status'], 'complete')
         self.assertFalse((self.attempt.directory
                           / controller.INHERITED_PROVIDER_CHECKPOINT).exists())
+        self.assertFalse((self.attempt.directory / 'web-memory-recovery-intent.json').exists())
         self.lock.validate()
 
     def assert_one_active_profile(self, active: str) -> None:
