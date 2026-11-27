@@ -32,6 +32,7 @@ from scripts.deploy.review.runtime.policy import (
     runtime_policy,
     successor_queue_policy_names,
 )
+from scripts.deploy.review.runtime.recovery.startup import recover_startup_source
 from scripts.deploy.review.runtime.recovery.web_memory import (
     record_recovered_web_memory,
     recover_web_memory,
@@ -458,6 +459,7 @@ def execute(
         if recover and (marker.exists() or marker.is_symlink()):
             if continue_check is not None:
                 continue_check()
+            recover_startup_source(operations, continue_check=continue_check)
             services.recover_completed(operations,
                                        continue_check=continue_check)
         services.verify_completed(operations)
