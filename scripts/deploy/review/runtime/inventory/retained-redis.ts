@@ -73,6 +73,11 @@ export async function inspectRetainedReviewRedis(
       .split(/\s+/)
       .filter((field) => field.startsWith('db='));
     assert.deepEqual(databases, ['db=0'], 'Redis client database changed');
+    const memory = await redis.info('memory');
+    assert(
+      /^maxmemory:0\r?$/m.test(memory) || /^maxmemory_policy:noeviction\r?$/m.test(memory),
+      'Redis eviction can remove retained jobs'
+    );
     const info = await redis.info('server');
     const runId = /^run_id:([a-f0-9]{40})\r?$/m.exec(info)?.[1];
     assert(runId, 'Redis server identity unavailable');

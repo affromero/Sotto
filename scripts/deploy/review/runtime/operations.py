@@ -53,8 +53,8 @@ from scripts.deploy.review.state import (
     DeploymentLock,
     atomic_json,
     checksum,
+    private_file,
     private_json,
-    sync_directory,
 )
 from scripts.deploy.review.topology import (
     DIRECTORY,
@@ -475,19 +475,7 @@ class HostOperations:
         finally:
             connection.close()
 
-    @staticmethod
-    def private_file(path: Path, content: bytes) -> None:
-        descriptor = os.open(
-            path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600,
-        )
-        try:
-            with os.fdopen(descriptor, 'wb', closefd=False) as output:
-                output.write(content)
-                output.flush()
-                os.fsync(descriptor)
-        finally:
-            os.close(descriptor)
-        sync_directory(path.parent)
+    private_file = staticmethod(private_file)
 
     def verify_archive(self, path: Path, budget: int) -> dict[str, object]:
         return verify_archive(path, budget)
@@ -541,10 +529,9 @@ class HostOperations:
         identity = checksum(binding)
         name = PROJECT + '-tool-' + identity[:24]
         path = self.attempt.directory / ('helper-' + identity + '.json')
-        options = {} if predecessor is None else {'predecessor': predecessor}
         command = self.tool_command(
             receipt, entrypoint, arguments, network=network, mounts=mounts,
-            container_name=name, **options,
+            container_name=name, predecessor=predecessor,
         )
         binding['environmentHash'] = bind_helper_environment(
             self, command, image,
@@ -577,12 +564,15 @@ class HostOperations:
         mounts: Sequence[str] = (),
         container_name: str | None = None,
         predecessor: HostOperations | None = None,
+        retained_inventory: bool = False,
     ) -> list[str]:
         if entrypoint not in {'node', 'npx', 'tar'}:
             raise ValueError('unsupported-reviewed-tool-entrypoint')
         if network not in {NETWORK, 'none'} \
                 and not network.startswith('container:'):
             raise ValueError('unsupported-reviewed-tool-network')
+        if retained_inventory and predecessor is None:
+            raise ValueError('retained-review-predecessor-required')
         if predecessor is None:
             self.runtime_environment()
             self.verify_storage()
@@ -594,17 +584,13 @@ class HostOperations:
             values = classified_environment(self.private_environment,
                                             environment(image))
         else:
-            from scripts.deploy.review.runtime import services
             from scripts.deploy.review.runtime.inventory.environment import (
-                admit_successor_environment,
+                admit_predecessor_helper_environment,
             )
-            worker = services.verify_candidate(predecessor, 'workers')
-            if (container_name is None or entrypoint != 'node' or mounts
-                    or network != 'container:' + worker
-                    or receipt != predecessor.attempt.manifest()['finalWorker']):
-                raise ValueError('predecessor-queue-helper-not-admitted')
-            values, _ = admit_successor_environment(predecessor, self)
-            values['NODE_OPTIONS'] = ''
+            values = admit_predecessor_helper_environment(
+                predecessor, self, receipt, entrypoint, mounts=mounts,
+                name=container_name, network=network, retained=retained_inventory,
+            )
             self.capacity()
         values.update({'COMMIT_SHA': cast(str, receipt['sha']),
                        'HOME': '/home/sotto',
@@ -780,19 +766,33 @@ class HostOperations:
     def runtime_exchange(
         self, mode: str, value: object, *,
         checkpoint: object = None, candidate_id: str | None = None,
+        predecessor: HostOperations | None = None,
     ) -> object:
         """Bind the helper before start and audit its exit."""
+        from scripts.deploy.review.runtime.inventory.environment import (
+            retained_inventory_network, review_code_mount,
+        )
         if mode not in {'capture', 'inspect', 'prepare', 'providers',
                         'queues', 'continuation', 'consumers', 'workloads',
-                        'paused-admission', 'queue-policy'}:
+                        'paused-admission', 'queue-policy', 'retained-single-client'}:
             raise ValueError('unsupported-review-runtime-operation')
+        if (mode == 'retained-single-client') != (predecessor is not None):
+            raise ValueError('retained-review-predecessor-required')
         self.lock.validate()
         self.settle_pending_helpers()
-        if mode == 'queue-policy':
-            admit_queue_getter(self)
-        elif mode != 'capture':
-            self.verify_fence()
-            self.verify_egress()
+
+        def verify_context() -> None:
+            if predecessor is not None:
+                if retained_inventory_network(predecessor, self) != network:
+                    raise ValueError('retained-inventory-network-changed')
+            elif mode == 'queue-policy':
+                admit_queue_getter(self)
+            elif mode != 'capture':
+                self.verify_fence()
+                self.verify_egress()
+            else:
+                self.lock.validate()
+
         image = record(self.manifest['finalWorker'], 'final worker image')
         self.verify_tools()
         tools = record(self.manifest['tools'], 'review tools')
@@ -811,7 +811,9 @@ class HostOperations:
         else:
             if candidate_id is not None:
                 raise ValueError('unexpected-runtime-network-reference')
-            network = NETWORK
+            network = (retained_inventory_network(predecessor, self)
+                       if predecessor is not None else NETWORK)
+        verify_context()
         initial = {'mode': mode, 'input': value,
                    'checkpoint': checkpoint,
                    'policy': runtime_policy(self.manifest)}
@@ -838,8 +840,9 @@ class HostOperations:
             image, 'node', arguments,
             network=network,
             container_name=name,
-            mounts=[f'type=bind,src={self.root / "scripts/deploy"},'
-                    'dst=/app/scripts/deploy,readonly'],
+            mounts=[review_code_mount(self)],
+            predecessor=predecessor,
+            retained_inventory=predecessor is not None,
         )
         actual_image = rows(json.loads(self.docker(
             'image', 'inspect', cast(str, image['imageId']),
@@ -863,11 +866,11 @@ class HostOperations:
                              'status': 'created'})
 
         def verify() -> None:
-            if mode == 'queue-policy':
-                admit_queue_getter(self)
-            else:
+            if mode == 'capture':
                 self.verify_fence()
                 self.verify_egress()
+            else:
+                verify_context()
             current = self.inspect(container_id)[0]
             if (current['Id'] != container_id
                     or current['Image'] != image['imageId']
@@ -907,13 +910,7 @@ class HostOperations:
                 'containerId': container_id})
             raise
         self.settle_helper(container_id, image, intent, binding, name)
-        if mode == 'queue-policy':
-            admit_queue_getter(self)
-        elif mode != 'capture':
-            self.verify_fence()
-            self.verify_egress()
-        else:
-            self.lock.validate()
+        verify_context()
         atomic_json(intent, {**binding, 'name': name,
                              'containerId': container_id,
                              'status': 'verified'})

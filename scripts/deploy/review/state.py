@@ -30,6 +30,20 @@ def checksum(value: object, *, ensure_ascii: bool = True) -> str:
     ).encode()).hexdigest()
 
 
+def private_file(path: Path, content: bytes) -> None:
+    descriptor = os.open(
+        path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600,
+    )
+    try:
+        with os.fdopen(descriptor, 'wb', closefd=False) as output:
+            output.write(content)
+            output.flush()
+            os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+    sync_directory(path.parent)
+
+
 def atomic_json(path: Path, value: Mapping[str, object]) -> None:
     """Use the existing deployment writer, including directory fsync."""
     writer = cast(
