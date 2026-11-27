@@ -1,5 +1,6 @@
 """Exercise the predecessor queue snapshot against the Docker boundary."""
 
+import hashlib
 import json
 import unittest
 from collections.abc import Callable
@@ -14,6 +15,7 @@ from scripts.deploy.review.runtime.inventory.queue_snapshot import (
     pause_predecessor_queues,
 )
 from scripts.deploy.review.runtime.inventory.quiescence import quiesce_predecessor
+from scripts.deploy.review.runtime.inventory.retained import observe_retained_inventory
 from scripts.deploy.review.state import atomic_json, private_json
 from scripts.deploy.review.topology import NETWORK, PROJECT
 from scripts.tests.review.runtime import admitted_runtime_fixture
@@ -100,6 +102,31 @@ class PredecessorQueueSnapshotTests(unittest.TestCase):
         self.assertEqual(receipt['workerId'], self.worker['Id'])
         self.assertEqual(receipt['originalQueues'], self.original)
         self.assertEqual(capture_predecessor_queue_snapshot(self.previous, self.successor), receipt)
+
+    def test_retained_inventory_binds_delivered_jobs_and_refuses_changed_data(self) -> None:
+        evidence = {'jobs': [{'id': str(number), 'delivered': True} for number in range(3)]}
+        path = self.path.parent / 'evidence.json'
+        atomic_json(path, evidence)
+        evidence_hash = hashlib.sha256(path.read_bytes()).hexdigest()
+        self.successor.attempt.evidence_hash = evidence_hash
+        marker = self.network.fixture.fixture.host / 'unresolved.json'
+        atomic_json(marker, {**private_json(marker), 'evidenceSha256': evidence_hash})
+        observed = {'server': 'a' * 64, 'fingerprint': 'b' * 64,
+                    'jobsFingerprint': 'c' * 64, 'keys': 15, 'queues': 2,
+                    'completed': 1, 'failed': 3}
+        with patch.object(self.successor, 'runtime_exchange', return_value=observed) as runtime:
+            self.assertEqual(observe_retained_inventory(self.previous, self.successor), observed)
+            runtime.assert_called_once_with(
+                'retained-single-client',
+                {'evidence': evidence, 'queues': ['learning-writing', 'worksheet-pdf']},
+                predecessor=self.previous,
+            )
+            runtime.return_value = {**observed, 'fingerprint': 'd' * 64}
+            with self.assertRaisesRegex(ValueError, 'retained-review-inventory-changed'):
+                observe_retained_inventory(self.previous, self.successor)
+        retained = private_json(self.path.parent / 'retained-redis.json')
+        self.assertEqual(retained['observation'], observed)
+        self.assertEqual(retained['successorEvidenceSha256'], evidence_hash)
 
     def paused_flags(self) -> dict[str, object]:
         return {

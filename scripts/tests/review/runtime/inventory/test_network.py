@@ -7,6 +7,10 @@ from importlib import import_module
 from unittest.mock import patch
 
 from scripts.deploy.review.runtime import release
+from scripts.deploy.review.runtime.inventory.environment import (
+    retained_inventory_network,
+    review_code_mount,
+)
 from scripts.deploy.review.runtime.inventory.network import (
     verify_retained_network,
     verify_running_predecessor_network,
@@ -17,6 +21,7 @@ from scripts.deploy.review.runtime.inventory.predecessor import (
 )
 from scripts.deploy.review.state import Attempt, atomic_json, checksum, private_json
 from scripts.deploy.review.topology import NETWORK, PROJECT, exact_mounts
+from scripts.tests.review.runtime import admitted_runtime_fixture
 
 class ReviewNetworkFixture(unittest.TestCase):
     def setUp(self) -> None:
@@ -96,7 +101,15 @@ class ReviewNetworkFixture(unittest.TestCase):
 
 class RetainedNetworkTests(ReviewNetworkFixture):
     def setUp(self) -> None:
-        super().setUp()
+        self.prepare_network()
+        fixture_type = import_module(
+            'scripts.tests.review.runtime.inventory.test_environment',
+        ).SuccessorEnvironmentTests
+        environment = fixture_type('runTest')
+        environment.fixture = self.fixture
+        environment.previous, environment.successor = self.previous, self.successor
+        environment.prepare_environment()
+        capture_predecessor(self.previous, self.successor)
         prepare_predecessor_stop(self.previous, self.successor, role='web')
         prepare_predecessor_stop(self.previous, self.successor, role='workers')
         for role, address in (('web', '10'), ('workers', '11')):
@@ -110,6 +123,29 @@ class RetainedNetworkTests(ReviewNetworkFixture):
 
     def test_exact_stopped_topology_is_accepted(self) -> None:
         verify_retained_network(self.previous, self.successor)
+
+    def test_observer_uses_the_admitted_redis_network_namespace(self) -> None:
+        self.successor.manifest['finalWorker'] = self.previous.manifest['finalWorker']
+        self.successor.manifest.update(admitted_runtime_fixture())
+        admitted = self.successor.manifest['finalWorker']
+        network = retained_inventory_network(self.previous, self.successor)
+        self.assertEqual(network, 'container:' + self.fixture.storage.ids['redis'])
+        code = review_code_mount(self.successor)
+        with patch.object(self.successor, 'capacity'):
+            command = self.successor.tool_command(
+                admitted, 'node', ['-e', ''], network=network, mounts=[code],
+                container_name='sotto-review-observer', predecessor=self.previous,
+                retained_inventory=True,
+            )
+        self.assertEqual(command[command.index('--network') + 1], network)
+        self.assertIn('--read-only', command)
+        self.assertEqual(command[command.index('--mount') + 1], code)
+        with self.assertRaisesRegex(ValueError, 'retained-inventory-helper-not-admitted'):
+            self.successor.tool_command(
+                admitted, 'node', ['-e', ''], network=NETWORK, mounts=[code],
+                container_name='sotto-review-observer', predecessor=self.previous,
+                retained_inventory=True,
+            )
 
     def test_unknown_member_is_rejected(self) -> None:
         self.networks[0]['Containers']['other'] = {}

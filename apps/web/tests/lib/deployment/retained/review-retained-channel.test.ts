@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { spawn } from 'node:child_process';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { inspectRetainedReviewRedis } from '../../../../../../scripts/deploy/review/runtime/inventory/retained-redis';
 import { createPrivateRedis } from '../../../helpers/queue/private-redis';
 
 describe('retained review inventory channel', () => {
@@ -10,6 +11,23 @@ describe('retained review inventory channel', () => {
   });
   afterAll(async () => {
     await redis?.close();
+  });
+
+  it('refuses a memory limit that can evict retained jobs', async () => {
+    const isolated = await createPrivateRedis();
+    try {
+      await isolated.client.config('SET', 'maxmemory', '64mb', 'maxmemory-policy', 'allkeys-lru');
+      await expect(
+        inspectRetainedReviewRedis(isolated.client, {
+          redisUrl: isolated.url,
+          queues: ['worksheet-pdf'],
+          failedWorksheetIds: ['first', 'second', 'third'],
+        })
+      ).rejects.toThrow('Redis eviction can remove retained jobs');
+      expect(await isolated.client.dbsize()).toBe(0);
+    } finally {
+      await isolated.close();
+    }
   });
 
   it.each(['retained-inventory', 'retained-single-client'])(

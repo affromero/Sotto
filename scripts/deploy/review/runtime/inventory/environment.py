@@ -6,10 +6,11 @@ import hashlib
 import json
 import os
 import re
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from scripts.deploy.images.metadata import record
+from scripts.deploy.images.metadata import digest, record
 from scripts.deploy.review.build_observer import bounded_bytes
 from scripts.deploy.review.runtime import services
 from scripts.deploy.review.runtime.inventory.predecessor import _verify_release
@@ -23,6 +24,45 @@ from scripts.deploy.review.topology import (
 
 if TYPE_CHECKING:
     from scripts.deploy.review.runtime.operations import HostOperations
+
+
+def review_code_mount(operations: HostOperations) -> str:
+    return (f'type=bind,src={operations.root / "scripts/deploy"},'
+            'dst=/app/scripts/deploy,readonly')
+
+
+def retained_inventory_network(
+    previous: HostOperations, successor: HostOperations,
+) -> str:
+    from scripts.deploy.review.runtime.inventory.network import verify_retained_network
+
+    verify_retained_network(previous, successor)
+    topology = record(previous.manifest['topology'], 'predecessor topology')
+    services = record(topology['services'], 'predecessor services')
+    redis = record(services['redis'], 'predecessor Redis')
+    return 'container:' + digest(redis['id'], 'predecessor Redis identity')
+
+
+def admit_predecessor_helper_environment(
+    previous: HostOperations, successor: HostOperations,
+    receipt: Mapping[str, object], entrypoint: str, *,
+    mounts: Sequence[str], name: str | None, network: str, retained: bool,
+) -> dict[str, str]:
+    if name is None or entrypoint != 'node':
+        raise ValueError('predecessor-helper-not-admitted')
+    if retained:
+        if (list(mounts) != [review_code_mount(successor)]
+                or network != retained_inventory_network(previous, successor)
+                or receipt != successor.manifest['finalWorker']):
+            raise ValueError('retained-inventory-helper-not-admitted')
+    else:
+        worker = services.verify_candidate(previous, 'workers')
+        if (mounts or network != 'container:' + worker
+                or receipt != previous.attempt.manifest()['finalWorker']):
+            raise ValueError('predecessor-queue-helper-not-admitted')
+    values, _ = admit_successor_environment(previous, successor)
+    values['NODE_OPTIONS'] = ''
+    return values
 
 
 def _private_bytes(path: Path) -> bytes:
