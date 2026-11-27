@@ -647,21 +647,27 @@ def stream_backup(
         sync_directory(target.parent)
     return target
 
-def backup_review(operations: HostOperations) -> None:
+def backup_review(
+    operations: HostOperations, *, predecessor: HostOperations | None = None,
+) -> None:
+    from scripts.deploy.review.runtime.inventory.backup import (
+        original_backup_sources, predecessor_backup_sources,
+    )
+
     operations.verify_fence()
-    if (operations.attempt.directory / 'backups.json').exists():
+    existing = (operations.attempt.directory / 'backups.json').exists()
+    if existing and predecessor is None:
         verify_backups(operations)
         return
     operations.settle_pending_helpers()
-    operations.capacity()
-    operations.runtime_environment()
-    services = record(record(operations.manifest['topology'], 'topology')
-                      ['services'], 'services')
-    postgres = record(services['postgres'], 'postgres')
-    redis = record(services['redis'], 'redis')
-    web = record(services['web'], 'web')
-    pg_id = cast(str, postgres['id'])
-    redis_id = cast(str, redis['id'])
+    if not existing:
+        operations.capacity()
+    sources = (original_backup_sources(operations) if predecessor is None
+               else predecessor_backup_sources(predecessor, operations))
+    if existing:
+        verify_backups(operations, binding=sources['binding'])
+        return
+    pg_id, redis_id = sources['postgres'], sources['redis']
     budget = cast(int, record(operations.manifest['resources'], 'resources')
                   ['backupBudgetBytes'])
     directory = operations.attempt.directory / ('backup-'+str(time.time_ns()))
@@ -673,21 +679,22 @@ def backup_review(operations: HostOperations) -> None:
         str(operations.root / 'scripts/deploy/database-command.py'),
         'dump', '--container', pg_id,
     ], limit=budget,
-        content=operations.private_environment['DATABASE_URL'].encode())
+        content=sources['database_url'].encode())
     if not 0 < dump.stat().st_size <= budget:
         raise ValueError('database-backup-budget-exceeded')
     verify_database_backup(operations, dump, pg_id)
-    operations.docker('exec', redis_id, 'redis-cli', 'SAVE')
+    saved = operations.docker('exec', redis_id, 'redis-cli', 'SAVE')
+    if saved.strip() != b'OK':
+        raise ValueError('review-redis-backup-save-failed')
     archives: dict[str, object] = {}
     total = dump.stat().st_size
     for name, container, path in (
         ('redis', redis_id, '/data'),
-        ('storage', cast(str, web['id']), '/tmp/sotto-review-storage'),
-        ('executions', cast(str, web['id']),
-         '/app/apps/web/.sotto/runtime'),
+        ('storage', sources['web'], '/tmp/sotto-review-storage'),
+        ('executions', sources['web'], '/app/apps/web/.sotto/runtime'),
     ):
         archive = backup_archive(operations, prefix+name, container,
-                                 cast(str, web['imageId']), path,
+                                 sources['image'], path,
                                  budget - total)
         proof = operations.verify_archive(archive, budget - total)
         archives[name] = proof
@@ -699,12 +706,7 @@ def backup_review(operations: HostOperations) -> None:
     archives['database'] = {'sha256': hashed.hexdigest(),
                             'bytes': dump.stat().st_size}
     files: dict[str, str] = {}
-    for name, source_path in (
-        ('compose', Path(DIRECTORY) / 'compose.yml'),
-        ('caddy', operations.attempt.directory / 'original-caddy.conf'),
-        ('environment', operations.runtime_environment()),
-    ):
-        value = bounded_bytes(source_path)
+    for name, value in sources['files'].items():
         operations.private_file(
             directory / (name + '.backup'), value,
         )
@@ -712,10 +714,15 @@ def backup_review(operations: HostOperations) -> None:
         total += len(value)
     if total > budget:
         raise ValueError('combined-backup-budget-exceeded')
-    atomic_json(operations.attempt.directory / 'backups.json', {
+    receipt = {
         'archives': archives, 'files': files, 'bytes': total,
         'databaseArchiveParsed': True, 'directory': directory.name,
-    })
+    }
+    if predecessor is not None:
+        if predecessor_backup_sources(predecessor, operations) != sources:
+            raise ValueError('predecessor-backup-inputs-changed')
+        receipt['predecessor'] = sources['binding']
+    atomic_json(operations.attempt.directory / 'backups.json', receipt)
     operations.verify_fence()
 
 
@@ -754,8 +761,12 @@ def verify_database_backup(
             raise ValueError('database-backup-archive-verification-failed')
 
 
-def verify_backups(operations: HostOperations) -> None:
+def verify_backups(
+    operations: HostOperations, *, binding: dict[str, str] | None = None,
+) -> None:
     retained = private_json(operations.attempt.directory / 'backups.json')
+    if retained.get('predecessor') != binding:
+        raise ValueError('retained-backup-predecessor-changed')
     name = cast(str, retained['directory'])
     if Path(name).name != name or not name.startswith('backup-'):
         raise ValueError('retained-backup-directory-invalid')
@@ -782,7 +793,10 @@ def verify_backups(operations: HostOperations) -> None:
             raise ValueError('retained-backup-archive-changed')
         total += cast(int, actual['bytes'])
     files = record(retained['files'], 'retained configurations')
-    if set(files) != {'compose', 'caddy', 'environment'}:
+    expected_files = {'compose', 'caddy', 'environment'}
+    if binding is not None:
+        expected_files.add('candidate')
+    if set(files) != expected_files:
         raise ValueError('complete-retained-configuration-required')
     for filename, expected in files.items():
         raw = bounded_bytes(directory / (filename+'.backup'), private=True)
