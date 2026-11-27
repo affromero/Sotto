@@ -14,6 +14,7 @@ from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, TypedDict, cast
 
 from scripts.deploy.images.metadata import digest, record, source_sha
+from scripts.deploy.images.probe import probe_source
 from scripts.deploy.review.build_observer import TARGET, bounded_bytes
 from scripts.deploy.review.state import (
     atomic_json,
@@ -35,6 +36,8 @@ PRISMA_DIFF = (
 )
 OUTPUT_LIMIT = 65_536
 JSON_LIMIT = 262_144
+MIGRATION_PROBE = 'scripts/deploy/images/migration-hashes.cjs'
+MIGRATION_PROBE_RUNNER = 'scripts/deploy/images/probe.py'
 CATALOG_FILES = {
     'binding.json', 'snapshot.raw', 'database-identity.raw',
     'schema-index.raw', 'schema-preparation.json', 'schema-index.json',
@@ -487,6 +490,70 @@ def migration_inventory(stage: Mapping[str, object]) -> dict[str, str]:
             raise ValueError('duplicate-admitted-migration-name')
         result[name] = digest(value, 'stage SQL')
     return result
+
+
+def admit_successor_migration(
+    predecessor: Mapping[str, object], successor: Mapping[str, object], *,
+    observed: tuple[str, Mapping[str, str]],
+) -> tuple[dict[str, object], dict[str, object]]:
+    """Admit one append-only stage against the completed release and image."""
+    previous = rows(predecessor['stages'], 'predecessor SQL stages')
+    stages = rows(successor['stages'], 'successor SQL stages')
+    if not previous or len(stages) != 1:
+        raise ValueError('exact-single-successor-sql-stage-required')
+    initial = record(successor['initialStage'], 'successor initial stage')
+    final = stages[0]
+    if previous[-1]['receipt'] != predecessor['finalWorker'] or initial != previous[-1]:
+        raise ValueError('successor-initial-migrations-differ-from-predecessor')
+    worker = record(successor['finalWorker'], 'successor worker image')
+    web = record(successor['finalWeb'], 'successor web image')
+    if (final['receipt'] != worker
+            or source_sha(web['sha']) != source_sha(worker['sha'])):
+        raise ValueError('successor-migration-image-differs-from-final-release')
+    original = record(initial['migrations'], 'predecessor SQL inventory')
+    candidate = record(final['migrations'], 'successor SQL inventory')
+    image, image_migrations = observed
+    if (image != digest(worker['imageId'], 'successor worker image', 'sha256:')
+            or candidate != dict(image_migrations)):
+        raise ValueError('successor-migration-files-differ-from-image')
+    if not original or not original.items() < candidate.items():
+        raise ValueError('successor-migration-history-changed')
+    if (len(migration_inventory(initial)) != len(original)
+            or len(migration_inventory(final)) != len(candidate)):
+        raise ValueError('successor-migration-inventory-invalid')
+    added = sorted(candidate.keys() - original.keys())
+    if added[0] <= max(original):
+        raise ValueError('successor-migrations-must-append-in-order')
+    # The published migration guard limits the number and shape of new paths.
+    guard = import_module('scripts.deploy.compatibility-review')
+    guard.published_migration_additions({
+        path: {'previousSha256': None, 'candidateSha256': candidate[path]}
+        for path in added
+    })
+    return initial, final
+
+
+def inspect_successor_worker_migrations(
+    operations: HostOperations,
+) -> tuple[str, dict[str, str]]:
+    """Inspect the admitted worker's SQL files without network or database access."""
+    operations.lock.validate()
+    operations.verify_tools()
+    tools = record(operations.manifest['tools'], 'successor tools')
+    digest(tools.get(MIGRATION_PROBE_RUNNER), 'migration probe runner')
+    path = operations.root / MIGRATION_PROBE
+    expected = digest(tools.get(MIGRATION_PROBE), 'migration inventory probe')
+    source = bounded_bytes(path)
+    if hashlib.sha256(source).hexdigest() != expected:
+        raise ValueError('successor-migration-probe-changed')
+    receipt = record(operations.manifest['finalWorker'], 'successor worker image')
+    image = digest(receipt['imageId'], 'successor worker image identity', 'sha256:')
+    observed = strict_json(probe_source(image, source.decode(), path.name).encode())
+    operations.lock.validate()
+    return image, {
+        name: digest(value, 'candidate image migration SQL')
+        for name, value in observed.items()
+    }
 
 
 def stage_progress(

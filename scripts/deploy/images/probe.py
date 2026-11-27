@@ -18,6 +18,12 @@ def inherited_lock() -> tuple[int, ...]:
 
 
 def probe(reference: str, path: Path, tsx: bool = False) -> str:
+    return probe_source(reference, path.read_text(), path.name, tsx)
+
+
+def probe_source(
+    reference: str, source: str, label: str, tsx: bool = False,
+) -> str:
     command = [
         'docker', 'run', '--rm', '--pull', 'never', '--network', 'none',
         '--platform', 'linux/amd64', '--read-only', '--tmpfs', '/tmp',
@@ -29,7 +35,7 @@ def probe(reference: str, path: Path, tsx: bool = False) -> str:
     ]
     if tsx:
         command.extend(['--require', 'tsx/cjs'])
-    command.extend(['-e', path.read_text()])
+    command.extend(['-e', source])
     try:
         output = subprocess.check_output(
             command, text=True, stderr=subprocess.PIPE, timeout=120,
@@ -38,10 +44,10 @@ def probe(reference: str, path: Path, tsx: bool = False) -> str:
     except subprocess.CalledProcessError as error:
         detail = error.stderr.strip() or f'exit status {error.returncode}'
         raise ValueError(
-            f'{path.name}: runtime probe failed: {detail}'
+            f'{label}: runtime probe failed: {detail}'
         ) from None
     if not output:
-        raise ValueError(f'{path.name}: runtime probe returned no evidence')
+        raise ValueError(f'{label}: runtime probe returned no evidence')
     return output
 
 

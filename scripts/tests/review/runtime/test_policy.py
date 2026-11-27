@@ -19,6 +19,7 @@ from scripts.deploy.review.runtime.policy import (
     concurrent_memory,
     helper_arguments,
     helper_memory,
+    retain_queue_intent,
     role_command,
     runtime_policy,
 )
@@ -32,6 +33,44 @@ from scripts.tests.review.runtime import admitted_runtime_fixture
 
 
 class ReviewResourcePolicyTests(unittest.TestCase):
+    def test_successor_intent_preserves_only_the_admitted_previous_limits(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            lock_path = root / 'fixture.lock'
+            lock_path.touch(mode=0o600)
+            lock = DeploymentLock(lock_path)
+            self.addCleanup(lock.close)
+            connection = 'a' * 64
+            previous = ['worksheet-pdf']
+            candidate = ['learning-writing', *previous]
+            manifest = {
+                'predecessor': {'directory': 'fixture'},
+                'originalQueues': {
+                    'connectionIdentity': connection,
+                    'queues': [{'name': name, 'paused': False} for name in previous],
+                },
+                'queueTransition': {
+                    'previousQueues': previous, 'candidateQueues': candidate,
+                    'addedQueues': ['learning-writing'],
+                },
+                'finalWorker': {'runtime': {'queueNames': candidate}},
+            }
+            attempt = Attempt.create(root, 'successor', manifest, 'b' * 64)
+            operations = HostOperations(attempt, lock)
+            expected = {
+                'schemaVersion': 2, 'connectionIdentity': connection,
+                'queues': [
+                    {'name': 'learning-writing', 'originalConcurrency': None, 'concurrency': 1},
+                    {'name': 'worksheet-pdf', 'originalConcurrency': 1, 'concurrency': 1},
+                ],
+            }
+            retain_queue_intent(operations, expected)
+            altered = copy.deepcopy(expected)
+            altered['queues'][1]['originalConcurrency'] = None
+            with self.assertRaisesRegex(ValueError, 'original-review-concurrency-intent-changed'):
+                retain_queue_intent(operations, altered)
+            self.assertEqual(private_json(attempt.directory / 'queue-policy-intent.json'), expected)
+
     def test_capacity_preserves_reserve_and_counts_the_concurrent_helper(
         self,
     ) -> None:

@@ -52,6 +52,72 @@ describe('dedicated review queue policy', () => {
     return Promise.all(keys.map(async (key) => [key, await fixture.client.dump(key)]));
   }
 
+  it('preserves the predecessor limits and adds policy for the new paused queue', async () => {
+    const owned = await queues();
+    const added = owned.find((queue) => queue.name === 'learning-writing');
+    if (!added) throw new Error('Candidate writing queue missing');
+    const previous = owned.filter((queue) => queue !== added);
+    try {
+      for (const queue of previous) await queue.setGlobalConcurrency(1);
+      const before = await Promise.all(
+        previous.map((queue) => fixture.client.dump(queue.keys.meta))
+      );
+      const names = previous.map((queue) => queue.name);
+      const result = await prepareReviewQueuePolicy(
+        owned,
+        connectionIdentity,
+        null,
+        async (intent) => {
+          expect(intent.schemaVersion).toBe(2);
+          expect(intent.queues).toContainEqual({
+            name: added.name,
+            originalConcurrency: null,
+            concurrency: 1,
+          });
+          expect(await added.getGlobalConcurrency()).toBeNull();
+        },
+        names
+      );
+      expect(await added.getGlobalConcurrency()).toBe(1);
+      expect(result.queues.filter((queue) => queue.originalConcurrency === 1)).toHaveLength(
+        previous.length
+      );
+      expect(
+        await Promise.all(previous.map((queue) => fixture.client.dump(queue.keys.meta)))
+      ).toEqual(before);
+      await expect(
+        prepareReviewQueuePolicy(
+          owned,
+          connectionIdentity,
+          result,
+          async (intent) => expect(intent).toEqual(result),
+          names
+        )
+      ).resolves.toEqual(result);
+      const beforeRetry = await snapshot();
+      await expect(
+        prepareReviewQueuePolicy(
+          owned,
+          connectionIdentity,
+          result,
+          async () => {
+            throw new Error('Retained policy could not be verified');
+          },
+          names
+        )
+      ).rejects.toThrow('Retained policy could not be verified');
+      expect(await snapshot()).toEqual(beforeRetry);
+      await previous[0].removeGlobalConcurrency();
+      const drifted = await snapshot();
+      await expect(
+        prepareReviewQueuePolicy(owned, connectionIdentity, result, async () => {}, names)
+      ).rejects.toThrow('Unknown original review queue concurrency');
+      expect(await snapshot()).toEqual(drifted);
+    } finally {
+      await Promise.all(owned.map((queue) => queue.close()));
+    }
+  });
+
   it('requires the acknowledged original null inventory before the first write', async () => {
     const owned = await queues();
     let retained: ReviewQueuePolicyIntent | null = null;
