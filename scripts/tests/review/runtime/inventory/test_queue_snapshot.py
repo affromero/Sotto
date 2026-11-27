@@ -2,16 +2,20 @@
 
 import json
 import unittest
+from collections.abc import Callable
 from importlib import import_module
+from pathlib import Path
 from unittest.mock import patch
 
 from scripts.deploy.review.runtime.inventory.predecessor import capture_predecessor
 from scripts.deploy.review.runtime.inventory.queue_snapshot import (
     capture_predecessor_queue_snapshot,
     observe_predecessor_queue_drain,
+    pause_predecessor_queues,
 )
 from scripts.deploy.review.state import private_json
 from scripts.deploy.review.topology import NETWORK, PROJECT
+from scripts.tests.review.runtime import admitted_runtime_fixture
 
 
 class PredecessorQueueSnapshotTests(unittest.TestCase):
@@ -40,8 +44,12 @@ class PredecessorQueueSnapshotTests(unittest.TestCase):
         self.boundary = self.successor.command
         self.output = self.response(self.original)
         self.expected_request = {'command': 'snapshot'}
-        self.after_observation = None
+        self.after_observation: Callable[[], None] | None = None
+        self.refuse_maintenance = False
+        self.responses: list[tuple[dict[str, object], bytes | BaseException]] | None = None
         self.enterContext(patch.object(self.successor, 'command', side_effect=self.command))
+        self.enterContext(patch.object(self.successor, 'image_command',
+                                     side_effect=self.maintenance_command))
 
     @staticmethod
     def response(value: object) -> bytes:
@@ -54,11 +62,37 @@ class PredecessorQueueSnapshotTests(unittest.TestCase):
             '-i', '--workdir', '/app/apps/web', '--env', 'NODE_OPTIONS=',
             self.worker['Id'], 'node',
         ])
-        self.assertEqual(json.loads(options['content']), self.expected_request)
+        request = json.loads(options['content'])
         self.assertEqual(options['timeout'], 25)
+        if self.responses is not None:
+            self.assertEqual(request['command'], 'snapshot')
+            return self.queued_response(request)
+        self.assertEqual(request, self.expected_request)
         if self.after_observation is not None:
             self.after_observation()
         return self.output
+
+    def queued_response(self, request: dict[str, object]) -> bytes:
+        expected, output = self.responses.pop(0)
+        self.assertEqual(request, expected)
+        if isinstance(output, BaseException):
+            raise output
+        return output
+
+    def maintenance_command(self, receipt: dict[str, object], entrypoint: str,
+                            arguments: list[str], **options: object) -> bytes:
+        self.assertEqual(receipt, self.previous.attempt.manifest()['finalWorker'])
+        self.assertEqual(entrypoint, 'node')
+        self.assertEqual(arguments[0:2], ['--import', 'tsx'])
+        self.assertEqual(options['network'], 'container:' + self.worker['Id'])
+        self.assertIs(options['predecessor'], self.previous)
+        if self.refuse_maintenance:
+            raise RuntimeError('helper capacity refused')
+        options['before_start']()
+        self.assertTrue((self.path.parent / 'predecessor-queue-pause-intent.json').exists())
+        request = json.loads(options['content'])
+        self.assertEqual(request['command'], 'pause')
+        return self.queued_response(request)
 
     def test_retains_exact_queue_flags_under_the_fence(self) -> None:
         receipt = capture_predecessor_queue_snapshot(self.previous, self.successor)
@@ -67,13 +101,88 @@ class PredecessorQueueSnapshotTests(unittest.TestCase):
         self.assertEqual(receipt['originalQueues'], self.original)
         self.assertEqual(capture_predecessor_queue_snapshot(self.previous, self.successor), receipt)
 
+    def paused_flags(self) -> dict[str, object]:
+        return {
+            **self.original,
+            'queues': [{**queue, 'paused': True} for queue in self.original['queues']],
+        }
+
+    def test_journals_the_pause_and_rechecks_the_result_without_dispatching_again(self) -> None:
+        paused = self.response(self.paused_flags())
+        self.responses = [
+            ({'command': 'snapshot'}, self.response(self.original)),
+            ({'command': 'pause', 'manifest': self.original}, paused),
+            ({'command': 'snapshot'}, paused),
+            ({'command': 'snapshot'}, paused),
+        ]
+        pause_predecessor_queues(self.previous, self.successor)
+        result = self.path.parent / 'predecessor-queue-pause-result.json'
+        evidence = result.read_bytes()
+        pause_predecessor_queues(self.previous, self.successor)
+        self.assertEqual(result.read_bytes(), evidence)
+        self.assertFalse(self.responses)
+
+    def test_unconfirmed_pause_requires_full_readback_and_never_reissues_pause(self) -> None:
+        paused = self.response(self.paused_flags())
+        self.responses = [
+            ({'command': 'snapshot'}, self.response(self.original)),
+            ({'command': 'pause', 'manifest': self.original}, TimeoutError('lost reply')),
+            ({'command': 'snapshot'}, self.response(self.original)),
+            ({'command': 'snapshot'}, paused),
+        ]
+        result = self.path.parent / 'predecessor-queue-pause-result.json'
+        with self.assertRaisesRegex(TimeoutError, 'lost reply'):
+            pause_predecessor_queues(self.previous, self.successor)
+        self.assertFalse(result.exists())
+        with self.assertRaisesRegex(ValueError, 'queue-pause-unresolved'):
+            pause_predecessor_queues(self.previous, self.successor)
+        self.assertFalse(result.exists())
+        pause_predecessor_queues(self.previous, self.successor)
+        self.assertTrue(result.exists())
+        self.assertFalse(self.responses)
+
+    def test_helper_preflight_failure_leaves_pause_dispatch_retryable(self) -> None:
+        paused = self.response(self.paused_flags())
+        self.responses = [
+            ({'command': 'snapshot'}, self.response(self.original)),
+            ({'command': 'snapshot'}, self.response(self.original)),
+            ({'command': 'pause', 'manifest': self.original}, paused),
+            ({'command': 'snapshot'}, paused),
+        ]
+        self.refuse_maintenance = True
+        with self.assertRaisesRegex(RuntimeError, 'helper capacity refused'):
+            pause_predecessor_queues(self.previous, self.successor)
+        self.assertFalse((self.path.parent / 'predecessor-queue-pause-intent.json').exists())
+        self.refuse_maintenance = False
+        pause_predecessor_queues(self.previous, self.successor)
+        self.assertTrue((self.path.parent / 'predecessor-queue-pause-result.json').exists())
+
+    def test_predecessor_helper_reuses_bound_environment_in_a_read_only_container(self) -> None:
+        self.successor.manifest.update(admitted_runtime_fixture())
+        image = self.previous.attempt.manifest()['finalWorker']
+        with patch.object(self.successor, 'capacity'):
+            command = self.successor.tool_command(
+                image, 'node', ['--eval', 'fixture'],
+                container_name='sotto-review-tool-fixture',
+                network='container:' + self.worker['Id'],
+                predecessor=self.previous,
+            )
+        self.assertEqual(command[:2], ['docker', 'create'])
+        self.assertIn('--read-only', command)
+        self.assertEqual(command[command.index('--network') + 1],
+                         'container:' + self.worker['Id'])
+        environment = Path(command[command.index('--env-file') + 1])
+        self.assertEqual(environment.stat().st_mode & 0o777, 0o600)
+        self.assertIn('DATABASE_URL=postgresql://fixture/secret\n',
+                      environment.read_text())
+        self.assertNotIn('--fixture', environment.read_text())
+
     def prepare_drain(self, *, jobs: int = 0, workers: int = 0,
                       synchronous: int = 0) -> dict[str, object]:
         capture_predecessor_queue_snapshot(self.previous, self.successor)
         self.expected_request = {'command': 'drained-all', 'manifest': self.original}
         return {
-            **self.original,
-            'queues': [{**queue, 'paused': True} for queue in self.original['queues']],
+            **self.paused_flags(),
             'activeJobs': jobs,
             'executions': {'inspected': 2 + workers + synchronous, 'settled': 2,
                            'workerActive': workers, 'synchronousActive': synchronous},
