@@ -117,6 +117,23 @@ class HostCommandTests(unittest.TestCase):
                                  'a' * 64)
         self.operations = HostOperations(attempt, self.lock)
 
+    def test_successor_queue_policy_joins_the_admitted_redis_namespace(self) -> None:
+        operations, redis = self.operations, 'b' * 64
+        operations.manifest.update({
+            'predecessor': {}, 'finalWorker': {'imageId': 'sha256:' + 'c' * 64},
+            'topology': {'services': {'redis': {'id': redis}}},
+            'runtimePolicy': {'schemaVersion': 1, 'queueConcurrency': 1,
+                              'privacyContactEmail': 'privacy@example.com',
+                              'webHeapMiB': 128, 'workerHeapMiB': 128, 'helperHeapMiB': 128},
+            'resources': {role + 'MemoryBytes': 512 << 20 for role in ('web', 'worker', 'helper')},
+        })
+        with (patch.object(operations, 'settle_pending_helpers'),
+              patch('scripts.deploy.review.runtime.operations.admit_queue_getter'),
+              patch('scripts.deploy.review.runtime.inventory.environment.review_code_mount'),
+              patch.object(operations, 'tool_command', side_effect=RuntimeError('Docker boundary')) as tool):
+            with self.assertRaisesRegex(RuntimeError, 'Docker boundary'):
+                operations.runtime_exchange('queue-policy', {})
+        self.assertEqual(tool.call_args.kwargs['network'], 'container:' + redis)
     def test_new_attempt_requires_its_canonical_writer_capture(self) -> None:
         writer: dict[str, object] = {
             'Id': 'a' * 64, 'Image': 'sha256:' + 'b' * 64, 'Name': '/candidate',

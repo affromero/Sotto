@@ -809,8 +809,15 @@ class HostOperations:
         else:
             if candidate_id is not None:
                 raise ValueError('unexpected-runtime-network-reference')
-            network = (retained_inventory_network(predecessor, self, phase=retained_phase)
-                       if predecessor is not None else NETWORK)
+            if mode == 'queue-policy' and 'predecessor' in self.manifest:
+                topology = record(self.manifest['topology'], 'topology')
+                services = record(topology['services'], 'review services')
+                redis = record(services['redis'], 'admitted Redis')
+                # Queue policy admission verifies the exact backing service and peers.
+                network = 'container:' + digest(redis['id'], 'admitted Redis')
+            else:
+                network = (retained_inventory_network(predecessor, self, phase=retained_phase)
+                           if predecessor is not None else NETWORK)
         verify_context()
         initial = {'mode': mode, 'input': value,
                    'checkpoint': checkpoint,

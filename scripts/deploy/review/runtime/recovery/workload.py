@@ -24,6 +24,7 @@ CONSUMED = 'workload-recovery-budget.json'
 MUTABLE_TOOLS = frozenset({
     'scripts/deploy/review/runtime/controller.py',
     'scripts/deploy/review/runtime/operations.py',
+    'scripts/deploy/review/runtime/recovery/startup.py',
     'scripts/deploy/review/runtime/recovery/web_memory.py',
     'scripts/deploy/review/runtime/recovery/workload.py',
     'scripts/deploy/review/runtime/release/successor.py',
@@ -63,7 +64,7 @@ def reviewed_source(root: Path, attempt: Attempt) -> dict[str, object] | None:
         'priorToolsSha256', 'checkpointSha256', 'failure', 'backupsSha256', 'supervisorSha256',
         'storageRecoverySha256', 'stitchRetrySha256',
     }
-    if (not required <= set(authorization) <= required | {'webMemory'}
+    if (not required <= set(authorization) <= required | {'webMemory', 'startup'}
             or type(authorization['version']) is not int or authorization['version'] != 1
             or authorization['source'] != directory.name
             or authorization['attemptDirectory'] != str(attempt.directory)
