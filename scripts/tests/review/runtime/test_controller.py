@@ -91,6 +91,9 @@ class HostBoundary:
     def capacity(self) -> None:
         self.lock.validate()
 
+    def successor_helper_capacity(self, *, previous: HostOperations | None = None) -> None:
+        self.lock.validate()
+
     def fence(self) -> None:
         marker = self.attempt.directory.parent / 'unresolved.json'
         if marker.exists():

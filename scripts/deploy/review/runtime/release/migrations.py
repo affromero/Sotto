@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, TypedDict, cast
 from scripts.deploy.images.metadata import digest, record, source_sha
 from scripts.deploy.images.probe import probe_source
 from scripts.deploy.review.build_observer import TARGET, bounded_bytes
+from scripts.deploy.review.runtime.policy import helper_memory
 from scripts.deploy.review.state import (
     atomic_json,
     checksum,
@@ -562,7 +563,10 @@ def inspect_successor_worker_migrations(
         raise ValueError('successor-migration-probe-changed')
     receipt = record(operations.manifest['finalWorker'], 'successor worker image')
     image = digest(receipt['imageId'], 'successor worker image identity', 'sha256:')
-    observed = strict_json(probe_source(image, source.decode(), path.name).encode())
+    observed = strict_json(probe_source(
+        image, source.decode(), path.name,
+        memory_bytes=helper_memory(operations.manifest), review_attempt=operations.attempt.manifest_hash,
+    ).encode())
     operations.lock.validate()
     return image, {
         name: digest(value, 'candidate image migration SQL')

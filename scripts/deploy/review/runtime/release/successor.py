@@ -27,6 +27,8 @@ from scripts.deploy.review.runtime.inventory.quiescence import quiesce_predecess
 from scripts.deploy.review.runtime.inventory.retained import observe_retained_inventory
 from scripts.deploy.review.runtime.inventory.storage import verify_running_completed_storage
 from scripts.deploy.review.runtime.policy import (
+    helper_arguments,
+    helper_memory,
     retain_queue_intent,
     runtime_policy,
     successor_queue_policy_names,
@@ -153,9 +155,9 @@ def preflight_successor(
     retained_predecessor_startup(operations)
     values, _ = observe_predecessor_environment(previous)
     successor_compose_document(operations, values)
-    verify_successor_workload(previous, operations)
     operations.verify_images()
-    operations.capacity()
+    operations.successor_helper_capacity(previous=previous)
+    verify_successor_workload(previous, operations)
     verify_successor_runtime_identity(operations)
     initial, final = admit_successor_migration(
         previous.manifest, operations.manifest,
@@ -192,7 +194,7 @@ def verify_successor_workload(previous: HostOperations, operations: HostOperatio
     identity = services.verify_candidate(previous, 'workers')
     data = operations.command(
         ['docker', 'exec', '-i', '-w', '/app/apps/web', identity,
-         'node', '-e', WORKLOAD_PREFLIGHT],
+         'node', *helper_arguments(operations.manifest, 'node', ['-e', WORKLOAD_PREFLIGHT])],
         content=json.dumps({'profiles': profiles, 'seed': admitted_review_seed(operations)}).encode(),
         timeout=25,
     )
@@ -212,7 +214,10 @@ def verify_successor_runtime_identity(operations: HostOperations) -> None:
     for role in ('finalWeb', 'finalWorker'):
         image = record(manifest[role], 'candidate image')
         identity = digest(image['imageId'], 'candidate image identity', 'sha256:')
-        if json.loads(probe_source(identity, source, 'successor runtime UID')) != expected:
+        if json.loads(probe_source(
+            identity, source, 'successor runtime UID',
+            memory_bytes=helper_memory(manifest), review_attempt=operations.attempt.manifest_hash,
+        )) != expected:
             raise ValueError('actual-final-runtime-ownership-changed')
     _adopt_receipt(operations.attempt.directory / 'runtime-ownership.json', expected)
 
@@ -294,9 +299,11 @@ def migrate_successor_data(
         if applied != original:
             raise ValueError('successor-initial-schema-changed')
         verify_successor_data(previous, operations, phase='BACKED_UP')
-        attempt.advance('SQL_STARTED')
     elif not stage_progress(applied, original, candidate):
         raise ValueError('actual-sql-is-not-an-admitted-stage-prefix')
+    operations.capacity()
+    if phase == 'BACKED_UP':
+        attempt.advance('SQL_STARTED')
     elif state['status'] == 'unresolved':
         atomic_json(attempt.directory / 'state.json', {**state, 'status': 'active'})
     continue_check()

@@ -161,7 +161,7 @@ class RetainedNetworkTests(ReviewNetworkFixture):
         network = retained_inventory_network(self.previous, self.successor)
         self.assertEqual(network, 'container:' + self.fixture.storage.ids['redis'])
         code = review_code_mount(self.successor)
-        with patch.object(self.successor, 'capacity'):
+        with patch.object(self.successor, 'successor_helper_capacity'):
             command = self.successor.tool_command(
                 admitted, 'node', ['-e', ''], network=network, mounts=[code],
                 container_name='sotto-review-observer', predecessor=self.previous,
