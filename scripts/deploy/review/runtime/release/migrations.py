@@ -13,8 +13,8 @@ from itertools import pairwise
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, TypedDict, cast
 
-from scripts.deploy.images.metadata import digest, record
-from scripts.deploy.review.build_observer import bounded_bytes
+from scripts.deploy.images.metadata import digest, record, source_sha
+from scripts.deploy.review.build_observer import TARGET, bounded_bytes
 from scripts.deploy.review.state import (
     atomic_json,
     checksum,
@@ -43,12 +43,108 @@ ACTIVE_FILES = CATALOG_FILES | {
     'prisma-result.json', 'schema-drift.sql', 'schema-drift.stderr',
     'schema-drift-proof.json',
 }
+APPLIED_MIGRATION_QUERY = '''SELECT json_agg(json_build_object(
+'name',migration_name,'checksum',checksum,'finished',finished_at IS NOT NULL,
+'rolledBack',rolled_back_at IS NOT NULL))::text FROM "_prisma_migrations"'''
+APPLIED_MIGRATION_SCRIPT = (
+    'const {Client}=require("pg");'
+    'const c=new Client({connectionString:process.env.DATABASE_URL,'
+    'connectionTimeoutMillis:5000,query_timeout:5000});'
+    '(async()=>{await c.connect();try{'
+    'await c.query("BEGIN READ ONLY");'
+    'const r=await c.query(' + json.dumps(APPLIED_MIGRATION_QUERY) + ');'
+    'console.log(r.rows[0].json_agg);'
+    '}finally{await c.query("ROLLBACK");await c.end()}})()'
+    '.catch(()=>{console.error("Migration inventory unavailable");'
+    'process.exitCode=1});'
+)
 
 
 class DiffResult(TypedDict):
     status: int
     stdout: bytes
     stderr: bytes
+
+
+def migration_image_command(
+    operations: HostOperations, receipt: Mapping[str, object], entrypoint: str,
+    arguments: Sequence[str], *, predecessor: HostOperations | None = None,
+    content: bytes | None = None, mounts: Sequence[str] = (),
+) -> bytes:
+    if predecessor is None:
+        return operations.image_command(
+            receipt, entrypoint, arguments, content=content, mounts=mounts,
+        )
+    from scripts.deploy.review.runtime.inventory.environment import (
+        retained_inventory_network,
+    )
+    phase = operations.attempt.state()['phase']
+    if phase not in ('BACKED_UP', 'SQL_STARTED', 'FINAL_SCHEMA_VERIFIED'):
+        raise ValueError('successor-migration-helper-phase-invalid')
+    network = retained_inventory_network(predecessor, operations, phase=phase)
+
+    def verify_network() -> None:
+        if retained_inventory_network(predecessor, operations, phase=phase) != network:
+            raise ValueError('successor-migration-network-changed')
+
+    def before_start() -> None:
+        verify_network()
+        if entrypoint == 'npx' and operations.attempt.state()['status'] != 'active':
+            raise ValueError('successor-schema-write-not-admitted')
+
+    result = operations.image_command(
+        receipt, entrypoint, arguments, content=content, mounts=mounts,
+        network=network, predecessor=predecessor, predecessor_tool='migration',
+        before_start=before_start,
+    )
+    verify_network()
+    return result
+
+
+def read_applied_migrations(
+    operations: HostOperations, *, predecessor: HostOperations | None = None,
+) -> dict[str, str]:
+    if predecessor is None:
+        topology = record(operations.manifest['topology'], 'topology')
+        old = record(record(topology['services'], 'services')['web'], 'web')
+        receipt = {'reference': old['imageId'], 'sha': TARGET}
+    else:
+        receipt = record(operations.manifest['finalWorker'], 'successor worker')
+    values = json.loads(migration_image_command(
+        operations, receipt, 'node', ['-e', APPLIED_MIGRATION_SCRIPT],
+        predecessor=predecessor,
+    ))
+    result: dict[str, str] = {}
+    for migration in rows(values, 'applied migration'):
+        name = migration.get('name')
+        if (not isinstance(name, str) or name in result
+                or migration.get('finished') is not True
+                or migration.get('rolledBack') is not False):
+            raise ValueError('unfinished-or-ambiguous-migration')
+        result[name] = digest(migration.get('checksum'), 'applied SQL')
+    return result
+
+
+def stage_asset_directory(
+    operations: HostOperations, receipt: Mapping[str, object],
+) -> Path:
+    return operations.root / 'review-stage-assets' / source_sha(receipt['sha'])
+
+
+def establishment_command(
+    operations: HostOperations, stage: Mapping[str, object], *,
+    successor: bool,
+) -> tuple[list[str], tuple[str, ...]]:
+    receipt = record(stage['receipt'], 'stage image')
+    helper = (stage_asset_directory(operations, receipt) if successor else
+              operations.root / 'review-stage-assets' / cast(str, receipt['sha']))
+    source = bounded_bytes(helper / 'queue-lifecycle.cjs')
+    if hashlib.sha256(source).hexdigest() != stage['lifecycleSha256']:
+        raise ValueError('stage-matched-helper-changed')
+    if successor:
+        return ['--require', 'tsx/cjs', '-e', canonical_loader(source)], ()
+    return (['--require', 'tsx/cjs', '/review-stage/queue-lifecycle.cjs'],
+            (f'type=bind,src={helper},dst=/review-stage,readonly',))
 
 
 def child_transport(
@@ -226,7 +322,8 @@ def catalog_preparation(
 
 
 def collect_catalog(
-    operations: HostOperations, directory: Path,
+    operations: HostOperations, directory: Path, *,
+    predecessor: HostOperations | None = None,
 ) -> None:
     source = bounded_bytes(operations.root / 'scripts/deploy/queue-lifecycle.cjs')
     arguments = ['--require', 'tsx/cjs', '-e', canonical_loader(source)]
@@ -238,8 +335,9 @@ def collect_catalog(
             request['manifest'] = reports['snapshot']
         # These requests deliberately have no transition or role. Snapshot
         # reads queue flags without inspecting current application tables.
-        raw = operations.image_command(
-            receipt, 'node', arguments, content=json.dumps(request).encode(),
+        raw = migration_image_command(
+            operations, receipt, 'node', arguments,
+            content=json.dumps(request).encode(), predecessor=predecessor,
         )
         operations.private_file(directory / (command + '.raw'), raw)
         reports[command] = framed_report(raw)
@@ -327,6 +425,7 @@ def retained_verification(
 def verify_stage_schema(
     operations: HostOperations, stage: Mapping[str, object], *,
     retained: Mapping[str, object] | None = None,
+    predecessor: HostOperations | None = None,
 ) -> dict[str, object]:
     """Complete canonical verification before a receipt, or recheck catalogs."""
     operations.verify_tools()
@@ -346,15 +445,15 @@ def verify_stage_schema(
     atomic_json(directory / 'binding.json', binding)
     result: DiffResult | None = None
     if retained is None:
-        raw = operations.image_command(
-            record(stage['receipt'], 'stage image'), 'node',
-            ['-e', child_transport(PRISMA_DIFF)],
+        raw = migration_image_command(
+            operations, record(stage['receipt'], 'stage image'), 'node',
+            ['-e', child_transport(PRISMA_DIFF)], predecessor=predecessor,
         )
         operations.private_file(directory / 'prisma-result.json', raw)
         result = diff_result(raw)
         operations.private_file(directory / 'schema-drift.sql', result['stdout'])
         operations.private_file(directory / 'schema-drift.stderr', result['stderr'])
-    collect_catalog(operations, directory)
+    collect_catalog(operations, directory, predecessor=predecessor)
     guard = import_module('scripts.deploy.compatibility-review')
     if result is None:
         catalog = cast(Callable[[Path], dict[str, object]], guard.schema_catalog)
