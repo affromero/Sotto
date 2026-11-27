@@ -31,23 +31,28 @@ def verify_retained_network(
     This observes network membership only. Host, client, provider and queue
     quiescence require separate controls and repeated checks by the caller.
     """
-    _verify_network(previous, successor, writer_state='stopped')
+    _verify_network(previous, successor, web='stopped', workers='stopped')
 
 
 def verify_running_predecessor_network(
     previous: HostOperations, successor: HostOperations,
+    *, web_stopped: bool = False,
 ) -> None:
-    """Verify the exact fenced topology before predecessor queue work."""
-    _verify_network(previous, successor, writer_state='running')
+    """Verify the fenced worker topology, including after a confirmed web stop."""
+    _verify_network(
+        previous, successor, web='stopped' if web_stopped else 'running',
+        workers='running',
+    )
 
 
 def _verify_network(
     previous: HostOperations, successor: HostOperations, *,
-    writer_state: Literal['running', 'stopped'],
+    web: Literal['running', 'stopped'],
+    workers: Literal['running', 'stopped'],
 ) -> None:
-    expected_state = {'web': writer_state, 'workers': writer_state}
+    expected_state = {'web': web, 'workers': workers}
     if inspect_predecessor(previous, successor) != expected_state:
-        raise ValueError('both-predecessor-writers-must-be-' + writer_state)
+        raise ValueError(f'expected-predecessor-web-{web}-workers-{workers}')
     previous.verify_egress()
     topology = record(previous.manifest['topology'], 'review topology')
     services = record(topology['services'], 'review services')
@@ -106,9 +111,9 @@ def _verify_network(
     def running_endpoints() -> tuple[Endpoints, Endpoints]:
         review_members: Endpoints = {}
         egress_members: Endpoints = {}
-        if writer_state == 'stopped':
-            return review_members, egress_members
-        for role in ('web', 'workers'):
+        for role, state in expected_state.items():
+            if state == 'stopped':
+                continue
             binding = private_json(previous.attempt.directory
                                    / ('candidate-' + role + '.json'))
             identity = binding.get('id')
@@ -173,8 +178,7 @@ def _verify_network(
 
     check_membership()
     if inspect_predecessor(previous, successor) != expected_state:
-        raise ValueError('predecessor-' + ('stop' if writer_state == 'stopped'
-                                           else 'running') + '-evidence-changed')
+        raise ValueError('predecessor-writer-state-evidence-changed')
     if running_endpoints() != writer_endpoints:
         raise ValueError('predecessor-network-evidence-changed')
     previous.verify_egress()
