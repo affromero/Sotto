@@ -5,6 +5,7 @@ import {
   ReviewWorkloadError,
   REVIEW_WORKLOAD_TIMEOUT_MS,
   reviewWorkloadCheckpointSchema,
+  runReviewWorkloads,
 } from '../../../../../scripts/deploy/review/runtime/workload';
 import { audio, fixture } from '../../helpers/review-workload/fixture';
 
@@ -282,6 +283,76 @@ describe('fenced review workloads', () => {
     const original = structuredClone(f.mutations);
     expect(await f.run()).toEqual(result);
     expect(f.mutations).toEqual(original);
+  });
+
+  it('finishes a repaired existing class under a separate budget and keeps the missed deadline', async () => {
+    const f = passiveFixture();
+    f.control.wrongTtsModel = true;
+    await expect(f.run()).rejects.toMatchObject({ phase: 'generation' });
+    const prior = f.checkpoint()!;
+    const active = prior.profiles.find((row) => row.profileId === f.activeId)!;
+    expect(active.classId).toBe(`class-${f.activeId}`);
+    expect(active.reference).toBeNull();
+    prior.startedAt = Date.now() - REVIEW_WORKLOAD_TIMEOUT_MS - 1;
+    active.preparationStartedAt = prior.startedAt + 1_000;
+    f.replaceCheckpoint(prior);
+    const before = structuredClone(f.mutations);
+    f.control.wrongTtsModel = false;
+    f.control.teachingRequired = true;
+    await expect(f.run()).rejects.toMatchObject({ phase: 'input' });
+    const recoveryStart = Date.now() - 10_000;
+    const continuation = {
+      checkpoint: structuredClone(prior),
+      recovery: {
+        prior: structuredClone(prior),
+        expiresAt: recoveryStart + 900_000,
+        startedAt: recoveryStart,
+        readbackOnly: false,
+        episodeId: `episode-${f.activeId}`,
+      },
+    };
+    await expect(
+      runReviewWorkloads(
+        f.input,
+        {
+          ...continuation,
+          recovery: { ...continuation.recovery, episodeId: 'different-episode' },
+        },
+        f.boundary
+      )
+    ).rejects.toMatchObject({ phase: 'generation' });
+    expect(f.mutations).toEqual(before);
+    await expect(runReviewWorkloads(f.input, continuation, f.boundary)).resolves.toMatchObject({
+      syntheticAssessments: 1,
+    });
+    expect(f.mutations.slice(before.length).map((mutation) => mutation.path)).toEqual([
+      `/api/v1/classes/class-${f.activeId}/teaching-prelude/acknowledge`,
+      `/api/v1/classes/class-${f.activeId}/speaking/prompt-${f.activeId}-0`,
+    ]);
+    const result = f.checkpoint()!;
+    expect(result.startedAt).toBe(prior.startedAt);
+    expect(result.profiles.find((row) => row.profileId === f.activeId)).toMatchObject({
+      classId: active.classId,
+      operationId: active.operationId,
+      preparationStartedAt: active.preparationStartedAt,
+      verified: true,
+    });
+    const mutations = structuredClone(f.mutations);
+    await expect(
+      runReviewWorkloads(
+        f.input,
+        {
+          checkpoint: result,
+          recovery: {
+            ...continuation.recovery,
+            expiresAt: Date.now() + 120_000,
+            readbackOnly: true,
+          },
+        },
+        f.boundary
+      )
+    ).resolves.toMatchObject({ syntheticAssessments: 1 });
+    expect(f.mutations).toEqual(mutations);
   });
 
   it.each(['member', 'owner'] as const)(

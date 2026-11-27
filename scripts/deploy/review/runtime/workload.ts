@@ -20,6 +20,7 @@ export const REVIEW_WORKLOAD_TIMEOUT_MS = 3_300_000;
 const noNewWorkMs = 3_000_000;
 const classTimeoutMs = 1_200_000;
 const recordingTimeoutMs = 300_000;
+const recoveryBudgetMs = 900_000;
 const id = z.string().regex(/^[A-Za-z0-9_-]{1,100}$/);
 const text = z.string().min(1).max(1024);
 const digest = z.string().regex(/^[a-f0-9]{64}$/);
@@ -124,6 +125,16 @@ export const reviewWorkloadCheckpointSchema = z.strictObject({
   profiles: z.array(progressSchema).length(2),
 });
 export type ReviewWorkloadCheckpoint = z.infer<typeof reviewWorkloadCheckpointSchema>;
+const recoveryCheckpointSchema = z.strictObject({
+  checkpoint: reviewWorkloadCheckpointSchema,
+  recovery: z.strictObject({
+    expiresAt: z.number().int().positive(),
+    startedAt: z.number().int().positive(),
+    readbackOnly: z.boolean(),
+    prior: reviewWorkloadCheckpointSchema,
+    episodeId: id,
+  }),
+});
 type Profile = ReviewWorkloadInput['profiles'][number];
 type Progress = ReviewWorkloadCheckpoint['profiles'][number];
 
@@ -245,14 +256,18 @@ export async function runReviewWorkloads(
         })
       )
       .digest('hex');
-    const checkpoint = reviewWorkloadCheckpointSchema.parse(
-      retained ?? {
-        version: 1,
-        inputHash,
-        startedAt: Date.now(),
-        profiles: input.profiles.map((profile) => initialProgress(profile.id)),
-      }
-    );
+    const continuation = recoveryCheckpointSchema.safeParse(retained);
+    const recovery = continuation.success ? continuation.data.recovery : null;
+    const checkpoint = continuation.success
+      ? continuation.data.checkpoint
+      : reviewWorkloadCheckpointSchema.parse(
+          retained ?? {
+            version: 1,
+            inputHash,
+            startedAt: Date.now(),
+            profiles: input.profiles.map((profile) => initialProgress(profile.id)),
+          }
+        );
     if (
       checkpoint.inputHash !== inputHash ||
       checkpoint.startedAt > Date.now() + 5000 ||
@@ -273,7 +288,48 @@ export async function runReviewWorkloads(
       const ids = checkpoint.profiles.map((row) => row[name]).filter((item) => item !== null);
       if (new Set(ids).size !== ids.length) fail();
     }
-    const remaining = checkpoint.startedAt + REVIEW_WORKLOAD_TIMEOUT_MS - Date.now();
+    if (recovery) {
+      phase = 'recovery_admission';
+      const fixtures = input.profiles.filter((profile) => profile.fixture !== null);
+      if (fixtures.length !== 1) fail();
+      const before = recovery.prior.profiles.find((row) => row.profileId === fixtures[0].id);
+      const active = checkpoint.profiles.find((row) => row.profileId === fixtures[0].id);
+      if (
+        !before ||
+        !active ||
+        !before.courseId ||
+        !before.classId ||
+        !before.operationId ||
+        before.reference ||
+        before.uploadIntent ||
+        before.recordingId ||
+        before.verified ||
+        before.cancelIntent ||
+        before.cancelled ||
+        active.cancelIntent ||
+        active.cancelled ||
+        active.courseId !== before.courseId ||
+        active.classId !== before.classId ||
+        active.operationId !== before.operationId ||
+        active.preparationStartedAt !== before.preparationStartedAt ||
+        before.preparationStartedAt === null ||
+        Date.now() < before.preparationStartedAt + classTimeoutMs ||
+        recovery.prior.startedAt !== checkpoint.startedAt ||
+        recovery.prior.inputHash !== inputHash ||
+        (active.uploadStartedAt !== null && active.uploadStartedAt < recovery.startedAt) ||
+        recovery.startedAt > Date.now() ||
+        (!recovery.readbackOnly && recovery.expiresAt !== recovery.startedAt + recoveryBudgetMs) ||
+        (recovery.readbackOnly && (!active.verified || !active.recordingId))
+      )
+        fail();
+    }
+    const deadline = recovery?.expiresAt ?? checkpoint.startedAt + REVIEW_WORKLOAD_TIMEOUT_MS;
+    const newWorkDeadline = recovery
+      ? recovery.readbackOnly
+        ? 0
+        : deadline - recordingTimeoutMs
+      : checkpoint.startedAt + noNewWorkMs;
+    const remaining = deadline - Date.now();
     if (remaining <= 0) fail();
     const signal = AbortSignal.any([boundary.signal, AbortSignal.timeout(remaining)]);
     const permittedAudio = new Set<string>();
@@ -309,7 +365,7 @@ export async function runReviewWorkloads(
     };
     const requireNewWorkTime = () => {
       signal.throwIfAborted();
-      if (Date.now() >= checkpoint.startedAt + noNewWorkMs) fail();
+      if (Date.now() >= newWorkDeadline) fail();
     };
     const mutate = async (path: string, body: unknown, expectedStatus: number) => {
       await boundary.assertFence();
@@ -515,7 +571,9 @@ export async function runReviewWorkloads(
       let acknowledgedTeaching = false;
       while (!generated) {
         const current = await activity();
+        if (recovery && current.status !== 'COMPLETED') fail();
         if (
+          !recovery &&
           !row.reference &&
           (Date.now() >= row.preparationStartedAt! + classTimeoutMs ||
             Date.now() >= checkpoint.startedAt + noNewWorkMs)
@@ -578,7 +636,9 @@ export async function runReviewWorkloads(
         const speaking = candidate.sections.find((section) => section.skill === 'SPEAKING')!;
         if (!listening.episode || speaking.prompts.some((prompt) => !prompt.referenceTtsUrl))
           fail();
+        if (recovery && listening.episode.id !== recovery.episodeId) fail();
         if (listening.episode.status !== 'READY' || !listening.episode.audioUrl) {
+          if (recovery) fail();
           await delay(5000, undefined, { signal });
           continue;
         }
@@ -620,6 +680,7 @@ export async function runReviewWorkloads(
         admit(preludePath);
         const prelude = classPreludeResponseSchema.parse(await request(preludePath));
         if (prelude.kind === 'GENERATING') {
+          if (recovery) fail();
           await delay(5000, undefined, { signal });
           continue;
         }

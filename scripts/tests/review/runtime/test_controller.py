@@ -58,6 +58,7 @@ class HostBoundary:
     """Model only the external host's durable state and runtime responses."""
 
     def __init__(self, attempt: Attempt, lock: DeploymentLock) -> None:
+        self.root = Path.cwd()
         self.attempt = attempt
         self.lock = lock
         self.manifest = attempt.manifest()
