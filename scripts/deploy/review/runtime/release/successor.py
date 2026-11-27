@@ -34,6 +34,7 @@ from scripts.deploy.review.runtime.policy import (
 from scripts.deploy.review.runtime.release import (
     retained_predecessor_startup,
     verify_completed_records,
+    verify_retention_begin,
     verify_startup_unit,
 )
 from scripts.deploy.review.runtime.release.fixture import (
@@ -160,6 +161,7 @@ def preflight_successor(
         previous.manifest, operations.manifest,
         observed=inspect_successor_worker_migrations(operations),
     )
+    verify_retention_begin(operations)
     operations.lock.validate()
     return previous, initial, final
 

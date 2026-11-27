@@ -28,26 +28,29 @@ def docker(*arguments):
     return subprocess.check_output(["docker", *arguments], text=True).strip()
 
 
-def update_record(phase, environment):
+def record_identity(environment):
     stack = environment["SOTTO_STACK"]
     attempt_key = environment["RETENTION_ATTEMPT_KEY"]
     if not re.fullmatch(r"[a-z0-9][a-z0-9_-]*", stack) or not re.fullmatch(r"[a-zA-Z0-9_-]+", attempt_key):
         raise ValueError("Invalid retention record identity")
-    if phase == "backups-success":
-        retain_backups(environment)
-        return
+    return stack, attempt_key
+
+
+def record_paths(environment):
+    stack, attempt_key = record_identity(environment)
     root = pathlib.Path(environment["PRODUCTION_IMAGE_RETENTION_DIR"])
-    root.mkdir(parents=True, exist_ok=True, mode=0o700)
-    stable = root / (stack + ".json")
-    attempt = root / (stack + "-attempt-" + attempt_key + ".json")
-    if phase == "success":
-        successful = json.loads(attempt.read_text())["successful_images"]
-        validate_images(successful)
-        atomic_json(stable, {"protected_images": sorted(set(successful))})
-        attempt.unlink()
-        return
-    if phase != "begin":
-        raise ValueError("Expected begin or success")
+    return root / (stack + ".json"), root / (stack + "-attempt-" + attempt_key + ".json")
+
+
+def plan_begin(environment, *, review_writer_ids=()):
+    """Discover the next record without changing any protection."""
+    stable, _ = record_paths(environment)
+    stack = environment["SOTTO_STACK"]
+    if review_writer_ids and (stack != "sotto-review" or len(set(review_writer_ids)) != 2
+                              or len(review_writer_ids) != 2
+                              or any(not re.fullmatch(r"[a-f0-9]{64}", identity)
+                                     for identity in review_writer_ids)):
+        raise ValueError("Expected the exact two admitted App Review writer IDs")
     protected = set(json.loads(stable.read_text())["protected_images"]) if stable.exists() else set()
     successful = set()
     for key in ("SOTTO_WEB_IMAGE_REF", "SOTTO_WORKERS_IMAGE_REF"):
@@ -56,11 +59,40 @@ def update_record(phase, environment):
         containers = docker("ps", "-aq", "--filter", "label=com.docker.compose.project=" + project).split()
         for container in containers:
             successful.add(docker("inspect", "--format", "{{.Image}}", container))
+    for identity in review_writer_ids:
+        actual, image = docker("inspect", "--type", "container", "--format",
+                               "{{.Id}} {{.Image}}", identity).split()
+        if actual != identity:
+            raise ValueError("App Review writer identity changed")
+        successful.add(image)
     protected.update(successful)
     validate_images(protected)
+    return {"protected_images": sorted(protected), "successful_images": sorted(successful)}
+
+
+def update_record(phase, environment, *, review_writer_ids=(), expected_begin=None):
+    if phase != "begin" and (review_writer_ids or expected_begin is not None):
+        raise ValueError("App Review writer admission is only valid for begin")
+    if phase == "backups-success":
+        record_identity(environment)
+        retain_backups(environment)
+        return
+    stable, attempt = record_paths(environment)
+    stable.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    if phase == "success":
+        successful = json.loads(attempt.read_text())["successful_images"]
+        validate_images(successful)
+        atomic_json(stable, {"protected_images": sorted(set(successful))})
+        attempt.unlink()
+        return
+    if phase != "begin":
+        raise ValueError("Expected begin or success")
+    plan = plan_begin(environment, review_writer_ids=review_writer_ids)
+    if expected_begin is not None and plan != expected_begin:
+        raise ValueError("App Review retention discovery changed before writing")
     if attempt.exists():
         raise ValueError("Deployment attempt record already exists")
-    atomic_json(attempt, {"protected_images": sorted(protected), "successful_images": sorted(successful)})
+    atomic_json(attempt, plan)
 
 
 def validate_images(images):

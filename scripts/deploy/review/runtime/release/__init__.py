@@ -274,11 +274,33 @@ def retention_context(
     }, identities
 
 
+def verify_retention_begin(
+    operations: HostOperations,
+) -> tuple[dict[str, str], tuple[str, ...], dict[str, object]]:
+    """Check the canonical discovery against every admitted rollback image."""
+    from scripts.deploy.review.runtime import services
+    from scripts.deploy.review.runtime.inventory.predecessor import bind_predecessor
+
+    operations.lock.validate()
+    environment, identities = retention_context(operations)
+    writers: tuple[str, ...] = ()
+    if 'predecessor' in operations.manifest:
+        previous = bind_predecessor(operations)
+        writers = tuple(services.verify_candidate(previous, role)
+                        for role in ('web', 'workers'))
+    retention = import_module('scripts.deploy.production-retention')
+    plan: dict[str, object] = retention.plan_begin(environment, review_writer_ids=writers)
+    if plan['successful_images'] != sorted(identities):
+        raise ValueError('canonical-review-protection-plan-differs-from-admission')
+    operations.lock.validate()
+    return environment, writers, plan
+
+
 def before_fence(operations: HostOperations) -> None:
     from scripts.deploy.review.runtime.operations import RETENTION
 
     operations.verify_images()
-    environment, identities = retention_context(operations)
+    environment, writers, plan = verify_retention_begin(operations)
     canonical = RETENTION / (
         PROJECT + '-attempt-' + operations.attempt.directory.name + '.json'
     )
@@ -287,14 +309,15 @@ def before_fence(operations: HostOperations) -> None:
     if intent.exists():
         retained = private_json(intent)
         expected = retained['record']
+        if plan != expected:
+            raise ValueError('retention-begin-recovery-state-changed')
     else:
         prior = private_json(stable) if stable.exists() else None
         previous = record(prior, 'previous stable')['protected_images'] \
             if prior is not None else []
         if not isinstance(previous, list):
             raise ValueError('previous-review-image-protection-invalid')
-        expected = {'protected_images': sorted(identities | set(previous)),
-                    'successful_images': sorted(identities)}
+        expected = plan
         if canonical.exists() or canonical.is_symlink():
             raise ValueError('unknown-existing-review-retention-attempt')
         atomic_json(intent, {'record': expected, 'previousStable': prior})
@@ -303,10 +326,9 @@ def before_fence(operations: HostOperations) -> None:
         prior = private_json(stable) if stable.exists() else None
         if prior != retained['previousStable']:
             raise ValueError('retention-begin-recovery-state-changed')
-        update = cast(Callable[[str, Mapping[str, str]], None], import_module(
-            'scripts.deploy.production-retention',
-        ).update_record)
-        update('begin', environment)
+        import_module('scripts.deploy.production-retention').update_record(
+            'begin', environment, review_writer_ids=writers, expected_begin=expected,
+        )
         sync_directory(RETENTION)
     if private_json(canonical) != expected:
         raise ValueError('canonical-review-protection-not-established')

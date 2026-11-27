@@ -54,6 +54,48 @@ class RetentionTests(unittest.TestCase):
         self.assertEqual(json.loads((self.root / "sotto.json").read_text()), stable)
         self.assertFalse((self.root / "sotto-attempt-test.json").exists())
 
+    def test_review_plan_preserves_two_exact_writers_outside_standard_projects(self):
+        web_writer, worker_writer = "1" * 64, "2" * 64
+        writer_images = {web_writer: "sha256:" + "e" * 64, worker_writer: "sha256:" + "f" * 64}
+        environment = {**self.environment, "SOTTO_STACK": "sotto-review"}
+        old = {"protected_images": sorted(writer_images.values())}
+        stable = self.root / "sotto-review.json"
+        stable.write_text(json.dumps(old))
+
+        def docker(*args):
+            if args[:2] == ("image", "inspect"):
+                return self.images[args[-1]]
+            if args[:2] == ("ps", "-aq"):
+                return ""
+            identity = args[-1]
+            return f"{identity} {writer_images[identity]}"
+
+        ids = (web_writer, worker_writer)
+        with patch.object(retention, "docker", side_effect=docker):
+            plan = retention.plan_begin(environment, review_writer_ids=ids)
+            self.assertEqual(set(plan["successful_images"]),
+                             {self.images["web"], self.images["workers"], *writer_images.values()})
+            self.assertEqual(list(self.root.iterdir()), [stable])
+            with self.assertRaisesRegex(ValueError, "discovery changed"):
+                retention.update_record("begin", environment, expected_begin=plan)
+            self.assertEqual(list(self.root.iterdir()), [stable])
+            retention.update_record("begin", environment, review_writer_ids=ids,
+                                    expected_begin=plan)
+        attempt = self.root / "sotto-review-attempt-test.json"
+        self.assertEqual(json.loads(attempt.read_text()), plan)
+        self.assertEqual(json.loads(stable.read_text()), old)
+        retention.update_record("success", environment)
+        self.assertEqual(json.loads(stable.read_text()), {"protected_images": plan["successful_images"]})
+
+    def test_review_plan_refuses_named_aliased_or_single_writer(self):
+        review = {**self.environment, "SOTTO_STACK": "sotto-review"}
+        for ids in (("review-old-web", "2" * 64), ("1" * 64, "1" * 64), ("1" * 64,)):
+            with self.subTest(ids=ids), self.assertRaisesRegex(ValueError, "exact two"):
+                retention.plan_begin(review, review_writer_ids=ids)
+        with self.assertRaisesRegex(ValueError, "exact two"):
+            retention.plan_begin(self.environment, review_writer_ids=("1" * 64, "2" * 64))
+        self.assertEqual(list(self.root.iterdir()), [])
+
     def test_record_names_cannot_escape_the_retention_directory(self):
         with self.assertRaises(ValueError):
             retention.update_record("begin", {**self.environment, "SOTTO_STACK": "../other"})
@@ -91,6 +133,17 @@ class RetentionTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             retention.update_record('backups-success', environment)
         self.assertEqual(list(self.root.iterdir()), [])
+
+    def test_completed_backup_does_not_require_an_image_retention_directory(self):
+        sha = 'a' * 40
+        path = self.root / (sha + '-test.dump')
+        path.write_bytes(b'verified backup')
+        pathlib.Path(str(path) + '.sha256').write_text('b' * 64 + '  ' + path.name)
+        environment = {**self.environment, 'SOTTO_BACKUP_DIR': str(self.root), 'SOTTO_RELEASE_SHA': sha}
+        del environment['PRODUCTION_IMAGE_RETENTION_DIR']
+        retention.update_record('backups-success', environment)
+        proof = json.loads(pathlib.Path(str(path) + '.success.json').read_text())
+        self.assertEqual(proof['backup'], path.name)
 
 
 if __name__ == "__main__":
