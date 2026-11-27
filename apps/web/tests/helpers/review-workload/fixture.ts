@@ -70,6 +70,7 @@ export function fixture(options: { pendingGenerationPolls?: number } = {}) {
     course: string | null;
     operation: string | null;
     recording: string | null;
+    teachingAcknowledged: boolean;
     status: 'COMPLETED' | 'RUNNING' | 'CANCELLED';
   };
   const remote = new Map(
@@ -81,6 +82,7 @@ export function fixture(options: { pendingGenerationPolls?: number } = {}) {
         course: null,
         operation: null,
         recording: null,
+        teachingAcknowledged: false,
         status: 'COMPLETED',
       } as Remote,
     ])
@@ -90,6 +92,9 @@ export function fixture(options: { pendingGenerationPolls?: number } = {}) {
   );
   const mutations: { path: string; profile: string; body: unknown }[] = [];
   const requests: string[] = [];
+  const revision = 'a1'.repeat(32);
+  const blockedRevision = 'b2'.repeat(32);
+  const teachingReceipt = '10000000-0000-4000-8000-000000000001';
   let selected = '';
   let durable: ReviewWorkloadCheckpoint | null = null;
   const control = {
@@ -115,6 +120,11 @@ export function fixture(options: { pendingGenerationPolls?: number } = {}) {
     exemptSpeech: false,
     missingSkill: false,
     missingAudio: false,
+    missingMaterialRevision: false,
+    teachingRequired: false,
+    loseTeachingReply: false,
+    omitTeachingWrite: false,
+    scopedReference: false,
     foreignAudio: false,
     redirectedAudio: false,
     failedRecording: false,
@@ -237,7 +247,11 @@ export function fixture(options: { pendingGenerationPolls?: number } = {}) {
     const course = `/api/v1/courses/${state.course}`;
     const cls = `class-${selected}`;
     const prompt = `prompt-${selected}-0`;
-    const reference = `/api/v1/storage/speaking-ref/${prompt}/fixture.wav`;
+    const referenceFor = (id: string) =>
+      control.scopedReference
+        ? `/api/v1/classes/${cls}/speaking/${id}/reference/audio`
+        : `/api/v1/storage/speaking-ref/${id}/fixture.wav`;
+    const reference = referenceFor(prompt);
     if (path === `${course}/next-class?background=1`) {
       assert.equal(progress?.preparationIntent, true);
       assert.equal(progress?.courseId, state.course);
@@ -287,6 +301,11 @@ export function fixture(options: { pendingGenerationPolls?: number } = {}) {
         id: cls,
         courseId: state.course,
         attempt: 1,
+        taskMaterialRevision: control.missingMaterialRevision
+          ? null
+          : control.teachingRequired && !state.teachingAcknowledged
+            ? blockedRevision
+            : revision,
         status: 'AVAILABLE',
         lesson: { title: 'A newly generated lesson', level: 'A1' },
         skillRequirements: requirements,
@@ -311,7 +330,7 @@ export function fixture(options: { pendingGenerationPolls?: number } = {}) {
                       ? null
                       : control.foreignAudio
                         ? 'https://outside.example/clip.wav'
-                        : `/api/v1/storage/speaking-ref/prompt-${selected}-${i}/fixture.wav`,
+                        : referenceFor(`prompt-${selected}-${i}`),
                   }))
                 : [],
             writingPrompts:
@@ -331,6 +350,42 @@ export function fixture(options: { pendingGenerationPolls?: number } = {}) {
                 : null,
           })),
       });
+    }
+    if (path === `/api/v1/classes/${cls}/teaching-prelude`) {
+      if (!control.teachingRequired) return reply({ kind: 'NOT_REQUIRED' });
+      return reply({
+        kind: 'BASE',
+        nativeLang: profile.fixture.native,
+        targetLang: profile.fixture.target,
+        receiptId: teachingReceipt,
+        acknowledged: state.teachingAcknowledged,
+        teaching: {
+          version: 1,
+          title: 'Review the first lesson',
+          explanation: 'Read the greeting examples before trying an independent exercise.',
+          workedExamples: [
+            { prompt: 'Greet a friend', answer: 'Hello', explanation: 'A simple greeting.' },
+            {
+              prompt: 'Greet a neighbor',
+              answer: 'Good morning',
+              explanation: 'A morning greeting.',
+            },
+          ],
+          commonMistake: {
+            incorrect: 'Good night',
+            correction: 'Good morning',
+            explanation: 'Use the morning form.',
+          },
+        },
+      });
+    }
+    if (path === `/api/v1/classes/${cls}/teaching-prelude/acknowledge`) {
+      assert.equal(method, 'POST');
+      assert.deepEqual(body, { kind: 'BASE', receiptId: teachingReceipt });
+      state.teachingAcknowledged = !control.omitTeachingWrite;
+      mutations.push({ path, profile: selected, body });
+      if (control.loseTeachingReply) throw new Error('teaching acknowledgment reply lost');
+      return reply({ kind: 'BASE', receiptId: teachingReceipt, acknowledged: true });
     }
     if (path === `/api/v1/episodes/episode-${selected}`)
       return reply({
@@ -352,6 +407,14 @@ export function fixture(options: { pendingGenerationPolls?: number } = {}) {
       assert.equal(progress?.uploadIntent, true);
       assert.equal(progress?.reference?.promptId, prompt);
       assert(body instanceof FormData);
+      assert.deepEqual([...body.keys()].sort(), [
+        'audio',
+        'expectedAttempt',
+        'taskMaterialRevision',
+      ]);
+      assert.deepEqual(body.getAll('expectedAttempt'), ['1']);
+      assert.deepEqual(body.getAll('taskMaterialRevision'), [revision]);
+      assert(!control.teachingRequired || state.teachingAcknowledged);
       const file = (body as FormData).get('audio') as File;
       assert.deepEqual(Buffer.from(await file.arrayBuffer()), control.audioBytes);
       assert(file.name.includes('synthetic-reference'));

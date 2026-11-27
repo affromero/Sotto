@@ -5,7 +5,11 @@ import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { isDeepStrictEqual } from 'node:util';
 import { AccessClient } from 'thesidedoor-core/access/browser';
-import { skillRequirementsSchema } from '@sotto/shared';
+import {
+  classPreludeAcknowledgmentResponseSchema,
+  classPreludeResponseSchema,
+  skillRequirementsSchema,
+} from '@sotto/shared';
 import { z } from 'zod';
 import { parseAgentModelId } from '@/lib/agent-models/id';
 import { detectAudioFormat, isRecognizedAudio } from '@/lib/audio-format';
@@ -189,6 +193,7 @@ const classSchema = z.object({
   id,
   courseId: id,
   attempt: z.literal(1),
+  taskMaterialRevision: digest,
   status: z.enum(['AVAILABLE', 'IN_PROGRESS']),
   skillRequirements: skillRequirementsSchema,
   lesson: z.object({ title: text, level: z.literal('A1') }),
@@ -507,6 +512,7 @@ export async function runReviewWorkloads(
       };
       phase = 'generation';
       let generated: z.infer<typeof classSchema> | null = null;
+      let acknowledgedTeaching = false;
       while (!generated) {
         const current = await activity();
         if (
@@ -610,12 +616,51 @@ export async function runReviewWorkloads(
           owned[0].ttsModel !== profile.selection.ttsModel
         )
           fail();
+        const preludePath = `${classPath}/teaching-prelude`;
+        admit(preludePath);
+        const prelude = classPreludeResponseSchema.parse(await request(preludePath));
+        if (prelude.kind === 'GENERATING') {
+          await delay(5000, undefined, { signal });
+          continue;
+        }
+        if (prelude.kind !== 'NOT_REQUIRED') {
+          if (
+            prelude.kind !== 'BASE' ||
+            prelude.nativeLang !== fixture.native ||
+            prelude.targetLang !== fixture.target ||
+            !prelude.receiptId
+          )
+            fail();
+          if (!prelude.acknowledged) {
+            phase = 'teaching_acknowledgment';
+            if (acknowledgedTeaching || row.reference || row.uploadIntent) fail();
+            await newMutation(profile, row);
+            const ackPath = `${preludePath}/acknowledge`;
+            admit(ackPath, ['POST']);
+            const acknowledgment = classPreludeAcknowledgmentResponseSchema.parse(
+              await request(ackPath, { kind: prelude.kind, receiptId: prelude.receiptId })
+            );
+            if (
+              acknowledgment.kind !== prelude.kind ||
+              acknowledgment.receiptId !== prelude.receiptId
+            )
+              fail();
+            acknowledgedTeaching = true;
+            phase = 'generation';
+            continue;
+          }
+        }
         generated = candidate;
       }
       phase = 'reference_audio';
       const prompt = generated.sections.find((section) => section.skill === 'SPEAKING')!.prompts[0];
       const reference = prompt.referenceTtsUrl!;
-      if (!reference.startsWith('/api/v1/storage/') || reference.includes('?')) fail();
+      const scopedReference = `/api/v1/classes/${row.classId}/speaking/${prompt.id}/reference/audio`;
+      if (
+        reference !== scopedReference &&
+        (!reference.startsWith('/api/v1/storage/') || reference.includes('?'))
+      )
+        fail();
       permittedAudio.add(reference);
       await boundary.assertFence();
       const response = await api.fetch(reference);
@@ -653,6 +698,8 @@ export async function runReviewWorkloads(
         row.uploadStartedAt = Date.now();
         await persist();
         const form = new FormData();
+        form.set('expectedAttempt', String(generated.attempt));
+        form.set('taskMaterialRevision', generated.taskMaterialRevision);
         form.set(
           'audio',
           new Blob([Uint8Array.from(bytes)], { type: format.mime }),
