@@ -20,8 +20,12 @@ from scripts.deploy.review.runtime.inventory.predecessor import (
     capture_predecessor,
     prepare_predecessor_stop,
 )
+from scripts.deploy.review.runtime.inventory.storage import (
+    retained_candidate_mounts, verify_running_completed_storage,
+)
+from scripts.deploy.review.runtime.operations import HostOperations
 from scripts.deploy.review.runtime.policy import helper_arguments
-from scripts.deploy.review.runtime.release.migrations import APPLIED_MIGRATION_SCRIPT
+from scripts.deploy.review.runtime.release.migrations import applied_migration_script
 from scripts.deploy.review.state import Attempt, atomic_json, checksum, private_json
 from scripts.deploy.review.topology import NETWORK, PROJECT, exact_mounts
 from scripts.tests.review.runtime import admitted_runtime_fixture
@@ -82,7 +86,10 @@ class ReviewNetworkFixture(unittest.TestCase):
         ]
         actual_docker = self.previous.docker
         def docker(*args):
-            if args == ('network', 'inspect', review_id, egress_id):
+            if args in (
+                ('network', 'inspect', review_id, egress_id),
+                ('network', 'inspect', NETWORK, PROJECT + '_egress'),
+            ):
                 return json.dumps(self.networks).encode()
             return actual_docker(*args)
         self.enterContext(patch.object(self.previous, 'docker', side_effect=docker))
@@ -182,7 +189,7 @@ class RetainedNetworkTests(ReviewNetworkFixture):
         with patch.object(self.successor, 'capacity'):
             with self.assertRaisesRegex(ValueError, 'successor-schema-write-not-admitted'):
                 self.successor.tool_command(image, 'npx', MIGRATE_DEPLOY, **options)
-            query = ['-e', APPLIED_MIGRATION_SCRIPT]
+            query = ['-e', applied_migration_script(require_idle=True)]
             query = helper_arguments(self.successor.manifest, 'node', query)
             self.assertEqual(
                 self.successor.tool_command(image, 'node', query, **options)[-len(query):],
@@ -288,6 +295,39 @@ class RunningPredecessorNetworkTests(ReviewNetworkFixture):
 
     def test_exact_running_topology_is_accepted(self) -> None:
         verify_running_predecessor_network(self.previous, self.successor)
+
+    def test_preflight_verifies_running_candidates_without_the_original_web_or_fence(self) -> None:
+        marker = self.fixture.fixture.host / 'unresolved.json'
+        marker.unlink()
+        topology = self.previous.attempt.manifest()['topology']
+        old_web = topology['services']['web']['id']
+        self.assertNotIn(old_web, self.fixture.storage.objects)
+        directory = self.previous.attempt.directory
+        original = private_json(directory / 'original-mount-objects.json')
+        handover = private_json(directory / 'auth-handover.json')
+        candidates = {role: private_json(directory / f'candidate-{role}.json')
+                      for role in ('web', 'workers')}
+        _, mapped = retained_candidate_mounts(topology, original, candidates, handover)
+        proof = {'originalSha256': checksum(original), 'mappedSha256': checksum(mapped),
+                 'candidatesSha256': checksum(candidates)}
+        attempt = Attempt.create(marker.parent, 'unfenced-check', {
+            'predecessorStorage': proof,
+        }, 'f' * 64)
+        operations = HostOperations(attempt, self.successor.lock)
+        with (
+            patch.object(operations, 'command', side_effect=self.successor.command),
+            patch.object(operations, 'docker', side_effect=self.previous.docker),
+        ):
+            verify_running_completed_storage(self.previous, operations)
+            self.networks[0]['Id'] = 'recreated'
+            with self.assertRaisesRegex(ValueError, 'guarded-review-network-identity-changed'):
+                verify_running_completed_storage(self.previous, operations)
+            self.networks[0]['Id'] = topology['network']['id']
+            self.networks[0]['Containers']['unexpected'] = {}
+            with self.assertRaisesRegex(ValueError, 'successor-network-membership-changed'):
+                verify_running_completed_storage(self.previous, operations)
+        self.assertFalse(marker.exists())
+        self.assertEqual(self.fixture.fixture.started, [])
 
     def test_queue_drain_after_confirmed_web_stop_requires_only_worker(self) -> None:
         with self.assertRaisesRegex(ValueError, 'expected-predecessor-web-stopped'):

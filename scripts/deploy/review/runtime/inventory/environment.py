@@ -8,7 +8,7 @@ import os
 import re
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal, cast
 
 from scripts.deploy.images.metadata import digest, record
 from scripts.deploy.review.build_observer import bounded_bytes
@@ -22,7 +22,9 @@ from scripts.deploy.review.topology import (
     AUTH_HOME,
     PRESERVED_ENVIRONMENT,
     PUBLIC_ENVIRONMENT,
+    classified_environment,
     environment,
+    rows,
 )
 
 if TYPE_CHECKING:
@@ -51,6 +53,14 @@ def retained_inventory_network(
     return 'container:' + digest(redis['id'], 'predecessor Redis identity')
 
 
+def retained_inventory_phase(operations: HostOperations) -> RetainedPhase:
+    phase = operations.attempt.state()['phase']
+    if phase not in ('FENCED', 'QUIESCENT', 'BACKED_UP', 'SQL_STARTED',
+                     'FINAL_SCHEMA_VERIFIED'):
+        raise ValueError('retained-inventory-phase-invalid')
+    return phase
+
+
 def admit_predecessor_helper_environment(
     previous: HostOperations, successor: HostOperations,
     receipt: Mapping[str, object], entrypoint: str, *,
@@ -66,8 +76,9 @@ def admit_predecessor_helper_environment(
             network=network, mounts=mounts, content=content,
         )
     elif operation == 'retained-inventory':
+        phase = retained_inventory_phase(successor)
         if (entrypoint != 'node' or list(mounts) != [review_code_mount(successor)]
-                or network != retained_inventory_network(previous, successor)
+                or network != retained_inventory_network(previous, successor, phase=phase)
                 or receipt != successor.attempt.manifest()['finalWorker']):
             raise ValueError('retained-inventory-helper-not-admitted')
     elif operation == 'pause':
@@ -98,9 +109,22 @@ def admit_migration_tool(
     ):
         raise ValueError('successor-migration-helper-not-admitted')
     if entrypoint == 'npx':
-        if (phase != 'SQL_STARTED' or state['sqlMayHaveStarted'] is not True
-                or state['status'] != 'active'
-                or mounts or tuple(arguments) != MIGRATE_DEPLOY or content is not None):
+        accepted = (phase == 'SQL_STARTED' and state['sqlMayHaveStarted'] is True
+                    and tuple(arguments) == MIGRATE_DEPLOY and content is None)
+        if phase == 'FINAL_SCHEMA_VERIFIED':
+            from scripts.deploy.review.runtime.release.fixture import (
+                admitted_review_seed, review_seed_command, review_seed_intent, review_seed_payload,
+            )
+
+            seed = admitted_review_seed(successor)
+            directory = successor.attempt.directory
+            accepted = (seed is not None and tuple(arguments) == review_seed_command(seed)
+                        and content == review_seed_payload(seed)
+                        and not (directory / 'review-seed-verified.json').exists()
+                        and not (directory / 'review-seed-verified.json').is_symlink()
+                        and private_json(directory / 'review-seed-intent.json')
+                        == review_seed_intent(successor, seed))
+        if not accepted or state['status'] != 'active' or mounts:
             raise ValueError('successor-schema-write-not-admitted')
     elif entrypoint == 'node':
         admit_migration_node(
@@ -134,8 +158,8 @@ def admit_migration_node(
 ) -> None:
     from scripts.deploy.review.runtime.policy import helper_arguments
     from scripts.deploy.review.runtime.release.migrations import (
-        APPLIED_MIGRATION_SCRIPT,
         PRISMA_DIFF,
+        applied_migration_script,
         canonical_loader,
         child_transport,
         stage_asset_directory,
@@ -145,8 +169,29 @@ def admit_migration_node(
     def matches(expected: Sequence[str]) -> bool:
         return list(arguments) == helper_arguments(operations.manifest, 'node', expected)
 
-    if not mounts and content is None and matches(['-e', APPLIED_MIGRATION_SCRIPT]):
+    if (not mounts and content is None
+            and matches(['-e', applied_migration_script(require_idle=True)])):
         return
+    if not mounts and matches(['-e', services.PRESERVATION_OBSERVER]):
+        from scripts.deploy.review.runtime.release.successor import successor_preservation_input
+
+        expected, _ = successor_preservation_input(operations)
+        if content == expected:
+            return
+        if phase == 'FINAL_SCHEMA_VERIFIED':
+            from scripts.deploy.review.runtime.release.fixture import (
+                admitted_review_seed, review_seed_intent, review_seed_projection,
+            )
+
+            seed = admitted_review_seed(operations)
+            if seed is not None:
+                if content == review_seed_projection(expected, seed, after=False):
+                    return
+                if (content == review_seed_projection(expected, seed, after=True)
+                        and private_json(operations.attempt.directory / 'review-seed-intent.json')
+                        == review_seed_intent(operations, seed)):
+                    return
+        raise ValueError('successor-preservation-projection-not-admitted')
     if phase == 'BACKED_UP':
         raise ValueError('successor-schema-verifier-before-sql')
     if mounts:
@@ -186,6 +231,52 @@ def _private_bytes(path: Path) -> bytes:
     return value
 
 
+def stage_runtime_environment(operations: HostOperations) -> Path:
+    if 'predecessor' in operations.manifest:
+        from scripts.deploy.review.runtime.release.successor import read_successor_compose
+
+        document = read_successor_compose(operations)
+        services = record(document['services'], 'candidate services')
+        web = record(services['web'], 'candidate web')
+        sealed = record(web['environment'], 'candidate environment')
+        if any(not isinstance(value, str) for value in sealed.values()):
+            raise ValueError('invalid-candidate-environment-value')
+        values = cast(dict[str, str], sealed)
+    else:
+        topology = record(operations.manifest['topology'], 'topology')
+        web = record(record(topology['services'], 'services')['web'], 'web')
+        original = operations.inspect(cast(str, web['id']))[0]
+        if original.get('Image') != web['imageId']:
+            raise ValueError('historical-runtime-image-changed')
+        values = environment(original)
+        if checksum(values) != web['environmentHash']:
+            raise ValueError('historical-environment-changed')
+    operations.private_environment = values
+    if any('\n' in value or '\r' in value or '\x00' in value for value in values.values()):
+        raise ValueError('unsupported-docker-environment-value')
+    encoded = ''.join(f'{name}={value}\n' for name, value in sorted(values.items())).encode()
+    target = operations.attempt.directory / 'original.env'
+    if target.exists() or target.is_symlink():
+        if bounded_bytes(target, private=True) != encoded:
+            raise ValueError('retained-private-environment-changed')
+    else:
+        operations.private_file(target, encoded)
+    return target
+
+
+def runtime_helper_environment(operations: HostOperations) -> dict[str, str]:
+    operations.runtime_environment()
+    operations.verify_storage()
+    if 'predecessor' in operations.manifest:
+        return dict(operations.private_environment)
+    topology = record(operations.manifest['topology'], 'topology')
+    old = record(record(topology['services'], 'services')['web'], 'web')
+    image = rows(json.loads(operations.docker(
+        'image', 'inspect', cast(str, old['imageId']),
+    )), 'historical image')[0]
+    return classified_environment(operations.private_environment, environment(image))
+
+
 def _parse_environment(data: bytes) -> dict[str, str]:
     if not data.endswith(b'\n') or b'\r' in data or b'\x00' in data:
         raise ValueError('review-environment-format-changed')
@@ -212,6 +303,16 @@ def admit_successor_environment(
     This does not admit any helper process or establish workload quiescence.
     """
     _verify_release(previous, successor, allow_unresolved=True, phase=phase)
+    values, binding = observe_predecessor_environment(previous)
+    successor.verify_fence()
+    return values, binding
+
+
+def observe_predecessor_environment(
+    previous: HostOperations,
+) -> tuple[dict[str, str], dict[str, str]]:
+    """Compare the retained settings with both exact predecessor containers."""
+    previous.lock.validate()
     directory = previous.attempt.directory
     original_bytes = _private_bytes(directory / 'original.env')
     original = _parse_environment(original_bytes)
@@ -271,7 +372,7 @@ def admit_successor_environment(
             raise ValueError('review-live-environment-changed')
         if role == 'workers':
             worker_values = expected
-    successor.verify_fence()
+    previous.lock.validate()
     return worker_values, {
         'originalEnvironmentSha256': checksum(original),
         'candidateComposeSha256': compose_hash,

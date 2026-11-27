@@ -396,6 +396,15 @@ are checked. Learning and speech workloads run on one or two profiles with an
 admitted absent course pair and an existing seeded curriculum. A profile that
 already has that course can be checked without generating new learning work.
 
+If both review profiles already use the only seeded pair, the successor may
+admit the authored English-to-Spanish curriculum for one profile. Bind the
+seed receipt and matching private workload input to the attempt. Before
+fencing, verify the exact existing course IDs and confirm that the new pair,
+curriculum ID, and target catalog are absent. The runner applies the seed
+after verifying the migrated schema. The seed transaction checks the admitted
+receipt before committing. The runner then checks the new catalog and lesson
+records and rechecks the original data before starting the candidate.
+
 The private review policy binds separate service and helper memory limits,
 their Node heap settings, and the public operator contact through the existing
 `SOTTO_PRIVACY_CONTACT_EMAIL` setting. Helpers count toward capacity alongside
@@ -406,7 +415,10 @@ This does not change production or self-hosting defaults.
 
 Before starting, independently admit the exact source, successful CI runs,
 immutable image receipts, staged migration inventories, host topology and
-private inputs. Preserve the original data and queue evidence. Require an
+private inputs. Preserve the original data and queue evidence. Record the
+checksum of the validated live Caddy fragment so the successor restores its
+current routing after maintenance. Keep the predecessor's original routing
+record as deployment evidence. Require an
 admitted Linux kernel proof of the review-only network guard. Import missing
 images through capacity admission before creating the private, checksum-bound
 `Attempt` with `scripts.deploy.review.state.Attempt.create`. The controller

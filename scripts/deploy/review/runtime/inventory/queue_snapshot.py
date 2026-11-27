@@ -35,10 +35,11 @@ main().catch(() => {
 
 
 def _original_queues(
-    successor: HostOperations,
+    successor: HostOperations, *, allow_unresolved: bool = False,
 ) -> dict[str, object]:
     successor.verify_fence()
-    if successor.attempt.state()['status'] != 'active':
+    allowed = {'active', 'unresolved'} if allow_unresolved else {'active'}
+    if successor.attempt.state()['status'] not in allowed:
         raise ValueError('active-review-successor-required')
     expected = record(successor.attempt.manifest()['originalQueues'],
                       'independently admitted predecessor queue manifest')

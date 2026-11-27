@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import stat
 from pathlib import Path
 from typing import TYPE_CHECKING, TypedDict, cast
 
@@ -28,6 +29,17 @@ class BackupInputs(TypedDict):
     image: str
     database_url: str
     files: dict[str, bytes]
+
+
+def predecessor_backup_binding(
+    previous: HostOperations, successor: HostOperations,
+) -> dict[str, str]:
+    return {
+        'predecessorManifestSha256': previous.attempt.manifest_hash,
+        'predecessorEvidenceSha256': previous.attempt.evidence_hash,
+        'successorManifestSha256': successor.attempt.manifest_hash,
+        'successorEvidenceSha256': successor.attempt.evidence_hash,
+    }
 
 
 def predecessor_backup_sources(
@@ -64,12 +76,7 @@ def predecessor_backup_sources(
     if checksum(original_environment) != environment['originalEnvironmentSha256']:
         raise ValueError('predecessor-backup-environment-changed')
     return {
-        'binding': {
-            'predecessorManifestSha256': previous.attempt.manifest_hash,
-            'predecessorEvidenceSha256': previous.attempt.evidence_hash,
-            'successorManifestSha256': successor.attempt.manifest_hash,
-            'successorEvidenceSha256': successor.attempt.evidence_hash,
-        },
+        'binding': predecessor_backup_binding(previous, successor),
         'postgres': digest(postgres['id'], 'predecessor PostgreSQL'),
         'redis': digest(redis['id'], 'predecessor Redis'),
         'web': digest(web['id'], 'predecessor web'),
@@ -99,3 +106,14 @@ def original_backup_sources(operations: HostOperations) -> BackupInputs:
             'environment': bounded_bytes(environment),
         },
     }
+
+
+def file_integrity(path: Path, budget: int) -> dict[str, object]:
+    metadata = path.stat(follow_symlinks=False)
+    if not stat.S_ISREG(metadata.st_mode) or not 0 < metadata.st_size <= budget:
+        raise ValueError('bounded-backup-file-required')
+    hashed = hashlib.sha256()
+    with path.open('rb') as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b''):
+            hashed.update(chunk)
+    return {'sha256': hashed.hexdigest(), 'bytes': metadata.st_size}

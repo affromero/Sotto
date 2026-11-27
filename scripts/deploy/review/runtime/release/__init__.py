@@ -15,7 +15,7 @@ from pathlib import Path
 from types import ModuleType
 from typing import TYPE_CHECKING, cast
 
-from scripts.deploy.images.metadata import record
+from scripts.deploy.images.metadata import digest, record
 from scripts.deploy.review.build_observer import bounded_bytes
 from scripts.deploy.review.state import (
     atomic_json,
@@ -92,18 +92,25 @@ def install_startup_unit(operations: HostOperations) -> None:
     operations.lock.validate()
     expected = startup_binding(operations)
     intent = operations.attempt.directory / 'startup-unit-intent.json'
+    predecessor_unit = None
+    if 'predecessor' in operations.manifest:
+        if operations.attempt.state()['phase'] != 'PUBLIC_COMMITTED':
+            raise ValueError('successor-startup-requires-committed-public-route')
+        predecessor_unit = retained_predecessor_startup(operations)
     if intent.exists():
         if private_json(intent) != expected:
             raise ValueError('startup-unit-intent-changed')
     else:
-        if STARTUP_UNIT.exists() or STARTUP_UNIT.is_symlink():
+        if predecessor_unit is None and (STARTUP_UNIT.exists() or STARTUP_UNIT.is_symlink()):
             raise ValueError('foreign-existing-completed-startup-unit')
         atomic_json(intent, expected)
     content = startup_unit(operations)
     if STARTUP_UNIT.exists() or STARTUP_UNIT.is_symlink():
         metadata = STARTUP_UNIT.lstat()
         if (not stat.S_ISREG(metadata.st_mode)
-                or bounded_bytes(STARTUP_UNIT) != content):
+                or metadata.st_uid != 0
+                or stat.S_IMODE(metadata.st_mode) != 0o644
+                or bounded_bytes(STARTUP_UNIT) not in (content, predecessor_unit)):
             raise ValueError('pending-completed-startup-unit-changed')
     candidate = operations.attempt.directory / STARTUP_UNIT.name
     if candidate.exists():
@@ -122,6 +129,29 @@ def install_startup_unit(operations: HostOperations) -> None:
     verify_startup_enabled(operations)
     atomic_json(operations.attempt.directory / 'startup-unit.json',
                 {**expected, 'enabled': True})
+
+
+def retained_predecessor_startup(operations: HostOperations) -> bytes:
+    from scripts.deploy.review.runtime.inventory.predecessor import bind_predecessor
+
+    phase = operations.attempt.state()['phase']
+    if phase not in ('PRECHECK', 'PUBLIC_COMMITTED'):
+        raise ValueError('successor-startup-capture-phase-invalid')
+    previous = bind_predecessor(operations)
+    expected = startup_unit(previous)
+    receipt = private_json(previous.attempt.directory / 'startup-unit.json')
+    if receipt != {**startup_binding(previous), 'enabled': True}:
+        raise ValueError('predecessor-startup-installation-changed')
+    path = operations.attempt.directory / 'predecessor-startup.service'
+    if path.exists() or path.is_symlink():
+        if bounded_bytes(path, private=True) != expected:
+            raise ValueError('retained-predecessor-startup-changed')
+    else:
+        if phase != 'PRECHECK':
+            raise ValueError('retained-predecessor-startup-required')
+        verify_startup_unit(previous)
+        operations.private_file(path, expected)
+    return expected
 
 
 def verify_startup_enabled(operations: HostOperations) -> None:
@@ -224,8 +254,15 @@ def retention_context(
     workers = record(operations.manifest['finalWorker'], 'final workers')
     topology = record(operations.manifest['topology'], 'topology')
     original = record(topology['services'], 'original services')
-    identities = {cast(str, record(value, 'service')['imageId'])
-                  for value in original.values()}
+    if 'predecessor' in operations.manifest:
+        from scripts.deploy.review.runtime.inventory.predecessor import bind_predecessor
+
+        predecessor = bind_predecessor(operations).manifest
+        retained = [original['postgres'], original['redis'],
+                    predecessor['finalWeb'], predecessor['finalWorker']]
+    else:
+        retained = list(original.values())
+    identities = {cast(str, record(value, 'service')['imageId']) for value in retained}
     identities.update((cast(str, web['imageId']),
                        cast(str, workers['imageId'])))
     return {
@@ -434,9 +471,12 @@ def verify_completed(operations: HostOperations) -> None:
 
 def verify_completed_records(
     operations: HostOperations, *, fenced: bool = False,
+    active_fragment_sha256: str | None = None,
 ) -> None:
     """Bind retained completion evidence without starting a container."""
-    expected = read_completed_record(operations, fenced=fenced)
+    expected = read_completed_record(
+        operations, fenced=fenced, active_fragment_sha256=active_fragment_sha256,
+    )
     release = private_json(operations.attempt.directory
                            / 'release-record.json')
     if release != expected:
@@ -445,10 +485,13 @@ def verify_completed_records(
 
 def read_completed_record(
     operations: HostOperations, *, fenced: bool = False,
+    active_fragment_sha256: str | None = None,
 ) -> dict[str, object]:
     """Derive completion from exact retained imports and live ownership."""
-    return read_retained_record(operations, fenced=fenced,
-                                inspect_imports=verify_archived_imports)
+    return read_retained_record(
+        operations, fenced=fenced, inspect_imports=verify_archived_imports,
+        active_fragment_sha256=active_fragment_sha256,
+    )
 
 
 def archive_directories(
@@ -545,6 +588,7 @@ def verify_archived_imports(
 def read_retained_record(
     operations: HostOperations, *, fenced: bool,
     inspect_imports: Callable[[HostOperations, dict[str, object]], None],
+    active_fragment_sha256: str | None = None,
 ) -> dict[str, object]:
     """Share ownership proofs while keeping completion's imports strict."""
     from scripts.deploy.review.runtime.operations import (
@@ -556,9 +600,15 @@ def read_retained_record(
     original = bounded_bytes(operations.attempt.directory
                              / 'original-caddy.conf', private=True)
     expected_files = record(operations.manifest['originalFiles'], 'original')
-    if (hashlib.sha256(original).hexdigest()
-            != expected_files['caddyFragment']
-            or bounded_bytes(CADDY) != (MAINTENANCE if fenced else original)):
+    if active_fragment_sha256 is not None and fenced:
+        raise ValueError('fenced-route-requires-maintenance-fragment')
+    expected_live = (
+        digest(active_fragment_sha256, 'admitted live Caddy fragment')
+        if active_fragment_sha256 is not None
+        else hashlib.sha256(MAINTENANCE if fenced else original).hexdigest()
+    )
+    if (hashlib.sha256(original).hexdigest() != expected_files['caddyFragment']
+            or hashlib.sha256(bounded_bytes(CADDY)).hexdigest() != expected_live):
         raise ValueError('completed-public-routing-changed')
     _, identities = retention_context(operations)
     if private_json(RETENTION / (PROJECT + '.json')) != {

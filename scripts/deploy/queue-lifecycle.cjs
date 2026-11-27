@@ -550,7 +550,7 @@ async function main() {
   }
 }
 
-module.exports = { run, connectionIdentity, main, queueWorkersInDatabase };
+module.exports = { run, connectionIdentity, main, queueWorkersInDatabase, addedQueuesEmpty };
 if (require.main === module)
   main().catch(() => {
     console.error(

@@ -78,6 +78,34 @@ describe('fenced review workloads', () => {
     expect(aborted.checkpoint()?.profiles[0].courseIntent).toBe(true);
   });
 
+  it('recovers the confirmed teaching receipt and uploads the newly bound scoped audio', async () => {
+    const f = fixture();
+    f.control.teachingRequired = true;
+    f.control.scopedReference = true;
+    f.control.loseTeachingReply = true;
+    await expect(f.run()).rejects.toMatchObject({ phase: 'teaching_acknowledgment' });
+    expect(f.mutations.some((row) => row.path.includes('/speaking/'))).toBe(false);
+    f.control.loseTeachingReply = false;
+    await expect(f.run()).resolves.toMatchObject({ syntheticAssessments: 2 });
+    expect(
+      f.mutations.filter((row) => row.path.includes('/teaching-prelude/acknowledge'))
+    ).toHaveLength(2);
+    expect(f.requests).toContain(
+      'GET /api/v1/classes/class-owner/speaking/prompt-owner-0/reference/audio'
+    );
+  });
+
+  it('stops before upload if the server does not retain the teaching acknowledgment', async () => {
+    const f = fixture();
+    f.control.teachingRequired = true;
+    f.control.omitTeachingWrite = true;
+    await expect(f.run()).rejects.toMatchObject({ phase: 'teaching_acknowledgment' });
+    expect(
+      f.mutations.filter((row) => row.path.includes('/teaching-prelude/acknowledge'))
+    ).toHaveLength(1);
+    expect(f.mutations.some((row) => row.path.includes('/speaking/'))).toBe(false);
+  });
+
   it.each([
     'wrongActor',
     'changedPreferences',
@@ -99,6 +127,7 @@ describe('fenced review workloads', () => {
     'missingOwnedEpisode',
     'exemptSpeech',
     'missingAudio',
+    'missingMaterialRevision',
   ] as const)('refuses %s without submitting a speaking attempt', async (failure) => {
     const f = fixture();
     f.control[failure] = true;

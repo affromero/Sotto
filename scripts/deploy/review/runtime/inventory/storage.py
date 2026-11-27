@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path, PurePosixPath
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Literal, cast
 
 from scripts.deploy.images.metadata import digest, record
 from scripts.deploy.review.runtime import services
@@ -16,7 +17,9 @@ from scripts.deploy.review.runtime.inventory.stopped_writer import (
 )
 from scripts.deploy.review.runtime.release import verify_completed_records, verify_startup_unit
 from scripts.deploy.review.state import atomic_json, checksum, private_json
-from scripts.deploy.review.topology import AUTH_HOME, DIRECTORY, EXECUTIONS, STORAGE, rows
+from scripts.deploy.review.topology import (
+    AUTH_HOME, DIRECTORY, EXECUTIONS, NETWORK, PROJECT, STORAGE, rows,
+)
 
 if TYPE_CHECKING:
     from scripts.deploy.review.runtime.operations import HostOperations
@@ -109,6 +112,72 @@ def inspect_completed_storage(
     return proof
 
 
+def verify_running_completed_storage(
+    previous: HostOperations, successor: HostOperations,
+) -> None:
+    """Inspect the live completed generation without requiring a new fence."""
+    successor.lock.validate()
+    if previous.lock is not successor.lock or previous.attempt.state()['status'] != 'complete':
+        raise ValueError('completed-review-release-required')
+    directory = previous.attempt.directory
+    topology = record(previous.attempt.manifest()['topology'], 'completed topology')
+    backing = record(topology['services'], 'completed backing services')
+    original = private_json(directory / 'original-mount-objects.json')
+    handover = private_json(directory / 'auth-handover.json')
+    candidates = {
+        role: private_json(directory / ('candidate-' + role + '.json'))
+        for role in ('web', 'workers')
+    }
+    protected, _ = retained_candidate_mounts(topology, original, candidates, handover)
+    candidate_ids = {digest(value['id'], 'completed candidate') for value in candidates.values()}
+    identities = successor.docker('ps', '-aq', '--no-trunc').decode().split()
+    containers = successor.inspect(*identities)
+    indexed = {item['Id']: item for item in containers}
+
+    def verify_backing(index: Mapping[object, dict[str, object]]) -> None:
+        for role in ('postgres', 'redis'):
+            expected = record(backing[role], 'completed backing service')
+            actual = record(index.get(expected['id']), 'actual completed backing service')
+            state = record(actual['State'], 'completed backing state')
+            health = state.get('Health')
+            if (actual['Image'] != expected['imageId']
+                    or state.get('Running') is not True
+                    or state.get('Status') != 'running'
+                    or state.get('Paused') is not False
+                    or state.get('Restarting') is not False
+                    or state.get('OOMKilled') is not False
+                    or state.get('Dead') is not False or state.get('Error') != ''
+                    or (health is not None
+                        and record(health, 'backing health').get('Status') != 'healthy')):
+                raise ValueError('retained-storage-service-unavailable')
+
+    verify_backing(indexed)
+    verify_successor_network_members(previous, indexed, backing, candidate_ids)
+    before = container_inventory(containers, protected)
+
+    def probe(content: bytes) -> bytes:
+        return successor.command(
+            ['sudo', '-n', '/usr/bin/python3', '-c', MOUNT_PROBE], content=content,
+        )
+
+    proof = inspect_completed_storage(
+        containers, topology, original, candidates, handover, probe=probe,
+    )
+    expected = record(successor.attempt.manifest()['predecessorStorage'], 'predecessor storage')
+    if proof != expected:
+        raise ValueError('admitted-predecessor-storage-changed')
+    refreshed_ids = successor.docker('ps', '-aq', '--no-trunc').decode().split()
+    if set(refreshed_ids) != set(identities) or len(refreshed_ids) != len(identities):
+        raise ValueError('review-storage-container-inventory-changed')
+    refreshed = successor.inspect(*refreshed_ids)
+    if container_inventory(refreshed, protected) != before:
+        raise ValueError('review-storage-mount-inventory-changed')
+    checked = {item['Id']: item for item in refreshed}
+    verify_backing(checked)
+    verify_successor_network_members(previous, checked, backing, candidate_ids)
+    successor.lock.validate()
+
+
 def verify_completed_storage(
     previous: HostOperations, successor: HostOperations,
 ) -> None:
@@ -189,7 +258,161 @@ def verify_completed_storage(
         successor.attempt.directory / 'predecessor-mounted-storage.json', binding,
         containers, topology, original, candidates, handover,
         probe=probe, verify_fence=verify_after_probe,
+        admitted_proof=successor.attempt.manifest().get('predecessorStorage'),
     )
+
+
+def verify_successor_storage(operations: HostOperations) -> None:
+    """Recheck both the stopped generation and the admitted successor mounts."""
+    from scripts.deploy.review.runtime.inventory.predecessor import (
+        _identity,
+        _stop_binding,
+        bind_predecessor,
+    )
+
+    previous = bind_predecessor(operations)
+    attempt = operations.attempt
+    directory = attempt.directory
+    old = previous.attempt.directory
+    original = private_json(old / 'original-mount-objects.json')
+    handover = private_json(old / 'auth-handover.json')
+    candidates = {
+        role: private_json(old / ('candidate-' + role + '.json'))
+        for role in ('web', 'workers')
+    }
+    topology = record(previous.manifest['topology'], 'original topology')
+    if attempt.manifest()['topology'] != topology:
+        raise ValueError('successor-physical-topology-changed')
+    protected, expected = retained_candidate_mounts(topology, original, candidates, handover)
+    proof = private_json(directory / 'predecessor-mounted-storage.json')
+    if (proof.get('predecessorManifestSha256') != previous.attempt.manifest_hash
+            or proof.get('predecessorEvidenceSha256') != previous.attempt.evidence_hash
+            or proof.get('successorManifestSha256') != attempt.manifest_hash
+            or proof.get('successorEvidenceSha256') != attempt.evidence_hash
+            or proof.get('proof') != attempt.manifest()['predecessorStorage']
+            or proof.get('proof') != {'originalSha256': checksum(original),
+                                     'mappedSha256': checksum(expected),
+                                     'candidatesSha256': checksum(candidates)}):
+        raise ValueError('successor-retained-mount-proof-changed')
+    baseline = private_json(directory / 'predecessor-running.json')
+    release = private_json(old / 'release-record.json')
+    binding_fields = _identity(previous, operations, release)
+    if any(baseline.get(key) != value for key, value in binding_fields.items()):
+        raise ValueError('predecessor-running-evidence-changed')
+    writers = record(baseline['writers'], 'retained predecessor writers')
+    stops = private_json(directory / 'predecessor-stopped.json')
+    identities = operations.docker('ps', '-aq', '--no-trunc').decode().split()
+    containers = operations.inspect(*identities)
+    indexed = {container['Id']: container for container in containers}
+    backing = record(topology['services'], 'retained services')
+    for role in ('postgres', 'redis'):
+        service = record(backing[role], 'retained backing service')
+        actual = record(indexed.get(service['id']), 'actual backing service')
+        state = record(actual['State'], 'backing service state')
+        if (actual.get('Image') != service['imageId']
+                or state.get('Running') is not True
+                or state.get('Status') != 'running'
+                or state.get('Paused') is not False
+                or state.get('OOMKilled') is not False):
+            raise ValueError('retained-storage-service-unavailable')
+    roles: tuple[Literal['web', 'workers'], ...] = ('web', 'workers')
+    for role in roles:
+        binding = candidates[role]
+        instance = record(writers[role], 'retained predecessor instance')
+        identity = binding['id']
+        result = inspect_stopped_writer(
+            record(indexed.get(identity), 'stopped predecessor'), binding,
+            role=role, baseline=instance, previous=record(stops[role], 'stop receipt'),
+        )
+        intent = _stop_binding(baseline, role)
+        if (private_json(directory / ('predecessor-stop-intent-' + role + '.json')) != intent
+                or private_json(directory / ('predecessor-stop-result-' + role + '.json'))
+                != {'outcome': 'confirmed', 'intentSha256': checksum(intent), 'stopped': result}):
+            raise ValueError('successor-predecessor-stop-receipt-changed')
+    extensions = operations.admitted_writers(containers)
+    if extensions & protected:
+        raise ValueError('distinct-successor-storage-writers-required')
+    old_web = digest(candidates['web']['id'], 'predecessor web ID')
+    for identity in extensions:
+        for destination in (STORAGE, EXECUTIONS, AUTH_HOME):
+            expected[identity + ':' + destination] = expected[old_web + ':' + destination]
+    protected.update(extensions)
+    before = container_inventory(containers, protected)
+    verify_successor_network_members(operations, indexed, backing, extensions)
+
+    def probe(content: bytes) -> bytes:
+        return operations.command(
+            ['sudo', '-n', '/usr/bin/python3', '-c', MOUNT_PROBE], content=content,
+        )
+
+    resolve_mounts(containers, protected, probe, expected)
+    current = operations.docker('ps', '-aq', '--no-trunc').decode().split()
+    if set(current) != set(identities) or len(current) != len(identities):
+        raise ValueError('review-storage-container-inventory-changed')
+    refreshed = operations.inspect(*current)
+    if container_inventory(refreshed, protected) != before:
+        raise ValueError('review-storage-mount-inventory-changed')
+    verify_successor_network_members(
+        operations, {item['Id']: item for item in refreshed}, backing, extensions,
+    )
+    operations.lock.validate()
+
+
+def verify_successor_network_members(
+    operations: HostOperations, containers: Mapping[object, dict[str, object]],
+    backing: Mapping[str, object], candidates: set[str],
+) -> None:
+    """Reject any unadmitted peer on either protected network."""
+    operations.verify_egress()
+    egress = PROJECT + '_egress'
+    running = {
+        identity for identity in candidates
+        if record(containers[identity]['State'], 'candidate state')['Running'] is True
+    }
+    directory = operations.attempt.directory
+    for role in ('web', 'workers'):
+        path = directory / ('candidate-' + role + '.json')
+        if path.exists() and private_json(path)['id'] in running:
+            services.verify_candidate(operations, role)
+    review_only: set[object] = set()
+    for role in ('postgres', 'redis'):
+        service = record(backing[role], 'retained backing service')
+        identity = service['id']
+        settings = record(containers[identity]['NetworkSettings'], 'backing network settings')
+        attachment = record(settings['Networks'], 'backing network attachments')
+        endpoint = record(attachment.get(NETWORK), 'backing review endpoint')
+        admitted = record(service['network'], 'admitted backing endpoint')
+        if (set(attachment) != {NETWORK} or endpoint.get('NetworkID') != admitted['id']
+                or endpoint.get('IPAddress') != admitted['address']
+                or endpoint.get('GlobalIPv6Address') not in ('', None)
+                or any(value not in (None, []) for value in
+                       record(settings['Ports'], 'backing ports').values())):
+            raise ValueError('successor-retained-backing-network-changed')
+        review_only.add(identity)
+    networks = rows(json.loads(operations.docker('network', 'inspect', NETWORK, egress)),
+                    'successor reviewed networks')
+    topology = record(operations.attempt.manifest()['topology'], 'network topology')
+    wanted = {
+        NETWORK: record(topology['network'], 'review network')['id'],
+        egress: private_json(directory / 'egress.json')['networkId'],
+    }
+    if {item['Name']: item['Id'] for item in networks} != wanted:
+        raise ValueError('successor-network-identity-changed')
+    members = {item['Name']: set(record(item['Containers'], 'members'))
+               for item in networks}
+    if len(networks) != 2 or members != {NETWORK: review_only | running, egress: running}:
+        raise ValueError('successor-network-membership-changed')
+
+
+def verify_review_storage(operations: HostOperations) -> None:
+    if 'predecessor' in operations.manifest:
+        verify_successor_storage(operations)
+        return
+    topology = record(operations.manifest['topology'], 'topology')
+    services = record(topology['services'], 'services')
+    identities = {str(record(item, 'service')['id']) for item in services.values()}
+    all_ids = operations.docker('ps', '-aq', '--no-trunc').decode().split()
+    operations.resolved_mounts(operations.inspect(*all_ids), identities)
 
 
 def _retain_completed_storage(
@@ -198,6 +421,7 @@ def _retain_completed_storage(
     original: Mapping[str, object], candidates: Mapping[str, object],
     handover: Mapping[str, object], *, probe: Callable[[bytes], bytes],
     verify_fence: Callable[[], None],
+    admitted_proof: object = None,
 ) -> None:
     saved = private_json(path) if path.exists() or path.is_symlink() else None
     if saved is not None and (set(saved) != {*binding, 'proof', 'instances'}
@@ -227,6 +451,8 @@ def _retain_completed_storage(
         containers, topology, original, candidates, handover, probe=probe,
         previous=record(saved['proof'], 'retained storage proof') if saved else None,
     )
+    if admitted_proof is not None and admitted_proof != proof:
+        raise ValueError('admitted-predecessor-storage-changed')
     verify_fence()
     if saved is None:
         atomic_json(path, {**binding, 'proof': proof, 'instances': instances})

@@ -369,6 +369,35 @@ class ReviewControllerTests(unittest.TestCase):
             self.attempt, self.lock, recover=recover,
         )
 
+    def test_successor_never_enters_legacy_retirement_or_sql_after_backup_failure(self) -> None:
+        attempt = Attempt.create(self.root, 'successor', {
+            **self.host.manifest, 'predecessor': {},
+        }, self.attempt.evidence_hash)
+        host = HostBoundary(attempt, self.lock)
+
+        def prepare_data(previous, operations, *, recover, continue_check) -> None:
+            continue_check()
+            host.verify_fence()
+            self.assertEqual(attempt.state()['phase'], 'FENCED')
+            self.assertIs(attempt.state()['sqlMayHaveStarted'], False)
+            raise ValueError('retained backup failed')
+
+        with (
+            patch.object(controller, 'HostOperations', return_value=host),
+            patch.object(controller, 'admission', return_value=self.files['evidence.json']),
+            patch.object(controller, 'bind_predecessor', return_value=self.host),
+            patch.object(controller, 'verify_live_predecessor'),
+            patch.object(controller, 'preflight_successor'),
+            patch.object(controller, 'prepare_successor_data', side_effect=prepare_data),
+            patch.object(host, 'retire_old_web') as legacy,
+            patch.object(host, 'migrate_stage') as migrate,
+        ):
+            with self.assertRaisesRegex(ValueError, 'retained backup failed'):
+                controller.execute(attempt, self.lock)
+            legacy.assert_not_called()
+            migrate.assert_not_called()
+        attempt.verify_marker(self.root / 'unresolved.json')
+
     def test_both_profiles_survive_and_public_routing_requires_actual_work(
         self,
     ) -> None:

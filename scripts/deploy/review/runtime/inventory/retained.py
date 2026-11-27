@@ -25,7 +25,7 @@ def observe_retained_inventory(
     if (len(jobs) != 3 or len({job['id'] for job in jobs}) != 3
             or any(job.get('delivered') is not True for job in jobs)):
         raise ValueError('exact-delivered-worksheet-evidence-required')
-    queue_manifest = _original_queues(successor)
+    queue_manifest = _original_queues(successor, allow_unresolved=True)
     queues = [item['name'] for item in rows(queue_manifest['queues'], 'original review queues')]
     result = record(successor.runtime_exchange(
         'retained-single-client', {'evidence': evidence, 'queues': queues},
