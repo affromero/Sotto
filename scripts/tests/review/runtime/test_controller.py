@@ -440,6 +440,8 @@ class ReviewControllerTests(unittest.TestCase):
         self.assertTrue(self.host.finalized)
         self.assertFalse((self.root / 'unresolved.json').exists())
         self.assertEqual(self.attempt.state()['status'], 'complete')
+        self.assertFalse((self.attempt.directory
+                          / controller.INHERITED_PROVIDER_CHECKPOINT).exists())
         self.lock.validate()
 
     def assert_one_active_profile(self, active: str) -> None:
