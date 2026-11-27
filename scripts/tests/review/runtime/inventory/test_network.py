@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 from scripts.deploy.review.runtime import release
 from scripts.deploy.review.runtime.inventory.environment import (
+    MIGRATE_DEPLOY,
     retained_inventory_network,
     review_code_mount,
 )
@@ -19,6 +20,8 @@ from scripts.deploy.review.runtime.inventory.predecessor import (
     capture_predecessor,
     prepare_predecessor_stop,
 )
+from scripts.deploy.review.runtime.policy import helper_arguments
+from scripts.deploy.review.runtime.release.migrations import APPLIED_MIGRATION_SCRIPT
 from scripts.deploy.review.state import Attempt, atomic_json, checksum, private_json
 from scripts.deploy.review.topology import NETWORK, PROJECT, exact_mounts
 from scripts.tests.review.runtime import admitted_runtime_fixture
@@ -109,6 +112,7 @@ class RetainedNetworkTests(ReviewNetworkFixture):
         environment.fixture = self.fixture
         environment.previous, environment.successor = self.previous, self.successor
         environment.prepare_environment()
+        self.admit_successor_runtime()
         capture_predecessor(self.previous, self.successor)
         prepare_predecessor_stop(self.previous, self.successor, role='web')
         prepare_predecessor_stop(self.previous, self.successor, role='workers')
@@ -121,12 +125,31 @@ class RetainedNetworkTests(ReviewNetworkFixture):
             }
             self.fixture.confirm_stop(role)
 
+    def admit_successor_runtime(self) -> None:
+        previous = self.previous.attempt.manifest()['finalWorker']
+        candidate = {**previous, 'sha': 'c' * 40, 'imageId': 'sha256:' + 'd' * 64}
+        attempt = self.successor.attempt
+        manifest = {
+            **attempt.manifest(), **admitted_runtime_fixture(),
+            'initialStage': {'receipt': previous},
+            'stages': [{'receipt': candidate}],
+            'finalWorker': candidate,
+        }
+        identity = checksum(manifest)
+        atomic_json(attempt.directory / 'manifest.json', manifest)
+        for path in (
+            attempt.directory / 'binding.json',
+            attempt.directory / 'state.json',
+            self.fixture.fixture.host / 'unresolved.json',
+        ):
+            atomic_json(path, {**private_json(path), 'manifestSha256': identity})
+        self.successor.attempt = Attempt(attempt.directory)
+        self.successor.manifest = self.successor.attempt.manifest()
+
     def test_exact_stopped_topology_is_accepted(self) -> None:
         verify_retained_network(self.previous, self.successor)
 
     def test_observer_uses_the_admitted_redis_network_namespace(self) -> None:
-        self.successor.manifest['finalWorker'] = self.previous.manifest['finalWorker']
-        self.successor.manifest.update(admitted_runtime_fixture())
         admitted = self.successor.manifest['finalWorker']
         network = retained_inventory_network(self.previous, self.successor)
         self.assertEqual(network, 'container:' + self.fixture.storage.ids['redis'])
@@ -135,7 +158,7 @@ class RetainedNetworkTests(ReviewNetworkFixture):
             command = self.successor.tool_command(
                 admitted, 'node', ['-e', ''], network=network, mounts=[code],
                 container_name='sotto-review-observer', predecessor=self.previous,
-                retained_inventory=True,
+                predecessor_tool='retained-inventory',
             )
         self.assertEqual(command[command.index('--network') + 1], network)
         self.assertIn('--read-only', command)
@@ -144,8 +167,49 @@ class RetainedNetworkTests(ReviewNetworkFixture):
             self.successor.tool_command(
                 admitted, 'node', ['-e', ''], network=NETWORK, mounts=[code],
                 container_name='sotto-review-observer', predecessor=self.previous,
-                retained_inventory=True,
+                predecessor_tool='retained-inventory',
             )
+
+    def test_schema_writer_requires_a_durable_sql_started_phase(self) -> None:
+        old = self.previous.manifest['finalWorker']
+        image = self.successor.manifest['finalWorker']
+        network = 'container:' + self.fixture.storage.ids['redis']
+        attempt = self.successor.attempt
+        for phase in ('QUIESCENT', 'BACKED_UP'):
+            attempt.advance(phase)
+        options = {'network': network, 'container_name': 'sotto-review-migration',
+                   'predecessor': self.previous, 'predecessor_tool': 'migration'}
+        with patch.object(self.successor, 'capacity'):
+            with self.assertRaisesRegex(ValueError, 'successor-schema-write-not-admitted'):
+                self.successor.tool_command(image, 'npx', MIGRATE_DEPLOY, **options)
+            query = ['-e', APPLIED_MIGRATION_SCRIPT]
+            query = helper_arguments(self.successor.manifest, 'node', query)
+            self.assertEqual(
+                self.successor.tool_command(image, 'node', query, **options)[-len(query):],
+                query,
+            )
+            arbitrary = helper_arguments(self.successor.manifest, 'node', ['-e', 'fixture'])
+            with self.assertRaisesRegex(ValueError, 'successor-schema-verifier-before-sql'):
+                self.successor.tool_command(image, 'node', arbitrary, **options)
+            attempt.advance('SQL_STARTED')
+            with self.assertRaisesRegex(ValueError, 'successor-migration-helper-not-admitted'):
+                self.successor.tool_command(old, 'npx', MIGRATE_DEPLOY, **options)
+            command = self.successor.tool_command(image, 'npx', MIGRATE_DEPLOY, **options)
+            self.assertEqual(command[-len(MIGRATE_DEPLOY):], list(MIGRATE_DEPLOY))
+            self.assertEqual(command[command.index('--network') + 1], network)
+            with self.assertRaisesRegex(ValueError, 'successor-schema-write-not-admitted'):
+                self.successor.tool_command(image, 'npx', ['prisma', 'db', 'push'], **options)
+            with self.assertRaisesRegex(ValueError, 'successor-migration-node-command-not-admitted'):
+                self.successor.tool_command(image, 'node', arbitrary, **options)
+            with patch.dict(self.successor.manifest, finalWorker=old):
+                with self.assertRaisesRegex(ValueError, 'exact-successor-sql-stage-required'):
+                    self.successor.tool_command(old, 'npx', MIGRATE_DEPLOY, **options)
+            attempt.unresolved('fixture-interrupted')
+            with self.assertRaisesRegex(ValueError, 'successor-schema-write-not-admitted'):
+                self.successor.tool_command(image, 'npx', MIGRATE_DEPLOY, **options)
+            attempt.advance('FINAL_SCHEMA_VERIFIED')
+            with self.assertRaisesRegex(ValueError, 'successor-schema-write-not-admitted'):
+                self.successor.tool_command(image, 'npx', MIGRATE_DEPLOY, **options)
 
     def test_unknown_member_is_rejected(self) -> None:
         self.networks[0]['Containers']['other'] = {}

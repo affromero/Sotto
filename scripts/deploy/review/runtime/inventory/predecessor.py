@@ -21,6 +21,10 @@ from scripts.deploy.review.state import Attempt, atomic_json, checksum, private_
 if TYPE_CHECKING:
     from scripts.deploy.review.runtime.operations import HostOperations
 
+RetainedPhase = Literal[
+    'FENCED', 'QUIESCENT', 'BACKED_UP', 'SQL_STARTED', 'FINAL_SCHEMA_VERIFIED',
+]
+
 
 def bind_predecessor(successor: HostOperations) -> HostOperations:
     """Open the exact completed release named by the successor admission."""
@@ -116,6 +120,7 @@ def capture_predecessor(
 def _verify_release(
     previous: HostOperations, successor: HostOperations, *,
     allow_unresolved: bool,
+    phase: RetainedPhase = 'FENCED',
 ) -> dict[str, object]:
     if previous.lock is not successor.lock:
         raise ValueError('shared-predecessor-lock-required')
@@ -123,7 +128,7 @@ def _verify_release(
     state = successor.attempt.state()
     if (previous.attempt.directory == successor.attempt.directory
             or previous.attempt.state()['status'] != 'complete'
-            or state['phase'] != 'FENCED'
+            or state['phase'] != phase
             or state['status'] not in (
                 {'active', 'unresolved'} if allow_unresolved else {'active'}
             )):
@@ -265,13 +270,14 @@ def stop_predecessor(
 
 def inspect_predecessor(
     previous: HostOperations, successor: HostOperations,
+    *, phase: RetainedPhase = 'FENCED',
 ) -> dict[str, object]:
     """Recheck captured instances, including a partially completed stop.
 
     Persist each observed stop before returning so a retry cannot accept a
     later, different exit. This is not a complete writer or queue fence.
     """
-    release = _verify_release(previous, successor, allow_unresolved=True)
+    release = _verify_release(previous, successor, allow_unresolved=True, phase=phase)
     directory = successor.attempt.directory
     baseline = private_json(directory / 'predecessor-running.json')
     identity = _identity(previous, successor, release)
@@ -302,6 +308,8 @@ def inspect_predecessor(
         original = record(writers[role], 'predecessor running instance')
         state = record(actual[0].get('State'), 'predecessor state')
         if state.get('Running') is True:
+            if phase != 'FENCED':
+                raise ValueError('predecessor-writer-running-after-quiescence')
             if role in retained or capture_running_writer(
                 actual[0], binding, role=role,
             ) != original:
