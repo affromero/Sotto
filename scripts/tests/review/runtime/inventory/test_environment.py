@@ -4,6 +4,8 @@ import json
 import unittest
 from hashlib import sha256
 from importlib import import_module
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from scripts.deploy.review.state import atomic_json, checksum
 from scripts.deploy.review.runtime.inventory.environment import admit_successor_environment
@@ -67,6 +69,28 @@ class SuccessorEnvironmentTests(unittest.TestCase):
         self.assertEqual(values['DATABASE_URL'], 'postgresql://fixture/secret')
         self.assertEqual(values['WORKER_PROFILE'], 'all')
         self.assertNotIn('fixture-secret', json.dumps(proof))
+
+    def test_archives_successor_web_environment_and_checks_its_original_lineage(self) -> None:
+        historical = self.directory / 'historical-environment'
+        historical.mkdir(mode=0o700)
+        self.previous.private_file(historical / 'original.env', self.original_bytes)
+        self.previous.private_file(
+            historical / 'original-mount-objects.json',
+            (self.directory / 'original-mount-objects.json').read_bytes(),
+        )
+        compose = json.loads((self.directory / 'candidate-compose.json').read_bytes())
+        retained = compose['services']['web']['environment']
+        current = self.directory / 'original.env'
+        content = ''.join(f'{name}={value}\n' for name, value in sorted(retained.items())).encode()
+        current.write_bytes(content)
+        original = SimpleNamespace(attempt=SimpleNamespace(directory=historical))
+        with patch('scripts.deploy.review.runtime.inventory.predecessor.original_review_release',
+                   return_value=original):
+            _, proof = admit_successor_environment(self.previous, self.successor)
+            self.assertEqual(proof['originalEnvironmentSha256'], checksum(retained))
+            current.write_bytes(content.replace(b'fixture-secret', b'changed'))
+            with self.assertRaisesRegex(ValueError, 'retained-successor-web-environment-changed'):
+                admit_successor_environment(self.previous, self.successor)
 
     def test_refuses_changed_original_and_duplicate_keys(self) -> None:
         path = self.directory / 'original.env'

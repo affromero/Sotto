@@ -27,16 +27,10 @@ if TYPE_CHECKING:
 
 def original_mount_objects(operations: HostOperations) -> dict[str, object]:
     """Resolve the original physical mount proof through completed predecessors."""
-    from scripts.deploy.review.runtime.inventory.predecessor import bind_predecessor
+    from scripts.deploy.review.runtime.inventory.predecessor import original_review_release
 
-    topology = operations.manifest['topology']
-    for _ in range(32):
-        if operations.manifest['topology'] != topology:
-            raise ValueError('successor-physical-topology-changed')
-        if 'predecessor' not in operations.manifest:
-            return private_json(operations.attempt.directory / 'original-mount-objects.json')
-        operations = bind_predecessor(operations)
-    raise ValueError('review-mount-lineage-bound')
+    original = original_review_release(operations)
+    return private_json(original.attempt.directory / 'original-mount-objects.json')
 
 
 def retained_candidate_mounts(

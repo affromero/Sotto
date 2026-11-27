@@ -61,6 +61,18 @@ def bind_predecessor(successor: HostOperations) -> HostOperations:
     return previous
 
 
+def original_review_release(operations: HostOperations) -> HostOperations:
+    """Find the completed bootstrap release behind the current physical topology."""
+    topology = operations.manifest['topology']
+    for _ in range(32):
+        if operations.manifest['topology'] != topology:
+            raise ValueError('successor-physical-topology-changed')
+        if 'predecessor' not in operations.manifest:
+            return operations
+        operations = bind_predecessor(operations)
+    raise ValueError('review-predecessor-lineage-bound')
+
+
 def _predecessor_records(
     attempt: Attempt, binding: Mapping[str, object],
 ) -> tuple[dict[str, object], dict[str, object]]:

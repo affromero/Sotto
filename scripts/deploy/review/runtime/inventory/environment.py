@@ -313,10 +313,14 @@ def observe_predecessor_environment(
     previous: HostOperations,
 ) -> tuple[dict[str, str], dict[str, str]]:
     """Compare the retained settings with both exact predecessor containers."""
+    from scripts.deploy.review.runtime.inventory.predecessor import original_review_release
+
     previous.lock.validate()
     directory = previous.attempt.directory
-    original_bytes = _private_bytes(directory / 'original.env')
-    original = _parse_environment(original_bytes)
+    original_release = original_review_release(previous)
+    original = _parse_environment(_private_bytes(original_release.attempt.directory / 'original.env'))
+    retained = (original if original_release is previous
+                else _parse_environment(_private_bytes(directory / 'original.env')))
     topology = record(previous.manifest['topology'], 'topology')
     old_web = record(record(topology['services'], 'services')['web'], 'old web')
     if checksum(original) != old_web['environmentHash']:
@@ -356,6 +360,8 @@ def observe_predecessor_environment(
         if role == 'workers':
             expected.update({'WORKER_PROFILE': 'all', 'WORKER_PRESET': 'full',
                              'WORKER_QUEUES': '', 'WORKER_EXCLUDE_QUEUES': ''})
+        elif original_release is not previous and retained != expected:
+            raise ValueError('retained-successor-web-environment-changed')
         if desired.get('environment') != expected:
             raise ValueError('review-candidate-environment-changed')
         if desired.get('image') != image['reference']:
@@ -375,7 +381,7 @@ def observe_predecessor_environment(
             worker_values = expected
     previous.lock.validate()
     return worker_values, {
-        'originalEnvironmentSha256': checksum(original),
+        'originalEnvironmentSha256': checksum(retained),
         'candidateComposeSha256': compose_hash,
         'workerEnvironmentSha256': checksum(worker_values),
     }
