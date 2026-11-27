@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import hashlib
+import shutil
 import unittest
 from importlib import import_module
 from pathlib import Path
@@ -11,6 +12,7 @@ from unittest.mock import patch
 
 from scripts.deploy.review.runtime import release
 from scripts.deploy.review.runtime.inventory.predecessor import (
+    bind_predecessor,
     capture_predecessor,
     inspect_predecessor,
     prepare_predecessor_stop,
@@ -26,6 +28,60 @@ from scripts.tests.review.runtime.inventory.storage_fixture import StorageHost
 class PredecessorCaptureTests(unittest.TestCase):
     def setUp(self) -> None:
         self.prepare_predecessor()
+
+    def successor_with_predecessor(self) -> HostOperations:
+        previous = self.previous.attempt
+        binding = {
+            'directory': str(previous.directory),
+            'manifestSha256': previous.manifest_hash,
+            'evidenceSha256': previous.evidence_hash,
+            'releaseSha256': checksum(private_json(previous.directory / 'release-record.json')),
+            'startupSha256': checksum(private_json(previous.directory / 'startup-unit.json')),
+        }
+        attempt = Attempt.create(previous.directory.parent, 'bound-successor', {
+            'predecessor': binding,
+        }, 'e' * 64)
+        return HostOperations(attempt, self.successor.lock)
+
+    def test_binds_the_specific_completed_predecessor_and_startup_source(self) -> None:
+        attempt = self.previous.attempt
+        source = attempt.directory / 'fixture-source'
+        source.mkdir()
+        shutil.copytree(
+            self.previous.root / 'scripts/deploy', source / 'scripts/deploy',
+            ignore=shutil.ignore_patterns('__pycache__'),
+        )
+        tools = {
+            str(path.relative_to(source)): hashlib.sha256(path.read_bytes()).hexdigest()
+            for path in (source / 'scripts/deploy').rglob('*') if path.is_file()
+        }
+        manifest = {**attempt.manifest(), 'tools': tools}
+        manifest_hash = checksum(manifest)
+        atomic_json(attempt.directory / 'manifest.json', manifest)
+        atomic_json(attempt.directory / 'binding.json', {
+            'manifestSha256': manifest_hash, 'evidenceSha256': attempt.evidence_hash,
+        })
+        state_path = attempt.directory / 'state.json'
+        atomic_json(state_path, {**private_json(state_path), 'manifestSha256': manifest_hash})
+        startup_path = attempt.directory / 'startup-unit.json'
+        atomic_json(startup_path, {**private_json(startup_path), 'sourceRoot': str(source)})
+        self.previous.attempt = Attempt(attempt.directory)
+        successor = self.successor_with_predecessor()
+        previous = bind_predecessor(successor)
+        self.assertEqual(previous.attempt.directory, self.previous.attempt.directory)
+        self.assertEqual(previous.root, source)
+        self.assertIs(previous.lock, successor.lock)
+        path = source / 'scripts/deploy/review/runtime/channel.py'
+        path.write_bytes(b'changed')
+        with self.assertRaisesRegex(ValueError, 'reviewed-runtime-tool-changed'):
+            bind_predecessor(successor)
+
+    def test_refuses_changed_startup_binding_even_with_same_release(self) -> None:
+        successor = self.successor_with_predecessor()
+        path = self.previous.attempt.directory / 'startup-unit.json'
+        atomic_json(path, {**private_json(path), 'sourceRoot': str(Path.cwd()) + '/other'})
+        with self.assertRaisesRegex(ValueError, 'predecessor-startup-binding-changed'):
+            bind_predecessor(successor)
 
     def prepare_predecessor(self, *, original_queues: dict[str, object] | None = None) -> None:
         fixture_type = import_module(
