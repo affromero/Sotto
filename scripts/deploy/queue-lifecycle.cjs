@@ -203,7 +203,7 @@ async function activationReady(runtime, queues) {
   return { activationReady: true, inspectedCredentials, inspectedJobs };
 }
 
-async function inspectExecutions(runtime, forbidden = []) {
+async function inspectExecutions(runtime, forbidden = [], recoveryJob) {
   return readOnly(runtime.database, async (transaction) => {
     const rows = await transaction.$queryRawUnsafe(
       'SELECT "state" FROM "SidedoorState" WHERE "state"->>\'kind\' = $1 LIMIT 10001',
@@ -213,6 +213,7 @@ async function inspectExecutions(runtime, forbidden = []) {
     const journal = runtime.sottoJobExecutions(transaction);
     const outbox = runtime.sottoJobOutbox(transaction);
     const summary = { inspected: 0, settled: 0, synchronousActive: 0, workerActive: 0 };
+    let recovery;
     for (const { state } of rows) {
       const record = await journal.read({
         id: state.id,
@@ -225,7 +226,11 @@ async function inspectExecutions(runtime, forbidden = []) {
         summary.settled++;
         continue;
       }
-      assert.equal(record.status, 'active', 'Execution cleanup is unresolved');
+      const retained =
+        recoveryJob !== undefined &&
+        record.parentId === recoveryJob &&
+        record.status === 'cleanup-unconfirmed';
+      if (!retained) assert.equal(record.status, 'active', 'Execution cleanup is unresolved');
       const receipt = await outbox.receipt(record.parentId);
       assert(
         receipt && receipt.id === record.parentId && receipt.fingerprint === record.fingerprint,
@@ -244,6 +249,31 @@ async function inspectExecutions(runtime, forbidden = []) {
       assert.equal(parent.job.version, receipt.version);
       assert.equal(parent.complete, receipt.status === 'complete');
       assert(!forbidden.includes(receipt.handler), 'Added queue has an active execution');
+      if (retained) {
+        assert(!recovery && !parent.complete, 'Exact pending recovery job required');
+        assert.equal(receipt.handler, 'interactions', 'Expected an assessment recovery');
+        assert.equal(receipt.version, 6, 'Expected an assessment recovery');
+        assert(record.workspace?.directory, 'Expected an attached assessment workspace');
+        const assessment = await transaction.classAssessment.findUnique({
+          where: { generationOperationId: record.parentId },
+          select: { id: true, status: true, sealedAt: true },
+        });
+        assert(assessment?.status === 'UNRESOLVED' && assessment.sealedAt === null);
+        recovery = {
+          parent,
+          assessmentId: assessment.id,
+          workspaceSha256: createHash('sha256')
+            .update(JSON.stringify(record.workspace))
+            .digest('hex'),
+          binding: {
+            id: record.id,
+            parentId: record.parentId,
+            fingerprint: record.fingerprint,
+            executorId: record.executorId,
+          },
+        };
+        continue;
+      }
       if (runtime.isSottoSynchronousJob(receipt.handler, receipt.version)) {
         assert.equal(receipt.handler, 'learning-writing');
         assert([1, 2].includes(receipt.version), 'Unsupported synchronous writing version');
@@ -254,7 +284,7 @@ async function inspectExecutions(runtime, forbidden = []) {
         summary.workerActive++;
       }
     }
-    return summary;
+    return { summary, recovery };
   });
 }
 
@@ -408,8 +438,18 @@ async function schemaIndex(runtime) {
 async function run(input, runtime) {
   assert(input && typeof input === 'object');
   assert(
-    Object.keys(input).every((key) => ['command', 'manifest', 'transition', 'role'].includes(key))
+    Object.keys(input).every((key) =>
+      ['command', 'manifest', 'transition', 'role', 'recoveryJob'].includes(key)
+    )
   );
+  if (Object.hasOwn(input, 'recoveryJob')) {
+    assert.equal(input.command, 'drained-all', 'Expected recovery drain observation');
+    assert(input.transition === undefined, 'Expected default review queue inventory');
+    assert(
+      typeof input.recoveryJob === 'string' &&
+        /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(input.recoveryJob)
+    );
+  }
   assert(
     [
       'snapshot',
@@ -484,7 +524,23 @@ async function run(input, runtime) {
       assert.deepEqual(snapshot, expected, 'Original queue pause states were not restored');
     }
     if (!['drained', 'drained-all'].includes(input.command)) return { ...base, queues: snapshot };
-    const executions = await inspectExecutions(runtime);
+    const { summary: executions, recovery } = await inspectExecutions(
+      runtime,
+      [],
+      input.recoveryJob
+    );
+    let recoveryProof;
+    if (input.recoveryJob) {
+      assert(recovery, 'Admitted assessment cleanup state was not observed');
+      const queue = queues.find((item) => item.name === 'interactions');
+      assert(queue, 'Assessment recovery queue missing');
+      recoveryProof = {
+        binding: recovery.binding,
+        assessmentId: recovery.assessmentId,
+        workspaceSha256: recovery.workspaceSha256,
+        delivery: await runtime.snapshotFailedSottoDelivery(queue, recovery.parent),
+      };
+    }
     let activeJobs = 0;
     for (const queue of queues) {
       assert(await queue.isPaused(), 'Queue fence changed during inspection');
@@ -495,6 +551,7 @@ async function run(input, runtime) {
       queues: snapshot,
       activeJobs,
       executions,
+      ...(recoveryProof ? { recovery: recoveryProof } : {}),
       drained:
         activeJobs === 0 &&
         executions.workerActive === 0 &&

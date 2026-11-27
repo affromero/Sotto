@@ -23,6 +23,7 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from scripts.deploy.images.metadata import record
 from scripts.deploy.review.runtime.operations import HostOperations
+from scripts.deploy.review.runtime.release.assessment_recovery import verify_change
 from scripts.deploy.review.runtime.services import (
     PRESERVATION_OBSERVER,
     handover_auth,
@@ -571,6 +572,74 @@ const c=new Client({connectionString:process.env.DATABASE_URL});
 '''
         result = self.node(script, sql)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_assessment_projection_detects_unrelated_state_changes(self) -> None:
+        namespace = 'sotto-platform-v2'
+        prefix = hashlib.sha256(namespace.encode()).hexdigest()
+        binding = {'id': str(uuid.uuid4()), 'parentId': str(uuid.uuid4()),
+                   'executorId': str(uuid.uuid4()), 'fingerprint': 'a' * 64}
+        execution, parent = binding['id'], binding['parentId']
+        workspace = {'executionId': execution}
+        delivery = {'operationId': parent, 'fingerprint': binding['fingerprint']}
+        scope = 'b' * 64
+        keys = {
+            'execution': f'sd-je:1:{prefix}:{execution}',
+            'outbox': f'sd-j:1:{prefix}:{parent}',
+            'gate': f'sd-jeg:1:{prefix}:{parent}',
+            'scoped': f'sd-jes:1:{prefix}:{scope}:{execution}',
+            'incomplete': f'sd-ji:1:{prefix}:{parent}',
+            'receipt': f'{namespace}:assessment-cleanup:{execution}',
+        }
+        self.sql('ALTER TABLE "SidedoorState" ADD COLUMN revision text')
+
+        def put(key: str, state: dict[str, object]) -> None:
+            data = json.dumps(state)
+            self.sql(f"""INSERT INTO "SidedoorState" (id,state,revision)
+                VALUES ('{keys[key]}','{data}','fixture')
+                ON CONFLICT (id) DO UPDATE SET state=EXCLUDED.state,revision=EXCLUDED.revision""")
+
+        execution_state = {**binding, 'kind': 'job_execution', 'scopeDigests': [scope]}
+        outbox = {'kind': 'outbox_job', 'fingerprint': binding['fingerprint'], 'delivered': True,
+                  'job': {'handler': 'interactions', 'version': 6, 'namespace': namespace, 'id': parent}}
+        gate = {'id': execution, 'fingerprint': binding['fingerprint']}
+        put('execution', {**execution_state, 'status': 'cleanup-unconfirmed', 'workspace': workspace})
+        put('outbox', {**outbox, 'complete': False})
+        put('gate', {**gate, 'settled': False})
+        put('scoped', binding)
+        put('incomplete', {'kind': 'outbox_pending', 'namespace': namespace, 'id': parent,
+                           'fingerprint': binding['fingerprint']})
+        original = self.node(PRESERVATION_OBSERVER, None)
+        self.assertEqual(original.returncode, 0, original.stderr)
+        request = {'projection': [{'table': table['table'], 'columns': table['columns']}
+                                  for table in json.loads(original.stdout)['tables']],
+                   'assessmentRecovery': {'binding': binding, 'namespace': namespace, 'delivery': delivery}}
+
+        def observe() -> dict[str, object]:
+            result = self.node(PRESERVATION_OBSERVER, request)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            return record(json.loads(result.stdout), 'recovery observation')
+
+        before = observe()
+        self.assertEqual(before['observation'], json.loads(original.stdout))
+        put('receipt', {'binding': binding, 'delivery': delivery, 'workspace': workspace})
+        put('execution', {**execution_state, 'status': 'settled'})
+        put('outbox', {**outbox, 'complete': True})
+        put('gate', {**gate, 'settled': True})
+        for kind in ('scoped', 'incomplete'):
+            self.sql(f"""DELETE FROM "SidedoorState" WHERE id='{keys[kind]}'""")
+        result = observe()
+        after = record(result['assessmentRecovery'], 'settled projection')
+        self.assertEqual(after, {**record(before['assessmentRecovery'], 'initial projection'),
+                                 'settled': True, 'receipt': True, 'indexesSha256': None})
+        self.assertEqual(verify_change(before, result, settled=True), result['observation'])
+        self.sql("""UPDATE "User" SET token='changed' WHERE id='member'""")
+        with self.assertRaisesRegex(ValueError, 'assessment-recovery-protected-data-changed'):
+            verify_change(before, observe(), settled=True)
+        self.sql("""UPDATE "SidedoorState" SET revision='unrelated' WHERE id='sotto-platform-v2'""")
+        changed = record(observe()['assessmentRecovery'], 'changed projection')
+        self.assertNotEqual(changed['outside'], after['outside'])
+        with self.assertRaisesRegex(ValueError, 'assessment-recovery-data-changed'):
+            verify_change(before, observe(), settled=True)
 
     def test_original_columns_survive_additions_and_changed_profile_is_seen(
         self,

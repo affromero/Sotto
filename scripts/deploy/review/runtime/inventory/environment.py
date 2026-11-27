@@ -30,7 +30,8 @@ from scripts.deploy.review.topology import (
 if TYPE_CHECKING:
     from scripts.deploy.review.runtime.operations import HostOperations
 
-PredecessorTool = Literal['pause', 'retained-inventory', 'migration']
+PredecessorTool = Literal['pause', 'retained-inventory', 'migration',
+                          'assessment-cleanup', 'assessment-preservation']
 MIGRATE_DEPLOY = ('--no-install', 'prisma', 'migrate', 'deploy',
                   '--config=/app/prisma.config.ts')
 
@@ -38,6 +39,22 @@ MIGRATE_DEPLOY = ('--no-install', 'prisma', 'migrate', 'deploy',
 def review_code_mount(operations: HostOperations) -> str:
     return (f'type=bind,src={operations.root / "scripts/deploy"},'
             'dst=/app/scripts/deploy,readonly')
+
+
+def review_helper_mounts(operations: HostOperations, mode: str) -> list[str]:
+    mounts = [review_code_mount(operations)]
+    if mode == 'assessment-cleanup':
+        from scripts.deploy.review.topology import EXECUTIONS, PROJECT
+
+        mounts.append(f'type=volume,src={PROJECT}_executions,dst={EXECUTIONS},readonly')
+    return mounts
+
+
+def admitted_redis_namespace(manifest: Mapping[str, object]) -> str:
+    topology = record(manifest['topology'], 'topology')
+    services = record(topology['services'], 'review services')
+    redis = record(services['redis'], 'admitted Redis')
+    return 'container:' + digest(redis['id'], 'admitted Redis')
 
 
 def retained_inventory_network(
@@ -75,12 +92,37 @@ def admit_predecessor_helper_environment(
             previous, successor, receipt, entrypoint, arguments,
             network=network, mounts=mounts, content=content,
         )
-    elif operation == 'retained-inventory':
+    elif operation == 'assessment-preservation':
+        from scripts.deploy.review.runtime.inventory.queue_snapshot import approved_assessment_cleanup
+        from scripts.deploy.review.runtime.policy import helper_arguments
+        from scripts.deploy.review.runtime.release.assessment_recovery import preservation_request
+
+        recovery = approved_assessment_cleanup(previous, successor)
+        proof = record(recovery['proof'], 'assessment recovery proof')
+        expected, _ = preservation_request(successor, proof)
+        if (entrypoint != 'node' or mounts or content != expected
+                or list(arguments) != helper_arguments(
+                    successor.manifest, entrypoint, ['-e', services.PRESERVATION_OBSERVER],
+                ) or receipt != successor.manifest['finalWorker']
+                or network != retained_inventory_network(previous, successor)):
+            raise ValueError('assessment-preservation-helper-not-admitted')
+    elif operation in {'retained-inventory', 'assessment-cleanup'}:
         phase = retained_inventory_phase(successor)
-        if (entrypoint != 'node' or list(mounts) != [review_code_mount(successor)]
+        if (entrypoint != 'node' or list(mounts) != review_helper_mounts(successor, operation)
                 or network != retained_inventory_network(previous, successor, phase=phase)
                 or receipt != successor.attempt.manifest()['finalWorker']):
             raise ValueError('retained-inventory-helper-not-admitted')
+        if operation == 'assessment-cleanup':
+            from scripts.deploy.review.runtime.channel import RUNTIME_CHANNEL_ARGS
+            from scripts.deploy.review.runtime.inventory.queue_snapshot import approved_assessment_cleanup
+            from scripts.deploy.review.runtime.policy import helper_arguments, runtime_policy
+
+            initial = {'mode': 'assessment-cleanup',
+                       'input': approved_assessment_cleanup(previous, successor),
+                       'checkpoint': None, 'policy': runtime_policy(successor.manifest)}
+            if (list(arguments) != helper_arguments(successor.manifest, entrypoint, RUNTIME_CHANNEL_ARGS)
+                    or content != json.dumps(initial).encode()):
+                raise ValueError('assessment-cleanup-helper-not-admitted')
     elif operation == 'pause':
         worker = services.verify_candidate(previous, 'workers')
         if (entrypoint != 'node' or mounts or network != 'container:' + worker

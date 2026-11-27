@@ -61,6 +61,70 @@ async function seedScope(seed){
  }
  return scopes;
 }
+async function assessmentScope(input){
+ if(input===null)return null;
+ const {binding,namespace,delivery}=input;
+ const uuid=/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
+ const digest=/^[a-f0-9]{64}$/;
+ assert(uuid.test(binding.id)&&uuid.test(binding.parentId)&&uuid.test(binding.executorId));
+ assert(digest.test(binding.fingerprint));
+ assert.equal(namespace,'sotto-platform-v2');
+ const hash=value=>crypto.createHash('sha256').update(value).digest('hex');
+ const prefix=hash(namespace);
+ const key=(kind,id)=>'sd-'+kind+':1:'+prefix+':'+id;
+ const executionKey=key('je',binding.id), jobKey=key('j',binding.parentId);
+ const gateKey=key('jeg',binding.parentId);
+ const receiptKey=namespace+':assessment-cleanup:'+binding.id;
+ const execution=(await client.query(
+  'SELECT state FROM "SidedoorState" WHERE id=$1',[executionKey])).rows[0]?.state;
+ assert(execution&&execution.kind==='job_execution');
+ for(const field of ['id','parentId','executorId','fingerprint'])
+  assert.equal(execution[field],binding[field]);
+ const settled=execution.status==='settled';
+ assert(settled?!Object.hasOwn(execution,'workspace'):
+  execution.status==='cleanup-unconfirmed'&&execution.workspace?.executionId===binding.id);
+ assert(Array.isArray(execution.scopeDigests)&&execution.scopeDigests.length>0&&
+  execution.scopeDigests.length<=100&&execution.scopeDigests.every(x=>digest.test(x)));
+ const scopeKeys=execution.scopeDigests.map(scope=>key('jes',scope+':'+binding.id));
+ assert.equal(new Set(scopeKeys).size,scopeKeys.length);
+ const pendingKey=key('jp',binding.parentId),incompleteKey=key('ji',binding.parentId);
+ const keys=[executionKey,jobKey,gateKey,receiptKey,pendingKey,incompleteKey,...scopeKeys];
+ const selected=(await client.query(
+  'SELECT id,revision,state FROM "SidedoorState" WHERE id=ANY($1) ORDER BY id',[keys])).rows;
+ const indexed=new Map(selected.map(row=>[row.id,row]));
+ assert.equal(indexed.size,selected.length);
+ const executionRow=indexed.get(executionKey),job=indexed.get(jobKey),gate=indexed.get(gateKey);
+ assert.deepEqual(executionRow.state,execution);
+ assert(job?.state.kind==='outbox_job'&&job.state.job.id===binding.parentId&&
+  job.state.job.namespace===namespace&&job.state.job.handler==='interactions'&&
+  job.state.job.version===6&&job.state.delivered===true&&job.state.complete===settled);
+ assert.equal(job.state.fingerprint,binding.fingerprint);
+ assert.deepEqual(gate?.state,{id:binding.id,fingerprint:binding.fingerprint,settled});
+ const receipt=indexed.get(receiptKey);
+ if(receipt){
+  assert.deepEqual(receipt.state.binding,binding);
+  assert.deepEqual(receipt.state.delivery,delivery);
+  assert.equal(receipt.state.workspace.executionId,binding.id);
+  if(!settled)assert.deepEqual(receipt.state.workspace,execution.workspace);
+ }
+ if(settled){
+  assert(receipt&&[pendingKey,incompleteKey,...scopeKeys].every(id=>!indexed.has(id)));
+ }else{
+  assert(!indexed.has(pendingKey));
+  assert.deepEqual(indexed.get(incompleteKey)?.state,{
+   kind:'outbox_pending',namespace,id:binding.parentId,fingerprint:binding.fingerprint,
+  });
+  for(const id of scopeKeys)assert.deepEqual(indexed.get(id)?.state,binding);
+ }
+ const {status,workspace,...retainedExecution}=execution;
+ const {complete,...retainedJob}=job.state;
+ return { keys, observation: {
+  settled, receipt: Boolean(receipt), binding,
+  indexesSha256: settled?null:hash(JSON.stringify([incompleteKey,...scopeKeys].map(id=>indexed.get(id)))),
+  workspaceSha256: hash(JSON.stringify(workspace??receipt.state.workspace)),
+  shapeSha256: hash(JSON.stringify({keys,retainedExecution,retainedJob})),
+ }};
+}
 (async()=>{
  await client.connect();
  try{
@@ -68,7 +132,9 @@ async function seedScope(seed){
   await client.query("SET LOCAL statement_timeout='5000ms'");
   const setting=await client.query('SHOW transaction_read_only');
   assert.equal(setting.rows[0].transaction_read_only,'on');
-  const seed=retained!==null&&!Array.isArray(retained)?retained.seed:null;
+  const options=retained!==null&&!Array.isArray(retained)?retained:null;
+  const seed=options?.seed??null;
+  const recovery=await assessmentScope(options?.assessmentRecovery??null);
   const scoped=await seedScope(seed);
   let inventory;
   if(retained===null){
@@ -83,9 +149,10 @@ async function seedScope(seed){
     mapping.get(row.table_name).push(row.column_name);
    }
    inventory=[...mapping].map(([table,columns])=>({table,columns}));
-  }else inventory=seed===null?retained:retained.projection;
+  }else inventory=options===null?retained:options.projection;
   assert(Array.isArray(inventory)&&inventory.length>0&&inventory.length<=256);
   const names=new Set();const tables=[];let totalBytes=0,totalRows=0;
+  let outsideRecovery=null;
   for(const item of inventory){
    assert(!names.has(item.table));names.add(item.table);
    assert(Array.isArray(item.columns)&&item.columns.length>0
@@ -119,9 +186,21 @@ async function seedScope(seed){
    assert.equal(actualBytes,bytes);
    tables.push({table:item.table,columns:item.columns,count,bytes,
                 sha256:hash.digest('hex')});
+   if(recovery&&item.table==='SidedoorState'){
+    assert.deepEqual([...item.columns].sort(),['id','revision','state']);
+    const keySet=new Set(recovery.keys);
+    const untouched=result.rows.filter(row=>!keySet.has(JSON.parse(row.value).id));
+    const outside=crypto.createHash('sha256');
+    for(const row of untouched)outside.update(row.value+'\n');
+    outsideRecovery={count:untouched.length,sha256:outside.digest('hex')};
+   }
   }
   assert([...scoped.keys()].every(name=>names.has(name)));
-  const output=JSON.stringify({schemaVersion:1,tables,totalBytes,totalRows});
+  const observation={schemaVersion:1,tables,totalBytes,totalRows};
+  assert(!recovery||outsideRecovery);
+  const output=JSON.stringify(recovery?
+   {observation,assessmentRecovery:{...recovery.observation,outside:outsideRecovery}}:
+   observation);
   assert(Buffer.byteLength(output)<=262144);console.log(output);
  }finally{
   await client.query('ROLLBACK');await client.end();clearTimeout(timer);
