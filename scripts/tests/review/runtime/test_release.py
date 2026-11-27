@@ -378,9 +378,42 @@ class ReleaseRecoveryTests(unittest.TestCase):
             'finalWorker': {**base['finalWorker'], 'imageId': 'sha256:' + '7' * 64},
         }, 'b' * 64), self.lock)
         boundary = 'scripts.deploy.review.runtime.inventory.predecessor.bind_predecessor'
-        with patch(boundary, return_value=self.operations):
-            _, protected = release.retention_context(successor)
-        self.assertEqual(protected, {'sha256:' + key * 64 for key in '124567'})
+        identities = {}
+        for role, digit in (('web', '1'), ('workers', '2')):
+            identity = digit * 64
+            container = self.candidates[role]
+            container['Id'] = identity
+            identities[identity] = container
+            atomic_json(self.operations.attempt.directory / f'candidate-{role}.json',
+                        self.operations.writer_binding(container))
+        references = {base['finalWeb']['reference']: 'sha256:' + '6' * 64,
+                      base['finalWorker']['reference']: 'sha256:' + '7' * 64}
+        extra = []
+
+        def docker(*args: str) -> str:
+            if args[:2] == ('image', 'inspect'):
+                return references[args[-1]]
+            if args[:2] == ('ps', '-aq'):
+                return ' '.join(['4' * 64, '5' * 64, *extra]) if args[-1].endswith('='+PROJECT) else ''
+            identity = args[-1]
+            if args[1] == '--type':
+                return f"{identity} {identities[identity]['Image']}"
+            return 'sha256:' + identity
+
+        canonical = import_module('scripts.deploy.production-retention')
+        with (
+            patch(boundary, return_value=self.operations),
+            patch.object(self.operations, 'inspect', side_effect=lambda identity: [identities[identity]]),
+            patch.object(canonical, 'docker', side_effect=docker),
+        ):
+            _, writers, planned = release.verify_retention_begin(successor)
+            self.assertEqual(set(writers), set(identities))
+            self.assertEqual(set(planned['successful_images']), {'sha256:' + key * 64 for key in '124567'})
+            self.assertFalse((successor.attempt.directory / 'retention-begin.json').exists())
+            self.assertFalse(list(self.retention.glob('*-attempt-*.json')))
+            extra.append('8' * 64)
+            with self.assertRaisesRegex(ValueError, 'protection-plan'):
+                release.verify_retention_begin(successor)
 
     def test_foreign_drop_in_refuses_completion_without_a_receipt(
         self,
@@ -424,9 +457,13 @@ class ReleaseRecoveryTests(unittest.TestCase):
         self,
     ) -> None:
         canonical = import_module('scripts.deploy.production-retention')
-        with patch.object(canonical, 'docker', side_effect=OSError('fixture')):
+        with (
+            patch.object(canonical, 'docker', side_effect=self.canonical_docker),
+            patch.object(canonical, 'update_record', side_effect=OSError('fixture')),
+        ):
             with self.assertRaises(OSError):
                 release.before_fence(self.operations)
+        self.assertTrue((self.operations.attempt.directory / 'retention-begin.json').exists())
         with patch.object(canonical, 'docker',
                           side_effect=self.canonical_docker):
             release.before_fence(self.operations)

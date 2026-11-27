@@ -94,6 +94,7 @@ class SuccessorPreflightTests(unittest.TestCase):
         self.enterContext(patch(runtime + 'release.successor.retained_predecessor_startup'))
         self.enterContext(patch(runtime + 'release.successor.verify_successor_runtime_identity'))
         self.enterContext(patch(runtime + 'release.successor.verify_successor_workload'))
+        self.retention_plan = self.enterContext(patch(runtime + 'release.successor.verify_retention_begin'))
         self.enterContext(patch(runtime + 'release.successor.observe_predecessor_environment',
                                 return_value=({}, {})))
         self.enterContext(patch.object(self.operations, 'verify_images'))
@@ -117,6 +118,15 @@ class SuccessorPreflightTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'successor-precheck-configuration-changed'):
             preflight_successor(self.operations)
         self.assertEqual(self.operations.attempt.state()['phase'], 'PRECHECK')
+
+    def test_preflight_refuses_an_incomplete_retention_plan_without_fencing(self) -> None:
+        self.retention_plan.side_effect = ValueError('canonical-review-protection-plan-differs-from-admission')
+        with patch('scripts.deploy.review.runtime.release.successor.successor_compose_document'):
+            with self.assertRaisesRegex(ValueError, 'protection-plan'):
+                preflight_successor(self.operations)
+        self.assertEqual(self.operations.attempt.state()['phase'], 'PRECHECK')
+        self.assertFalse((self.operations.attempt.directory.parent / 'unresolved.json').exists())
+        self.assertFalse((self.operations.attempt.directory / 'retention-begin.json').exists())
 
     def test_preflight_refuses_a_remote_docker_daemon(self) -> None:
         with (patch.dict(os.environ, {'DOCKER_HOST': 'ssh://foreign.example'}),
