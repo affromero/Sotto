@@ -472,10 +472,12 @@ def verify_completed(operations: HostOperations) -> None:
 def verify_completed_records(
     operations: HostOperations, *, fenced: bool = False,
     active_fragment_sha256: str | None = None,
+    successor: HostOperations | None = None,
 ) -> None:
     """Bind retained completion evidence without starting a container."""
     expected = read_completed_record(
         operations, fenced=fenced, active_fragment_sha256=active_fragment_sha256,
+        successor=successor,
     )
     release = private_json(operations.attempt.directory
                            / 'release-record.json')
@@ -486,11 +488,13 @@ def verify_completed_records(
 def read_completed_record(
     operations: HostOperations, *, fenced: bool = False,
     active_fragment_sha256: str | None = None,
+    successor: HostOperations | None = None,
 ) -> dict[str, object]:
     """Derive completion from exact retained imports and live ownership."""
     return read_retained_record(
         operations, fenced=fenced, inspect_imports=verify_archived_imports,
         active_fragment_sha256=active_fragment_sha256,
+        successor=successor,
     )
 
 
@@ -585,10 +589,53 @@ def verify_archived_imports(
             raise ValueError('completed-import-archive-changed')
 
 
+def verify_retired_bootstrap(
+    previous: HostOperations, successor: HostOperations | None,
+    available: Mapping[str, object], identities: set[str],
+) -> None:
+    """Admit one sealed retirement without rewriting the completed receipt."""
+    from scripts.deploy.review.runtime.inventory.predecessor import bind_predecessor
+
+    if (successor is None or previous.lock is not successor.lock
+            or 'predecessor' in previous.manifest):
+        raise ValueError('completed-image-protection-changed')
+    bound = bind_predecessor(successor)
+    if (bound.attempt.directory != previous.attempt.directory
+            or bound.attempt.manifest_hash != previous.attempt.manifest_hash):
+        raise ValueError('completed-predecessor-binding-changed')
+    topology = record(previous.manifest['topology'], 'predecessor topology')
+    services = record(topology['services'], 'predecessor services')
+    retired = record(services['web'], 'retired bootstrap web')
+    image = digest(retired['imageId'], 'retired bootstrap image', 'sha256:')
+    identity = digest(retired['id'], 'retired bootstrap container')
+    kept = {digest(record(services[role], role)['imageId'], role, 'sha256:')
+            for role in ('postgres', 'redis')}
+    kept.update(digest(record(previous.manifest[role], role)['imageId'], role, 'sha256:')
+                for role in ('finalWeb', 'finalWorker'))
+    if (successor.attempt.manifest().get('retiredBootstrapImage') != image
+            or image in kept or kept | {image} != identities
+            or dict(available) != {'protected_images': sorted(kept)}):
+        raise ValueError('completed-image-protection-changed')
+    images = {digest(value, 'listed image', 'sha256:') for value in previous.docker(
+        'image', 'ls', '--all', '--no-trunc', '--format', '{{.ID}}',
+    ).decode().splitlines()}
+    if image in images or not kept <= images:
+        raise ValueError('retired-bootstrap-image-absence-not-proven')
+    ids = previous.docker('ps', '-aq', '--no-trunc').decode().split()
+    containers = previous.inspect(*ids) if ids else []
+    if ({row['Id'] for row in containers} != set(ids)
+            or not kept <= {row['Image'] for row in containers}
+            or any(row['Id'] == identity or row['Image'] == image
+                   or row['Name'] == retired['name'] for row in containers)):
+        raise ValueError('retired-bootstrap-container-absence-not-proven')
+    successor.lock.validate()
+
+
 def read_retained_record(
     operations: HostOperations, *, fenced: bool,
     inspect_imports: Callable[[HostOperations, dict[str, object]], None],
     active_fragment_sha256: str | None = None,
+    successor: HostOperations | None = None,
 ) -> dict[str, object]:
     """Share ownership proofs while keeping completion's imports strict."""
     from scripts.deploy.review.runtime.operations import (
@@ -611,10 +658,9 @@ def read_retained_record(
             or hashlib.sha256(bounded_bytes(CADDY)).hexdigest() != expected_live):
         raise ValueError('completed-public-routing-changed')
     _, identities = retention_context(operations)
-    if private_json(RETENTION / (PROJECT + '.json')) != {
-        'protected_images': sorted(identities),
-    }:
-        raise ValueError('completed-image-protection-changed')
+    available = private_json(RETENTION / (PROJECT + '.json'))
+    if available != {'protected_images': sorted(identities)}:
+        verify_retired_bootstrap(operations, successor, available, identities)
     captured = private_json(operations.attempt.directory
                             / 'admitted-imports.json')
     inspect_imports(operations, captured)

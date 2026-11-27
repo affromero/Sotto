@@ -68,6 +68,8 @@ class PredecessorCaptureTests(unittest.TestCase):
         self.previous.attempt = Attempt(attempt.directory)
         successor = self.successor_with_predecessor()
         previous = bind_predecessor(successor)
+        self.assertTrue(previous.retained_initial_release)
+        self.assertFalse(successor.retained_initial_release)
         self.assertEqual(previous.attempt.directory, self.previous.attempt.directory)
         self.assertEqual(previous.root, source)
         self.assertIs(previous.lock, successor.lock)

@@ -171,6 +171,7 @@ def verify_live_predecessor(previous: HostOperations, successor: HostOperations)
     routing = record(successor.attempt.manifest()['originalFiles'], 'admitted routing')
     verify_completed_records(
         previous, active_fragment_sha256=digest(routing['caddyFragment'], 'live Caddy fragment'),
+        successor=successor,
     )
     verify_startup_unit(previous)
     verify_running_completed_storage(previous, successor)

@@ -56,6 +56,7 @@ def bind_predecessor(successor: HostOperations) -> HostOperations:
     previous = HostOperations(attempt, successor.lock)
     previous.root = root
     previous.verify_tools()
+    previous.retained_initial_release = 'predecessor' not in previous.manifest
     successor.lock.validate()
     return previous
 

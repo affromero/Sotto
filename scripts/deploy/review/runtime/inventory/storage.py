@@ -13,7 +13,7 @@ from scripts.deploy.review.runtime.mounts import (
     MOUNT_PROBE, container_inventory, physical_identity, resolve_mounts,
 )
 from scripts.deploy.review.runtime.inventory.stopped_writer import (
-    capture_running_writer, inspect_stopped_writer,
+    capture_running_writer, inspect_stopped_writer, matches_archived_writer,
 )
 from scripts.deploy.review.runtime.release import verify_completed_records, verify_startup_unit
 from scripts.deploy.review.state import atomic_json, checksum, private_json
@@ -86,8 +86,6 @@ def inspect_completed_storage(
     previous: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
     """Check roots and aliases; caller must durably retain the initial proof."""
-    from scripts.deploy.review.runtime.operations import HostOperations
-
     protected, retained = retained_candidate_mounts(topology, original, candidates, handover)
     indexed = {container.get('Id'): container for container in containers}
     if len(indexed) != len(containers) or not protected <= indexed.keys():
@@ -98,7 +96,7 @@ def inspect_completed_storage(
     for role in ('web', 'workers'):
         candidate = record(candidates[role], 'candidate')
         actual = indexed[candidate['id']]
-        if HostOperations.writer_binding(actual) != candidate:
+        if not matches_archived_writer(actual, candidate):
             raise ValueError('review-storage-candidate-changed')
         state = record(actual['State'], 'candidate state')
         if state.get('Running') is not True and previous is None:
@@ -192,7 +190,7 @@ def verify_completed_storage(
     previous.verify_tools()
     previous.verify_images(require_imports=False, final_only=True)
     previous.verify_egress()
-    verify_completed_records(previous, fenced=True)
+    verify_completed_records(previous, fenced=True, successor=successor)
     verify_startup_unit(previous)
     directory = previous.attempt.directory
     topology = record(previous.attempt.manifest()['topology'], 'topology')

@@ -10,8 +10,11 @@ from typing import cast
 from scripts.deploy.review.runtime.inventory.stopped_writer import (
     capture_running_writer,
     inspect_stopped_writer,
+    matches_archived_writer,
 )
 from scripts.deploy.review.runtime.operations import HostOperations
+from scripts.deploy.review.state import checksum
+from scripts.deploy.review.topology import rows
 
 
 class StoppedWriterTests(unittest.TestCase):
@@ -61,6 +64,26 @@ class StoppedWriterTests(unittest.TestCase):
         cast(dict[str, object], changed['State'])['FinishedAt'] = '2026-10-26T01:23:01Z'
         with self.assertRaisesRegex(ValueError, 'evidence-changed'):
             self.inspect(changed, previous=observed)
+
+    def test_archived_writer_accepts_reordering_and_rejects_changed_mounts(self) -> None:
+        running = copy.deepcopy(self.running)
+        mounts = rows(running['Mounts'], 'test mounts')
+        mounts.append({'Type': 'volume', 'Destination': '/elsewhere', 'RW': False})
+        running['Mounts'] = mounts
+        cast(dict[str, object], running['HostConfig'])['OomKillDisable'] = None
+        binding = {**HostOperations.writer_binding(running),
+                   'hostHash': checksum(running['HostConfig']),
+                   'mountsHash': checksum(list(reversed(sorted(mounts, key=checksum))))}
+        self.assertEqual(capture_running_writer(running, binding, role='workers'), self.baseline)
+        mixed = {**binding, 'hostHash': HostOperations.writer_binding(running)['hostHash']}
+        self.assertFalse(matches_archived_writer(running, mixed))
+        mounts[0]['RW'] = False
+        with self.assertRaisesRegex(ValueError, 'binding-changed'):
+            capture_running_writer(running, binding, role='workers')
+        mounts[0]['RW'] = True
+        mounts.append(mounts[0])
+        with self.assertRaisesRegex(ValueError, 'bounded-distinct'):
+            matches_archived_writer(running, binding)
 
     def test_refuses_running_or_uncertain_exits(self) -> None:
         for field, value in (

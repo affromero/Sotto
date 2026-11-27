@@ -555,6 +555,66 @@ class ReleaseRecoveryTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'archive-changed'):
                 release.verify_completed_records(self.operations)
 
+    def test_preserves_full_completion_receipt_after_exact_bootstrap_retirement(self) -> None:
+        retired = 'sha256:' + '3' * 64
+        old_web = {'imageId': retired, 'id': '3' * 64, 'name': '/bootstrap'}
+        backing = {role: {'imageId': 'sha256:' + digit * 64}
+                   for role, digit in (('postgres', '4'), ('redis', '5'))}
+        prior_manifest = {**self.operations.manifest, 'topology': {
+            'services': {'web': old_web, **backing},
+        }}
+        previous = HostOperations(
+            Attempt.create(self.host, 'completed-prior', prior_manifest, 'a' * 64),
+            self.lock,
+        )
+        previous.root = self.root
+        self.operations = previous
+        self.prepare_completed_records()
+        successor = HostOperations(Attempt.create(
+            self.host, 'sealed-next', {'retiredBootstrapImage': retired}, 'b' * 64,
+        ), self.lock)
+        with patch.object(release, 'DIRECTORY', str(self.review)):
+            historical = release.read_completed_record(previous)
+            atomic_json(previous.attempt.directory / 'release-record.json', historical)
+            kept = {'sha256:' + digit * 64 for digit in ('1', '2', '4', '5')}
+            stable = self.retention / (PROJECT + '.json')
+            atomic_json(stable, {'protected_images': sorted(kept)})
+            with self.assertRaisesRegex(ValueError, 'completed-image-protection-changed'):
+                release.verify_completed_records(previous)
+            candidates = [
+                {'Id': digit * 64, 'Name': f'/fixture-{digit}', 'Image': 'sha256:' + digit * 64}
+                for digit in ('1', '2', '4', '5')
+            ]
+            images = kept.copy()
+
+            def docker(*args: str) -> bytes:
+                if args[:2] == ('image', 'ls'):
+                    return '\n'.join(sorted(images)).encode()
+                self.assertEqual(args, ('ps', '-aq', '--no-trunc'))
+                return '\n'.join(row['Id'] for row in candidates).encode()
+
+            with (
+                patch('scripts.deploy.review.runtime.inventory.predecessor.bind_predecessor',
+                      return_value=previous),
+                patch.object(previous, 'docker', side_effect=docker),
+                patch.object(previous, 'inspect', return_value=candidates),
+            ):
+                release.verify_completed_records(previous, successor=successor)
+                self.assertEqual(historical['protectedImages'], sorted(kept | {retired}))
+                self.assertEqual(private_json(stable), {'protected_images': sorted(kept)})
+                for bad in (kept - {'sha256:' + '1' * 64}, kept | {'sha256:' + 'f' * 64}):
+                    atomic_json(stable, {'protected_images': sorted(bad)})
+                    with self.assertRaisesRegex(ValueError, 'completed-image-protection-changed'):
+                        release.verify_completed_records(previous, successor=successor)
+                atomic_json(stable, {'protected_images': sorted(kept)})
+                images.add(retired)
+                with self.assertRaisesRegex(ValueError, 'image-absence-not-proven'):
+                    release.verify_completed_records(previous, successor=successor)
+                images.remove(retired)
+                candidates.append({'Id': old_web['id'], 'Name': old_web['name'], 'Image': retired})
+                with self.assertRaisesRegex(ValueError, 'container-absence-not-proven'):
+                    release.verify_completed_records(previous, successor=successor)
+
     def test_completed_evidence_rejects_replacement_shared_auth_directory(
         self,
     ) -> None:

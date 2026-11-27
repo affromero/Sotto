@@ -75,6 +75,7 @@ class SuccessorPreflightTests(unittest.TestCase):
             'topology': topology, 'initialStage': self.initial, 'stages': [self.final],
             'finalWorker': new_worker, 'finalWeb': {'sha': new_worker['sha']},
             'originalFiles': files,
+            'retiredBootstrapImage': 'sha256:' + 'd' * 64,
             'originalDataSha256': hashlib.sha256(baseline).hexdigest(),
             'originalQueues': {
                 'schemaVersion': 1, 'connectionIdentity': 'b' * 64,
@@ -107,6 +108,8 @@ class SuccessorPreflightTests(unittest.TestCase):
         self.assertIs(previous, self.previous)
         self.assertEqual((initial, final), (self.initial, self.final))
         self.assertEqual(self.operations.attempt.state()['phase'], 'PRECHECK')
+        self.assertEqual(self.operations.attempt.manifest()['retiredBootstrapImage'],
+                         'sha256:' + 'd' * 64)
         self.assertFalse((self.operations.attempt.directory.parent / 'unresolved.json').exists())
 
     def test_preflight_refuses_routing_changed_since_admission(self) -> None:

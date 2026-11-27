@@ -50,7 +50,7 @@ class CompletedStorageTests(unittest.TestCase):
                           'StartedAt': '2026-10-26T01:22:11.143667407Z',
                           'FinishedAt': '0001-01-01T00:00:00Z'},
                 'RestartCount': 0,
-                'Mounts': [{'Source': str(self.paths[name]),
+                'Mounts': [{'Type': 'bind', 'Source': str(self.paths[name]),
                             'Destination': self.destinations[name], 'RW': True}
                            for name in names],
             })
@@ -100,6 +100,10 @@ class CompletedStorageTests(unittest.TestCase):
         )
 
     def test_absent_original_with_both_mounted_candidates_preserves_roots(self) -> None:
+        web = self.by_role('web')
+        web['HostConfig']['OomKillDisable'] = None
+        self.bindings['web']['hostHash'] = checksum(web['HostConfig'])
+        self.bindings['web']['mountsHash'] = checksum(list(reversed(web['Mounts'])))
         proof = self.inspect()
         self.by_role('web')['State'] = {'Running': False, 'Pid': 0}
         self.assertEqual(self.inspect(proof), proof)
