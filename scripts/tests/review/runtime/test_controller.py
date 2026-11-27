@@ -20,12 +20,38 @@ from unittest.mock import patch
 from scripts.deploy.review.runtime import controller, services
 from scripts.deploy.review.runtime.operations import HostOperations
 from scripts.deploy.review.state import (
+    ROLLBACK_COMPLETE,
+    ROLLBACK_HANDOFF,
+    ROLLBACK_INTENT,
     Attempt,
     DeploymentLock,
     atomic_json,
     private_json,
 )
 from scripts.tests.review.runtime import admitted_runtime_fixture
+
+
+class RollbackAdmissionTests(unittest.TestCase):
+    def test_normal_controller_cannot_resume_after_rollback_takes_ownership(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            root.chmod(0o700)
+            attempt = Attempt.create(root, 'review', {}, 'a' * 64)
+            lock = root / 'deploy.lock'
+            lock.touch(mode=0o600)
+            with (
+                patch.object(controller, 'HOST_STATE', root),
+                patch.object(controller, 'CANONICAL_LOCK', lock),
+                patch.object(controller.sys, 'platform', 'linux'),
+                patch.object(controller.os, 'geteuid', return_value=1000),
+            ):
+                for name in (ROLLBACK_HANDOFF, ROLLBACK_INTENT, ROLLBACK_COMPLETE):
+                    with self.subTest(name=name):
+                        path = attempt.directory / name
+                        path.symlink_to(attempt.directory / 'absent')
+                        with self.assertRaisesRegex(ValueError, 'rollback-attempt-cannot-resume'):
+                            controller.canonical_attempt(attempt.directory, lock)
+                        path.unlink()
 
 
 class HostBoundary:

@@ -58,6 +58,9 @@ const initialSchema = z
   .strict();
 const ackSchema = z.object({ type: z.literal('ack'), id: z.number().int().positive() }).strict();
 const prefix = 'SOTTO_REVIEW_IPC=';
+// Each retained-runtime acknowledgement runs the full host fence and storage
+// verification. The live observer can need nine such checks in one exchange.
+const retainedRuntimeTimeoutMs = 240_000;
 const load = createRequire(import.meta.url);
 const lifecycle = load('../../queue-lifecycle.cjs') as {
   connectionIdentity(environment: NodeJS.ProcessEnv, namespace: string): string;
@@ -138,7 +141,10 @@ export async function main(): Promise<void> {
       ? REVIEW_WORKLOAD_TIMEOUT_MS + 10_000
       : initial.mode === 'providers'
         ? 310_000
-        : 90_000
+        : initial.mode === 'retained-single-client' ||
+            initial.mode === 'prepare-successor-queue-policy'
+          ? retainedRuntimeTimeoutMs
+          : 90_000
   );
   let redis: Redis | null = null;
   try {

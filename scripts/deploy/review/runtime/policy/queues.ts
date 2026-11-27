@@ -103,7 +103,12 @@ export async function prepareReviewQueuePolicy(
     assert(previous.size > 0 && verifyFence, 'Guarded successor queue initialization required');
     await confirmAddedEmpty(added);
   }
-  const deadline = Date.now() + 15_000;
+  let deadline = Date.now() + 15_000;
+  const awaitHostCheck = async (check: () => Promise<void>) => {
+    const start = Date.now();
+    await check();
+    deadline += Date.now() - start;
+  };
   for (const queue of queues) {
     assert.equal(queue.opts.skipMetasUpdate, true, 'Metadata-free queue construction required');
     assert(Date.now() < deadline, 'Review queue policy preparation deadline');
@@ -122,12 +127,12 @@ export async function prepareReviewQueuePolicy(
       'Unknown original review queue concurrency'
     );
   }
-  if (retained === null || previous.size > 0) await admit(intent);
+  if (retained === null || previous.size > 0) await awaitHostCheck(() => admit(intent));
   if (confirmAddedEmpty && verifyFence) {
     for (const queue of added) {
       if (!(await queue.isPaused())) {
         await confirmAddedEmpty([queue]);
-        await verifyFence();
+        await awaitHostCheck(verifyFence);
         await queue.pause();
       }
     }
@@ -144,7 +149,7 @@ export async function prepareReviewQueuePolicy(
       'Unknown review concurrency'
     );
     if (current === null) {
-      await verifyFence?.();
+      if (verifyFence) await awaitHostCheck(verifyFence);
       await queue.setGlobalConcurrency(1);
     }
     assert.equal(await queue.getGlobalConcurrency(), 1, 'Review queue concurrency not retained');

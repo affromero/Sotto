@@ -30,9 +30,13 @@ describe('retained review inventory channel', () => {
     }
   });
 
-  it.each(['retained-inventory', 'retained-single-client'])(
-    'refuses duplicate queue identities in %s without changing Redis',
-    async (mode) => {
+  it.each([
+    { mode: 'retained-inventory', slowFence: false },
+    { mode: 'retained-single-client', slowFence: false },
+    { mode: 'retained-single-client', slowFence: true },
+  ])(
+    'refuses duplicate queue identities in $mode without changing Redis (slow fence $slowFence)',
+    async ({ mode, slowFence }) => {
       await redis.client.set('retained-fixture', 'preserved');
       const before = await redis.client.callBuffer('DUMP', 'retained-fixture');
       const hash = 'a'.repeat(64);
@@ -66,26 +70,29 @@ describe('retained review inventory channel', () => {
       };
       const outcome = await new Promise<{ code: number | null; errors: string; fences: number }>(
         (resolve, reject) => {
-          const child = spawn(
-            process.execPath,
-            [
-              '--require',
-              'tsx/cjs',
-              '-e',
-              'require("../../scripts/deploy/review/runtime/channel.ts").main().catch(error=>{console.error(error);process.exit(1)})',
-            ],
-            {
-              env: {
-                ...process.env,
-                REDIS_URL: redis.url,
-                DATABASE_URL: 'postgresql://unreachable:fixture@127.0.0.1:1/unreachable',
-              },
-              stdio: ['pipe', 'pipe', 'pipe'],
-            }
-          );
+          const childSource = `
+const channel = require("../../scripts/deploy/review/runtime/channel.ts");
+if (${slowFence}) {
+  const schedule = globalThis.setTimeout;
+  let deadlines = 0;
+  globalThis.setTimeout = (callback, delay, ...args) => schedule(
+    callback, [90000, 240000].includes(delay) && ++deadlines === 2 ? delay / 100 : delay, ...args
+  );
+}
+channel.main().catch(error => { console.error(error); process.exit(1); });
+`;
+          const child = spawn(process.execPath, ['--require', 'tsx/cjs', '-e', childSource], {
+            env: {
+              ...process.env,
+              REDIS_URL: redis.url,
+              DATABASE_URL: 'postgresql://unreachable:fixture@127.0.0.1:1/unreachable',
+            },
+            stdio: ['pipe', 'pipe', 'pipe'],
+          });
           let output = '';
           let errors = '';
           let fences = 0;
+          let acknowledgement: ReturnType<typeof setTimeout> | undefined;
           const timeout = setTimeout(() => {
             child.kill('SIGKILL');
             reject(new Error('Retained inventory channel timed out'));
@@ -104,7 +111,13 @@ describe('retained review inventory channel', () => {
                 return;
               }
               fences++;
-              child.stdin.write(JSON.stringify({ type: 'ack', id: event.id }) + '\n');
+              const acknowledge = () => {
+                if (child.exitCode === null) {
+                  child.stdin.write(JSON.stringify({ type: 'ack', id: event.id }) + '\n');
+                }
+              };
+              if (slowFence) acknowledgement = setTimeout(acknowledge, 1500);
+              else acknowledge();
             }
           });
           child.stderr.on('data', (chunk: Buffer) => {
@@ -113,6 +126,7 @@ describe('retained review inventory channel', () => {
           child.once('error', reject);
           child.once('close', (code) => {
             clearTimeout(timeout);
+            clearTimeout(acknowledgement);
             resolve({ code, errors, fences });
           });
           child.stdin.write(

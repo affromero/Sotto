@@ -13,6 +13,7 @@ from scripts.deploy.review.runtime.inventory.queue_snapshot import (
     capture_predecessor_queue_snapshot,
     observe_predecessor_queue_drain,
     pause_predecessor_queues,
+    verify_predecessor_queue_pause,
 )
 from scripts.deploy.review.runtime.inventory.quiescence import quiesce_predecessor
 from scripts.deploy.review.runtime.inventory.retained import observe_retained_inventory
@@ -102,6 +103,24 @@ class PredecessorQueueSnapshotTests(unittest.TestCase):
         self.assertEqual(receipt['workerId'], self.worker['Id'])
         self.assertEqual(receipt['originalQueues'], self.original)
         self.assertEqual(capture_predecessor_queue_snapshot(self.previous, self.successor), receipt)
+
+    def test_rollback_can_verify_an_unresolved_pause_without_redis_writes(self) -> None:
+        paused = self.response(self.paused_flags())
+        self.responses = [
+            ({'command': 'snapshot'}, self.response(self.original)),
+            ({'command': 'pause', 'manifest': self.original}, paused),
+            ({'command': 'snapshot'}, paused),
+        ]
+        pause_predecessor_queues(self.previous, self.successor)
+        self.successor.attempt.unresolved('pre-sql-deadline')
+        with self.assertRaisesRegex(ValueError, 'active-review-successor-required'):
+            verify_predecessor_queue_pause(self.successor)
+        verify_predecessor_queue_pause(self.successor, allow_unresolved=True)
+        self.assertEqual(self.responses, [])
+        intent = self.path.parent / 'predecessor-queue-pause-intent.json'
+        atomic_json(intent, {**private_json(intent), 'expectedPausedSha256': 'f' * 64})
+        with self.assertRaisesRegex(ValueError, 'predecessor-queue-pause-result-changed'):
+            verify_predecessor_queue_pause(self.successor, allow_unresolved=True)
 
     def test_retained_inventory_binds_delivered_jobs_and_refuses_changed_data(self) -> None:
         evidence = {'jobs': [{'id': str(number), 'delivered': True} for number in range(3)]}

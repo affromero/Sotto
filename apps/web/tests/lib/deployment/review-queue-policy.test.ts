@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { spawn } from 'node:child_process';
 import { Queue, Worker } from 'bullmq';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPrivateRedis } from '../../helpers/queue/private-redis';
 import { ALL_QUEUE_NAMES } from '@/lib/queue';
 import { privacyContactUrl } from '@/lib/privacy/contact';
@@ -166,6 +166,44 @@ describe('dedicated review queue policy', () => {
       ).rejects.toThrow('Unknown original review queue concurrency');
       expect(await snapshot()).toEqual(drifted);
     } finally {
+      await Promise.all(owned.map((queue) => queue.close()));
+    }
+  });
+
+  it('retains queue limits when host fence acknowledgements are slower than Redis', async () => {
+    const owned = ALL_QUEUE_NAMES.map(runtime().createQueue);
+    const added = owned.find((queue) => queue.name === 'learning-writing');
+    if (!added) throw new Error('Candidate writing queue missing');
+    const previous = owned.filter((queue) => queue !== added);
+    const now = Date.now;
+    let acknowledgementTime = 0;
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => now() + acknowledgementTime);
+    const hostCheck = async () => {
+      acknowledgementTime += 16_000;
+    };
+    try {
+      for (const queue of previous) {
+        await queue.pause();
+        await queue.setGlobalConcurrency(1);
+      }
+      await prepareReviewQueuePolicy(
+        owned,
+        connectionIdentity,
+        null,
+        hostCheck,
+        previous.map((queue) => queue.name),
+        hostCheck,
+        async (queues) => {
+          for (const queue of queues) expect(await queue.getJobs()).toEqual([]);
+        }
+      );
+      expect(await added.isPaused()).toBe(true);
+      expect(await added.getGlobalConcurrency()).toBe(1);
+      expect(await Promise.all(previous.map((queue) => queue.getGlobalConcurrency()))).toEqual(
+        previous.map(() => 1)
+      );
+    } finally {
+      clock.mockRestore();
       await Promise.all(owned.map((queue) => queue.close()));
     }
   });

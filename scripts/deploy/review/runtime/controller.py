@@ -43,6 +43,9 @@ from scripts.deploy.review.runtime.release.successor import (
     verify_live_predecessor,
 )
 from scripts.deploy.review.state import (
+    ROLLBACK_COMPLETE,
+    ROLLBACK_HANDOFF,
+    ROLLBACK_INTENT,
     PHASES,
     Attempt,
     DeploymentLock,
@@ -865,12 +868,19 @@ def request_recovery(attempt: Attempt) -> None:
         os.close(descriptor)
 
 
-def canonical_attempt(path: Path, lock: Path) -> Attempt:
+def canonical_attempt(
+    path: Path, lock: Path, *, allow_rolled_back: bool = False,
+) -> Attempt:
     if (not sys.platform.startswith('linux') or os.geteuid() == 0
             or lock != CANONICAL_LOCK or lock.is_symlink()
             or not path.is_absolute() or path.is_symlink()
             or path.parent != HOST_STATE or path.resolve() != path):
         raise ValueError('owned-canonical-linux-review-attempt-required')
+    if not allow_rolled_back and any(
+        (path / name).exists() or (path / name).is_symlink()
+        for name in (ROLLBACK_HANDOFF, ROLLBACK_INTENT, ROLLBACK_COMPLETE)
+    ):
+        raise ValueError('review-rollback-attempt-cannot-resume')
     return Attempt(path)
 
 

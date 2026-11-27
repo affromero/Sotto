@@ -22,6 +22,9 @@ PHASES = (
     'BACKED_UP', 'SQL_STARTED', 'FINAL_SCHEMA_VERIFIED',
     'EGRESS_GUARDED', 'CANDIDATE_READY', 'PUBLIC_COMMITTED', 'COMPLETE',
 )
+ROLLBACK_HANDOFF = 'pre-sql-rollback-handoff.json'
+ROLLBACK_INTENT = 'pre-sql-rollback-intent.json'
+ROLLBACK_COMPLETE = 'pre-sql-rollback.json'
 
 
 def checksum(value: object, *, ensure_ascii: bool = True) -> str:

@@ -5,8 +5,10 @@ from __future__ import annotations
 import os
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from scripts.deploy.review.runtime.channel import exchange
 from scripts.deploy.review.state import (
@@ -39,7 +41,7 @@ class ReviewChannelTests(unittest.TestCase):
         self.fences += 1
 
     def run_child(
-        self, body: str, *, mode: str = 'providers', timeout: float = 2,
+        self, body: str, *, mode: str = 'providers', timeout: float | None = 2,
     ) -> object:
         preamble = '''import json,os,sys,time
 from pathlib import Path
@@ -95,6 +97,21 @@ emit({'type':'result','value':{'keys':112}})
                 self.fence_failure_after = 3
                 with self.assertRaisesRegex(ValueError, 'actual-fence-missing'):
                     self.run_child(script, mode=mode)
+
+    def test_slow_retained_exchanges_check_every_fence_before_returning(self) -> None:
+        script = '''for identity in range(1,10):
+ emit({'type':'fence','id':identity});ack(identity)
+emit({'type':'result','value':{'keys':112}})
+'''
+        monotonic = time.monotonic
+        for mode in ('retained-single-client', 'prepare-successor-queue-policy'):
+            with self.subTest(mode=mode):
+                self.fences = 0
+                with patch('scripts.deploy.review.runtime.channel.time.monotonic',
+                           side_effect=lambda: monotonic() + self.fences * 16):
+                    result = self.run_child(script, mode=mode, timeout=None)
+                self.assertEqual(result, {'keys': 112})
+                self.assertEqual(self.fences, 9)
 
     def test_successor_policy_acknowledges_durable_limits_before_writes(self) -> None:
         path = self.root / 'queue-policy-intent.json'
