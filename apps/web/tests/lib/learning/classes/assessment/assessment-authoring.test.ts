@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { createSkillRequirements } from '@sotto/shared';
 import { prerequisitePublicSourceSchema } from '@/lib/classes/help/content/prerequisite-source';
-import { authorAssessmentSection } from '@/lib/learning/classes/generation/assessment-authoring';
+import {
+  authoredSectionSchema,
+  authorAssessmentSection,
+} from '@/lib/learning/classes/generation/assessment-authoring';
 import {
   assessmentReviewPayload,
   reviewAssessmentDraft,
@@ -502,8 +505,15 @@ describe('assessment section authoring', () => {
   it('requests a private held-out exercise set with the exact required count', async () => {
     const requests: string[] = [];
     const result = await authorAssessmentSection(
-      { source, prerequisite: null, requirements, skill: 'GRAMMAR' },
+      { source, prerequisite: null, requirements, skill: 'GRAMMAR', authorSchemaVersion: 2 },
       async (request) => {
+        expect(request.schema).toMatchObject({
+          type: 'object',
+          properties: { skill: { const: 'GRAMMAR' }, items: { type: 'array' } },
+          required: ['skill', 'items'],
+          additionalProperties: false,
+        });
+        expect(request.schema).not.toHaveProperty('oneOf');
         requests.push(request.payload);
         return JSON.stringify({
           skill: 'GRAMMAR',
@@ -518,6 +528,20 @@ describe('assessment section authoring', () => {
       count: grammarRequirement.expectedCount,
     });
     expect(JSON.parse(requests[0]!).source.teaching.guidedPractice).not.toHaveProperty('answer');
+  });
+  it('reconstructs the same provider schema for older retained requests', async () => {
+    await authorAssessmentSection(
+      { source, prerequisite: null, requirements, skill: 'GRAMMAR' },
+      async (request) => {
+        expect(request.schema).toEqual(
+          authoredSectionSchema.options[0].toJSONSchema({ target: 'draft-7' })
+        );
+        return JSON.stringify({
+          skill: 'GRAMMAR',
+          items: Array.from({ length: grammarRequirement.expectedCount }, () => question),
+        });
+      }
+    );
   });
   it('asks the author to avoid previously exposed assessment tasks', async () => {
     const priorTasks = [[{ skill: 'GRAMMAR' as const, task: 'Previously shown question' }]];

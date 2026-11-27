@@ -21,6 +21,7 @@ export const assessmentFenceSchema = z
     userId: z.string().min(1),
     classAttempt: z.number().int().positive(),
     assessmentAttempt: z.number().int().positive(),
+    authorSchemaVersion: z.literal(2).optional(),
     materialVersion: z.literal(2).optional(),
     speakingPolicy: z.literal(READ_ALOUD_ASSESSMENT_POLICY).optional(),
     ownership: prerequisiteFenceSchema.shape.ownership,
@@ -127,6 +128,7 @@ export function admitAssessmentFence(current: AssessmentFence | null, proposed: 
     existing.userId === next.userId &&
     existing.classAttempt === next.classAttempt &&
     existing.assessmentAttempt === next.assessmentAttempt &&
+    existing.authorSchemaVersion === next.authorSchemaVersion &&
     (existing.materialVersion ?? 1) === (next.materialVersion ?? 1) &&
     existing.speakingPolicy === next.speakingPolicy &&
     existing.formativeRevision === next.formativeRevision &&
