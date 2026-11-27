@@ -415,7 +415,10 @@ This does not change production or self-hosting defaults.
 
 Before starting, independently admit the exact source, successful CI runs,
 immutable image receipts, staged migration inventories, host topology and
-private inputs. Preserve the original data and queue evidence. Require an
+private inputs. Preserve the original data and queue evidence. Record the
+checksum of the validated live Caddy fragment so the successor restores its
+current routing after maintenance. Keep the predecessor's original routing
+record as deployment evidence. Require an
 admitted Linux kernel proof of the review-only network guard. Import missing
 images through capacity admission before creating the private, checksum-bound
 `Attempt` with `scripts.deploy.review.state.Attempt.create`. The controller

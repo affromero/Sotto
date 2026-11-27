@@ -15,7 +15,7 @@ from pathlib import Path
 from types import ModuleType
 from typing import TYPE_CHECKING, cast
 
-from scripts.deploy.images.metadata import record
+from scripts.deploy.images.metadata import digest, record
 from scripts.deploy.review.build_observer import bounded_bytes
 from scripts.deploy.review.state import (
     atomic_json,
@@ -471,9 +471,12 @@ def verify_completed(operations: HostOperations) -> None:
 
 def verify_completed_records(
     operations: HostOperations, *, fenced: bool = False,
+    active_fragment_sha256: str | None = None,
 ) -> None:
     """Bind retained completion evidence without starting a container."""
-    expected = read_completed_record(operations, fenced=fenced)
+    expected = read_completed_record(
+        operations, fenced=fenced, active_fragment_sha256=active_fragment_sha256,
+    )
     release = private_json(operations.attempt.directory
                            / 'release-record.json')
     if release != expected:
@@ -482,10 +485,13 @@ def verify_completed_records(
 
 def read_completed_record(
     operations: HostOperations, *, fenced: bool = False,
+    active_fragment_sha256: str | None = None,
 ) -> dict[str, object]:
     """Derive completion from exact retained imports and live ownership."""
-    return read_retained_record(operations, fenced=fenced,
-                                inspect_imports=verify_archived_imports)
+    return read_retained_record(
+        operations, fenced=fenced, inspect_imports=verify_archived_imports,
+        active_fragment_sha256=active_fragment_sha256,
+    )
 
 
 def archive_directories(
@@ -582,6 +588,7 @@ def verify_archived_imports(
 def read_retained_record(
     operations: HostOperations, *, fenced: bool,
     inspect_imports: Callable[[HostOperations, dict[str, object]], None],
+    active_fragment_sha256: str | None = None,
 ) -> dict[str, object]:
     """Share ownership proofs while keeping completion's imports strict."""
     from scripts.deploy.review.runtime.operations import (
@@ -593,9 +600,15 @@ def read_retained_record(
     original = bounded_bytes(operations.attempt.directory
                              / 'original-caddy.conf', private=True)
     expected_files = record(operations.manifest['originalFiles'], 'original')
-    if (hashlib.sha256(original).hexdigest()
-            != expected_files['caddyFragment']
-            or bounded_bytes(CADDY) != (MAINTENANCE if fenced else original)):
+    if active_fragment_sha256 is not None and fenced:
+        raise ValueError('fenced-route-requires-maintenance-fragment')
+    expected_live = (
+        digest(active_fragment_sha256, 'admitted live Caddy fragment')
+        if active_fragment_sha256 is not None
+        else hashlib.sha256(MAINTENANCE if fenced else original).hexdigest()
+    )
+    if (hashlib.sha256(original).hexdigest() != expected_files['caddyFragment']
+            or hashlib.sha256(bounded_bytes(CADDY)).hexdigest() != expected_live):
         raise ValueError('completed-public-routing-changed')
     _, identities = retention_context(operations)
     if private_json(RETENTION / (PROJECT + '.json')) != {

@@ -168,7 +168,10 @@ def verify_live_predecessor(previous: HostOperations, successor: HostOperations)
     """Verify the current release using its actual writers and retained mount roots."""
     previous.verify_tools()
     previous.verify_images(require_imports=False, final_only=True)
-    verify_completed_records(previous)
+    routing = record(successor.attempt.manifest()['originalFiles'], 'admitted routing')
+    verify_completed_records(
+        previous, active_fragment_sha256=digest(routing['caddyFragment'], 'live Caddy fragment'),
+    )
     verify_startup_unit(previous)
     verify_running_completed_storage(previous, successor)
     services.wait_health(previous, public=True)

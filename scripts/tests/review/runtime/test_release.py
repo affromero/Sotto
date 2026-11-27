@@ -570,6 +570,35 @@ class ReleaseRecoveryTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'shared-auth-home'):
                 release.verify_completed_records(self.operations)
 
+    def test_successor_binds_current_and_historical_routes(self) -> None:
+        self.prepare_completed_records()
+        directory = self.operations.attempt.directory
+        with patch('scripts.deploy.review.runtime.release.DIRECTORY', str(self.review)):
+            expected = release.read_completed_record(self.operations)
+            atomic_json(directory / 'release-record.json', expected)
+            active = self.original.replace(b'reverse_proxy', b'encode gzip\n reverse_proxy')
+            self.caddy.write_bytes(active)
+            accepted = hashlib.sha256(active).hexdigest()
+            with self.assertRaisesRegex(ValueError, 'completed-public-routing-changed'):
+                release.verify_completed_records(self.operations)
+            release.verify_completed_records(self.operations, active_fragment_sha256=accepted)
+            self.assertEqual((directory / 'original-caddy.conf').read_bytes(), self.original)
+            with self.assertRaisesRegex(ValueError, 'admitted live Caddy fragment'):
+                release.verify_completed_records(
+                    self.operations, active_fragment_sha256=accepted.upper(),
+                )
+            (directory / 'original-caddy.conf').write_bytes(b'changed historical route')
+            with self.assertRaisesRegex(ValueError, 'completed-public-routing-changed'):
+                release.verify_completed_records(self.operations, active_fragment_sha256=accepted)
+            (directory / 'original-caddy.conf').write_bytes(self.original)
+            self.caddy.write_bytes(active + b'\n')
+            with self.assertRaisesRegex(ValueError, 'completed-public-routing-changed'):
+                release.verify_completed_records(self.operations, active_fragment_sha256=accepted)
+            with self.assertRaisesRegex(ValueError, 'fenced-route-requires-maintenance-fragment'):
+                release.verify_completed_records(
+                    self.operations, fenced=True, active_fragment_sha256=accepted,
+                )
+
     @unittest.skipUnless(
         os.environ.get('SOTTO_REVIEW_IMPORT_FINALIZER'),
         'Requires the explicitly admitted unchanged canonical finalizer',
