@@ -65,11 +65,12 @@ def _original_queues(
 def _run_queue_command(
     previous: HostOperations, successor: HostOperations, *,
     mode: Literal['snapshot', 'drained-all', 'pause'],
+    web_stopped: bool = False,
 ) -> tuple[dict[str, object], dict[str, object]]:
     if mode not in ('snapshot', 'drained-all', 'pause'):
         raise ValueError('predecessor-queue-command-invalid')
     expected = _original_queues(successor)
-    verify_running_predecessor_network(previous, successor)
+    verify_running_predecessor_network(previous, successor, web_stopped=web_stopped)
     _, environment = admit_successor_environment(previous, successor)
     identity = services.verify_candidate(previous, 'workers')
     digest(identity, 'predecessor worker')
@@ -127,7 +128,7 @@ def _run_queue_command(
     if len(results) != 1 or len(results[0]) > 65536:
         raise ValueError('unique-bounded-predecessor-queue-snapshot-required')
     observed = record(json.loads(results[0]), 'predecessor queue snapshot')
-    verify_running_predecessor_network(previous, successor)
+    verify_running_predecessor_network(previous, successor, web_stopped=web_stopped)
     _, current_environment = admit_successor_environment(previous, successor)
     if (current_environment != environment
             or services.verify_candidate(previous, 'workers') != identity):
@@ -168,6 +169,23 @@ def _pause_intent(receipt: dict[str, object]) -> dict[str, object]:
             'expectedPausedSha256': checksum(_paused_queues(receipt))}
 
 
+def verify_predecessor_queue_pause(successor: HostOperations) -> None:
+    """Verify the retained proof when the full running topology has changed."""
+    directory = successor.attempt.directory
+    receipt = private_json(directory / 'predecessor-queues.json')
+    if (receipt.get('originalQueues') != _original_queues(successor)
+            or receipt.get('successorManifestSha256') != successor.attempt.manifest_hash
+            or receipt.get('successorEvidenceSha256') != successor.attempt.evidence_hash):
+        raise ValueError('predecessor-queue-runtime-changed')
+    intent = _pause_intent(receipt)
+    result = {'intentSha256': checksum(intent),
+              'pausedManifestSha256': intent['expectedPausedSha256']}
+    if (private_json(directory / 'predecessor-queue-pause-intent.json') != intent
+            or private_json(directory / 'predecessor-queue-pause-result.json') != result):
+        raise ValueError('predecessor-queue-pause-result-changed')
+    successor.verify_fence()
+
+
 def pause_predecessor_queues(
     previous: HostOperations, successor: HostOperations,
 ) -> None:
@@ -206,9 +224,12 @@ def pause_predecessor_queues(
 
 def observe_predecessor_queue_drain(
     previous: HostOperations, successor: HostOperations,
+    *, web_stopped: bool = False,
 ) -> bool:
     """Read whether paused queues and both execution classes have drained."""
-    observed, receipt = _run_queue_command(previous, successor, mode='drained-all')
+    observed, receipt = _run_queue_command(
+        previous, successor, mode='drained-all', web_stopped=web_stopped,
+    )
     paused = _paused_queues(receipt)
     if (set(observed) != {*paused, 'activeJobs', 'executions', 'drained'}
             or checksum({key: observed[key] for key in paused}) != checksum(paused)):

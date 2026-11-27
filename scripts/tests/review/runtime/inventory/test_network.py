@@ -189,6 +189,38 @@ class RunningPredecessorNetworkTests(ReviewNetworkFixture):
     def test_exact_running_topology_is_accepted(self) -> None:
         verify_running_predecessor_network(self.previous, self.successor)
 
+    def test_queue_drain_after_confirmed_web_stop_requires_only_worker(self) -> None:
+        with self.assertRaisesRegex(ValueError, 'expected-predecessor-web-stopped'):
+            verify_running_predecessor_network(
+                self.previous, self.successor, web_stopped=True,
+            )
+
+        prepare_predecessor_stop(self.previous, self.successor, role='web')
+        web = self.fixture.fixture.candidates['web']
+        web['State'].update({'Running': False, 'Status': 'exited', 'ExitCode': 0,
+                             'FinishedAt': '2026-10-26T01:23:00Z'})
+        endpoint = web['NetworkSettings']['Networks'][NETWORK]
+        endpoint['IPAMConfig'] = {'IPv4Address': endpoint['IPAddress']}
+        self.fixture.confirm_stop('web')
+        for network in self.networks:
+            network['Containers'].pop(web['Id'])
+
+        verify_running_predecessor_network(
+            self.previous, self.successor, web_stopped=True,
+        )
+        with self.assertRaisesRegex(ValueError, 'expected-predecessor-web-running'):
+            verify_running_predecessor_network(self.previous, self.successor)
+
+        for network in self.networks:
+            with self.subTest(network=network['Name']):
+                members = network['Containers']
+                members[web['Id']] = {}
+                with self.assertRaisesRegex(ValueError, 'unexpected-review-network-member'):
+                    verify_running_predecessor_network(
+                        self.previous, self.successor, web_stopped=True,
+                    )
+                del members[web['Id']]
+
     def test_unknown_peer_on_either_network_is_rejected(self) -> None:
         for network in self.networks:
             with self.subTest(network=network['Name']):

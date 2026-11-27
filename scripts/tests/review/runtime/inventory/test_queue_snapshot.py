@@ -13,7 +13,8 @@ from scripts.deploy.review.runtime.inventory.queue_snapshot import (
     observe_predecessor_queue_drain,
     pause_predecessor_queues,
 )
-from scripts.deploy.review.state import private_json
+from scripts.deploy.review.runtime.inventory.quiescence import quiesce_predecessor
+from scripts.deploy.review.state import atomic_json, private_json
 from scripts.deploy.review.topology import NETWORK, PROJECT
 from scripts.tests.review.runtime import admitted_runtime_fixture
 
@@ -65,7 +66,6 @@ class PredecessorQueueSnapshotTests(unittest.TestCase):
         request = json.loads(options['content'])
         self.assertEqual(options['timeout'], 25)
         if self.responses is not None:
-            self.assertEqual(request['command'], 'snapshot')
             return self.queued_response(request)
         self.assertEqual(request, self.expected_request)
         if self.after_observation is not None:
@@ -194,6 +194,76 @@ class PredecessorQueueSnapshotTests(unittest.TestCase):
         original_bytes = self.path.read_bytes()
         self.assertTrue(observe_predecessor_queue_drain(self.previous, self.successor))
         self.assertEqual(self.path.read_bytes(), original_bytes)
+
+    def test_quiescence_rechecks_drain_after_web_stops_and_keeps_stop_proof(self) -> None:
+        drained_result = self.prepare_drain()
+        drained = self.response(drained_result)
+        busy = self.response({**drained_result, 'activeJobs': 1, 'drained': False})
+        drain = {'command': 'drained-all', 'manifest': self.original}
+        paused = self.response(self.paused_flags())
+        self.responses = [
+            ({'command': 'snapshot'}, self.response(self.original)),
+            ({'command': 'pause', 'manifest': self.original}, paused),
+            ({'command': 'snapshot'}, paused),
+            (drain, busy),
+            ({'command': 'snapshot'}, paused),
+            (drain, drained),
+            (drain, drained),
+        ]
+        stopped = []
+
+        def command(arguments: list[str], **options: object) -> bytes:
+            if arguments[1:3] != ['-I', '-']:
+                return self.command(arguments, **options)
+            operation, identity = arguments[3:]
+            role = {'stop-web': 'web', 'stop': 'workers'}[operation]
+            self.assertEqual(len(self.responses), 1 if role == 'web' else 0)
+            container = self.network.fixture.fixture.candidates[role]
+            self.assertEqual(identity, container['Id'])
+            container['State'].update({
+                'Running': False, 'Status': 'exited', 'ExitCode': 0,
+                'FinishedAt': '2026-10-26T01:23:00Z',
+            })
+            endpoint = container['NetworkSettings']['Networks'][NETWORK]
+            endpoint['IPAMConfig'] = {'IPv4Address': endpoint['IPAddress']}
+            for network in self.network.networks:
+                network['Containers'].pop(identity)
+            stopped.append(role)
+            return b''
+
+        with patch.object(self.successor, 'command', side_effect=command), patch.object(
+            self.successor, 'inspect', side_effect=self.previous.inspect,
+        ):
+            with patch('scripts.deploy.review.runtime.inventory.quiescence.time') as clock:
+                clock.monotonic.side_effect = [0, 120]
+                with self.assertRaisesRegex(TimeoutError, 'predecessor-workload-drain-unresolved'):
+                    quiesce_predecessor(self.previous, self.successor, continue_check=lambda: None)
+            quiesce_predecessor(self.previous, self.successor, continue_check=lambda: None)
+            quiesce_predecessor(self.previous, self.successor, continue_check=lambda: None)
+        self.assertEqual(stopped, ['web', 'workers'])
+        self.assertEqual(set(private_json(self.path.parent / 'predecessor-stopped.json')),
+                         {'web', 'workers'})
+        atomic_json(self.path.parent / 'predecessor-queue-pause-result.json', {})
+        with self.assertRaisesRegex(ValueError, 'predecessor-queue-pause-result-changed'):
+            quiesce_predecessor(self.previous, self.successor, continue_check=lambda: None)
+
+    def test_quiescence_leaves_writers_running_while_work_is_active(self) -> None:
+        busy = self.response(self.prepare_drain(synchronous=1))
+        paused = self.response(self.paused_flags())
+        self.responses = [
+            ({'command': 'snapshot'}, self.response(self.original)),
+            ({'command': 'pause', 'manifest': self.original}, paused),
+            ({'command': 'snapshot'}, paused),
+            ({'command': 'drained-all', 'manifest': self.original}, busy),
+        ]
+        with patch('scripts.deploy.review.runtime.inventory.quiescence.time') as clock:
+            clock.monotonic.side_effect = [0, 120]
+            with self.assertRaisesRegex(TimeoutError, 'predecessor-workload-drain-unresolved'):
+                quiesce_predecessor(self.previous, self.successor, continue_check=lambda: None)
+        self.assertFalse(self.responses)
+        for role, container in self.network.fixture.fixture.candidates.items():
+            self.assertTrue(container['State']['Running'])
+            self.assertFalse((self.path.parent / f'predecessor-stop-intent-{role}.json').exists())
 
     def test_each_kind_of_active_work_prevents_a_drain_result(self) -> None:
         first = self.prepare_drain(jobs=1)
