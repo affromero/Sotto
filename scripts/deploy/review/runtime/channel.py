@@ -30,6 +30,7 @@ def exchange(
         'inspect', 'prepare', 'providers', 'queues', 'capture',
         'continuation', 'consumers', 'workloads', 'paused-admission',
         'queue-policy', 'retained-inventory', 'retained-single-client',
+        'prepare-successor-queue-policy',
     } or not 0 < timeout <= (3330 if initial.get('mode') == 'workloads'
                             else 330):
         raise ValueError('bounded-runtime-exchange-required')
@@ -121,7 +122,7 @@ def exchange(
                             raise ValueError('invalid-queue-policy-event')
                         assert_fence()
                     elif kind == 'queuePolicyIntent':
-                        if (initial['mode'] != 'prepare'
+                        if (initial['mode'] not in ('prepare', 'prepare-successor-queue-policy')
                                 or queue_policy is None
                                 or set(message) != {'type', 'id', 'value'}):
                             raise ValueError('invalid-queue-policy-intent')
