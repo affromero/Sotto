@@ -62,12 +62,12 @@ def _original_queues(
     return expected
 
 
-def _observe_queues(
+def _run_queue_command(
     previous: HostOperations, successor: HostOperations, *,
-    mode: Literal['snapshot', 'drained-all'],
+    mode: Literal['snapshot', 'drained-all', 'pause'],
 ) -> tuple[dict[str, object], dict[str, object]]:
-    if mode not in ('snapshot', 'drained-all'):
-        raise ValueError('read-only-predecessor-queue-command-required')
+    if mode not in ('snapshot', 'drained-all', 'pause'):
+        raise ValueError('predecessor-queue-command-invalid')
     expected = _original_queues(successor)
     verify_running_predecessor_network(previous, successor)
     _, environment = admit_successor_environment(previous, successor)
@@ -91,19 +91,37 @@ def _observe_queues(
     }
     path = successor.attempt.directory / 'predecessor-queues.json'
     request: dict[str, object] = {'command': mode}
-    if mode == 'drained-all':
+    if mode != 'snapshot':
         if not path.exists() or private_json(path) != receipt:
             raise ValueError('exact-retained-predecessor-queue-snapshot-required')
         request['manifest'] = expected
     successor.verify_fence()
     # Node's eval mode does not enter the helper's require.main guard.
-    output = successor.command(
-        ['docker', 'exec', '-i', '--workdir', '/app/apps/web',
-         '--env', 'NODE_OPTIONS=', identity, 'node', '--import', 'tsx',
-         '--input-type=commonjs', '--eval', source.decode() + DEADLINE],
-        content=json.dumps(request, separators=(',', ':')).encode() + b'\n',
-        timeout=25,
-    )
+    arguments = ['--import', 'tsx', '--input-type=commonjs',
+                 '--eval', source.decode() + DEADLINE]
+    content = json.dumps(request, separators=(',', ':')).encode() + b'\n'
+    if mode == 'pause':
+        image = record(previous.attempt.manifest()['finalWorker'], 'predecessor worker')
+
+        def record_dispatch() -> None:
+            intent = successor.attempt.directory / 'predecessor-queue-pause-intent.json'
+            if intent.exists() or intent.is_symlink():
+                raise ValueError('predecessor-queue-pause-dispatch-already-recorded')
+            if private_json(path) != receipt:
+                raise ValueError('exact-retained-predecessor-queue-snapshot-required')
+            atomic_json(intent, _pause_intent(receipt))
+
+        output = successor.image_command(
+            image, 'node', arguments, content=content,
+            network='container:' + identity, predecessor=previous,
+            before_start=record_dispatch,
+        )
+    else:
+        output = successor.command(
+            ['docker', 'exec', '-i', '--workdir', '/app/apps/web',
+             '--env', 'NODE_OPTIONS=', identity, 'node', *arguments],
+            content=content, timeout=25,
+        )
     results = [line.removeprefix(PREFIX) for line in output.splitlines()
                if line.startswith(PREFIX)]
     if len(results) != 1 or len(results[0]) > 65536:
@@ -124,7 +142,7 @@ def capture_predecessor_queue_snapshot(
     previous: HostOperations, successor: HostOperations,
 ) -> dict[str, object]:
     """Persist original flags after verifying a read-only predecessor snapshot."""
-    observed, receipt = _observe_queues(previous, successor, mode='snapshot')
+    observed, receipt = _run_queue_command(previous, successor, mode='snapshot')
     if checksum(observed) != checksum(receipt['originalQueues']):
         raise ValueError('predecessor-queue-snapshot-changed')
     path = successor.attempt.directory / 'predecessor-queues.json'
@@ -136,17 +154,62 @@ def capture_predecessor_queue_snapshot(
     return receipt
 
 
-def observe_predecessor_queue_drain(
-    previous: HostOperations, successor: HostOperations,
-) -> bool:
-    """Read whether paused queues and both execution classes have drained."""
-    observed, receipt = _observe_queues(previous, successor, mode='drained-all')
+def _paused_queues(receipt: dict[str, object]) -> dict[str, object]:
     expected = record(receipt['originalQueues'], 'predecessor queues')
-    paused = {
+    return {
         **expected,
         'queues': [{**queue, 'paused': True}
                    for queue in rows(expected['queues'], 'predecessor queues')],
     }
+
+
+def _pause_intent(receipt: dict[str, object]) -> dict[str, object]:
+    return {'snapshotSha256': checksum(receipt),
+            'expectedPausedSha256': checksum(_paused_queues(receipt))}
+
+
+def pause_predecessor_queues(
+    previous: HostOperations, successor: HostOperations,
+) -> None:
+    """Pause once, or confirm an interrupted pause through exact readback."""
+    directory = successor.attempt.directory
+    intent_path = directory / 'predecessor-queue-pause-intent.json'
+    result_path = directory / 'predecessor-queue-pause-result.json'
+    if intent_path.exists() or intent_path.is_symlink():
+        successor.verify_fence()
+        successor.settle_pending_helpers()
+        observed, receipt = _run_queue_command(previous, successor, mode='snapshot')
+    else:
+        if result_path.exists() or result_path.is_symlink():
+            raise ValueError('predecessor-queue-pause-result-without-intent')
+        capture_predecessor_queue_snapshot(previous, successor)
+        dispatch, receipt = _run_queue_command(previous, successor, mode='pause')
+        if checksum(dispatch) != checksum(_paused_queues(receipt)):
+            raise ValueError('predecessor-queue-pause-unresolved')
+        observed, readback = _run_queue_command(previous, successor, mode='snapshot')
+        if readback != receipt:
+            raise ValueError('predecessor-queue-runtime-changed')
+    intent = _pause_intent(receipt)
+    if (private_json(directory / 'predecessor-queues.json') != receipt
+            or private_json(intent_path) != intent
+            or checksum(observed) != intent['expectedPausedSha256']):
+        raise ValueError('predecessor-queue-pause-unresolved')
+    result = {'intentSha256': checksum(intent),
+              'pausedManifestSha256': checksum(observed)}
+    successor.verify_fence()
+    if result_path.exists() or result_path.is_symlink():
+        if private_json(result_path) != result:
+            raise ValueError('predecessor-queue-pause-result-changed')
+    else:
+        atomic_json(result_path, result)
+
+
+def observe_predecessor_queue_drain(
+    previous: HostOperations, successor: HostOperations,
+) -> bool:
+    """Read whether paused queues and both execution classes have drained."""
+    observed, receipt = _run_queue_command(previous, successor, mode='drained-all')
+    paused = _paused_queues(receipt)
     if (set(observed) != {*paused, 'activeJobs', 'executions', 'drained'}
             or checksum({key: observed[key] for key in paused}) != checksum(paused)):
         raise ValueError('predecessor-queue-drain-inventory-changed')

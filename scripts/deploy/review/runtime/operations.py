@@ -10,7 +10,7 @@ import subprocess
 import sys
 import tempfile
 import time
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from importlib import import_module
 from pathlib import Path
 from typing import cast
@@ -519,6 +519,8 @@ class HostOperations:
         self, receipt: Mapping[str, object], entrypoint: str,
         arguments: Sequence[str], *, content: bytes | None = None,
         network: str = NETWORK, mounts: Sequence[str] = (),
+        predecessor: HostOperations | None = None,
+        before_start: Callable[[], None] | None = None,
     ) -> bytes:
         """An admitted image runs the explicitly named maintenance tool."""
         self.settle_pending_helpers()
@@ -527,6 +529,8 @@ class HostOperations:
             'image', 'inspect', cast(str, receipt['reference']),
         )), 'maintenance image')[0]
         image_id = digest(image['Id'], 'maintenance image', 'sha256:')
+        if predecessor is not None and image_id != receipt.get('imageId'):
+            raise ValueError('predecessor-helper-image-changed')
         binding = {
             'kind': 'maintenance', 'imageId': image_id, 'network': network,
             'entrypoint': entrypoint, 'argumentsHash': checksum(arguments),
@@ -537,9 +541,10 @@ class HostOperations:
         identity = checksum(binding)
         name = PROJECT + '-tool-' + identity[:24]
         path = self.attempt.directory / ('helper-' + identity + '.json')
+        options = {} if predecessor is None else {'predecessor': predecessor}
         command = self.tool_command(
             receipt, entrypoint, arguments, network=network, mounts=mounts,
-            container_name=name,
+            container_name=name, **options,
         )
         binding['environmentHash'] = bind_helper_environment(
             self, command, image,
@@ -552,6 +557,11 @@ class HostOperations:
         atomic_json(path, {**binding, 'name': name,
                            'containerId': container_id, 'status': 'created'})
         try:
+            if predecessor is not None:
+                self.verify_fence()
+            if before_start is not None:
+                before_start()
+                self.verify_fence()
             value = self.command(['docker', 'start', '-ai', container_id],
                                  content=content, timeout=900)
         except BaseException:
@@ -566,21 +576,36 @@ class HostOperations:
         arguments: Sequence[str], *, network: str = NETWORK,
         mounts: Sequence[str] = (),
         container_name: str | None = None,
+        predecessor: HostOperations | None = None,
     ) -> list[str]:
         if entrypoint not in {'node', 'npx', 'tar'}:
             raise ValueError('unsupported-reviewed-tool-entrypoint')
         if network not in {NETWORK, 'none'} \
                 and not network.startswith('container:'):
             raise ValueError('unsupported-reviewed-tool-network')
-        self.runtime_environment()
-        self.verify_storage()
-        topology = record(self.manifest['topology'], 'topology')
-        old = record(record(topology['services'], 'services')['web'], 'web')
-        image = rows(json.loads(self.docker(
-            'image', 'inspect', cast(str, old['imageId']),
-        )), 'historical image')[0]
-        values = classified_environment(self.private_environment,
-                                        environment(image))
+        if predecessor is None:
+            self.runtime_environment()
+            self.verify_storage()
+            topology = record(self.manifest['topology'], 'topology')
+            old = record(record(topology['services'], 'services')['web'], 'web')
+            image = rows(json.loads(self.docker(
+                'image', 'inspect', cast(str, old['imageId']),
+            )), 'historical image')[0]
+            values = classified_environment(self.private_environment,
+                                            environment(image))
+        else:
+            from scripts.deploy.review.runtime import services
+            from scripts.deploy.review.runtime.inventory.environment import (
+                admit_successor_environment,
+            )
+            worker = services.verify_candidate(predecessor, 'workers')
+            if (container_name is None or entrypoint != 'node' or mounts
+                    or network != 'container:' + worker
+                    or receipt != predecessor.attempt.manifest()['finalWorker']):
+                raise ValueError('predecessor-queue-helper-not-admitted')
+            values, _ = admit_successor_environment(predecessor, self)
+            values['NODE_OPTIONS'] = ''
+            self.capacity()
         values.update({'COMMIT_SHA': cast(str, receipt['sha']),
                        'HOME': '/home/sotto',
                        'CODEX_HOME': '/home/sotto/.codex'})
