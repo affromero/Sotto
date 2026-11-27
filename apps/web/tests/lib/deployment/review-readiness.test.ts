@@ -317,6 +317,27 @@ describe('fenced review provider configuration through canonical HTTP', () => {
     expect(server.checkpoint().modelChangePrepared).toBe(true);
   });
 
+  it('checks completed predecessor settings without writing and refuses a changed key revision', async () => {
+    const server = fixture();
+    await server.run();
+    const inherited = server.checkpoint();
+    server.writes.length = 0;
+    server.state.checkpointWritable = false;
+
+    await expect(server.run(inherited)).resolves.toMatchObject({
+      credentialCount: 4,
+      modelDiscovery: 'live',
+      speechSelectionsPreserved: true,
+    });
+    expect(server.writes).toEqual([]);
+
+    const slot = 'owner/ai-keys';
+    const previous = server.stored.get(slot)!;
+    server.stored.set(slot, { ...previous, operationId: crypto.randomUUID() });
+    await expect(server.run(inherited)).rejects.toMatchObject({ phase: 'credential_precheck' });
+    expect(server.writes).toEqual([]);
+  });
+
   it('refuses curated model offerings before sending any provider credential', async () => {
     const server = fixture();
     server.state.discoveryLive = false;

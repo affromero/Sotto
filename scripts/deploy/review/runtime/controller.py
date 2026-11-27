@@ -33,6 +33,9 @@ from scripts.deploy.review.runtime.policy import (
     successor_queue_policy_names,
 )
 from scripts.deploy.review.runtime.release.successor import (
+    INHERITED_PROVIDER_CHECKPOINT,
+    PROVIDER_CHECKPOINT,
+    inherited_provider_checkpoint,
     migrate_successor_data,
     preflight_successor,
     prepare_successor_activation,
@@ -307,11 +310,18 @@ def activate(
     services.handover_auth(operations)
     web = services.candidate(operations, 'web')
     services.wait_health(operations)
-    checkpoint_path = operations.attempt.directory / 'provider-checkpoint.json'
-    provider_checkpoint = (
-        private_json(checkpoint_path) if checkpoint_path.exists()
-        else {'credentials': [], 'modelChangePrepared': False}
-    )
+    checkpoint_path = operations.attempt.directory / PROVIDER_CHECKPOINT
+    inherited_path = operations.attempt.directory / INHERITED_PROVIDER_CHECKPOINT
+    inherited = None
+    if checkpoint_path.exists() or checkpoint_path.is_symlink():
+        if inherited_path.exists() or inherited_path.is_symlink():
+            raise ValueError('provider-checkpoint-lineage-conflict')
+        provider_checkpoint = private_json(checkpoint_path)
+    elif successor:
+        inherited = inherited_provider_checkpoint(operations, readiness)
+        provider_checkpoint = record(inherited['checkpoint'], 'inherited provider checkpoint')
+    else:
+        provider_checkpoint = {'credentials': [], 'modelChangePrepared': False}
     if continue_check is not None:
         continue_check()
     ready = record(operations.runtime_exchange(
@@ -326,6 +336,12 @@ def activate(
             or ready.get('speechSelectionsPreserved') is not True
             or ready.get('workloadVerification') != 'required'):
         raise ValueError('canonical-provider-readiness-not-verified')
+    if inherited is not None:
+        if checkpoint_path.exists() or checkpoint_path.is_symlink():
+            raise ValueError('inherited-provider-readiness-issued-a-mutation')
+        operations.verify_fence()
+        if not inherited_path.exists():
+            atomic_json(inherited_path, inherited)
     if not journal['restoreIntent']:
         if continue_check is not None:
             continue_check()

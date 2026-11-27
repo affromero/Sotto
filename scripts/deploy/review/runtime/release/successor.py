@@ -522,6 +522,80 @@ def prepare_successor_activation(
     attempt.advance('EGRESS_GUARDED')
 
 
+INHERITED_PROVIDER_CHECKPOINT = 'inherited-provider-checkpoint.json'
+PROVIDER_CHECKPOINT = 'provider-checkpoint.json'
+
+
+def verify_complete_provider_checkpoint(
+    checkpoint: dict[str, object], readiness: dict[str, object],
+) -> None:
+    credentials = rows(checkpoint.get('credentials'), 'retained credentials')
+    profiles = rows(readiness['profiles'], 'admitted readiness profiles')
+    expected = {(profile['id'], endpoint) for profile in profiles
+                for endpoint in ('ai-keys', 'byok')}
+    operation_ids: set[str] = set()
+    targets: set[tuple[str, str]] = set()
+    for item in credentials:
+        command = record(item.get('command'), 'retained credential command')
+        identity, profile, endpoint = (
+            command.get('operationId'), item.get('profileId'), item.get('endpoint'),
+        )
+        if (not isinstance(identity, str) or not identity
+                or not isinstance(profile, str) or not isinstance(endpoint, str)
+                or command.get('provider') != readiness['speechProvider']
+                or command.get('expectedRevision') is not None):
+            raise ValueError('invalid-retained-provider-command')
+        operation_ids.add(identity)
+        targets.add((profile, endpoint))
+    if (set(checkpoint) != {'credentials', 'modelChangePrepared'}
+            or checkpoint['modelChangePrepared'] is not True
+            or len(expected) != 4 or len(credentials) != 4
+            or len(operation_ids) != 4 or targets != expected):
+        raise ValueError('complete-retained-provider-checkpoint-required')
+
+
+def inherited_provider_checkpoint(
+    operations: HostOperations, readiness: dict[str, object],
+) -> dict[str, object]:
+    """Read an established provider checkpoint without attributing its writes anew."""
+    previous = bind_predecessor(operations)
+    if services.private_inputs(previous)['readiness'] != readiness:
+        raise ValueError('retained-provider-readiness-inputs-changed')
+    sources = [previous.attempt.directory / name
+               for name in (PROVIDER_CHECKPOINT, INHERITED_PROVIDER_CHECKPOINT)]
+    existing = [path for path in sources if path.exists() or path.is_symlink()]
+    if len(existing) != 1:
+        raise ValueError('one-completed-predecessor-provider-checkpoint-required')
+    source = existing[0]
+    raw = bounded_bytes(source, private=True)
+    retained = private_json(source)
+    if json.loads(raw) != retained:
+        raise ValueError('retained-provider-checkpoint-changed')
+    if source.name == INHERITED_PROVIDER_CHECKPOINT:
+        if (set(retained) != {'manifestSha256', 'predecessor', 'source', 'sourceSha256', 'checkpoint'}
+                or retained.get('manifestSha256') != previous.attempt.manifest_hash
+                or retained.get('predecessor') != previous.manifest.get('predecessor')
+                or retained.get('source') not in (PROVIDER_CHECKPOINT, INHERITED_PROVIDER_CHECKPOINT)):
+            raise ValueError('retained-provider-receipt-attempt-mismatch')
+        digest(retained['sourceSha256'], 'previous provider checkpoint')
+        checkpoint = record(retained.get('checkpoint'), 'predecessor provider checkpoint')
+    else:
+        checkpoint = retained
+    verify_complete_provider_checkpoint(checkpoint, readiness)
+    receipt = {
+        'manifestSha256': operations.attempt.manifest_hash,
+        'predecessor': operations.manifest['predecessor'],
+        'source': source.name,
+        'sourceSha256': hashlib.sha256(raw).hexdigest(),
+        'checkpoint': checkpoint,
+    }
+    operations.lock.validate()
+    path = operations.attempt.directory / INHERITED_PROVIDER_CHECKPOINT
+    if (path.exists() or path.is_symlink()) and private_json(path) != receipt:
+        raise ValueError('inherited-provider-checkpoint-changed')
+    return receipt
+
+
 def _adopt_receipt(path: Path, value: dict[str, object]) -> None:
     if path.exists() or path.is_symlink():
         if private_json(path) != value:
