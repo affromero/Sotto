@@ -41,6 +41,27 @@ class SuccessorMigrationAdmissionTests(unittest.TestCase):
                 observed=(self.image, {**self.candidate, extra: 'f' * 64}),
             )
 
+    def test_runtime_only_requires_the_exact_predecessor_inventory(self) -> None:
+        original = dict(self.initial['migrations'])
+        final = {**self.final, 'migrations': original}
+        same_inventory = {**self.successor, 'stages': [final]}
+        with self.assertRaisesRegex(ValueError, 'migration-history-changed'):
+            admit_successor_migration(
+                self.previous, same_inventory, observed=(self.image, original),
+            )
+        self.assertEqual(
+            admit_successor_migration(
+                self.previous, {**same_inventory, 'runtimeOnly': True, 'predecessor': {}},
+                observed=(self.image, original),
+            ),
+            (self.initial, final),
+        )
+        with self.assertRaisesRegex(ValueError, 'runtime-only-migration-inventory-changed'):
+            admit_successor_migration(
+                self.previous, {**self.successor, 'runtimeOnly': True, 'predecessor': {}},
+                observed=(self.image, self.candidate),
+            )
+
     def test_refuses_an_inventory_observed_on_another_worker_image(self) -> None:
         with self.assertRaisesRegex(ValueError, 'migration-files-differ-from-image'):
             admit_successor_migration(

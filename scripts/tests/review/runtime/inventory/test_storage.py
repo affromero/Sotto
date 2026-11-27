@@ -156,6 +156,17 @@ class CompletedStorageWrapperTests(unittest.TestCase):
         self.objects = host.objects
         self.ids = host.ids
 
+    def test_successor_resolves_the_original_mount_proof_from_its_predecessor(self) -> None:
+        proof = 'original-mount-objects.json'
+        successor = self.fixture.successor_with_predecessor()
+        successor.manifest['topology'] = self.previous.manifest['topology']
+        self.assertFalse((successor.attempt.directory / proof).exists())
+        with patch.object(HostOperations, 'verify_tools'):
+            self.assertEqual(
+                module.original_mount_objects(successor),
+                private_json(self.previous.attempt.directory / proof),
+            )
+
     def test_successor_network_refuses_a_foreign_peer_after_predecessor_stop(self) -> None:
         review = self.previous.attempt.manifest()['topology']['network']['id']
         egress = private_json(self.previous.attempt.directory / 'egress.json')['networkId']

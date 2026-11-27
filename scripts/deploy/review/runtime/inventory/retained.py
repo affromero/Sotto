@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING
 
 from scripts.deploy.images.metadata import digest, record
 from scripts.deploy.review.runtime.inventory.queue_snapshot import _original_queues
-from scripts.deploy.review.state import atomic_json, checksum, private_json
+from scripts.deploy.review.state import atomic_json, checksum, private_json, runtime_only_successor
 from scripts.deploy.review.topology import rows
 
 if TYPE_CHECKING:
@@ -27,8 +28,15 @@ def observe_retained_inventory(
         raise ValueError('exact-delivered-worksheet-evidence-required')
     queue_manifest = _original_queues(successor, allow_unresolved=True)
     queues = [item['name'] for item in rows(queue_manifest['queues'], 'original review queues')]
+    failure = successor.manifest.get('retainedAssessmentFailure')
+    if 'retainedAssessmentFailure' in successor.manifest and (
+        not runtime_only_successor(successor.manifest) or not isinstance(failure, str)
+        or not re.fullmatch(r'[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}', failure)
+    ):
+        raise ValueError('exact-retained-assessment-failure-required')
     result = record(successor.runtime_exchange(
-        'retained-single-client', {'evidence': evidence, 'queues': queues},
+        'retained-single-client', {'evidence': evidence, 'queues': queues,
+                                   **({'assessmentFailure': failure} if failure else {})},
         predecessor=previous,
     ), 'retained review inventory')
     if set(result) != {'server', 'fingerprint', 'jobsFingerprint',
@@ -37,7 +45,8 @@ def observe_retained_inventory(
     for key in ('server', 'fingerprint', 'jobsFingerprint'):
         digest(result[key], key)
     if (any(type(result[key]) is not int for key in ('keys', 'queues', 'completed', 'failed'))
-            or result['queues'] != len(queues) or result['failed'] != len(jobs)):
+            or result['queues'] != len(queues)
+            or result['failed'] != len(jobs) + int(failure is not None)):
         raise ValueError('retained-review-inventory-counts-changed')
     successor.verify_fence()
     receipt = {

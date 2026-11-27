@@ -48,6 +48,27 @@ describe('retained review Redis inventory', () => {
     expect(first).toMatchObject({ queues: 2, completed: 1, failed: 3, keys: 12 });
   });
 
+  it('retains only the admitted failed assessment in the interactions queue', async () => {
+    const redis = fixture.client;
+    const id = 'bfd935aa-954f-4ea2-b40d-589fe3ceec49';
+    const prefix = 'bull:interactions:';
+    await redis.hset(prefix + 'meta', 'opts.maxLenEvents', '10000');
+    await redis.xadd(prefix + 'events', '*', 'event', 'failed');
+    await redis.set(prefix + 'id', '1');
+    await redis.zadd(prefix + 'failed', 1, id);
+    await redis.hset(prefix + id, 'data', '{}');
+    const input = {
+      redisUrl: fixture.url,
+      queues: [...queues, 'interactions'],
+      failedWorksheetIds,
+    };
+    await expect(inspectRetainedReviewRedis(redis, input)).rejects.toThrow('Unknown failed work');
+    await expect(
+      inspectRetainedReviewRedis(redis, { ...input, assessmentFailure: id })
+    ).resolves.toMatchObject({ failed: 4 });
+    expect(await redis.zrange(prefix + 'failed', '0', '-1')).toEqual([id]);
+  });
+
   it('refuses retained evidence if another client appears between observations', async () => {
     const observer = createExclusiveRedisObserver(fixture.client);
     let stranger: Redis | undefined;

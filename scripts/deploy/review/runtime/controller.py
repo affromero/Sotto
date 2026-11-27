@@ -13,7 +13,6 @@ import sys
 import time
 import traceback
 from collections.abc import Callable
-from importlib import import_module
 from pathlib import Path
 from types import FrameType
 from typing import cast
@@ -41,6 +40,7 @@ from scripts.deploy.review.runtime.recovery.workload import (
     effective_tool_manifest,
     recovery_workload_input,
 )
+from scripts.deploy.review.runtime.release.migrations import validate_review_stage_change
 from scripts.deploy.review.runtime.release.successor import (
     INHERITED_PROVIDER_CHECKPOINT,
     PROVIDER_CHECKPOINT,
@@ -63,6 +63,7 @@ from scripts.deploy.review.state import (
     DeploymentLock,
     atomic_json,
     private_json,
+    runtime_only_successor,
 )
 from scripts.deploy.review.topology import rows
 
@@ -121,7 +122,9 @@ def admission(operations: HostOperations) -> dict[str, object]:
     if not 1 <= len(stages) <= 8:
         raise ValueError('bounded-admitted-sql-stages-required')
     previous = initial
-    schema_guard = import_module('scripts.deploy.compatibility-review')
+    runtime_only = runtime_only_successor(manifest)
+    if runtime_only and len(stages) != 1:
+        raise ValueError('exact-runtime-only-stage-required')
     for stage in stages:
         before = record(previous['migrations'], 'previous SQL inventory')
         after = record(stage['migrations'], 'candidate SQL inventory')
@@ -130,13 +133,7 @@ def admission(operations: HostOperations) -> dict[str, object]:
             raise ValueError('additive-schema-stage-inventory-required')
         for value in after.values():
             digest(value, 'published migration SQL')
-        changes = {
-            name: {'previousSha256': before.get(name),
-                   'candidateSha256': after.get(name)}
-            for name in sorted(before.keys() | after.keys())
-            if before.get(name) != after.get(name)
-        }
-        schema_guard.published_migration_additions(changes)
+        validate_review_stage_change(previous, stage, unchanged=runtime_only)
         previous = stage
     final = record(manifest['finalWorker'], 'final worker')
     web = record(manifest['finalWeb'], 'final web')

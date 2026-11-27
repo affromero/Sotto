@@ -437,6 +437,15 @@ maintenance fence through backups, staged SQL, provider configuration, learning
 and speech workloads. Public routing returns after those checks pass. Complete
 browser and two-player checks separately after cutover.
 
+A completed App Review deployment can admit a code-only successor with
+`runtimeOnly: true` in its bound manifest. Supply a candidate stage with the
+same migration hashes and queue names as the predecessor. The controller takes
+a fresh backup, checks the live database and queue inventory, and disallows
+`prisma migrate deploy` for the attempt. An explicitly admitted
+`retainedAssessmentFailure` identifies one failed assessment job to preserve.
+The controller verifies the exact job, unresolved assessment, and drained
+execution before accepting that failed delivery in the retained Redis inventory.
+
 On failure or a requested stop, inspect the private attempt records and resolve
 the recorded cause. The live supervisor retains FD9. After fencing begins,
 recovery keeps the 503 response in place. Resume only that verified held

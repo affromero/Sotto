@@ -27,6 +27,14 @@ ROLLBACK_INTENT = 'pre-sql-rollback-intent.json'
 ROLLBACK_COMPLETE = 'pre-sql-rollback.json'
 
 
+def runtime_only_successor(manifest: Mapping[str, object]) -> bool:
+    if 'runtimeOnly' not in manifest:
+        return False
+    if manifest['runtimeOnly'] is not True or 'predecessor' not in manifest:
+        raise ValueError('explicit-runtime-only-successor-required')
+    return True
+
+
 def checksum(value: object, *, ensure_ascii: bool = True) -> str:
     return hashlib.sha256(json.dumps(
         value, sort_keys=True, separators=(',', ':'), ensure_ascii=ensure_ascii,

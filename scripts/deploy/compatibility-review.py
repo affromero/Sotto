@@ -651,18 +651,19 @@ def published_migration_additions(
     return sorted(added)
 
 
-def validate_queue_transition(value: object) -> dict[str, list[str]]:
+def validate_queue_transition(value: object, *, unchanged: bool = False) -> dict[str, list[str]]:
     fields = {'previousQueues', 'candidateQueues', 'addedQueues'}
     if not isinstance(value, dict) or set(value) != fields:
         raise ValueError('Exact additive queue transition review required')
     for names in value.values():
-        if (not isinstance(names, list) or not names or len(names) > 100
+        if (not isinstance(names, list) or len(names) > 100
                 or any(not isinstance(name, str) or not re.fullmatch(
                     r'[a-z][a-z-]*', name) for name in names)
                 or names != sorted(set(names))):
             raise ValueError('Bounded sorted unique queue names required')
     previous, candidate = set(value['previousQueues']), set(value['candidateQueues'])
-    if not previous < candidate or value['addedQueues'] != sorted(candidate - previous):
+    if (not previous or not (previous == candidate if unchanged else previous < candidate)
+            or value['addedQueues'] != sorted(candidate - previous)):
         raise ValueError('Only exact additive queue transitions are supported')
     return cast(dict[str, list[str]], value)
 
