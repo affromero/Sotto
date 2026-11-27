@@ -193,20 +193,45 @@ def verified_routing(attempt: Attempt) -> tuple[bytes, str]:
 
 
 def verify_restored(
-    previous: HostOperations, successor: HostOperations, intent: dict[str, object],
+    previous: HostOperations, successor: HostOperations,
     start_state: dict[str, object], routing_hash: str,
-) -> dict[str, object]:
+) -> None:
     attempt = successor.attempt
-    directory = attempt.directory
-    result = {**intent, 'restored': True, 'schemaChanged': False}
-    if private_json(directory / READY) != result:
-        raise ValueError('pre-sql-review-rollback-readiness-changed')
     services.wait_health(previous, public=True)
     verify_completed_records(previous, active_fragment_sha256=routing_hash, successor=successor)
     verify_running_completed_storage(previous, successor)
     previous.verify_egress()
     if require_pre_sql(attempt) != start_state:
         raise ValueError('review-rollback-state-changed')
+
+
+def activate_restored_route(
+    previous: HostOperations, successor: HostOperations, result: dict[str, object],
+    start_state: dict[str, object], routing: bytes, routing_hash: str,
+) -> dict[str, object]:
+    """Reload an admitted route even if the prior writer installed its file."""
+    attempt = successor.attempt
+    marker = HOST_STATE / 'unresolved.json'
+    if not marker.exists() and not marker.is_symlink():
+        if private_json(attempt.directory / ROLLBACK_COMPLETE) != result:
+            raise ValueError('pre-sql-review-rollback-disposition-changed')
+        verify_restored(previous, successor, start_state, routing_hash)
+    else:
+        attempt.verify_marker(marker)
+        configured = bounded_bytes(CADDY)
+        if configured not in {MAINTENANCE, routing}:
+            raise ValueError('review-rollback-route-changed')
+        try:
+            if private_json(attempt.directory / READY) != result:
+                raise ValueError('pre-sql-review-rollback-readiness-changed')
+            if configured == MAINTENANCE:
+                successor.verify_fence()
+            successor.install_caddy(routing)
+            verify_restored(previous, successor, start_state, routing_hash)
+        except BaseException:
+            successor.fence()
+            raise
+    release_rollback_marker(attempt, result)
     return result
 
 
@@ -253,14 +278,15 @@ def rollback(successor: HostOperations) -> dict[str, object]:
         'queueSnapshotSha256': checksum(retained), 'writers': ids, 'routingSha256': routing_hash,
         'handoffSha256': checksum(handoff),
     }
+    result = {**intent, 'restored': True, 'schemaChanged': False}
     path = directory / ROLLBACK_INTENT
     if path.exists() or path.is_symlink():
         if private_json(path) != intent:
             raise ValueError('pre-sql-review-rollback-intent-changed')
         if bounded_bytes(CADDY) == routing:
-            result = verify_restored(previous, successor, intent, start_state, routing_hash)
-            release_rollback_marker(attempt, result)
-            return result
+            return activate_restored_route(
+                previous, successor, result, start_state, routing, routing_hash,
+            )
     else:
         verify_retained_network(previous, successor, phase=cast(RetainedPhase, start_state['phase']))
         atomic_json(path, intent)
@@ -283,22 +309,15 @@ def rollback(successor: HostOperations) -> dict[str, object]:
     restore_queues(previous, successor, ids['workers'], original)
     services.wait_health(previous)
     previous.verify_egress()
-    result = {**intent, 'restored': True, 'schemaChanged': False}
     ready = directory / READY
     if ready.exists() or ready.is_symlink():
         if private_json(ready) != result:
             raise ValueError('pre-sql-review-rollback-readiness-changed')
     else:
         atomic_json(ready, result)
-    try:
-        successor.verify_fence()
-        successor.install_caddy(routing)
-        result = verify_restored(previous, successor, intent, start_state, routing_hash)
-    except BaseException:
-        successor.fence()
-        raise
-    release_rollback_marker(attempt, result)
-    return result
+    return activate_restored_route(
+        previous, successor, result, start_state, routing, routing_hash,
+    )
 
 
 def main() -> None:
