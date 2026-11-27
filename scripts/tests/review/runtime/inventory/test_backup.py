@@ -68,7 +68,7 @@ class PredecessorBackupTests(unittest.TestCase):
         self.enterContext(patch(
             'scripts.deploy.review.runtime.inventory.backup.DIRECTORY', str(root),
         ))
-        self.enterContext(patch.object(self.successor, 'capacity'))
+        self.enterContext(patch.object(self.successor, 'successor_helper_capacity'))
         self.enterContext(patch.object(services, 'verify_database_backup'))
         self.enterContext(patch.object(services, 'stream_backup', side_effect=self.dump))
         self.enterContext(patch.object(services, 'backup_archive', side_effect=self.archive))

@@ -206,7 +206,7 @@ class PredecessorQueueSnapshotTests(unittest.TestCase):
     def test_predecessor_helper_reuses_bound_environment_in_a_read_only_container(self) -> None:
         self.successor.manifest.update(admitted_runtime_fixture())
         image = self.previous.attempt.manifest()['finalWorker']
-        with patch.object(self.successor, 'capacity'):
+        with patch.object(self.successor, 'successor_helper_capacity'):
             command = self.successor.tool_command(
                 image, 'node', ['--eval', 'fixture'],
                 container_name='sotto-review-tool-fixture',

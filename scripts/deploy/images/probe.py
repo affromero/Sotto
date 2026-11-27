@@ -23,6 +23,7 @@ def probe(reference: str, path: Path, tsx: bool = False) -> str:
 
 def probe_source(
     reference: str, source: str, label: str, tsx: bool = False,
+    *, memory_bytes: int | None = None, review_attempt: str | None = None,
 ) -> str:
     command = [
         'docker', 'run', '--rm', '--pull', 'never', '--network', 'none',
@@ -31,8 +32,14 @@ def probe_source(
         '--env', 'TSX_TSCONFIG_PATH=/app/apps/web/tsconfig.json',
         '--env', 'DATABASE_URL=postgresql://probe:probe@127.0.0.1:1/probe',
         '--env', 'REDIS_URL=redis://127.0.0.1:1/15', '--entrypoint', 'node',
-        reference,
     ]
+    if memory_bytes is not None:
+        if type(memory_bytes) is not int or memory_bytes <= 0:
+            raise ValueError('Positive probe memory limit required')
+        command.extend(['--memory', str(memory_bytes), '--memory-swap', str(memory_bytes)])
+    if review_attempt is not None:
+        command.extend(['--label', 'io.sotto.review-attempt=' + review_attempt])
+    command.append(reference)
     if tsx:
         command.extend(['--require', 'tsx/cjs'])
     command.extend(['-e', source])

@@ -72,6 +72,7 @@ class SuccessorPreflightTests(unittest.TestCase):
             'topology': topology, 'stages': [self.initial], 'finalWorker': old_worker,
         }, 'f' * 64)
         successor = Attempt.create(root, 'successor', {
+            **admitted_runtime_fixture(),
             'topology': topology, 'initialStage': self.initial, 'stages': [self.final],
             'finalWorker': new_worker, 'finalWeb': {'sha': new_worker['sha']},
             'originalFiles': files,
@@ -99,6 +100,7 @@ class SuccessorPreflightTests(unittest.TestCase):
                                 return_value=({}, {})))
         self.enterContext(patch.object(self.operations, 'verify_images'))
         self.enterContext(patch.object(self.operations, 'capacity'))
+        self.enterContext(patch.object(self.operations, 'successor_helper_capacity'))
         self.enterContext(patch.object(self.operations, 'verify_tools'))
         self.enterContext(patch(runtime + 'release.successor.inspect_successor_worker_migrations',
                                 return_value=(self.image, self.migrations)))
@@ -270,6 +272,14 @@ class SuccessorPreflightTests(unittest.TestCase):
             raise RuntimeError('lost migration response')
 
         with patch.object(self.operations, 'migrate_stage', side_effect=run_sql):
+            self.operations.capacity.side_effect = ValueError('insufficient candidate memory')
+            with self.assertRaisesRegex(ValueError, 'insufficient candidate memory'):
+                migrate_successor_data(
+                    self.previous, self.operations, recover=False, continue_check=lambda: None,
+                )
+            self.assertEqual(attempt.state()['phase'], 'BACKED_UP')
+            self.assertFalse(attempt.state()['sqlMayHaveStarted'])
+            self.operations.capacity.side_effect = None
             with self.assertRaisesRegex(RuntimeError, 'lost migration response'):
                 migrate_successor_data(
                     self.previous, self.operations, recover=False, continue_check=lambda: None,
@@ -282,11 +292,19 @@ class SuccessorPreflightTests(unittest.TestCase):
             self.assertEqual(applied, migration_inventory(final))
 
         with patch.object(self.operations, 'migrate_stage', side_effect=verify_sql):
+            self.operations.capacity.side_effect = ValueError('insufficient candidate memory')
+            with self.assertRaisesRegex(ValueError, 'insufficient candidate memory'):
+                migrate_successor_data(
+                    self.previous, self.operations, recover=True, continue_check=lambda: None,
+                )
+            self.assertEqual(attempt.state()['phase'], 'SQL_STARTED')
+            self.assertEqual(attempt.state()['status'], 'unresolved')
+            self.operations.capacity.side_effect = None
             migrate_successor_data(
                 self.previous, self.operations, recover=True, continue_check=lambda: None,
             )
         self.assertEqual(attempt.state()['phase'], 'FINAL_SCHEMA_VERIFIED')
-        self.assertEqual(projections, ['BACKED_UP', 'SQL_STARTED'])
+        self.assertEqual(projections, ['BACKED_UP', 'BACKED_UP', 'SQL_STARTED'])
 
     def test_preservation_rejects_changed_predecessor_rows(self) -> None:
         self.enterContext(patch.object(self.operations, 'verify_fence'))

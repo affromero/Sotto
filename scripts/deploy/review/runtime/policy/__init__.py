@@ -7,7 +7,7 @@ from importlib import import_module
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
-from scripts.deploy.images.metadata import record
+from scripts.deploy.images.metadata import digest, record
 from scripts.deploy.review.build_observer import bounded_bytes
 from scripts.deploy.review.state import atomic_json, checksum, private_json
 
@@ -76,6 +76,75 @@ def concurrent_memory(manifest: Mapping[str, object]) -> int:
     resources = record(manifest['resources'], 'review resources')
     return sum(cast(int, resources[role + 'MemoryBytes'])
                for role in ('web', 'worker', 'helper'))
+
+
+def projected_predecessor_memory(
+    manifest: Mapping[str, object], predecessor_anonymous: int,
+) -> int:
+    """The only new allocation before the predecessor stops is one helper."""
+    if type(predecessor_anonymous) is not int or predecessor_anonymous < 0:
+        raise ValueError('invalid-review-predecessor-memory')
+    return max(helper_memory(manifest), concurrent_memory(manifest) - predecessor_anonymous)
+
+
+def successor_helper_budget(
+    operations: HostOperations, *, previous: HostOperations | None,
+) -> int:
+    """Use only the admitted helper allowance during the pre-candidate phase."""
+    phase = operations.attempt.state()['phase']
+    manifest = operations.manifest
+    binding = record(manifest.get('predecessor'), 'review predecessor')
+    preparing = phase in {'PRECHECK', 'ADMITTED', 'PREPARED'}
+    if not preparing and phase not in {'FENCED', 'QUIESCENT'}:
+        raise ValueError('early-review-helper-capacity-required')
+    if operations.docker(
+        'ps', '-q', '--filter', 'label=io.sotto.review-attempt=' + operations.attempt.manifest_hash,
+    ).strip():
+        raise ValueError('review-attempt-already-has-a-running-container')
+    if previous is None:
+        if preparing:
+            raise ValueError('live-predecessor-memory-projection-required')
+        return helper_memory(manifest)
+    if (not preparing or previous.lock is not operations.lock
+            or str(previous.attempt.directory) != binding['directory']
+            or previous.attempt.manifest_hash != binding['manifestSha256']):
+        raise ValueError('exact-live-predecessor-memory-required')
+    anonymous = sum(live_writer_anonymous_memory(previous, role) for role in ('web', 'workers'))
+    return projected_predecessor_memory(manifest, anonymous)
+
+
+def live_writer_anonymous_memory(previous: HostOperations, role: str) -> int:
+    from scripts.deploy.review.runtime.services import verify_candidate
+
+    identity = digest(verify_candidate(previous, role), 'live review writer')
+    before, = previous.inspect(identity)
+    state = record(before['State'], 'live writer state')
+    pid = state.get('Pid')
+    if type(pid) is not int or pid <= 1:
+        raise ValueError('live-review-writer-pid-required')
+    relative = (Path('/proc') / str(pid) / 'cgroup').read_text().strip()
+    root = Path('/sys/fs/cgroup')
+    if not relative.startswith('0::/') or '\n' in relative:
+        raise ValueError('unified-review-writer-cgroup-required')
+    group = root / relative.removeprefix('0::/')
+    if (group != group.resolve(strict=True) or not group.is_relative_to(root)
+            or group.name not in {identity, 'docker-' + identity + '.scope'}):
+        raise ValueError('exact-review-writer-cgroup-required')
+    counts = [line.removeprefix('anon ').strip()
+              for line in (group / 'memory.stat').read_text().splitlines()
+              if line.startswith('anon ')]
+    maximum = record(before['HostConfig'], 'live writer host')['Memory']
+    after, = previous.inspect(identity)
+    current = record(after['State'], 'live writer state')
+    if (len(counts) != 1 or not counts[0].isdigit() or type(maximum) is not int
+            or type(state.get('StartedAt')) is not str
+            or current.get('Pid') != pid or current.get('StartedAt') != state['StartedAt']
+            or current.get('Running') is not True or verify_candidate(previous, role) != identity):
+        raise ValueError('live-review-writer-memory-changed')
+    anonymous = int(counts[0])
+    if not 0 <= anonymous <= maximum:
+        raise ValueError('review-writer-memory-outside-admission')
+    return anonymous
 
 
 def verify_queue_policy(operations: HostOperations) -> None:

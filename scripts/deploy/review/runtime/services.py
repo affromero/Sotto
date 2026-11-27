@@ -415,6 +415,8 @@ def candidate(operations: HostOperations, role: str) -> str:
             raise ValueError('failed-candidate-requires-forward-recovery')
         operations.verify_storage()
         operations.verify_egress()
+        if 'predecessor' in operations.manifest and role == 'web':
+            operations.capacity()
         operations.docker('start', identity)
     verify_candidate(operations, role)
     return identity
@@ -583,7 +585,10 @@ def backup_review(
         return
     operations.settle_pending_helpers()
     if not existing:
-        operations.capacity()
+        if predecessor is None:
+            operations.capacity()
+        else:
+            operations.successor_helper_capacity()
     sources = (original_backup_sources(operations) if predecessor is None
                else predecessor_backup_sources(predecessor, operations))
     if existing:

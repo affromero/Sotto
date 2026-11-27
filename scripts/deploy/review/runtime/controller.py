@@ -468,9 +468,10 @@ def execute(
         elif phase == 'ADMITTED':
             if predecessor is None:
                 operations.runtime_environment()
+                operations.capacity()
             else:
                 verify_live_predecessor(predecessor, operations)
-            operations.capacity()
+                operations.successor_helper_capacity(previous=predecessor)
             operations.verify_tools()
             services.before_fence(operations)
             attempt.advance('PREPARED')
@@ -480,6 +481,7 @@ def execute(
                 or (HOST_STATE / 'unresolved.json').is_symlink()
             ):
                 verify_live_predecessor(predecessor, operations)
+                operations.successor_helper_capacity(previous=predecessor)
             operations.fence()
             attempt.advance('FENCED')
         elif predecessor is not None and phase in ('FENCED', 'QUIESCENT'):

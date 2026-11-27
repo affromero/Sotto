@@ -56,6 +56,14 @@ class SharedImageProbeTests(ReceiptFixture):
                         pass
                     else:
                         raise RuntimeError('Deployment lock was released')
+            if os.environ.get('EXPECT_REVIEW_LIMIT') == '1':
+                expected = {
+                    '--memory': '503316480', '--memory-swap': '503316480',
+                    '--label': 'io.sotto.review-attempt=' + 'a' * 64,
+                }
+                for option, value in expected.items():
+                    if option not in args or args[args.index(option)+1] != value:
+                        raise RuntimeError('Unbounded review probe: ' + option)
             if os.environ.get('FAIL_PROBE') == '1':
                 print('fixture transform failure', file=sys.stderr)
                 raise SystemExit(7)
@@ -111,6 +119,17 @@ class SharedImageProbeTests(ReceiptFixture):
     ) -> None:
         result = self.run_probe(locked=True)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_review_probes_are_tagged_and_capped_without_swap_overlap(self) -> None:
+        result = subprocess.run([
+            sys.executable, '-c',
+            'from scripts.deploy.images.probe import probe_source; '
+            'print(probe_source("worker", "probe", "test", True, '
+            'memory_bytes=503316480, review_attempt="a"*64))',
+        ], cwd=ROOT, env={**self.env, 'EXPECT_REVIEW_LIMIT': '1'},
+            text=True, capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(json.loads(result.stdout), ['audio-generation', 'class-preparation'])
         self.assertTrue(json.loads(result.stdout))
 
     def test_probe_failure_surfaces_stderr_without_queue_output(self) -> None:

@@ -36,6 +36,7 @@ from scripts.deploy.review.runtime.policy import (
     helper_memory,
     retain_queue_intent,
     runtime_policy,
+    successor_helper_budget,
 )
 from scripts.deploy.review.runtime.release.migrations import (
     establishment_command,
@@ -374,6 +375,13 @@ class HostOperations:
                 raise ValueError('verified-import-protection-required')
 
     def capacity(self) -> None:
+        self._capacity(concurrent_memory(self.manifest))
+
+    def successor_helper_capacity(self, *, previous: HostOperations | None = None) -> None:
+        """Reserve one helper before any successor service can be started."""
+        self._capacity(successor_helper_budget(self, previous=previous))
+
+    def _capacity(self, required: int) -> None:
         resources = record(self.manifest['resources'], 'resources')
         docker_root = self.docker(
             'info', '--format', '{{.DockerRootDir}}',
@@ -387,7 +395,7 @@ class HostOperations:
         require_memory = import_module('scripts.deploy.stop-workers')
         require_memory.require_overlap_memory(
             Path('/proc/meminfo').read_text(),
-            concurrent_memory(self.manifest),
+            required,
         )
 
     def install_caddy(self, content: bytes) -> None:
@@ -586,7 +594,10 @@ class HostOperations:
                 name=container_name, network=network, arguments=arguments,
                 operation=predecessor_tool, content=content,
             )
-            self.capacity()
+            if predecessor_tool != 'migration' and self.attempt.state()['phase'] in {'FENCED', 'QUIESCENT'}:
+                self.successor_helper_capacity()
+            else:
+                self.capacity()
         values.update({'COMMIT_SHA': cast(str, receipt['sha']),
                        'HOME': '/home/sotto',
                        'CODEX_HOME': '/home/sotto/.codex'})

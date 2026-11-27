@@ -19,9 +19,11 @@ from scripts.deploy.review.runtime.policy import (
     concurrent_memory,
     helper_arguments,
     helper_memory,
+    projected_predecessor_memory,
     retain_queue_intent,
     role_command,
     runtime_policy,
+    successor_helper_budget,
 )
 from scripts.deploy.review.state import (
     Attempt,
@@ -86,6 +88,48 @@ class ReviewResourcePolicyTests(unittest.TestCase):
                 'MemTotal: 8388608 kB\nMemAvailable: 2621439 kB\n',
                 candidate,
             )
+
+    def test_projection_credits_only_predecessor_memory_and_preserves_helper_reserve(self) -> None:
+        manifest = admitted_runtime_fixture()
+        cap = 1024 * 1024
+        guard = importlib.import_module('scripts.deploy.stop-workers')
+        measured = 'MemTotal: 8388608 kB\nMemAvailable: 2202009 kB\n'
+        projected = projected_predecessor_memory(manifest, 512 * cap)
+        self.assertEqual(projected, 1536 * cap)
+        guard.require_overlap_memory(measured, projected)
+        with self.assertRaisesRegex(ValueError, 'Insufficient RAM'):
+            guard.require_overlap_memory(measured, concurrent_memory(manifest))
+        self.assertEqual(projected_predecessor_memory(manifest, 2048 * cap),
+                         helper_memory(manifest))
+        with self.assertRaisesRegex(ValueError, 'Insufficient RAM'):
+            guard.require_overlap_memory('MemTotal: 8388608 kB\nMemAvailable: 900000 kB\n',
+                                         helper_memory(manifest))
+
+    def test_fenced_helper_budget_refuses_a_running_successor_or_an_sql_phase(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            attempt = Attempt.create(root, 'successor', {
+                **admitted_runtime_fixture(), 'predecessor': {'directory': 'prior'},
+            }, 'a' * 64)
+            path = root / 'deploy.lock'
+            path.touch(mode=0o600)
+            lock = DeploymentLock(path)
+            try:
+                operations = HostOperations(attempt, lock)
+                for phase in ('ADMITTED', 'PREPARED', 'FENCED'):
+                    attempt.advance(phase)
+                with patch.object(operations, 'docker', return_value=b''):
+                    self.assertEqual(successor_helper_budget(operations, previous=None),
+                                     helper_memory(operations.manifest))
+                with (patch.object(operations, 'docker', return_value=b'working-helper\n'),
+                      self.assertRaisesRegex(ValueError, 'running-container')):
+                    successor_helper_budget(operations, previous=None)
+                for phase in ('QUIESCENT', 'BACKED_UP', 'SQL_STARTED'):
+                    attempt.advance(phase)
+                with self.assertRaisesRegex(ValueError, 'early-review-helper-capacity-required'):
+                    successor_helper_budget(operations, previous=None)
+            finally:
+                lock.close()
 
     def test_role_and_helper_commands_keep_the_canonical_entrypoints(
         self,
