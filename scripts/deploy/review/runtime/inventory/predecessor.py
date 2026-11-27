@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, cast
 
@@ -16,10 +16,61 @@ from scripts.deploy.review.runtime.inventory.stopped_writer import (
     inspect_stopped_writer,
 )
 from scripts.deploy.review.runtime.inventory.storage import verify_completed_storage
-from scripts.deploy.review.state import atomic_json, checksum, private_json
+from scripts.deploy.review.state import Attempt, atomic_json, checksum, private_json
 
 if TYPE_CHECKING:
     from scripts.deploy.review.runtime.operations import HostOperations
+
+
+def bind_predecessor(successor: HostOperations) -> HostOperations:
+    """Open the exact completed release named by the successor admission."""
+    from scripts.deploy.review.runtime.operations import HostOperations
+
+    successor.lock.validate()
+    binding = record(successor.attempt.manifest()['predecessor'],
+                     'admitted predecessor')
+    if set(binding) != {'directory', 'manifestSha256', 'evidenceSha256',
+                       'releaseSha256', 'startupSha256'}:
+        raise ValueError('exact-predecessor-attempt-binding-required')
+    name = binding['directory']
+    if not isinstance(name, str):
+        raise ValueError('predecessor-attempt-directory-invalid')
+    directory = Path(name)
+    if (not directory.is_absolute() or directory.is_symlink()
+            or directory.resolve() != directory
+            or directory.parent != successor.attempt.directory.parent
+            or directory == successor.attempt.directory):
+        raise ValueError('predecessor-attempt-directory-invalid')
+    attempt = Attempt(directory)
+    _, startup = _predecessor_records(attempt, binding)
+    source = startup.get('sourceRoot')
+    if not isinstance(source, str):
+        raise ValueError('predecessor-source-root-changed')
+    root = Path(source)
+    if (not root.is_absolute() or root.resolve() != root or not root.is_dir()):
+        raise ValueError('predecessor-source-root-changed')
+    previous = HostOperations(attempt, successor.lock)
+    previous.root = root
+    previous.verify_tools()
+    successor.lock.validate()
+    return previous
+
+
+def _predecessor_records(
+    attempt: Attempt, binding: Mapping[str, object],
+) -> tuple[dict[str, object], dict[str, object]]:
+    directory = attempt.directory
+    release = private_json(directory / 'release-record.json')
+    startup = private_json(directory / 'startup-unit.json')
+    if (str(directory) != binding.get('directory')
+            or attempt.manifest_hash != digest(binding['manifestSha256'], 'predecessor manifest')
+            or attempt.evidence_hash != digest(binding['evidenceSha256'], 'predecessor evidence')
+            or attempt.state()['status'] != 'complete'
+            or checksum(release) != digest(binding['releaseSha256'], 'predecessor release')):
+        raise ValueError('completed-predecessor-binding-changed')
+    if checksum(startup) != digest(binding['startupSha256'], 'predecessor startup'):
+        raise ValueError('predecessor-startup-binding-changed')
+    return release, startup
 
 
 def capture_predecessor(
@@ -30,8 +81,7 @@ def capture_predecessor(
     This does not stop a writer or establish queue, provider, or network
     quiescence. A retry may only reproduce identical running evidence.
     """
-    _verify_release(previous, successor, allow_unresolved=False)
-    release = private_json(previous.attempt.directory / 'release-record.json')
+    release = _verify_release(previous, successor, allow_unresolved=False)
     writers: dict[str, object] = {}
     for role in ('web', 'workers'):
         binding = private_json(previous.attempt.directory
@@ -66,7 +116,7 @@ def capture_predecessor(
 def _verify_release(
     previous: HostOperations, successor: HostOperations, *,
     allow_unresolved: bool,
-) -> None:
+) -> dict[str, object]:
     if previous.lock is not successor.lock:
         raise ValueError('shared-predecessor-lock-required')
     successor.verify_fence()
@@ -78,13 +128,21 @@ def _verify_release(
                 {'active', 'unresolved'} if allow_unresolved else {'active'}
             )):
         raise ValueError('completed-predecessor-and-fenced-successor-required')
-    startup = private_json(previous.attempt.directory / 'startup-unit.json')
+    binding = successor.attempt.manifest().get('predecessor')
+    if binding is None:
+        release = private_json(previous.attempt.directory / 'release-record.json')
+        startup = private_json(previous.attempt.directory / 'startup-unit.json')
+    else:
+        release, startup = _predecessor_records(
+            previous.attempt, record(binding, 'admitted predecessor'),
+        )
     source_root = startup.get('sourceRoot')
     if (not isinstance(source_root, str) or not Path(source_root).is_absolute()
             or Path(source_root).resolve() != previous.root
             or str(previous.root) != source_root):
         raise ValueError('predecessor-source-root-changed')
     verify_completed_storage(previous, successor)
+    return release
 
 
 def _identity(
@@ -213,10 +271,9 @@ def inspect_predecessor(
     Persist each observed stop before returning so a retry cannot accept a
     later, different exit. This is not a complete writer or queue fence.
     """
-    _verify_release(previous, successor, allow_unresolved=True)
+    release = _verify_release(previous, successor, allow_unresolved=True)
     directory = successor.attempt.directory
     baseline = private_json(directory / 'predecessor-running.json')
-    release = private_json(previous.attempt.directory / 'release-record.json')
     identity = _identity(previous, successor, release)
     if (set(baseline) != {*identity, 'writers'}
             or any(baseline[key] != value for key, value in identity.items())):
