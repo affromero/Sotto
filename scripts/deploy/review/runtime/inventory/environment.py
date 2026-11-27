@@ -8,12 +8,15 @@ import os
 import re
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from scripts.deploy.images.metadata import digest, record
 from scripts.deploy.review.build_observer import bounded_bytes
 from scripts.deploy.review.runtime import services
-from scripts.deploy.review.runtime.inventory.predecessor import _verify_release
+from scripts.deploy.review.runtime.inventory.predecessor import (
+    RetainedPhase,
+    _verify_release,
+)
 from scripts.deploy.review.state import checksum, private_json
 from scripts.deploy.review.topology import (
     AUTH_HOME,
@@ -25,6 +28,10 @@ from scripts.deploy.review.topology import (
 if TYPE_CHECKING:
     from scripts.deploy.review.runtime.operations import HostOperations
 
+PredecessorTool = Literal['pause', 'retained-inventory', 'migration']
+MIGRATE_DEPLOY = ('--no-install', 'prisma', 'migrate', 'deploy',
+                  '--config=/app/prisma.config.ts')
+
 
 def review_code_mount(operations: HostOperations) -> str:
     return (f'type=bind,src={operations.root / "scripts/deploy"},'
@@ -33,10 +40,11 @@ def review_code_mount(operations: HostOperations) -> str:
 
 def retained_inventory_network(
     previous: HostOperations, successor: HostOperations,
+    *, phase: RetainedPhase = 'FENCED',
 ) -> str:
     from scripts.deploy.review.runtime.inventory.network import verify_retained_network
 
-    verify_retained_network(previous, successor)
+    verify_retained_network(previous, successor, phase=phase)
     topology = record(previous.manifest['topology'], 'predecessor topology')
     services = record(topology['services'], 'predecessor services')
     redis = record(services['redis'], 'predecessor Redis')
@@ -46,23 +54,127 @@ def retained_inventory_network(
 def admit_predecessor_helper_environment(
     previous: HostOperations, successor: HostOperations,
     receipt: Mapping[str, object], entrypoint: str, *,
-    mounts: Sequence[str], name: str | None, network: str, retained: bool,
+    mounts: Sequence[str], name: str | None, network: str,
+    arguments: Sequence[str], operation: PredecessorTool, content: bytes | None,
 ) -> dict[str, str]:
-    if name is None or entrypoint != 'node':
+    if name is None:
         raise ValueError('predecessor-helper-not-admitted')
-    if retained:
-        if (list(mounts) != [review_code_mount(successor)]
+    phase: RetainedPhase = 'FENCED'
+    if operation == 'migration':
+        phase = admit_migration_tool(
+            previous, successor, receipt, entrypoint, arguments,
+            network=network, mounts=mounts, content=content,
+        )
+    elif operation == 'retained-inventory':
+        if (entrypoint != 'node' or list(mounts) != [review_code_mount(successor)]
                 or network != retained_inventory_network(previous, successor)
-                or receipt != successor.manifest['finalWorker']):
+                or receipt != successor.attempt.manifest()['finalWorker']):
             raise ValueError('retained-inventory-helper-not-admitted')
-    else:
+    elif operation == 'pause':
         worker = services.verify_candidate(previous, 'workers')
-        if (mounts or network != 'container:' + worker
+        if (entrypoint != 'node' or mounts or network != 'container:' + worker
                 or receipt != previous.attempt.manifest()['finalWorker']):
             raise ValueError('predecessor-queue-helper-not-admitted')
-    values, _ = admit_successor_environment(previous, successor)
+    else:
+        raise ValueError('predecessor-helper-not-admitted')
+    values, _ = admit_successor_environment(previous, successor, phase=phase)
     values['NODE_OPTIONS'] = ''
     return values
+
+
+def admit_migration_tool(
+    previous: HostOperations, successor: HostOperations,
+    receipt: Mapping[str, object], entrypoint: str, arguments: Sequence[str], *,
+    network: str, mounts: Sequence[str], content: bytes | None,
+) -> RetainedPhase:
+    state = successor.attempt.state()
+    phase = state['phase']
+    if phase not in ('BACKED_UP', 'SQL_STARTED', 'FINAL_SCHEMA_VERIFIED'):
+        raise ValueError('successor-migration-helper-phase-invalid')
+    _, stage = exact_successor_sql_stages(previous, successor)
+    worker = record(stage['receipt'], 'successor worker')
+    if receipt != worker or network != retained_inventory_network(
+        previous, successor, phase=phase,
+    ):
+        raise ValueError('successor-migration-helper-not-admitted')
+    if entrypoint == 'npx':
+        if (phase != 'SQL_STARTED' or state['sqlMayHaveStarted'] is not True
+                or state['status'] != 'active'
+                or mounts or tuple(arguments) != MIGRATE_DEPLOY or content is not None):
+            raise ValueError('successor-schema-write-not-admitted')
+    elif entrypoint == 'node':
+        admit_migration_node(
+            successor, stage, arguments, phase, mounts=mounts, content=content,
+        )
+    else:
+        raise ValueError('successor-migration-helper-not-admitted')
+    return phase
+
+
+def exact_successor_sql_stages(
+    previous: HostOperations, operations: HostOperations,
+) -> tuple[dict[str, object], dict[str, object]]:
+    from scripts.deploy.review.topology import rows
+
+    manifest = operations.attempt.manifest()
+    initial = record(manifest['initialStage'], 'successor initial stage')
+    stages = rows(manifest['stages'], 'successor migration stage')
+    if (len(stages) != 1 or stages[0]['receipt'] != manifest['finalWorker']
+            or initial['receipt'] != previous.attempt.manifest()['finalWorker']
+            or any(operations.manifest[key] != manifest[key]
+                   for key in ('initialStage', 'stages', 'finalWorker'))):
+        raise ValueError('exact-successor-sql-stage-required')
+    return initial, stages[0]
+
+
+def admit_migration_node(
+    operations: HostOperations, stage: Mapping[str, object],
+    arguments: Sequence[str], phase: RetainedPhase, *,
+    mounts: Sequence[str], content: bytes | None,
+) -> None:
+    from scripts.deploy.review.runtime.policy import helper_arguments
+    from scripts.deploy.review.runtime.release.migrations import (
+        APPLIED_MIGRATION_SCRIPT,
+        PRISMA_DIFF,
+        canonical_loader,
+        child_transport,
+        stage_asset_directory,
+        strict_json,
+    )
+
+    def matches(expected: Sequence[str]) -> bool:
+        return list(arguments) == helper_arguments(operations.manifest, 'node', expected)
+
+    if not mounts and content is None and matches(['-e', APPLIED_MIGRATION_SCRIPT]):
+        return
+    if phase == 'BACKED_UP':
+        raise ValueError('successor-schema-verifier-before-sql')
+    if mounts:
+        raise ValueError('successor-migration-helper-mount-not-admitted')
+    if phase == 'SQL_STARTED' and content == b'{"command":"established"}':
+        worker = record(stage['receipt'], 'successor worker')
+        path = stage_asset_directory(operations, worker) / 'queue-lifecycle.cjs'
+        source = bounded_bytes(path)
+        if hashlib.sha256(source).hexdigest() != stage['lifecycleSha256']:
+            raise ValueError('successor-lifecycle-tool-changed')
+        if matches(['--require', 'tsx/cjs', '-e', canonical_loader(source)]):
+            return
+    if content is None and matches(['-e', child_transport(PRISMA_DIFF)]):
+        return
+    if content is not None:
+        request = strict_json(content)
+        command = request.get('command')
+        if ((command in ('snapshot', 'database-identity') and set(request) == {'command'})
+                or (command == 'schema-index' and set(request) == {'command', 'manifest'})):
+            operations.verify_tools()
+            relative = 'scripts/deploy/queue-lifecycle.cjs'
+            source = bounded_bytes(operations.root / relative)
+            tools = record(operations.attempt.manifest()['tools'], 'successor tools')
+            if hashlib.sha256(source).hexdigest() != tools[relative]:
+                raise ValueError('successor-lifecycle-tool-changed')
+            if matches(['--require', 'tsx/cjs', '-e', canonical_loader(source)]):
+                return
+    raise ValueError('successor-migration-node-command-not-admitted')
 
 
 def _private_bytes(path: Path) -> bytes:
@@ -92,13 +204,14 @@ def _parse_environment(data: bytes) -> dict[str, str]:
 
 def admit_successor_environment(
     previous: HostOperations, successor: HostOperations,
+    *, phase: RetainedPhase = 'FENCED',
 ) -> tuple[dict[str, str], dict[str, str]]:
     """Return verified worker settings and hashes without logging secrets.
 
     The caller must keep values in memory or a private 0600 helper env file.
     This does not admit any helper process or establish workload quiescence.
     """
-    _verify_release(previous, successor, allow_unresolved=True)
+    _verify_release(previous, successor, allow_unresolved=True, phase=phase)
     directory = previous.attempt.directory
     original_bytes = _private_bytes(directory / 'original.env')
     original = _parse_environment(original_bytes)

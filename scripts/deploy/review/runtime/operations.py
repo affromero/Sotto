@@ -13,7 +13,7 @@ import time
 from collections.abc import Callable, Mapping, Sequence
 from importlib import import_module
 from pathlib import Path
-from typing import cast
+from typing import TYPE_CHECKING, cast
 from urllib.parse import urlsplit
 
 from scripts.deploy.images.metadata import digest, record
@@ -38,8 +38,11 @@ from scripts.deploy.review.runtime.policy import (
     runtime_policy,
 )
 from scripts.deploy.review.runtime.release.migrations import (
+    establishment_command,
     later_stage_progress,
+    migration_image_command,
     migration_inventory,
+    read_applied_migrations,
     stage_progress,
     verify_stage_schema,
 )
@@ -66,6 +69,9 @@ from scripts.deploy.review.topology import (
     rows,
     verify_capture,
 )
+
+if TYPE_CHECKING:
+    from scripts.deploy.review.runtime.inventory.environment import PredecessorTool
 
 HOST_STATE = Path('/home/sotto/.local/state/sotto-review-deploy')
 RETENTION = Path('/home/sotto/.local/state/production-image-retention')
@@ -508,6 +514,7 @@ class HostOperations:
         arguments: Sequence[str], *, content: bytes | None = None,
         network: str = NETWORK, mounts: Sequence[str] = (),
         predecessor: HostOperations | None = None,
+        predecessor_tool: PredecessorTool = 'pause',
         before_start: Callable[[], None] | None = None,
     ) -> bytes:
         """An admitted image runs the explicitly named maintenance tool."""
@@ -532,6 +539,7 @@ class HostOperations:
         command = self.tool_command(
             receipt, entrypoint, arguments, network=network, mounts=mounts,
             container_name=name, predecessor=predecessor,
+            predecessor_tool=predecessor_tool, content=content,
         )
         binding['environmentHash'] = bind_helper_environment(
             self, command, image,
@@ -564,14 +572,15 @@ class HostOperations:
         mounts: Sequence[str] = (),
         container_name: str | None = None,
         predecessor: HostOperations | None = None,
-        retained_inventory: bool = False,
+        predecessor_tool: PredecessorTool = 'pause',
+        content: bytes | None = None,
     ) -> list[str]:
         if entrypoint not in {'node', 'npx', 'tar'}:
             raise ValueError('unsupported-reviewed-tool-entrypoint')
         if network not in {NETWORK, 'none'} \
                 and not network.startswith('container:'):
             raise ValueError('unsupported-reviewed-tool-network')
-        if retained_inventory and predecessor is None:
+        if predecessor_tool != 'pause' and predecessor is None:
             raise ValueError('retained-review-predecessor-required')
         if predecessor is None:
             self.runtime_environment()
@@ -589,7 +598,8 @@ class HostOperations:
             )
             values = admit_predecessor_helper_environment(
                 predecessor, self, receipt, entrypoint, mounts=mounts,
-                name=container_name, network=network, retained=retained_inventory,
+                name=container_name, network=network, arguments=arguments,
+                operation=predecessor_tool, content=content,
             )
             self.capacity()
         values.update({'COMMIT_SHA': cast(str, receipt['sha']),
@@ -632,6 +642,7 @@ class HostOperations:
 
     def check_stage(
         self, stage: Mapping[str, object], previous: Mapping[str, object],
+        *, predecessor: HostOperations | None = None,
     ) -> None:
         before = record(previous['migrations'], 'previous migrations')
         after = record(stage['migrations'], 'stage migrations')
@@ -643,48 +654,34 @@ class HostOperations:
         guard.published_migration_additions(changes)
         self.verify_images()
         self.verify_fence()
-        self.verify_storage()
+        if predecessor is None:
+            self.verify_storage()
 
     def applied_migrations(self) -> dict[str, str]:
-        sql = '''SELECT json_agg(json_build_object(
-'name',migration_name,'checksum',checksum,'finished',finished_at IS NOT NULL,
-'rolledBack',rolled_back_at IS NOT NULL))::text FROM "_prisma_migrations"'''
-        script = (
-            'const {Client}=require("pg");'
-            'const c=new Client({connectionString:process.env.DATABASE_URL,'
-            'connectionTimeoutMillis:5000,query_timeout:5000});'
-            '(async()=>{await c.connect();try{'
-            'await c.query("BEGIN READ ONLY");'
-            'const r=await c.query(' + json.dumps(sql) + ');'
-            'console.log(r.rows[0].json_agg);'
-            '}finally{await c.query("ROLLBACK");await c.end()}})()'
-            '.catch(()=>{console.error("Migration inventory unavailable");'
-            'process.exitCode=1});'
-        )
-        topology = record(self.manifest['topology'], 'topology')
-        old = record(record(topology['services'], 'services')['web'], 'web')
-        values = json.loads(self.image_command(
-            {'reference': old['imageId'], 'sha': TARGET},
-            'node', ['-e', script],
-        ))
-        result: dict[str, str] = {}
-        for migration in rows(values, 'applied migration'):
-            name = migration.get('name')
-            if (
-                not isinstance(name, str) or name in result
-                or migration.get('finished') is not True
-                or migration.get('rolledBack') is not False
-            ):
-                raise ValueError('unfinished-or-ambiguous-migration')
-            result[name] = digest(migration.get('checksum'), 'applied SQL')
-        return result
+        return read_applied_migrations(self)
 
     def migrate_stage(
         self, stage: Mapping[str, object], previous: Mapping[str, object],
+        *, predecessor: HostOperations | None = None,
     ) -> None:
-        self.check_stage(stage, previous)
+        from scripts.deploy.review.runtime.inventory.environment import (
+            MIGRATE_DEPLOY,
+            exact_successor_sql_stages,
+        )
+
+        if predecessor is None:
+            self.check_stage(stage, previous)
+            read_applied = self.applied_migrations
+        else:
+            if (exact_successor_sql_stages(predecessor, self) != (previous, stage)
+                    or self.attempt.state()['phase'] != 'SQL_STARTED'):
+                raise ValueError('exact-successor-sql-stage-required')
+            self.check_stage(stage, previous, predecessor=predecessor)
+
+            def read_applied() -> dict[str, str]:
+                return read_applied_migrations(self, predecessor=predecessor)
         expected = migration_inventory(stage)
-        applied = self.applied_migrations()
+        applied = read_applied()
         retained = self.attempt.directory / (
             'stage-' + cast(str, record(stage['receipt'], 'stage')['sha'])
             + '.json'
@@ -698,31 +695,28 @@ class HostOperations:
                            rows(self.manifest['stages'], 'admitted stage')]
             if not later_stage_progress(applied, expected, inventories):
                 raise ValueError('unknown-post-stage-sql-state')
-            verify_stage_schema(self, stage, retained=proof)
+            verify_stage_schema(self, stage, retained=proof, predecessor=predecessor)
             return
         if not stage_progress(
             applied, migration_inventory(previous), expected,
         ):
             raise ValueError('actual-sql-is-not-an-admitted-stage-prefix')
         if applied != expected:
-            self.image_command(
-                record(stage['receipt'], 'stage image'), 'npx',
-                ['--no-install', 'prisma', 'migrate', 'deploy',
-                 '--config=/app/prisma.config.ts'],
+            migration_image_command(
+                self, record(stage['receipt'], 'stage image'), 'npx',
+                MIGRATE_DEPLOY,
+                predecessor=predecessor,
             )
-        if self.applied_migrations() != expected:
+        if read_applied() != expected:
             raise ValueError('stage-sql-not-established')
         receipt = record(stage['receipt'], 'stage image')
-        helper = self.root / 'review-stage-assets' / cast(str, receipt['sha'])
-        source = helper / 'queue-lifecycle.cjs'
-        if hashlib.sha256(bounded_bytes(source)).hexdigest() \
-                != stage['lifecycleSha256']:
-            raise ValueError('stage-matched-helper-changed')
-        result = self.image_command(
-            receipt, 'node', ['--require', 'tsx/cjs',
-                              '/review-stage/queue-lifecycle.cjs'],
-            content=b'{"command":"established"}',
-            mounts=[f'type=bind,src={helper},dst=/review-stage,readonly'],
+        arguments, mounts = establishment_command(
+            self, stage, successor=predecessor is not None,
+        )
+        result = migration_image_command(
+            self, receipt, 'node', arguments,
+            content=b'{"command":"established"}', mounts=mounts,
+            predecessor=predecessor,
         )
         lines = result.decode().splitlines()
         proofs = [json.loads(line.removeprefix('SOTTO_DEPLOY_QUEUE='))
@@ -730,7 +724,7 @@ class HostOperations:
         if (len(proofs) != 1 or proofs[0].get('established') is not True
                 or proofs[0].get('appliedMigrations') != len(expected)):
             raise ValueError('canonical-stage-establishment-failed')
-        verification = verify_stage_schema(self, stage)
+        verification = verify_stage_schema(self, stage, predecessor=predecessor)
         atomic_json(self.attempt.directory / (
             'stage-' + cast(str, receipt['sha']) + '.json'
         ), {'verified': True, 'migrations': expected, **verification})
@@ -842,7 +836,7 @@ class HostOperations:
             container_name=name,
             mounts=[review_code_mount(self)],
             predecessor=predecessor,
-            retained_inventory=predecessor is not None,
+            predecessor_tool='retained-inventory' if predecessor is not None else 'pause',
         )
         actual_image = rows(json.loads(self.docker(
             'image', 'inspect', cast(str, image['imageId']),

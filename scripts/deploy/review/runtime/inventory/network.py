@@ -7,7 +7,10 @@ from ipaddress import ip_interface, ip_network
 from typing import TYPE_CHECKING, Literal, cast
 
 from scripts.deploy.images.metadata import record
-from scripts.deploy.review.runtime.inventory.predecessor import inspect_predecessor
+from scripts.deploy.review.runtime.inventory.predecessor import (
+    RetainedPhase,
+    inspect_predecessor,
+)
 from scripts.deploy.review.state import checksum, private_json
 from scripts.deploy.review.topology import (
     NETWORK,
@@ -25,13 +28,14 @@ Endpoints = dict[str, tuple[str, str]]
 
 def verify_retained_network(
     previous: HostOperations, successor: HostOperations,
+    *, phase: RetainedPhase = 'FENCED',
 ) -> None:
     """Check exact service and network identities around stopped writers.
 
     This observes network membership only. Host, client, provider and queue
     quiescence require separate controls and repeated checks by the caller.
     """
-    _verify_network(previous, successor, web='stopped', workers='stopped')
+    _verify_network(previous, successor, web='stopped', workers='stopped', phase=phase)
 
 
 def verify_running_predecessor_network(
@@ -49,9 +53,10 @@ def _verify_network(
     previous: HostOperations, successor: HostOperations, *,
     web: Literal['running', 'stopped'],
     workers: Literal['running', 'stopped'],
+    phase: RetainedPhase = 'FENCED',
 ) -> None:
     expected_state = {'web': web, 'workers': workers}
-    if inspect_predecessor(previous, successor) != expected_state:
+    if inspect_predecessor(previous, successor, phase=phase) != expected_state:
         raise ValueError(f'expected-predecessor-web-{web}-workers-{workers}')
     previous.verify_egress()
     topology = record(previous.manifest['topology'], 'review topology')
@@ -177,7 +182,7 @@ def _verify_network(
                     raise ValueError('review-network-endpoint-changed')
 
     check_membership()
-    if inspect_predecessor(previous, successor) != expected_state:
+    if inspect_predecessor(previous, successor, phase=phase) != expected_state:
         raise ValueError('predecessor-writer-state-evidence-changed')
     if running_endpoints() != writer_endpoints:
         raise ValueError('predecessor-network-evidence-changed')
