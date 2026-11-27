@@ -454,6 +454,16 @@ started, recovery moves forward with compatible code. Keep the marker, backups
 and failed records; do not restart the old release or run a first-install
 bootstrap against this database.
 
+A reviewed workload recovery may use a root-owned compatible source bundle
+from `/var/lib/sotto-review-recovery/<tested-sha>/source`. Its authorization
+binds the same attempt, retained failure and backup, original workload
+checkpoint, completed storage recovery and exact stitch retry. The controller
+rechecks the repaired lesson and preserves its original deadline and operation.
+It gives the existing workload one separate, nonrenewable verification window
+under the public fence. Stage an exact source revision with successful GitHub
+checks before handing off the held attempt. Keep this source bundle and its
+authorization for the completed release's startup and future upgrades.
+
 Completion installs and enables `sotto-review-start.service` for the captured
 release. It runs after Docker and the review network guard, using this entry
 point from the admitted source directory:

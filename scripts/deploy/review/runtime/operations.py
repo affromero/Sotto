@@ -38,6 +38,7 @@ from scripts.deploy.review.runtime.policy import (
     runtime_policy,
     successor_helper_budget,
 )
+from scripts.deploy.review.runtime.recovery.workload import effective_tool_manifest
 from scripts.deploy.review.runtime.release.migrations import (
     establishment_command,
     later_stage_progress,
@@ -160,7 +161,7 @@ class HostOperations:
         return self.command(['docker', *arguments])
 
     def verify_tools(self) -> None:
-        self.verify_tool_inventory(self.root, self.manifest)
+        self.verify_tool_inventory(self.root, effective_tool_manifest(self.root, self.attempt, self.manifest))
 
     @staticmethod
     def verify_tool_inventory(
@@ -792,7 +793,7 @@ class HostOperations:
 
         image = record(self.manifest['finalWorker'], 'final worker image')
         self.verify_tools()
-        tools = record(self.manifest['tools'], 'review tools')
+        tools = record(effective_tool_manifest(self.root, self.attempt, self.manifest)['tools'], 'review tools')
         if mode in {'providers', 'workloads'}:
             if candidate_id is None:
                 raise ValueError('exact-private-candidate-required')

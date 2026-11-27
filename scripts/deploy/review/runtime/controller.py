@@ -32,6 +32,10 @@ from scripts.deploy.review.runtime.policy import (
     runtime_policy,
     successor_queue_policy_names,
 )
+from scripts.deploy.review.runtime.recovery.workload import (
+    effective_tool_manifest,
+    recovery_workload_input,
+)
 from scripts.deploy.review.runtime.release.successor import (
     INHERITED_PROVIDER_CHECKPOINT,
     PROVIDER_CHECKPOINT,
@@ -404,7 +408,9 @@ def activate(
     if continue_check is not None:
         continue_check()
     result = record(operations.runtime_exchange(
-        'workloads', workloads, checkpoint=workload_checkpoint,
+        'workloads', workloads, checkpoint=recovery_workload_input(
+            operations.root, operations.attempt, workload_checkpoint,
+        ),
         candidate_id=web,
     ), 'actual learning and speech workload')
     if (any(type(result.get(name)) is not int for name in (
@@ -785,7 +791,7 @@ def supervise(
 def launch(attempt: Attempt, *, recover: bool = False) -> dict[str, object]:
     """Launch one owner without taking the deployment lock in this parent."""
     root = Path(__file__).resolve().parents[4]
-    HostOperations.verify_tool_inventory(root, attempt.manifest())
+    HostOperations.verify_tool_inventory(root, effective_tool_manifest(root, attempt, attempt.manifest()))
     retained = attempt.directory / 'supervisor.json'
     if retained.exists():
         prior = private_json(retained)
@@ -869,9 +875,8 @@ def request_recovery(attempt: Attempt) -> None:
     """Bind the recovery signal to the inspected process through a pidfd."""
     if sys.platform != 'linux':
         raise ValueError('linux-supervisor-recovery-required')
-    HostOperations.verify_tool_inventory(
-        Path(__file__).resolve().parents[4], attempt.manifest(),
-    )
+    root = Path(__file__).resolve().parents[4]
+    HostOperations.verify_tool_inventory(root, effective_tool_manifest(root, attempt, attempt.manifest()))
     retained = private_json(attempt.directory / 'supervisor.json')
     pid = retained.get('pid')
     if type(pid) is not int:
