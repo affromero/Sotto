@@ -16,23 +16,34 @@ from scripts.deploy.review.state import atomic_json
 
 PREFIX = b'SOTTO_REVIEW_IPC='
 MAX_LINE = 262_144
+MODE_TIMEOUTS = {
+    'workloads': 3330,
+    'providers': 330,
+    # The child gets 240 seconds for repeated full host fence checks.
+    'retained-single-client': 260,
+    'prepare-successor-queue-policy': 260,
+}
 
 
 def exchange(
     command: Sequence[str], initial: Mapping[str, object], *,
     directory: Path, assert_fence: Callable[[], None],
     queue_manifest: Callable[[Mapping[str, object]], None],
-    timeout: float,
+    timeout: float | None = None,
     queue_policy: Callable[[Mapping[str, object]], None] | None = None,
 ) -> object:
     """Keep secrets on stdin and retain uncertain credential operations."""
-    if initial.get('mode') not in {
+    mode = initial.get('mode')
+    if not isinstance(mode, str) or mode not in {
         'inspect', 'prepare', 'providers', 'queues', 'capture',
         'continuation', 'consumers', 'workloads', 'paused-admission',
         'queue-policy', 'retained-inventory', 'retained-single-client',
         'prepare-successor-queue-policy',
-    } or not 0 < timeout <= (3330 if initial.get('mode') == 'workloads'
-                            else 330):
+    }:
+        raise ValueError('bounded-runtime-exchange-required')
+    if timeout is None:
+        timeout = MODE_TIMEOUTS.get(mode, 100)
+    if not 0 < timeout <= (3330 if mode == 'workloads' else 330):
         raise ValueError('bounded-runtime-exchange-required')
     encoded = json.dumps(initial, separators=(',', ':')).encode() + b'\n'
     if len(encoded) > MAX_LINE:
@@ -40,7 +51,7 @@ def exchange(
     # Workloads share 3300s: 3300s / 5s * 3 poll acknowledgements = 1980.
     # Fewer than 200 nonpoll acknowledgements keep the total below 2200;
     # 4096 leaves headroom while other modes retain their 100-event budget.
-    acknowledgement_limit = 4096 if initial.get('mode') == 'workloads' else 100
+    acknowledgement_limit = 4096 if mode == 'workloads' else 100
     deadline = time.monotonic() + timeout
     with tempfile.TemporaryFile() as errors:
         process = subprocess.Popen(

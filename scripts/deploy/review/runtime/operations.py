@@ -880,8 +880,6 @@ class HostOperations:
                 directory=self.attempt.directory,
                 assert_fence=verify, queue_manifest=original_manifest,
                 queue_policy=lambda value: retain_queue_intent(self, value),
-                timeout=(3330 if mode == 'workloads' else
-                         330 if mode == 'providers' else 100),
             )
         except BaseException as original:
             try:

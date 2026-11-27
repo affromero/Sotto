@@ -170,11 +170,15 @@ def _pause_intent(receipt: dict[str, object]) -> dict[str, object]:
             'expectedPausedSha256': checksum(_paused_queues(receipt))}
 
 
-def verify_predecessor_queue_pause(successor: HostOperations) -> None:
+def verify_predecessor_queue_pause(
+    successor: HostOperations, *, allow_unresolved: bool = False,
+) -> None:
     """Verify the retained proof when the full running topology has changed."""
     directory = successor.attempt.directory
     receipt = private_json(directory / 'predecessor-queues.json')
-    if (receipt.get('originalQueues') != _original_queues(successor)
+    if (receipt.get('originalQueues') != _original_queues(
+            successor, allow_unresolved=allow_unresolved,
+            )
             or receipt.get('successorManifestSha256') != successor.attempt.manifest_hash
             or receipt.get('successorEvidenceSha256') != successor.attempt.evidence_hash):
         raise ValueError('predecessor-queue-runtime-changed')
