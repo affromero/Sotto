@@ -8,6 +8,7 @@ from unittest.mock import patch
 from scripts.deploy.review.runtime.inventory.predecessor import capture_predecessor
 from scripts.deploy.review.runtime.inventory.queue_snapshot import (
     capture_predecessor_queue_snapshot,
+    observe_predecessor_queue_drain,
 )
 from scripts.deploy.review.state import private_json
 from scripts.deploy.review.topology import NETWORK, PROJECT
@@ -38,6 +39,7 @@ class PredecessorQueueSnapshotTests(unittest.TestCase):
         self.path = self.successor.attempt.directory / 'predecessor-queues.json'
         self.boundary = self.successor.command
         self.output = self.response(self.original)
+        self.expected_request = {'command': 'snapshot'}
         self.after_observation = None
         self.enterContext(patch.object(self.successor, 'command', side_effect=self.command))
 
@@ -52,7 +54,7 @@ class PredecessorQueueSnapshotTests(unittest.TestCase):
             '-i', '--workdir', '/app/apps/web', '--env', 'NODE_OPTIONS=',
             self.worker['Id'], 'node',
         ])
-        self.assertEqual(json.loads(options['content']), {'command': 'snapshot'})
+        self.assertEqual(json.loads(options['content']), self.expected_request)
         self.assertEqual(options['timeout'], 25)
         if self.after_observation is not None:
             self.after_observation()
@@ -64,6 +66,54 @@ class PredecessorQueueSnapshotTests(unittest.TestCase):
         self.assertEqual(receipt['workerId'], self.worker['Id'])
         self.assertEqual(receipt['originalQueues'], self.original)
         self.assertEqual(capture_predecessor_queue_snapshot(self.previous, self.successor), receipt)
+
+    def prepare_drain(self, *, jobs: int = 0, workers: int = 0,
+                      synchronous: int = 0) -> dict[str, object]:
+        capture_predecessor_queue_snapshot(self.previous, self.successor)
+        self.expected_request = {'command': 'drained-all', 'manifest': self.original}
+        return {
+            **self.original,
+            'queues': [{**queue, 'paused': True} for queue in self.original['queues']],
+            'activeJobs': jobs,
+            'executions': {'inspected': 2 + workers + synchronous, 'settled': 2,
+                           'workerActive': workers, 'synchronousActive': synchronous},
+            'drained': jobs == workers == synchronous == 0,
+        }
+
+    def test_reads_paused_queue_drain_using_unchanged_original_flags(self) -> None:
+        self.output = self.response(self.prepare_drain())
+        original_bytes = self.path.read_bytes()
+        self.assertTrue(observe_predecessor_queue_drain(self.previous, self.successor))
+        self.assertEqual(self.path.read_bytes(), original_bytes)
+
+    def test_each_kind_of_active_work_prevents_a_drain_result(self) -> None:
+        first = self.prepare_drain(jobs=1)
+        self.output = self.response(first)
+        self.assertFalse(observe_predecessor_queue_drain(self.previous, self.successor))
+        for kind in ('workerActive', 'synchronousActive'):
+            with self.subTest(kind=kind):
+                self.output = self.response({
+                    **first, 'activeJobs': 0,
+                    'executions': {'inspected': 1, 'settled': 0, 'workerActive': 0,
+                                   'synchronousActive': 0, kind: 1},
+                })
+                self.assertFalse(observe_predecessor_queue_drain(self.previous, self.successor))
+
+    def test_refuses_a_claim_of_drain_with_active_work(self) -> None:
+        self.output = self.response({**self.prepare_drain(jobs=1), 'drained': True})
+        with self.assertRaisesRegex(ValueError, 'queue-drain-result-invalid'):
+            observe_predecessor_queue_drain(self.previous, self.successor)
+
+    def test_refuses_a_drain_result_when_a_queue_is_unpaused(self) -> None:
+        drifted = self.prepare_drain()
+        drifted['queues'] = self.original['queues']
+        self.output = self.response(drifted)
+        with self.assertRaisesRegex(ValueError, 'queue-drain-inventory-changed'):
+            observe_predecessor_queue_drain(self.previous, self.successor)
+
+    def test_refuses_a_drain_without_the_original_queue_receipt(self) -> None:
+        with self.assertRaisesRegex(ValueError, 'exact-retained-predecessor-queue-snapshot-required'):
+            observe_predecessor_queue_drain(self.previous, self.successor)
 
     def test_refuses_a_changed_pause_flag(self) -> None:
         changed = json.loads(json.dumps(self.original))
