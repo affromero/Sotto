@@ -333,6 +333,55 @@ class ReleaseRecoveryTests(unittest.TestCase):
         self.assertEqual(self.unit.read_bytes(), b'foreign service')
         self.assertEqual(self.command_history, [])
 
+    def test_successor_replaces_only_the_verified_predecessor_startup_unit(self) -> None:
+        release.install_startup_unit(self.operations)
+        prior = self.unit.read_bytes()
+        attempt = Attempt.create(self.host, 'successor', {
+            **self.operations.manifest, 'predecessor': {},
+        }, 'b' * 64)
+        successor = HostOperations(attempt, self.lock)
+        successor.root = self.root
+        boundary = 'scripts.deploy.review.runtime.inventory.predecessor.bind_predecessor'
+        with patch(boundary, return_value=self.operations):
+            self.assertEqual(release.retained_predecessor_startup(successor), prior)
+        for phase in ('ADMITTED', 'PREPARED', 'FENCED', 'QUIESCENT', 'BACKED_UP',
+                      'SQL_STARTED', 'FINAL_SCHEMA_VERIFIED', 'EGRESS_GUARDED',
+                      'CANDIDATE_READY', 'PUBLIC_COMMITTED'):
+            attempt.advance(phase)
+        self.lost_startup_result = 'install'
+        with patch(boundary, return_value=self.operations):
+            with self.assertRaisesRegex(OSError, 'lost startup'):
+                release.install_startup_unit(successor)
+            self.assertEqual((attempt.directory / 'predecessor-startup.service').read_bytes(),
+                             prior)
+            self.assertEqual(self.unit.read_bytes(), release.startup_unit(successor))
+            self.unit.write_bytes(b'foreign service')
+            with self.assertRaisesRegex(ValueError, 'pending-completed-startup-unit-changed'):
+                release.install_startup_unit(successor)
+            self.assertEqual(self.unit.read_bytes(), b'foreign service')
+            self.unit.write_bytes(release.startup_unit(successor))
+            release.install_startup_unit(successor)
+            release.verify_startup_unit(successor)
+        self.assertEqual(self.started, [])
+
+    def test_successor_retention_protects_actual_predecessor_images_and_backing_services(self) -> None:
+        base = self.operations.attempt.manifest()
+        successor = HostOperations(Attempt.create(self.host, 'retention-successor', {
+            **base,
+            'predecessor': {},
+            'topology': {'services': {
+                'web': {'imageId': 'sha256:' + '3' * 64},
+                'postgres': {'imageId': 'sha256:' + '4' * 64},
+                'redis': {'imageId': 'sha256:' + '5' * 64},
+            }},
+            'finalWeb': {**base['finalWeb'], 'imageId': 'sha256:' + '6' * 64},
+            'finalWorker': {**base['finalWorker'], 'imageId': 'sha256:' + '7' * 64},
+        }, 'b' * 64), self.lock)
+        boundary = 'scripts.deploy.review.runtime.inventory.predecessor.bind_predecessor'
+        with patch(boundary, return_value=self.operations):
+            _, protected = release.retention_context(successor)
+        self.assertEqual(protected, {'sha256:' + key * 64 for key in '124567'})
+
     def test_foreign_drop_in_refuses_completion_without_a_receipt(
         self,
     ) -> None:

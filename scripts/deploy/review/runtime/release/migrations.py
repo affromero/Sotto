@@ -49,18 +49,31 @@ ACTIVE_FILES = CATALOG_FILES | {
 APPLIED_MIGRATION_QUERY = '''SELECT json_agg(json_build_object(
 'name',migration_name,'checksum',checksum,'finished',finished_at IS NOT NULL,
 'rolledBack',rolled_back_at IS NOT NULL))::text FROM "_prisma_migrations"'''
-APPLIED_MIGRATION_SCRIPT = (
-    'const {Client}=require("pg");'
-    'const c=new Client({connectionString:process.env.DATABASE_URL,'
-    'connectionTimeoutMillis:5000,query_timeout:5000});'
-    '(async()=>{await c.connect();try{'
-    'await c.query("BEGIN READ ONLY");'
-    'const r=await c.query(' + json.dumps(APPLIED_MIGRATION_QUERY) + ');'
-    'console.log(r.rows[0].json_agg);'
-    '}finally{await c.query("ROLLBACK");await c.end()}})()'
-    '.catch(()=>{console.error("Migration inventory unavailable");'
-    'process.exitCode=1});'
-)
+POSTGRES_CLIENT_QUERY = '''
+SELECT count(*)::text AS clients FROM pg_stat_activity
+WHERE datname=current_database() AND backend_type='client backend'
+AND pid<>pg_backend_pid()
+'''
+
+
+def applied_migration_script(*, require_idle: bool) -> str:
+    check = (
+        'const sessions=await c.query(' + json.dumps(POSTGRES_CLIENT_QUERY) + ');'
+        'if(sessions.rows[0].clients!=="0"){'
+        'console.error("Unexpected PostgreSQL client");throw Error("Database not idle");}'
+    ) if require_idle else ''
+    return (
+        'const {Client}=require("pg");'
+        'const c=new Client({connectionString:process.env.DATABASE_URL,'
+        'connectionTimeoutMillis:5000,query_timeout:5000});'
+        '(async()=>{await c.connect();try{'
+        'await c.query("BEGIN READ ONLY");' + check +
+        'const r=await c.query(' + json.dumps(APPLIED_MIGRATION_QUERY) + ');'
+        'console.log(r.rows[0].json_agg);'
+        '}finally{await c.query("ROLLBACK");await c.end()}})()'
+        '.catch(()=>{console.error("Migration inventory unavailable");'
+        'process.exitCode=1});'
+    )
 
 
 class DiffResult(TypedDict):
@@ -114,7 +127,8 @@ def read_applied_migrations(
     else:
         receipt = record(operations.manifest['finalWorker'], 'successor worker')
     values = json.loads(migration_image_command(
-        operations, receipt, 'node', ['-e', APPLIED_MIGRATION_SCRIPT],
+        operations, receipt, 'node',
+        ['-e', applied_migration_script(require_idle=predecessor is not None)],
         predecessor=predecessor,
     ))
     result: dict[str, str] = {}

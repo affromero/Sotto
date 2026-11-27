@@ -64,7 +64,6 @@ from scripts.deploy.review.topology import (
     NETWORK,
     PROJECT,
     capture,
-    classified_environment,
     environment,
     rows,
     verify_capture,
@@ -261,12 +260,9 @@ class HostOperations:
         }
 
     def verify_storage(self) -> None:
-        services = record(record(self.manifest['topology'], 'topology')
-                          ['services'], 'services')
-        identities = {str(record(item, 'service')['id'])
-                      for item in services.values()}
-        all_ids = self.docker('ps', '-aq', '--no-trunc').decode().split()
-        self.resolved_mounts(self.inspect(*all_ids), identities)
+        from scripts.deploy.review.runtime.inventory.storage import verify_review_storage
+
+        verify_review_storage(self)
 
     def preflight(self) -> dict[str, object]:
         endpoint = os.environ.get('DOCKER_HOST') or self.docker(
@@ -487,27 +483,9 @@ class HostOperations:
         return verify_archive(path, budget)
 
     def runtime_environment(self) -> Path:
-        topology = record(self.manifest['topology'], 'topology')
-        web = record(record(topology['services'], 'services')['web'], 'web')
-        original = self.inspect(cast(str, web['id']))[0]
-        if original.get('Image') != web['imageId']:
-            raise ValueError('historical-runtime-image-changed')
-        values = environment(original)
-        if checksum(values) != web['environmentHash']:
-            raise ValueError('historical-environment-changed')
-        self.private_environment = values
-        if any('\n' in value or '\r' in value or '\x00' in value
-               for value in values.values()):
-            raise ValueError('unsupported-docker-environment-value')
-        encoded = ''.join(f'{name}={value}\n'
-                          for name, value in sorted(values.items())).encode()
-        target = self.attempt.directory / 'original.env'
-        if target.exists():
-            if bounded_bytes(target, private=True) != encoded:
-                raise ValueError('retained-private-environment-changed')
-        else:
-            self.private_file(target, encoded)
-        return target
+        from scripts.deploy.review.runtime.inventory.environment import stage_runtime_environment
+
+        return stage_runtime_environment(self)
 
     def image_command(
         self, receipt: Mapping[str, object], entrypoint: str,
@@ -575,6 +553,11 @@ class HostOperations:
         predecessor_tool: PredecessorTool = 'pause',
         content: bytes | None = None,
     ) -> list[str]:
+        from scripts.deploy.review.runtime.inventory.environment import (
+            admit_predecessor_helper_environment,
+            runtime_helper_environment,
+        )
+
         if entrypoint not in {'node', 'npx', 'tar'}:
             raise ValueError('unsupported-reviewed-tool-entrypoint')
         if network not in {NETWORK, 'none'} \
@@ -583,19 +566,8 @@ class HostOperations:
         if predecessor_tool != 'pause' and predecessor is None:
             raise ValueError('retained-review-predecessor-required')
         if predecessor is None:
-            self.runtime_environment()
-            self.verify_storage()
-            topology = record(self.manifest['topology'], 'topology')
-            old = record(record(topology['services'], 'services')['web'], 'web')
-            image = rows(json.loads(self.docker(
-                'image', 'inspect', cast(str, old['imageId']),
-            )), 'historical image')[0]
-            values = classified_environment(self.private_environment,
-                                            environment(image))
+            values = runtime_helper_environment(self)
         else:
-            from scripts.deploy.review.runtime.inventory.environment import (
-                admit_predecessor_helper_environment,
-            )
             values = admit_predecessor_helper_environment(
                 predecessor, self, receipt, entrypoint, mounts=mounts,
                 name=container_name, network=network, arguments=arguments,
@@ -764,20 +736,27 @@ class HostOperations:
     ) -> object:
         """Bind the helper before start and audit its exit."""
         from scripts.deploy.review.runtime.inventory.environment import (
-            retained_inventory_network, review_code_mount,
+            retained_inventory_network, retained_inventory_phase, review_code_mount,
         )
         if mode not in {'capture', 'inspect', 'prepare', 'providers',
                         'queues', 'continuation', 'consumers', 'workloads',
-                        'paused-admission', 'queue-policy', 'retained-single-client'}:
+                        'paused-admission', 'queue-policy', 'retained-single-client',
+                        'prepare-successor-queue-policy'}:
             raise ValueError('unsupported-review-runtime-operation')
-        if (mode == 'retained-single-client') != (predecessor is not None):
+        needs_predecessor = mode in ('retained-single-client', 'prepare-successor-queue-policy')
+        if needs_predecessor != (predecessor is not None):
             raise ValueError('retained-review-predecessor-required')
         self.lock.validate()
         self.settle_pending_helpers()
+        retained_phase = retained_inventory_phase(self) if predecessor is not None else 'FENCED'
 
         def verify_context() -> None:
             if predecessor is not None:
-                if retained_inventory_network(predecessor, self) != network:
+                if (mode == 'prepare-successor-queue-policy'
+                        and (retained_phase != 'FINAL_SCHEMA_VERIFIED'
+                             or self.attempt.state()['status'] != 'active')):
+                    raise ValueError('successor-queue-policy-phase-invalid')
+                if retained_inventory_network(predecessor, self, phase=retained_phase) != network:
                     raise ValueError('retained-inventory-network-changed')
             elif mode == 'queue-policy':
                 admit_queue_getter(self)
@@ -805,7 +784,7 @@ class HostOperations:
         else:
             if candidate_id is not None:
                 raise ValueError('unexpected-runtime-network-reference')
-            network = (retained_inventory_network(predecessor, self)
+            network = (retained_inventory_network(predecessor, self, phase=retained_phase)
                        if predecessor is not None else NETWORK)
         verify_context()
         initial = {'mode': mode, 'input': value,

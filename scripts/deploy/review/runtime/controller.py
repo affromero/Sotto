@@ -21,6 +21,8 @@ from typing import cast
 from scripts.deploy.images.metadata import digest, record
 from scripts.deploy.review.build_observer import bounded_bytes
 from scripts.deploy.review.runtime import services
+from scripts.deploy.review.runtime.inventory.environment import exact_successor_sql_stages
+from scripts.deploy.review.runtime.inventory.predecessor import bind_predecessor
 from scripts.deploy.review.runtime.operations import (
     HOST_STATE,
     HostOperations,
@@ -28,6 +30,16 @@ from scripts.deploy.review.runtime.operations import (
 from scripts.deploy.review.runtime.policy import (
     retain_queue_intent,
     runtime_policy,
+    successor_queue_policy_names,
+)
+from scripts.deploy.review.runtime.release.successor import (
+    migrate_successor_data,
+    preflight_successor,
+    prepare_successor_activation,
+    prepare_successor_data,
+    reconcile_created_candidates,
+    retain_successor_restore_manifest,
+    successor_restore_manifest,
 )
 from scripts.deploy.review.state import (
     PHASES,
@@ -113,6 +125,15 @@ def admission(operations: HostOperations) -> dict[str, object]:
     final = record(manifest['finalWorker'], 'final worker')
     web = record(manifest['finalWeb'], 'final web')
     receipt = record(stages[-1]['receipt'], 'last schema receipt')
+    if 'predecessor' in manifest:
+        previous_operations = bind_predecessor(operations)
+        exact_successor_sql_stages(previous_operations, operations)
+        successor_queue_policy_names(operations)
+        if (receipt != final or web.get('sha') != final.get('sha')
+                or any(job.get('delivered') is not True for job in jobs)):
+            raise ValueError('exact-delivered-successor-admission-required')
+        admitted_file(attempt, 'original-data.json', manifest['originalDataSha256'])
+        return evidence
     if (receipt != final or web.get('sha') != final.get('sha')
             or len(record(stages[-1]['migrations'], 'final SQL')) != 31):
         raise ValueError('one-admitted-final-thirty-one-schema-required')
@@ -230,8 +251,17 @@ def activate(
     )
     journal = read_activation(operations)
     path = operations.attempt.directory / 'activation.json'
-    original_queues = record(operations.manifest['originalQueues'],
-                             'original queues')
+    successor = 'predecessor' in operations.manifest
+    if successor:
+        original_queues = successor_restore_manifest(operations)
+        if not journal['queuesPrepared']:
+            if continue_check is not None:
+                continue_check()
+            retain_successor_restore_manifest(operations)
+            journal.update(prepareIntent=True, queuesPrepared=True)
+            atomic_json(path, journal)
+    else:
+        original_queues = record(operations.manifest['originalQueues'], 'original queues')
     if not journal['queuesPrepared']:
         if continue_check is not None:
             continue_check()
@@ -412,26 +442,62 @@ def execute(
         operations.settle_pending_helpers()
         if PHASES.index(phase) >= PHASES.index('FENCED'):
             operations.fence()
-    while True:
+    predecessor = bind_predecessor(operations) if 'predecessor' in operations.manifest else None
+
+    def check_continuation() -> None:
         lock.validate()
         if continue_check is not None:
             continue_check()
+
+    while True:
+        check_continuation()
         phase = cast(str, attempt.state()['phase'])
         if phase == 'PRECHECK':
-            operations.preflight()
-            services.runtime_identity(operations)
             admitted_workload_inputs(services.private_inputs(operations))
-            inspect_original(operations, evidence)
+            if predecessor is None:
+                operations.preflight()
+                services.runtime_identity(operations)
+                inspect_original(operations, evidence)
+            else:
+                preflight_successor(operations, recover=recover)
             attempt.advance('ADMITTED')
         elif phase == 'ADMITTED':
-            operations.runtime_environment()
+            if predecessor is None:
+                operations.runtime_environment()
+            else:
+                services.verify_completed(predecessor)
             operations.capacity()
             operations.verify_tools()
             services.before_fence(operations)
             attempt.advance('PREPARED')
         elif phase == 'PREPARED':
+            if predecessor is not None and not (
+                (HOST_STATE / 'unresolved.json').exists()
+                or (HOST_STATE / 'unresolved.json').is_symlink()
+            ):
+                services.verify_completed(predecessor)
             operations.fence()
             attempt.advance('FENCED')
+        elif predecessor is not None and phase in ('FENCED', 'QUIESCENT'):
+            prepare_successor_data(
+                predecessor, operations, recover=recover,
+                continue_check=check_continuation,
+            )
+        elif predecessor is not None and phase in ('BACKED_UP', 'SQL_STARTED'):
+            migrate_successor_data(
+                predecessor, operations, recover=recover,
+                continue_check=check_continuation,
+            )
+        elif predecessor is not None and phase == 'FINAL_SCHEMA_VERIFIED':
+            if not (attempt.directory / 'queue-policy-intent.json').exists():
+                migrate_successor_data(
+                    predecessor, operations, recover=recover,
+                    continue_check=check_continuation,
+                )
+            prepare_successor_activation(
+                predecessor, operations, recover=recover,
+                continue_check=check_continuation,
+            )
         elif phase == 'FENCED':
             operations.retire_old_web()
             operations.verify_empty_redis()
@@ -461,6 +527,13 @@ def execute(
             operations.verify_egress()
             attempt.advance('EGRESS_GUARDED')
         elif phase == 'EGRESS_GUARDED':
+            if predecessor is not None and attempt.state()['status'] == 'unresolved':
+                operations.verify_fence()
+                operations.verify_egress()
+                reconcile_created_candidates(operations)
+                operations.verify_storage()
+                state = attempt.state()
+                atomic_json(attempt.directory / 'state.json', {**state, 'status': 'active'})
             activate(operations, evidence, continue_check)
             attempt.advance('CANDIDATE_READY')
         elif phase == 'CANDIDATE_READY':

@@ -62,6 +62,11 @@ const load = createRequire(import.meta.url);
 const lifecycle = load('../../queue-lifecycle.cjs') as {
   connectionIdentity(environment: NodeJS.ProcessEnv, namespace: string): string;
   run(input: unknown, runtime: unknown): Promise<unknown>;
+  addedQueuesEmpty(
+    runtime: unknown,
+    queues: readonly Queue[],
+    added: readonly string[]
+  ): Promise<void>;
 };
 
 /** Only the parent can acknowledge its independently checked fence and durable journal. */
@@ -214,7 +219,13 @@ export async function main(): Promise<void> {
             input.policyIntent,
             (intent) => request('queuePolicyIntent', intent),
             input.previousQueues,
-            () => request('fence')
+            () => request('fence'),
+            (added) =>
+              lifecycle.addedQueuesEmpty(
+                runtime,
+                added,
+                added.map((queue) => queue.name)
+              )
           );
         } finally {
           await Promise.all(queues.map((queue) => queue.close()));

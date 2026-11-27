@@ -76,7 +76,8 @@ export async function prepareReviewQueuePolicy(
   retained: unknown,
   admit: (intent: ReviewQueuePolicyIntent) => Promise<void>,
   previousQueues: readonly string[] = [],
-  verifyFence?: () => Promise<void>
+  verifyFence?: () => Promise<void>,
+  confirmAddedEmpty?: (queues: readonly Queue[]) => Promise<void>
 ) {
   const expected = [...ALL_QUEUE_NAMES].sort();
   assert.deepEqual(queues.map((queue) => queue.name).sort(), expected);
@@ -97,11 +98,21 @@ export async function prepareReviewQueuePolicy(
     })),
   });
   if (retained !== null) assert.deepEqual(reviewQueuePolicyIntentSchema.parse(retained), intent);
+  const added = queues.filter((queue) => !previous.has(queue.name));
+  if (confirmAddedEmpty) {
+    assert(previous.size > 0 && verifyFence, 'Guarded successor queue initialization required');
+    await confirmAddedEmpty(added);
+  }
   const deadline = Date.now() + 15_000;
   for (const queue of queues) {
     assert.equal(queue.opts.skipMetasUpdate, true, 'Metadata-free queue construction required');
     assert(Date.now() < deadline, 'Review queue policy preparation deadline');
-    assert(await queue.isPaused(), 'Review queues must remain paused');
+    const paused = await queue.isPaused();
+    if (confirmAddedEmpty && !previous.has(queue.name)) {
+      assert(retained !== null || !paused, 'Unadmitted added queue pause');
+    } else {
+      assert(paused, 'Review queues must remain paused');
+    }
     assert.equal((await queue.getWorkers()).length, 0, 'Review queue consumer appeared');
     assert.equal(await queue.getActiveCount(), 0, 'Review queue work appeared');
     assert.equal(await queue.getGlobalRateLimit(), null, 'Unknown review rate-limit metadata');
@@ -112,6 +123,15 @@ export async function prepareReviewQueuePolicy(
     );
   }
   if (retained === null || previous.size > 0) await admit(intent);
+  if (confirmAddedEmpty && verifyFence) {
+    for (const queue of added) {
+      if (!(await queue.isPaused())) {
+        await confirmAddedEmpty([queue]);
+        await verifyFence();
+        await queue.pause();
+      }
+    }
+  }
   for (const queue of queues) {
     assert(Date.now() < deadline, 'Review queue policy preparation deadline');
     assert(await queue.isPaused(), 'Review queues must remain paused');

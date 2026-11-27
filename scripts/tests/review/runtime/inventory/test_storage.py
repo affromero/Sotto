@@ -152,6 +152,31 @@ class CompletedStorageWrapperTests(unittest.TestCase):
         self.objects = host.objects
         self.ids = host.ids
 
+    def test_successor_network_refuses_a_foreign_peer_after_predecessor_stop(self) -> None:
+        backing = {}
+        indexed = {}
+        for role, suffix in (('postgres', '3'), ('redis', '2')):
+            identity = self.ids[role]
+            endpoint = {'id': 'review-bridge', 'address': '172.30.99.' + suffix}
+            backing[role] = {'id': identity, 'network': endpoint}
+            indexed[identity] = {'NetworkSettings': {
+                'Ports': {}, 'Networks': {
+                    NETWORK: {'NetworkID': endpoint['id'], 'IPAddress': endpoint['address']},
+                },
+            }}
+        peers = {identity: {} for identity in indexed}
+        networks = [{'Name': NETWORK, 'Containers': peers},
+                    {'Name': PROJECT + '_egress', 'Containers': {}}]
+        with (
+            patch.object(self.successor, 'verify_egress'),
+            patch.object(self.successor, 'docker',
+                         side_effect=lambda *args: json.dumps(networks).encode()),
+        ):
+            module.verify_successor_network_members(self.successor, indexed, backing, set())
+            peers['foreign-review-helper'] = {}
+            with self.assertRaisesRegex(ValueError, 'successor-network-membership-changed'):
+                module.verify_successor_network_members(self.successor, indexed, backing, set())
+
     def test_running_proof_is_durable_and_same_stopped_instance_is_accepted(self) -> None:
         module.verify_completed_storage(self.previous, self.successor)
         path = self.successor.attempt.directory / 'predecessor-mounted-storage.json'

@@ -276,6 +276,10 @@ def handover_auth(operations: HostOperations) -> None:
 
 
 def candidate_document(operations: HostOperations) -> dict[str, object]:
+    if 'predecessor' in operations.manifest:
+        from scripts.deploy.review.runtime.release.successor import read_successor_compose
+
+        return read_successor_compose(operations)
     topology = record(operations.manifest['topology'], 'topology')
     old = record(record(topology['services'], 'services')['web'], 'old web')
     original = operations.inspect(cast(str, old['id']))[0]
@@ -301,7 +305,6 @@ def candidate_document(operations: HostOperations) -> dict[str, object]:
         worker_memory=cast(int, resources['workerMemoryBytes']),
         egress_network=PROJECT + '_egress',
         runtime_policy=runtime_policy(operations.manifest),
-        isolate_project='predecessor' in operations.manifest,
     )
     for service in record(result['services'], 'candidate services').values():
         record(service, 'candidate service')['labels'] = {
@@ -435,12 +438,19 @@ def validate_created_candidate(
 
 
 def candidate(operations: HostOperations, role: str) -> str:
+    from scripts.deploy.review.runtime.release.successor import (
+        create_bound_candidate, verify_successor_candidate_admission,
+    )
+
     if role not in {'web', 'workers'}:
         raise ValueError('exact-review-runtime-role-required')
     operations.verify_fence()
     operations.verify_egress()
     operations.verify_images()
-    operations.verify_storage()
+    if 'predecessor' in operations.manifest:
+        verify_successor_candidate_admission(operations, role)
+    else:
+        operations.verify_storage()
     document = candidate_document(operations)
     project = str(document['name']) if 'predecessor' in operations.manifest else None
     services = record(document['services'], 'candidate services')
@@ -479,11 +489,7 @@ def candidate(operations: HostOperations, role: str) -> str:
             'name=^/' + cast(str, desired['container_name']) + '$',
         ).decode().split()
         if not existing:
-            project_option = ['--project-name', project] if project is not None else []
-            operations.command([
-                'docker', 'compose', *project_option, '-f', str(compose), 'create',
-                '--no-build', '--pull', 'never', role,
-            ])
+            create_bound_candidate(operations, document, compose, role, project=project)
         elif len(existing) != 1:
             raise ValueError('unique-attempt-candidate-required')
         actual = operations.inspect(cast(str, desired['container_name']))[0]
@@ -770,6 +776,8 @@ def verify_database_backup(
 def verify_backups(
     operations: HostOperations, *, binding: dict[str, str] | None = None,
 ) -> None:
+    from scripts.deploy.review.runtime.inventory.backup import file_integrity
+
     retained = private_json(operations.attempt.directory / 'backups.json')
     if retained.get('predecessor') != binding:
         raise ValueError('retained-backup-predecessor-changed')
@@ -811,18 +819,6 @@ def verify_backups(
         total += len(raw)
     if total != retained['bytes'] or total > budget:
         raise ValueError('retained-combined-backup-budget-changed')
-
-
-def file_integrity(path: Path, budget: int) -> dict[str, object]:
-    metadata = path.stat(follow_symlinks=False)
-    if (not stat.S_ISREG(metadata.st_mode)
-            or not 0 < metadata.st_size <= budget):
-        raise ValueError('bounded-backup-file-required')
-    hashed = hashlib.sha256()
-    with path.open('rb') as stream:
-        for chunk in iter(lambda: stream.read(1024*1024), b''):
-            hashed.update(chunk)
-    return {'sha256': hashed.hexdigest(), 'bytes': metadata.st_size}
 
 
 def backup_archive(

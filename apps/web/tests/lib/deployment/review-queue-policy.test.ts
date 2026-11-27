@@ -52,6 +52,58 @@ describe('dedicated review queue policy', () => {
     return Promise.all(keys.map(async (key) => [key, await fixture.client.dump(key)]));
   }
 
+  it('pauses the added queue only after the successor intent and fence are verified', async () => {
+    const owned = ALL_QUEUE_NAMES.map(runtime().createQueue);
+    const added = owned.find((queue) => queue.name === 'learning-writing');
+    if (!added) throw new Error('Candidate writing queue missing');
+    const previous = owned.filter((queue) => queue !== added);
+    const names = previous.map((queue) => queue.name);
+    let receipt: ReviewQueuePolicyIntent | null = null;
+    const admit = async (intent: ReviewQueuePolicyIntent) => {
+      expect(await added.isPaused()).toBe(false);
+      expect(await added.getGlobalConcurrency()).toBeNull();
+      receipt = intent;
+    };
+    const confirmEmpty = async (queues: readonly Queue[]) => {
+      for (const queue of queues) expect(await queue.getJobs()).toEqual([]);
+    };
+    try {
+      for (const queue of previous) {
+        await queue.pause();
+        await queue.setGlobalConcurrency(1);
+      }
+      const before = await snapshot();
+      await expect(
+        prepareReviewQueuePolicy(
+          owned,
+          connectionIdentity,
+          null,
+          admit,
+          names,
+          async () => {
+            throw new Error('Fence was lost');
+          },
+          confirmEmpty
+        )
+      ).rejects.toThrow('Fence was lost');
+      expect(await snapshot()).toEqual(before);
+      expect(receipt).toBeTruthy();
+      await prepareReviewQueuePolicy(
+        owned,
+        connectionIdentity,
+        receipt,
+        admit,
+        names,
+        async () => {},
+        confirmEmpty
+      );
+      expect(await added.isPaused()).toBe(true);
+      expect(await added.getGlobalConcurrency()).toBe(1);
+    } finally {
+      await Promise.all(owned.map((queue) => queue.close()));
+    }
+  });
+
   it('preserves the predecessor limits and adds policy for the new paused queue', async () => {
     const owned = await queues();
     const added = owned.find((queue) => queue.name === 'learning-writing');

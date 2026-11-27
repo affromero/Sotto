@@ -21,7 +21,7 @@ from scripts.deploy.review.runtime.inventory.predecessor import (
     prepare_predecessor_stop,
 )
 from scripts.deploy.review.runtime.policy import helper_arguments
-from scripts.deploy.review.runtime.release.migrations import APPLIED_MIGRATION_SCRIPT
+from scripts.deploy.review.runtime.release.migrations import applied_migration_script
 from scripts.deploy.review.state import Attempt, atomic_json, checksum, private_json
 from scripts.deploy.review.topology import NETWORK, PROJECT, exact_mounts
 from scripts.tests.review.runtime import admitted_runtime_fixture
@@ -182,7 +182,7 @@ class RetainedNetworkTests(ReviewNetworkFixture):
         with patch.object(self.successor, 'capacity'):
             with self.assertRaisesRegex(ValueError, 'successor-schema-write-not-admitted'):
                 self.successor.tool_command(image, 'npx', MIGRATE_DEPLOY, **options)
-            query = ['-e', APPLIED_MIGRATION_SCRIPT]
+            query = ['-e', applied_migration_script(require_idle=True)]
             query = helper_arguments(self.successor.manifest, 'node', query)
             self.assertEqual(
                 self.successor.tool_command(image, 'node', query, **options)[-len(query):],
