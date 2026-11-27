@@ -268,6 +268,7 @@ export function registerAssessmentCliJournalCase(
         prerequisite: pendingWriting.source.prerequisite,
         requirements: pendingWriting.source.requirements,
         skill: 'WRITING',
+        authorSchemaVersion: pendingWriting.current.authorSchemaVersion,
       },
       async (request) => {
         writingRequest = request;

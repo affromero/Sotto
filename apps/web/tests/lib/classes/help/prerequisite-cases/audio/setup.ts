@@ -203,6 +203,7 @@ export async function checkAssessmentAudioAdapter({
         requirements: captured.source.requirements,
         skill: 'SPEAKING',
         materialVersion: completionMode === 'worker' ? 2 : 1,
+        authorSchemaVersion: captured.current.authorSchemaVersion,
       },
       async (request) =>
         (

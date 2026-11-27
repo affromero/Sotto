@@ -561,6 +561,7 @@ export async function checkFailedAssessmentSubmission({
       prerequisite: null,
       requirements: fence.requirements,
       skill: 'GRAMMAR',
+      authorSchemaVersion: fence.authorSchemaVersion,
       priorTasks: exposure.map((item) => item.tasks),
     },
     async (request) => {
