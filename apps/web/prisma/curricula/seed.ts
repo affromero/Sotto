@@ -30,7 +30,8 @@ function lessonData(lesson: LoadedCurriculum['lessons'][number]) {
 export function seedCurriculum(
   prisma: PrismaClient,
   { manifest, lessons }: LoadedCurriculum,
-  missingId?: string
+  missingId?: string,
+  expectedReceipt?: unknown
 ) {
   const pair = { nativeLang: manifest.nativeLang, targetLang: manifest.targetLang };
   const source = { title: manifest.title, version: manifest.version, source: 'seeded' };
@@ -48,6 +49,15 @@ export function seedCurriculum(
         ? reviewedSeedObjectives(manifest.targetLang, lesson.slug, availability.catalog, lesson)
         : [],
   }));
+  function verifyReceipt<Mapping extends object>(mapping: Mapping) {
+    if (
+      expectedReceipt !== undefined &&
+      !isDeepStrictEqual({ ...pair, ...mapping }, expectedReceipt)
+    ) {
+      throw new Error('Curriculum seed result differs from the admitted receipt.');
+    }
+    return mapping;
+  }
   return prisma.$transaction(
     async (database) => {
       if (missingId !== undefined) {
@@ -112,14 +122,14 @@ export function seedCurriculum(
             mapped += links.length;
             if (!result || result.unresolved) unresolved++;
           }
-          return {
+          return verifyReceipt({
             curriculumId: existing.id,
             status: availability.status,
             lessons: lessons.length,
             mapped,
             unresolved,
             catalogRevision,
-          };
+          });
         }
       }
       const curriculum =
@@ -149,7 +159,7 @@ export function seedCurriculum(
         manifest.targetLang,
         authored
       );
-      return { curriculumId: curriculum.id, ...mapping, catalogRevision };
+      return verifyReceipt({ curriculumId: curriculum.id, ...mapping, catalogRevision });
     },
     { timeout: 30000 }
   );

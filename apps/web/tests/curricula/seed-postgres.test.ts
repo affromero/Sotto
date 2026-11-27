@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { loadCurriculum } from '../../prisma/curricula/schema';
 import { seedCurriculum } from '../../prisma/curricula/seed';
 import { createSharedTestInstance } from '../helpers/setup/shared-instance';
@@ -8,10 +8,10 @@ const suite = process.env.SIDEDOOR_TEST_DATABASE_URL ? describe : describe.skip;
 
 suite('additive curriculum seeding', () => {
   let instance: Awaited<ReturnType<typeof createSharedTestInstance>>;
-  beforeAll(async () => {
+  beforeEach(async () => {
     instance = await createSharedTestInstance('additive_seed');
   });
-  afterAll(async () => {
+  afterEach(async () => {
     await instance?.close();
   });
 
@@ -71,6 +71,20 @@ suite('additive curriculum seeding', () => {
     });
     await expect(seedCurriculum(database, curriculum, 'review-es-en-v1')).rejects.toThrow();
     expect(await database.curriculum.findUnique({ where: { id: 'review-es-en-v1' } })).toBeNull();
+    expect(await database.lesson.count()).toBe(before);
+  });
+
+  it('checks the admitted receipt inside the transaction before any rows commit', async () => {
+    const { database } = instance;
+    const curriculum = loadCurriculum('en-from-es');
+    const before = await database.lesson.count();
+    const id = 'review-en-es-invalid-receipt';
+    await expect(seedCurriculum(database, curriculum, id, {})).rejects.toThrow(
+      'Curriculum seed result differs from the admitted receipt.'
+    );
+    expect(await database.curriculum.findUnique({ where: { id } })).toBeNull();
+    expect(await database.learningMapRevision.count({ where: { targetLang: 'en' } })).toBe(0);
+    expect(await database.learningNodeIdentity.count({ where: { targetLang: 'en' } })).toBe(0);
     expect(await database.lesson.count()).toBe(before);
   });
 });
