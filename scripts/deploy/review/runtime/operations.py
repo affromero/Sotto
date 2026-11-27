@@ -90,6 +90,7 @@ class HostOperations:
     root: Path
     manifest: dict[str, object]
     private_environment: dict[str, str]
+    retained_initial_release: bool
 
     def __init__(self, attempt: Attempt, lock: DeploymentLock) -> None:
         self.attempt = attempt
@@ -97,6 +98,7 @@ class HostOperations:
         self.root = Path(__file__).resolve().parents[4]
         self.manifest = attempt.manifest()
         self.private_environment = {}
+        self.retained_initial_release = False
 
     def command(
         self, arguments: Sequence[str], *, content: bytes | None = None,
@@ -240,7 +242,7 @@ class HostOperations:
             actual = [item for item in containers
                       if item['Id'] == retained.get('id')]
             if (len(actual) != 1
-                    or self.writer_binding(actual[0]) != retained):
+                    or not self.candidate_binding_matches(actual[0], retained)):
                 raise ValueError('admitted-review-writer-changed')
             allowed.add(cast(str, retained['id']))
         return allowed
@@ -258,6 +260,17 @@ class HostOperations:
             'configHash': checksum(container['Config']),
             'hostHash': checksum(host), 'mountsHash': checksum(mounts),
         }
+
+    def candidate_binding_matches(
+        self, container: Mapping[str, object], binding: Mapping[str, object],
+    ) -> bool:
+        if self.retained_initial_release:
+            from scripts.deploy.review.runtime.inventory.stopped_writer import (
+                matches_archived_writer,
+            )
+
+            return matches_archived_writer(container, binding)
+        return self.writer_binding(container) == binding
 
     def verify_storage(self) -> None:
         from scripts.deploy.review.runtime.inventory.storage import verify_review_storage

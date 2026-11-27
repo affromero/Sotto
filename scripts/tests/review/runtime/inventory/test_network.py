@@ -397,7 +397,15 @@ class RunningPredecessorNetworkTests(ReviewNetworkFixture):
 
     def test_running_writer_binding_must_match_the_completed_release(self) -> None:
         worker = self.fixture.fixture.candidates['workers']
+        previous = worker['Config'].get('Env')
         worker['Config']['Env'] = ['UNADMITTED=fixture']
+        with self.assertRaisesRegex(ValueError, 'candidate-changed|writer-changed'):
+            verify_running_predecessor_network(self.previous, self.successor)
+        if previous is None:
+            del worker['Config']['Env']
+        else:
+            worker['Config']['Env'] = previous
+        worker['Mounts'][0]['RW'] = False
         with self.assertRaisesRegex(ValueError, 'candidate-changed|writer-changed'):
             verify_running_predecessor_network(self.previous, self.successor)
 

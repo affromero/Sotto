@@ -427,7 +427,7 @@ def verify_candidate(
         'candidate-' + role + '.json'
     ))
     actual = operations.inspect(cast(str, binding['id']))[0]
-    if operations.writer_binding(actual) != binding:
+    if not operations.candidate_binding_matches(actual, binding):
         raise ValueError('running-review-candidate-changed')
     state = record(actual['State'], 'running candidate state')
     if (state.get('OOMKilled')

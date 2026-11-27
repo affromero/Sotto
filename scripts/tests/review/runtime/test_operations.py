@@ -117,6 +117,20 @@ class HostCommandTests(unittest.TestCase):
                                  'a' * 64)
         self.operations = HostOperations(attempt, self.lock)
 
+    def test_new_attempt_requires_its_canonical_writer_capture(self) -> None:
+        writer: dict[str, object] = {
+            'Id': 'a' * 64, 'Image': 'sha256:' + 'b' * 64, 'Name': '/candidate',
+            'Config': {}, 'HostConfig': {'OomKillDisable': None}, 'Mounts': [],
+        }
+        archived = {**HostOperations.writer_binding(writer),
+                    'hostHash': checksum(writer['HostConfig'])}
+        target = self.operations.attempt.directory / 'candidate-web.json'
+        atomic_json(target, archived)
+        with self.assertRaisesRegex(ValueError, 'admitted-review-writer-changed'):
+            self.operations.admitted_writers([writer])
+        atomic_json(target, HostOperations.writer_binding(writer))
+        self.assertEqual(self.operations.admitted_writers([writer]), {'a' * 64})
+
     def test_retained_attempt_reopens_against_its_original_tool_bundle(
         self,
     ) -> None:

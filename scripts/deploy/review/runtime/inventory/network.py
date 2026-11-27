@@ -127,7 +127,7 @@ def _verify_network(
                 raise ValueError('distinct-predecessor-writers-required')
             actual = previous.inspect(identity)
             if (len(actual) != 1
-                    or previous.writer_binding(actual[0]) != binding):
+                    or not previous.candidate_binding_matches(actual[0], binding)):
                 raise ValueError('predecessor-candidate-identity-changed')
             container = actual[0]
             name = cast(str, container['Name']).lstrip('/')

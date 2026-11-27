@@ -5,13 +5,42 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping
 from datetime import datetime
+from itertools import permutations
 from typing import Literal
 
 from scripts.deploy.images.metadata import record
+from scripts.deploy.review.state import checksum
+from scripts.deploy.review.topology import rows
 
 TIMESTAMP = re.compile(
     r'(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d)(?:\.(\d{1,9}))?Z',
 )
+
+
+def matches_archived_writer(
+    container: Mapping[str, object], binding: Mapping[str, object],
+) -> bool:
+    """Verify a complete current or historical Docker inspect binding."""
+    from scripts.deploy.review.runtime.operations import HostOperations
+
+    actual = HostOperations.writer_binding(container)
+    if actual == binding:
+        return True
+    expected = dict(binding)
+    expected_mounts = expected.pop('mountsHash', None)
+    actual.pop('mountsHash')
+    actual['hostHash'] = checksum(container['HostConfig'])
+    if actual != expected:
+        return False
+    mounts = rows(container['Mounts'], 'historical writer mounts')
+    destinations = [mount.get('Destination') for mount in mounts]
+    if (len(mounts) > 6 or any(not isinstance(value, str) or not value
+                              for value in destinations)
+            or len(set(destinations)) != len(destinations)
+            or any(not isinstance(mount.get('Type'), str) for mount in mounts)):
+        raise ValueError('bounded-distinct-historical-writer-mounts-required')
+    return any(checksum(list(ordered)) == expected_mounts
+               for ordered in permutations(mounts))
 
 
 def timestamp(value: object) -> tuple[datetime, int]:
@@ -27,11 +56,9 @@ def capture_running_writer(
     role: Literal['web', 'workers'],
 ) -> dict[str, object]:
     """Inspect a running instance; the caller must fence and persist it."""
-    from scripts.deploy.review.runtime.operations import HostOperations
-
     if role not in ('web', 'workers'):
         raise ValueError('predecessor-role-invalid')
-    if HostOperations.writer_binding(container) != dict(binding):
+    if not matches_archived_writer(container, binding):
         raise ValueError('predecessor-writer-binding-changed')
     state = record(container.get('State'), 'predecessor state')
     host = record(container.get('HostConfig'), 'predecessor host')
@@ -64,11 +91,9 @@ def inspect_stopped_writer(
     verify the deployment lock, maintenance marker, network clients, storage
     and all provider and queue activity.
     """
-    from scripts.deploy.review.runtime.operations import HostOperations
-
     if role not in ('web', 'workers'):
         raise ValueError('predecessor-role-invalid')
-    if HostOperations.writer_binding(container) != dict(binding):
+    if not matches_archived_writer(container, binding):
         raise ValueError('predecessor-writer-binding-changed')
     if (set(baseline) != {'id', 'role', 'startedAt', 'restartCount'}
             or baseline.get('id') != container.get('Id')

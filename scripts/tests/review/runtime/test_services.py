@@ -30,9 +30,10 @@ from scripts.deploy.review.runtime.services import (
     stream_backup,
     validate_created_candidate,
     verify_backups,
+    verify_candidate,
     verify_database_backup,
 )
-from scripts.deploy.review.state import Attempt, DeploymentLock, atomic_json
+from scripts.deploy.review.state import Attempt, DeploymentLock, atomic_json, checksum
 from scripts.deploy.review.topology import AUTH_HOME, DIRECTORY, NETWORK
 from scripts.tests.review.runtime import admitted_runtime_fixture
 
@@ -373,6 +374,23 @@ class CandidateAdmissionTests(unittest.TestCase):
             validate_created_candidate(self.operations, self.actual,
                                        self.desired,
                                        {'imageId': 'admitted-image'})
+
+    def test_only_retained_initial_release_reads_a_historical_candidate_binding(self) -> None:
+        identity = 'd' * 64
+        self.actual['Id'] = identity
+        record(self.actual['HostConfig'], 'host')['OomKillDisable'] = None
+        settings = record(self.actual['NetworkSettings'], 'settings')
+        settings['Ports'] = {}
+        path = self.operations.attempt.directory / 'candidate-web.json'
+        binding = {**self.operations.writer_binding(self.actual),
+                   'hostHash': checksum(self.actual['HostConfig'])}
+        atomic_json(path, binding)
+        with patch.object(self.operations, 'inspect', return_value=[self.actual]):
+            with self.assertRaisesRegex(ValueError, 'running-review-candidate-changed'):
+                verify_candidate(self.operations, 'web', require_running=False)
+            self.operations.retained_initial_release = True
+            self.assertEqual(verify_candidate(self.operations, 'web', require_running=False),
+                             identity)
 
     def test_created_successor_requires_its_own_compose_project(self) -> None:
         project = 'sotto-review-fixture-runtime'
