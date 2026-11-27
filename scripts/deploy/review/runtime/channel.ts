@@ -17,7 +17,11 @@ import {
 } from '../first-worker';
 import { runReviewReadiness } from '../readiness';
 import { REVIEW_WORKLOAD_TIMEOUT_MS, runReviewWorkloads } from './workload';
-import { inspectReviewQueuePolicy, reviewRuntimePolicySchema } from './policy/queues';
+import {
+  inspectReviewQueuePolicy,
+  prepareReviewQueuePolicy,
+  reviewRuntimePolicySchema,
+} from './policy/queues';
 import { inspectRetainedReviewRedis } from './inventory/retained-redis';
 import { createExclusiveRedisObserver } from './inventory/redis-clients';
 import { ALL_QUEUE_NAMES } from '../../../../apps/web/src/lib/queue';
@@ -43,6 +47,7 @@ const initialSchema = z
       'workloads',
       'paused-admission',
       'queue-policy',
+      'prepare-successor-queue-policy',
       'retained-inventory',
       'retained-single-client',
     ]),
@@ -185,6 +190,35 @@ export async function main(): Promise<void> {
       await request(initial.mode === 'queue-policy' ? 'policyCheck' : 'fence');
       if (initial.mode === 'queue-policy') {
         result = await inspectReviewQueuePolicy(queueRuntime, initial.input, false);
+      } else if (initial.mode === 'prepare-successor-queue-policy') {
+        const input = z
+          .strictObject({
+            previousQueues: z
+              .array(z.string().regex(/^[a-z][a-z0-9-]{0,99}$/))
+              .min(1)
+              .max(100),
+            connectionIdentity: z.string().regex(/^[a-f0-9]{64}$/),
+            policyIntent: z.unknown(),
+          })
+          .parse(initial.input);
+        assert.equal(
+          input.connectionIdentity,
+          lifecycle.connectionIdentity(process.env, SIDEDOOR_STATE_ID),
+          'Successor Redis connection differs from admission'
+        );
+        const queues = ALL_QUEUE_NAMES.map(queueRuntime.createQueue);
+        try {
+          result = await prepareReviewQueuePolicy(
+            queues,
+            input.connectionIdentity,
+            input.policyIntent,
+            (intent) => request('queuePolicyIntent', intent),
+            input.previousQueues,
+            () => request('fence')
+          );
+        } finally {
+          await Promise.all(queues.map((queue) => queue.close()));
+        }
       } else if (initial.mode === 'inspect') {
         result = await inspectReviewFirstWorker(prismaUnfiltered, initial.input);
       } else if (initial.mode === 'prepare') {

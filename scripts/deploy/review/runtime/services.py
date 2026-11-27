@@ -301,6 +301,7 @@ def candidate_document(operations: HostOperations) -> dict[str, object]:
         worker_memory=cast(int, resources['workerMemoryBytes']),
         egress_network=PROJECT + '_egress',
         runtime_policy=runtime_policy(operations.manifest),
+        isolate_project='predecessor' in operations.manifest,
     )
     for service in record(result['services'], 'candidate services').values():
         record(service, 'candidate service')['labels'] = {
@@ -327,6 +328,7 @@ def runtime_identity(operations: HostOperations) -> None:
 def validate_created_candidate(
     operations: HostOperations, actual: dict[str, object],
     desired: dict[str, object], expected_image: dict[str, object],
+    *, project: str | None = None,
 ) -> None:
     image = rows(json.loads(operations.docker(
         'image', 'inspect', cast(str, expected_image['imageId']),
@@ -334,6 +336,8 @@ def validate_created_candidate(
     config = record(actual['Config'], 'candidate configuration')
     base = record(image['Config'], 'admitted image configuration')
     labels = record(config.get('Labels'), 'candidate labels')
+    if project is not None and labels.get('com.docker.compose.project') != project:
+        raise ValueError('candidate-compose-project-changed')
     supplied = record(desired['environment'], 'candidate environment')
     state = record(actual['State'], 'candidate state')
     if (actual['Image'] != expected_image['imageId']
@@ -438,6 +442,7 @@ def candidate(operations: HostOperations, role: str) -> str:
     operations.verify_images()
     operations.verify_storage()
     document = candidate_document(operations)
+    project = str(document['name']) if 'predecessor' in operations.manifest else None
     services = record(document['services'], 'candidate services')
     desired = record(services[role], 'candidate role')
     compose = operations.attempt.directory / 'candidate-compose.json'
@@ -474,8 +479,9 @@ def candidate(operations: HostOperations, role: str) -> str:
             'name=^/' + cast(str, desired['container_name']) + '$',
         ).decode().split()
         if not existing:
+            project_option = ['--project-name', project] if project is not None else []
             operations.command([
-                'docker', 'compose', '-f', str(compose), 'create',
+                'docker', 'compose', *project_option, '-f', str(compose), 'create',
                 '--no-build', '--pull', 'never', role,
             ])
         elif len(existing) != 1:
@@ -484,7 +490,7 @@ def candidate(operations: HostOperations, role: str) -> str:
         expected_image = record(operations.manifest[
             'finalWeb' if role == 'web' else 'finalWorker'
         ], 'candidate image')
-        validate_created_candidate(operations, actual, desired, expected_image)
+        validate_created_candidate(operations, actual, desired, expected_image, project=project)
         atomic_json(binding_path, operations.writer_binding(actual))
     identity = cast(str, actual['Id'])
     state = record(actual['State'], 'candidate state')

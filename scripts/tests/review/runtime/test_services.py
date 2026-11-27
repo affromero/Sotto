@@ -374,6 +374,23 @@ class CandidateAdmissionTests(unittest.TestCase):
                                        self.desired,
                                        {'imageId': 'admitted-image'})
 
+    def test_created_successor_requires_its_own_compose_project(self) -> None:
+        project = 'sotto-review-fixture-runtime'
+        labels = record(record(self.actual['Config'], 'candidate configuration')['Labels'],
+                        'candidate labels')
+        labels['com.docker.compose.project'] = 'sotto-review-runtime'
+        with patch.object(HostOperations, 'docker', side_effect=self.docker):
+            with self.assertRaisesRegex(ValueError, 'candidate-compose-project-changed'):
+                validate_created_candidate(
+                    self.operations, self.actual, self.desired,
+                    {'imageId': 'admitted-image'}, project=project,
+                )
+            labels['com.docker.compose.project'] = project
+            validate_created_candidate(
+                self.operations, self.actual, self.desired,
+                {'imageId': 'admitted-image'}, project=project,
+            )
+
     def test_created_networks_reject_changed_live_identity(self) -> None:
         for name in (NETWORK, 'sotto-review_egress'):
             with self.subTest(network=name):

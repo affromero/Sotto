@@ -96,6 +96,19 @@ emit({'type':'result','value':{'keys':112}})
                 with self.assertRaisesRegex(ValueError, 'actual-fence-missing'):
                     self.run_child(script, mode=mode)
 
+    def test_successor_policy_acknowledges_durable_limits_before_writes(self) -> None:
+        path = self.root / 'queue-policy-intent.json'
+        script = '''intent={'schemaVersion':2,'queues':[]}
+emit({'type':'queuePolicyIntent','id':1,'value':intent});ack(1)
+assert json.loads(Path(INTENT).read_text())==intent
+emit({'type':'fence','id':2});ack(2)
+emit({'type':'result','value':intent})
+'''.replace('INTENT', repr(str(path)))
+        result = self.run_child(script, mode='prepare-successor-queue-policy')
+        self.assertEqual(result, private_json(path))
+        self.assertEqual(self.fences, 2)
+        self.assertEqual(self.manifests, [])
+
     def test_workload_budget_completes_after_4096_acknowledgements(
         self,
     ) -> None:
