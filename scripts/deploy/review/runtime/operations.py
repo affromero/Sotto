@@ -46,6 +46,7 @@ from scripts.deploy.review.runtime.release.migrations import (
     migration_inventory,
     read_applied_migrations,
     stage_progress,
+    validate_review_stage_change,
     verify_stage_schema,
 )
 from scripts.deploy.review.runtime.services import (
@@ -60,6 +61,7 @@ from scripts.deploy.review.state import (
     checksum,
     private_file,
     private_json,
+    runtime_only_successor,
 )
 from scripts.deploy.review.topology import (
     DIRECTORY,
@@ -641,14 +643,10 @@ class HostOperations:
         self, stage: Mapping[str, object], previous: Mapping[str, object],
         *, predecessor: HostOperations | None = None,
     ) -> None:
-        before = record(previous['migrations'], 'previous migrations')
-        after = record(stage['migrations'], 'stage migrations')
-        changes = {name: {'previousSha256': before.get(name),
-                          'candidateSha256': after.get(name)}
-                   for name in sorted(before.keys() | after.keys())
-                   if before.get(name) != after.get(name)}
-        guard = import_module('scripts.deploy.compatibility-review')
-        guard.published_migration_additions(changes)
+        unchanged = runtime_only_successor(self.manifest)
+        if unchanged and predecessor is None:
+            raise ValueError('exact-runtime-only-predecessor-required')
+        validate_review_stage_change(previous, stage, unchanged=unchanged)
         self.verify_images()
         self.verify_fence()
         if predecessor is None:

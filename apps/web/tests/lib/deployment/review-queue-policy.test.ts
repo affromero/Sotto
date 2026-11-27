@@ -52,6 +52,32 @@ describe('dedicated review queue policy', () => {
     return Promise.all(keys.map(async (key) => [key, await fixture.client.dump(key)]));
   }
 
+  it('verifies an explicitly unchanged queue inventory without rewriting Redis', async () => {
+    const owned = await queues();
+    try {
+      for (const queue of owned) await queue.setGlobalConcurrency(1);
+      const before = await snapshot();
+      const names = [...ALL_QUEUE_NAMES];
+      const result = await prepareReviewQueuePolicy(
+        owned,
+        connectionIdentity,
+        null,
+        async () => {},
+        names,
+        async () => {},
+        async (added) => expect(added).toEqual([]),
+        true
+      );
+      expect(result.queues.every((queue) => queue.originalConcurrency === 1)).toBe(true);
+      expect(await snapshot()).toEqual(before);
+      await expect(
+        prepareReviewQueuePolicy(owned, connectionIdentity, null, async () => {}, names)
+      ).rejects.toThrow('Exact predecessor queue subset required');
+    } finally {
+      await Promise.all(owned.map((queue) => queue.close()));
+    }
+  });
+
   it('pauses the added queue only after the successor intent and fence are verified', async () => {
     const owned = ALL_QUEUE_NAMES.map(runtime().createQueue);
     const added = owned.find((queue) => queue.name === 'learning-writing');

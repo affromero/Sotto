@@ -204,6 +204,9 @@ class RetainedNetworkTests(ReviewNetworkFixture):
             command = self.successor.tool_command(image, 'npx', MIGRATE_DEPLOY, **options)
             self.assertEqual(command[-len(MIGRATE_DEPLOY):], list(MIGRATE_DEPLOY))
             self.assertEqual(command[command.index('--network') + 1], network)
+            with patch.dict(self.successor.manifest, runtimeOnly=True, predecessor={}):
+                with self.assertRaisesRegex(ValueError, 'successor-schema-write-not-admitted'):
+                    self.successor.tool_command(image, 'npx', MIGRATE_DEPLOY, **options)
             with self.assertRaisesRegex(ValueError, 'successor-schema-write-not-admitted'):
                 self.successor.tool_command(image, 'npx', ['prisma', 'db', 'push'], **options)
             with self.assertRaisesRegex(ValueError, 'successor-migration-node-command-not-admitted'):

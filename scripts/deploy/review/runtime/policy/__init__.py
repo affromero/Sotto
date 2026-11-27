@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, cast
 
 from scripts.deploy.images.metadata import digest, record
 from scripts.deploy.review.build_observer import bounded_bytes
-from scripts.deploy.review.state import atomic_json, checksum, private_json
+from scripts.deploy.review.state import atomic_json, checksum, private_json, runtime_only_successor
 
 if TYPE_CHECKING:
     from scripts.deploy.review.runtime.operations import HostOperations
@@ -209,9 +209,9 @@ def successor_queue_policy_names(
     )):
         raise ValueError('successor-queue-policy-admission-changed')
     guard = import_module('scripts.deploy.compatibility-review')
-    transition = cast(
-        dict[str, list[str]], guard.validate_queue_transition(manifest['queueTransition']),
-    )
+    transition = cast(dict[str, list[str]], guard.validate_queue_transition(
+        manifest['queueTransition'], unchanged=runtime_only_successor(manifest),
+    ))
     original = record(manifest['originalQueues'], 'original queues')
     previous = transition['previousQueues']
     candidate = transition['candidateQueues']

@@ -77,14 +77,15 @@ export async function prepareReviewQueuePolicy(
   admit: (intent: ReviewQueuePolicyIntent) => Promise<void>,
   previousQueues: readonly string[] = [],
   verifyFence?: () => Promise<void>,
-  confirmAddedEmpty?: (queues: readonly Queue[]) => Promise<void>
+  confirmAddedEmpty?: (queues: readonly Queue[]) => Promise<void>,
+  unchanged = false
 ) {
   const expected = [...ALL_QUEUE_NAMES].sort();
   assert.deepEqual(queues.map((queue) => queue.name).sort(), expected);
   const previous = new Set(previousQueues);
   assert(
     previous.size === previousQueues.length &&
-      previous.size < expected.length &&
+      (unchanged ? previous.size === expected.length : previous.size < expected.length) &&
       previousQueues.every((name) => expected.includes(name)),
     'Exact predecessor queue subset required'
   );

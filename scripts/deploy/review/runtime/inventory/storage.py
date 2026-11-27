@@ -25,6 +25,20 @@ if TYPE_CHECKING:
     from scripts.deploy.review.runtime.operations import HostOperations
 
 
+def original_mount_objects(operations: HostOperations) -> dict[str, object]:
+    """Resolve the original physical mount proof through completed predecessors."""
+    from scripts.deploy.review.runtime.inventory.predecessor import bind_predecessor
+
+    topology = operations.manifest['topology']
+    for _ in range(32):
+        if operations.manifest['topology'] != topology:
+            raise ValueError('successor-physical-topology-changed')
+        if 'predecessor' not in operations.manifest:
+            return private_json(operations.attempt.directory / 'original-mount-objects.json')
+        operations = bind_predecessor(operations)
+    raise ValueError('review-mount-lineage-bound')
+
+
 def retained_candidate_mounts(
     topology: Mapping[str, object], original: Mapping[str, object],
     candidates: Mapping[str, object], handover: Mapping[str, object],
@@ -120,7 +134,7 @@ def verify_running_completed_storage(
     directory = previous.attempt.directory
     topology = record(previous.attempt.manifest()['topology'], 'completed topology')
     backing = record(topology['services'], 'completed backing services')
-    original = private_json(directory / 'original-mount-objects.json')
+    original = original_mount_objects(previous)
     handover = private_json(directory / 'auth-handover.json')
     candidates = {
         role: private_json(directory / ('candidate-' + role + '.json'))
@@ -194,7 +208,7 @@ def verify_completed_storage(
     verify_startup_unit(previous)
     directory = previous.attempt.directory
     topology = record(previous.attempt.manifest()['topology'], 'topology')
-    original = private_json(directory / 'original-mount-objects.json')
+    original = original_mount_objects(previous)
     handover = private_json(directory / 'auth-handover.json')
     candidates = {role: private_json(directory / ('candidate-' + role + '.json'))
                   for role in ('web', 'workers')}
@@ -272,7 +286,7 @@ def verify_successor_storage(operations: HostOperations) -> None:
     attempt = operations.attempt
     directory = attempt.directory
     old = previous.attempt.directory
-    original = private_json(old / 'original-mount-objects.json')
+    original = original_mount_objects(previous)
     handover = private_json(old / 'auth-handover.json')
     candidates = {
         role: private_json(old / ('candidate-' + role + '.json'))

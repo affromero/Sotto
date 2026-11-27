@@ -210,6 +210,7 @@ export async function main(): Promise<void> {
               .max(100),
             connectionIdentity: z.string().regex(/^[a-f0-9]{64}$/),
             policyIntent: z.unknown(),
+            unchanged: z.boolean().optional(),
           })
           .parse(initial.input);
         assert.equal(
@@ -231,7 +232,8 @@ export async function main(): Promise<void> {
                 runtime,
                 added,
                 added.map((queue) => queue.name)
-              )
+              ),
+            input.unchanged
           );
         } finally {
           await Promise.all(queues.map((queue) => queue.close()));
@@ -268,6 +270,7 @@ export async function main(): Promise<void> {
         const input = z
           .strictObject({
             evidence: reviewFirstWorkerEvidenceSchema,
+            assessmentFailure: z.uuid().optional(),
             queues: z
               .array(z.string().regex(/^[a-z][a-z0-9-]{0,99}$/))
               .min(1)
@@ -294,6 +297,24 @@ export async function main(): Promise<void> {
           await verify();
           await inspectReviewFirstWorker(prismaUnfiltered, input.evidence);
           await inspectReviewContinuation(prismaUnfiltered, input.evidence, queue);
+          const assessmentFailure = input.assessmentFailure;
+          if (assessmentFailure) {
+            assert.equal(initial.mode, 'retained-single-client');
+            await prismaUnfiltered.$transaction(async (database) => {
+              await database.$executeRaw`SET TRANSACTION READ ONLY`;
+              const outbox = sottoJobOutbox(database);
+              const job = await outbox.read(assessmentFailure);
+              const assessment = await database.classAssessment.findUnique({
+                where: { generationOperationId: assessmentFailure },
+                select: { status: true },
+              });
+              assert(job && job.job.id === assessmentFailure);
+              assert.equal(job.job.handler, 'interactions');
+              assert.equal(job.job.version, 6);
+              assert.equal(assessment?.status, 'UNRESOLVED');
+              await sottoJobExecutions(database).requireParentDrained(job.job.id, job.fingerprint);
+            });
+          }
           await verify();
           result = await inspectRetainedReviewRedis(
             redis,
@@ -301,6 +322,7 @@ export async function main(): Promise<void> {
               redisUrl: process.env.REDIS_URL,
               queues: input.queues,
               failedWorksheetIds: input.evidence.jobs.map((job) => job.id),
+              assessmentFailure: input.assessmentFailure,
             },
             verify
           );

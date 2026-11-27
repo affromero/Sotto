@@ -17,7 +17,7 @@ from scripts.deploy.review.runtime.inventory.predecessor import (
     RetainedPhase,
     _verify_release,
 )
-from scripts.deploy.review.state import checksum, private_json
+from scripts.deploy.review.state import checksum, private_json, runtime_only_successor
 from scripts.deploy.review.topology import (
     AUTH_HOME,
     PRESERVED_ENVIRONMENT,
@@ -110,6 +110,7 @@ def admit_migration_tool(
         raise ValueError('successor-migration-helper-not-admitted')
     if entrypoint == 'npx':
         accepted = (phase == 'SQL_STARTED' and state['sqlMayHaveStarted'] is True
+                    and not runtime_only_successor(successor.manifest)
                     and tuple(arguments) == MIGRATE_DEPLOY and content is None)
         if phase == 'FINAL_SCHEMA_VERIFIED':
             from scripts.deploy.review.runtime.release.fixture import (

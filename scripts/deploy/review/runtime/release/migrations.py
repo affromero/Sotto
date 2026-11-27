@@ -22,6 +22,7 @@ from scripts.deploy.review.state import (
     checksum,
     private_directory,
     private_json,
+    runtime_only_successor,
     sync_directory,
 )
 from scripts.deploy.review.topology import rows
@@ -495,6 +496,24 @@ def verify_stage_schema(
     }
 
 
+def validate_review_stage_change(
+    previous: Mapping[str, object], stage: Mapping[str, object], *,
+    unchanged: bool,
+) -> None:
+    before = record(previous['migrations'], 'previous migrations')
+    after = record(stage['migrations'], 'candidate migrations')
+    if unchanged:
+        if not before or before != after:
+            raise ValueError('runtime-only-migration-inventory-changed')
+        return
+    changes = {name: {'previousSha256': before.get(name),
+                      'candidateSha256': after.get(name)}
+               for name in sorted(before.keys() | after.keys())
+               if before.get(name) != after.get(name)}
+    guard = import_module('scripts.deploy.compatibility-review')
+    guard.published_migration_additions(changes)
+
+
 def migration_inventory(stage: Mapping[str, object]) -> dict[str, str]:
     result: dict[str, str] = {}
     for path, value in record(stage['migrations'], 'stage SQL').items():
@@ -531,11 +550,15 @@ def admit_successor_migration(
     if (image != digest(worker['imageId'], 'successor worker image', 'sha256:')
             or candidate != dict(image_migrations)):
         raise ValueError('successor-migration-files-differ-from-image')
-    if not original or not original.items() < candidate.items():
-        raise ValueError('successor-migration-history-changed')
     if (len(migration_inventory(initial)) != len(original)
             or len(migration_inventory(final)) != len(candidate)):
         raise ValueError('successor-migration-inventory-invalid')
+    if runtime_only_successor(successor):
+        if not original or original != candidate:
+            raise ValueError('runtime-only-migration-inventory-changed')
+        return initial, final
+    if not original or not original.items() < candidate.items():
+        raise ValueError('successor-migration-history-changed')
     added = sorted(candidate.keys() - original.keys())
     if added[0] <= max(original):
         raise ValueError('successor-migrations-must-append-in-order')

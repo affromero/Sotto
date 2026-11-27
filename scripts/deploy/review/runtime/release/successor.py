@@ -58,7 +58,7 @@ from scripts.deploy.review.topology import (
     candidate_compose,
     rows,
 )
-from scripts.deploy.review.state import atomic_json, checksum, private_json
+from scripts.deploy.review.state import atomic_json, checksum, private_json, runtime_only_successor
 
 if TYPE_CHECKING:
     from scripts.deploy.review.runtime.operations import HostOperations
@@ -373,6 +373,7 @@ def prepare_successor_queue_policy(
         'previousQueues': prior,
         'connectionIdentity': original['connectionIdentity'],
         'policyIntent': retained,
+        **({'unchanged': True} if runtime_only_successor(operations.manifest) else {}),
     }, predecessor=previous)
     if private_json(path) != result:
         raise ValueError('successor-queue-policy-result-changed')
