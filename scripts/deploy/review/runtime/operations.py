@@ -38,7 +38,7 @@ from scripts.deploy.review.runtime.policy import (
     runtime_policy,
     successor_helper_budget,
 )
-from scripts.deploy.review.runtime.recovery.workload import effective_tool_manifest
+from scripts.deploy.review.runtime.recovery.workload import effective_tool_manifest, web_memory_delta
 from scripts.deploy.review.runtime.release.migrations import (
     establishment_command,
     later_stage_progress,
@@ -376,7 +376,7 @@ class HostOperations:
                 raise ValueError('verified-import-protection-required')
 
     def capacity(self) -> None:
-        self._capacity(concurrent_memory(self.manifest))
+        self._capacity(concurrent_memory(self.manifest) + web_memory_delta(self.root, self.attempt))
 
     def successor_helper_capacity(self, *, previous: HostOperations | None = None) -> None:
         """Reserve one helper before any successor service can be started."""

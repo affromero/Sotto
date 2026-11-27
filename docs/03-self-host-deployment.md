@@ -464,6 +464,12 @@ under the public fence. Stage an exact source revision with successful GitHub
 checks before handing off the held attempt. Keep this source bundle and its
 authorization for the completed release's startup and future upgrades.
 
+When confirmed web and Codex discovery memory pressure prevents continuation,
+the reviewed authorization can bind a one-time cap increase for the exact
+stopped web container. The controller checks the full adjusted capacity,
+preserves the original container binding in its recovery record, and verifies
+the live cgroup through provider discovery and the workload before cutover.
+
 Completion installs and enables `sotto-review-start.service` for the captured
 release. It runs after Docker and the review network guard, using this entry
 point from the admitted source directory:

@@ -24,6 +24,7 @@ CONSUMED = 'workload-recovery-budget.json'
 MUTABLE_TOOLS = frozenset({
     'scripts/deploy/review/runtime/controller.py',
     'scripts/deploy/review/runtime/operations.py',
+    'scripts/deploy/review/runtime/recovery/web_memory.py',
     'scripts/deploy/review/runtime/recovery/workload.py',
     'scripts/deploy/review/runtime/release/successor.py',
     'scripts/deploy/review/runtime/workload.ts',
@@ -57,11 +58,13 @@ def reviewed_source(root: Path, attempt: Attempt) -> dict[str, object] | None:
     if mode.st_uid != 0 or not stat.S_ISREG(mode.st_mode) or mode.st_mode & 0o022:
         raise ValueError('root-owned-review-recovery-authorization-required')
     authorization = record(json.loads(bounded_bytes(path)), 'reviewed recovery authorization')
-    if (set(authorization) != {
+    required = {
         'version', 'source', 'attemptDirectory', 'manifestSha256', 'tools',
         'priorToolsSha256', 'checkpointSha256', 'failure', 'backupsSha256', 'supervisorSha256',
         'storageRecoverySha256', 'stitchRetrySha256',
-    } or type(authorization['version']) is not int or authorization['version'] != 1
+    }
+    if (not required <= set(authorization) <= required | {'webMemory'}
+            or type(authorization['version']) is not int or authorization['version'] != 1
             or authorization['source'] != directory.name
             or authorization['attemptDirectory'] != str(attempt.directory)
             or authorization['manifestSha256'] != attempt.manifest_hash):
@@ -71,6 +74,33 @@ def reviewed_source(root: Path, attempt: Attempt) -> dict[str, object] | None:
     }:
         raise ValueError('recovery-source-cannot-enter-earlier-deployment-phase')
     return authorization
+
+
+def web_memory_plan(root: Path, attempt: Attempt) -> dict[str, object] | None:
+    """Read the exact bounded resource change from the root-owned authorization."""
+    authorization = reviewed_source(root, attempt)
+    if authorization is None or 'webMemory' not in authorization:
+        return None
+    plan = record(authorization['webMemory'], 'authorized recovery web memory')
+    if (set(plan) != {'bindingSha256', 'oomEvidenceSha256', 'priorBytes', 'bytes'}
+            or type(plan['priorBytes']) is not int or plan['priorBytes'] != 512 * 1024 * 1024
+            or type(plan['bytes']) is not int or plan['bytes'] != 768 * 1024 * 1024
+            or record(attempt.manifest()['resources'], 'review resources')['webMemoryBytes']
+            != plan['priorBytes']):
+        raise ValueError('exact-measured-review-web-memory-required')
+    for name in ('bindingSha256', 'oomEvidenceSha256'):
+        digest(plan[name], name)
+    return plan
+
+
+def web_memory_delta(root: Path, attempt: Attempt) -> int:
+    """Count the authorized reserve for this attempt without changing its defaults."""
+    plan = web_memory_plan(root, attempt)
+    if plan is None:
+        return 0
+    before, after = plan['priorBytes'], plan['bytes']
+    assert type(before) is int and type(after) is int
+    return after - before
 
 
 def effective_tool_manifest(

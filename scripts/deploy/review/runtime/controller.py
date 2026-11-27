@@ -32,6 +32,10 @@ from scripts.deploy.review.runtime.policy import (
     runtime_policy,
     successor_queue_policy_names,
 )
+from scripts.deploy.review.runtime.recovery.web_memory import (
+    record_recovered_web_memory,
+    recover_web_memory,
+)
 from scripts.deploy.review.runtime.recovery.workload import (
     effective_tool_manifest,
     recovery_workload_input,
@@ -555,6 +559,7 @@ def execute(
             operations.verify_egress()
             attempt.advance('EGRESS_GUARDED')
         elif phase == 'EGRESS_GUARDED':
+            recover_web_memory(operations)
             if predecessor is not None and attempt.state()['status'] == 'unresolved':
                 operations.verify_fence()
                 operations.verify_egress()
@@ -563,6 +568,7 @@ def execute(
                 state = attempt.state()
                 atomic_json(attempt.directory / 'state.json', {**state, 'status': 'active'})
             activate(operations, evidence, continue_check)
+            record_recovered_web_memory(operations)
             attempt.advance('CANDIDATE_READY')
         elif phase == 'CANDIDATE_READY':
             if continue_check is not None:
