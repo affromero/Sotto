@@ -67,6 +67,11 @@ describe('youtube extractor', () => {
       expect(isYouTubeUrl('https://www.youtube.com/shorts/abc123')).toBe(true);
     });
 
+    it('matches youtube.com/live/xxx and music.youtube.com/watch?v=xxx', () => {
+      expect(isYouTubeUrl('https://www.youtube.com/live/abc123')).toBe(true);
+      expect(isYouTubeUrl('https://music.youtube.com/watch?v=abc123')).toBe(true);
+    });
+
     it('rejects non-YouTube URLs', () => {
       expect(isYouTubeUrl('https://example.com/video')).toBe(false);
       expect(isYouTubeUrl('https://vimeo.com/123')).toBe(false);
@@ -76,6 +81,11 @@ describe('youtube extractor', () => {
   describe('extractVideoId', () => {
     it('extracts ID from standard watch URL', () => {
       expect(extractVideoId('https://www.youtube.com/watch?v=dQw4w9WgXcQ')).toBe('dQw4w9WgXcQ');
+    });
+
+    it('extracts ID from live and music.youtube.com URLs', () => {
+      expect(extractVideoId('https://www.youtube.com/live/dQw4w9WgXcQ')).toBe('dQw4w9WgXcQ');
+      expect(extractVideoId('https://music.youtube.com/watch?v=dQw4w9WgXcQ')).toBe('dQw4w9WgXcQ');
     });
 
     it('extracts ID from short URL', () => {
