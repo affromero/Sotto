@@ -97,6 +97,14 @@ def _run_queue_command(
         if not path.exists() or private_json(path) != receipt:
             raise ValueError('exact-retained-predecessor-queue-snapshot-required')
         request['manifest'] = expected
+    recovery_job = admitted_assessment_recovery(successor)
+    if mode == 'drained-all' and recovery_job:
+        successor.verify_tools()
+        source = bounded_bytes(successor.root / TOOL)
+        new_tools = record(successor.attempt.manifest()['tools'], 'successor tools')
+        if len(source) > 65536 or hashlib.sha256(source).hexdigest() != new_tools.get(TOOL):
+            raise ValueError('successor-recovery-queue-tool-changed')
+        request['recoveryJob'] = recovery_job
     successor.verify_fence()
     # Node's eval mode does not enter the helper's require.main guard.
     arguments = ['--import', 'tsx', '--input-type=commonjs',
@@ -227,6 +235,45 @@ def pause_predecessor_queues(
         atomic_json(result_path, result)
 
 
+def admitted_assessment_recovery(operations: HostOperations) -> str | None:
+    manifest = operations.attempt.manifest()
+    if 'recoverAssessmentExecution' not in manifest:
+        return None
+    job = manifest.get('retainedAssessmentFailure')
+    if (manifest['recoverAssessmentExecution'] is not True
+            or manifest.get('runtimeOnly') is not True or 'predecessor' not in manifest
+            or not isinstance(job, str)
+            or not re.fullmatch(r'[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}', job)):
+        raise ValueError('exact-review-assessment-recovery-required')
+    return job
+
+
+def approved_assessment_cleanup(
+    previous: HostOperations, successor: HostOperations,
+) -> dict[str, object]:
+    """Require stopped writers, the paused queue proof and a pre-cleanup backup."""
+    from scripts.deploy.review.runtime.inventory.backup import predecessor_backup_binding
+    from scripts.deploy.review.runtime.inventory.network import verify_retained_network
+
+    job = admitted_assessment_recovery(successor)
+    attempt = successor.attempt
+    state = attempt.state()
+    if job is None or state['phase'] != 'FENCED' or state['status'] != 'active':
+        raise ValueError('exact-fenced-assessment-cleanup-required')
+    verify_retained_network(previous, successor)
+    verify_predecessor_queue_pause(successor)
+    services.verify_backups(successor, binding=predecessor_backup_binding(previous, successor))
+    proof = private_json(attempt.directory / 'assessment-recovery-drain.json')
+    recovery = record(proof.get('recovery'), 'assessment recovery proof')
+    binding = record(recovery.get('binding'), 'assessment execution binding')
+    queue_receipt = private_json(attempt.directory / 'predecessor-queues.json')
+    if (proof.get('manifestSha256') != attempt.manifest_hash
+            or proof.get('queueReceiptSha256') != checksum(queue_receipt)
+            or binding.get('parentId') != job):
+        raise ValueError('exact-assessment-recovery-drain-required')
+    return {'proof': recovery, 'originalQueues': queue_receipt['originalQueues']}
+
+
 def observe_predecessor_queue_drain(
     previous: HostOperations, successor: HostOperations,
     *, web_stopped: bool = False,
@@ -236,7 +283,11 @@ def observe_predecessor_queue_drain(
         previous, successor, mode='drained-all', web_stopped=web_stopped,
     )
     paused = _paused_queues(receipt)
-    if (set(observed) != {*paused, 'activeJobs', 'executions', 'drained'}
+    job = admitted_assessment_recovery(successor)
+    keys = {*paused, 'activeJobs', 'executions', 'drained'}
+    if job is not None:
+        keys.add('recovery')
+    if (set(observed) != keys
             or checksum({key: observed[key] for key in paused}) != checksum(paused)):
         raise ValueError('predecessor-queue-drain-inventory-changed')
     execution = record(observed['executions'], 'predecessor execution counts')
@@ -250,7 +301,7 @@ def observe_predecessor_queue_drain(
             or type(settled) is not int or settled < 0
             or type(workers) is not int or workers < 0
             or type(synchronous) is not int or synchronous < 0
-            or inspected != settled + workers + synchronous):
+            or inspected != settled + workers + synchronous + int(job is not None)):
         raise ValueError('predecessor-queue-drain-result-invalid')
     drained = jobs == 0 and workers == 0 and synchronous == 0
     if observed['drained'] is not drained:
@@ -258,4 +309,28 @@ def observe_predecessor_queue_drain(
     path = successor.attempt.directory / 'predecessor-queues.json'
     if private_json(path) != receipt:
         raise ValueError('exact-retained-predecessor-queue-snapshot-required')
+    if drained and job is not None:
+        proof = record(observed['recovery'], 'assessment recovery drain')
+        if set(proof) != {'binding', 'delivery', 'assessmentId', 'workspaceSha256'}:
+            raise ValueError('review-assessment-drain-proof-changed')
+        binding = record(proof['binding'], 'assessment execution binding')
+        delivery = record(proof['delivery'], 'failed assessment delivery')
+        digest(proof['workspaceSha256'], 'assessment cleanup workspace')
+        if (not isinstance(proof['assessmentId'], str) or not proof['assessmentId']
+                or set(binding) != {'id', 'parentId', 'executorId', 'fingerprint'}
+                or binding['parentId'] != job or delivery.get('operationId') != job
+                or digest(binding['fingerprint'], 'assessment execution')
+                != delivery.get('fingerprint')
+                or any(not isinstance(value := binding[field], str)
+                       or not re.fullmatch(r'[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}',
+                                           value) for field in ('id', 'executorId'))):
+            raise ValueError('review-assessment-drain-proof-changed')
+        path = successor.attempt.directory / 'assessment-recovery-drain.json'
+        expected = {'manifestSha256': successor.attempt.manifest_hash,
+                    'queueReceiptSha256': checksum(receipt), 'recovery': proof}
+        if path.exists() or path.is_symlink():
+            if private_json(path) != expected:
+                raise ValueError('review-assessment-drain-proof-changed')
+        else:
+            atomic_json(path, expected)
     return drained

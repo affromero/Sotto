@@ -22,6 +22,7 @@ from scripts.deploy.review.build_observer import bounded_bytes
 from scripts.deploy.review.runtime import services
 from scripts.deploy.review.runtime.inventory.environment import exact_successor_sql_stages
 from scripts.deploy.review.runtime.inventory.predecessor import bind_predecessor
+from scripts.deploy.review.runtime.inventory.queue_snapshot import admitted_assessment_recovery
 from scripts.deploy.review.runtime.operations import (
     HOST_STATE,
     HostOperations,
@@ -138,6 +139,7 @@ def admission(operations: HostOperations) -> dict[str, object]:
     final = record(manifest['finalWorker'], 'final worker')
     web = record(manifest['finalWeb'], 'final web')
     receipt = record(stages[-1]['receipt'], 'last schema receipt')
+    admitted_assessment_recovery(operations)
     if 'predecessor' in manifest:
         previous_operations = bind_predecessor(operations)
         exact_successor_sql_stages(previous_operations, operations)

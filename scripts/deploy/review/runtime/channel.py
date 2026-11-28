@@ -15,6 +15,11 @@ from scripts.deploy.images.metadata import digest, record
 from scripts.deploy.review.state import atomic_json
 
 PREFIX = b'SOTTO_REVIEW_IPC='
+RUNTIME_CHANNEL_ARGS = (
+    '--require', 'tsx/cjs', '-e',
+    'require("/app/scripts/deploy/review/runtime/channel.ts").main().catch(()=>{'
+    'console.error("Review runtime operation failed");process.exitCode=1})',
+)
 MAX_LINE = 262_144
 MODE_TIMEOUTS = {
     'workloads': 3330,
@@ -22,6 +27,7 @@ MODE_TIMEOUTS = {
     # The child gets 240 seconds for repeated full host fence checks.
     'retained-single-client': 260,
     'prepare-successor-queue-policy': 260,
+    'assessment-cleanup': 260,
 }
 
 
@@ -31,6 +37,7 @@ def exchange(
     queue_manifest: Callable[[Mapping[str, object]], None],
     timeout: float | None = None,
     queue_policy: Callable[[Mapping[str, object]], None] | None = None,
+    remove_assessment_workspace: Callable[[object], None] | None = None,
 ) -> object:
     """Keep secrets on stdin and retain uncertain credential operations."""
     mode = initial.get('mode')
@@ -38,7 +45,7 @@ def exchange(
         'inspect', 'prepare', 'providers', 'queues', 'capture',
         'continuation', 'consumers', 'workloads', 'paused-admission',
         'queue-policy', 'retained-inventory', 'retained-single-client',
-        'prepare-successor-queue-policy',
+        'prepare-successor-queue-policy', 'assessment-cleanup',
     }:
         raise ValueError('bounded-runtime-exchange-required')
     if timeout is None:
@@ -132,6 +139,12 @@ def exchange(
                                 or set(message) != {'type', 'id'}):
                             raise ValueError('invalid-queue-policy-event')
                         assert_fence()
+                    elif kind == 'removeAssessmentWorkspace':
+                        if (mode != 'assessment-cleanup' or remove_assessment_workspace is None
+                                or set(message) != {'type', 'id', 'value'}):
+                            raise ValueError('unexpected-assessment-workspace-removal')
+                        assert_fence()
+                        remove_assessment_workspace(message['value'])
                     elif kind == 'queuePolicyIntent':
                         if (initial['mode'] not in ('prepare', 'prepare-successor-queue-policy')
                                 or queue_policy is None

@@ -26,8 +26,15 @@ import { inspectRetainedReviewRedis } from './inventory/retained-redis';
 import { createExclusiveRedisObserver } from './inventory/redis-clients';
 import { ALL_QUEUE_NAMES } from '../../../../apps/web/src/lib/queue';
 import { prismaUnfiltered } from '../../../../apps/web/src/lib/prisma';
+import {
+  recoverStoppedAssessmentExecution,
+  stoppedAssessmentProofSchema,
+} from '../../../../apps/web/src/lib/learning/classes/lifecycle/assessment-unresolved';
 import { SIDEDOOR_STATE_ID } from '../../../../apps/web/src/lib/sidedoor/access/state/store';
-import { sottoJobOutbox } from '../../../../apps/web/src/lib/sidedoor/jobs/core/job-delivery';
+import {
+  snapshotFailedSottoDelivery,
+  sottoJobOutbox,
+} from '../../../../apps/web/src/lib/sidedoor/jobs/core/job-delivery';
 import { sottoJobExecutions } from '../../../../apps/web/src/lib/sidedoor/jobs/core/job-execution-lifetime';
 import {
   isSottoSynchronousJob,
@@ -50,6 +57,7 @@ const initialSchema = z
       'prepare-successor-queue-policy',
       'retained-inventory',
       'retained-single-client',
+      'assessment-cleanup',
     ]),
     input: z.unknown(),
     checkpoint: z.unknown().optional(),
@@ -142,6 +150,7 @@ export async function main(): Promise<void> {
       : initial.mode === 'providers'
         ? 310_000
         : initial.mode === 'retained-single-client' ||
+            initial.mode === 'assessment-cleanup' ||
             initial.mode === 'prepare-successor-queue-policy'
           ? retainedRuntimeTimeoutMs
           : 90_000
@@ -258,6 +267,39 @@ export async function main(): Promise<void> {
         const queue = runtime.createQueue('worksheet-pdf');
         try {
           result = await inspectReviewContinuation(prismaUnfiltered, initial.input, queue);
+        } finally {
+          await queue.close();
+        }
+      } else if (initial.mode === 'assessment-cleanup') {
+        const { proof, originalQueues } = z
+          .strictObject({
+            proof: stoppedAssessmentProofSchema,
+            originalQueues: z.record(z.string(), z.unknown()),
+          })
+          .parse(initial.input);
+        const drained = z
+          .object({ drained: z.literal(true), recovery: stoppedAssessmentProofSchema })
+          .parse(
+            await lifecycle.run(
+              {
+                command: 'drained-all',
+                manifest: originalQueues,
+                recoveryJob: proof.binding.parentId,
+              },
+              { ...runtime, snapshotFailedSottoDelivery }
+            )
+          );
+        assert.deepEqual(drained.recovery, proof);
+        const queue = runtime.createQueue('interactions');
+        try {
+          result = await recoverStoppedAssessmentExecution({
+            database: prismaUnfiltered,
+            queue,
+            proof,
+            signal: controller.signal,
+            verifyStopped: async () => request('fence'),
+            removeEmptyWorkspace: (identity) => request('removeAssessmentWorkspace', identity),
+          });
         } finally {
           await queue.close();
         }

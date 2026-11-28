@@ -244,9 +244,17 @@ def prepare_successor_data(
             atomic_json(attempt.directory / 'state.json', {**state, 'status': 'active'})
         quiesce_predecessor(previous, operations, continue_check=continue_check)
         continue_check()
-        observe_retained_inventory(previous, operations)
+        from scripts.deploy.review.runtime.inventory.queue_snapshot import admitted_assessment_recovery
+        from scripts.deploy.review.runtime.release.assessment_recovery import recover_assessment_data
+
+        recovery_job = admitted_assessment_recovery(operations)
+        if recovery_job is None:
+            observe_retained_inventory(previous, operations)
         services.backup_review(operations, predecessor=previous)
         continue_check()
+        if recovery_job is not None:
+            recover_assessment_data(previous, operations)
+            continue_check()
         observe_retained_inventory(previous, operations)
         attempt.advance('QUIESCENT')
         phase = 'QUIESCENT'
@@ -318,10 +326,14 @@ def migrate_successor_data(
 
 def successor_preservation_input(operations: HostOperations) -> tuple[bytes, dict[str, object]]:
     from scripts.deploy.review.runtime.controller import admitted_file
+    from scripts.deploy.review.runtime.inventory.queue_snapshot import admitted_assessment_recovery
+    from scripts.deploy.review.runtime.release.assessment_recovery import retained_assessment_recovery_data
 
     retained = admitted_file(
         operations.attempt, 'original-data.json', operations.manifest['originalDataSha256'],
     )
+    if admitted_assessment_recovery(operations) is not None:
+        retained = retained_assessment_recovery_data(operations, retained)
     selected = [
         {'table': item['table'], 'columns': item['columns']}
         for item in rows(retained['tables'], 'original table')

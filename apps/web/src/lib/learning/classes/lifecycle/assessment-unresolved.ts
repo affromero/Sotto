@@ -1,7 +1,9 @@
 import { isDeepStrictEqual } from 'node:util';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
+import { readdir } from 'node:fs/promises';
 import { z } from 'zod';
 import { JobExecutionJournal, JobOutbox, type OutboxJob } from 'thesidedoor-core/runtime/outbox';
+import { openExecutionLocation, recoverExecutionWorkspace } from 'thesidedoor-core/storage';
 import type { Queue } from 'bullmq';
 import type { Prisma, PrismaClient } from '@/generated/prisma/client';
 import { capturePrerequisiteOwnership } from '@/lib/classes/help/lifecycle/prerequisite-ownership';
@@ -14,6 +16,7 @@ import {
   assertSottoExecutionStopped,
   hasSottoExecutionFailure,
   isSottoExecutionUncertain,
+  resolveSottoExecutionDirectory,
   runSottoExecutionOperation,
   sottoJobExecutions,
   type SottoJobExecutionCapability,
@@ -36,6 +39,85 @@ const gateSchema = z
   .object({ id: z.uuid(), fingerprint: z.string().regex(/^[a-f0-9]{64}$/), settled: z.boolean() })
   .strict();
 const pointRead = 'SELECT "revision", "state" FROM "SidedoorState" WHERE "id" = $1';
+const assessmentCleanupPrefix = `${SIDEDOOR_STATE_ID}:assessment-cleanup:`;
+const cleanupDigest = z.string().regex(/^[a-f0-9]{64}$/);
+export const stoppedAssessmentProofSchema = z.strictObject({
+  binding: z.strictObject({
+    id: z.uuid(),
+    parentId: z.uuid(),
+    fingerprint: cleanupDigest,
+    executorId: z.uuid(),
+  }),
+  assessmentId: z.string().min(1),
+  workspaceSha256: cleanupDigest,
+  delivery: z.strictObject({
+    operationId: z.uuid(),
+    fingerprint: cleanupDigest,
+    deliveryAttempts: z.number().int().positive(),
+    failedAt: z.number().int().positive(),
+    processedAt: z.number().int().positive(),
+  }),
+});
+const workspaceDirectoryIdentity = z.strictObject({
+  root: z.string(),
+  device: z.string(),
+  inode: z.string(),
+  binding: z.string(),
+});
+const stoppedAssessmentReceiptSchema = stoppedAssessmentProofSchema
+  .pick({ binding: true, delivery: true })
+  .extend({
+    workspace: z.strictObject({
+      locationId: z.uuid(),
+      executionId: z.uuid(),
+      root: workspaceDirectoryIdentity,
+      directory: workspaceDirectoryIdentity,
+    }),
+  });
+
+export async function hasStoppedAssessmentCleanup(
+  database: Prisma.TransactionClient,
+  identity: { id: string; fingerprint: string },
+  proof?: z.infer<typeof stoppedAssessmentProofSchema>
+) {
+  const receipts = await database.sidedoorState.findMany({
+    where: {
+      id: proof
+        ? assessmentCleanupPrefix + proof.binding.id
+        : { startsWith: assessmentCleanupPrefix },
+      AND: [
+        { state: { path: ['binding', 'parentId'], equals: identity.id } },
+        { state: { path: ['binding', 'fingerprint'], equals: identity.fingerprint } },
+      ],
+    },
+    take: 2,
+  });
+  const receipt = receipts[0];
+  if (receipts.length !== 1 || !receipt) return false;
+  const parsed = stoppedAssessmentReceiptSchema.safeParse(receipt.state);
+  if (!parsed.success) return false;
+  const binding = parsed.data.binding;
+  if (
+    receipt.id !== assessmentCleanupPrefix + binding.id ||
+    binding.parentId !== identity.id ||
+    binding.fingerprint !== identity.fingerprint ||
+    parsed.data.workspace.executionId !== binding.id ||
+    parsed.data.delivery.operationId !== identity.id ||
+    parsed.data.delivery.fingerprint !== identity.fingerprint
+  )
+    return false;
+  if (
+    proof &&
+    (!isDeepStrictEqual(binding, proof.binding) ||
+      !isDeepStrictEqual(parsed.data.delivery, proof.delivery) ||
+      createHash('sha256').update(JSON.stringify(parsed.data.workspace)).digest('hex') !==
+        proof.workspaceSha256)
+  )
+    return false;
+  const journal = sottoJobExecutions(database);
+  if ((await journal.blockingStatus(identity.id, identity.fingerprint)) !== null) return false;
+  return (await journal.read(binding)).status === 'settled';
+}
 
 /** Capture the SDK gate revision so a later execution invalidates an old queue observation. */
 export async function observeExecutionGate(
@@ -357,11 +439,10 @@ async function lockExactExecution(database: Prisma.TransactionClient, binding: B
   return execution.status;
 }
 
-async function markInTransaction(
+async function lockAssessmentSettlement(
   database: Prisma.TransactionClient,
   input: { id: string; fingerprint: string },
-  binding: Binding,
-  mayNeedRecovery: boolean
+  binding: Binding
 ) {
   const identity = { ...input };
   const isolation = await database.$queryRaw<{ isolation: string }[]>`
@@ -371,7 +452,6 @@ async function markInTransaction(
   const record = await sottoJobOutbox(database).read(identity.id);
   if (
     !record ||
-    record.complete ||
     record.fingerprint !== identity.fingerprint ||
     record.job.handler !== 'interactions' ||
     record.job.version !== 6
@@ -387,8 +467,6 @@ async function markInTransaction(
   await database.$queryRaw`SELECT id FROM "CourseClass" WHERE id = ${fence.classId} FOR UPDATE`;
   await database.$queryRaw`SELECT id FROM "ClassAssessment" WHERE id = ${fence.assessmentId} FOR UPDATE`;
   const executionStatus = await lockExactExecution(database, binding);
-  if (!mayNeedRecovery && executionStatus !== 'cleanup-unconfirmed')
-    throw new AssessmentFenceConflict();
   const current = (
     await assessmentFenceStore(assessmentFenceBackend(database, fence.classId)).read()
   ).current;
@@ -426,6 +504,19 @@ async function markInTransaction(
     throw new AssessmentFenceConflict();
   const grant = learningPreparationGrant(database, current, 'assessment');
   const authority = await grant.read(current.grant);
+  return { record, current, fence, grant, authority, executionStatus };
+}
+
+async function markInTransaction(
+  database: Prisma.TransactionClient,
+  identity: { id: string; fingerprint: string },
+  binding: Binding,
+  mayNeedRecovery: boolean
+) {
+  const { record, current, fence, grant, authority, executionStatus } =
+    await lockAssessmentSettlement(database, identity, binding);
+  if (record.complete || (!mayNeedRecovery && executionStatus !== 'cleanup-unconfirmed'))
+    throw new AssessmentFenceConflict();
   if (!['active', 'revoked'].includes(authority.status)) throw new AssessmentFenceConflict();
   await grant.revoke(current.grant);
   if (current.status !== 'UNRESOLVED') {
@@ -442,4 +533,108 @@ async function markInTransaction(
     );
   }
   return { status: 'UNRESOLVED' as const };
+}
+
+/** Operator-only. Prove the original supervisor stopped and keep admissions fenced until completion. */
+export async function recoverStoppedAssessmentExecution(input: {
+  database: PrismaClient;
+  queue: Queue;
+  proof: z.infer<typeof stoppedAssessmentProofSchema>;
+  verifyStopped: () => Promise<void>;
+  removeEmptyWorkspace: (identity: string) => Promise<void>;
+  signal: AbortSignal;
+}) {
+  if (input.queue.name !== 'interactions') throw new AssessmentFenceConflict();
+  const proof = stoppedAssessmentProofSchema.parse(input.proof);
+  const { binding } = proof;
+  const identity = { id: binding.parentId, fingerprint: binding.fingerprint };
+  const receiptId = assessmentCleanupPrefix + binding.id;
+
+  async function read(database: Prisma.TransactionClient) {
+    const { record, current, authority, executionStatus } = await lockAssessmentSettlement(
+      database,
+      identity,
+      binding
+    );
+    if (
+      current.status !== 'UNRESOLVED' ||
+      current.assessmentId !== proof.assessmentId ||
+      authority.status !== 'revoked' ||
+      (record.complete ? executionStatus !== 'settled' : executionStatus !== 'cleanup-unconfirmed')
+    )
+      throw new AssessmentFenceConflict();
+    return { record, execution: await sottoJobExecutions(database).read(binding) };
+  }
+  async function transaction<Result>(run: (database: Prisma.TransactionClient) => Promise<Result>) {
+    await input.verifyStopped();
+    return sottoTransaction(input.database, run, { signal: input.signal });
+  }
+  const captured = await transaction(read);
+  if (captured.record.complete) {
+    if (!(await transaction((database) => hasStoppedAssessmentCleanup(database, identity, proof))))
+      throw new AssessmentFenceConflict();
+    return { executionId: binding.id };
+  }
+  if (!(await input.queue.isPaused()) || (await input.queue.getWorkers()).length !== 0)
+    throw new AssessmentFenceConflict();
+  const workspace = captured.execution.workspace;
+  if (!workspace || !('directory' in workspace)) throw new AssessmentFenceConflict();
+  const workspaceIdentity = JSON.stringify(workspace);
+  const workspaceHash = createHash('sha256').update(workspaceIdentity).digest('hex');
+  if (workspaceHash !== proof.workspaceSha256) throw new AssessmentFenceConflict();
+  const location = await openExecutionLocation(resolveSottoExecutionDirectory());
+  if (location.locationId !== workspace.locationId) throw new AssessmentFenceConflict();
+  const delivery = await snapshotFailedSottoDelivery(input.queue, captured.record);
+  if (!isDeepStrictEqual(delivery, proof.delivery)) throw new AssessmentFenceConflict();
+  const expected = JSON.parse(
+    JSON.stringify({ binding, workspace, delivery })
+  ) as Prisma.InputJsonValue;
+  const approved = await transaction((database) =>
+    database.sidedoorState.findUnique({ where: { id: receiptId } })
+  );
+  if (approved && !isDeepStrictEqual(approved.state, expected)) throw new AssessmentFenceConflict();
+  // The SDK validates the canonical path and both directory identities.
+  const { directory, ...plan } = workspace;
+  const inspectWorkspace = async () => {
+    const present = await recoverExecutionWorkspace(plan, location.locationId);
+    if (present && !isDeepStrictEqual(present, workspace)) throw new AssessmentFenceConflict();
+    return present;
+  };
+  const present = await inspectWorkspace();
+  if (!present && !approved) throw new AssessmentFenceConflict();
+  if (present && (await readdir(directory.root)).length !== 0)
+    throw new Error('Stopped assessment workspace must be empty');
+  await transaction(async (database) => {
+    if (!isDeepStrictEqual(await read(database), captured)) throw new AssessmentFenceConflict();
+    const existing = await database.sidedoorState.findUnique({ where: { id: receiptId } });
+    if (existing && !isDeepStrictEqual(existing.state, expected))
+      throw new AssessmentFenceConflict();
+    if (!existing)
+      await database.sidedoorState.create({
+        data: { id: receiptId, revision: randomUUID(), state: expected },
+      });
+  });
+  input.signal.throwIfAborted();
+  await input.verifyStopped();
+  const current = await inspectWorkspace();
+  if (Boolean(current) !== Boolean(present)) throw new AssessmentFenceConflict();
+  if (current) {
+    await input.removeEmptyWorkspace(workspaceIdentity);
+    if (await inspectWorkspace()) throw new AssessmentFenceConflict();
+  }
+  if (
+    !(await input.queue.isPaused()) ||
+    (await input.queue.getWorkers()).length !== 0 ||
+    !isDeepStrictEqual(await snapshotFailedSottoDelivery(input.queue, captured.record), delivery)
+  )
+    throw new AssessmentFenceConflict();
+  await transaction(async (database) => {
+    if (!isDeepStrictEqual(await read(database), captured)) throw new AssessmentFenceConflict();
+    const journal = sottoJobExecutions(database);
+    await journal.releaseWorkspace(binding, workspace);
+    if (!(await sottoJobOutbox(database).complete(binding.parentId, binding.fingerprint)))
+      throw new AssessmentFenceConflict();
+    await journal.settle(binding);
+  });
+  return { executionId: binding.id };
 }

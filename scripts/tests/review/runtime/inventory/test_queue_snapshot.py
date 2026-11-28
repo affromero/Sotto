@@ -2,6 +2,9 @@
 
 import hashlib
 import json
+import subprocess
+import sys
+import tempfile
 import unittest
 from collections.abc import Callable
 from importlib import import_module
@@ -9,7 +12,11 @@ from pathlib import Path
 from unittest.mock import patch
 
 from scripts.deploy.review.runtime.inventory.predecessor import capture_predecessor
+from scripts.deploy.review.runtime.release.assessment_workspace import (
+    REMOVE_EMPTY_WORKSPACE, workspace_removal,
+)
 from scripts.deploy.review.runtime.inventory.queue_snapshot import (
+    approved_assessment_cleanup,
     capture_predecessor_queue_snapshot,
     observe_predecessor_queue_drain,
     pause_predecessor_queues,
@@ -18,7 +25,7 @@ from scripts.deploy.review.runtime.inventory.queue_snapshot import (
 from scripts.deploy.review.runtime.inventory.quiescence import quiesce_predecessor
 from scripts.deploy.review.runtime.inventory.retained import observe_retained_inventory
 from scripts.deploy.review.state import atomic_json, private_json
-from scripts.deploy.review.topology import NETWORK, PROJECT
+from scripts.deploy.review.topology import EXECUTIONS, NETWORK, PROJECT
 from scripts.tests.review.runtime import admitted_runtime_fixture
 
 
@@ -328,6 +335,86 @@ class PredecessorQueueSnapshotTests(unittest.TestCase):
         self.output = self.response({**self.prepare_drain(jobs=1), 'drained': True})
         with self.assertRaisesRegex(ValueError, 'queue-drain-result-invalid'):
             observe_predecessor_queue_drain(self.previous, self.successor)
+
+    def test_recovery_drain_cannot_be_reused_for_another_execution(self) -> None:
+        observed = self.prepare_drain()
+        receipt = private_json(self.path)
+        parent = '10000000-0000-0000-0000-000000000000'
+        proof = {
+            'binding': {'parentId': parent, 'fingerprint': 'b' * 64,
+                        'id': '20000000-0000-0000-0000-000000000000',
+                        'executorId': '30000000-0000-0000-0000-000000000000'},
+            'delivery': {'operationId': parent, 'fingerprint': 'b' * 64},
+            'assessmentId': 'synthetic-assessment', 'workspaceSha256': 'c' * 64,
+        }
+        observed['executions'] = {'inspected': 1, 'settled': 0,
+                                  'workerActive': 0, 'synchronousActive': 0}
+        observed['recovery'] = proof
+        module = observe_predecessor_queue_drain.__module__
+        with (patch(f'{module}.admitted_assessment_recovery', return_value=parent),
+              patch(f'{module}._run_queue_command', return_value=(observed, receipt))):
+            self.assertTrue(observe_predecessor_queue_drain(self.previous, self.successor))
+            path = self.path.parent / 'assessment-recovery-drain.json'
+            self.assertEqual(private_json(path)['recovery'], proof)
+            observed['recovery'] = {**proof, 'workspaceSha256': 'd' * 64}
+            with self.assertRaisesRegex(ValueError, 'review-assessment-drain-proof-changed'):
+                observe_predecessor_queue_drain(self.previous, self.successor)
+
+    def test_refuses_cleanup_while_predecessor_writers_are_running(self) -> None:
+        module = approved_assessment_cleanup.__module__
+        parent = '10000000-0000-0000-0000-000000000000'
+        with patch(f'{module}.admitted_assessment_recovery', return_value=parent):
+            with self.assertRaisesRegex(ValueError, 'expected-predecessor-web-stopped-workers-stopped'):
+                approved_assessment_cleanup(self.previous, self.successor)
+
+    def test_removal_requires_the_exact_empty_directory(self) -> None:
+        execution_id = '10000000-0000-0000-0000-000000000000'
+        leaf = 'execution-' + execution_id
+        with tempfile.TemporaryDirectory() as scratch:
+            mount = Path(scratch).resolve()
+            root = mount / 'executions'
+            root.mkdir()
+            directory = root / leaf
+            directory.mkdir()
+
+            def identity(path: Path, review_path: str) -> dict[str, str]:
+                info = path.stat()
+                return {'root': review_path, 'device': str(info.st_dev), 'inode': str(info.st_ino)}
+
+            review_root = EXECUTIONS + '/executions'
+            encoded = json.dumps({
+                'executionId': execution_id,
+                'root': identity(root, review_root),
+                'directory': identity(directory, review_root + '/' + leaf),
+            })
+            proof = {'binding': {'id': execution_id},
+                     'workspaceSha256': hashlib.sha256(encoded.encode()).hexdigest()}
+            request = workspace_removal(encoded, proof, str(mount))
+            with self.assertRaisesRegex(ValueError, 'exact-stopped-assessment-workspace-required'):
+                workspace_removal(encoded + ' ', proof, str(mount))
+
+            def remove() -> subprocess.CompletedProcess[bytes]:
+                return subprocess.run(
+                    [sys.executable, '-c', REMOVE_EMPTY_WORKSPACE],
+                    input=json.dumps(request).encode(), capture_output=True, check=False,
+                )
+
+            artifact = directory / 'preserved'
+            artifact.write_text('evidence')
+            self.assertNotEqual(remove().returncode, 0)
+            self.assertEqual(artifact.read_text(), 'evidence')
+            alternate = root / 'alternate'
+            directory.rename(alternate)
+            directory.symlink_to(alternate, target_is_directory=True)
+            self.assertNotEqual(remove().returncode, 0)
+            self.assertEqual((alternate / 'preserved').read_text(), 'evidence')
+            directory.unlink()
+            alternate.rename(directory)
+            artifact.unlink()
+            result = remove()
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertFalse(directory.exists())
+            self.assertNotEqual(remove().returncode, 0)
 
     def test_refuses_a_drain_result_when_a_queue_is_unpaused(self) -> None:
         drifted = self.prepare_drain()

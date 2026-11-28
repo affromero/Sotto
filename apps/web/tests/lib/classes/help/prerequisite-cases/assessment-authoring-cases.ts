@@ -1,12 +1,18 @@
 import { expect, it, vi, type Mock } from 'vitest';
 import { createHash, randomUUID } from 'node:crypto';
+import { lstat, mkdtemp, readFile, rm, rmdir, writeFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { isSerializationConflict } from 'thesidedoor-core/storage/sql';
 import { Prisma } from '@/generated/prisma/client';
 import { createSkillRequirements } from '@sotto/shared';
 import { sottoTransaction } from '@/lib/sidedoor/access/state/transaction';
 import { readPrerequisiteSource } from '@/lib/classes/help/content/prerequisite-source';
-import { sottoJobOutbox } from '@/lib/sidedoor/jobs/core/job-delivery';
+import { snapshotFailedSottoDelivery, sottoJobOutbox } from '@/lib/sidedoor/jobs/core/job-delivery';
 import {
+  assertSottoExecutionOperation,
+  sottoJobExecutions,
   withSottoJobExecution,
   runSottoExecutionOperation,
 } from '@/lib/sidedoor/jobs/core/job-execution-lifetime';
@@ -16,6 +22,8 @@ import {
   captureAssessmentSettlementAuthority,
   markExpiredAssessmentUnresolved,
   markAssessmentUnresolved,
+  recoverStoppedAssessmentExecution,
+  stoppedAssessmentProofSchema,
 } from '@/lib/learning/classes/lifecycle/assessment-unresolved';
 import { stageAssessmentSection } from '@/lib/learning/classes/generation/assessment-draft';
 import { SIDEDOOR_STATE_ID } from '@/lib/sidedoor/access/state/store';
@@ -162,6 +170,7 @@ export function registerAssessmentAuthoringCases(getContext: () => AssessmentAut
     'terminal_retry',
     'terminal_yield',
     'terminal_missing',
+    'terminal_cleanup',
   ] as const)(
     'retains a stopped failed assessment for recovery without completing its work (%s)',
     async (mode) => {
@@ -214,7 +223,8 @@ export function registerAssessmentAuthoringCases(getContext: () => AssessmentAut
         mode === 'terminal' ||
         mode === 'terminal_retry' ||
         mode === 'terminal_yield' ||
-        mode === 'terminal_missing'
+        mode === 'terminal_missing' ||
+        mode === 'terminal_cleanup'
       ) {
         const { Queue, Worker, UnrecoverableError } = await import('bullmq');
         const { observeExecutionGate, reconcileFailedAssessmentDelivery } =
@@ -276,6 +286,184 @@ export function registerAssessmentAuthoringCases(getContext: () => AssessmentAut
           void worker.run();
           await expect.poll(() => queued.getState(), { timeout: 10000 }).toBe('failed');
           await worker.close();
+          if (mode === 'terminal_cleanup') {
+            const providerJournal =
+              await import('@/lib/learning/classes/provider/assessment-provider-journal');
+            const request = {
+              identity: operation,
+              execution,
+              stage: 'AUTHOR_GRAMMAR' as const,
+              ordinal: 0,
+              role: 'MODEL' as const,
+              inputDigest: 'a'.repeat(64),
+            };
+            const attempt = { id: randomUUID(), fingerprint: 'b'.repeat(64) };
+            await sottoTransaction(instance.database, async (tx) => {
+              await providerJournal.prepareAssessmentProviderCall(tx, request);
+              await providerJournal.admitAssessmentProviderCall(tx, request, attempt);
+              await providerJournal.settleAssessmentProviderCall(tx, request, attempt, 'unknown');
+            });
+            const root = await mkdtemp(join(tmpdir(), 'sotto-assessment-recover-'));
+            const previousExecutionDirectory = process.env.SIDEDOOR_EXECUTION_DIR;
+            vi.stubEnv('SIDEDOOR_EXECUTION_DIR', join(root, 'executions'));
+            try {
+              let authority: object | undefined;
+              let binding: ReturnType<typeof assertSottoExecutionOperation> | undefined;
+              let workspace: string | undefined;
+              await expect(
+                withSottoJobExecution({
+                  database: instance.database,
+                  parentId: operation.id,
+                  fingerprint: operation.fingerprint,
+                  signal: new AbortController().signal,
+                  capabilityScope: scope,
+                  isCleanupFailure: () => false,
+                  validate: async () => true,
+                  run: async ({ capability, directory, markCleanupUnconfirmed }) => {
+                    if (!capability || !directory) throw new Error('Expected attached execution');
+                    workspace = directory;
+                    authority = await captureAssessmentSettlementAuthority({
+                      identity: operation,
+                      capability,
+                    });
+                    binding = await runSottoExecutionOperation(
+                      capability,
+                      { parentId: operation.id, fingerprint: operation.fingerprint },
+                      async (active) =>
+                        assertSottoExecutionOperation(active, {
+                          parentId: operation.id,
+                          fingerprint: operation.fingerprint,
+                        })
+                    );
+                    markCleanupUnconfirmed();
+                    throw new Error('Synthetic provider outcome unknown');
+                  },
+                })
+              ).rejects.toThrow('Execution operations failed');
+              if (!binding || !authority || !workspace) throw new Error('Missing recovery inputs');
+              await markAssessmentUnresolved({ database: instance.database, authority });
+              const { run: queueLifecycle } = createRequire(import.meta.url)(
+                resolve(process.cwd(), '../../scripts/deploy/queue-lifecycle.cjs')
+              ) as {
+                run: (request: object, runtime: object) => Promise<{ recovery?: unknown }>;
+              };
+              const runtime = {
+                environment: {
+                  REDIS_URL: redisUrl.href,
+                  DATABASE_URL: process.env.SIDEDOOR_TEST_DATABASE_URL,
+                },
+                namespace: SIDEDOOR_STATE_ID,
+                names: [queue.name],
+                database: instance.database,
+                createQueue: (name: string) =>
+                  new Queue(name, { connection, prefix, skipMetasUpdate: true }),
+                sottoJobExecutions,
+                sottoJobOutbox,
+                snapshotFailedSottoDelivery,
+              };
+              const manifest = await queueLifecycle({ command: 'snapshot' }, runtime);
+              await queueLifecycle({ command: 'pause', manifest }, runtime);
+              await expect(
+                queueLifecycle({ command: 'drained-all', manifest }, runtime)
+              ).rejects.toThrow('Execution cleanup is unresolved');
+              const observation = await queueLifecycle(
+                { command: 'drained-all', manifest, recoveryJob: operation.id },
+                runtime
+              );
+              expect(observation).toMatchObject({
+                drained: true,
+                activeJobs: 0,
+                recovery: {
+                  binding,
+                  delivery: { operationId: operation.id, fingerprint: operation.fingerprint },
+                },
+              });
+              const workspacePath = workspace;
+              const proof = stoppedAssessmentProofSchema.parse(observation.recovery);
+              const recovery = {
+                database: instance.database,
+                queue,
+                proof,
+                verifyStopped: async () => {},
+                removeEmptyWorkspace: async (identity: string) => {
+                  expect(createHash('sha256').update(identity).digest('hex')).toBe(
+                    proof.workspaceSha256
+                  );
+                  await rmdir(workspacePath);
+                },
+                signal: new AbortController().signal,
+              };
+              await expect(
+                recoverStoppedAssessmentExecution({
+                  ...recovery,
+                  verifyStopped: async () => {
+                    throw new Error('Original supervisor is still running');
+                  },
+                })
+              ).rejects.toThrow('Original supervisor is still running');
+              await expect(
+                recoverStoppedAssessmentExecution({
+                  ...recovery,
+                  proof: { ...recovery.proof, workspaceSha256: '0'.repeat(64) },
+                })
+              ).rejects.toThrow();
+              expect((await lstat(workspace)).isDirectory()).toBe(true);
+              const artifact = join(workspace, 'retained-evidence');
+              await writeFile(artifact, 'evidence');
+              await expect(recoverStoppedAssessmentExecution(recovery)).rejects.toThrow(
+                'Stopped assessment workspace must be empty'
+              );
+              await expect(readFile(artifact, 'utf8')).resolves.toBe('evidence');
+              await rm(artifact);
+              await expect(
+                recoverStoppedAssessmentExecution({
+                  ...recovery,
+                  removeEmptyWorkspace: async (identity) => {
+                    await recovery.removeEmptyWorkspace(identity);
+                    throw new Error('Host acknowledgement lost');
+                  },
+                })
+              ).rejects.toThrow('Host acknowledgement lost');
+              expect(
+                await sottoTransaction(instance.database, (tx) =>
+                  sottoJobOutbox(tx).receipt(operation.id)
+                )
+              ).toMatchObject({ status: 'pending' });
+              await expect(recoverStoppedAssessmentExecution(recovery)).resolves.toEqual({
+                executionId: binding.id,
+              });
+              await expect(
+                recoverStoppedAssessmentExecution({
+                  ...recovery,
+                  proof: { ...proof, workspaceSha256: '0'.repeat(64) },
+                })
+              ).rejects.toThrow();
+              await expect(recoverStoppedAssessmentExecution(recovery)).resolves.toEqual({
+                executionId: binding.id,
+              });
+              await expect(lstat(workspace)).rejects.toMatchObject({ code: 'ENOENT' });
+              expect(await queued.getState()).toBe('failed');
+              expect(
+                await instance.database.classAssessmentProviderCall.findUnique({
+                  where: { attemptId: attempt.id },
+                })
+              ).toMatchObject({ status: 'UNKNOWN', responseBytes: null });
+              expect(
+                await sottoTransaction(instance.database, (tx) =>
+                  readAssessmentStatus(tx, classId, execution)
+                )
+              ).toMatchObject({ status: 'UNRESOLVED' });
+              expect(
+                await sottoTransaction(instance.database, (tx) =>
+                  sottoJobOutbox(tx).receipt(operation.id)
+                )
+              ).toMatchObject({ status: 'complete' });
+              return;
+            } finally {
+              vi.stubEnv('SIDEDOOR_EXECUTION_DIR', previousExecutionDirectory);
+              await rm(root, { recursive: true, force: true });
+            }
+          }
           await withSottoJobExecution({
             database: instance.database,
             parentId: operation.id,

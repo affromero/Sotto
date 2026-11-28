@@ -24,7 +24,7 @@ from scripts.deploy.review.egress import (
     collect_policy,
     verify_policy,
 )
-from scripts.deploy.review.runtime.channel import exchange
+from scripts.deploy.review.runtime.channel import RUNTIME_CHANNEL_ARGS, exchange
 from scripts.deploy.review.runtime.mounts import (
     MOUNT_PROBE, container_inventory, resolve_mounts,
 )
@@ -759,14 +759,18 @@ class HostOperations:
     ) -> object:
         """Bind the helper before start and audit its exit."""
         from scripts.deploy.review.runtime.inventory.environment import (
-            retained_inventory_network, retained_inventory_phase, review_code_mount,
+            admitted_redis_namespace, retained_inventory_network, retained_inventory_phase,
+            review_helper_mounts,
         )
+        from scripts.deploy.review.runtime.inventory.queue_snapshot import approved_assessment_cleanup
+        from scripts.deploy.review.runtime.release.assessment_workspace import remove_assessment_workspace
         if mode not in {'capture', 'inspect', 'prepare', 'providers',
                         'queues', 'continuation', 'consumers', 'workloads',
                         'paused-admission', 'queue-policy', 'retained-single-client',
-                        'prepare-successor-queue-policy'}:
+                        'prepare-successor-queue-policy', 'assessment-cleanup'}:
             raise ValueError('unsupported-review-runtime-operation')
-        needs_predecessor = mode in ('retained-single-client', 'prepare-successor-queue-policy')
+        needs_predecessor = mode in ('retained-single-client', 'prepare-successor-queue-policy',
+                                     'assessment-cleanup')
         if needs_predecessor != (predecessor is not None):
             raise ValueError('retained-review-predecessor-required')
         self.lock.validate()
@@ -781,6 +785,8 @@ class HostOperations:
                     raise ValueError('successor-queue-policy-phase-invalid')
                 if retained_inventory_network(predecessor, self, phase=retained_phase) != network:
                     raise ValueError('retained-inventory-network-changed')
+                if mode == 'assessment-cleanup' and value != approved_assessment_cleanup(predecessor, self):
+                    raise ValueError('assessment-cleanup-input-changed')
             elif mode == 'queue-policy':
                 admit_queue_getter(self)
             elif mode != 'capture':
@@ -808,26 +814,13 @@ class HostOperations:
             if candidate_id is not None:
                 raise ValueError('unexpected-runtime-network-reference')
             if mode == 'queue-policy' and 'predecessor' in self.manifest:
-                topology = record(self.manifest['topology'], 'topology')
-                services = record(topology['services'], 'review services')
-                redis = record(services['redis'], 'admitted Redis')
-                # Queue policy admission verifies the exact backing service and peers.
-                network = 'container:' + digest(redis['id'], 'admitted Redis')
+                network = admitted_redis_namespace(self.manifest)
             else:
                 network = (retained_inventory_network(predecessor, self, phase=retained_phase)
                            if predecessor is not None else NETWORK)
         verify_context()
-        initial = {'mode': mode, 'input': value,
-                   'checkpoint': checkpoint,
-                   'policy': runtime_policy(self.manifest)}
-        script = (
-            'require("/app/scripts/deploy/review/runtime/channel.ts")'
-            '.main().catch(()=>{console.error('
-            '"Review runtime operation failed");process.exitCode=1})'
-        )
-        arguments = helper_arguments(
-            self.manifest, 'node', ['--require', 'tsx/cjs', '-e', script],
-        )
+        initial = {'mode': mode, 'input': value, 'checkpoint': checkpoint, 'policy': runtime_policy(self.manifest)}
+        arguments = helper_arguments(self.manifest, 'node', RUNTIME_CHANNEL_ARGS)
         binding = {'mode': mode, 'inputSha256': checksum(initial),
                    'imageId': image['imageId'], 'network': network,
                    'entrypoint': 'node', 'toolsSha256': checksum(tools),
@@ -843,9 +836,11 @@ class HostOperations:
             image, 'node', arguments,
             network=network,
             container_name=name,
-            mounts=[review_code_mount(self)],
+            mounts=review_helper_mounts(self, mode),
             predecessor=predecessor,
-            predecessor_tool='retained-inventory' if predecessor is not None else 'pause',
+            predecessor_tool=('assessment-cleanup' if mode == 'assessment-cleanup' else
+                              'retained-inventory' if predecessor is not None else 'pause'),
+            content=json.dumps(initial).encode() if mode == 'assessment-cleanup' else None,
         )
         actual_image = rows(json.loads(self.docker(
             'image', 'inspect', cast(str, image['imageId']),
@@ -854,7 +849,6 @@ class HostOperations:
             self, command, actual_image,
         )
         atomic_json(intent, {**binding, 'name': name, 'status': 'prepared'})
-        # Create first so process loss cannot hide the container identity.
         container_id = self.command(command).decode().strip()
         digest(container_id, 'runtime helper container')
         actual = self.inspect(container_id)[0]
@@ -897,6 +891,8 @@ class HostOperations:
                 directory=self.attempt.directory,
                 assert_fence=verify, queue_manifest=original_manifest,
                 queue_policy=lambda value: retain_queue_intent(self, value),
+                remove_assessment_workspace=(lambda identity: remove_assessment_workspace(predecessor, self, identity))
+                if predecessor is not None and mode == 'assessment-cleanup' else None,
             )
         except BaseException as original:
             try:

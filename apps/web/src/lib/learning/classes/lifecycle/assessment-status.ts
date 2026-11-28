@@ -16,6 +16,7 @@ import {
 } from './assessment-fence';
 import { requirePendingAssessmentWork } from '../generation/assessment-work';
 import { recoverAssessmentOutcome } from './assessment-outcome';
+import { hasStoppedAssessmentCleanup } from './assessment-unresolved';
 import { readPublicAssessment } from '../material/assessment-read';
 import { captureAssessmentGenerationSource } from '../material/assessment-source';
 import { requireAssessmentPracticeComplete } from '../practice/assessment-practice';
@@ -130,7 +131,11 @@ export async function readAssessmentStatus(
     tokenizer.dispose();
   }
   if (fence.status === 'UNRESOLVED') {
-    if (record.complete || assessment.status !== 'UNRESOLVED') throw new AssessmentFenceConflict();
+    if (
+      assessment.status !== 'UNRESOLVED' ||
+      (record.complete && !(await hasStoppedAssessmentCleanup(database, identity)))
+    )
+      throw new AssessmentFenceConflict();
     return { status: 'UNRESOLVED' as const, classAttempt: cls.attempt };
   }
   if (fence.status === 'QUEUED' || fence.status === 'RUNNING') {

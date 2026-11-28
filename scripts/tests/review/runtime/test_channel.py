@@ -32,6 +32,7 @@ class ReviewChannelTests(unittest.TestCase):
         self.fence_failure = False
         self.fence_failure_after: int | None = None
         self.manifests: list[dict[str, object]] = []
+        self.workspace_removals: list[object] = []
 
     def fence(self) -> None:
         self.lock.validate()
@@ -59,6 +60,7 @@ def ack(identity):
             queue_policy=lambda value: atomic_json(
                 self.root / 'queue-policy-intent.json', value,
             ),
+            remove_assessment_workspace=self.workspace_removals.append,
             timeout=timeout,
         )
 
@@ -112,6 +114,21 @@ emit({'type':'result','value':{'keys':112}})
                     result = self.run_child(script, mode=mode, timeout=None)
                 self.assertEqual(result, {'keys': 112})
                 self.assertEqual(self.fences, 9)
+
+    def test_workspace_removal_acknowledgement_requires_cleanup_mode_and_fence(self) -> None:
+        script = '''emit({'type':'removeAssessmentWorkspace','id':1,'value':'identity'})
+ack(1)
+emit({'type':'result','value':'removed'})
+'''
+        with self.assertRaisesRegex(ValueError, 'unexpected-assessment-workspace-removal'):
+            self.run_child(script, mode='prepare')
+        self.fence_failure = True
+        with self.assertRaisesRegex(ValueError, 'actual-fence-missing'):
+            self.run_child(script, mode='assessment-cleanup')
+        self.assertEqual(self.workspace_removals, [])
+        self.fence_failure = False
+        self.assertEqual(self.run_child(script, mode='assessment-cleanup'), 'removed')
+        self.assertEqual(self.workspace_removals, ['identity'])
 
     def test_successor_policy_acknowledges_durable_limits_before_writes(self) -> None:
         path = self.root / 'queue-policy-intent.json'
