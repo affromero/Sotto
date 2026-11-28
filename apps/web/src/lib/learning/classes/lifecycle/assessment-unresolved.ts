@@ -1,9 +1,11 @@
 import { isDeepStrictEqual } from 'node:util';
 import { createHash, randomUUID } from 'node:crypto';
-import { readdir } from 'node:fs/promises';
+import { constants } from 'node:fs';
+import { lstat, open, readdir, realpath } from 'node:fs/promises';
+import { join } from 'node:path';
 import { z } from 'zod';
 import { JobExecutionJournal, JobOutbox, type OutboxJob } from 'thesidedoor-core/runtime/outbox';
-import { openExecutionLocation, recoverExecutionWorkspace } from 'thesidedoor-core/storage';
+import { LocalStorageCleanup, recoverExecutionWorkspace } from 'thesidedoor-core/storage';
 import type { Queue } from 'bullmq';
 import type { Prisma, PrismaClient } from '@/generated/prisma/client';
 import { capturePrerequisiteOwnership } from '@/lib/classes/help/lifecycle/prerequisite-ownership';
@@ -63,6 +65,11 @@ const workspaceDirectoryIdentity = z.strictObject({
   device: z.string(),
   inode: z.string(),
   binding: z.string(),
+});
+const executionLocationMarker = z.strictObject({
+  version: z.literal(1),
+  locationId: z.uuid(),
+  root: workspaceDirectoryIdentity,
 });
 const stoppedAssessmentReceiptSchema = stoppedAssessmentProofSchema
   .pick({ binding: true, delivery: true })
@@ -535,6 +542,60 @@ async function markInTransaction(
   return { status: 'UNRESOLVED' as const };
 }
 
+async function verifyStoppedExecutionLocation(
+  workspace: z.infer<typeof stoppedAssessmentReceiptSchema>['workspace']
+) {
+  const root = workspace.root.root;
+  if ((await realpath(resolveSottoExecutionDirectory())) !== root)
+    throw new AssessmentFenceConflict();
+  await LocalStorageCleanup.restore(workspace.root);
+  const directory = await lstat(root);
+  if (!directory.isDirectory() || (directory.mode & 0o7777) !== 0o700)
+    throw new AssessmentFenceConflict();
+
+  const path = join(root, 'location.json');
+  const file = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+  try {
+    const info = await file.stat({ bigint: true });
+    if (
+      !info.isFile() ||
+      (info.mode & 0o7777n) !== 0o600n ||
+      info.nlink !== 1n ||
+      info.uid !== BigInt(directory.uid) ||
+      info.size < 1n ||
+      info.size > 4096n
+    )
+      throw new AssessmentFenceConflict();
+    const bytes = Buffer.alloc(Number(info.size) + 1);
+    let offset = 0;
+    while (offset < bytes.length) {
+      const { bytesRead } = await file.read(bytes, offset, bytes.length - offset, offset);
+      if (bytesRead === 0) break;
+      offset += bytesRead;
+    }
+    const current = await lstat(path, { bigint: true });
+    if (
+      BigInt(offset) !== info.size ||
+      current.dev !== info.dev ||
+      current.ino !== info.ino ||
+      current.size !== info.size ||
+      current.ctimeNs !== info.ctimeNs
+    )
+      throw new AssessmentFenceConflict();
+    const location = executionLocationMarker.parse(
+      JSON.parse(bytes.subarray(0, offset).toString())
+    );
+    if (
+      location.locationId !== workspace.locationId ||
+      !isDeepStrictEqual(location.root, workspace.root)
+    )
+      throw new AssessmentFenceConflict();
+    await LocalStorageCleanup.restore(workspace.root);
+  } finally {
+    await file.close();
+  }
+}
+
 /** Operator-only. Prove the original supervisor stopped and keep admissions fenced until completion. */
 export async function recoverStoppedAssessmentExecution(input: {
   database: PrismaClient;
@@ -582,8 +643,8 @@ export async function recoverStoppedAssessmentExecution(input: {
   const workspaceIdentity = JSON.stringify(workspace);
   const workspaceHash = createHash('sha256').update(workspaceIdentity).digest('hex');
   if (workspaceHash !== proof.workspaceSha256) throw new AssessmentFenceConflict();
-  const location = await openExecutionLocation(resolveSottoExecutionDirectory());
-  if (location.locationId !== workspace.locationId) throw new AssessmentFenceConflict();
+  // The stopped-writer fence permits reading the marker without a writable SDK guard.
+  await verifyStoppedExecutionLocation(workspace);
   const delivery = await snapshotFailedSottoDelivery(input.queue, captured.record);
   if (!isDeepStrictEqual(delivery, proof.delivery)) throw new AssessmentFenceConflict();
   const expected = JSON.parse(
@@ -596,7 +657,7 @@ export async function recoverStoppedAssessmentExecution(input: {
   // The SDK validates the canonical path and both directory identities.
   const { directory, ...plan } = workspace;
   const inspectWorkspace = async () => {
-    const present = await recoverExecutionWorkspace(plan, location.locationId);
+    const present = await recoverExecutionWorkspace(plan, workspace.locationId);
     if (present && !isDeepStrictEqual(present, workspace)) throw new AssessmentFenceConflict();
     return present;
   };

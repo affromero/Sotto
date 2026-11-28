@@ -1,6 +1,6 @@
 import { expect, it, vi, type Mock } from 'vitest';
 import { createHash, randomUUID } from 'node:crypto';
-import { lstat, mkdtemp, readFile, rm, rmdir, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, mkdtemp, readFile, rename, rm, rmdir, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -407,6 +407,18 @@ export function registerAssessmentAuthoringCases(getContext: () => AssessmentAut
                   proof: { ...recovery.proof, workspaceSha256: '0'.repeat(64) },
                 })
               ).rejects.toThrow();
+              const locationRoot = resolve(workspace, '..');
+              const marker = join(locationRoot, 'location.json');
+              const originalMarker = await readFile(marker, 'utf8');
+              await writeFile(
+                marker,
+                JSON.stringify({ ...JSON.parse(originalMarker), locationId: randomUUID() })
+              );
+              await expect(recoverStoppedAssessmentExecution(recovery)).rejects.toThrow();
+              await writeFile(marker, originalMarker);
+              const guard = locationRoot + '.guard';
+              await rename(guard, guard + '.saved');
+              await mkdir(guard);
               expect((await lstat(workspace)).isDirectory()).toBe(true);
               const artifact = join(workspace, 'retained-evidence');
               await writeFile(artifact, 'evidence');
