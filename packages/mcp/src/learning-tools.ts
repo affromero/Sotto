@@ -42,6 +42,31 @@ export function registerLearningTools(server: McpServer, client: SottoClient) {
     () => result(() => client.learningRequest('GET', '/api/v1/courses'))
   );
   server.registerTool(
+    'list_course_vocabulary',
+    {
+      description:
+        'List a course’s vocabulary words and review state (unseen, due, learning, strong) with optional search and pagination.',
+      inputSchema: {
+        course_id: course,
+        state: z.enum(['unseen', 'due', 'learning', 'strong']).optional(),
+        search: z.string().max(120).optional(),
+        page: z.number().int().min(1).optional(),
+      },
+      annotations: readAnnotations,
+    },
+    ({ course_id, state, search, page }) =>
+      result(() =>
+        client.learningRequest(
+          'GET',
+          `/api/v1/courses/${encodeURIComponent(course_id)}/vocabulary${query({
+            state,
+            search,
+            page: page?.toString(),
+          })}`
+        )
+      )
+  );
+  server.registerTool(
     'get_learning_map',
     {
       description:

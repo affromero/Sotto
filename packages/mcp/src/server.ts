@@ -144,11 +144,39 @@ export function createServer(client: SottoClient): McpServer {
 
   server.tool(
     'list_episodes',
-    'List all your episodes, ordered by most recent first.',
-    {},
-    async () => {
+    'List your episodes, ordered by most recent first, with optional status and limit filters.',
+    {
+      status: z
+        .enum([
+          'EXTRACTING',
+          'RESEARCHING',
+          'PLANNING',
+          'WRITING',
+          'VERIFYING',
+          'AUDIO',
+          'STITCHING',
+          'READY',
+          'FAILED',
+        ])
+        .optional()
+        .describe('Optional episode status filter'),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe('Maximum number of episodes to return'),
+    },
+    async ({ status, limit }) => {
       try {
-        const episodes = await client.listEpisodes();
+        let episodes = await client.listEpisodes();
+        if (status) {
+          episodes = episodes.filter((ep) => ep.status === status);
+        }
+        if (limit !== undefined) {
+          episodes = episodes.slice(0, limit);
+        }
         return { content: [{ type: 'text', text: formatEpisodeList(episodes) }] };
       } catch (err) {
         return errorResult(err);
