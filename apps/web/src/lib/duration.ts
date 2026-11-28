@@ -37,7 +37,7 @@ export function wordCountBounds(durationMinutes: number): {
   const target = minutesToWords(durationMinutes);
   return {
     target,
-    min: target - tolerance,
+    min: Math.max(0, target - tolerance),
     max: target + tolerance,
   };
 }

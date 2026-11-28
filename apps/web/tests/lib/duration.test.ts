@@ -72,4 +72,11 @@ describe('duration helpers', () => {
     const turns = [{ text: ' hello world ' }, { text: 'foo bar baz ' }, { text: ' one ' }];
     expect(countScriptWords(turns)).toBe(6);
   });
+
+  it('wordCountBounds clamps min to 0 for short durations under 0.5 minutes', () => {
+    const bounds = wordCountBounds(0.25);
+    expect(bounds.target).toBe(38);
+    expect(bounds.min).toBe(0);
+    expect(bounds.max).toBe(113);
+  });
 });
