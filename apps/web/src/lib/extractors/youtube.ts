@@ -7,8 +7,10 @@ const YOUTUBE_PATTERNS = [
   /^https?:\/\/(?:www\.)?youtube\.com\/watch\?/,
   /^https?:\/\/youtu\.be\//,
   /^https?:\/\/m\.youtube\.com\/watch\?/,
+  /^https?:\/\/music\.youtube\.com\/watch\?/,
   /^https?:\/\/(?:www\.)?youtube\.com\/shorts\//,
   /^https?:\/\/(?:www\.)?youtube\.com\/embed\//,
+  /^https?:\/\/(?:www\.)?youtube\.com\/live\//,
 ];
 
 const MAX_CONTENT_LENGTH = 50000;
@@ -32,8 +34,8 @@ export function extractVideoId(url: string): string | null {
       return id || null;
     }
 
-    // youtube.com/shorts/ID or youtube.com/embed/ID
-    const pathMatch = parsed.pathname.match(/^\/(?:shorts|embed)\/([a-zA-Z0-9_-]+)/);
+    // youtube.com/shorts/ID, youtube.com/embed/ID, or youtube.com/live/ID
+    const pathMatch = parsed.pathname.match(/^\/(?:shorts|embed|live)\/([a-zA-Z0-9_-]+)/);
     if (pathMatch) {
       return pathMatch[1];
     }
