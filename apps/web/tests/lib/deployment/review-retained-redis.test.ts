@@ -94,6 +94,33 @@ describe('retained review Redis inventory', () => {
     }
   });
 
+  it('preserves an admitted stitching failure and rejects a different delivery', async () => {
+    const redis = fixture.client;
+    const id = '845e0948-bca5-4ea4-89af-e9c5643fac9d';
+    const prefix = 'bull:audio-stitching:';
+    const input = {
+      redisUrl: fixture.url,
+      queues: [...queues, 'audio-stitching'],
+      failedWorksheetIds,
+    };
+    await redis.hset(prefix + 'meta', 'opts.maxLenEvents', '10000');
+    await redis.xadd(prefix + 'events', '*', 'event', 'failed');
+    await redis.set(prefix + 'id', '1');
+    await expect(
+      inspectRetainedReviewRedis(redis, { ...input, stitchingFailure: id })
+    ).rejects.toThrow('Admitted failed delivery is missing');
+    await redis.zadd(prefix + 'failed', 1, id);
+    await redis.hset(prefix + id, 'data', JSON.stringify({ operationId: id }));
+    const before = await redis.hgetall(prefix + id);
+    await expect(inspectRetainedReviewRedis(redis, input)).rejects.toThrow('Unknown failed work');
+    await expect(
+      inspectRetainedReviewRedis(redis, { ...input, stitchingFailure: id })
+    ).resolves.toMatchObject({ failed: 4 });
+    expect(await redis.zrange(prefix + 'failed', '0', '-1')).toEqual([id]);
+    expect(await redis.zscore(prefix + 'failed', id)).toBe('1');
+    expect(await redis.hgetall(prefix + id)).toEqual(before);
+  });
+
   it('binds both retained job contents and sorted-set scores', async () => {
     const initial = await inspect();
     await fixture.client.hset('bull:worksheet-pdf:failure-1', 'data', '{"changed":true}');

@@ -32,6 +32,7 @@ import {
 } from '../../../../apps/web/src/lib/learning/classes/lifecycle/assessment-unresolved';
 import { SIDEDOOR_STATE_ID } from '../../../../apps/web/src/lib/sidedoor/access/state/store';
 import {
+  readFailedSottoDelivery,
   snapshotFailedSottoDelivery,
   sottoJobOutbox,
 } from '../../../../apps/web/src/lib/sidedoor/jobs/core/job-delivery';
@@ -313,6 +314,7 @@ export async function main(): Promise<void> {
           .strictObject({
             evidence: reviewFirstWorkerEvidenceSchema,
             assessmentFailure: z.uuid().optional(),
+            stitchingFailure: z.uuid().optional(),
             queues: z
               .array(z.string().regex(/^[a-z][a-z0-9-]{0,99}$/))
               .min(1)
@@ -357,6 +359,32 @@ export async function main(): Promise<void> {
               await sottoJobExecutions(database).requireParentDrained(job.job.id, job.fingerprint);
             });
           }
+          if (input.stitchingFailure) {
+            assert.equal(initial.mode, 'retained-single-client');
+            const operationId = input.stitchingFailure;
+            const stitchingQueue = runtime.createQueue('audio-stitching');
+            try {
+              const delivery = await readFailedSottoDelivery({
+                database: prismaUnfiltered,
+                queue: stitchingQueue,
+                operationId,
+                version: 2,
+              });
+              const failed = await stitchingQueue.getJob(operationId);
+              assert.equal(failed?.attemptsMade, delivery.job.delivery.attempts);
+              await prismaUnfiltered.$transaction(async (database) => {
+                await database.$executeRaw`SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY`;
+                const job = await sottoJobOutbox(database).read(operationId);
+                assert(job?.complete && job.delivered && job.fingerprint === delivery.fingerprint);
+                await sottoJobExecutions(database).requireParentDrained(
+                  operationId,
+                  job.fingerprint
+                );
+              });
+            } finally {
+              await stitchingQueue.close();
+            }
+          }
           await verify();
           result = await inspectRetainedReviewRedis(
             redis,
@@ -365,6 +393,7 @@ export async function main(): Promise<void> {
               queues: input.queues,
               failedWorksheetIds: input.evidence.jobs.map((job) => job.id),
               assessmentFailure: input.assessmentFailure,
+              stitchingFailure: input.stitchingFailure,
             },
             verify
           );

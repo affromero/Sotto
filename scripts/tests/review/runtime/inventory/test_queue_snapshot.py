@@ -154,6 +154,32 @@ class PredecessorQueueSnapshotTests(unittest.TestCase):
         self.assertEqual(retained['observation'], observed)
         self.assertEqual(retained['successorEvidenceSha256'], evidence_hash)
 
+    def test_retained_inventory_admits_exact_settled_stitching_only_for_runtime_successors(self) -> None:
+        evidence = {'jobs': [{'id': str(number), 'delivered': True} for number in range(3)]}
+        path = self.path.parent / 'evidence.json'
+        atomic_json(path, evidence)
+        self.successor.attempt.evidence_hash = hashlib.sha256(path.read_bytes()).hexdigest()
+        marker = self.network.fixture.fixture.host / 'unresolved.json'
+        atomic_json(marker, {**private_json(marker),
+                            'evidenceSha256': self.successor.attempt.evidence_hash})
+        job = '845e0948-bca5-4ea2-b40d-589fe3ceec49'
+        self.successor.manifest['retainedStitchingFailure'] = job
+        with self.assertRaisesRegex(ValueError, 'exact-retained-stitching-failure-required'):
+            observe_retained_inventory(self.previous, self.successor)
+        self.successor.manifest['runtimeOnly'] = True
+        self.successor.manifest['predecessor'] = self.previous.attempt.manifest_hash
+        observed = {'server': 'a' * 64, 'fingerprint': 'b' * 64,
+                    'jobsFingerprint': 'c' * 64, 'keys': 16, 'queues': 2,
+                    'completed': 1, 'failed': 4}
+        with patch.object(self.successor, 'runtime_exchange', return_value=observed) as runtime:
+            self.assertEqual(observe_retained_inventory(self.previous, self.successor), observed)
+            runtime.assert_called_once_with(
+                'retained-single-client',
+                {'evidence': evidence, 'queues': ['learning-writing', 'worksheet-pdf'],
+                 'stitchingFailure': job},
+                predecessor=self.previous,
+            )
+
     def paused_flags(self) -> dict[str, object]:
         return {
             **self.original,

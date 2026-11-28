@@ -24,6 +24,7 @@ interface RetainedInput {
   queues: readonly string[];
   failedWorksheetIds: readonly string[];
   assessmentFailure?: string;
+  stitchingFailure?: string;
 }
 
 /**
@@ -110,7 +111,11 @@ export async function inspectRetainedReviewRedis(
     const expected = new Map<string, string>();
     const jobKeys = new Set<string>();
     const failedFound: string[] = [];
-    let assessmentFailureFound = false;
+    const extraFailures = new Map([
+      ['interactions', input.assessmentFailure],
+      ['audio-stitching', input.stitchingFailure],
+    ]);
+    const found = new Set<string>();
     let completedCount = 0;
     for (const queue of queues) {
       const prefix = `bull:${queue}:`;
@@ -143,9 +148,9 @@ export async function inspectRetainedReviewRedis(
           jobKeys.add(jobKey);
           assert(expected.size <= maxKeys, 'Redis key bound exceeded');
           if (state === 'failed') {
-            if (queue === 'interactions' && id === input.assessmentFailure) {
-              assert(!assessmentFailureFound, 'Duplicate retained assessment failure');
-              assessmentFailureFound = true;
+            if (id === extraFailures.get(queue)) {
+              assert(!found.has(queue), 'Duplicate retained queue failure');
+              found.add(queue);
             } else {
               assert.equal(queue, 'worksheet-pdf', 'Unknown failed work');
               failedFound.push(id);
@@ -160,7 +165,11 @@ export async function inspectRetainedReviewRedis(
       }
     }
     assert.deepEqual(failedFound.sort(), failed, 'Failed delivery identities changed');
-    assert.equal(assessmentFailureFound, input.assessmentFailure !== undefined);
+    assert.equal(
+      found.size,
+      [...extraFailures.values()].filter((value) => value !== undefined).length,
+      'Admitted failed delivery is missing'
+    );
     assert.equal(expected.size, keys.size, 'Unexpected or missing Redis keys');
     const records: [string, string, string][] = [];
     let bytes = 0;
@@ -192,7 +201,7 @@ export async function inspectRetainedReviewRedis(
       keys: keys.size,
       queues: queues.length,
       completed: completedCount,
-      failed: failedFound.length + Number(assessmentFailureFound),
+      failed: failedFound.length + found.size,
     };
   }
 
