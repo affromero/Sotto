@@ -6,7 +6,7 @@ Sotto is source-available language-learning infrastructure released under PolyFo
 
 ### Prerequisites
 
-- Node.js 20+
+- Node.js 24+ (see \`package.json\` \`engines\`)
 - Docker and Docker Compose
 - Access to an AI provider and a speech provider, configured after startup in `/welcome` or Admin
 
