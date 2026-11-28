@@ -7,15 +7,17 @@ import tempfile
 import unittest
 from importlib import import_module
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from scripts.deploy.review.runtime.operations import HostOperations
 from scripts.deploy.review.runtime import release
 from scripts.deploy.review.runtime.inventory import storage as module
 from scripts.deploy.review.runtime.inventory.network import verify_retained_network
 from scripts.deploy.review.runtime.inventory.predecessor import (
+    _identity, _stop_binding,
     capture_predecessor, prepare_predecessor_stop,
 )
+from scripts.deploy.review.runtime.inventory.stopped_writer import capture_running_writer
 from scripts.deploy.review.state import Attempt, atomic_json, checksum, private_json
 from scripts.deploy.review.topology import NETWORK, PROJECT, exact_mounts
 
@@ -93,10 +95,10 @@ class CompletedStorageTests(unittest.TestCase):
             mounted[entry['key']] = [stat.st_dev, stat.st_ino]
         return json.dumps({'sources': sources, 'mounted': mounted}).encode()
 
-    def inspect(self, previous=None):
+    def inspect(self, previous=None, *, archived=None):
         return module.inspect_completed_storage(
             self.containers, self.topology, self.original, self.bindings, self.handover,
-            probe=self.probe, previous=previous,
+            probe=self.probe, previous=previous, archived=archived,
         )
 
     def test_absent_original_with_both_mounted_candidates_preserves_roots(self) -> None:
@@ -139,6 +141,72 @@ class CompletedStorageTests(unittest.TestCase):
         self.by_role('web')['Config']['User'] = '0'
         with self.assertRaisesRegex(ValueError, 'storage-candidate-changed'):
             self.inspect()
+
+    def test_archived_writers_require_their_confirmed_stop_and_exact_mounts(self) -> None:
+        proof = self.inspect()
+        lock = Mock()
+        old = Attempt.create(self.root, 'original-release', {'topology': self.topology}, '1' * 64)
+        atomic_json(old.directory / 'state.json', {
+            **old.state(), 'phase': 'COMPLETE', 'status': 'complete', 'sqlMayHaveStarted': True,
+        })
+        receipt = {'source': '2' * 40}
+        startup = {'sourceRoot': str(self.root)}
+        atomic_json(old.directory / 'release-record.json', receipt)
+        atomic_json(old.directory / 'startup-unit.json', startup)
+        atomic_json(old.directory / 'auth-handover.json', self.handover)
+        completed = Attempt.create(self.root, 'completed-release', {
+            'topology': self.topology,
+            'predecessor': {'directory': str(old.directory), 'manifestSha256': old.manifest_hash,
+                            'evidenceSha256': old.evidence_hash, 'releaseSha256': checksum(receipt),
+                            'startupSha256': checksum(startup)},
+        }, '3' * 64)
+        atomic_json(completed.directory / 'state.json', {
+            **completed.state(), 'phase': 'COMPLETE', 'status': 'complete', 'sqlMayHaveStarted': True,
+        })
+        previous = HostOperations(old, lock)
+        current = HostOperations(completed, lock)
+        baseline = {**_identity(previous, current, receipt), 'writers': {}}
+        stops = {}
+        for role, identity in (('web', '4' * 64), ('workers', '5' * 64)):
+            archive = {**copy.deepcopy(self.by_role(role)), 'Id': identity, 'Name': '/archived-' + role}
+            binding = HostOperations.writer_binding(archive)
+            captured = capture_running_writer(archive, binding, role=role)
+            baseline['writers'][role] = captured
+            archive['State'].update({'Status': 'exited', 'Running': False, 'Pid': 0,
+                                     'FinishedAt': '2026-10-26T01:23:00Z'})
+            stops[role] = {**captured, 'finishedAt': archive['State']['FinishedAt'], 'exitCode': 0}
+            atomic_json(old.directory / ('candidate-' + role + '.json'), binding)
+            self.containers.append(archive)
+        for role in ('web', 'workers'):
+            intent = _stop_binding(baseline, role)
+            atomic_json(completed.directory / ('predecessor-stop-intent-' + role + '.json'), intent)
+            atomic_json(completed.directory / ('predecessor-stop-result-' + role + '.json'), {
+                'outcome': 'confirmed', 'intentSha256': checksum(intent), 'stopped': stops[role],
+            })
+        atomic_json(completed.directory / 'predecessor-running.json', baseline)
+        atomic_json(completed.directory / 'predecessor-stopped.json', stops)
+        indexed = {container['Id']: container for container in self.containers}
+        with patch.object(HostOperations, 'verify_tools'):
+            with self.assertRaisesRegex(ValueError, 'physical-review-storage-alias'):
+                self.inspect()
+            archived = module.archived_mounts(current, indexed, self.original)
+            self.assertEqual(self.inspect(archived=archived), proof)
+            foreign = {**copy.deepcopy(archive), 'Id': '6' * 64}
+            self.containers.append(foreign)
+            with self.assertRaisesRegex(ValueError, 'physical-review-storage-alias'):
+                self.inspect(archived=archived)
+            self.containers.remove(foreign)
+            archive['State']['StartedAt'] = '2026-10-26T01:22:12Z'
+            with self.assertRaisesRegex(ValueError, 'predecessor-stop-not-proven'):
+                module.archived_mounts(current, indexed, self.original)
+            archive['State']['StartedAt'] = baseline['writers']['workers']['startedAt']
+            archive['State']['Pid'] = os.getpid()
+            with self.assertRaisesRegex(ValueError, 'archived-review-writer-has-process'):
+                module.archived_mounts(current, indexed, self.original)
+            archive['State']['Pid'] = 0
+            (completed.directory / 'predecessor-stop-result-workers.json').unlink()
+            with self.assertRaises(OSError):
+                module.archived_mounts(current, indexed, self.original)
 
 class CompletedStorageWrapperTests(unittest.TestCase):
     def setUp(self) -> None:
